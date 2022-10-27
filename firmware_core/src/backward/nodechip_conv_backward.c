@@ -240,19 +240,22 @@ static void grad_weight_split(
 
     int isize_pern = DIV_UP(ic, NPU_NUM) * tpu_aligned_feature_size(ih, iw, idtype);
     // split n simply
-    // isize can use 4 banks(if not grad_bias_enable, will be 5)
-    nslice = (grad_bias_enable ? 4 : 5) * LOCAL_BANK_SIZE / isize_pern;
+    // isize can use 9 banks(if not grad_bias_enable, will be 11)
+    unsigned int isize = n * isize_pern;
+    if (isize > (grad_bias_enable ? 9 : 11) * LOCAL_BANK_SIZE)
+        nslice = (grad_bias_enable ? 9 : 11) * LOCAL_BANK_SIZE / isize_pern;
     TPUKERNEL_ASSERT(nslice >= 1);
     secs_info->nsecs = DIV_UP(n, nslice);
-    unsigned int isize = nslice * DIV_UP(ic, NPU_NUM) * tpu_aligned_feature_size(ih, iw, idtype);
+    isize = nslice * DIV_UP(ic, NPU_NUM) * tpu_aligned_feature_size(ih, iw, idtype);
 
     // split kh & kw
-    unsigned int i_bank_size = ALIGN(isize, BANK_SIZE) / LOCAL_BANK_SIZE * 2;
+    unsigned int i_bank_size = ALIGN(isize, BANK_SIZE) / LOCAL_BANK_SIZE;
     unsigned int w_bank_size = LOCAL_MEM_BANKS - i_bank_size - (2 + (grad_bias_enable ? 2 : 0) + 1);
     unsigned int w_coeff = (idtype == DT_FP32 ? ic : ALIGN(ic, 32)) *
                      kernel->h * kernel->w * tpu_data_type_size(idtype);
     int khwslice = w_bank_size / 2 * LOCAL_BANK_SIZE / w_coeff;
     if (khwslice == 0) {
+        ocslice = NPU_NUM;
         int w_coeff_perw = (idtype == DT_FP32 ? ic : ALIGN(ic, 32)) * 1 * kernel->w * tpu_data_type_size(idtype);
         khwslice = w_bank_size / 2 * LOCAL_BANK_SIZE / w_coeff_perw;
         if (khwslice >= 1) {
@@ -264,23 +267,36 @@ static void grad_weight_split(
             if (khwslice == 0) TPUKERNEL_ASSERT(0);
             secs_info->kwsecs = DIV_UP(kw, khwslice);
         }
+    } else {
+      ocslice = w_bank_size / 2 * LOCAL_BANK_SIZE / w_coeff * NPU_NUM;
     }
+    secs_info->ocsecs = DIV_UP(oc, ocslice);
+    unsigned int wsize = DIV_UP(ocslice, NPU_NUM) * (idtype == DT_FP32 ? ic : ALIGN(ic, 32)) * khslice * kwslice * tpu_data_type_size(idtype);
+    w_bank_size = ALIGN(wsize, BANK_SIZE) / LOCAL_BANK_SIZE * 2;
 
+    unsigned int last_ocslice = ocslice;
+
+    unsigned int o_bank_size = LOCAL_MEM_BANKS - i_bank_size - w_bank_size - ((grad_bias_enable ? 2 : 0) + 1);
     //split oc
     int max_size_per_64oc = MAX(nslice * tpu_aligned_feature_size(oh, ow, odtype), tpu_aligned_feature_size(1, 32, idtype));
-    ocslice = LOCAL_BANK_SIZE / max_size_per_64oc;
+    ocslice = MIN(last_ocslice, o_bank_size / 2 * LOCAL_BANK_SIZE / max_size_per_64oc * NPU_NUM);
+    if (ocslice == 0) {
+        // split n secondly
+        nslice = o_bank_size / 2 * LOCAL_BANK_SIZE / tpu_aligned_feature_size(oh, ow, odtype);
+        secs_info->nsecs = DIV_UP(n, nslice);
+        ocslice = MIN(last_ocslice, NPU_NUM);
+    }
     TPUKERNEL_ASSERT(ocslice > 0);
-    ocslice = MIN(oc, ocslice * NPU_NUM);
     secs_info->ocsecs = DIV_UP(oc, ocslice);
 
+    isize = nslice * DIV_UP(ic, NPU_NUM) * tpu_aligned_feature_size(ih, iw, idtype);
+    wsize = DIV_UP(ocslice, NPU_NUM) * (idtype == DT_FP32 ? ic : ALIGN(ic, 32)) * khslice * kwslice * tpu_data_type_size(idtype);
     unsigned int osize = nslice * DIV_UP(ocslice, NPU_NUM) * tpu_aligned_feature_size(oh, ow, odtype);
     unsigned int grad_bias_size = grad_bias_enable ? DIV_UP(ocslice, NPU_NUM) * tpu_aligned_feature_size(1, 1, idtype): 0;
     unsigned int buffer_size = grad_bias_enable ? DIV_UP(ocslice, NPU_NUM) * tpu_aligned_feature_size(1, 32, idtype) : 0;
     buffer_size = MAX(buffer_size, osize);
 
-    int wsize = DIV_UP(ocslice, NPU_NUM) * (idtype == DT_FP32 ? ic : ALIGN(ic, 32)) * khslice * kwslice * tpu_data_type_size(idtype);
-
-    unsigned int total_size = ALIGN(isize, BANK_SIZE) * 2 +
+    unsigned int total_size = ALIGN(isize, BANK_SIZE) +
                               ALIGN(osize, BANK_SIZE) * 2 +
                               ALIGN(wsize, BANK_SIZE) * 2 +
                               ALIGN(grad_bias_size, BANK_SIZE) * 2 +
@@ -433,9 +449,10 @@ void nodechip_weight_reorder(
                                        DIV_UP(64, 32) * kh * kw * 32);//32 * kh * kw;
     TPUKERNEL_ASSERT(kernel_min_size <= (unsigned int)(LOCAL_MEM_SIZE / 4));
     icslice = DIV_UP((unsigned int)(LOCAL_MEM_SIZE / 4), kernel_min_size);
-    icsecs = DIV_UP(ic, icslice);
     ocslice = DIV_UP((unsigned int)(LOCAL_MEM_SIZE / 4),
                         DIV_UP(oc, 64) * ALIGN(DIV_UP(ic, 32) * kh * kw * 32, tpu_eu_num(dtype)));
+
+    icsecs = DIV_UP(ic, icslice);
     ocsecs = DIV_UP(oc, ocslice);
 
     local_addr_t iaddr_ping = 0;
@@ -471,7 +488,7 @@ void nodechip_weight_reorder(
             dim4 dst_shape = {kh * kw,
                               ocslice,
                               DIV_UP(icslice, 32),
-                              icslice >= 32 ? 32 : last_icslice};
+                              icslice >= 32 ? 32 : icslice};
             dim4 src_stride = {32,
                                DIV_UP(ic, 32) * kh * kw * 32,
                                32 * kh * kw,
@@ -479,9 +496,9 @@ void nodechip_weight_reorder(
             tpu_gdma_cpy_S2L(
                 ping ? iaddr_ping : iaddr_pong,
                 weight_global_addr +
-                    ocstart * DIV_UP(ic, 32) * kh * kw * 32 +
-                    last_icstart / 32 * kh * kw * 32 +
-                    last_icstart - last_icstart / 32 * 32,
+                    (ocstart * DIV_UP(ic, 32) * kh * kw * 32 +
+                     icstart / 32 * kh * kw * 32 +
+                     icstart % 32) * tpu_data_type_size(dtype),
                 &dst_shape,
                 NULL,
                 &src_stride,
@@ -494,7 +511,7 @@ void nodechip_weight_reorder(
             parallel_branch = true;
 
             // [kh * kw, oc, DIV_UP(ic, 32), 32] can consider as [kh * kw, oc, 1, ic]
-            dim4 cw_dst_shape = {kh * kw, ic, 1, oc};
+            dim4 cw_dst_shape = {kh * kw, icslice, 1, ocslice};
             // [kh * kw, oc, 1, ic] => [kh * kw, ic, 1, oc]
             if (cw_dst_shape.w <= cw_dst_shape.c) {
                 tpu_bdc_cw_trans(
@@ -523,9 +540,9 @@ void nodechip_weight_reorder(
                                          1};
                 tpu_gdma_cpy_L2S(
                     weight_reordered_global_addr +
-                        last_icstart * DIV_UP(oc, 32) * kh * kw * 32 +
-                        last_ocstart / 32 * kh * kw * 32 +
-                        last_ocstart - last_ocstart / 32 * 32,
+                        (last_icstart * DIV_UP(oc, 32) * kh * kw * 32 +
+                         last_ocstart / 32 * kh * kw * 32 +
+                         last_ocstart % 32) * tpu_data_type_size(dtype),
                     ping ? oaddr_pong : oaddr_ping,
                     &reordered_shape,
                     &reordered_stride,
@@ -550,9 +567,9 @@ void nodechip_weight_reorder(
                                   1};
     tpu_gdma_cpy_L2S(
         weight_reordered_global_addr +
-            last_icstart * DIV_UP(oc, 32) * kh * kw * 32 +
-            last_ocstart / 32 * kh * kw * 32 +
-            last_ocstart - last_ocstart / 32 * 32,
+            (last_icstart * DIV_UP(oc, 32) * kh * kw * 32 +
+             last_ocstart / 32 * kh * kw * 32 +
+             last_ocstart % 32) * tpu_data_type_size(dtype),
         ping ? oaddr_pong : oaddr_ping,
         &last_reordered_shape,
         &last_reordered_stride,
@@ -940,7 +957,7 @@ void nodechip_grad_output_reorder(
 
             // [ic, oc, 1, kh * kw] => [oc, ic, 1, kh * kw]
             dim4 nc_dst_shape = {ocslice, icslice, 1, kh * kw};
-            dim4 src_stride = {kh * kw, oc * kh * kw, kh * kw, 1};
+            dim4 src_stride = {oc * kh * kw, kh * kw, kh * kw, 1};
             tpu_gdma_cpy_nc_trans_S2L(
                 ping ? iaddr_ping : iaddr_pong,
                 grad_out_global_addr +
@@ -979,9 +996,9 @@ void nodechip_grad_output_reorder(
                 dim4 reordered_stride = {DIV_UP(ic, 32) * kh * kw * 32, 32, kh * kw * 32, 1};
                 tpu_gdma_cpy_L2S(
                     grad_out_reordered_global_addr +
-                        last_ocstart * DIV_UP(ic, 32) * kh * kw * 32 +
-                        last_icstart / 32 * kh * kw * 32 +
-                        last_icstart % 32,
+                        (last_ocstart * DIV_UP(ic, 32) * kh * kw * 32 +
+                         last_icstart / 32 * kh * kw * 32 +
+                         last_icstart % 32) * tpu_data_type_size(dtype),
                     ping ? oaddr_pong : oaddr_ping,
                     &reordered_shape,
                     &reordered_stride,
@@ -1003,9 +1020,9 @@ void nodechip_grad_output_reorder(
     dim4 last_reordered_stride = {DIV_UP(ic, 32) * kh * kw * 32, 32, kh * kw * 32, 1};
     tpu_gdma_cpy_L2S(
         grad_out_reordered_global_addr +
-            last_ocstart * DIV_UP(ic, 32) * kh * kw * 32 +
-            last_icstart / 32 * kh * kw * 32 +
-            last_icstart % 32,
+            (last_ocstart * DIV_UP(ic, 32) * kh * kw * 32 +
+             last_icstart / 32 * kh * kw * 32 +
+             last_icstart % 32) * tpu_data_type_size(dtype),
         ping ? oaddr_pong : oaddr_ping,
         &last_reordered_shape,
         &last_reordered_stride,
@@ -1025,12 +1042,18 @@ void nodechip_conv_backward_weight(
     const dim4       *forward_input_shape,
     const dim4       *grad_out_shape,
     const dim2       *forward_kernel,
-    const dim2       *stride,
-    const dim2       *dilation,
+    const dim2       *forward_stride,
+    const dim2       *forward_dilation,
     const padding_t  *pad,
     bool             grad_bias_enable
  ) {
     const data_type_t idtype = DT_FP16, odtype = DT_FP16;
+
+    dim2 stride, dilation;
+    stride.h = forward_dilation->h;
+    stride.w = forward_dilation->w;
+    dilation.h = forward_stride->h;
+    dilation.w = forward_stride->w;
 
     int n = forward_input_shape->c;
     int ic = forward_input_shape->n;
@@ -1041,14 +1064,14 @@ void nodechip_conv_backward_weight(
     int ow = forward_kernel->w;
     int kh = grad_out_shape->h;
     int kw = grad_out_shape->w;
-    int kh_ext = dilation->h * (kh - 1) + 1;
-    int kw_ext = dilation->w * (kw - 1) + 1;
-    int ih_ext = (ih - 1) + pad->top + pad->bottom + 1;
-    int iw_ext = (iw - 1) + pad->left + pad->right + 1;
-    int output_h = (ih_ext - kh_ext) / stride->h + 1;
-    int output_w = (iw_ext - kw_ext) / stride->w + 1;
-    TPUKERNEL_ASSERT(output_h == oh);
-    TPUKERNEL_ASSERT(output_w == ow);
+    int kh_ext = dilation.h * (kh - 1) + 1;
+    int kw_ext = dilation.w * (kw - 1) + 1;
+    //int ih_ext = (ih - 1) + pad->top + pad->bottom + 1;
+    //int iw_ext = (iw - 1) + pad->left + pad->right + 1;
+    //int output_h = (ih_ext - kh_ext) / stride->h + 1;
+    //int output_w = (iw_ext - kw_ext) / stride->w + 1;
+    //TPUKERNEL_ASSERT(output_h == oh);
+    //TPUKERNEL_ASSERT(output_w == ow);
 
     dim4 ishape = {n, ic, ih, iw};
     dim4 oshape = {n, oc, oh, ow};
@@ -1062,8 +1085,8 @@ void nodechip_conv_backward_weight(
             &oshape,
             groups,
             &kernel,
-            dilation,
-            stride,
+            &dilation,
+            &stride,
             idtype,
             odtype,
             grad_bias_enable,
@@ -1076,10 +1099,10 @@ void nodechip_conv_backward_weight(
     ocslice = secs_info.ocsecs > 1 ? ALIGN(ocslice, NPU_NUM) : ocslice;
     int khslice = DIV_UP(kh, secs_info.khsecs);
     int kwslice = DIV_UP(kw, secs_info.kwsecs);
-    kh_ext = dilation->h * (kh - 1) + 1;
-    kw_ext = dilation->w * (kw - 1) + 1;
-    int ihslice = MIN((oh - 1) * stride->h + kh_ext, ishape.h);
-    int iwslice = MIN((ow - 1) * stride->w + kw_ext, ishape.w);
+    kh_ext = dilation.h * (kh - 1) + 1;
+    kw_ext = dilation.w * (kw - 1) + 1;
+    int ihslice = MIN((oh - 1) * stride.h + kh_ext, ishape.h);
+    int iwslice = MIN((ow - 1) * stride.w + kw_ext, ishape.w);
     TPUKERNEL_DBG("nsecs=%d  nslice=%d\n", secs_info.nsecs, nslice);
     TPUKERNEL_DBG("ocsecs=%d  ocslice=%d\n", secs_info.ocsecs, ocslice);
     TPUKERNEL_DBG("khsecs=%d  khslice=%d\n", secs_info.khsecs, khslice);
@@ -1099,13 +1122,12 @@ void nodechip_conv_backward_weight(
     local_addr_t waddr_ping = ALIGN(iaddr + isize, BANK_SIZE);
     local_addr_t waddr_pong = ALIGN(waddr_ping + wsize, BANK_SIZE);
     if (!split_kernel) waddr_pong = waddr_ping;
-    local_addr_t oaddr_ping = ALIGN(waddr_pong + isize, BANK_SIZE);
+    local_addr_t oaddr_ping = ALIGN(waddr_pong + wsize, BANK_SIZE);
     local_addr_t oaddr_pong = ALIGN(oaddr_ping + osize, BANK_SIZE);
-    local_addr_t buffer_addr = ALIGN(oaddr_pong + buffer_size, BANK_SIZE);
+    local_addr_t buffer_addr = ALIGN(oaddr_pong + osize, BANK_SIZE);
     TPUKERNEL_ASSERT(buffer_addr + buffer_size <= (unsigned int)LOCAL_MEM_SIZE);
     local_addr_t grad_bias_addr_ping = grad_bias_enable ? ALIGN(buffer_addr + buffer_size, BANK_SIZE) : 0;
     local_addr_t grad_bias_addr_pong = grad_bias_enable ? ALIGN(grad_bias_addr_ping + grad_bias_size, BANK_SIZE) : 0;
-    TPUKERNEL_ASSERT(buffer_addr + buffer_size <= (unsigned int)LOCAL_MEM_SIZE);
     if (grad_bias_enable)
         TPUKERNEL_ASSERT(grad_bias_addr_pong + grad_bias_size <= (unsigned int)LOCAL_MEM_SIZE);
 
@@ -1120,12 +1142,6 @@ void nodechip_conv_backward_weight(
         TPUKERNEL_DBG("grad_bias ping local addr = 0x%5x, bank id = %d\n", grad_bias_addr_pong, grad_bias_addr_pong / BANK_SIZE);
     }
 
-    // input nc_trans cpy
-    dim4 istride = {
-        ishape.n * ishape.h * ishape.w,
-        ishape.h * ishape.w,
-        ishape.w,
-        1};
     dim4 ostride = {
         oshape.c * oshape.h * oshape.w,
         oshape.c * oshape.w,
@@ -1199,17 +1215,17 @@ void nodechip_conv_backward_weight(
             nslice = ishape.n / secs_info.nsecs + ((ishape.n % secs_info.nsecs) > nidx);
             nend = nstart + nslice;
 
-            dim4 input_nc_shape = {nslice, ic, ih, iw};
+            dim4 input_nc_trans_shape = {ic, nslice, ih, iw};
             tpu_gdma_cpy_nc_trans_S2L(
                     iaddr,
                     input_global_addr +
-                        (gidx * ic * istride.n +
-                         nstart * istride.c +
-                         ih * istride.h +
+                        (nstart * ic * ih * iw +
+                         gidx * ic * ih * iw +
+                         ih * iw +
                          iw) * tpu_data_type_size(idtype),
-                    &input_nc_shape,
+                    &input_nc_trans_shape,
                     NULL,
-                    &istride,
+                    NULL,
                     idtype);
 
             bool parallel_branch = false;
@@ -1250,17 +1266,17 @@ void nodechip_conv_backward_weight(
                             ping ? waddr_ping : waddr_pong,
                             weight_global_addr +
                                 ((gidx * oc + ocstart) * wstride.c +
-                                 (ic * kh * kw + khstart * kw + kwstart) * (idtype == DT_FP32 ? 1 : 32)) * tpu_data_type_size(idtype),
+                                 (khstart * kw + kwstart) * (idtype == DT_FP32 ? 1 : 32)) * tpu_data_type_size(idtype),
                             &wslice_shape,
                             &wslice_stride,
                             &wstride,
                             idtype);
 
-                        kh_ext = dilation->h * (kh - 1) + 1;
-                        kw_ext = dilation->w * (kw - 1) + 1;
+                        kh_ext = dilation.h * (kh - 1) + 1;
+                        kw_ext = dilation.w * (kw - 1) + 1;
                         padding_t pad_slice;
                         int ihstart = khstart;
-                        int ihend = (oh - 1) * stride->h + kh_ext - pad->top;
+                        int ihend = (oh - 1) * stride.h + kh_ext - pad->top;
                         pad_slice.top = ihstart < 0 ? -ihstart : 0;
                         pad_slice.bottom = ihend > ishape.h ? ihend - ishape.h : 0;
                         ihstart = ihstart < 0 ? 0 : ihstart;
@@ -1268,7 +1284,7 @@ void nodechip_conv_backward_weight(
                         ihslice = ihend - ihstart;
 
                         int iwstart = kwstart;
-                        int iwend = (ow - 1) * stride->w + kw_ext - pad->left;
+                        int iwend = (ow - 1) * stride.w + kw_ext - pad->left;
                         pad_slice.left = iwstart < 0 ? -iwstart : 0;
                         pad_slice.right = iwend > ishape.w ? iwend - ishape.w : 0;
                         iwstart = iwstart < 0 ? 0 : iwstart;
@@ -1297,8 +1313,8 @@ void nodechip_conv_backward_weight(
                                 oslice_shape.c,
                                 &kernel_slice,
                                 &pad_slice,
-                                stride,
-                                dilation,
+                                &stride,
+                                &dilation,
                                 odtype,
                                 idtype,
                                 false,
@@ -1347,6 +1363,7 @@ void nodechip_conv_backward_weight(
                                 &pooling_dilation,
                                 idtype,
                                 tpu_cast(scale, idtype, DT_FP32, RM_HALF_AWAY_FROM_ZERO));
+                            grad_bias_shape.w = 1;
                             if (khidx != 0 || kwidx != 0)
                                 tpu_bdc_fp_add(
                                     ping ? grad_bias_addr_ping : grad_bias_addr_pong,
