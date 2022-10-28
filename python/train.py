@@ -2,6 +2,7 @@
 #https://blog.csdn.net/weixin_52527544/article/details/127129303
 
 # database
+#http://wjhsh.net/hmlovetech-p-14409886.html
 #https://github.com/pytorch/examples/blob/main/imagenet/extract_ILSVRC.sh
 
 #train with extend ops
@@ -23,11 +24,11 @@ from resnet50 import resnet50
 
 save_dir='./resnet50/'
 
-train_dir='./dataset/train/'
+train_dir='./dataset/train_1/'
 test_dir='./dataset/test/'
 net_name='resnet50'
 
-batch_size = 64
+batch_size = 1#64
 epochs=30
 lr=0.001
 
@@ -60,9 +61,7 @@ train_loader = DataLoader(train_dataset,
 net=models.resnet50(pretrained=True)
 model_dict = net.state_dict()
 
-#model=ResNet()
 model=ResNet(block=Bottleneck, block_num=[3, 4, 6, 3], num_classes=1000)
-#model=resnet50
 model.load_state_dict(model_dict)
 
 model.to(device)
@@ -135,5 +134,4 @@ for epoch in range(epochs):
 print("=================================Training Finished==================================")
 print(train_acc_list)
 #print(test_acc_list)
-
 

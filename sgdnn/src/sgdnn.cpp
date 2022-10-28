@@ -9,8 +9,8 @@
 // pybind11 register c++ half-precision floating point as numpy.float16
 // https://github.com/pybind/pybind11/issues/1776
 
-#include <pybind11/embed.h>
-#include <pybind11/eval.h>
+//#include <pybind11/embed.h>
+//#include <pybind11/eval.h>
 #include <pybind11/numpy.h>
 #include <pybind11/pybind11.h>
 

@@ -12,9 +12,13 @@ import math
 import numpy as np
 
 import torch
+import torch.nn as nn
 import torch.nn.functional as F
+
+from torch import Tensor
 from torch.autograd import Function
 from torch.nn.modules.utils import _single, _pair, _triple, _quadruple
+from typing import Optional, List, Tuple, Union
 
 sys.path.append(r"./build/sgdnn")
 import sgdnn

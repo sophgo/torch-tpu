@@ -6,9 +6,6 @@ import math
 import torch
 import torch.nn as nn
 
-from torch import Tensor
-from typing import Optional, List, Tuple, Union
-
 from tpu_ops import tpu_conv2d
 
 # todo Bottleneck
