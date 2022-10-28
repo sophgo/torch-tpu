@@ -70,7 +70,7 @@ class Conv2dFunc(Function):
         ic = weight.shape[1]
         kh = weight.shape[2]
         kw = weight.shape[3]
-        weight_32IC = torch.zeros((oc * math.ceil(ic / 32) * kh * kw * 32,), dtype = torch.float16)
+        weight_32IC = torch.zeros((oc * math.ceil(ic / 32) * kh * kw * 32,))
         for oc_idx in range(oc):
             for ic_idx in range(math.ceil(ic / 32)):
                 for k_idx in range(kh * kw):
