@@ -69,6 +69,7 @@ class ResNet(nn.Module):
         super(ResNet, self).__init__()
         self.in_channel = 64    # conv1的输出维度
 
+        #self.conv1 = nn.Conv2d(in_channels=3, out_channels=self.in_channel, kernel_size=7, stride=2, padding=3, bias=False)     # H/2,W/2。C:3->64
         self.conv1 = tpu_conv2d(in_channels=3, out_channels=self.in_channel, kernel_size=7, stride=2, padding=3, bias=False)     # H/2,W/2。C:3->64
         self.bn1 = nn.BatchNorm2d(self.in_channel)
         self.relu = nn.ReLU(inplace=True)

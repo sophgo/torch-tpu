@@ -195,12 +195,6 @@ PYBIND11_MODULE(sgdnn, m)
                             bias_grad_enable,
                             (sg_data_type_t)1);
 
-        // debug
-        //std::cout<<(fp16_to_fp32(grad_input_fp16[0])).fval<< endl;
-        //std::cout<<(fp16_to_fp32(grad_input_fp16[1])).fval<< endl;
-        //std::cout<<(fp16_to_fp32(grad_input_fp16[2])).fval<< endl;
-        //std::cout<<(fp16_to_fp32(grad_input_fp16[3])).fval<< endl;
-
         UNUSED(status);
         //assert(status == BM_SUCCESS);
         bm_dev_free(handle);

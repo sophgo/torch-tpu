@@ -1,6 +1,6 @@
 project(SGDNN CXX)
 
-add_subdirectory(../pybind11 ${CMAKE_CURRENT_SOURCE_DIR})
+add_subdirectory(${PROJECT_ROOT}/third_party/include/pybind11 ${CMAKE_CURRENT_SOURCE_DIR})
 
 include(${PROJECT_ROOT}/toolchain-cmodel.cmake)
 
