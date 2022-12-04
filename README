@@ -1,4 +1,0 @@
-source scripts/envsetup.sh
-rebuila_all
-cmodel:
-  set_cmodel_firmware ./build/firmware_core/libfirmware_cmodel.so

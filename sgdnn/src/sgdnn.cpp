@@ -3,8 +3,11 @@
 #include <assert.h>
 #include <memory>
 #include <string.h>
-#include "sg_stas_gen_util.h"
 #include "sg_fp16.h"
+
+#ifdef USING_CMODEL
+#include "sg_stas_gen_util.h"
+#endif
 
 // pybind11 register c++ half-precision floating point as numpy.float16
 // https://github.com/pybind/pybind11/issues/1776
