@@ -7,7 +7,6 @@
 #include <string.h>
 #include <stdlib.h>
 #include <math.h>
-#include "memmap.h"
 #include "op_code.h"
 #include "common_def.h"
 

@@ -1,4 +1,3 @@
-#include "config.h"
 #include "common.h"
 #include "sg_api_struct.h"
 #include "common_def.h"
@@ -242,49 +241,49 @@ static void grad_weight_split(
     // split n simply
     // isize can use 9 banks(if not grad_bias_enable, will be 11)
     unsigned int isize = n * isize_pern;
-    if (isize > (grad_bias_enable ? 9 : 11) * LOCAL_BANK_SIZE)
-        nslice = (grad_bias_enable ? 9 : 11) * LOCAL_BANK_SIZE / isize_pern;
+    if (isize > (unsigned int)((grad_bias_enable ? 9 : 11) * BANK_SIZE))
+        nslice = (grad_bias_enable ? 9 : 11) * BANK_SIZE / isize_pern;
     TPUKERNEL_ASSERT(nslice >= 1);
     secs_info->nsecs = DIV_UP(n, nslice);
     isize = nslice * DIV_UP(ic, NPU_NUM) * tpu_aligned_feature_size(ih, iw, idtype);
 
     // split kh & kw
-    unsigned int i_bank_size = ALIGN(isize, BANK_SIZE) / LOCAL_BANK_SIZE;
+    unsigned int i_bank_size = ALIGN(isize, BANK_SIZE) / BANK_SIZE;
     unsigned int w_bank_size = LOCAL_MEM_BANKS - i_bank_size - (2 + (grad_bias_enable ? 2 : 0) + 1);
     unsigned int w_coeff = (idtype == DT_FP32 ? ic : ALIGN(ic, 32)) *
                      kernel->h * kernel->w * tpu_data_type_size(idtype);
-    int khwslice = w_bank_size / 2 * LOCAL_BANK_SIZE / w_coeff;
+    int khwslice = w_bank_size / 2 * BANK_SIZE / w_coeff;
     if (khwslice == 0) {
         ocslice = NPU_NUM;
         int w_coeff_perw = (idtype == DT_FP32 ? ic : ALIGN(ic, 32)) * 1 * kernel->w * tpu_data_type_size(idtype);
-        khwslice = w_bank_size / 2 * LOCAL_BANK_SIZE / w_coeff_perw;
+        khwslice = w_bank_size / 2 * BANK_SIZE / w_coeff_perw;
         if (khwslice >= 1) {
             khslice = khwslice;
             secs_info->khsecs = DIV_UP(kh, khslice);
         } else {
             int w_coeff_min = (idtype == DT_FP32 ? ic : ALIGN(ic, 32)) * 1 * 1 * tpu_data_type_size(idtype);
-            khwslice = w_bank_size / 2 * LOCAL_BANK_SIZE / w_coeff_min;
+            khwslice = w_bank_size / 2 * BANK_SIZE / w_coeff_min;
             if (khwslice == 0) TPUKERNEL_ASSERT(0);
             secs_info->kwsecs = DIV_UP(kw, khwslice);
         }
     } else {
-      ocslice = w_bank_size / 2 * LOCAL_BANK_SIZE / w_coeff * NPU_NUM;
+      ocslice = w_bank_size / 2 * BANK_SIZE / w_coeff * NPU_NUM;
     }
     secs_info->ocsecs = DIV_UP(oc, ocslice);
     unsigned int wsize = DIV_UP(ocslice, NPU_NUM) * (idtype == DT_FP32 ? ic : ALIGN(ic, 32)) * khslice * kwslice * tpu_data_type_size(idtype);
-    w_bank_size = ALIGN(wsize, BANK_SIZE) / LOCAL_BANK_SIZE * 2;
+    w_bank_size = ALIGN(wsize, BANK_SIZE) / BANK_SIZE * 2;
 
     unsigned int last_ocslice = ocslice;
 
     unsigned int o_bank_size = LOCAL_MEM_BANKS - i_bank_size - w_bank_size - ((grad_bias_enable ? 2 : 0) + 1);
     //split oc
     int max_size_per_64oc = MAX(nslice * tpu_aligned_feature_size(oh, ow, odtype), tpu_aligned_feature_size(1, 32, idtype));
-    ocslice = MIN(last_ocslice, o_bank_size / 2 * LOCAL_BANK_SIZE / max_size_per_64oc * NPU_NUM);
+    ocslice = MIN(last_ocslice, o_bank_size / 2 * BANK_SIZE / max_size_per_64oc * NPU_NUM);
     if (ocslice == 0) {
         // split n secondly
-        nslice = o_bank_size / 2 * LOCAL_BANK_SIZE / tpu_aligned_feature_size(oh, ow, odtype);
+        nslice = o_bank_size / 2 * BANK_SIZE / tpu_aligned_feature_size(oh, ow, odtype);
         secs_info->nsecs = DIV_UP(n, nslice);
-        ocslice = MIN(last_ocslice, NPU_NUM);
+        ocslice = MIN(last_ocslice, (unsigned int)NPU_NUM);
     }
     TPUKERNEL_ASSERT(ocslice > 0);
     secs_info->ocsecs = DIV_UP(oc, ocslice);
@@ -456,9 +455,9 @@ void nodechip_weight_reorder(
     ocsecs = DIV_UP(oc, ocslice);
 
     local_addr_t iaddr_ping = 0;
-    local_addr_t iaddr_pong = 4 * LOCAL_BANK_SIZE;
-    local_addr_t oaddr_ping = 8 * LOCAL_BANK_SIZE;
-    local_addr_t oaddr_pong = 12 * LOCAL_BANK_SIZE;
+    local_addr_t iaddr_pong = 4 * BANK_SIZE;
+    local_addr_t oaddr_ping = 8 * BANK_SIZE;
+    local_addr_t oaddr_pong = 12 * BANK_SIZE;
 
     bool ping = true;
     bool parallel_branch = false;
@@ -896,13 +895,13 @@ void nodechip_grad_output_reorder(
     int ocslice = oc;
     int icslice = ic;
 
-    TPUKERNEL_ASSERT(ALIGN(kh * kw, tpu_eu_num(dtype)) <= 4 * LOCAL_BANK_SIZE);
-    TPUKERNEL_ASSERT(DIV_UP(kh * kw, NPU_NUM) * ALIGN(1 * 1, tpu_eu_num(dtype)) <= 4 * LOCAL_BANK_SIZE);
+    TPUKERNEL_ASSERT(ALIGN(kh * kw, tpu_eu_num(dtype)) <= 4 * BANK_SIZE);
+    TPUKERNEL_ASSERT(DIV_UP(kh * kw, NPU_NUM) * ALIGN(1 * 1, tpu_eu_num(dtype)) <= 4 * BANK_SIZE);
 
     unsigned int ic_size = DIV_UP(ic, NPU_NUM) * tpu_aligned_feature_size(kh, kw, dtype);
     unsigned int ic_size_cwtrans = DIV_UP(kh * kw, NPU_NUM) * tpu_aligned_feature_size(1, ic, dtype);
     unsigned int max_ic_size = MAX(ic_size, ic_size_cwtrans);
-    int slice = (unsigned int)(4 * LOCAL_BANK_SIZE) / max_ic_size;
+    int slice = (unsigned int)(4 * BANK_SIZE) / max_ic_size;
     if (slice == 0) {
         bool valid = false;
         while (!valid) {
@@ -911,7 +910,7 @@ void nodechip_grad_output_reorder(
             ic_size = DIV_UP(icslice, NPU_NUM) * tpu_aligned_feature_size(kh , kw, dtype);
             ic_size_cwtrans = DIV_UP(kh * kw, NPU_NUM) * tpu_aligned_feature_size(1, icslice, dtype);
             max_ic_size = MAX(ic_size, ic_size_cwtrans);
-            valid = (unsigned int)(4 * LOCAL_BANK_SIZE) / max_ic_size > 0;
+            valid = (unsigned int)(4 * BANK_SIZE) / max_ic_size > 0;
         }
         ocslice = 1;
         ocsecs = oc;
@@ -928,9 +927,9 @@ void nodechip_grad_output_reorder(
     }
 
     local_addr_t iaddr_ping = 0;
-    local_addr_t iaddr_pong = 4 * LOCAL_BANK_SIZE;
-    local_addr_t oaddr_ping = 8 * LOCAL_BANK_SIZE;
-    local_addr_t oaddr_pong = 12 * LOCAL_BANK_SIZE;
+    local_addr_t iaddr_pong = 4 * BANK_SIZE;
+    local_addr_t oaddr_ping = 8 * BANK_SIZE;
+    local_addr_t oaddr_pong = 12 * BANK_SIZE;
 
     bool ping = true;
     bool parallel_branch = false;
