@@ -31,5 +31,24 @@ typedef struct {
 } sg_api_conv_backward_t;
 #endif
 
+typedef struct{
+    unsigned long long grad_output_global_addr;
+    unsigned long long input_global_addr;
+    unsigned long long weight_global_addr;
+    unsigned long long saved_mean_global_addr;
+    unsigned long long saved_invstd_global_addr;
+    unsigned long long grad_input_global_addr;
+    unsigned long long grad_weight_global_addr;
+    unsigned long long grad_bias_global_addr;
+    int                shape[4];
+    int                grad_input_enable;
+    int                grad_weight_enable;
+    int                grad_bias_enable;
+#ifndef WIN32
+} __attribute__((packed)) sg_api_batchnorm_backward_t;
+#else
+} sg_api_batchnorm_backward_t;
+#endif
+
 #pragma pack(pop)
 #endif  // SG_API_STRUCT_H
