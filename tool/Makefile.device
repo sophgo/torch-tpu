@@ -56,9 +56,11 @@ ARM_OBJDUMP := $(ARM_CROSS_COMPILE)objdump
 src_dir    ?= device
 output_dir ?= build
 firmware ?= bm1684x.bin
-TPU_KERNEL_INC := -I$(TPUKERNEL_TOP)/include
-TPU_KERNEL_INC += -I$(TPUKERNEL_TOP)/include/device
-TPU_KERNEL_LIB := -L$(TPUKERNEL_TOP)/lib/ -lbm1684x
+#TPU_KERNEL_INC := -I$(TPUKERNEL_TOP)/include
+#TPU_KERNEL_INC += -I$(TPUKERNEL_TOP)/include/device
+#TPU_KERNEL_LIB := -L$(TPUKERNEL_TOP)/lib/ -lbm1684x
+TPU_KERNEL_INC := -I$(TRAIN_TOP)/common/include
+TPU_KERNEL_LIB := -L$(TRAIN_TOP)/third_party/lib/ -lbm1684x
 TPU_KERNEL_LINK := target-ram.lds
 c_src   = $(wildcard $(src_dir)/*.c)
 c_exe1  = $(patsubst $(src_dir)/%.c, %, $(c_src))
@@ -86,3 +88,4 @@ $(firmware): $(c_objs)
 clean:
 	rm -rf $(output_dir)
 	rm $(firmware)
+
