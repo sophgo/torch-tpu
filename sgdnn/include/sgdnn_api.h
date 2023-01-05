@@ -41,8 +41,28 @@ bm_status_t sgdnn_conv_backward(
     bool               bias_need_grad,
     sg_data_type_t     dtype);
 
+bm_status_t sgdnn_batchnorm_backward(
+    bm_handle_t        handle,
+    bm_device_mem_t    grad_output,
+    bm_device_mem_t    input,
+    bm_device_mem_t    weight,
+    bm_device_mem_t    mean,
+    bm_device_mem_t    invstd,
+    bm_device_mem_t    grad_input,
+    bm_device_mem_t    grad_weight,
+    bm_device_mem_t    grad_bias,
+    int                n,  
+    int                c,  
+    int                h,  
+    int                w,
+    bool               input_need_grad,
+    bool               weight_need_grad,
+    bool               bias_need_grad,
+    sg_data_type_t     dtype);
+    
 #if defined(__cplusplus)
 }
 #endif
 
 #endif /* SGDNN_API_H */
+
