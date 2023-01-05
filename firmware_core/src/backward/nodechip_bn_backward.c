@@ -37,7 +37,8 @@ typedef struct{
  *  | c_param = 3 * (1,c,1,1) | c_param = 5 * (1,c,1,1) | c_param = 5 * (1,c,1,1) |
  *  | buffer1 = (1,c,1,1)     | buffer1 = (1,c,1,1)     |                         |
  *  | buffer2 = (1,c,n,1)     | buffer2 = (1,c,n,1)     |                         |
- *  -------------------------------------------------------------------------------
+ *  | buffer3 = (1,c,n,hw)    | buffer3 = (1,c,n,hw)    |                         |
+ * -------------------------------------------------------------------------------
 */
 
 static inline bool is_local_mem_enough(
@@ -47,9 +48,12 @@ static inline bool is_local_mem_enough(
     int mode,
     data_type_t dtype)
 {
-    int c_param_size = ALIGN(DIV_UP(c, NPU_NUM) * tpu_data_type_size(dtype),4);
-    int param_size = n * DIV_UP(c,NPU_NUM) * tpu_aligned_feature_size(hw, 1, dtype);
-    int buffer_size = n==1 ? DIV_UP(c,NPU_NUM) * 64 : DIV_UP(c,NPU_NUM) * (tpu_aligned_feature_size(n, 1, dtype) + 64);
+    int c_param_size = ALIGN(DIV_UP(c, NPU_NUM) * tpu_data_type_size(dtype), 4);
+    int param_size = n * DIV_UP(c, NPU_NUM) * tpu_aligned_feature_size(hw, 1, dtype);
+    int buffer_size1 = DIV_UP(c,NPU_NUM) * 64;
+    int buffer_size2 = n == 1 ? 0 : DIV_UP(c,NPU_NUM) * tpu_aligned_feature_size(n, 1, DT_FP32);
+    int buffer_size3 = dtype == DT_FP32 ? 0 : n * DIV_UP(c,NPU_NUM) * tpu_aligned_feature_size(hw, 1, DT_FP32);
+    int buffer_size = buffer_size1 + buffer_size2 + buffer_size3;
     // mode 0 : split c
     // mode 1 : split hw first loop
     // mode 2 : split hw second loop
@@ -62,6 +66,78 @@ static inline bool is_local_mem_enough(
                                ALIGN(c_param_size * 4, BANK_SIZE) +
                                ALIGN(param_size, BANK_SIZE) * 2;
     return total_size < LOCAL_MEM_SIZE;
+}
+
+void pooling_fp16_to_fp32(
+    local_addr_t pooling_addr,
+    local_addr_t pooling_fp32,
+    local_addr_t pooling_buffer1,
+    local_addr_t pooling_buffer2,
+    dim4 input_shape,
+    dim4 pooling_shape,
+    data_type_t dtype)
+{
+    dim4 cshape = {
+        .n = 1,
+        .c = input_shape.c,
+        .h = 1,
+        .w = 1};
+    dim4 compact_stride;
+    dim4 aligned_stride;
+    dim4 local_stride;
+    tpu_compact_stride(&compact_stride, 0, &cshape);
+    tpu_aligned_stride(&aligned_stride, 0, &input_shape, dtype);
+    tpu_aligned_stride(&local_stride, 0, &input_shape, DT_FP32);
+    if(input_shape.c > NPU_NUM)
+    {
+        local_stride.n = local_stride.c;
+        local_stride.c *= input_shape.n;
+    }
+    scalar_t scale = {.f32 = 1.};
+    dim2 pooling_kernel = {1, pooling_shape.w};
+    dim2 pooling_stride = {1, 1};
+    dim2 pooling_dilation = {1, 1};
+    padding_t pooling_padding = {0, 0, 0, 0};
+    if(dtype!=DT_FP32)
+    {
+        tpu_bdc_cast(
+            pooling_fp32,
+            pooling_addr,
+            &input_shape,
+            &local_stride,
+            &aligned_stride,
+            DT_FP32,
+            dtype,
+            0);
+    }
+    // {1,c,n,hw} to {1,c,n,1}
+    tpu_bdc_fp_avg_pool2d(
+        pooling_buffer1,
+        dtype == DT_FP32 ? pooling_addr : pooling_fp32,
+        &pooling_shape,
+        &pooling_kernel,
+        &pooling_padding,
+        &pooling_stride,
+        &pooling_dilation,
+        DT_FP32,
+        scale);
+    if(input_shape.n>1)
+    {
+        pooling_shape.w = 1;
+        pooling_kernel.w = 1;
+        pooling_kernel.h = pooling_shape.h;
+        // {1,c,n,1} to {1,c,1,1}
+        tpu_bdc_fp_avg_pool2d(
+            pooling_buffer2,
+            pooling_buffer1,
+            &pooling_shape,
+            &pooling_kernel,
+            &pooling_padding,
+            &pooling_stride,
+            &pooling_dilation,
+            DT_FP32,
+            scale);
+    }
 }
 
 void bn_backward_split_c(
@@ -92,57 +168,73 @@ void bn_backward_split_c(
         .c = csecs,
         .h = 1,
         .w = 1};
+    dim4 pooling_shape = {
+        .n = 1,
+        .c = csecs,
+        .h = n,
+        .w = ALIGN(h * w, tpu_eu_num(DT_FP32))};
     int c_param_size = ALIGN(DIV_UP(csecs, NPU_NUM) * tpu_data_type_size(dtype),4);
     int param_size = n * DIV_UP(csecs, NPU_NUM) * tpu_aligned_feature_size(h, w, dtype);
     int buffer_size1 = DIV_UP(csecs, NPU_NUM) * 64; 
-    int buffer_size2 = n == 1 ? 0 : DIV_UP(csecs, NPU_NUM) * tpu_aligned_feature_size(n, 1, dtype);
+    int buffer_size2 = n == 1 ? 0 : DIV_UP(csecs, NPU_NUM) * tpu_aligned_feature_size(n, 1, DT_FP32);
+    int buffer_size3 = dtype == DT_FP32 ? 0 : n * DIV_UP(csecs, NPU_NUM) * tpu_aligned_feature_size(h, w, DT_FP32);
+    
     //param (1,c,1,1) compact
     local_addr_t weight_local_addr = 0;
     local_addr_t invstd_local_addr = weight_local_addr + c_param_size;
     local_addr_t mean_local_addr = invstd_local_addr + c_param_size;
     local_addr_t grad_bias_local_addr = invstd_local_addr;
     local_addr_t grad_weight_local_addr = mean_local_addr;
-    //param (1,c,n,1) aligned
+    //param (1,c,1,1)+(1,c,n,1)+(1,c,n,hw) aligned
     local_addr_t pooling_buffer1 = ALIGN(c_param_size * 3, BANK_SIZE);
     local_addr_t pooling_buffer2 = pooling_buffer1 + buffer_size2;
+    local_addr_t pooling_fp32 = pooling_buffer1 + buffer_size1 + buffer_size2;
     //param (n,c,h,w) aligned
-    local_addr_t input_local_addr = pooling_buffer1 + ALIGN(buffer_size1 + buffer_size2, BANK_SIZE);
+    local_addr_t input_local_addr = pooling_buffer1 + ALIGN(buffer_size1 + buffer_size2 + buffer_size3, BANK_SIZE);
     local_addr_t grad_output_local_addr = input_local_addr + ALIGN(param_size, BANK_SIZE);
     local_addr_t prod_local_addr = grad_output_local_addr + ALIGN(param_size, BANK_SIZE);
 
-    dim4 aligned_stride;
-    dim4 global_stride;
     dim4 compact_stride;
-    tpu_aligned_stride(&aligned_stride, 0, &input_shape, dtype);
-    tpu_continuous_stride(&global_stride ,&ori_shape);
+    dim4 aligned_stride;
+    dim4 local_stride;
+    dim4 global_stride;
     tpu_compact_stride(&compact_stride, 0, &cshape);
-    dim4 local_stride = aligned_stride;
+    tpu_aligned_stride(&aligned_stride, 0, &input_shape, dtype);
+    tpu_aligned_stride(&local_stride, 0, &input_shape, DT_FP32);
+    tpu_continuous_stride(&global_stride ,&ori_shape);
+    scalar_t scale = {.f32 = 0};  
     if(csecs > NPU_NUM)
     {
         local_stride.n = local_stride.c;
         local_stride.c *= n;
     }
-    scalar_t scale = {.f32 = 0};
-    dim4 pooling_shape = {1, csecs, n, ALIGN(h * w, tpu_eu_num(dtype))};
-    dim2 pooling_kernel = {1, pooling_shape.w};
-    dim2 pooling_stride = {1, 1};
-    dim2 pooling_dilation = {1, 1};
-    padding_t pooling_padding = {0, 0, 0, 0};    
-    if((h * w) % (tpu_eu_num(dtype)))
+    if((h * w) % (tpu_eu_num(DT_FP32)))
     {
         tpu_parallel_start();
-        tpu_bdc_set_C(
-            grad_output_local_addr,
-            tpu_cast(scale, dtype, DT_FP32, RM_HALF_AWAY_FROM_ZERO),
-            &pooling_shape,
-            NULL,
-            dtype);
-        tpu_bdc_set_C(
-            prod_local_addr,
-            tpu_cast(scale, dtype, DT_FP32, RM_HALF_AWAY_FROM_ZERO),
-            &pooling_shape,
-            NULL,
-            dtype);
+        if(dtype==DT_FP32)
+        {
+            tpu_bdc_set_C(
+                grad_output_local_addr,
+                scale,
+                &pooling_shape,
+                NULL,
+                DT_FP32);
+            tpu_bdc_set_C(
+                prod_local_addr,
+                scale,
+                &pooling_shape,
+                NULL,
+                DT_FP32);
+        }
+        else
+        {
+            tpu_bdc_set_C(
+                pooling_fp32,
+                scale,
+                &pooling_shape,
+                NULL,
+                DT_FP32);
+        }
     }
     tpu_gdma_compact_S2L(
         weight_local_addr,
@@ -167,14 +259,13 @@ void bn_backward_split_c(
         &global_stride,
         dtype);
     if(tpu_is_parallel_state()){tpu_parallel_end();}
-
     // compute x_norm
     tpu_parallel_start();
     tpu_gdma_cpy_S2L(
         grad_output_local_addr,
         grad_output_global_addr,
         &input_shape,
-        &local_stride,
+        dtype==DT_FP32? &local_stride : &aligned_stride,
         &global_stride,
         dtype);
     tpu_bdc_fp_mul(
@@ -206,43 +297,37 @@ void bn_backward_split_c(
         &input_shape,
         dtype);
     tpu_parallel_end();
-
     // compute grad_bias
-    scale.f32 = 1.;
-    tpu_bdc_fp_avg_pool2d(
-        pooling_buffer1,                                // output_shape = {1,c,n,1};
-        grad_output_local_addr,                         // input_shape = {1,c,n,hw};
-        &pooling_shape,
-        &pooling_kernel,
-        &pooling_padding,
-        &pooling_stride,
-        &pooling_dilation,
-        dtype,
-        tpu_cast(scale, dtype, DT_FP32, RM_HALF_AWAY_FROM_ZERO));
-    if(n>1)
-    {
-        pooling_shape.w = 1;
-        pooling_kernel.w = 1;
-        pooling_kernel.h = pooling_shape.h;
-        tpu_bdc_fp_avg_pool2d(
-            pooling_buffer2,                                // output_shape = {1,c,1,1};
-            pooling_buffer1,                                // input_shape = {1,c,n,1};
-            &pooling_shape,
-            &pooling_kernel,
-            &pooling_padding,
-            &pooling_stride,
-            &pooling_dilation,
-            dtype,
-            tpu_cast(scale, dtype, DT_FP32, RM_HALF_AWAY_FROM_ZERO));
-    }
-    tpu_bdc_cpy(
-        grad_bias_local_addr,
-        n>1 ? pooling_buffer2 : pooling_buffer1,
-        &cshape,
-        &compact_stride,
-        NULL,
+    pooling_fp16_to_fp32(
+        grad_output_local_addr,
+        pooling_fp32,
+        pooling_buffer1,
+        pooling_buffer2,
+        input_shape,
+        pooling_shape,
         dtype);
-        
+    if(dtype!=DT_FP32)
+    {
+        tpu_bdc_cast(
+            grad_bias_local_addr,
+            pooling_buffer2,
+            &cshape,
+            &compact_stride,
+            NULL,
+            dtype,
+            DT_FP32,
+            RM_HALF_AWAY_FROM_ZERO);
+    }
+    else
+    {
+        tpu_bdc_cpy(
+            grad_bias_local_addr,
+            pooling_buffer2,
+            &cshape,
+            &compact_stride,
+            NULL,
+            dtype);
+    }
     // compute grad_weight
     if(grad_bias_enable)
     {
@@ -258,48 +343,41 @@ void bn_backward_split_c(
         grad_output_local_addr,
         input_local_addr,
         &input_shape,
-        &local_stride,
-        &local_stride,
+        dtype==DT_FP32? &local_stride : &aligned_stride,
+        dtype==DT_FP32? &local_stride : &aligned_stride,
         &aligned_stride,
         dtype);
-    pooling_shape.w = ALIGN(h * w, tpu_eu_num(dtype));
-    pooling_kernel.w= pooling_shape.w;
-    pooling_kernel.h= 1;
-    tpu_bdc_fp_avg_pool2d(
-        pooling_buffer1,                               // output_shape = {1,c,n,hw};
-        prod_local_addr,                               // input_shape = {1,c,1,hw};
-        &pooling_shape,
-        &pooling_kernel,
-        &pooling_padding,
-        &pooling_stride,
-        &pooling_dilation,
-        dtype,
-        tpu_cast(scale, dtype, DT_FP32, RM_HALF_AWAY_FROM_ZERO));
-    if(n>1)
-    {
-        pooling_shape.w = 1;
-        pooling_kernel.w = 1;
-        pooling_kernel.h = pooling_shape.h;
-        tpu_bdc_fp_avg_pool2d(
-            pooling_buffer2,                                // output_shape = {1,c,1,1};
-            pooling_buffer1,                                // input_shape = {1,c,1,hw};
-            &pooling_shape,
-            &pooling_kernel,
-            &pooling_padding,
-            &pooling_stride,
-            &pooling_dilation,
-            dtype,
-            tpu_cast(scale, dtype, DT_FP32, RM_HALF_AWAY_FROM_ZERO));
-    }
-    tpu_bdc_cpy(
-        grad_weight_local_addr,
-        n>1 ? pooling_buffer2 : pooling_buffer1,
-        &cshape,
-        &compact_stride,
-        NULL,
+    pooling_fp16_to_fp32(
+        prod_local_addr,
+        pooling_fp32,
+        pooling_buffer1,
+        pooling_buffer2,
+        input_shape,
+        pooling_shape,
         dtype);
+    if(dtype!=DT_FP32)
+    {
+        tpu_bdc_cast(
+            grad_weight_local_addr,
+            pooling_buffer2,
+            &cshape,
+            &compact_stride,
+            NULL,
+            dtype,
+            DT_FP32,
+            RM_HALF_AWAY_FROM_ZERO);
+    }
+    else
+    {
+        tpu_bdc_cpy(
+            grad_weight_local_addr,
+            pooling_buffer2,
+            &cshape,
+            &compact_stride,
+            NULL,
+            dtype);
+    }
     if(tpu_is_parallel_state()) tpu_parallel_end();
-    
     //compute grad_out
     if(grad_weight_enable)
     {
@@ -311,20 +389,32 @@ void bn_backward_split_c(
             dtype);
     }
     // part1: (γ/σ)*dL/dy
-    dim4 zero_stride = {
-        .n = 0,
-        .c = 1,
-        .h = 0,
-        .w = 0};
-    tpu_bdc_fp_mul(
-        grad_output_local_addr,
-        grad_output_local_addr,
-        weight_local_addr,
-        &input_shape,
-        &local_stride,
-        &local_stride,
-        &zero_stride,
-        dtype);
+    if(dtype!=DT_FP32)
+    {
+        tpu_bdc_fp_scale(
+            grad_output_local_addr,
+            grad_output_local_addr,
+            weight_local_addr,
+            &input_shape,
+            dtype);
+    }
+    else
+    {
+        dim4 zero_stride = {
+            .n = 0,
+            .c = 1,
+            .h = 0,
+            .w = 0};
+        tpu_bdc_fp_mul(
+            grad_output_local_addr,
+            grad_output_local_addr,
+            weight_local_addr,
+            &input_shape,
+            &local_stride,
+            &local_stride,
+            &zero_stride,
+            dtype);
+    }
     // part2: (dL/dγ * x_norm + dL/dβ) * γ/σ/N
     tpu_bdc_fp_scale(
         input_local_addr,
@@ -358,8 +448,8 @@ void bn_backward_split_c(
         grad_output_local_addr,
         input_local_addr,
         &input_shape,
-        &local_stride,
-        &local_stride,
+        dtype==DT_FP32? &local_stride : &aligned_stride,
+        dtype==DT_FP32? &local_stride : &aligned_stride,
         &aligned_stride,
         dtype);
     if(tpu_is_parallel_state()) tpu_parallel_end();
@@ -368,7 +458,7 @@ void bn_backward_split_c(
         grad_output_local_addr,
         &input_shape,
         &global_stride,
-        &local_stride,
+        dtype==DT_FP32? &local_stride : &aligned_stride,
         dtype);
 }
 
@@ -383,6 +473,7 @@ void accumulate_grad_weight_bias(
     int hwidx,
     data_type_t dtype)
 {
+    TPUKERNEL_ASSERT(!(hwsecs%tpu_eu_num(dtype)));
     int n = ori_shape.n;
     int c = ori_shape.c;
     dim4 input_shape = {
@@ -395,10 +486,17 @@ void accumulate_grad_weight_bias(
         .c = c,
         .h = 1,
         .w = 1};
+    dim4 pooling_shape = {
+        .n = 1,
+        .c = c,
+        .h = n,
+        .w = hwsecs};
     int c_param_size = ALIGN(DIV_UP(c, NPU_NUM) * tpu_data_type_size(dtype),4);
     int param_size = n * DIV_UP(c, NPU_NUM) * tpu_aligned_feature_size(hwsecs, 1, dtype);
     int buffer_size1 = DIV_UP(c, NPU_NUM) * 64; 
     int buffer_size2 = n == 1 ? 0 : DIV_UP(c, NPU_NUM) * tpu_aligned_feature_size(n, 1, dtype);
+    int buffer_size3 = dtype == DT_FP32 ? 0 : n * DIV_UP(c, NPU_NUM) * tpu_aligned_feature_size(hwsecs, 1, DT_FP32);
+
     //param (1,c,1,1) compact
     local_addr_t grad_bias_local_addr = 0;
     local_addr_t grad_weight_local_addr = grad_bias_local_addr + c_param_size;
@@ -408,23 +506,25 @@ void accumulate_grad_weight_bias(
     //param (1,c,n,1) aligned
     local_addr_t pooling_buffer1 = ALIGN(c_param_size * 5, BANK_SIZE);
     local_addr_t pooling_buffer2 = pooling_buffer1 + buffer_size2;
+    local_addr_t pooling_fp32 = pooling_buffer1 + buffer_size1 + buffer_size2;
     //param (n,c,h,w) aligned
-    local_addr_t input_local_addr = pooling_buffer1 + ALIGN(buffer_size1 + buffer_size2, BANK_SIZE);
+    local_addr_t input_local_addr = pooling_buffer1 + ALIGN(buffer_size1 + buffer_size2 + buffer_size3, BANK_SIZE);
     local_addr_t grad_output_local_addr = input_local_addr + ALIGN(param_size, BANK_SIZE);
 
-    dim4 aligned_stride;
-    dim4 global_stride;
     dim4 compact_stride;
-    tpu_aligned_stride(&aligned_stride, 0, &input_shape, dtype);
-    tpu_continuous_stride(&global_stride, &ori_shape);
+    dim4 aligned_stride;
+    dim4 local_stride;
+    dim4 global_stride;
     tpu_compact_stride(&compact_stride, 0, &cshape);
-    dim4 local_stride = aligned_stride;
+    tpu_aligned_stride(&aligned_stride, 0, &input_shape, dtype);
+    tpu_aligned_stride(&local_stride, 0, &input_shape, DT_FP32);
+    tpu_continuous_stride(&global_stride ,&ori_shape);
+    scalar_t scale = {.f32 = 0};
     if(c > NPU_NUM)
     {
         local_stride.n = local_stride.c;
         local_stride.c *= n;
-    }
-    scalar_t scale = {.f32 = 0};  
+    }  
     if(!hwidx)
     {
         tpu_parallel_start();
@@ -465,13 +565,20 @@ void accumulate_grad_weight_bias(
             &compact_stride,
             &compact_stride,
             dtype);
+        tpu_bdc_neg(
+            mean_local_addr,
+            mean_local_addr,
+            &cshape,
+            &compact_stride,
+            &compact_stride,
+            dtype);
     }
 
     tpu_gdma_cpy_S2L(
         input_local_addr,
         input_global_addr,
         &input_shape,
-        &local_stride,
+        dtype==DT_FP32 ? &local_stride : &aligned_stride,
         &global_stride,
         dtype);
     // compute x_norm_part
@@ -480,15 +587,8 @@ void accumulate_grad_weight_bias(
         grad_output_local_addr,
         grad_output_global_addr,
         &input_shape,
-        &local_stride,
+        dtype==DT_FP32 ? &local_stride : &aligned_stride,
         &global_stride,
-        dtype);
-    tpu_bdc_neg(
-        mean_local_addr,
-        mean_local_addr,
-        &cshape,
-        &compact_stride,
-        &compact_stride,
         dtype);
     tpu_bdc_fp_bias(
         input_local_addr,
@@ -509,88 +609,67 @@ void accumulate_grad_weight_bias(
         input_local_addr,
         grad_output_local_addr,
         &input_shape,
-        &local_stride,
-        &local_stride,
-        &local_stride,
+        dtype==DT_FP32 ? &local_stride : &aligned_stride,
+        dtype==DT_FP32 ? &local_stride : &aligned_stride,
+        dtype==DT_FP32 ? &local_stride : &aligned_stride,
         dtype);
-    scale.f32 = 1.;
-    dim4 pooling_shape = {1, c, n, hwsecs};
-    dim2 pooling_kernel = {1, pooling_shape.w};
-    dim2 pooling_stride = {1, 1};
-    dim2 pooling_dilation = {1, 1};
-    padding_t pooling_padding = {0, 0, 0, 0};
-    tpu_bdc_fp_avg_pool2d(
-        pooling_buffer1,                           // output_shape = {1,c,n,1};
-        grad_output_local_addr,                    // input_shape = {1,c,n,hw};
-        &pooling_shape,
-        &pooling_kernel,
-        &pooling_padding,
-        &pooling_stride,
-        &pooling_dilation,
-        dtype,
-        tpu_cast(scale, dtype, DT_FP32, RM_HALF_AWAY_FROM_ZERO));
-    if(n>1)
+    pooling_fp16_to_fp32(
+        grad_output_local_addr,
+        pooling_fp32,
+        pooling_buffer1,
+        pooling_buffer2,
+        input_shape,
+        pooling_shape,
+        dtype);
+    if(dtype!=DT_FP32)
     {
-        pooling_shape.w = 1;
-        pooling_kernel.w = 1;
-        pooling_kernel.h = pooling_shape.h;
-        tpu_bdc_fp_avg_pool2d(
-            pooling_buffer2,                       // output_shape = {1,c,1,1};
-            pooling_buffer1,                       // input_shape = {1,c,n,1};
-            &pooling_shape,
-            &pooling_kernel,
-            &pooling_padding,
-            &pooling_stride,
-            &pooling_dilation,
+        tpu_bdc_cast(
+            pooling_fp32,
+            pooling_buffer2,
+            &cshape,
+            &compact_stride,
+            NULL,
             dtype,
-            tpu_cast(scale, dtype, DT_FP32, RM_HALF_AWAY_FROM_ZERO));
+            DT_FP32,
+            RM_HALF_AWAY_FROM_ZERO);
     }
     tpu_bdc_fp_add(
         grad_bias_local_addr,
         grad_bias_local_addr,
-        n>1 ? pooling_buffer2 : pooling_buffer1,
+        dtype == DT_FP32 ? pooling_buffer2 : pooling_fp32,
         &cshape,
         &compact_stride,
         &compact_stride,
-        NULL,
+        &compact_stride,
         dtype);
-    pooling_shape.w = hwsecs;
-    pooling_kernel.w = pooling_shape.w;
-    pooling_kernel.h = 1;
-    tpu_bdc_fp_avg_pool2d(
-        pooling_buffer1,                           // output_shape = {1,c,n,1};
-        input_local_addr,                          // input_shape = {1,c,n,hw};
-        &pooling_shape,
-        &pooling_kernel,
-        &pooling_padding,
-        &pooling_stride,
-        &pooling_dilation,
-        dtype,
-        tpu_cast(scale, dtype, DT_FP32, RM_HALF_AWAY_FROM_ZERO));
-    if(n>1)
+    pooling_fp16_to_fp32(
+        input_local_addr,
+        pooling_fp32,
+        pooling_buffer1,
+        pooling_buffer2,
+        input_shape,
+        pooling_shape,
+        dtype);
+    if(dtype!=DT_FP32)
     {
-        pooling_shape.w = 1;
-        pooling_kernel.w = 1;
-        pooling_kernel.h = pooling_shape.h;
-        tpu_bdc_fp_avg_pool2d(
-            pooling_buffer2,                         // output_shape = {1,c,1,1};
-            pooling_buffer1,                         // input_shape = {1,c,n,1};
-            &pooling_shape,
-            &pooling_kernel,
-            &pooling_padding,
-            &pooling_stride,
-            &pooling_dilation,
+        tpu_bdc_cast(
+            pooling_fp32,
+            pooling_buffer2,
+            &cshape,
+            &compact_stride,
+            NULL,
             dtype,
-            tpu_cast(scale, dtype, DT_FP32, RM_HALF_AWAY_FROM_ZERO));
+            DT_FP32,
+            RM_HALF_AWAY_FROM_ZERO);
     }
     tpu_bdc_fp_add(
         grad_weight_local_addr,
         grad_weight_local_addr,
-        n>1 ? pooling_buffer2 : pooling_buffer1,
+        dtype == DT_FP32 ? pooling_buffer2 : pooling_fp32,
         &cshape,
         &compact_stride,
         &compact_stride,
-        NULL,
+        &compact_stride,
         dtype);
 }
 
@@ -675,13 +754,6 @@ void bn_backward_split_hw(
         &input_shape,
         &aligned_stride,
         &global_stride,
-        dtype);
-    tpu_bdc_neg(
-        mean_local_addr,
-        mean_local_addr,
-        &cshape,
-        &compact_stride,
-        &compact_stride,
         dtype);
     tpu_bdc_fp_bias(
         input_local_addr,
@@ -861,8 +933,9 @@ void tpu_kernel_api_batchnorm_backward(const void *args)
 {
     sg_api_bn_backward_t *api = (sg_api_bn_backward_t *)args;
     dim4 shape = {api->shape[0], api->shape[1], api->shape[2], api->shape[3]};
-    
-    TPUKERNEL_ASSERT(is_local_mem_enough(shape.n, shape.c, 32, 1, DT_FP16));
+    data_type_t dtype = DT_FP16;
+
+    TPUKERNEL_ASSERT(is_local_mem_enough(shape.n, shape.c, 32, 1, dtype));
     TPUKERNEL_ASSERT(api->grad_input_enable);
     
     tpu_initialize();
@@ -876,7 +949,7 @@ void tpu_kernel_api_batchnorm_backward(const void *args)
             api->grad_weight_global_addr,
             api->grad_bias_global_addr,
             shape,
-            DT_FP16,
+            dtype,
             api->grad_input_enable,
             api->grad_weight_enable,
             api->grad_bias_enable);
