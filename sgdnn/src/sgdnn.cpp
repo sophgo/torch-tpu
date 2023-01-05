@@ -144,7 +144,6 @@ bm_status_t sgdnn_conv_backward(
     return BM_SUCCESS;
 }
 
-
 bm_status_t sgdnn_batchnorm_backward(
     bm_handle_t        handle,
     bm_device_mem_t    grad_output,
@@ -213,6 +212,135 @@ bm_status_t sgdnn_batchnorm_backward(
     DEVICE_MEM_DEL_OUTPUT(handle, grad_weight, grad_weight_mem);
     DEVICE_MEM_DEL_OUTPUT(handle, grad_bias, grad_bias_mem);
 
+    return BM_SUCCESS;
+}
+
+bm_status_t sgdnn_avgpool_backward(
+    bm_handle_t        handle,
+    bm_device_mem_t    grad_output,
+    bm_device_mem_t    grad_input,
+    int                n,
+    int                c,
+    int                ih,
+    int                iw,
+    int                oh,
+    int                ow,
+    int                kh,
+    int                kw,
+    int                stride_h,
+    int                stride_w,
+    int                pad_h,
+    int                pad_w,
+    bool               ceil_mode,
+    bool               count_include_pad,
+    int                divisor_override,
+    sg_data_type_t     dtype
+  ) {
+
+    auto dtype_size = [](int dtype) {
+        int size = 1;
+        if (dtype == SG_DTYPE_INT8 || dtype == SG_DTYPE_UINT8) size = 1;
+        else if (dtype == SG_DTYPE_INT16 || dtype == SG_DTYPE_UINT16 ||
+                 dtype == SG_DTYPE_FP16 || dtype == SG_DTYPE_BFP16)
+            size = 2;
+        else if (dtype == SG_DTYPE_FP32 || dtype == SG_DTYPE_INT32 || dtype == SG_DTYPE_UINT32)
+            size = 4;
+        return size;};
+
+    bm_device_mem_t grad_output_mem, grad_input_mem;
+    u64 grad_output_size = (u64)n * c * oh * ow * dtype_size(dtype);
+    u64 grad_input_size = (u64)n * c * ih * iw * dtype_size(dtype);
+
+    DEVICE_MEM_NEW_INPUT(handle, grad_output, grad_output_size, grad_output_mem);
+    DEVICE_MEM_NEW_OUTPUT(handle, grad_input, grad_input_size, grad_input_mem);
+
+    sg_api_avgpool_backward_t api = {
+        bm_mem_get_device_addr(grad_output_mem),
+        bm_mem_get_device_addr(grad_input_mem),
+        {n, c, ih, iw},
+        {n, c, oh, ow},
+        {kh, kw},
+        {stride_h, stride_w},
+        {pad_h, pad_w},
+        ceil_mode == true ? 1 : 0,
+        count_include_pad == true ? 1 : 0,
+        divisor_override,
+    };
+
+    tpu_kernel_launch_sync(handle, "tpu_kernel_api_avgpool_backward", &api, sizeof(api));
+
+    DEVICE_MEM_DEL_OUTPUT(handle, grad_input, grad_input_mem);
+    DEVICE_MEM_DEL_INPUT(handle, grad_output, grad_output_mem);
+    return BM_SUCCESS;
+}
+
+bm_status_t sgdnn_maxpool_backward(
+    bm_handle_t        handle,
+    bm_device_mem_t    forward_input,
+    bm_device_mem_t    forward_output,
+    bm_device_mem_t    grad_output,
+    bm_device_mem_t    grad_input,
+    int                n,
+    int                c,
+    int                ih,
+    int                iw,
+    int                oh,
+    int                ow,
+    int                kh,
+    int                kw,
+    int                stride_h,
+    int                stride_w,
+    int                pad_h,
+    int                pad_w,
+    int                dilation_h,
+    int                dilation_w,
+    bool               ceil_mode,
+    sg_data_type_t     dtype
+  ) {
+
+    auto dtype_size = [](int dtype) {
+        int size = 1;
+        if (dtype == SG_DTYPE_INT8 || dtype == SG_DTYPE_UINT8) size = 1;
+        else if (dtype == SG_DTYPE_INT16 || dtype == SG_DTYPE_UINT16 ||
+                 dtype == SG_DTYPE_FP16 || dtype == SG_DTYPE_BFP16)
+            size = 2;
+        else if (dtype == SG_DTYPE_FP32 || dtype == SG_DTYPE_INT32 || dtype == SG_DTYPE_UINT32)
+            size = 4;
+        return size;
+    };
+
+    bm_device_mem_t forward_input_mem, forward_output_mem;
+    bm_device_mem_t grad_input_mem, grad_output_mem;
+    u64 grad_output_size = (u64)n * c * oh * ow * dtype_size(dtype);
+    u64 grad_input_size = (u64)n * c * ih * iw * dtype_size(dtype);
+    u64 forward_input_size = grad_input_size;
+    u64 forward_output_size = grad_output_size;
+
+    DEVICE_MEM_NEW_INPUT(handle, forward_input, forward_input_size, forward_input_mem);
+    DEVICE_MEM_NEW_INPUT(handle, forward_output, forward_output_size, forward_output_mem);
+    DEVICE_MEM_NEW_INPUT(handle, grad_output, grad_output_size, grad_output_mem);
+    DEVICE_MEM_NEW_OUTPUT(handle, grad_input, grad_input_size, grad_input_mem);
+
+    sg_api_maxpool_backward_t api = {
+        bm_mem_get_device_addr(forward_input_mem),
+        bm_mem_get_device_addr(forward_output_mem),
+        bm_mem_get_device_addr(grad_output_mem),
+        bm_mem_get_device_addr(grad_input_mem),
+        {n, c, ih, iw},
+        {n, c, oh, ow},
+        {kh, kw},
+        {stride_h, stride_w},
+        {pad_h, pad_w},
+        {dilation_h, dilation_w},
+        ceil_mode == true ? 1 : 0
+    };
+
+    tpu_kernel_launch_sync(handle, "tpu_kernel_api_maxpool_backward", &api, sizeof(api));
+
+    DEVICE_MEM_DEL_OUTPUT(handle, grad_input, grad_input_mem);
+    DEVICE_MEM_DEL_INPUT(handle, forward_input, forward_input_mem);
+    DEVICE_MEM_DEL_INPUT(handle, forward_output, forward_output_mem);
+    DEVICE_MEM_DEL_INPUT(handle, grad_output, grad_output_mem);
     return BM_SUCCESS;
 }
 
@@ -324,7 +452,85 @@ PYBIND11_MODULE(sgdnn, m)
           UNUSED(status);
           assert(status == BM_SUCCESS);
           bm_dev_free(handle);
-      });
+    });
+
+    m.def("avgpool_backward", [](py::array_t<float16> grad_output,
+                                 py::array_t<float16> grad_input,
+                                 int n, int c, int ih, int iw,
+                                 int oh, int ow,
+                                 int kh, int kw,
+                                 int stride_h, int stride_w,
+                                 int pad_h, int pad_w,
+                                 bool ceil_mode,
+                                 bool count_include_pad,
+                                 int divisor_override) {
+
+        py::buffer_info grad_out_buf = grad_output.request();
+        float16 *grad_out_fp16 = (float16 *)grad_out_buf.ptr;
+        py::buffer_info grad_input_buf = grad_input.request();
+        float16 *grad_input_fp16 = (float16 *)grad_input_buf.ptr;
+
+        bm_handle_t handle;
+        bm_dev_request(&handle, 0);
+
+        bm_status_t status = sgdnn_avgpool_backward(handle,
+                            bm_mem_from_system(grad_out_fp16),
+                            bm_mem_from_system(grad_input_fp16),
+                            n, c, ih, iw, oh, ow,
+                            kh, kw,
+                            stride_h, stride_w,
+                            pad_h, pad_w,
+                            ceil_mode,
+                            count_include_pad,
+                            divisor_override,
+                            (sg_data_type_t)1);
+
+        UNUSED(status);
+        //assert(status == BM_SUCCESS);
+        bm_dev_free(handle);
+    });
+
+    m.def("maxpool_backward", [](py::array_t<float16> forward_input,
+                                 py::array_t<float16> forward_output,
+                                 py::array_t<float16> grad_output,
+                                 py::array_t<float16> grad_input,
+                                 int n, int c, int ih, int iw,
+                                 int oh, int ow,
+                                 int kh, int kw,
+                                 int stride_h, int stride_w,
+                                 int pad_h, int pad_w,
+                                 int dilation_h, int dilation_w,
+                                 bool ceil_mode) {
+
+        py::buffer_info forward_input_buf = forward_input.request();
+        float16 *forward_input_fp16 = (float16 *)forward_input_buf.ptr;
+        py::buffer_info forward_output_buf = forward_output.request();
+        float16 *forward_output_fp16 = (float16 *)forward_output_buf.ptr;
+        py::buffer_info grad_out_buf = grad_output.request();
+        float16 *grad_out_fp16 = (float16 *)grad_out_buf.ptr;
+        py::buffer_info grad_input_buf = grad_input.request();
+        float16 *grad_input_fp16 = (float16 *)grad_input_buf.ptr;
+
+        bm_handle_t handle;
+        bm_dev_request(&handle, 0);
+
+        bm_status_t status = sgdnn_maxpool_backward(handle,
+                            bm_mem_from_system(forward_input_fp16),
+                            bm_mem_from_system(forward_output_fp16),
+                            bm_mem_from_system(grad_out_fp16),
+                            bm_mem_from_system(grad_input_fp16),
+                            n, c, ih, iw, oh, ow,
+                            kh, kw,
+                            stride_h, stride_w,
+                            pad_h, pad_w,
+                            dilation_h, dilation_w,
+                            ceil_mode,
+                            (sg_data_type_t)1);
+
+        UNUSED(status);
+        //assert(status == BM_SUCCESS);
+        bm_dev_free(handle);
+    });
 
     // add new ops backward here
     // m.def("batchnorm_backward", ...);

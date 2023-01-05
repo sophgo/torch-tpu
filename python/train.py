@@ -24,11 +24,11 @@ from resnet50 import resnet50
 
 save_dir='./resnet50/'
 
-train_dir='./dataset/train_1/'
+train_dir='./dataset/train/'
 test_dir='./dataset/test/'
 net_name='resnet50'
 
-batch_size = 1#64
+batch_size = 64
 epochs=30
 lr=0.001
 

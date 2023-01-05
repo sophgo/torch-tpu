@@ -51,15 +51,57 @@ bm_status_t sgdnn_batchnorm_backward(
     bm_device_mem_t    grad_input,
     bm_device_mem_t    grad_weight,
     bm_device_mem_t    grad_bias,
-    int                n,  
-    int                c,  
-    int                h,  
+    int                n,
+    int                c,
+    int                h,
     int                w,
     bool               input_need_grad,
     bool               weight_need_grad,
     bool               bias_need_grad,
     sg_data_type_t     dtype);
-    
+
+bm_status_t sgdnn_avgpool_backward(
+    bm_handle_t        handle,
+    bm_device_mem_t    grad_output,
+    bm_device_mem_t    grad_input,
+    int                n,
+    int                c,
+    int                ih,
+    int                iw,
+    int                oh,
+    int                ow,
+    int                kh,
+    int                kw,
+    int                stride_h,
+    int                stride_w,
+    int                pad_h,
+    int                pad_w,
+    bool               ceil_mode,
+    bool               count_include_pad,
+    bool               divisor_override,
+    sg_data_type_t     dtype);
+
+bm_status_t sgdnn_maxpool_backward(
+    bm_handle_t        handle,
+    bm_device_mem_t    grad_output,
+    bm_device_mem_t    grad_input,
+    int                n,
+    int                c,
+    int                ih,
+    int                iw,
+    int                oh,
+    int                ow,
+    int                kh,
+    int                kw,
+    int                stride_h,
+    int                stride_w,
+    int                pad_h,
+    int                pad_w,
+    int                dilation_h,
+    int                dilation_w,
+    bool               ceil_mode,
+    sg_data_type_t     dtype);
+
 #if defined(__cplusplus)
 }
 #endif

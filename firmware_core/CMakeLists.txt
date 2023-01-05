@@ -24,7 +24,6 @@ target_compile_definitions(firmware PRIVATE -DUSING_CMODEL)
 target_link_libraries(firmware PRIVATE ${PROJECT_ROOT}/third_party/lib/libcmodel.so)
 set_target_properties(firmware PROPERTIES OUTPUT_NAME firmware_cmodel)
 else()
-message("not cmodel")
 message(${PROJECT_ROOT}/tool/build_firmware.sh)
 aux_source_directory(./src/backward KERNEL_SRC_FILES)
 add_custom_target(firmware

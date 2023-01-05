@@ -50,5 +50,40 @@ typedef struct{
 } sg_api_batchnorm_backward_t;
 #endif
 
+typedef struct {
+    unsigned long long grad_output_global_addr;
+    unsigned long long grad_input_global_addr;
+    int                input_shape[4];
+    int                output_shape[4];
+    int                kernel[2];
+    int                stride[2];
+    int                pad[2];
+    int                ceil_mode;
+    int                count_include_pad;
+    int                divisor_override;
+#ifndef WIN32
+} __attribute__((packed)) sg_api_avgpool_backward_t;
+#else
+} sg_api_avgpool_backward_t;
+#endif
+
+typedef struct {
+    unsigned long long forward_input_global_addr;
+    unsigned long long forward_output_global_addr;
+    unsigned long long grad_output_global_addr;
+    unsigned long long grad_input_global_addr;
+    int                input_shape[4];
+    int                output_shape[4];
+    int                kernel[2];
+    int                stride[2];
+    int                pad[2];
+    int                dilation[2];
+    int                ceil_mode;
+#ifndef WIN32
+} __attribute__((packed)) sg_api_maxpool_backward_t;
+#else
+} sg_api_maxpool_backward_t;
+#endif
+
 #pragma pack(pop)
 #endif  // SG_API_STRUCT_H

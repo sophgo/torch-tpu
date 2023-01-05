@@ -86,12 +86,12 @@ class Conv2dFunc(Function):
         grad_weight_np = np.ones(weight.shape, dtype = np.float16)
         grad_bias_np = np.ones((oc,), dtype = np.float16)
 
-        stride_h = get_parameter(stride, 0);
-        stride_w = get_parameter(stride, 1);
-        dilation_h = get_parameter(dilation, 0);
-        dilation_w = get_parameter(dilation, 1);
-        padding_h = get_parameter(padding, 0);
-        padding_w = get_parameter(padding, 1);
+        stride_h = get_parameter(stride, 0)
+        stride_w = get_parameter(stride, 1)
+        dilation_h = get_parameter(dilation, 0)
+        dilation_w = get_parameter(dilation, 1)
+        padding_h = get_parameter(padding, 0)
+        padding_w = get_parameter(padding, 1)
 
         grad_bias_enable = 0 if bias is None else 1
         sgdnn.conv_backward(grad_out_np,
@@ -178,3 +178,178 @@ def BatchNorm2d(input, weight, bias, training=True, momentum=0.1, eps=1e-5):
 class tpu_batchnorm2d(nn.BatchNorm2d):
     def _batchnorm_forward(self, input: Tensor, weight: Tensor, bias: Tensor):
         return BatchNorm2d(input, weight, bias, self.training, self.momentum, self.eps)
+
+class AvgPool2dFunc(Function):
+    # Note that both forward and backward are @staticmethods
+    @staticmethod
+    def forward(ctx, input, kernel_size, stride=None, padding=0,
+                     ceil_mode=False, count_include_pad=True, divisor_override=None):
+        ctx.save_for_backward(input)
+        ctx.kernel_size = kernel_size
+        ctx.stride = stride
+        ctx.padding = padding
+        ctx.ceil_mode = ceil_mode
+        ctx.count_include_pad = count_include_pad
+        ctx.divisor_override = divisor_override
+        return F.avg_pool2d(input, kernel_size, stride, padding, ceil_mode, count_include_pad, divisor_override)
+
+    @staticmethod
+    def backward(ctx, grad_output):
+        input, = ctx.saved_tensors
+        kernel_size = ctx.kernel_size
+        stride = ctx.stride
+        padding = ctx.padding
+        ceil_mode = ctx.ceil_mode
+        count_include_pad = ctx.count_include_pad
+        divisor_override = ctx.divisor_override
+
+        grad_input = None
+        grad_input_np = np.ones(input.shape, dtype = np.float16)
+
+        grad_out_np = np.asarray(grad_output.half().data.flatten())
+
+        kh = get_parameter(kernel_size, 0)
+        kw = get_parameter(kernel_size, 1)
+        stride_h = kh
+        stride_w = kw
+        if stride is not None:
+            stride_h = get_parameter(stride, 0)
+            stride_w = get_parameter(stride, 1)
+        pad_h = get_parameter(padding, 0)
+        pad_w = get_parameter(padding, 1)
+
+        divisor = kh * kw if divisor_override is None else divisor_override
+        sgdnn.avgpool_backward(grad_out_np,
+                               grad_input_np,
+                               input.shape[0],
+                               input.shape[1],
+                               input.shape[2],
+                               input.shape[3],
+                               grad_output.shape[2],
+                               grad_output.shape[3],
+                               kh, kw,
+                               stride_h, stride_w,
+                               pad_h, pad_w,
+                               ceil_mode,
+                               count_include_pad,
+                               divisor);
+
+        grad_input = torch.from_numpy(grad_input_np).reshape(input.shape)
+        return grad_input, None, None, None, None, None, None
+
+def AvgPool2d(input, kernel_size, stride, padding, ceil_mode, count_include_pad, divisor_override):
+    return AvgPool2dFunc.apply(input, kernel_size, stride, padding, ceil_mode, count_include_pad, divisor_override)
+
+class AdaptiveAvgPool2dFunc(Function):
+    # Note that both forward and backward are @staticmethods
+    @staticmethod
+    def forward(ctx, input, output_size):
+        ctx.save_for_backward(input)
+        ctx.output_size = output_size
+        return F.adaptive_avg_pool2d(input, output_size)
+
+    @staticmethod
+    def backward(ctx, grad_output):
+        input = ctx.saved_tensors
+        output_size = ctx.output_size
+
+        ih = input.shape[2]
+        iw = input.shape[3]
+        oh = ih
+        ow = iw
+        if output_size is not None:
+            oh = get_parameter(output_size, 0)
+            ow = get_parameter(output_size, 1)
+
+        assert ih % oh == 0
+        assert iw % ow == 0
+
+        stride_h = ih//oh
+        stride_w = iw//ow
+        kh = ih - (oh - 1) * stride_h
+        kw = iw - (ow - 1) * stride_w
+
+        grad_input = None
+        grad_input_np = np.ones(input.shape, dtype = np.float16)
+
+        grad_out_np = np.asarray(grad_output.half().data.flatten())
+
+        sgdnn.avgpool_backward(grad_out_np,
+                               grad_input_np,
+                               input.shape[0],
+                               input.shape[1],
+                               ih, iw,
+                               oh, ow,
+                               kh, kw,
+                               stride_h, stride_w,
+                               0, 0,
+                               False,
+                               True,
+                               kh * kw);
+
+        grad_input = torch.from_numpy(grad_input_np).reshape(input.shape)
+        return grad_input, None
+
+def AdaptiveAvgPool2d(input, output_size):
+    return AdaptiveAvgPool2dFunc.apply(input, output_size);
+
+class MaxPool2dFunc(Function):
+    # Note that both forward and backward are @staticmethods
+    @staticmethod
+    def forward(ctx, input, kernel_size, stride=None, padding=0, dilation=1, ceil_mode=False):
+        ctx.kernel_size = kernel_size
+        ctx.stride = stride
+        ctx.padding = padding
+        ctx.dilation = dilation
+        ctx.ceil_mode = ceil_mode
+        output = F.max_pool2d(input, kernel_size, stride, padding, dilation, False, ceil_mode)
+        ctx.save_for_backward(input, output)
+        return output
+
+    def backward(ctx, grad_output):
+        input, output = ctx.saved_tensors
+        kernel_size = ctx.kernel_size
+        stride = ctx.stride
+        padding = ctx.padding
+        dilation = ctx.dilation
+        ceil_mode = ctx.ceil_mode
+
+        grad_input = None
+        grad_input_np = np.ones(input.shape, dtype = np.float16)
+
+        input_np = np.asarray(input.half().data.flatten())
+        output_np = np.asarray(output.half().data.flatten())
+        grad_out_np = np.asarray(grad_output.half().data.flatten())
+        kh = get_parameter(kernel_size, 0)
+        kw = get_parameter(kernel_size, 1)
+        stride_h = kh
+        stride_w = kw
+        if stride is not None:
+            stride_h = get_parameter(stride, 0)
+            stride_w = get_parameter(stride, 1)
+        pad_h = get_parameter(padding, 0)
+        pad_w = get_parameter(padding, 1)
+        dh = get_parameter(dilation, 0)
+        dw = get_parameter(dilation, 1)
+
+        sgdnn.maxpool_backward(input_np,
+                               output_np,
+                               grad_out_np,
+                               grad_input_np,
+                               input.shape[0],
+                               input.shape[1],
+                               input.shape[2],
+                               input.shape[3],
+                               grad_output.shape[2],
+                               grad_output.shape[3],
+                               kh, kw,
+                               stride_h, stride_w,
+                               pad_h, pad_w,
+                               dh, dw,
+                               ceil_mode);
+
+        grad_input = torch.from_numpy(grad_input_np).reshape(input.shape)
+        return grad_input, None, None, None, None, None
+
+def MaxPool2d(input, kernel_size, stride, padding, dilation, ceil_mode):
+    return MaxPool2dFunc.apply(input, kernel_size, stride, padding, dilation, ceil_mode)

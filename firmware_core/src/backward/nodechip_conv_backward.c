@@ -72,6 +72,47 @@ static inline bool split_oh_or_ow(
     return true;
 }
 
+static inline bool split_kh_or_kw(
+        int *slice,
+        int *secs,
+        int stride,
+        int ic,
+        int oc,
+        int ih_or_iw,
+        int oh_or_ow,
+        int kh_or_kw,
+        int dh_or_dw,
+        int other_size,
+        data_type_t idtype,
+        data_type_t odtype) {
+    bool valid = false;
+    int slice_new = *slice;
+    do {
+        if (slice_new == 1) {
+            *slice = slice_new;
+            --(*secs);
+            return false;
+        }
+        slice_new = DIV_UP(*slice, *secs);
+
+        int kslice_ext = dh_or_dw * (slice_new - 1) + 1;
+        int islice = (oh_or_ow - 1) * stride + kslice_ext;
+
+        unsigned int wsize = MIN(oc, NPU_NUM) * (idtype == DT_FP32 ? ic : ALIGN(ic, 32)) * slice_new * kh_or_kw * tpu_data_type_size(idtype);
+        unsigned int isize = DIV_UP(ic, NPU_NUM) * tpu_aligned_feature_size(islice, ih_or_iw, idtype);
+        unsigned int total_size = ALIGN(isize, BANK_SIZE) * 2 +
+                                  ALIGN(wsize, BANK_SIZE) * 2 +
+                                  other_size;
+        valid = total_size <= (unsigned int)LOCAL_MEM_SIZE;
+
+        ++(*secs);
+    } while(!valid);
+    *slice = slice_new;
+    --(*secs);
+    return true;
+}
+
+
 typedef struct {
     int nsecs;
     int ohsecs;
@@ -237,71 +278,115 @@ static void grad_weight_split(
     int khslice = kh;
     int kwslice = kw;
 
-    int isize_pern = DIV_UP(ic, NPU_NUM) * tpu_aligned_feature_size(ih, iw, idtype);
-    // split n simply
-    // isize can use 9 banks(if not grad_bias_enable, will be 11)
-    unsigned int isize = n * isize_pern;
-    if (isize > (unsigned int)((grad_bias_enable ? 9 : 11) * BANK_SIZE))
-        nslice = (grad_bias_enable ? 9 : 11) * BANK_SIZE / isize_pern;
-    TPUKERNEL_ASSERT(nslice >= 1);
-    secs_info->nsecs = DIV_UP(n, nslice);
-    isize = nslice * DIV_UP(ic, NPU_NUM) * tpu_aligned_feature_size(ih, iw, idtype);
-
-    // split kh & kw
-    unsigned int i_bank_size = ALIGN(isize, BANK_SIZE) / BANK_SIZE;
-    unsigned int w_bank_size = LOCAL_MEM_BANKS - i_bank_size - (2 + (grad_bias_enable ? 2 : 0) + 1);
-    unsigned int w_coeff = (idtype == DT_FP32 ? ic : ALIGN(ic, 32)) *
-                     kernel->h * kernel->w * tpu_data_type_size(idtype);
-    int khwslice = w_bank_size / 2 * BANK_SIZE / w_coeff;
-    if (khwslice == 0) {
-        ocslice = NPU_NUM;
-        int w_coeff_perw = (idtype == DT_FP32 ? ic : ALIGN(ic, 32)) * 1 * kernel->w * tpu_data_type_size(idtype);
-        khwslice = w_bank_size / 2 * BANK_SIZE / w_coeff_perw;
-        if (khwslice >= 1) {
-            khslice = khwslice;
-            secs_info->khsecs = DIV_UP(kh, khslice);
-        } else {
-            int w_coeff_min = (idtype == DT_FP32 ? ic : ALIGN(ic, 32)) * 1 * 1 * tpu_data_type_size(idtype);
-            khwslice = w_bank_size / 2 * BANK_SIZE / w_coeff_min;
-            if (khwslice == 0) TPUKERNEL_ASSERT(0);
-            secs_info->kwsecs = DIV_UP(kw, khwslice);
-        }
-    } else {
-      ocslice = w_bank_size / 2 * BANK_SIZE / w_coeff * NPU_NUM;
-    }
-    secs_info->ocsecs = DIV_UP(oc, ocslice);
+    unsigned int isize = nslice * DIV_UP(ic, NPU_NUM) * tpu_aligned_feature_size(ih, iw, idtype);
     unsigned int wsize = DIV_UP(ocslice, NPU_NUM) * (idtype == DT_FP32 ? ic : ALIGN(ic, 32)) * khslice * kwslice * tpu_data_type_size(idtype);
-    w_bank_size = ALIGN(wsize, BANK_SIZE) / BANK_SIZE * 2;
-
-    unsigned int last_ocslice = ocslice;
-
-    unsigned int o_bank_size = LOCAL_MEM_BANKS - i_bank_size - w_bank_size - ((grad_bias_enable ? 2 : 0) + 1);
-    //split oc
-    int max_size_per_64oc = MAX(nslice * tpu_aligned_feature_size(oh, ow, odtype), tpu_aligned_feature_size(1, 32, idtype));
-    ocslice = MIN(last_ocslice, o_bank_size / 2 * BANK_SIZE / max_size_per_64oc * NPU_NUM);
-    if (ocslice == 0) {
-        // split n secondly
-        nslice = o_bank_size / 2 * BANK_SIZE / tpu_aligned_feature_size(oh, ow, odtype);
-        secs_info->nsecs = DIV_UP(n, nslice);
-        ocslice = MIN(last_ocslice, (unsigned int)NPU_NUM);
-    }
-    TPUKERNEL_ASSERT(ocslice > 0);
-    secs_info->ocsecs = DIV_UP(oc, ocslice);
-
-    isize = nslice * DIV_UP(ic, NPU_NUM) * tpu_aligned_feature_size(ih, iw, idtype);
-    wsize = DIV_UP(ocslice, NPU_NUM) * (idtype == DT_FP32 ? ic : ALIGN(ic, 32)) * khslice * kwslice * tpu_data_type_size(idtype);
     unsigned int osize = nslice * DIV_UP(ocslice, NPU_NUM) * tpu_aligned_feature_size(oh, ow, odtype);
     unsigned int grad_bias_size = grad_bias_enable ? DIV_UP(ocslice, NPU_NUM) * tpu_aligned_feature_size(1, 1, idtype): 0;
     unsigned int buffer_size = grad_bias_enable ? DIV_UP(ocslice, NPU_NUM) * tpu_aligned_feature_size(1, 32, idtype) : 0;
-    buffer_size = MAX(buffer_size, osize);
+    buffer_size = MAX(buffer_size, osize);// or no need
 
     unsigned int total_size = ALIGN(isize, BANK_SIZE) +
-                              ALIGN(osize, BANK_SIZE) * 2 +
-                              ALIGN(wsize, BANK_SIZE) * 2 +
-                              ALIGN(grad_bias_size, BANK_SIZE) * 2 +
+                              ALIGN(wsize, BANK_SIZE) +
+                              ALIGN(osize, BANK_SIZE) +
+                              ALIGN(grad_bias_size, BANK_SIZE) +
                               ALIGN(buffer_size, BANK_SIZE);
+    if (total_size <= (unsigned int)LOCAL_MEM_SIZE) return;
 
-    TPUKERNEL_ASSERT(total_size <= (unsigned int)LOCAL_MEM_SIZE);
+    unsigned int pern_isize = DIV_UP(ic, NPU_NUM) * tpu_aligned_feature_size(ih, iw, idtype);
+    unsigned int pern_osize = DIV_UP(ocslice, NPU_NUM) * tpu_aligned_feature_size(oh, ow, odtype);
+    unsigned int pern_buffer_size = grad_bias_enable ? DIV_UP(ocslice, NPU_NUM) * tpu_aligned_feature_size(1, 32, idtype) : 0;
+    pern_buffer_size = MAX(pern_buffer_size, pern_osize);
+    unsigned int pern_total_size = ALIGN(pern_isize, BANK_SIZE) * 2 +
+                                   ALIGN(pern_osize, BANK_SIZE) * 2 +
+                                   ALIGN(wsize, BANK_SIZE) +
+                                   ALIGN(grad_bias_size, BANK_SIZE) +
+                                   ALIGN(pern_buffer_size, BANK_SIZE);
+    if (pern_total_size <= (unsigned int)LOCAL_MEM_SIZE) {
+        unsigned int nslice_iosize = (unsigned int)LOCAL_MEM_SIZE
+                                   - ALIGN(wsize, BANK_SIZE)
+                                   - ALIGN(grad_bias_size, BANK_SIZE);
+        while(1) {
+            if (secs_info->nsecs == n) break;
+            unsigned int nslice_isize = nslice * pern_isize;
+            unsigned int nslice_osize = nslice * pern_osize;
+            pern_buffer_size = grad_bias_enable ? DIV_UP(ocslice, NPU_NUM) * tpu_aligned_feature_size(1, 32, idtype) : 0;
+            pern_buffer_size = MAX(pern_buffer_size, nslice_osize);
+            if (ALIGN(nslice_isize, BANK_SIZE) * 2 +
+                ALIGN(nslice_osize, BANK_SIZE) * 2 +
+                ALIGN(pern_buffer_size, BANK_SIZE) <= nslice_iosize) {
+                break;
+            } else {
+                secs_info->nsecs++;
+                nslice = DIV_UP(n, secs_info->nsecs);
+            }
+        }
+        return;
+    } else {
+        nslice = 1;
+        secs_info->nsecs = n;
+    }
+
+    unsigned int pern_64oc_isize = DIV_UP(ic, NPU_NUM) * tpu_aligned_feature_size(ih, iw, idtype);
+    unsigned int pern_64oc_osize = tpu_aligned_feature_size(oh, ow, odtype);
+    unsigned int pern_64oc_wsize = MIN(oc, NPU_NUM) * (idtype == DT_FP32 ? ic : ALIGN(ic, 32)) * khslice * kwslice * tpu_data_type_size(idtype);
+    unsigned int pern_64oc_grad_bias_size = grad_bias_enable ? tpu_aligned_feature_size(1, 1, idtype): 0;
+    unsigned int pern_64oc_buffer_size = grad_bias_enable ? tpu_aligned_feature_size(1, 32, idtype) : 0;
+    pern_64oc_buffer_size = MAX(pern_64oc_buffer_size, pern_64oc_osize);// or no need
+    unsigned int pern_64oc_total_size = ALIGN(pern_64oc_isize, BANK_SIZE) * 2 +
+                                        ALIGN(pern_64oc_osize, BANK_SIZE) * 2 +
+                                        ALIGN(pern_64oc_wsize, BANK_SIZE) * (oc > NPU_NUM ? 2 : 1) +
+                                        ALIGN(pern_64oc_grad_bias_size, BANK_SIZE) * (oc > NPU_NUM ? 2 : 1) +
+                                        ALIGN(pern_64oc_buffer_size, BANK_SIZE);
+    if (pern_64oc_total_size <= (unsigned int)LOCAL_MEM_SIZE) {
+        unsigned int pern_64oc_free_size = (unsigned int)LOCAL_MEM_SIZE - ALIGN(pern_64oc_isize, BANK_SIZE) * 2;
+        unsigned int pern_64oc_size = ALIGN(pern_64oc_osize, BANK_SIZE) * 2 +
+                                      ALIGN(pern_64oc_wsize, BANK_SIZE) * (oc > NPU_NUM ? 2 : 1) +
+                                      ALIGN(pern_64oc_grad_bias_size, BANK_SIZE) * (oc > NPU_NUM ? 2 : 1) +
+                                      ALIGN(pern_64oc_buffer_size, BANK_SIZE);
+        ocslice = pern_64oc_free_size / pern_64oc_size * NPU_NUM;
+        secs_info->ocsecs = DIV_UP(oc, ocslice);
+        return;
+    } else {
+        ocslice = MIN(NPU_NUM, oc);
+        secs_info->ocsecs = DIV_UP(oc, ocslice);
+    }
+
+    //split kh&kw
+    bool valid = false;
+    unsigned int other_size = ALIGN(pern_64oc_osize, BANK_SIZE) * 2 +
+                              ALIGN(pern_64oc_grad_bias_size, BANK_SIZE) * (oc > NPU_NUM ? 2 : 1) +
+                              ALIGN(pern_64oc_buffer_size, BANK_SIZE);
+    valid = split_kh_or_kw(
+            &khslice,
+            &(secs_info->khsecs),
+            stride->h,
+            ic,
+            oc,
+            iw,
+            oh,
+            kwslice,
+            dilation->h,
+            other_size,
+            idtype,
+            odtype);
+    if (!valid) {
+        int khslice_ext = dilation->h * (khslice - 1) + 1;
+        int ihslice = (oh - 1) * stride->h + khslice_ext;
+        valid = split_kh_or_kw(
+                &kwslice,
+                &(secs_info->kwsecs),
+                stride->w,
+                ic,
+                oc,
+                ihslice,
+                ow,
+                khslice,
+                dilation->w,
+                other_size,
+                idtype,
+                odtype);
+    }
+    TPUKERNEL_ASSERT(valid);
 }
 
 static void split_deconv_float(
@@ -426,7 +511,18 @@ static void split_deconv_float(
   [1, oc, DIV_UP(ic, 32) * kh * kw, 32]
   [kh * kw, oc, DIV_UP(ic, 32), 32] => [kh * kw, oc, 1, ic]
   [kh * kw, ic, 1, oc] => [kh * kw, ic, DIV_UP(oc, 32), 32]
-  [1, ic, DIV_UP(ic, 32) * kh * kw, 32]
+  [1, ic, DIV_UP(oc, 32) * kh * kw, 32]
+*/
+
+/*
+ * 32oc -> 32ic
+ * [1, ic, DIV_UP(oc, 32) * kh * kw, 32] => [1, oc, DIV_UP(ic, 32) * kh * kw, 32]
+ *
+ * [1, ic, DIV_UP(oc, 32) * kh * kw, 32]
+   [kh * kw, ic, DIV_UP(oc, 32), 32] => [kh * kw, ic, 1, oc]
+   [kh * kw, oc, 1, ic] => [kh * kw, oc, DIV_UP(ic, 32), 32]
+   [1, oc, DIV_UP(ic, 32) * kh * kw, 32]
+ *
 */
 void nodechip_weight_reorder(
     global_addr_t   weight_global_addr,
@@ -442,14 +538,12 @@ void nodechip_weight_reorder(
     int icsecs = 1;
     int ocslice = oc;
     int icslice = ic;
-    // ocslice icslice min 64
-    // unsigned int kernel_hw_size = kh * kw;
     unsigned int kernel_min_size = MAX(DIV_UP(64, 32) * kh * kw * 32,
                                        DIV_UP(64, 32) * kh * kw * 32);//32 * kh * kw;
     TPUKERNEL_ASSERT(kernel_min_size <= (unsigned int)(LOCAL_MEM_SIZE / 4));
-    icslice = DIV_UP((unsigned int)(LOCAL_MEM_SIZE / 4), kernel_min_size);
-    ocslice = DIV_UP((unsigned int)(LOCAL_MEM_SIZE / 4),
-                        DIV_UP(oc, 64) * ALIGN(DIV_UP(ic, 32) * kh * kw * 32, tpu_eu_num(dtype)));
+    ocslice = DIV_UP((unsigned int)(LOCAL_MEM_SIZE / 4), kernel_min_size);
+    icslice = DIV_UP((unsigned int)(LOCAL_MEM_SIZE / 4),
+                        DIV_UP(ic, 64) * ALIGN(DIV_UP(oc, 32) * kh * kw * 32, tpu_eu_num(dtype)));
 
     icsecs = DIV_UP(ic, icslice);
     ocsecs = DIV_UP(oc, ocslice);
@@ -461,47 +555,78 @@ void nodechip_weight_reorder(
 
     bool ping = true;
     bool parallel_branch = false;
-    // [ic, oc, kh, kw] => [oc, ic, 1, kh * kw] => [oc, 1, kh * kw, ic] => [1, oc, kh * kw, ic]
 
     int last_ocstart = 0;
     int last_ocslice = 0;
     int last_icstart = 0;
     int last_icslice = 0;
 
-    int ocstart = 0;
-    int ocend = 0;
-    for (int ocidx = 0; ocidx < ocsecs; ocidx++) {
-        ocstart = ocend;
-        ocslice = MIN(ocslice, oc - ocend);
-        ocend = ocstart + ocslice;
+    icsecs = 2;
+    ocsecs = 1;
 
-        int icstart = 0;
-        int icend = 0;
-        for (int icidx = 0; icidx < icsecs; icidx++) {
-            icstart = icend;
-            icslice = MIN(icslice, ic - icend);
-            icend = icstart + icslice;
+    int icstart = 0;
+    int icend = 0;
+    for (int icidx = 0; icidx < icsecs; icidx++) {
+        icstart = icend;
+        //icslice = MIN(icslice, ic - icend);
+        icslice = ic / icsecs + ((ic % icsecs) > icidx);
+        icend = icstart + icslice;
 
-            // [1, oc, DIV_UP(ic, 32) * kh * kw, 32] => [kh * kw, oc, DIV_UP(ic, 32), 32]
-            //dim4 src_shape = {1, ocslice, DIV_UP(icslice, 32) * kh * kw, 32};
-            dim4 dst_shape = {kh * kw,
-                              ocslice,
-                              DIV_UP(icslice, 32),
-                              icslice >= 32 ? 32 : icslice};
-            dim4 src_stride = {32,
-                               DIV_UP(ic, 32) * kh * kw * 32,
-                               32 * kh * kw,
-                               1};
-            tpu_gdma_cpy_S2L(
-                ping ? iaddr_ping : iaddr_pong,
-                weight_global_addr +
-                    (ocstart * DIV_UP(ic, 32) * kh * kw * 32 +
-                     icstart / 32 * kh * kw * 32 +
-                     icstart % 32) * tpu_data_type_size(dtype),
-                &dst_shape,
-                NULL,
-                &src_stride,
-                dtype);
+        int ocstart = 0;
+        int ocend = 0;
+        for (int ocidx = 0; ocidx < ocsecs; ocidx++) {
+            ocstart = ocend;
+            //ocslice = MIN(ocslice, oc - ocend);
+            ocslice = oc / ocsecs + ((oc % ocsecs) > ocidx);
+            ocend = ocstart + ocslice;
+
+            // [1, ic, DIV_UP(oc, 32) * kh * kw, 32] => [kh * kw, ic, DIV_UP(oc, 32), 32]
+            //dim4 src_shape = {1, icslice, DIV_UP(ocslice, 32) * kh * kw, 32};
+            if (ocsecs > 1 && ocstart % 32 > 0 && (ocstart % 32 + ocslice > 32)) {
+                int ocslice_part_one = 32 - ocstart % 32;
+                int ocslice_part_two = ocslice - ocslice_part_one;
+                dim4 src_stride = {32, DIV_UP(oc, 32) * kh * kw * 32, 32 * kh * kw, 1};
+                dim4 dst_shape = {kh * kw, icslice, 1, ocslice_part_one};
+                tpu_gdma_cpy_S2L(
+                    ping ? iaddr_ping : iaddr_pong,
+                    weight_global_addr +
+                        (icstart * DIV_UP(oc, 32) * kh * kw * 32 +
+                         ocstart / 32 * kh * kw * 32 +
+                         ocstart % 32) * tpu_data_type_size(dtype),
+                    &dst_shape,
+                    NULL,
+                    &src_stride,
+                    dtype);
+                dst_shape.h = DIV_UP(ocslice_part_two, 32);
+                dst_shape.w = 32;
+                tpu_gdma_cpy_S2L(
+                    ping ? iaddr_ping + ocslice_part_one * tpu_data_type_size(dtype)
+                         : iaddr_pong + ocslice_part_one * tpu_data_type_size(dtype),
+                    weight_global_addr +
+                        (icstart * DIV_UP(oc, 32) * kh * kw * 32 +
+                         (ocstart + ocslice_part_one) / 32 * kh * kw * 32 +
+                         (ocstart + ocslice_part_one) % 32) * tpu_data_type_size(dtype),
+                    &dst_shape,
+                    NULL,
+                    &src_stride,
+                    dtype);
+            } else {
+                dim4 dst_shape = {kh * kw, icslice, DIV_UP(ocslice, 32), 32};
+                dim4 src_stride = {32,
+                                   DIV_UP(oc, 32) * kh * kw * 32,
+                                   32 * kh * kw,
+                                   1};
+                tpu_gdma_cpy_S2L(
+                    ping ? iaddr_ping : iaddr_pong,
+                    weight_global_addr +
+                        (icstart * DIV_UP(oc, 32) * kh * kw * 32 +
+                         ocstart / 32 * kh * kw * 32 +
+                         ocstart % 32) * tpu_data_type_size(dtype),
+                    &dst_shape,
+                    NULL,
+                    &src_stride,
+                    dtype);
+            }
 
             if (parallel_branch) {
                 tpu_parallel_end();
@@ -509,9 +634,18 @@ void nodechip_weight_reorder(
             tpu_parallel_start();
             parallel_branch = true;
 
-            // [kh * kw, oc, DIV_UP(ic, 32), 32] can consider as [kh * kw, oc, 1, ic]
-            dim4 cw_dst_shape = {kh * kw, icslice, 1, ocslice};
-            // [kh * kw, oc, 1, ic] => [kh * kw, ic, 1, oc]
+            scalar_t zero = {.f32 = 0.0f};
+            dim4 zero_shape = {kh * kw, ocslice, 1, ALIGN(icslice, 32)};
+            tpu_bdc_set_C(
+                ping ? oaddr_ping : oaddr_pong,
+                tpu_cast(zero, dtype, DT_FP32, RM_HALF_AWAY_FROM_ZERO),
+                &zero_shape,
+                NULL,
+                dtype);
+
+            // [kh * kw, ic, DIV_UP(oc, 32), 32] can consider as [kh * kw, ic, 1, oc]
+            dim4 cw_dst_shape = {kh * kw, ocslice, 1, icslice};
+            // [kh * kw, ic, 1, oc] => [kh * kw, oc, 1, ic]
             if (cw_dst_shape.w <= cw_dst_shape.c) {
                 tpu_bdc_cw_trans(
                     ping ? oaddr_ping : oaddr_pong,
@@ -526,27 +660,67 @@ void nodechip_weight_reorder(
                     dtype);
             }
 
-            // [kh * kw, ic, 1, oc] can consider as [kh * kw, ic, DIV_UP(oc, 32), 32]
-            // [kh * kw, ic, DIV_UP(oc, 32), 32] => [1, ic, DIV_UP(oc, 32) * kh * kw, 32]
+            // [kh * kw, oc, 1, ic] can consider as [kh * kw, oc, DIV_UP(ic, 32), 32]
+            // [kh * kw, oc, DIV_UP(ic, 32), 32] => [1, oc, DIV_UP(ic, 32) * kh * kw, 32]
             if (icidx > 0 || ocidx > 0) {
-                dim4 reordered_shape = {kh * kw,
-                                        last_icslice,
-                                        DIV_UP(last_ocslice, 32),
-                                        last_icslice >= 32 ? 32 : last_icslice};
-                dim4 reordered_stride = {32,
-                                         DIV_UP(oc, 32) * kh * kw * 32,
-                                         32 * kh * kw,
-                                         1};
-                tpu_gdma_cpy_L2S(
-                    weight_reordered_global_addr +
-                        (last_icstart * DIV_UP(oc, 32) * kh * kw * 32 +
-                         last_ocstart / 32 * kh * kw * 32 +
-                         last_ocstart % 32) * tpu_data_type_size(dtype),
-                    ping ? oaddr_pong : oaddr_ping,
-                    &reordered_shape,
-                    &reordered_stride,
-                    NULL,
-                    dtype);
+                if (icsecs > 1 && last_icstart % 32 > 0 && ((last_icstart % 32 + last_icslice) > 32)) {
+                    int last_icslice_part_one = 32 - last_icstart % 32;
+                    int last_icslice_part_two = last_icslice - last_icslice_part_one;
+                    dim4 last_reordered_shape;
+                    last_reordered_shape.n = kh * kw;
+                    last_reordered_shape.c = last_ocslice;
+                    dim4 last_reordered_stride = {32, DIV_UP(ic, 32) * kh * kw * 32, 32 * kh * kw, 1};
+                    for (int idx = 0; idx < 2; idx++) {
+                        if (idx == 0) {
+                            last_reordered_shape.h = 1;
+                            last_reordered_shape.w = last_icslice_part_one;
+                            tpu_gdma_cpy_L2S(
+                                weight_reordered_global_addr +
+                                    (last_ocstart * DIV_UP(ic, 32) * kh * kw * 32 +
+                                     last_icstart / 32 * kh * kw * 32 +
+                                     last_icstart % 32) * tpu_data_type_size(dtype),
+                                ping ? oaddr_pong : oaddr_ping,
+                                &last_reordered_shape,
+                                &last_reordered_stride,
+                                NULL,
+                                dtype);
+                        } else if (idx == 1) {
+                            last_reordered_shape.h = DIV_UP(last_icslice_part_two, 32);
+                            last_reordered_shape.w = 32;
+                            tpu_gdma_cpy_L2S(
+                                weight_reordered_global_addr +
+                                    (last_ocstart * DIV_UP(ic, 32) * kh * kw * 32 +
+                                     (last_icstart + last_icslice_part_one) / 32 * kh * kw * 32 +
+                                     (last_icstart + last_icslice_part_one) % 32) * tpu_data_type_size(dtype),
+                                ping ? oaddr_pong + last_icslice_part_one * tpu_data_type_size(dtype)
+                                     : oaddr_ping + last_icslice_part_one * tpu_data_type_size(dtype),
+                                &last_reordered_shape,
+                                &last_reordered_stride,
+                                NULL,
+                                dtype);
+                        }
+                    }
+                } else {
+                    dim4 last_reordered_shape = {kh * kw,
+                                                 last_ocslice,
+                                                 DIV_UP(last_icslice, 32),
+                                                 //32};
+                                                 last_icstart % 32 != 0 ? ALIGN(last_icstart, 32) - last_icstart : 32};
+                    dim4 last_reordered_stride = {32,
+                                                  DIV_UP(ic, 32) * kh * kw * 32,
+                                                  32 * kh * kw,
+                                                  1};
+                    tpu_gdma_cpy_L2S(
+                        weight_reordered_global_addr +
+                            (last_ocstart * DIV_UP(ic, 32) * kh * kw * 32 +
+                             last_icstart / 32 * kh * kw * 32 +
+                             last_icstart % 32) * tpu_data_type_size(dtype),
+                        ping ? oaddr_pong : oaddr_ping,
+                        &last_reordered_shape,
+                        &last_reordered_stride,
+                        NULL,
+                        dtype);
+                }
             }
             ping = !ping;
             last_ocstart = ocstart;
@@ -556,24 +730,65 @@ void nodechip_weight_reorder(
         }
     }
     tpu_parallel_end();
-    dim4 last_reordered_shape = {kh * kw,
-                                 last_icslice,
-                                 DIV_UP(last_ocslice, 32),
-                                 last_icslice >= 32 ? 32 : last_icslice};
-    dim4 last_reordered_stride = {32,
-                                  DIV_UP(oc, 32) * kh * kw * 32,
-                                  32 * kh * kw,
-                                  1};
-    tpu_gdma_cpy_L2S(
-        weight_reordered_global_addr +
-            (last_icstart * DIV_UP(oc, 32) * kh * kw * 32 +
-             last_ocstart / 32 * kh * kw * 32 +
-             last_ocstart % 32) * tpu_data_type_size(dtype),
-        ping ? oaddr_pong : oaddr_ping,
-        &last_reordered_shape,
-        &last_reordered_stride,
-        NULL,
-        dtype);
+    if (icsecs > 1 && last_icstart % 32 > 0 && ((last_icstart % 32 + last_icslice) > 32)) {
+        int last_icslice_part_one = 32 - last_icstart % 32;
+        int last_icslice_part_two = last_icslice - last_icslice_part_one;
+        dim4 last_reordered_shape;
+        last_reordered_shape.n = kh * kw;
+        last_reordered_shape.c = last_ocslice;
+        dim4 last_reordered_stride = {32, DIV_UP(ic, 32) * kh * kw * 32, 32 * kh * kw, 1};
+        for (int idx = 0; idx < 2; idx++) {
+            if (idx == 0) {
+                last_reordered_shape.h = 1;
+                last_reordered_shape.w = last_icslice_part_one;
+                tpu_gdma_cpy_L2S(
+                    weight_reordered_global_addr +
+                        (last_ocstart * DIV_UP(ic, 32) * kh * kw * 32 +
+                         last_icstart / 32 * kh * kw * 32 +
+                         last_icstart % 32) * tpu_data_type_size(dtype),
+                    ping ? oaddr_pong : oaddr_ping,
+                    &last_reordered_shape,
+                    &last_reordered_stride,
+                    NULL,
+                    dtype);
+                //last_icstart += last_reordered_shape.w;
+            } else if (idx == 1) {
+                last_reordered_shape.h = DIV_UP(last_icslice_part_two, 32);
+                last_reordered_shape.w = 32;
+                tpu_gdma_cpy_L2S(
+                    weight_reordered_global_addr +
+                        (last_ocstart * DIV_UP(ic, 32) * kh * kw * 32 +
+                         (last_icstart + last_icslice_part_one) / 32 * kh * kw * 32 +
+                         (last_icstart + last_icslice_part_one) % 32) * tpu_data_type_size(dtype),
+                    ping ? oaddr_pong + last_icslice_part_one * tpu_data_type_size(dtype)
+                         : oaddr_ping + last_icslice_part_one * tpu_data_type_size(dtype),
+                    &last_reordered_shape,
+                    &last_reordered_stride,
+                    NULL,
+                    dtype);
+            }
+        }
+    } else {
+        dim4 last_reordered_shape = {kh * kw,
+                                     last_ocslice,
+                                     DIV_UP(last_icslice, 32),
+                                     //31};
+                                     last_icstart % 32 != 0 ? ALIGN(last_icstart, 32) - last_icstart : 32};
+        dim4 last_reordered_stride = {32,
+                                      DIV_UP(ic, 32) * kh * kw * 32,
+                                      32 * kh * kw,
+                                      1};
+        tpu_gdma_cpy_L2S(
+            weight_reordered_global_addr +
+                (last_ocstart * DIV_UP(ic, 32) * kh * kw * 32 +
+                 last_icstart / 32 * kh * kw * 32 +
+                 last_icstart % 32) * tpu_data_type_size(dtype),
+            ping ? oaddr_pong : oaddr_ping,
+            &last_reordered_shape,
+            &last_reordered_stride,
+            NULL,
+            dtype);
+    }
 }
 
 // grad_out deconv (trans)weight => grad_input
@@ -669,37 +884,7 @@ void nodechip_conv_backward_input(
                             kh,
                             kw,
                             idtype);
-/*
-    // weight reorder
-    u32 weight_size = oc * ic * kh * kw * sizeof(short);
-    u32 weight_reordered_size = ALIGN(ic, 32) * kh * kw * oc * sizeof(short);
-    u8 weight_data[weight_size], weight_reordered_data[weight_reordered_size];
-    memset((void*)weight_reordered_data, 0, weight_reordered_size);
-    tpu_invalidate_cache(forward_weight_global_addr, ALIGN(weight_size, 64));
-    memcpy(weight_data, GET_GLOBAL_ADDR(forward_weight_global_addr), weight_size);
-    for (int oc_idx = 0; oc_idx < oc; oc_idx++) {
-      for (int ic_idx = 0; ic_idx < ceiling_func(ic, 32); ic_idx++) {
-        for (int k_idx = 0; k_idx < kh * kw;  k_idx++) {
-          for (int inner = 0; inner < 32; inner++) {
-            if (ic_idx * 32 + inner >= ic) break;
-//            int src_idx = oc_idx * ic * kh * kw +
-//                          (ic_idx * 32 + inner) * kh * kw +
-//                          k_idx;
-            int src_idx = (ic_idx * 32 + inner) * oc * kh * kw +
-                          oc_idx * kh * kw +
-                          k_idx;
-            int dst_idx = oc_idx * ceiling_func(ic, 32) * kh * kw * 32 +
-                          ic_idx * kh * kw * 32 +
-                          k_idx * 32 +
-                          inner;
-            ((u16*)weight_reordered_data)[dst_idx] = ((u16*)weight_data)[src_idx];
-          }
-        }
-      }
-    }
-    memcpy(GET_GLOBAL_ADDR(weight_reordered_global_addr), weight_reordered_data, weight_reordered_size);
-    tpu_flush_cache(weight_reordered_global_addr, ALIGN(weight_reordered_size, 64));
-*/
+
     global_addr_t input_global_addr = grad_out_global_addr;
     global_addr_t weight_global_addr = weight_reordered_global_addr;
     global_addr_t output_global_addr = grad_input_global_addr;
@@ -799,13 +984,13 @@ void nodechip_conv_backward_input(
                         dim4 oslice_shape = {nslice, ocslice, ohslice, owslice};
                         // copy input from global
                         tpu_gdma_cpy_S2L(
-                            (ping ? iaddr_ping : iaddr_pong),
+                            ping ? iaddr_ping : iaddr_pong,
                             input_global_addr + (nstart * istride.n + gidx * ic * istride.c +
                                 ihstart * istride.h + iwstart) * tpu_data_type_size(idtype),
-                               &islice_shape,
-                               NULL,
-                               &istride,
-                               idtype);
+                            &islice_shape,
+                            NULL,
+                            &istride,
+                            idtype);
 
                         if (parallel_branch) {
                             tpu_parallel_end();
@@ -905,6 +1090,10 @@ void nodechip_grad_output_reorder(
     if (slice == 0) {
         bool valid = false;
         while (!valid) {
+            if (icsecs == ic) {
+                TPUKERNEL_LOG("grad output transposed need to split h&w!");
+                TPUKERNEL_ASSERT(false);
+                }
             icsecs++;
             icslice = DIV_UP(ic, icsecs);
             ic_size = DIV_UP(icslice, NPU_NUM) * tpu_aligned_feature_size(kh , kw, dtype);
@@ -972,6 +1161,15 @@ void nodechip_grad_output_reorder(
             tpu_parallel_start();
             parallel_branch = true;
 
+            scalar_t zero = {.f32 = 0.0f};
+            dim4 zero_shape = {ocslice, kh * kw, 1, ALIGN(icslice, 32)};
+            tpu_bdc_set_C(
+                ping ? oaddr_ping : oaddr_pong,
+                tpu_cast(zero, dtype, DT_FP32, RM_HALF_AWAY_FROM_ZERO),
+                &zero_shape,
+                NULL,
+                dtype);
+
             dim4 cw_dst_shape = {ocslice, kh * kw, 1, icslice};
             // [oc, ic, 1, kh * kw] => [oc, kh * kw, 1, ic]
             if (cw_dst_shape.w <= cw_dst_shape.c) {
@@ -991,7 +1189,7 @@ void nodechip_grad_output_reorder(
                 dim4 reordered_shape = {last_ocslice,
                                         kh * kw,
                                         DIV_UP(last_icslice, 32),
-                                        last_icslice >= 32 ? 32 : last_icslice};
+                                        32};//last_icslice >= 32 ? 32 : last_icslice};
                 dim4 reordered_stride = {DIV_UP(ic, 32) * kh * kw * 32, 32, kh * kw * 32, 1};
                 tpu_gdma_cpy_L2S(
                     grad_out_reordered_global_addr +
@@ -1015,7 +1213,7 @@ void nodechip_grad_output_reorder(
     dim4 last_reordered_shape = {last_ocslice,
                                  kh * kw,
                                  DIV_UP(last_icslice, 32),
-                                 last_icslice >= 32 ? 32 : last_icslice};
+                                 32};//last_icslice >= 32 ? 32 : last_icslice};
     dim4 last_reordered_stride = {DIV_UP(ic, 32) * kh * kw * 32, 32, kh * kw * 32, 1};
     tpu_gdma_cpy_L2S(
         grad_out_reordered_global_addr +
@@ -1053,6 +1251,10 @@ void nodechip_conv_backward_weight(
     stride.w = forward_dilation->w;
     dilation.h = forward_stride->h;
     dilation.w = forward_stride->w;
+    //stride.h = forward_stride->h;
+    //stride.w = forward_stride->w;
+    //dilation.h = forward_dilation->h;
+    //dilation.w = forward_dilation->w;
 
     int n = forward_input_shape->c;
     int ic = forward_input_shape->n;
@@ -1063,8 +1265,6 @@ void nodechip_conv_backward_weight(
     int ow = forward_kernel->w;
     int kh = grad_out_shape->h;
     int kw = grad_out_shape->w;
-    int kh_ext = dilation.h * (kh - 1) + 1;
-    int kw_ext = dilation.w * (kw - 1) + 1;
     //int ih_ext = (ih - 1) + pad->top + pad->bottom + 1;
     //int iw_ext = (iw - 1) + pad->left + pad->right + 1;
     //int output_h = (ih_ext - kh_ext) / stride->h + 1;
@@ -1077,8 +1277,6 @@ void nodechip_conv_backward_weight(
     dim2 kernel = {kh, kw};
 
     grad_weight_secs_info_t secs_info;
-    // ocsecs can more
-    // nsecs need less
     grad_weight_split(
             &ishape,
             &oshape,
@@ -1091,17 +1289,22 @@ void nodechip_conv_backward_weight(
             grad_bias_enable,
             &secs_info);
 
+    bool split_n = secs_info.nsecs != 1;
+    bool split_oc = secs_info.ocsecs != 1;
     bool split_kernel = secs_info.khsecs != 1 || secs_info.kwsecs != 1;
+    bool split_input = split_n || split_kernel;
+    bool split_weight = split_oc || split_kernel;
+    bool split_output = split_n || split_oc;
 
     int nslice = DIV_UP(ishape.n, secs_info.nsecs);
     int ocslice = DIV_UP(oc, secs_info.ocsecs);
     ocslice = secs_info.ocsecs > 1 ? ALIGN(ocslice, NPU_NUM) : ocslice;
     int khslice = DIV_UP(kh, secs_info.khsecs);
     int kwslice = DIV_UP(kw, secs_info.kwsecs);
-    kh_ext = dilation.h * (kh - 1) + 1;
-    kw_ext = dilation.w * (kw - 1) + 1;
-    int ihslice = MIN((oh - 1) * stride.h + kh_ext, ishape.h);
-    int iwslice = MIN((ow - 1) * stride.w + kw_ext, ishape.w);
+    int khslice_ext = dilation.h * (khslice - 1) + 1;
+    int kwslice_ext = dilation.w * (kwslice - 1) + 1;
+    int ihslice = MIN((oh - 1) * stride.h + khslice_ext, ishape.h);
+    int iwslice = MIN((ow - 1) * stride.w + kwslice_ext, ishape.w);
     TPUKERNEL_DBG("nsecs=%d  nslice=%d\n", secs_info.nsecs, nslice);
     TPUKERNEL_DBG("ocsecs=%d  ocslice=%d\n", secs_info.ocsecs, ocslice);
     TPUKERNEL_DBG("khsecs=%d  khslice=%d\n", secs_info.khsecs, khslice);
@@ -1117,20 +1320,34 @@ void nodechip_conv_backward_weight(
     if (grad_bias_enable) buffer_size = DIV_UP(ocslice, NPU_NUM) * tpu_aligned_feature_size(1, 32, idtype);
     if (secs_info.khsecs != 1 || secs_info.kwsecs != 1) buffer_size = MAX(buffer_size, osize);
     unsigned int grad_bias_size = grad_bias_enable ? DIV_UP(ocslice, NPU_NUM) * ALIGN(1 * 1, tpu_eu_num(idtype)) : 0;
-    local_addr_t iaddr = 0;
-    local_addr_t waddr_ping = ALIGN(iaddr + isize, BANK_SIZE);
+
+    local_addr_t iaddr_ping = 0;
+    local_addr_t iaddr_pong = ALIGN(iaddr_ping + isize, BANK_SIZE);
+    if (!split_input) iaddr_pong = iaddr_ping;
+    local_addr_t waddr_ping = ALIGN(iaddr_pong + isize, BANK_SIZE);
     local_addr_t waddr_pong = ALIGN(waddr_ping + wsize, BANK_SIZE);
-    if (!split_kernel) waddr_pong = waddr_ping;
+    if (!split_weight) waddr_pong = waddr_ping;
     local_addr_t oaddr_ping = ALIGN(waddr_pong + wsize, BANK_SIZE);
     local_addr_t oaddr_pong = ALIGN(oaddr_ping + osize, BANK_SIZE);
+    if (!split_output) oaddr_pong = oaddr_ping;
     local_addr_t buffer_addr = ALIGN(oaddr_pong + osize, BANK_SIZE);
-    TPUKERNEL_ASSERT(buffer_addr + buffer_size <= (unsigned int)LOCAL_MEM_SIZE);
-    local_addr_t grad_bias_addr_ping = grad_bias_enable ? ALIGN(buffer_addr + buffer_size, BANK_SIZE) : 0;
+    if (!split_kernel) {
+        buffer_addr = 0;
+        TPUKERNEL_ASSERT(oaddr_pong + osize <= (unsigned int)LOCAL_MEM_SIZE);
+    } else {
+        TPUKERNEL_ASSERT(buffer_addr + buffer_size <= (unsigned int)LOCAL_MEM_SIZE);
+    }
+
+    local_addr_t grad_bias_addr_ping = grad_bias_enable ?
+                                           split_kernel ? ALIGN(buffer_addr + buffer_size, BANK_SIZE) :
+                                                          ALIGN(oaddr_pong + osize, BANK_SIZE) : 0;
     local_addr_t grad_bias_addr_pong = grad_bias_enable ? ALIGN(grad_bias_addr_ping + grad_bias_size, BANK_SIZE) : 0;
+    if (grad_bias_enable && !split_oc)
+        grad_bias_addr_pong = grad_bias_addr_ping;
     if (grad_bias_enable)
         TPUKERNEL_ASSERT(grad_bias_addr_pong + grad_bias_size <= (unsigned int)LOCAL_MEM_SIZE);
-
-    TPUKERNEL_DBG("in local addr = 0x%5x, bank id = %d\n", iaddr, iaddr / BANK_SIZE);
+    TPUKERNEL_DBG("in ping local addr = 0x%5x, bank id = %d\n", iaddr_ping, iaddr_ping / BANK_SIZE);
+    TPUKERNEL_DBG("in pong local addr = 0x%5x, bank id = %d\n", iaddr_pong, iaddr_pong / BANK_SIZE);
     TPUKERNEL_DBG("weight ping local addr = 0x%5x, bank id = %d\n", waddr_ping, waddr_ping / BANK_SIZE);
     TPUKERNEL_DBG("weight pong local addr = 0x%5x, bank id = %d\n", waddr_pong, waddr_pong / BANK_SIZE);
     TPUKERNEL_DBG("out ping local addr = 0x%5x, bank id = %d\n", oaddr_ping, oaddr_ping / BANK_SIZE);
@@ -1141,9 +1358,15 @@ void nodechip_conv_backward_weight(
         TPUKERNEL_DBG("grad_bias ping local addr = 0x%5x, bank id = %d\n", grad_bias_addr_pong, grad_bias_addr_pong / BANK_SIZE);
     }
 
+    dim4 istride = {
+        n * ih * iw,
+        ih * iw,
+        iw,
+        1};
+
     dim4 ostride = {
         oshape.c * oshape.h * oshape.w,
-        oshape.c * oshape.w,
+        oshape.h * oshape.w,
         oshape.w,
         1};
     dim4 wshape = {
@@ -1161,51 +1384,24 @@ void nodechip_conv_backward_weight(
                                  kh,
                                  kw,
                                  idtype);
-/*
-    // grad_out 32n reorder, noneed nc_trans
-    u32 grad_out_size = grad_out_shape->n * grad_out_shape->c * grad_out_shape->h * grad_out_shape->w * sizeof(short);
-    u32 grad_out_reordered_size = ALIGN(grad_out_shape->n, 32) * grad_out_shape->c * grad_out_shape->h * grad_out_shape->w * sizeof(short); 
-    u8 grad_out_data[grad_out_size];
-    u8 grad_out_reordered_data[grad_out_reordered_size];
-    memset((void*)grad_out_reordered_data, 0, grad_out_reordered_size);
-    tpu_invalidate_cache(grad_out_global_addr, ALIGN(grad_out_size, 64));
-    memcpy(grad_out_data, GET_GLOBAL_ADDR(grad_out_global_addr), grad_out_size);
-
-    for (int oc_idx = 0; oc_idx < oc; oc_idx++) {
-      for (int ic_idx = 0; ic_idx < ceiling_func(ic, 32); ic_idx++) {
-        for (int k_idx = 0; k_idx < kh * kw;  k_idx++) {
-          for (int inner = 0; inner < 32; inner++) {
-            if (ic_idx * 32 + inner >= ic) break;
-//            int src_idx = oc_idx * ic * kh * kw +
-//                          (ic_idx * 32 + inner) * kh * kw +
-//                          k_idx;
-            int src_idx = (ic_idx * 32 + inner) * oc * kh * kw +
-                          oc_idx * kh * kw +
-                          k_idx;
-            int dst_idx = oc_idx * ceiling_func(ic, 32) * kh * kw * 32 +
-                          ic_idx * kh * kw * 32 +
-                          k_idx * 32 +
-                          inner;
-            ((u16*)grad_out_reordered_data)[dst_idx] = ((u16*)grad_out_data)[src_idx];
-          }
-        }
-      }
-    }
-    memcpy(GET_GLOBAL_ADDR(grad_out_reordered_global_addr), grad_out_reordered_data, grad_out_reordered_size);
-    tpu_flush_cache(grad_out_reordered_global_addr, ALIGN(grad_out_reordered_size, 64));
-*/
 
     global_addr_t input_global_addr = forward_input_global_addr;
     global_addr_t weight_global_addr = grad_out_reordered_global_addr;
     global_addr_t output_global_addr = grad_weight_global_addr;
 
+    int last_nslice = 0;
+    int last_nstart = 0;
     int last_ocslice = 0;
     int last_ocstart = 0;
 
-    bool ping = true;
+    bool ping_in = true;
+    bool ping_out = true;
+    bool load_input = true;
+    bool load_weight = true;
     // 1st loop: groups
     for (int gidx = 0; gidx < groups; gidx++) {
 
+        bool parallel_branch = false;
         int nstart = 0;
         int nend = 0;
         // 2nd loop: split N dim
@@ -1214,43 +1410,34 @@ void nodechip_conv_backward_weight(
             nslice = ishape.n / secs_info.nsecs + ((ishape.n % secs_info.nsecs) > nidx);
             nend = nstart + nslice;
 
-            dim4 input_nc_trans_shape = {ic, nslice, ih, iw};
-            tpu_gdma_cpy_nc_trans_S2L(
-                    iaddr,
-                    input_global_addr +
-                        (nstart * ic * ih * iw +
-                         gidx * ic * ih * iw +
-                         ih * iw +
-                         iw) * tpu_data_type_size(idtype),
-                    &input_nc_trans_shape,
-                    NULL,
-                    NULL,
-                    idtype);
+            if (nidx != 0 && !split_oc && !split_kernel) load_weight = false;
 
-            bool parallel_branch = false;
             int ocstart = 0;
             int ocend = 0;
-            // 2nd loop: split OC dim
+            // 3nd loop: split OC dim
             for (int ocidx = 0; ocidx < secs_info.ocsecs; ocidx++) {
                 // oc boundary: [ocstart, ocend)
                 ocstart = ocend;
-                ocslice = MIN(ocslice, oc - ocend);
+                ocslice = DIV_UP(oc, secs_info.ocsecs);
+                ocslice = MIN(ALIGN(ocslice, NPU_NUM), oc - ocend);
                 ocend = ocstart + ocslice;
+
+                if (ocidx != 0 && !split_kernel) load_input = false;
 
                 int khstart = 0;
                 int khend = 0;
-                // 2nd loop: split KH dim
+                // 4nd loop: split KH dim
                 for (int khidx = 0; khidx < secs_info.khsecs; khidx++) {
                     khstart = khend;
-                    khslice = MIN(khslice, kh - khend);
+                    khslice = kh / secs_info.khsecs + ((kh % secs_info.khsecs) > khidx);
                     khend = khstart + khslice;
 
                     int kwstart = 0;
                     int kwend = 0;
-                    // 2nd loop: split KW dim
+                    // 5nd loop: split KW dim
                     for (int kwidx = 0; kwidx < secs_info.kwsecs; kwidx++) {
                         kwstart = kwend;
-                        kwslice = MIN(kwslice, kw - kwend);
+                        kwslice = kw / secs_info.kwsecs + ((kw % secs_info.kwsecs) > kwidx);
                         kwend = kwstart + kwslice;
 
                         dim4 wslice_shape = {
@@ -1261,29 +1448,51 @@ void nodechip_conv_backward_weight(
 
                         dim4 wslice_stride;
                         tpu_compact_stride(&wslice_stride, 0, &wslice_shape);
-                        tpu_gdma_cpy_S2L(
-                            ping ? waddr_ping : waddr_pong,
-                            weight_global_addr +
-                                ((gidx * oc + ocstart) * wstride.c +
-                                 (khstart * kw + kwstart) * (idtype == DT_FP32 ? 1 : 32)) * tpu_data_type_size(idtype),
-                            &wslice_shape,
-                            &wslice_stride,
-                            &wstride,
-                            idtype);
+                        if (load_weight) {
+                            if (idtype == DT_FP16 && ic > 32 && split_kernel) {
+                                for (int icidx = 0; icidx < DIV_UP(ic, 32); icidx++) {
+                                    dim4 per32ic_wslice_shape = {1, ocslice, khslice * kwslice, 32};
+                                    tpu_gdma_cpy_S2L(
+                                        ping_in ? waddr_ping + icidx * khslice * kwslice *32 * tpu_data_type_size(idtype)
+                                                : waddr_pong + icidx * khslice * kwslice *32 * tpu_data_type_size(idtype),
+                                        weight_global_addr +
+                                            ((gidx * oc + ocstart) * wstride.c +
+                                             (icidx * kh * kw + khstart * kw + kwstart) * 32) * tpu_data_type_size(idtype),
+                                        &per32ic_wslice_shape,
+                                        &wslice_stride,
+                                        &wstride,
+                                        idtype);
+                                }
+                            } else {
+                                tpu_gdma_cpy_S2L(
+                                    ping_in ? waddr_ping : waddr_pong,
+                                    weight_global_addr +
+                                        ((gidx * oc + ocstart) * wstride.c +
+                                         (khstart * kw + kwstart) * (idtype == DT_FP32 ? 1 : 32)) * tpu_data_type_size(idtype),
+                                    &wslice_shape,
+                                    &wslice_stride,//NULL?
+                                    &wstride,
+                                    idtype);
+                            }
+                        }
+                        load_weight = true;
 
-                        kh_ext = dilation.h * (kh - 1) + 1;
-                        kw_ext = dilation.w * (kw - 1) + 1;
+                        khslice_ext = dilation.h * (khslice - 1) + 1;
+                        kwslice_ext = dilation.h * (kwslice - 1) + 1;
+
                         padding_t pad_slice;
-                        int ihstart = khstart;
-                        int ihend = (oh - 1) * stride.h + kh_ext - pad->top;
+                        int ihstart = - pad->top + dilation.h * khstart;
+                        ihslice = (oh - 1) * stride.h + khslice_ext;
+                        int ihend = ihstart + ihslice;
                         pad_slice.top = ihstart < 0 ? -ihstart : 0;
                         pad_slice.bottom = ihend > ishape.h ? ihend - ishape.h : 0;
                         ihstart = ihstart < 0 ? 0 : ihstart;
                         ihend = ihend > ishape.h ? ishape.h : ihend;
                         ihslice = ihend - ihstart;
 
-                        int iwstart = kwstart;
-                        int iwend = (ow - 1) * stride.w + kw_ext - pad->left;
+                        int iwstart = -pad->left + dilation.w * kwstart;
+                        iwslice = (ow - 1) * stride.w + kwslice_ext;
+                        int iwend = iwstart + iwslice;
                         pad_slice.left = iwstart < 0 ? -iwstart : 0;
                         pad_slice.right = iwend > ishape.w ? iwend - ishape.w : 0;
                         iwstart = iwstart < 0 ? 0 : iwstart;
@@ -1292,6 +1501,22 @@ void nodechip_conv_backward_weight(
 
                         dim4 islice_shape = {nslice, ic, ihslice, iwslice};
                         dim4 oslice_shape = {nslice, ocslice, oh, ow};
+
+                        dim4 input_shape = {nslice, ic, ihslice, iwslice};
+                        if (load_input) {
+                            tpu_gdma_cpy_nc_trans_S2L(
+                                ping_in ? iaddr_ping : iaddr_pong,
+                                input_global_addr +
+                                    (nstart * istride.c +
+                                     gidx * ic * istride.n +
+                                     ihstart * istride.h +
+                                     iwstart) * tpu_data_type_size(idtype),
+                                &input_shape,
+                                NULL,
+                                &istride,
+                                idtype);
+                        }
+                        load_input = true;
 
                         if (parallel_branch) {
                             tpu_parallel_end();
@@ -1303,9 +1528,11 @@ void nodechip_conv_backward_weight(
                         kernel_slice.h = khslice;
                         kernel_slice.w = kwslice;
                         tpu_bdc_fp_conv2d(
-                                khidx == 0 && kwidx == 0 ? ping ? oaddr_ping : oaddr_pong : buffer_addr,
-                                iaddr,
-                                ping ? waddr_ping : waddr_pong,
+                                khidx == 0 && kwidx == 0 ?
+                                    ping_out ? oaddr_ping : oaddr_pong :
+                                    buffer_addr,
+                                ping_in ? iaddr_ping : iaddr_pong,
+                                ping_in ? waddr_ping : waddr_pong,
                                 0,
                                 &islice_shape,
                                 NULL,
@@ -1320,8 +1547,8 @@ void nodechip_conv_backward_weight(
                                 false);
                         if (khidx > 0 || kwidx > 0)
                             tpu_bdc_fp_add(
-                                ping ? oaddr_ping : oaddr_pong,
-                                ping ? oaddr_ping : oaddr_pong,
+                                ping_out ? oaddr_ping : oaddr_pong,
+                                ping_out ? oaddr_ping : oaddr_pong,
                                 buffer_addr,
                                 &oslice_shape,
                                 NULL,
@@ -1340,7 +1567,7 @@ void nodechip_conv_backward_weight(
                             dim2 pooling_dilation = {1, 1};
                             tpu_bdc_fp_avg_pool2d(
                                 buffer_addr,
-                                ping ? waddr_ping : waddr_pong,
+                                ping_in ? waddr_ping : waddr_pong,
                                 &grad_bias_shape,
                                 &pooling_kernel,
                                 &pooling_padding,
@@ -1353,7 +1580,8 @@ void nodechip_conv_backward_weight(
                             pooling_kernel.w = grad_bias_shape.w;
                             tpu_bdc_fp_avg_pool2d(
                                 khidx == 0 && kwidx == 0 ?
-                                    ping ? grad_bias_addr_ping : grad_bias_addr_pong : buffer_addr,
+                                    ping_out ? grad_bias_addr_ping : grad_bias_addr_pong :
+                                    ping_in ? waddr_ping : waddr_pong,//buffer_addr,
                                 buffer_addr,
                                 &grad_bias_shape,
                                 &pooling_kernel,
@@ -1365,97 +1593,98 @@ void nodechip_conv_backward_weight(
                             grad_bias_shape.w = 1;
                             if (khidx != 0 || kwidx != 0)
                                 tpu_bdc_fp_add(
-                                    ping ? grad_bias_addr_ping : grad_bias_addr_pong,
-                                    ping ? grad_bias_addr_ping : grad_bias_addr_pong,
-                                    buffer_addr,
+                                    ping_out ? grad_bias_addr_ping : grad_bias_addr_pong,
+                                    ping_out ? grad_bias_addr_ping : grad_bias_addr_pong,
+                                    ping_in ? waddr_ping : waddr_pong,//buffer_addr,
                                     &grad_bias_shape,
                                     NULL,
                                     NULL,
                                     NULL,
                                     idtype);
-                            if (ocidx > 0) {
-                                bool do_cw_trans = last_ocslice > 1;
-                                dim4 move_bias_shape = {1,
-                                                        do_cw_trans ? 1 : last_ocslice,
-                                                        1,
-                                                        do_cw_trans ? last_ocslice : 1};
-                                if (do_cw_trans) {
-                                    tpu_bdc_cw_trans(
-                                        buffer_addr,
-                                        ping ? grad_bias_addr_pong : grad_bias_addr_ping,
-                                        &move_bias_shape,
-                                        idtype);
-                                }
-                                tpu_gdma_cpy_L2S(
-                                    grad_bias_global_addr +
-                                        last_ocstart * tpu_data_type_size(idtype),
-                                    do_cw_trans ? buffer_addr :
-                                                  ping ? grad_bias_addr_pong :
-                                                         grad_bias_addr_ping,
-                                    &move_bias_shape,
-                                    NULL,
-                                    NULL,
-                                    idtype);
-                            }
                         }
-
-                        if (ocidx > 0) {
-                            dim4 last_oslice_shape = {nslice, last_ocslice, oh, ow};
-                            tpu_gdma_cpy_L2S(
-                                output_global_addr +
-                                    (nstart * ostride.n +
-                                     (gidx * oc + last_ocstart) * ostride.c +
-                                     oh * ostride.h + ow) * tpu_data_type_size(odtype),
-                                ping ? oaddr_pong : oaddr_ping,
-                                &last_oslice_shape,
-                                &ostride,
-                                NULL,
-                                odtype);
-                        }
-                        ping = !ping;
-                        // save current info used for moving output to global memory next loop
-                        last_ocstart = ocstart;
-                        last_ocslice = ocslice;
+                        ping_in = !ping_in;
                     }
                 }
-            }
-            tpu_parallel_end();
-            // move last output to global memory
-            dim4 last_oslice_shape = {nslice, last_ocslice, oh, ow};
-            tpu_gdma_cpy_L2S(
-                output_global_addr +
-                    (nstart * ostride.n +
-                     ((groups - 1) * oc + last_ocstart) * ostride.c +
-                     oh * ostride.h + ow) * tpu_data_type_size(odtype),
-                ping ? oaddr_pong : oaddr_ping,
-                &last_oslice_shape,
-                &ostride,
-                NULL,
-                odtype);
-            if (grad_bias_enable && nidx == 0) {
-                bool do_cw_trans = last_ocslice > 1;
-                dim4 move_bias_shape = {1,
-                                        do_cw_trans ? 1 : last_ocslice,
-                                        1,
-                                        do_cw_trans ? last_ocslice : 1};
-                if (do_cw_trans) {
-                    tpu_bdc_cw_trans(
-                        buffer_addr,
-                        ping ? grad_bias_addr_pong : grad_bias_addr_ping,
-                        &move_bias_shape,
-                        idtype);
+                if (nidx > 0 || ocidx > 0) {
+                    dim4 last_oslice_shape = {last_nslice, last_ocslice, oh, ow};
+                    tpu_gdma_cpy_L2S(
+                        output_global_addr +
+                            (last_nstart * ostride.n +
+                             (gidx * oc + last_ocstart) * ostride.c) * tpu_data_type_size(odtype),
+                        ping_out ? oaddr_pong : oaddr_ping,
+                        &last_oslice_shape,
+                        &ostride,
+                        NULL,
+                        odtype);
+                    if (grad_bias_enable && nidx == 0 && ocidx > 0) {
+                        bool do_cw_trans = last_ocslice > 1;
+                        dim4 move_bias_shape = {1,
+                                                do_cw_trans ? 1 : last_ocslice,
+                                                1,
+                                                do_cw_trans ? last_ocslice : 1};
+                        if (do_cw_trans) {
+                            tpu_bdc_cw_trans(
+                                buffer_addr,
+                                ping_out ? grad_bias_addr_pong : grad_bias_addr_ping,
+                                &move_bias_shape,
+                                idtype);
+                        }
+                        tpu_gdma_cpy_L2S(
+                            grad_bias_global_addr +
+                                last_ocstart * tpu_data_type_size(idtype),
+                            do_cw_trans ? buffer_addr :
+                                          ping_out ? grad_bias_addr_pong :
+                                                     grad_bias_addr_ping,
+                            &move_bias_shape,
+                            NULL,
+                            NULL,
+                            idtype);
+                    }
                 }
-                tpu_gdma_cpy_L2S(
-                    grad_bias_global_addr +
-                        last_ocstart * tpu_data_type_size(idtype),
-                    do_cw_trans ? buffer_addr :
-                                  ping ? grad_bias_addr_pong :
-                                         grad_bias_addr_ping,
+                ping_out = !ping_out;
+                // save current info used for moving output to global memory next loop
+                last_nstart = nstart;
+                last_nslice = nslice;
+                last_ocstart = ocstart;
+                last_ocslice = ocslice;
+            }
+        }
+        tpu_parallel_end();
+        // move last output to global memory
+        dim4 last_oslice_shape = {last_nslice, last_ocslice, oh, ow};
+        tpu_gdma_cpy_L2S(
+            output_global_addr +
+                (last_nstart * ostride.n +
+                 ((groups - 1) * oc + last_ocstart) * ostride.c)
+                * tpu_data_type_size(odtype),
+            ping_out ? oaddr_pong : oaddr_ping,
+            &last_oslice_shape,
+            &ostride,
+            NULL,
+            odtype);
+        if (grad_bias_enable) {
+            bool do_cw_trans = last_ocslice > 1;
+            dim4 move_bias_shape = {1,
+                                    do_cw_trans ? 1 : last_ocslice,
+                                    1,
+                                    do_cw_trans ? last_ocslice : 1};
+            if (do_cw_trans) {
+                tpu_bdc_cw_trans(
+                    buffer_addr,
+                    ping_out ? grad_bias_addr_pong : grad_bias_addr_ping,
                     &move_bias_shape,
-                    NULL,
-                    NULL,
                     idtype);
             }
+            tpu_gdma_cpy_L2S(
+                grad_bias_global_addr +
+                    last_ocstart * tpu_data_type_size(idtype),
+                do_cw_trans ? buffer_addr :
+                              ping_out ? grad_bias_addr_pong :
+                                         grad_bias_addr_ping,
+                &move_bias_shape,
+                NULL,
+                NULL,
+                idtype);
         }
     }
 }

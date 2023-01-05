@@ -1260,6 +1260,7 @@ void tpu_bdc_fp_depthwise_for_deconv2d(
     const dim2       *dilation,
     data_type_t       output_dtype,
     data_type_t       input_dtype,
+    bool              kernel_is_const,
     bool              has_bias);
 
 void tpu_bdc_fp_conv2d_kernel_const(
