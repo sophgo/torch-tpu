@@ -302,7 +302,7 @@ class MaxPool2dFunc(Function):
         ctx.padding = padding
         ctx.dilation = dilation
         ctx.ceil_mode = ceil_mode
-        output = F.max_pool2d(input, kernel_size, stride, padding, dilation, False, ceil_mode)
+        output = F.max_pool2d(input, kernel_size, stride, padding, dilation)
         ctx.save_for_backward(input, output)
         return output
 
@@ -314,12 +314,6 @@ class MaxPool2dFunc(Function):
         dilation = ctx.dilation
         ceil_mode = ctx.ceil_mode
 
-        grad_input = None
-        grad_input_np = np.ones(input.shape, dtype = np.float16)
-
-        input_np = np.asarray(input.half().data.flatten())
-        output_np = np.asarray(output.half().data.flatten())
-        grad_out_np = np.asarray(grad_output.half().data.flatten())
         kh = get_parameter(kernel_size, 0)
         kw = get_parameter(kernel_size, 1)
         stride_h = kh
@@ -332,21 +326,28 @@ class MaxPool2dFunc(Function):
         dh = get_parameter(dilation, 0)
         dw = get_parameter(dilation, 1)
 
-        sgdnn.maxpool_backward(input_np,
-                               output_np,
-                               grad_out_np,
-                               grad_input_np,
-                               input.shape[0],
-                               input.shape[1],
-                               input.shape[2],
-                               input.shape[3],
-                               grad_output.shape[2],
-                               grad_output.shape[3],
-                               kh, kw,
-                               stride_h, stride_w,
-                               pad_h, pad_w,
-                               dh, dw,
-                               ceil_mode);
+        grad_input = None
+        grad_input_np = np.ones(input.shape, dtype = np.float32)
+
+        input_np = np.asarray(input.data.flatten())
+        output_np = np.asarray(output.data.flatten())
+        grad_out_np = np.asarray(grad_output.data.flatten())
+
+        sgdnn.maxpool_backward_f32(input_np,
+                                   output_np,
+                                   grad_out_np,
+                                   grad_input_np,
+                                   input.shape[0],
+                                   input.shape[1],
+                                   input.shape[2],
+                                   input.shape[3],
+                                   grad_output.shape[2],
+                                   grad_output.shape[3],
+                                   kh, kw,
+                                   stride_h, stride_w,
+                                   pad_h, pad_w,
+                                   dh, dw,
+                                   ceil_mode);
 
         grad_input = torch.from_numpy(grad_input_np).reshape(input.shape)
         return grad_input, None, None, None, None, None

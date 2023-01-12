@@ -332,7 +332,8 @@ bm_status_t sgdnn_maxpool_backward(
         {stride_h, stride_w},
         {pad_h, pad_w},
         {dilation_h, dilation_w},
-        ceil_mode == true ? 1 : 0
+        ceil_mode == true ? 1 : 0,
+        dtype
     };
 
     tpu_kernel_launch_sync(handle, "tpu_kernel_api_maxpool_backward", &api, sizeof(api));
@@ -490,17 +491,17 @@ PYBIND11_MODULE(sgdnn, m)
         bm_dev_free(handle);
     });
 
-    m.def("maxpool_backward", [](py::array_t<float16> forward_input,
-                                 py::array_t<float16> forward_output,
-                                 py::array_t<float16> grad_output,
-                                 py::array_t<float16> grad_input,
-                                 int n, int c, int ih, int iw,
-                                 int oh, int ow,
-                                 int kh, int kw,
-                                 int stride_h, int stride_w,
-                                 int pad_h, int pad_w,
-                                 int dilation_h, int dilation_w,
-                                 bool ceil_mode) {
+    m.def("maxpool_backward_f16", [](py::array_t<float16> forward_input,
+                                     py::array_t<float16> forward_output,
+                                     py::array_t<float16> grad_output,
+                                     py::array_t<float16> grad_input,
+                                     int n, int c, int ih, int iw,
+                                     int oh, int ow,
+                                     int kh, int kw,
+                                     int stride_h, int stride_w,
+                                     int pad_h, int pad_w,
+                                     int dilation_h, int dilation_w,
+                                     bool ceil_mode) {
 
         py::buffer_info forward_input_buf = forward_input.request();
         float16 *forward_input_fp16 = (float16 *)forward_input_buf.ptr;
@@ -526,6 +527,48 @@ PYBIND11_MODULE(sgdnn, m)
                             dilation_h, dilation_w,
                             ceil_mode,
                             (sg_data_type_t)1);
+
+        UNUSED(status);
+        //assert(status == BM_SUCCESS);
+        bm_dev_free(handle);
+    });
+
+    m.def("maxpool_backward_f32", [](py::array_t<float> forward_input,
+                                     py::array_t<float> forward_output,
+                                     py::array_t<float> grad_output,
+                                     py::array_t<float> grad_input,
+                                     int n, int c, int ih, int iw,
+                                     int oh, int ow,
+                                     int kh, int kw,
+                                     int stride_h, int stride_w,
+                                     int pad_h, int pad_w,
+                                     int dilation_h, int dilation_w,
+                                     bool ceil_mode) {
+
+        py::buffer_info forward_input_buf = forward_input.request();
+        float *forward_input_fp32 = (float *)forward_input_buf.ptr;
+        py::buffer_info forward_output_buf = forward_output.request();
+        float *forward_output_fp32 = (float *)forward_output_buf.ptr;
+        py::buffer_info grad_out_buf = grad_output.request();
+        float *grad_out_fp32 = (float *)grad_out_buf.ptr;
+        py::buffer_info grad_input_buf = grad_input.request();
+        float *grad_input_fp32 = (float *)grad_input_buf.ptr;
+
+        bm_handle_t handle;
+        bm_dev_request(&handle, 0);
+
+        bm_status_t status = sgdnn_maxpool_backward(handle,
+                            bm_mem_from_system(forward_input_fp32),
+                            bm_mem_from_system(forward_output_fp32),
+                            bm_mem_from_system(grad_out_fp32),
+                            bm_mem_from_system(grad_input_fp32),
+                            n, c, ih, iw, oh, ow,
+                            kh, kw,
+                            stride_h, stride_w,
+                            pad_h, pad_w,
+                            dilation_h, dilation_w,
+                            ceil_mode,
+                            (sg_data_type_t)0);
 
         UNUSED(status);
         //assert(status == BM_SUCCESS);

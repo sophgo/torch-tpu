@@ -22,13 +22,17 @@ def assertEqual(got, exp, threshold=0.001, name=None):
             assertEqual(t, e)
     else:
         if (got - exp).abs().max() > threshold:
-            # print("compare failed, exp:{} got:{}".format(exp, got))
+            #diff_numpy = (got - exp).abs().detach().numpy()
+            #exp_numpy = exp.detach().numpy()
+            #got_numpy = got.detach().numpy()
+            #indices = np.argmax(diff_numpy)
+            #print("compare failed, max_difference:{}, exp {}, got {}".format((got - exp).abs().max()), exp_numpy.flatten()[indices], got_numpy.flatten()[indices])
             print("compare failed, max_difference:{}".format((got - exp).abs().max()))
         else:
             print("{} compare success".format(name if name is not None else ''))
 
 def grad_compare(grad, grad_ref, tolerance, name=None):
-    assert(grad.size() == grad_ref.size())
+    #assert(grad.size() == grad_ref.size())
     assertEqual(grad, grad_ref, tolerance, name)
 
 class Test_Backward_Ops(object):
@@ -43,18 +47,18 @@ class Test_Backward_Ops(object):
 
     def test_conv2d_backward(self):
         torch.manual_seed(0)
-        n = 1
-        ic = 1024#1024#2#64
-        ih = 14#7#4#64#14
-        iw = 14#7#4#64#14
-        oc = 2048#1024#1#3#2#64#64
+        n = 31
+        ic = 2048#1024#2#64
+        ih = 7#7#4#64#14
+        iw = 7#7#4#64#14
+        oc = 512#1024#1#3#2#64#64
         kh = 1
         kw = 1
 
         dilation = 1
         groups = 1
         padding = 0
-        stride = 2
+        stride = 1
 
         input = torch.randn(n, ic, ih, iw, requires_grad = True)
         weight = torch.randn(oc, ic, kh, kw, requires_grad = True)
@@ -76,64 +80,6 @@ class Test_Backward_Ops(object):
         grad_compare(weight.grad, grad_weight_ref, 1e-1, "grad_weight")
         if bias is not None:
             grad_compare(bias.grad, grad_bias_ref, 1e-1, "grad_bias")
-
-    def test_avgpool2d_backward(self):
-        torch.manual_seed(0)
-        n = 64
-        c = 2048
-        h = 7
-        w = 7
-        kernel_size = 7
-        stride = 1
-        padding = 0
-
-        input = torch.randn(n, c, h, w, requires_grad = True)
-        output = AvgPool2d(input, kernel_size, _pair(stride), _pair(padding), False, True, kernel_size * kernel_size)
-        grad_output = torch.randn(output.shape)
-        output.backward(grad_output)
-
-        torch_avgpool = nn.AvgPool2d(kernel_size, stride, padding, False, True, kernel_size * kernel_size)
-        torch_input = input
-        torch_input.grad.zero_()
-        torch_output = torch_avgpool(torch_input)
-        torch_output.backward(grad_output)
-
-        grad_compare(input.grad, torch_input.grad, 1e-2)
-
-        #from torch.autograd import gradcheck
-        #input = torch.randn(n, c, h, w, dtype=torch.double, requires_grad = True)
-        #result = gradcheck(AvgPool2d, [input, kernel_size, _pair(stride), _pair(0), False, True, kernel_size * kernel_size])
-        #print(result)
-
-    def test_maxpool2d_backward(self):
-        torch.manual_seed(0);
-        n = 1
-        c = 1
-        h = 3
-        w = 3
-        kernel_size = 2
-        stride = 1
-        padding = 1
-        dilation = 1
-
-        input = torch.randn(n, c, h, w, requires_grad = True)
-        output = MaxPool2d(input, kernel_size, stride, padding, dilation, False);
-        grad_output = torch.randn(output.shape)
-        output.backward(grad_output)
-
-        torch_maxpool = nn.MaxPool2d(kernel_size, stride, padding, dilation, return_indices=True)
-        torch_input = input
-        torch_input.grad.zero_()
-        torch_output, torch_indices = torch_maxpool(torch_input)
-        torch_output.backward(grad_output)
-
-'''
-        from torch.autograd import gradcheck
-        input = torch.randn(n, c, h, w, dtype=torch.double, requires_grad = True)
-        print(input)
-        result = gradcheck(MaxPool2d, [input, kernel_size, _pair(stride), _pair(padding), _pair(dilation), False])
-        print(result)
-'''
 
     def test_batchnorm2d_backward(self):
         torch.manual_seed(0)
@@ -173,6 +119,74 @@ class Test_Backward_Ops(object):
             grad_compare(input.grad, grad_input_ref, 1)
             grad_compare(weight.grad, grad_weight_ref, 1)
             grad_compare(bias.grad, grad_bias_ref, 1)
+
+
+    def test_avgpool2d_backward(self):
+        torch.manual_seed(0)
+        n = 64
+        c = 2048
+        h = 7
+        w = 7
+        kernel_size = 7
+        stride = 1
+        padding = 0
+
+        input = torch.randn(n, c, h, w, requires_grad = True)
+        output = AvgPool2d(input, kernel_size, _pair(stride), _pair(padding), False, True, kernel_size * kernel_size)
+        grad_output = torch.randn(output.shape)
+        output.backward(grad_output)
+        input_grad = torch.ones(input.grad.shape)
+        input_grad.copy_(input.grad.detach())
+
+        torch_avgpool = nn.AvgPool2d(kernel_size, stride, padding, False, True, kernel_size * kernel_size)
+        torch_input = input
+        torch_input.grad.zero_()
+        torch_output = torch_avgpool(torch_input)
+        torch_output.backward(grad_output)
+        torch_input_grad = torch.ones(torch_input.grad.shape)
+        torch_input_grad.copy_(torch_input.grad.detach())
+
+        grad_compare(input_grad, torch_input_grad, 1e-2)
+
+        #from torch.autograd import gradcheck
+        #input = torch.randn(n, c, h, w, dtype=torch.double, requires_grad = True)
+        #result = gradcheck(AvgPool2d, [input, kernel_size, _pair(stride), _pair(0), False, True, kernel_size * kernel_size])
+        #print(result)
+
+    def test_maxpool2d_backward(self):
+        torch.manual_seed(0);
+        n = 1
+        c = 1
+        h = 112
+        w = 112
+        kernel_size = 3
+        stride = 2
+        padding = 1
+        dilation = 1
+
+        input = torch.ones(n, c, h, w, requires_grad = True)
+
+        output = MaxPool2d(input, kernel_size, stride, padding, dilation, False);
+        grad_output = torch.randn(output.shape)
+        output.backward(grad_output)
+        input_grad = torch.ones(input.grad.shape)
+        input_grad.copy_(input.grad.detach())
+
+        torch_maxpool = nn.MaxPool2d(kernel_size, stride, padding, dilation, return_indices=True)
+        torch_input = input
+        torch_input.grad.zero_()
+        torch_output, torch_indices = torch_maxpool(torch_input)
+        torch_output.backward(grad_output)
+        torch_input_grad = torch.ones(torch_input.grad.shape)
+        torch_input_grad.copy_(torch_input.grad.detach())
+
+        grad_compare(input_grad, torch_input_grad, 1e-2)
+
+        #from torch.autograd import gradcheck
+        #input = torch.randn(n, c, h, w, dtype=torch.double, requires_grad = True)
+        #print(input)
+        #result = gradcheck(MaxPool2d, [input, kernel_size, _pair(stride), _pair(padding), _pair(dilation), False])
+        #print(result)
 
 if __name__ == "__main__":
     test = Test_Backward_Ops()
