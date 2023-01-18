@@ -1,3 +1,4 @@
+#https://blog.csdn.net/scarecrow_sun/article/details/119699797
 import torch
 from torch.utils.tensorboard.summary import image
 import torchvision
@@ -32,11 +33,11 @@ test_loader = torch.utils.data.DataLoader(test_dataset, batch_size=4, shuffle=Tr
 #inchannel = myModel.fc.in_features
 #myModel.fc = nn.Linear(inchannel, 10)
 
-#net=torchvision.models.resnet50(pretrained=True)
-#model_dict = net.state_dict()
+net=torchvision.models.resnet50(pretrained=True)
+model_dict = net.state_dict()
 
 myModel=ResNet(block=Bottleneck, block_num=[3, 4, 6, 3], num_classes=1000)
-#myModel.load_state_dict(model_dict)
+myModel.load_state_dict(model_dict)
 
 inchannel = myModel.fc.in_features
 myModel.fc = nn.Linear(inchannel, 10)
@@ -64,7 +65,7 @@ for images,labels in test_loader:
     correct += (predicted==labels).sum().item()
 
 print('Testing Accuracy : %.3f %%' % ( 100 * correct / total))
-myWriter.add_scalar('test_Accuracy',100 * correct / total)
+#myWriter.add_scalar('test_Accuracy',100 * correct / total)
 
 for _epoch in range(10):
     training_loss = 0.0
@@ -75,7 +76,7 @@ for _epoch in range(10):
 
         loss = myLoss(predict_label, label)
 
-        myWriter.add_scalar('training loss', loss, global_step = _epoch*len(train_loader) + _step)
+        #myWriter.add_scalar('training loss', loss, global_step = _epoch*len(train_loader) + _step)
 
         myOptimzier.zero_grad()
         loss.backward()
@@ -100,5 +101,5 @@ for _epoch in range(10):
         correct += (predicted==labels).sum().item()
 
     print('Testing Accuracy : %.3f %%' % ( 100 * correct / total))
-    myWriter.add_scalar('test_Accuracy',100 * correct / total)
+    #myWriter.add_scalar('test_Accuracy',100 * correct / total)
 
