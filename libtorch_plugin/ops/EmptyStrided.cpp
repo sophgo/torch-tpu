@@ -3,8 +3,6 @@
 #include <ATen/EmptyTensor.h>
 #include <TPUAllocator.h>
 
-#include <iostream>
-
 namespace at
 {
 Tensor empty_strided_tpu ( IntArrayRef size,

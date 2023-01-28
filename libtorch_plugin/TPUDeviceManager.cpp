@@ -141,6 +141,46 @@ public:
     Mutex_.unlock();
   }
 
+  void CopyHostToDevice ( void * Dst, const void * Src, size_t Size )
+  {
+    bm_handle_t Handle = GetDeviceHandle();
+    if ( Handle == nullptr )
+    {
+      LOG ( FATAL ) << "TPU handle of device #" << GetDeviceIndex()
+                    << " is null";
+    }
+    bm_device_mem_t DstMem = bm_mem_from_device (
+                             ( unsigned long long ) Dst, Size );
+    bm_status_t Status = BM_SUCCESS;
+    Status = bm_memcpy_s2d ( Handle, DstMem, ( void * ) Src );
+    if ( Status != BM_SUCCESS )
+    {
+      LOG ( FATAL ) << "Failed to copy memory from host to TPU device #"
+                    << GetDeviceIndex() << " with size = " << Size << "bytes"
+                    << ERROR_CODE ( Status );
+    }
+  }
+
+  void CopyDeviceToHost ( void * Dst, const void * Src, size_t Size )
+  {
+    bm_handle_t Handle = GetDeviceHandle();
+    if ( Handle == nullptr )
+    {
+      LOG ( FATAL ) << "TPU handle of device #" << GetDeviceIndex()
+                    << " is null";
+    }
+    bm_device_mem_t SrcMem = bm_mem_from_device (
+                             ( unsigned long long ) Src, Size );
+    bm_status_t Status = BM_SUCCESS;
+    Status = bm_memcpy_d2s ( Handle, Dst, SrcMem );
+    if ( Status != BM_SUCCESS )
+    {
+      LOG ( FATAL ) << "Failed to copy memory from TPU device #"
+                    << GetDeviceIndex() << " to host with size = " << Size
+                    << "bytes" << ERROR_CODE ( Status );
+    }
+  }
+
 private:
   std::vector<bm_handle_t> Handles_;
   int Index_;
@@ -189,6 +229,16 @@ void * TPUAlloc ( size_t Size )
 void TPUFree ( void * Ptr )
 {
   ThreadLocalTPUDeviceManager.Free ( Ptr );
+}
+
+void TPUCopyHostToDevice ( void * Dst, const void * Src, size_t Size )
+{
+  ThreadLocalTPUDeviceManager.CopyHostToDevice ( Dst, Src, Size );
+}
+
+void TPUCopyDeviceToHost ( void *Dst, const void *Src, size_t Size )
+{
+  ThreadLocalTPUDeviceManager.CopyDeviceToHost ( Dst, Src, Size );
 }
 
 } // namespace tpu
