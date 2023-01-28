@@ -83,6 +83,8 @@ bm_status_t sgdnn_avgpool_backward(
 
 bm_status_t sgdnn_maxpool_backward(
     bm_handle_t        handle,
+    bm_device_mem_t    forward_input,
+    bm_device_mem_t    forward_output,
     bm_device_mem_t    grad_output,
     bm_device_mem_t    grad_input,
     int                n,

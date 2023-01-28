@@ -17,12 +17,13 @@ endif()
 
 link_directories(${PROJECT_ROOT}/third_party/lib)
 
-pybind11_add_module(sgdnn ${CMAKE_CURRENT_SOURCE_DIR}/src/sgdnn.cpp)
+add_library(sgdnn SHARED ${CMAKE_CURRENT_SOURCE_DIR}/src/sgdnn.cpp)
+pybind11_add_module(sgdnn_pybind11 ${CMAKE_CURRENT_SOURCE_DIR}/src/sgdnn_pybind11.cpp)
 
 if(USING_CMODEL)
-  target_link_libraries(sgdnn PRIVATE bmlib_cmodel cmodel)
+  target_link_libraries(sgdnn bmlib_cmodel cmodel)
+  target_link_libraries(sgdnn_pybind11 bmlib_cmodel cmodel)
 else()
-  target_link_libraries(sgdnn PRIVATE bmlib)
+  target_link_libraries(sgdnn bmlib)
+  target_link_libraries(sgdnn_pybind11 bmlib)
 endif()
-
-INSTALL(TARGETS sgdnn LIBRARY DESTINATION /usr/lib)
