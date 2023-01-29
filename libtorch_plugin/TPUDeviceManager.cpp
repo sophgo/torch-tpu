@@ -244,5 +244,11 @@ void TPUCopyDeviceToHost ( void *Dst, const void *Src, size_t Size )
   ThreadLocalTPUDeviceManager.CopyDeviceToHost ( Dst, Src, Size );
 }
 
+bool TPUPtrIsInCurrentDevice ( const void * Ptr )
+{
+  int Index = GetDeviceIndexByUnifiedAddr ( ( unsigned long long ) Ptr );
+  return ThreadLocalTPUDeviceManager.GetDeviceIndex() == Index;
+}
+
 } // namespace tpu
 } // namespace c10
