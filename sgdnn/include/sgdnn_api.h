@@ -9,6 +9,35 @@
 extern "C" {
 #endif
 
+bm_status_t sgdnn_conv_forward(
+    bm_handle_t        handle,
+    bm_device_mem_t    input,
+    bm_device_mem_t    weight,
+    bm_device_mem_t    bias,
+    bm_device_mem_t    output,
+    int                n,
+    int                ic,
+    int                ih,
+    int                iw,
+    int                oc,
+    int                groups,
+    int                kh,
+    int                kw,
+    int                stride_h,
+    int                stride_w,
+    int                dh,
+    int                dw,
+    int                pht,
+    int                phb,
+    int                pwl,
+    int                pwr,
+    bool               has_bias,
+    bool               if_relu,
+    float              upper_limit,
+    bool               result_add,
+    sg_data_type_t     idtype,
+    sg_data_type_t     odtype);
+
 bm_status_t sgdnn_conv_backward(
     bm_handle_t        handle,
     bm_device_mem_t    grad_output,
@@ -59,6 +88,34 @@ bm_status_t sgdnn_batchnorm_backward(
     bool               weight_need_grad,
     bool               bias_need_grad,
     sg_data_type_t     dtype);
+
+bm_status_t sgdnn_pooling_forward(
+    bm_handle_t         handle,
+    bm_device_mem_t     input,
+    bm_device_mem_t     output,
+    bm_device_mem_t     max_mask,
+    int                 input_n,
+    int                 input_c,
+    int                 input_h,
+    int                 input_w,
+    int                 output_h,
+    int                 output_w,
+    int                 kh,
+    int                 kw,
+    int                 pad_h,
+    int                 pad_w,
+    int                 pad_h_after,
+    int                 pad_w_after,
+    int                 stride_h,
+    int                 stride_w,
+    int                 dilation_h,
+    int                 dilation_w,
+    int                 is_avg_pooling,
+    int                 avg_pooling_mode,
+    int                 if_mask_max,
+    int                 if_relu,
+    float               relu_upper_limit,
+    sg_data_type_t      dtype);
 
 bm_status_t sgdnn_avgpool_backward(
     bm_handle_t        handle,

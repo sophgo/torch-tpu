@@ -9,7 +9,90 @@
 #include "sg_stas_gen_util.h"
 #endif
 
-//using namespace py::literals;
+bm_status_t sgdnn_conv_forward(
+    bm_handle_t        handle,
+    bm_device_mem_t    input,
+    bm_device_mem_t    weight,
+    bm_device_mem_t    bias,
+    bm_device_mem_t    output,
+    int                n,
+    int                ic,
+    int                ih,
+    int                iw,
+    int                oc,
+    int                groups,
+    int                kh,
+    int                kw,
+    int                stride_h,
+    int                stride_w,
+    int                dh,
+    int                dw,
+    int                pht,
+    int                phb,
+    int                pwl,
+    int                pwr,
+    bool               has_bias,
+    bool               if_relu,
+    float              upper_limit,
+    bool               result_add,
+    sg_data_type_t     idtype,
+    sg_data_type_t     odtype) {
+
+    assert(handle);
+    assert(idtype == SG_DTYPE_FP32 || idtype == SG_DTYPE_FP16 || idtype == SG_DTYPE_BFP16);
+    assert((idtype == SG_DTYPE_FP32 && odtype == SG_DTYPE_FP32) ||
+           (idtype == SG_DTYPE_BFP16 && (odtype == SG_DTYPE_BFP16 || odtype == SG_DTYPE_FP32)) ||
+           (idtype == SG_DTYPE_FP16 && (odtype == SG_DTYPE_FP16 || odtype == SG_DTYPE_FP32)));
+    assert(!result_add || (result_add && odtype == SG_DTYPE_FP32));
+    int kh_ext = dh * (kh - 1) + 1;
+    int kw_ext = dw * (kw - 1) + 1;
+    int ih_ext = ih + pht + phb;
+    int iw_ext = iw + pwr + pwl;
+    int oh = (ih_ext - kh_ext) / stride_h + 1;
+    int ow = (iw_ext - kw_ext) / stride_w + 1;
+    u64 isz = (u64)n * ic * ih * iw * (idtype == SG_DTYPE_FP32 ? 4 : 2);
+    u64 wsz = (u64)oc * kh * kw * (idtype == SG_DTYPE_FP32 ? 4 * ic / groups : 2 * ALIGN(ic / groups, 32));
+    u64 osz = (u64)n * oc * oh * ow * (odtype == SG_DTYPE_FP32 ? 4 : 2);
+    bm_device_mem_t imem, wmem, bmem, omem;
+    DEVICE_MEM_NEW_INPUT(handle, input, isz, imem);
+    DEVICE_MEM_NEW_INPUT(handle, weight, wsz, wmem);
+    if (has_bias)
+        DEVICE_MEM_NEW_INPUT(handle, bias, oc * sizeof(float), bmem);
+    if (result_add)
+        DEVICE_MEM_NEW_INPUT(handle, output, osz, omem);
+    else
+        DEVICE_MEM_NEW_OUTPUT(handle, output, osz, omem);
+
+    sg_api_conv_forward_t api = {
+        bm_mem_get_device_addr(imem),
+        bm_mem_get_device_addr(wmem),
+        bm_mem_get_device_addr(bmem),
+        bm_mem_get_device_addr(omem),
+        {n, ic, ih, iw},
+        groups,
+        oc,
+        {kh, kw},
+        {stride_h, stride_w},
+        {dh, dw},
+        {pht, phb, pwl, pwr},
+        has_bias,
+        if_relu,
+        upper_limit,
+        result_add,
+        idtype,
+        odtype
+    };
+
+    tpu_kernel_launch_sync(handle, "tpu_kernel_api_conv_forward", &api, sizeof(api));
+
+    DEVICE_MEM_DEL_OUTPUT(handle, output, omem);
+    DEVICE_MEM_DEL_INPUT(handle, input, imem);
+    DEVICE_MEM_DEL_INPUT(handle, weight, wmem);
+    if (has_bias)
+        DEVICE_MEM_DEL_INPUT(handle, bias, bmem);
+    return BM_SUCCESS;
+}
+
 bm_status_t sgdnn_conv_backward(
     bm_handle_t        handle,
     bm_device_mem_t    grad_output,
@@ -175,6 +258,107 @@ bm_status_t sgdnn_batchnorm_backward(
     DEVICE_MEM_DEL_OUTPUT(handle, grad_weight, grad_weight_mem);
     DEVICE_MEM_DEL_OUTPUT(handle, grad_bias, grad_bias_mem);
 
+    return BM_SUCCESS;
+}
+
+bm_status_t sgdnn_pooling_forward(
+    bm_handle_t         handle,
+    bm_device_mem_t     input,
+    bm_device_mem_t     output,
+    bm_device_mem_t     max_mask,
+    int                 input_n,
+    int                 input_c,
+    int                 input_h,
+    int                 input_w,
+    int                 output_h,
+    int                 output_w,
+    int                 kh,
+    int                 kw,
+    int                 pad_h,
+    int                 pad_w,
+    int                 pad_h_after,
+    int                 pad_w_after,
+    int                 stride_h,
+    int                 stride_w,
+    int                 dilation_h,
+    int                 dilation_w,
+    int                 is_avg_pooling,
+    int                 avg_pooling_mode,
+    int                 if_mask_max,
+    int                 if_relu,
+    float               relu_upper_limit,
+    sg_data_type_t      dtype) {
+
+    auto dtype_size = [](int dtype) {
+        int size = 1;
+        if (dtype == SG_DTYPE_INT8 || dtype == SG_DTYPE_UINT8) size = 1;
+        else if (dtype == SG_DTYPE_INT16 || dtype == SG_DTYPE_UINT16 ||
+                 dtype == SG_DTYPE_FP16 || dtype == SG_DTYPE_BFP16)
+            size = 2;
+        else if (dtype == SG_DTYPE_FP32 || dtype == SG_DTYPE_INT32 || dtype == SG_DTYPE_UINT32)
+            size = 4;
+        return size;
+    };
+
+    if (output_h == 0 || output_w == 0) {
+        output_h = (input_h + pad_h + pad_h_after - kh) / stride_h + 1;
+        output_w = (input_w + pad_w + pad_w_after - kw) / stride_w + 1;
+        if ((input_h + pad_h + pad_h_after - kh) % stride_h != 0 &&
+                output_h * stride_h < input_h + pad_h)
+            output_h++;
+
+        if ((input_w + pad_w + pad_w_after - kw) % stride_w != 0 &&
+                output_w * stride_w < input_w + pad_w)
+            output_w++;
+
+        if (input_h + 2 * pad_h - kh < 0)  output_h = 1;
+        if (input_w + 2 * pad_w - kw < 0)  output_w = 1;
+    }
+
+    bm_device_mem_t input_mem, output_mem, max_mask_mem;
+    u64 input_size = (u64)input_n * input_c * input_h * input_w * dtype_size(dtype);
+    u64 output_size = (u64)input_n * input_c * output_h * output_w * dtype_size(dtype);
+
+    DEVICE_MEM_NEW_INPUT(handle, input, input_size, input_mem);
+    DEVICE_MEM_NEW_OUTPUT(handle, output, output_size, output_mem);
+    if (if_mask_max == 1) {
+        DEVICE_MEM_NEW_OUTPUT(handle, max_mask, output_size, max_mask_mem);
+    }
+
+    sg_api_pooling_forward_t api = {
+        bm_mem_get_device_addr(input_mem),
+        bm_mem_get_device_addr(output_mem),
+        bm_mem_get_device_addr(max_mask_mem),
+        input_n,
+        input_c,
+        input_h,
+        input_w,
+        output_h,
+        output_w,
+        kh,
+        kw,
+        pad_h,
+        pad_w,
+        pad_h_after,
+        pad_w_after,
+        stride_h,
+        stride_w,
+        dilation_h,
+        dilation_w,
+        is_avg_pooling,
+        avg_pooling_mode,
+        if_mask_max,
+        if_relu,
+        relu_upper_limit,
+        dtype};
+
+    tpu_kernel_launch_sync(handle, "tpu_kernel_api_pooling_forward", &api, sizeof(api));
+
+    DEVICE_MEM_DEL_OUTPUT(handle, output, output_mem);
+    if (if_mask_max == 1) {
+        DEVICE_MEM_DEL_OUTPUT(handle, max_mask, max_mask_mem);
+    }
+    DEVICE_MEM_DEL_INPUT(handle, input, input_mem);
     return BM_SUCCESS;
 }
 
