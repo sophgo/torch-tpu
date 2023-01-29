@@ -4,12 +4,31 @@
 #include <c10/util/Logging.h>
 #include <TPUDeviceManager.h>
 
-#define ERROR_CODE(err) " ( TPU error code: " << err << ")"
+#define ERROR_CODE(Err) " ( TPU error code: " << Err << ")"
+#define TPU_DEVICE_INDEX_BITS 8
 
 namespace c10
 {
 namespace tpu
 {
+
+static inline unsigned long long UnifiedAddr (
+unsigned long long Addr, int Index )
+{
+  return ( ( ( unsigned long long ) Index ) << ( 64 - TPU_DEVICE_INDEX_BITS ) )
+         + Addr;
+}
+
+static inline int GetDeviceIndexByUnifiedAddr ( unsigned long long Addr )
+{
+  return Addr >> ( 64 - TPU_DEVICE_INDEX_BITS );
+}
+
+static inline unsigned long long GetAddrByUnifiedAddr (
+unsigned long long Addr )
+{
+  return Addr & ( ( 1UL << ( 64 - TPU_DEVICE_INDEX_BITS ) ) - 1 );
+}
 
 class TPUDeviceManager
 {
@@ -42,13 +61,6 @@ public:
     {
       Index_ = -1;
     }
-    static std::mutex Mutex;
-    Mutex.lock();
-    if ( MemMap_.empty() && DeviceCount > 0 )
-    {
-      MemMap_.resize ( DeviceCount );
-    }
-    Mutex.unlock();
   }
 
   ~TPUDeviceManager()
@@ -74,16 +86,21 @@ public:
     return ( int ) Handles_.size();
   }
 
-  bm_handle_t GetDeviceHandle() const
+  bm_handle_t GetDeviceHandle ( int Index ) const
   {
-    if ( Index_ < 0 || Index_ > ( int ) Handles_.size() - 1 )
+    if ( Index < 0 || Index > ( int ) Handles_.size() - 1 )
     {
       return nullptr;
     }
     else
     {
-      return Handles_[Index_];
+      return Handles_[Index];
     }
+  }
+
+  bm_handle_t GetDeviceHandle() const
+  {
+    return GetDeviceHandle ( Index_ );
   }
 
   void * Alloc ( size_t Size ) const
@@ -110,10 +127,10 @@ public:
                     << GetDeviceIndex() << " with size = " << Size << "bytes"
                     << ERROR_CODE ( Status );
     }
-    MemoryInfo Info = { Handle, Mem };
-    MemMap_[GetDeviceIndex()].emplace ( Mem.u.device.device_addr, Info );
     Mutex_.unlock();
-    return ( void * ) Mem.u.device.device_addr;
+    unsigned long long Addr = UnifiedAddr ( Mem.u.device.device_addr,
+                                            GetDeviceIndex() );
+    return ( void * ) Addr;
   }
 
   void Free ( void * Ptr ) const
@@ -123,21 +140,17 @@ public:
     {
       return;
     }
-    bm_handle_t Handle = GetDeviceHandle();
+    int Index = GetDeviceIndexByUnifiedAddr ( ( unsigned long long ) Ptr );
+    bm_handle_t Handle = GetDeviceHandle ( Index );
     if ( Handle == nullptr )
     {
-      LOG ( FATAL ) << "TPU handle of device #" << GetDeviceIndex()
+      LOG ( FATAL ) << "TPU handle of device #" << Index
                     << " is null";
     }
-    int Index = bm_get_devid ( Handle );
-    auto Info = MemMap_[Index].find ( ( unsigned long long ) Ptr );
-    if ( Info == MemMap_[Index].end() )
-    {
-      LOG ( FATAL ) << "Memory is not allocated on TPU device #"
-                    << Index << " with address = " << Ptr;
-    }
-    bm_free_device ( Info->second.Handle, Info->second.Mem );
-    MemMap_[Index].erase ( Info );
+    unsigned long long Addr = GetAddrByUnifiedAddr (
+                              ( unsigned long long ) Ptr );
+    bm_device_mem_t Mem = bm_mem_from_device ( Addr, 0 );
+    bm_free_device ( Handle, Mem );
     Mutex_.unlock();
   }
 
@@ -184,18 +197,8 @@ public:
 private:
   std::vector<bm_handle_t> Handles_;
   int Index_;
-  struct MemoryInfo
-  {
-    bm_handle_t      Handle;
-    bm_device_mem_t  Mem;
-  };
-  static std::vector < std::unordered_map < unsigned long long, MemoryInfo > >
-  MemMap_;
   static std::mutex Mutex_;
 };
-
-std::vector < std::unordered_map < unsigned long long,
-    TPUDeviceManager::MemoryInfo > > TPUDeviceManager::MemMap_;
 
 std::mutex TPUDeviceManager::Mutex_;
 

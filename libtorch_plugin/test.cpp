@@ -39,5 +39,6 @@ int main()
   }
   std::cout << std::endl;
   //net->to ( Device );
+  auto D = torch::add ( B, B );
   return 0;
 }
