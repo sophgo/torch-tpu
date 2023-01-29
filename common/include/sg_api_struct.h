@@ -132,6 +132,61 @@ typedef struct {
 } __attribute__((packed)) sg_api_relu_backward_t;
 #else
 } sg_api_relu_backward_t;
+
+typedef struct {
+    unsigned long long input_global_addr;
+    unsigned long long weight_global_addr;
+    unsigned long long bias_global_addr;
+    unsigned long long output_global_addr;
+    int ishape[4];
+    int groups;
+    int output_c;
+    int kernel[2];
+    int stride[2];
+    int dilation[2];
+    int pad[4];
+    int has_bias;
+    int if_relu;
+    float upper_limit;
+    int result_add;
+    sg_data_type_t idtype;
+    sg_data_type_t odtype;
+#ifndef WIN32
+} __attribute__((packed)) sg_api_conv_forward_t;
+#else
+} sg_api_conv_forward_t;
+#endif
+
+typedef struct sg_api_pooling_forward {
+    unsigned long long input_global_addr;
+    unsigned long long output_global_addr;
+    unsigned long long max_mask_global_addr;
+    int input_n;
+    int input_c;
+    int input_h;
+    int input_w;
+    int output_h;
+    int output_w;
+    int kh;
+    int kw;
+    int pad_h;
+    int pad_w;
+    int pad_h_after;
+    int pad_w_after;
+    int stride_h;
+    int stride_w;
+    int dilation_h;
+    int dilation_w;
+    int is_avg_pooling;
+    int avg_pooling_mode;
+    int max_with_mask;
+    int if_relu;
+    float relu_upper_limit;
+    sg_data_type_t   data_type;
+#ifndef WIN32
+} __attribute__((packed)) sg_api_pooling_forward_t;
+#else
+} sg_api_pooling_forward_t;
 #endif
 
 #pragma pack(pop)
