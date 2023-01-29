@@ -60,10 +60,10 @@ static inline bool is_local_mem_enough(
     int total_size = mode==0 ? ALIGN(c_param_size * 3, BANK_SIZE) +
                                ALIGN(param_size, BANK_SIZE) * 3 +
                                ALIGN(buffer_size, BANK_SIZE):
-                     mode==1 ? ALIGN(c_param_size * 4, BANK_SIZE) +
+                     mode==1 ? ALIGN(c_param_size * 5, BANK_SIZE) +
                                ALIGN(param_size, BANK_SIZE) * 2 +
                                ALIGN(buffer_size, BANK_SIZE):
-                               ALIGN(c_param_size * 4, BANK_SIZE) +
+                               ALIGN(c_param_size * 5, BANK_SIZE) +
                                ALIGN(param_size, BANK_SIZE) * 2;
     return total_size < LOCAL_MEM_SIZE;
 }
@@ -175,7 +175,7 @@ void bn_backward_split_c(
         .w = ALIGN(h * w, tpu_eu_num(DT_FP32))};
     int c_param_size = ALIGN(DIV_UP(csecs, NPU_NUM) * tpu_data_type_size(dtype),4);
     int param_size = n * DIV_UP(csecs, NPU_NUM) * tpu_aligned_feature_size(h, w, dtype);
-    int buffer_size1 = DIV_UP(csecs, NPU_NUM) * 64; 
+    int buffer_size1 = DIV_UP(csecs, NPU_NUM) * 64;
     int buffer_size2 = n == 1 ? 0 : DIV_UP(csecs, NPU_NUM) * tpu_aligned_feature_size(n, 1, DT_FP32);
     int buffer_size3 = dtype == DT_FP32 ? 0 : n * DIV_UP(csecs, NPU_NUM) * tpu_aligned_feature_size(h, w, DT_FP32);
     
@@ -494,7 +494,7 @@ void accumulate_grad_weight_bias(
     int c_param_size = ALIGN(DIV_UP(c, NPU_NUM) * tpu_data_type_size(dtype),4);
     int param_size = n * DIV_UP(c, NPU_NUM) * tpu_aligned_feature_size(hwsecs, 1, dtype);
     int buffer_size1 = DIV_UP(c, NPU_NUM) * 64; 
-    int buffer_size2 = n == 1 ? 0 : DIV_UP(c, NPU_NUM) * tpu_aligned_feature_size(n, 1, dtype);
+    int buffer_size2 = n == 1 ? 0 : DIV_UP(c, NPU_NUM) * tpu_aligned_feature_size(n, 1, DT_FP32);
     int buffer_size3 = dtype == DT_FP32 ? 0 : n * DIV_UP(c, NPU_NUM) * tpu_aligned_feature_size(hwsecs, 1, DT_FP32);
 
     //param (1,c,1,1) compact
@@ -573,7 +573,6 @@ void accumulate_grad_weight_bias(
             &compact_stride,
             dtype);
     }
-
     tpu_gdma_cpy_S2L(
         input_local_addr,
         input_global_addr,
@@ -590,18 +589,45 @@ void accumulate_grad_weight_bias(
         dtype==DT_FP32 ? &local_stride : &aligned_stride,
         &global_stride,
         dtype);
-    tpu_bdc_fp_bias(
-        input_local_addr,
-        input_local_addr,
-        mean_local_addr,
-        &input_shape,
-        dtype);
-    tpu_bdc_fp_scale(
-        input_local_addr,
-        input_local_addr,
-        invstd_local_addr,
-        &input_shape,
-        dtype);
+    if(dtype==DT_FP32)
+    {
+        dim4 zero_stride = {
+            .n = 0,
+            .c = 1,
+            .h = 0,
+            .w = 0};
+        tpu_bdc_fp_add(
+            input_local_addr,
+            input_local_addr,
+            mean_local_addr,
+            &input_shape,
+            &local_stride,
+            &local_stride,
+            &zero_stride,
+            dtype);
+        tpu_bdc_fp_mul(
+            input_local_addr,
+            input_local_addr,
+            invstd_local_addr,
+            &input_shape,
+            &local_stride,
+            &local_stride,
+            &zero_stride,
+            dtype);}
+    else{
+        tpu_bdc_fp_bias(
+            input_local_addr,
+            input_local_addr,
+            mean_local_addr,
+            &input_shape,
+            dtype);
+        tpu_bdc_fp_scale(
+            input_local_addr,
+            input_local_addr,
+            invstd_local_addr,
+            &input_shape,
+            dtype);
+    }
     tpu_parallel_end();
     // compute pooling_part
     tpu_bdc_fp_mul(
@@ -640,7 +666,7 @@ void accumulate_grad_weight_bias(
         &cshape,
         &compact_stride,
         &compact_stride,
-        &compact_stride,
+        dtype == DT_FP32 ? NULL : &compact_stride,
         dtype);
     pooling_fp16_to_fp32(
         input_local_addr,
@@ -669,7 +695,7 @@ void accumulate_grad_weight_bias(
         &cshape,
         &compact_stride,
         &compact_stride,
-        &compact_stride,
+        dtype == DT_FP32 ? NULL : &compact_stride,
         dtype);
 }
 
@@ -718,7 +744,6 @@ void bn_backward_split_hw(
     tpu_aligned_stride(&aligned_stride, 0, &input_shape, dtype);
     tpu_continuous_stride(&global_stride, &ori_shape);
     tpu_compact_stride(&compact_stride, 0, &cshape);
-    
     tpu_gdma_cpy_S2L(
         input_local_addr,
         input_global_addr,
@@ -828,14 +853,14 @@ void nodechip_bn_backward(
     data_type_t dtype,
     int grad_input_enable,
     int grad_weight_enable,
-    int grad_biad_enable)
+    int grad_bias_enable)
 {
     TPUKERNEL_ASSERT(grad_input_enable);
     if(!is_local_mem_enough(shape.n, shape.c, shape.h*shape.w, 0, dtype))
     {
         if(is_local_mem_enough(shape.n, NPU_NUM, shape.h*shape.w, 0, dtype))
         {
-            //cut c   
+            //cut c
             int csecs = ALIGN(shape.c,NPU_NUM);
             while(!is_local_mem_enough(shape.n, csecs, shape.h*shape.w, 0, dtype))
             {
@@ -857,11 +882,11 @@ void nodechip_bn_backward(
                     cidx == csecs_num-1 ? shape.c - cidx * csecs : csecs,
                     dtype,
                     grad_weight_enable,
-                    grad_biad_enable);
+                    grad_bias_enable);
             }
         }
         else if(is_local_mem_enough(shape.n, shape.c, tpu_eu_num(dtype), 1, dtype))
-        {   
+        {
             //cut hw
             int hwsecs = ALIGN(shape.h * shape.w, tpu_eu_num(dtype));
             while(!is_local_mem_enough(shape.n, shape.c, hwsecs, 1, dtype))
@@ -901,13 +926,65 @@ void nodechip_bn_backward(
                     hwidx,
                     dtype,
                     grad_weight_enable,
-                    grad_biad_enable);
+                    grad_bias_enable);
             }
         }
         else
-        {   //TODO: cut chw/n
-            TPUKERNEL_ASSERT(is_local_mem_enough(shape.n, NPU_NUM, tpu_eu_num(dtype), 0, dtype));         
-            return;
+        {   //cut nhw
+            TPUKERNEL_ASSERT(is_local_mem_enough(1, shape.c, tpu_eu_num(dtype), 1, dtype));
+            int nsecs = shape.n;
+            while(!is_local_mem_enough(nsecs, shape.c, tpu_eu_num(dtype), 1, dtype))
+            {
+                nsecs-=1;
+            }
+            int nsecs_num = DIV_UP(shape.n, nsecs);
+            for(int nidx=0; nidx < nsecs_num; nidx++)
+            {
+                grad_output_global_addr += nidx * nsecs * shape.c * shape.h * shape.w * tpu_data_type_size(dtype);
+                input_global_addr += nidx * nsecs * shape.c * shape.h * shape.w * tpu_data_type_size(dtype);
+                grad_input_global_addr += nidx * nsecs * shape.c * shape.h * shape.w * tpu_data_type_size(dtype);
+                nsecs = nidx == nsecs_num-1 ? shape.n - nidx * nsecs : nsecs;
+                int hwsecs = ALIGN(shape.h * shape.w, tpu_eu_num(dtype));
+                while(!is_local_mem_enough(nsecs, shape.c, hwsecs, 1, dtype))
+                {
+                    hwsecs-=tpu_eu_num(dtype);
+                }
+                int hwsecs_num = DIV_UP(shape.h * shape.w, hwsecs);
+                for(int hwidx=0; hwidx < hwsecs_num; hwidx++)
+                {
+                    accumulate_grad_weight_bias(
+                        grad_output_global_addr + hwidx * hwsecs * tpu_data_type_size(dtype),
+                        input_global_addr + hwidx * hwsecs * tpu_data_type_size(dtype),
+                        saved_mean_global_addr,
+                        saved_invstd_global_addr,
+                        weight_global_addr,
+                        shape,
+                        hwidx == hwsecs_num-1 ? shape.h * shape.w - hwidx * hwsecs : hwsecs,
+                        nidx,
+                        dtype);
+                }
+            }
+            // int hwsecs = ALIGN(shape.h * shape.w, tpu_eu_num(dtype));
+            // while(!is_local_mem_enough(nsecs, shape.c, hwsecs, 2, dtype))
+            // {
+            //     hwsecs-=tpu_eu_num(dtype);
+            // }
+            // int hwsecs_num = DIV_UP(shape.h * shape.w, hwsecs);
+            // for(int hwidx=0; hwidx < hwsecs_num; hwidx++)
+            // {
+            //     bn_backward_split_hw(
+            //         grad_output_global_addr + hwidx * hwsecs * tpu_data_type_size(dtype),
+            //         input_global_addr + hwidx * hwsecs * tpu_data_type_size(dtype),
+            //         grad_input_global_addr + hwidx * hwsecs * tpu_data_type_size(dtype),
+            //         grad_weight_global_addr,
+            //         grad_bias_global_addr,
+            //         shape,
+            //         hwidx == hwsecs_num-1 ? shape.h * shape.w - hwidx * hwsecs : hwsecs,
+            //         hwidx,
+            //         dtype,
+            //         grad_weight_enable,
+            //         grad_bias_enable);
+            // }
         }
     }
     else
@@ -925,7 +1002,7 @@ void nodechip_bn_backward(
             shape.c,
             dtype,
             grad_weight_enable,
-            grad_biad_enable);
+            grad_bias_enable);
     }
 }
 
@@ -935,9 +1012,8 @@ void tpu_kernel_api_batchnorm_backward(const void *args)
     dim4 shape = {api->shape[0], api->shape[1], api->shape[2], api->shape[3]};
     data_type_t dtype = DT_FP16;
 
-    TPUKERNEL_ASSERT(is_local_mem_enough(shape.n, shape.c, 32, 1, dtype));
     TPUKERNEL_ASSERT(api->grad_input_enable);
-    
+    TPUKERNEL_ASSERT(is_local_mem_enough(shape.n,shape.c,tpu_eu_num(dtype),1,dtype));
     tpu_initialize();
     nodechip_bn_backward(
             api->grad_output_global_addr,

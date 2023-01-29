@@ -267,6 +267,125 @@ PYBIND11_MODULE(sgdnn, m)
         bm_dev_free(handle);
     });
 
+    m.def("eltwise_backward", [](py::array_t<float16> input_a,
+                                 py::array_t<float16> input_b,
+                                 py::array_t<float16> grad_output,
+                                 py::array_t<float16> grad_input_a,
+                                 py::array_t<float16> grad_input_b,
+                                 int n, int c, int h, int w,
+                                 int op_code,
+                                 int coeff_a,
+                                 int coeff_b,
+                                 bool input_a_grad_enable,
+                                 bool input_b_grad_enable) {
+          py::buffer_info input_a_buf = input_a.request();
+          float16 *input_a_fp16 = (float16 *)input_a_buf.ptr;
+          py::buffer_info input_b_buf = input_b.request();
+          float16 *input_b_fp16 = (float16 *)input_b_buf.ptr;
+          py::buffer_info grad_output_buf = grad_output.request();
+          float16 *grad_output_fp16 = (float16 *)grad_output_buf.ptr;
+          py::buffer_info grad_input_a_buf = grad_input_a.request();
+          float16 *grad_input_a_fp16 = (float16 *)grad_input_a_buf.ptr;
+          py::buffer_info grad_input_b_buf = grad_input_b.request();
+          float16 *grad_input_b_fp16 = (float16 *)grad_input_b_buf.ptr;
+
+          bm_handle_t handle;
+          bm_dev_request(&handle, 0);
+
+          bm_status_t status = sgdnn_eltwise_backward(handle,
+                              bm_mem_from_system(input_a_fp16),
+                              bm_mem_from_system(input_b_fp16),
+                              bm_mem_from_system(grad_output_fp16),
+                              bm_mem_from_system(grad_input_a_fp16),
+                              bm_mem_from_system(grad_input_b_fp16),
+                              n, c, h, w,
+                              op_code,
+                              coeff_a,
+                              coeff_b,
+                              input_a_grad_enable,
+                              input_b_grad_enable,
+                              (sg_data_type_t)1);
+
+          UNUSED(status);
+          assert(status == BM_SUCCESS);
+          bm_dev_free(handle);
+    });
+
+    m.def("linear_backward", [](py::array_t<float16> input,
+                                py::array_t<float16> weight,
+                                py::array_t<float16> grad_output,
+                                py::array_t<float16> grad_input,
+                                py::array_t<float16> grad_weight,
+                                py::array_t<float16> grad_bias,
+                                int batch,
+                                int in_features,
+                                int out_features,
+                                bool input_grad_enable,
+                                bool weight_grad_enable,
+                                bool bias_grad_enable) {
+        py::buffer_info input_buf = input.request();
+        float16 *input_fp16 = (float16 *)input_buf.ptr;
+        py::buffer_info weight_buf = weight.request();
+        float16 *weight_fp16 = (float16 *)weight_buf.ptr;
+        py::buffer_info grad_output_buf = grad_output.request();
+        float16 *grad_output_fp16 = (float16 *)grad_output_buf.ptr;
+        py::buffer_info grad_input_buf = grad_input.request();
+        float16 *grad_input_fp16 = (float16 *)grad_input_buf.ptr;
+        py::buffer_info grad_weight_buf = grad_weight.request();
+        float16 *grad_weight_fp16 = (float16 *)grad_weight_buf.ptr;
+        py::buffer_info grad_bias_buf = grad_bias.request();
+        float16 *grad_bias_fp16 = (float16 *)grad_bias_buf.ptr;
+
+        bm_handle_t handle;
+        bm_dev_request(&handle, 0);
+
+        bm_status_t status = sgdnn_linear_backward(handle,
+                            bm_mem_from_system(input_fp16),
+                            bm_mem_from_system(weight_fp16),
+                            bm_mem_from_system(grad_output_fp16),
+                            bm_mem_from_system(grad_input_fp16),
+                            bm_mem_from_system(grad_weight_fp16),
+                            bm_mem_from_system(grad_bias_fp16),
+                            batch,
+                            in_features,
+                            out_features,
+                            input_grad_enable,
+                            weight_grad_enable,
+                            bias_grad_enable,
+                            (sg_data_type_t)1);
+
+        UNUSED(status);
+        assert(status == BM_SUCCESS);
+        bm_dev_free(handle);
+    });
+
+    m.def("relu_backward", [](py::array_t<float16> input,
+                              py::array_t<float16> grad_output,
+                              py::array_t<float16> grad_input,
+                              int n, int c, int h, int w,
+                              bool input_grad_enable) {
+        py::buffer_info input_buf = input.request();
+        float16 *input_fp16 = (float16 *)input_buf.ptr;
+        py::buffer_info grad_output_buf = grad_output.request();
+        float16 *grad_output_fp16 = (float16 *)grad_output_buf.ptr;
+        py::buffer_info grad_input_buf = grad_input.request();
+        float16 *grad_input_fp16 = (float16 *)grad_input_buf.ptr;
+
+        bm_handle_t handle;
+        bm_dev_request(&handle, 0);
+
+        bm_status_t status = sgdnn_relu_backward(handle,
+                            bm_mem_from_system(input_fp16),
+                            bm_mem_from_system(grad_output_fp16),
+                            bm_mem_from_system(grad_input_fp16),
+                            n, c, h, w,
+                            input_grad_enable,
+                            (sg_data_type_t)1);
+
+        UNUSED(status);
+        assert(status == BM_SUCCESS);
+        bm_dev_free(handle);
+    });
     // add new ops backward here
     // m.def("batchnorm_backward", ...);
 }

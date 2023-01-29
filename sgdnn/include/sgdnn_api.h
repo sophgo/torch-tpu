@@ -104,6 +104,52 @@ bm_status_t sgdnn_maxpool_backward(
     bool               ceil_mode,
     sg_data_type_t     dtype);
 
+bm_status_t sgdnn_eltwise_backward(
+    bm_handle_t        handle,
+    bm_device_mem_t    input_a,
+    bm_device_mem_t    input_b,
+    bm_device_mem_t    grad_output,
+    bm_device_mem_t    grad_input_a,
+    bm_device_mem_t    grad_input_b,
+    int                n,
+    int                c,
+    int                h,
+    int                w,
+    int                op_code,
+    int                coeff_a,
+    int                coeff_b,
+    bool               input_a_need_grad,
+    bool               input_b_need_grad,
+    sg_data_type_t     dtype);
+
+bm_status_t sgdnn_linear_backward(
+    bm_handle_t        handle,
+    bm_device_mem_t    grad_output,
+    bm_device_mem_t    input,
+    bm_device_mem_t    weight,
+    bm_device_mem_t    grad_input,
+    bm_device_mem_t    grad_weight,
+    bm_device_mem_t    grad_bias,
+    int                batch,  
+    int                in_features,  
+    int                out_features,  
+    bool               input_need_grad,
+    bool               weight_need_grad,
+    bool               bias_need_grad,
+    sg_data_type_t     dtype);
+
+bm_status_t sgdnn_relu_backward(
+    bm_handle_t        handle,
+    bm_device_mem_t    input,
+    bm_device_mem_t    grad_output,
+    bm_device_mem_t    grad_input,
+    int                n,
+    int                c,
+    int                h,
+    int                w,
+    bool               input_need_grad,
+    sg_data_type_t     dtype);
+
 #if defined(__cplusplus)
 }
 #endif

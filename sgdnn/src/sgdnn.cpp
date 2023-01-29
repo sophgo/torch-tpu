@@ -308,3 +308,172 @@ bm_status_t sgdnn_maxpool_backward(
     return BM_SUCCESS;
 }
 
+bm_status_t sgdnn_eltwise_backward(
+    bm_handle_t        handle,
+    bm_device_mem_t    input_a,
+    bm_device_mem_t    input_b,
+    bm_device_mem_t    grad_output,
+    bm_device_mem_t    grad_input_a,
+    bm_device_mem_t    grad_input_b,
+    int                n,
+    int                c,
+    int                h,
+    int                w,
+    int                op_code,
+    int                coeff_a,
+    int                coeff_b,
+    bool               input_a_need_grad,
+    bool               input_b_need_grad,
+    sg_data_type_t     dtype)
+{
+    auto dtype_size = [](int dtype) {
+        int size = 1;
+        if (dtype == SG_DTYPE_INT8 || dtype == SG_DTYPE_UINT8) size = 1;
+        else if (dtype == SG_DTYPE_INT16 || dtype == SG_DTYPE_UINT16 ||
+                 dtype == SG_DTYPE_FP16 || dtype == SG_DTYPE_BFP16)
+            size = 2;
+        else if (dtype == SG_DTYPE_FP32 || dtype == SG_DTYPE_INT32 || dtype == SG_DTYPE_UINT32)
+            size = 4;
+        return size;};
+
+    bm_device_mem_t input_a_mem, input_b_mem, grad_output_mem;
+    bm_device_mem_t grad_input_a_mem, grad_input_b_mem;
+    u64 param_size = (u64)n * c * h * w * dtype_size(dtype);
+
+    DEVICE_MEM_NEW_INPUT(handle, input_a, param_size, input_a_mem);
+    DEVICE_MEM_NEW_INPUT(handle, input_b, param_size, input_b_mem);
+    DEVICE_MEM_NEW_INPUT(handle, grad_output, param_size, grad_output_mem);
+    DEVICE_MEM_NEW_OUTPUT(handle, grad_input_a, param_size, grad_input_a_mem);
+    DEVICE_MEM_NEW_OUTPUT(handle, grad_input_b, param_size, grad_input_b_mem);
+
+    sg_api_eltwise_backward_t api = {
+        bm_mem_get_device_addr(input_a_mem),
+        bm_mem_get_device_addr(input_b_mem),
+        bm_mem_get_device_addr(grad_output_mem),
+        bm_mem_get_device_addr(grad_input_a_mem),
+        bm_mem_get_device_addr(grad_input_b_mem),
+        {n, c, h, w},
+        op_code,
+        coeff_a,
+        coeff_b,
+        1,1};
+
+    tpu_kernel_launch_sync(handle, "tpu_kernel_api_eltwise_backward", &api, sizeof(api));
+
+    DEVICE_MEM_DEL_INPUT(handle, input_a, input_a_mem);
+    DEVICE_MEM_DEL_INPUT(handle, input_b, input_b_mem);
+    DEVICE_MEM_DEL_INPUT(handle, grad_output, grad_output_mem);
+    DEVICE_MEM_DEL_OUTPUT(handle, grad_input_a, grad_input_a_mem);
+    DEVICE_MEM_DEL_OUTPUT(handle, grad_input_b, grad_input_b_mem);
+
+    return BM_SUCCESS;
+}
+
+bm_status_t sgdnn_linear_backward(
+    bm_handle_t        handle,
+    bm_device_mem_t    grad_output,
+    bm_device_mem_t    input,
+    bm_device_mem_t    weight,
+    bm_device_mem_t    grad_input,
+    bm_device_mem_t    grad_weight,
+    bm_device_mem_t    grad_bias,
+    int                batch,  
+    int                in_features,  
+    int                out_features,  
+    bool               input_need_grad,
+    bool               weight_need_grad,
+    bool               bias_need_grad,
+    sg_data_type_t     dtype)
+{
+    auto dtype_size = [](int dtype) {
+        int size = 1;
+        if (dtype == SG_DTYPE_INT8 || dtype == SG_DTYPE_UINT8) size = 1;
+        else if (dtype == SG_DTYPE_INT16 || dtype == SG_DTYPE_UINT16 ||
+                 dtype == SG_DTYPE_FP16 || dtype == SG_DTYPE_BFP16)
+            size = 2;
+        else if (dtype == SG_DTYPE_FP32 || dtype == SG_DTYPE_INT32 || dtype == SG_DTYPE_UINT32)
+            size = 4;
+        return size;};
+
+    bm_device_mem_t grad_output_mem, input_mem, weight_mem;
+    bm_device_mem_t grad_input_mem, grad_weight_mem, grad_bias_mem;
+    u64 input_size = (u64)batch * in_features * dtype_size(dtype);
+    u64 weight_size = (u64)in_features * out_features * dtype_size(dtype);
+    u64 grad_output_size = (u64)batch * out_features * dtype_size(dtype);
+    u64 bias_size = (u64)out_features * dtype_size(dtype);
+
+    DEVICE_MEM_NEW_INPUT(handle, input, input_size, input_mem);
+    DEVICE_MEM_NEW_INPUT(handle, weight, weight_size, weight_mem);
+    DEVICE_MEM_NEW_INPUT(handle, grad_output, grad_output_size, grad_output_mem);
+    DEVICE_MEM_NEW_OUTPUT(handle, grad_input, input_size, grad_input_mem);
+    DEVICE_MEM_NEW_OUTPUT(handle, grad_weight, weight_size, grad_weight_mem);
+    DEVICE_MEM_NEW_OUTPUT(handle, grad_bias, bias_size, grad_bias_mem);
+
+    sg_api_linear_backward_t api = {
+        bm_mem_get_device_addr(input_mem),
+        bm_mem_get_device_addr(weight_mem),
+        bm_mem_get_device_addr(grad_output_mem),
+        bm_mem_get_device_addr(grad_input_mem),
+        bm_mem_get_device_addr(grad_weight_mem),
+        bm_mem_get_device_addr(grad_bias_mem),
+        batch,
+        {in_features, out_features},
+        1, 1, 1};
+
+    tpu_kernel_launch_sync(handle, "tpu_kernel_api_linear_backward", &api, sizeof(api));
+
+    DEVICE_MEM_DEL_INPUT(handle, input, input_mem);
+    DEVICE_MEM_DEL_INPUT(handle, weight, weight_mem);
+    DEVICE_MEM_DEL_INPUT(handle, grad_output, grad_output_mem);
+    DEVICE_MEM_DEL_OUTPUT(handle, grad_input, grad_input_mem);
+    DEVICE_MEM_DEL_OUTPUT(handle, grad_weight, grad_weight_mem);
+    DEVICE_MEM_DEL_OUTPUT(handle, grad_bias, grad_bias_mem);
+
+    return BM_SUCCESS;
+}
+
+bm_status_t sgdnn_relu_backward(
+    bm_handle_t        handle,
+    bm_device_mem_t    input,
+    bm_device_mem_t    grad_output,
+    bm_device_mem_t    grad_input,
+    int                n,
+    int                c,
+    int                h,
+    int                w, 
+    bool               input_need_grad,
+    sg_data_type_t     dtype)
+{
+    auto dtype_size = [](int dtype) {
+        int size = 1;
+        if (dtype == SG_DTYPE_INT8 || dtype == SG_DTYPE_UINT8) size = 1;
+        else if (dtype == SG_DTYPE_INT16 || dtype == SG_DTYPE_UINT16 ||
+                 dtype == SG_DTYPE_FP16 || dtype == SG_DTYPE_BFP16)
+            size = 2;
+        else if (dtype == SG_DTYPE_FP32 || dtype == SG_DTYPE_INT32 || dtype == SG_DTYPE_UINT32)
+            size = 4;
+        return size;};
+
+    bm_device_mem_t grad_output_mem, input_mem;
+    bm_device_mem_t grad_input_mem;
+    u64 size = (u64)n * c * h * w * dtype_size(dtype);
+
+    DEVICE_MEM_NEW_INPUT(handle, input, size, input_mem);
+    DEVICE_MEM_NEW_INPUT(handle, grad_output, size, grad_output_mem);
+    DEVICE_MEM_NEW_OUTPUT(handle, grad_input, size, grad_input_mem);
+
+    sg_api_relu_backward_t api = {
+        bm_mem_get_device_addr(input_mem),
+        bm_mem_get_device_addr(grad_output_mem),
+        bm_mem_get_device_addr(grad_input_mem),
+        {n, c, h, w},
+        1};
+
+    tpu_kernel_launch_sync(handle, "tpu_kernel_api_relu_backward", &api, sizeof(api));
+
+    DEVICE_MEM_DEL_INPUT(handle, input, input_mem);
+    DEVICE_MEM_DEL_INPUT(handle, grad_output, grad_output_mem);
+    DEVICE_MEM_DEL_OUTPUT(handle, grad_input, grad_input_mem);
+
+    return BM_SUCCESS;
+}

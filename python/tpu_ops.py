@@ -130,50 +130,70 @@ class tpu_conv2d(nn.Conv2d):
 
 class BatchNorm2dFunc(Function):
     @staticmethod
-    def forward(ctx, input, weight, bias, training=True, momentum=0.1, eps=1e-5):
+    def forward(ctx, input, running_mean, running_var, weight, bias, training=True, momentum=0.1, eps=1e-5):
         reduced_dims = [i for i in range(input.dim()) if i!=1]
         mean = torch.mean(input, dim=reduced_dims).reshape(weight.shape)
-        var = torch.var(input, dim=(0,2,3), unbiased = False).reshape(weight.shape)
+        var = torch.var(input, dim=reduced_dims, unbiased = False).reshape(weight.shape)
         invstd = 1/torch.sqrt(var+eps)
         ctx.save_for_backward(input, weight, mean, invstd)
-        return F.batch_norm(input, None, None, weight, bias, True, momentum, eps)
+        return F.batch_norm(input, running_mean, running_var, weight, bias, True, momentum, eps)
 
     @staticmethod
     def backward(ctx, grad_output):
         input, weight, mean, invstd = ctx.saved_tensors
         grad_input = grad_weight = grad_bias = None
+        n = input.shape[0]
+        c = input.shape[1]
+        h = input.shape[2]
+        w = input.shape[3]
+        
+        # test fp16
         grad_out_np = np.asarray(grad_output.half().data.flatten())
         input_np = np.asarray(input.half().data.flatten())
         weight_np = np.asarray(weight.half().data.flatten())
         mean_np = np.asarray(mean.half().data.flatten())
         invstd_np = np.asarray(invstd.half().data.flatten())
-        n = input.shape[0]
-        c = input.shape[1]
-        h = input.shape[2]
-        w = input.shape[3]
-        # import pdb
-        # pdb.set_trace()
         grad_input_np = np.ones(input.shape, dtype = np.float16)
         grad_weight_np = np.ones(weight.shape, dtype = np.float16)
         grad_bias_np = np.ones(weight.shape, dtype = np.float16)
-
         sgdnn.batchnorm_backward(grad_out_np,
-                                input_np,
-                                weight_np,
-                                mean_np,
-                                invstd_np,
-                                grad_input_np,
-                                grad_weight_np,
-                                grad_bias_np,
-                                n,c,h,w,
-                                1, 1, 1)
+                                 input_np,
+                                 weight_np,
+                                 mean_np,
+                                 invstd_np,
+                                 grad_input_np,
+                                 grad_weight_np,
+                                 grad_bias_np,
+                                 n,c,h,w,
+                                 1, 1, 1)
+        # test fp32
+        # grad_out_np = np.asarray(grad_output.data.flatten())
+        # input_np = np.asarray(input.data.flatten())
+        # weight_np = np.asarray(weight.data.flatten())
+        # mean_np = np.asarray(mean.data.flatten())
+        # invstd_np = np.asarray(invstd.data.flatten())
+        # grad_input_np = np.ones(input.shape, dtype = np.float32)
+        # grad_weight_np = np.ones(weight.shape, dtype = np.float32)
+        # grad_bias_np = np.ones(weight.shape, dtype = np.float32)
+        # # import pdb
+        # # pdb.set_trace()
+        # sgdnn.batchnorm_backward_fp32(grad_out_np,
+        #                               input_np,
+        #                               weight_np,
+        #                               mean_np,
+        #                               invstd_np,
+        #                               grad_input_np,
+        #                               grad_weight_np,
+        #                               grad_bias_np,
+        #                               n,c,h,w,
+        #                               1, 1, 1)
         grad_input = torch.from_numpy(grad_input_np).reshape(input.shape)
         grad_weight = torch.from_numpy(grad_weight_np).reshape(weight.shape)
         grad_bias = torch.from_numpy(grad_bias_np).reshape(weight.shape)
-        return grad_input, grad_weight, grad_bias, None, None, None
+        return grad_input, None, None, grad_weight, grad_bias, None, None, None
 
-def BatchNorm2d(input, weight, bias, training=True, momentum=0.1, eps=1e-5):
-    return BatchNorm2dFunc.apply(input, weight, bias, training, momentum, eps)
+def BatchNorm2d(input, running_mean, running_var, weight, bias, training=True, momentum=0.1, eps=1e-5):
+    return BatchNorm2dFunc.apply(input, running_mean, running_var, weight, bias, training, momentum, eps)
 
 class tpu_batchnorm2d(nn.BatchNorm2d):
     def _batchnorm_forward(self, input: Tensor, weight: Tensor, bias: Tensor):
@@ -354,3 +374,121 @@ class MaxPool2dFunc(Function):
 
 def MaxPool2d(input, kernel_size, stride, padding, dilation, ceil_mode):
     return MaxPool2dFunc.apply(input, kernel_size, stride, padding, dilation, ceil_mode)
+
+class EltwiseFunc(Function):
+    @staticmethod
+    def forward(ctx, input_a, input_b, op_code=1, coeff_a=1, coeff_b=1):
+        ctx.op_code = op_code
+        ctx.coeff_a = coeff_a
+        ctx.coeff_b = coeff_b
+        ctx.save_for_backward(input_a, input_b)
+        if(op_code==0):
+            output = input_a * input_b
+        if(op_code==1):
+            output = coeff_a * input_a + coeff_b * input_b
+        if(op_code==2):
+            output = torch.max(input_a, input_b)
+        return output
+
+    @staticmethod
+    def backward(ctx, grad_output):
+        input_a, input_b = ctx.saved_tensors
+        grad_input_a = grad_input_b = None
+        op_code = ctx.op_code
+        coeff_a = ctx.coeff_a
+        coeff_b = ctx.coeff_b
+        n = grad_output.shape[0]
+        c = grad_output.shape[1]
+        h = grad_output.shape[2]
+        w = grad_output.shape[3]
+        input_a_np = np.asarray(input_a.half().data.flatten())
+        input_b_np = np.asarray(input_b.half().data.flatten())
+        grad_output_np = np.asarray(grad_output.half().data.flatten())
+        grad_input_a_np = np.ones(input_a.shape, dtype = np.float16)
+        grad_input_b_np = np.ones(input_b.shape, dtype = np.float16)
+        sgdnn.eltwise_backward(input_a_np,
+                              input_b_np,
+                              grad_output_np,
+                              grad_input_a_np,
+                              grad_input_b_np,
+                              n, c, h, w,
+                              op_code,
+                              coeff_a,
+                              coeff_b,
+                              1,1)
+        grad_input_a = torch.from_numpy(grad_input_a_np).reshape(input_a.shape)
+        grad_input_b = torch.from_numpy(grad_input_b_np).reshape(input_b.shape)
+        return grad_input_a, grad_input_b, None, None, None
+
+def Eltwise(input_a, input_b, op_code=1, coeff_a=1, coeff_b=1):
+    return EltwiseFunc.apply(input_a, input_b, op_code, coeff_a, coeff_b)
+
+class LinearFunc(Function):
+    @staticmethod
+    def forward(ctx, input, weight, bias):
+        ctx.batch = input.shape[0]
+        ctx.in_features = input.shape[1]
+        ctx.out_features = weight.shape[0]
+        ctx.save_for_backward(input, weight)
+        return F.linear(input, weight, bias)
+
+    @staticmethod
+    def backward(ctx, grad_output):
+        input, weight = ctx.saved_tensors
+        grad_input = grad_weight = grad_bias = None
+        batch = ctx.batch
+        in_features = ctx.in_features
+        out_features = ctx.out_features
+        input_np = np.asarray(input.half().data.flatten())
+        weight_np = np.asarray(weight.half().data.flatten())
+        grad_output_np = np.asarray(grad_output.half().data.flatten())
+        grad_input_np = np.ones(input.shape, dtype = np.float16)
+        grad_weight_np = np.ones(weight.shape, dtype = np.float16)
+        grad_bias_np = np.ones(out_features, dtype = np.float16)
+        import pdb
+        pdb.set_trace()
+        sgdnn.linear_backward(input_np,
+                              weight_np,
+                              grad_output_np,
+                              grad_input_np,
+                              grad_weight_np,
+                              grad_bias_np,
+                              batch,
+                              in_features,
+                              out_features,
+                              1, 1, 1)
+        grad_input = torch.from_numpy(grad_input_np).reshape((batch, in_features))
+        grad_weight = torch.from_numpy(grad_weight_np).reshape((out_features, in_features))
+        grad_bias = torch.from_numpy(grad_bias_np)
+        return grad_input, grad_weight, grad_bias
+
+def Linear(input, weight, bias):
+    return LinearFunc.apply(input, weight, bias)
+
+class ReluFunc(Function):
+    @staticmethod
+    def forward(ctx, input):
+        ctx.save_for_backward(input)
+        return F.Relu(input)
+
+    @staticmethod
+    def backward(ctx, grad_output):
+        input = ctx.saved_tensors
+        n = input.shape[0]
+        c = input.shape[1]
+        h = input.shape[2]
+        w = input.shape[3]
+        grad_input = None
+        input_np = np.asarray(input.half().data.flatten())
+        grad_output_np = np.asarray(grad_output.half().data.flatten())
+        grad_input_np = np.ones(input.shape, dtype = np.float16)
+        sgdnn.relu_backward(input_np,
+                            grad_output_np,
+                            grad_input_np,
+                            n, c, h, w,
+                            1)
+        grad_input = torch.from_numpy(grad_input_np).reshape((n, c, h, w))
+        return grad_input
+
+def Relu(input):
+    return ReluFunc.apply(input)

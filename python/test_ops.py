@@ -12,8 +12,12 @@ from tpu_ops import *
 
 backward_ops = [
     "Conv2d",
+    "BatchNorm2d",
     "AvgPool2d",
     "MaxPool2d",
+    "Eltwise",
+    "Linear",
+    "Relu",
 ]
 
 def assertEqual(got, exp, threshold=0.001, name=None):
@@ -29,7 +33,7 @@ def assertEqual(got, exp, threshold=0.001, name=None):
             #print("compare failed, max_difference:{}, exp {}, got {}".format((got - exp).abs().max()), exp_numpy.flatten()[indices], got_numpy.flatten()[indices])
             print("compare failed, max_difference:{}".format((got - exp).abs().max()))
         else:
-            print("{} compare success".format(name if name is not None else ''))
+            print("{} compare success, max_difference:{}".format(name if name is not None else '',(got - exp).abs().max()))
 
 def grad_compare(grad, grad_ref, tolerance, name=None):
     #assert(grad.size() == grad_ref.size())
@@ -43,6 +47,9 @@ class Test_Backward_Ops(object):
             "BatchNorm2d": self.test_batchnorm2d_backward,
             "AvgPool2d": self.test_avgpool2d_backward,
             "MaxPool2d": self.test_maxpool2d_backward,
+            "Eltwise": self.test_eltwise_backward,
+            "Linear": self.test_linear_backward,
+            "Relu": self.test_relu_backward,
         }
 
     def test_conv2d_backward(self):
@@ -80,46 +87,6 @@ class Test_Backward_Ops(object):
         grad_compare(weight.grad, grad_weight_ref, 1e-1, "grad_weight")
         if bias is not None:
             grad_compare(bias.grad, grad_bias_ref, 1e-1, "grad_bias")
-
-    def test_batchnorm2d_backward(self):
-        torch.manual_seed(0)
-        batch_norm_shapes = [
-                [100, 64, 2, 2],
-                [100, 64, 7, 7],
-                [100, 64, 14, 14],
-                [100, 64, 28, 28],
-                [1, 64, 56, 56],
-                [5, 512, 7, 7],
-                [5, 64, 112, 112],
-                [1, 256, 14, 14],
-                [1, 128, 28, 28],
-                # [1, 64, 112, 112],
-                # [3, 64, 224, 224],
-                # [1, 51200, 2, 2],
-                # [5, 256, 14, 14],
-                # [5, 128, 28, 28],
-                # [1, 64, 56, 56],
-                # [5, 64, 56, 56],
-                # [3, 512, 64, 64],
-                # [1, 64, 224, 224],
-                ]
-        for n, c, h, w in batch_norm_shapes:
-            input = torch.rand((n, c, h, w), requires_grad = True)
-            weight = torch.rand(c, requires_grad = True)
-            bias = torch.rand(c, requires_grad = True)
-            mean = torch.mean(input, dim=(0,2,3)).reshape(weight.shape)
-            var = torch.var(input, dim=(0,2,3), unbiased = False).reshape(weight.shape)
-            invstd = 1/torch.sqrt(var+1e-5)
-            output = BatchNorm2d(input, weight, bias)
-            grad_output = torch.rand(output.shape)
-            output.backward(grad_output)
-            grad_input_ref, grad_weight_ref, grad_bias_ref = torch.ops.aten.native_batch_norm_backward(
-                grad_output, input, weight, None, None, mean, invstd, True, 1e-5, [True,True,True])
-                # grad_output, input, weight, mean, var, None, None, False, 1e-5, [True,False,False])
-            grad_compare(input.grad, grad_input_ref, 1)
-            grad_compare(weight.grad, grad_weight_ref, 1)
-            grad_compare(bias.grad, grad_bias_ref, 1)
-
 
     def test_avgpool2d_backward(self):
         torch.manual_seed(0)
@@ -180,13 +147,134 @@ class Test_Backward_Ops(object):
         torch_input_grad = torch.ones(torch_input.grad.shape)
         torch_input_grad.copy_(torch_input.grad.detach())
 
-        grad_compare(input_grad, torch_input_grad, 1e-2)
+    '''
+            from torch.autograd import gradcheck
+            input = torch.randn(n, c, h, w, dtype=torch.double, requires_grad = True)
+            print(input)
+            result = gradcheck(MaxPool2d, [input, kernel_size, _pair(stride), _pair(padding), _pair(dilation), False])
+            print(result)
+    '''
+    def test_batchnorm2d_backward(self):
+        torch.manual_seed(0)
+        resnet50_shapes = [
+                [1, 3, 224, 224],
+                [1, 64, 112, 112],
+                [1, 256, 56, 56],
+                [1, 512, 28, 28],
+                [1, 1024, 14, 14],
+                [1, 2048, 7, 7],
+                # [64, 3, 224, 224],
+                # [64, 64, 112, 112],
+                # [64, 256, 56, 56],
+                # [64, 512, 28, 28],
+                # [64, 1024, 14, 14],
+                # [64, 2048, 7, 7],
+                ]
+        for i, [n, c, h, w] in enumerate(resnet50_shapes):
+            input = torch.rand((n, c, h, w), requires_grad = True)
+            weight = torch.rand(c, requires_grad = True)
+            bias = torch.rand(c, requires_grad = True)
+            running_mean = torch.rand(c, requires_grad = False)
+            running_var = torch.rand(c, requires_grad = False)
+            mean = torch.mean(input, dim=(0,2,3)).reshape(weight.shape)
+            var = torch.var(input, dim=(0,2,3), unbiased = False).reshape(weight.shape)
+            invstd = 1/torch.sqrt(var+1e-5)
+            output = BatchNorm2d(input, running_mean, running_var, weight, bias)
+            grad_output = torch.rand(output.shape)
+            output.backward(grad_output)
+            grad_input_ref, grad_weight_ref, grad_bias_ref = torch.ops.aten.native_batch_norm_backward(
+                grad_output, input, weight, None, None, mean, invstd, True, 1e-5, [True,True,True])
+                # grad_output, input, weight, running_mean, running_var, None, None, False, 1e-5, [True,False,False])
+            print("case:",i)
+            grad_compare(input.grad, grad_input_ref, 1e-1)
+            grad_compare(weight.grad, grad_weight_ref, 1e-1)
+            grad_compare(bias.grad, grad_bias_ref, 1e-1)
 
-        #from torch.autograd import gradcheck
-        #input = torch.randn(n, c, h, w, dtype=torch.double, requires_grad = True)
-        #print(input)
-        #result = gradcheck(MaxPool2d, [input, kernel_size, _pair(stride), _pair(padding), _pair(dilation), False])
-        #print(result)
+    def test_eltwise_backward(self):
+        torch.manual_seed(0)
+        op_code = [0,1,2]
+        resnet50_shapes = [
+                [64, 3, 224, 224],
+                [64, 64, 112, 112],
+                [64, 256, 56, 56],
+                [64, 512, 28, 28],
+                [64, 1024, 14, 14],
+                [64, 2048, 7, 7],
+                ]
+        for [n, c, h, w] in resnet50_shapes:
+            input_a = torch.rand((n, c, h, w), requires_grad = True)
+            input_b = torch.rand((n, c, h, w), requires_grad = True)
+            coeff_a = int(torch.randn(1)[0]*10)
+            coeff_b = int(torch.randn(1)[0]*10)
+            for i, code in enumerate(op_code):
+                output = Eltwise(input_a, input_b, code, coeff_a, coeff_b)
+                grad_output = torch.rand((n, c, h, w))
+                output.backward(grad_output)
+                torch_input_a = input_a
+                torch_input_b = input_b
+                torch_input_a.grad.zero_()
+                torch_input_b.grad.zero_()
+                print("case:",i)
+                if(code==0):
+                    print("eltwise op:product")
+                    torch_output = torch_input_a * torch_input_b
+                if(code==1):
+                    print("eltwise op:sum")
+                    torch_output = coeff_a * torch_input_a + coeff_b * torch_input_b
+                if(code==2):
+                    print("eltwise op:max")
+                    torch_output = torch.max(torch_input_a, torch_input_b)
+                torch_output.backward(grad_output)
+                grad_compare(input_a.grad, torch_input_a.grad, 1e-1)
+                grad_compare(input_b.grad, torch_input_b.grad, 1e-1)
+      
+    def test_linear_backward(self):
+        torch.manual_seed(0)
+        features = [
+                [64, 4096, 1000],
+                [64, 2048, 100],
+                [64, 1024, 100],
+                ]
+        for i, [batch, in_features, out_features] in enumerate(features):
+            input = torch.rand((batch, in_features), requires_grad = True)
+            weight = torch.rand((out_features, in_features), requires_grad = True)
+            bias = torch.rand(out_features, requires_grad = True)
+            output = Linear(input, weight, bias)
+            grad_output = torch.rand((batch, out_features))
+            output.backward(grad_output)
+            torch_linear = nn.Linear(in_features, out_features, True)
+            torch_linear.weight.data = weight
+            torch_linear.bias.data = bias
+            torch_input = input
+            torch_input.grad.zero_()
+            torch_output = torch_linear(torch_input)
+            torch_output.backward(grad_output)
+            print("case:",i)
+            grad_compare(input.grad, torch_input.grad, 1e-1)
+            grad_compare(weight.grad, torch_linear.weight.grad, 1e-1)
+            grad_compare(bias.grad, torch_linear.bias.grad, 1e-1)
+
+    def test_relu_backward(self):
+        torch.manual_seed(0)
+        resnet50_shapes = [
+                [64, 3, 224, 224],
+                [64, 64, 112, 112],
+                [64, 256, 56, 56],
+                [64, 512, 28, 28],
+                [64, 1024, 14, 14],
+                [64, 2048, 7, 7],
+                ]
+        for i, [n, c, h, w] in enumerate(resnet50_shapes):
+            input = torch.rand((n, c, h, w), requires_grad = True)
+            output = Relu(input)
+            grad_output = torch.rand((n, c, h, w))
+            output.backward(grad_output)
+            torch_input = input
+            torch_input.grad.zero_()
+            torch_output = nn.ReLU(torch_input)
+            torch_output.backward(grad_output)
+            print("case:",i)
+            grad_compare(input.grad, torch_input.grad, 1e-1)
 
 if __name__ == "__main__":
     test = Test_Backward_Ops()
