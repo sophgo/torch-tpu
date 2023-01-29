@@ -231,9 +231,9 @@ class Test_Backward_Ops(object):
     def test_linear_backward(self):
         torch.manual_seed(0)
         features = [
-                [64, 4096, 1000],
-                [64, 2048, 100],
-                [64, 1024, 100],
+                [64, 1024, 1000],
+                [64, 2048, 1000],
+                [64, 4096, 500],
                 ]
         for i, [batch, in_features, out_features] in enumerate(features):
             input = torch.rand((batch, in_features), requires_grad = True)
@@ -253,7 +253,7 @@ class Test_Backward_Ops(object):
             grad_compare(input.grad, torch_input.grad, 1e-1)
             grad_compare(weight.grad, torch_linear.weight.grad, 1e-1)
             grad_compare(bias.grad, torch_linear.bias.grad, 1e-1)
-
+            
     def test_relu_backward(self):
         torch.manual_seed(0)
         resnet50_shapes = [
@@ -271,7 +271,7 @@ class Test_Backward_Ops(object):
             output.backward(grad_output)
             torch_input = input
             torch_input.grad.zero_()
-            torch_output = nn.ReLU(torch_input)
+            torch_output = torch.nn.functional.relu(torch_input)
             torch_output.backward(grad_output)
             print("case:",i)
             grad_compare(input.grad, torch_input.grad, 1e-1)
