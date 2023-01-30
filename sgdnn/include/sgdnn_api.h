@@ -161,23 +161,47 @@ bm_status_t sgdnn_maxpool_backward(
     bool               ceil_mode,
     sg_data_type_t     dtype);
 
+typedef struct{
+    int         dtype;
+    int         ndims;
+    int         shape[FW_MAX_SHAPE_DIMS];
+    int         stride[FW_MAX_SHAPE_DIMS];
+    int         format;
+} __attribute__((packed)) TensorDescriptor_t;
+
+typedef struct{
+    int         op_code;
+} __attribute__((packed)) OpTensorDescriptor_t;
+
+bm_status_t sgdnn_eltwise_forward(
+    bm_handle_t                handle,
+    const void*                alpha1,
+    const TensorDescriptor_t   aDesc,
+    const void*                A,
+    const void*                alpha2,
+    const TensorDescriptor_t   bDesc,
+    const void*                B,
+    const void*                beta,
+    const TensorDescriptor_t   cDesc,
+    void*                      C,
+    const OpTensorDescriptor_t opTensorDesc);
+
 bm_status_t sgdnn_eltwise_backward(
-    bm_handle_t        handle,
-    bm_device_mem_t    input_a,
-    bm_device_mem_t    input_b,
-    bm_device_mem_t    grad_output,
-    bm_device_mem_t    grad_input_a,
-    bm_device_mem_t    grad_input_b,
-    int                n,
-    int                c,
-    int                h,
-    int                w,
-    int                op_code,
-    int                coeff_a,
-    int                coeff_b,
-    bool               input_a_need_grad,
-    bool               input_b_need_grad,
-    sg_data_type_t     dtype);
+    bm_handle_t                handle,
+    const void*                alpha1,
+    const TensorDescriptor_t   aDesc,
+    const void*                input_a,
+    const void*                alpha2,
+    const TensorDescriptor_t   bDesc,
+    const void*                input_b,
+    const void*                beta,
+    const TensorDescriptor_t   cDesc,
+    const void*                grad_output,
+    void*                      grad_input_a,
+    void*                      grad_input_b,
+    bool                       grad_input_a_enable,
+    bool                       grad_input_b_enable,
+    const OpTensorDescriptor_t opTensorDesc);
 
 bm_status_t sgdnn_linear_backward(
     bm_handle_t        handle,

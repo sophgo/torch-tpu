@@ -1,4 +1,5 @@
 #include "sgdnn_api.h"
+#include "sgdnn_helpers.h"
 
 // pybind11 register c++ half-precision floating point as numpy.float16
 // https://github.com/pybind/pybind11/issues/1776
@@ -276,8 +277,8 @@ PYBIND11_MODULE(sgdnn, m)
                                  int op_code,
                                  int coeff_a,
                                  int coeff_b,
-                                 bool input_a_grad_enable,
-                                 bool input_b_grad_enable) {
+                                 bool grad_input_a_enable,
+                                 bool grad_input_b_enable) {
           py::buffer_info input_a_buf = input_a.request();
           float16 *input_a_fp16 = (float16 *)input_a_buf.ptr;
           py::buffer_info input_b_buf = input_b.request();
@@ -292,19 +293,60 @@ PYBIND11_MODULE(sgdnn, m)
           bm_handle_t handle;
           bm_dev_request(&handle, 0);
 
+          auto dtype_size = [](int dtype) {
+              int size = 1;
+              if (dtype == SG_DTYPE_INT8 || dtype == SG_DTYPE_UINT8) size = 1;
+              else if (dtype == SG_DTYPE_INT16 || dtype == SG_DTYPE_UINT16 ||
+                       dtype == SG_DTYPE_FP16 || dtype == SG_DTYPE_BFP16)
+                  size = 2;
+              else if (dtype == SG_DTYPE_FP32 || dtype == SG_DTYPE_INT32 || dtype == SG_DTYPE_UINT32)
+                  size = 4;
+              return size;};
+
+          bm_device_mem_t input_a_mem, input_b_mem, grad_output_mem;
+          bm_device_mem_t grad_input_a_mem, grad_input_b_mem;
+ 
+          u64 param_size = (u64)n * c * h * w * dtype_size(SG_DTYPE_FP16);
+
+          DEVICE_MEM_NEW_INPUT(handle, bm_mem_from_system(input_a_fp16), param_size, input_a_mem);
+          DEVICE_MEM_NEW_INPUT(handle, bm_mem_from_system(input_b_fp16), param_size, input_b_mem);
+          DEVICE_MEM_NEW_INPUT(handle, bm_mem_from_system(grad_output_fp16), param_size, grad_output_mem);
+          DEVICE_MEM_NEW_OUTPUT(handle, bm_mem_from_system(grad_input_a_fp16), param_size, grad_input_a_mem);
+          DEVICE_MEM_NEW_OUTPUT(handle, bm_mem_from_system(grad_input_b_fp16), param_size, grad_input_b_mem);
+
+          OpTensorDescriptor_t opTensorDesc;
+          opTensorDesc.op_code = op_code;
+
+          TensorDescriptor_t aDesc;
+          aDesc.dtype = SG_DTYPE_FP16;
+          aDesc.ndims = 4;
+          aDesc.shape[0] = n;
+          aDesc.shape[1] = c;
+          aDesc.shape[2] = h;
+          aDesc.shape[3] = w;
+
+          float alpha1[1] = {(float)coeff_a};
+          float alpha2[1] = {(float)coeff_b};
+          float beta[1] = {0.0f};
+
           bm_status_t status = sgdnn_eltwise_backward(handle,
-                              bm_mem_from_system(input_a_fp16),
-                              bm_mem_from_system(input_b_fp16),
-                              bm_mem_from_system(grad_output_fp16),
-                              bm_mem_from_system(grad_input_a_fp16),
-                              bm_mem_from_system(grad_input_b_fp16),
-                              n, c, h, w,
-                              op_code,
-                              coeff_a,
-                              coeff_b,
-                              input_a_grad_enable,
-                              input_b_grad_enable,
-                              (sg_data_type_t)1);
+                               &alpha1, aDesc,
+                               ((void*)(input_a_mem.u.device.device_addr)),
+                               &alpha2, aDesc,// use real bDesc later
+                               ((void*)(input_b_mem.u.device.device_addr)),
+                               &beta, aDesc,// use real cDesc later
+                               ((void*)(grad_output_mem.u.device.device_addr)),
+                               ((void*)(grad_input_a_mem.u.device.device_addr)),
+                               ((void*)(grad_input_b_mem.u.device.device_addr)),
+                               grad_input_a_enable,
+                               grad_input_b_enable,
+                               opTensorDesc);
+
+          DEVICE_MEM_DEL_OUTPUT(handle, bm_mem_from_system(grad_input_a_fp16), grad_input_a_mem);
+          DEVICE_MEM_DEL_OUTPUT(handle, bm_mem_from_system(grad_input_b_fp16), grad_input_b_mem);
+          DEVICE_MEM_DEL_INPUT(handle, bm_mem_from_system(input_a_fp16), input_a_mem);
+          DEVICE_MEM_DEL_INPUT(handle, bm_mem_from_system(input_b_fp16), input_b_mem);
+          DEVICE_MEM_DEL_INPUT(handle, bm_mem_from_system(grad_output_fp16), grad_output_mem);
 
           UNUSED(status);
           assert(status == BM_SUCCESS);

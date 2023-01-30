@@ -492,63 +492,142 @@ bm_status_t sgdnn_maxpool_backward(
     return BM_SUCCESS;
 }
 
+// C = op(alpha1[0] * A, alpha2[0] * B) + beta[0] * C
+bm_status_t sgdnn_eltwise_forward(
+    bm_handle_t                handle,
+    const void*                alpha1,
+    const TensorDescriptor_t   aDesc,
+    const void*                A,
+    const void*                alpha2,
+    const TensorDescriptor_t   bDesc,
+    const void*                B,
+    const void*                beta,
+    const TensorDescriptor_t   cDesc,
+    void*                      C,
+    const OpTensorDescriptor_t opTensorDesc
+) {
+
+    int op_code = opTensorDesc.op_code;
+
+    assert(aDesc.ndims == 4 && bDesc.ndims == 4 && cDesc.ndims == 4);
+    int A_n = aDesc.shape[0];
+    int A_c = aDesc.shape[1];
+    int A_h = aDesc.shape[2];
+    int A_w = aDesc.shape[3];
+
+    int B_n = bDesc.shape[0];
+    int B_c = bDesc.shape[1];
+    int B_h = bDesc.shape[2];
+    int B_w = bDesc.shape[3];
+
+    int C_n = cDesc.shape[0];
+    int C_c = cDesc.shape[1];
+    int C_h = cDesc.shape[2];
+    int C_w = cDesc.shape[3];
+
+    assert(A_n == B_n && B_n == C_n);
+    assert(A_c == B_c && B_c == C_c);
+    assert(A_h == B_h && B_h == C_h);
+    assert(A_w == B_w && B_w == C_w);
+
+    float alpha_A = ((float*)alpha1)[0];
+    float alpha_B = ((float*)alpha2)[0];
+    float beta_C = ((float*)beta)[0];
+    assert(beta_C == 0.0f);
+
+    sg_data_type_t dtype_A = (sg_data_type_t)(aDesc.dtype);
+    sg_data_type_t dtype_B = (sg_data_type_t)(bDesc.dtype);
+    assert(dtype_A == dtype_B);
+
+    sg_data_type_t dtype_C = (sg_data_type_t)(cDesc.dtype);
+
+    sg_api_eltwise_forward_t api = {
+        (unsigned long long)A,
+        (unsigned long long)B,
+        (unsigned long long)C,
+        0,// mask_global_addr
+        2,// input number
+        A_n, A_c, A_h, A_w,
+        op_code,
+        alpha_A, alpha_B,
+        0, 0, 0,
+        0,
+        dtype_A,
+        dtype_C};
+
+    tpu_kernel_launch_sync(handle, "tpu_kernel_api_eltwise_forward", &api, sizeof(api));
+
+    return BM_SUCCESS;
+}
+
 bm_status_t sgdnn_eltwise_backward(
-    bm_handle_t        handle,
-    bm_device_mem_t    input_a,
-    bm_device_mem_t    input_b,
-    bm_device_mem_t    grad_output,
-    bm_device_mem_t    grad_input_a,
-    bm_device_mem_t    grad_input_b,
-    int                n,
-    int                c,
-    int                h,
-    int                w,
-    int                op_code,
-    int                coeff_a,
-    int                coeff_b,
-    bool               input_a_need_grad,
-    bool               input_b_need_grad,
-    sg_data_type_t     dtype)
-{
-    auto dtype_size = [](int dtype) {
-        int size = 1;
-        if (dtype == SG_DTYPE_INT8 || dtype == SG_DTYPE_UINT8) size = 1;
-        else if (dtype == SG_DTYPE_INT16 || dtype == SG_DTYPE_UINT16 ||
-                 dtype == SG_DTYPE_FP16 || dtype == SG_DTYPE_BFP16)
-            size = 2;
-        else if (dtype == SG_DTYPE_FP32 || dtype == SG_DTYPE_INT32 || dtype == SG_DTYPE_UINT32)
-            size = 4;
-        return size;};
+    bm_handle_t                handle,
+    const void*                alpha1,
+    const TensorDescriptor_t   aDesc,
+    const void*                input_a,
+    const void*                alpha2,
+    const TensorDescriptor_t   bDesc,
+    const void*                input_b,
+    const void*                beta,
+    const TensorDescriptor_t   cDesc,
+    const void*                grad_output,
+    void*                      grad_input_a,
+    void*                      grad_input_b,
+    bool                       grad_input_a_enable,
+    bool                       grad_input_b_enable,
+    const OpTensorDescriptor_t opTensorDesc
+ ) {
 
-    bm_device_mem_t input_a_mem, input_b_mem, grad_output_mem;
-    bm_device_mem_t grad_input_a_mem, grad_input_b_mem;
-    u64 param_size = (u64)n * c * h * w * dtype_size(dtype);
+    int op_code = opTensorDesc.op_code;
 
-    DEVICE_MEM_NEW_INPUT(handle, input_a, param_size, input_a_mem);
-    DEVICE_MEM_NEW_INPUT(handle, input_b, param_size, input_b_mem);
-    DEVICE_MEM_NEW_INPUT(handle, grad_output, param_size, grad_output_mem);
-    DEVICE_MEM_NEW_OUTPUT(handle, grad_input_a, param_size, grad_input_a_mem);
-    DEVICE_MEM_NEW_OUTPUT(handle, grad_input_b, param_size, grad_input_b_mem);
+    assert(aDesc.ndims == 4 && bDesc.ndims == 4 && cDesc.ndims == 4);
+    int A_n = aDesc.shape[0];
+    int A_c = aDesc.shape[1];
+    int A_h = aDesc.shape[2];
+    int A_w = aDesc.shape[3];
+
+    int B_n = bDesc.shape[0];
+    int B_c = bDesc.shape[1];
+    int B_h = bDesc.shape[2];
+    int B_w = bDesc.shape[3];
+
+    int C_n = cDesc.shape[0];
+    int C_c = cDesc.shape[1];
+    int C_h = cDesc.shape[2];
+    int C_w = cDesc.shape[3];
+
+    assert(A_n == B_n && B_n == C_n);
+    assert(A_c == B_c && B_c == C_c);
+    assert(A_h == B_h && B_h == C_h);
+    assert(A_w == B_w && B_w == C_w);
+
+    float alpha_A = ((float*)alpha1)[0];
+    float alpha_B = ((float*)alpha2)[0];
+    float beta_C = ((float*)beta)[0];
+    assert(beta_C == 0.0f);
+
+    sg_data_type_t dtype_A = (sg_data_type_t)(aDesc.dtype);
+    sg_data_type_t dtype_B = (sg_data_type_t)(bDesc.dtype);
+    assert(dtype_A == dtype_B);
+
+    sg_data_type_t dtype_C = (sg_data_type_t)(cDesc.dtype);
 
     sg_api_eltwise_backward_t api = {
-        bm_mem_get_device_addr(input_a_mem),
-        bm_mem_get_device_addr(input_b_mem),
-        bm_mem_get_device_addr(grad_output_mem),
-        bm_mem_get_device_addr(grad_input_a_mem),
-        bm_mem_get_device_addr(grad_input_b_mem),
-        {n, c, h, w},
+        (unsigned long long)input_a,
+        (unsigned long long)input_b,
+        (unsigned long long)grad_output,
+        (unsigned long long)grad_input_a,
+        (unsigned long long)grad_input_b,
+        {A_n, A_c, A_h, A_w},
         op_code,
-        coeff_a,
-        coeff_b,
-        1,1};
+        alpha_A,
+        alpha_B,
+        grad_input_a_enable,
+        grad_input_b_enable,
+        dtype_A,
+        dtype_C};
 
     tpu_kernel_launch_sync(handle, "tpu_kernel_api_eltwise_backward", &api, sizeof(api));
-
-    DEVICE_MEM_DEL_INPUT(handle, input_a, input_a_mem);
-    DEVICE_MEM_DEL_INPUT(handle, input_b, input_b_mem);
-    DEVICE_MEM_DEL_INPUT(handle, grad_output, grad_output_mem);
-    DEVICE_MEM_DEL_OUTPUT(handle, grad_input_a, grad_input_a_mem);
-    DEVICE_MEM_DEL_OUTPUT(handle, grad_input_b, grad_input_b_mem);
 
     return BM_SUCCESS;
 }

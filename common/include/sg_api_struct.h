@@ -89,15 +89,42 @@ typedef struct {
 typedef struct{
     unsigned long long inputA_global_addr;
     unsigned long long inputB_global_addr;
+    unsigned long long output_global_addr;
+    unsigned long long mask_global_addr;
+    int                input_num;
+    int                tensor_n;
+    int                tensor_c;
+    int                tensor_h;
+    int                tensor_w;
+    int                op_code;
+    float              coeff_A;
+    float              coeff_B;
+    int                need_mask;
+    int                mask_index_A;
+    int                mask_index_B;
+    int                if_relu;
+    sg_data_type_t     idtype;//dtype for inputA&&inputB
+    sg_data_type_t     odtype;//dtype for output
+#ifndef WIN32
+} __attribute__((packed)) sg_api_eltwise_forward_t;
+#else
+} sg_api_eltwise_forward_t;
+#endif
+
+typedef struct{
+    unsigned long long inputA_global_addr;
+    unsigned long long inputB_global_addr;
     unsigned long long grad_output_global_addr;
     unsigned long long grad_inputA_global_addr;
     unsigned long long grad_inputB_global_addr;
     int                shape[4];
     int                op_code;
-    int                coeff_a;
-    int                coeff_b;
+    float              coeff_a;
+    float              coeff_b;
     int                grad_input_a_enable;
     int                grad_input_b_enable;
+    sg_data_type_t     idtype;//dtype for input && grad_input
+    sg_data_type_t     odtype;//dtype for output && grad_output
 #ifndef WIN32
 } __attribute__((packed)) sg_api_eltwise_backward_t;
 #else
@@ -132,6 +159,7 @@ typedef struct {
 } __attribute__((packed)) sg_api_relu_backward_t;
 #else
 } sg_api_relu_backward_t;
+#endif
 
 typedef struct {
     unsigned long long input_global_addr;

@@ -341,7 +341,12 @@ void tpu_kernel_api_eltwise_backward(const void *args)
 {
     sg_api_eltwise_backward_t *api = (sg_api_eltwise_backward_t *)args;
     dim4 shape = {api->shape[0], api->shape[1], api->shape[2], api->shape[3]};
-    data_type_t dtype = DT_FP16;
+
+    data_type_t forward_idtype = api->idtype;
+    data_type_t forward_odtype = api->odtype;
+    TPUKERNEL_ASSERT(forward_idtype == forward_odtype);
+    data_type_t dtype = forward_idtype;
+
     int op_code = api->op_code;
     TPUKERNEL_ASSERT(op_code==0||op_code==1||op_code==2);
     tpu_initialize();
