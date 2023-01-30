@@ -12,7 +12,7 @@ struct C10_API DefaultTPUAllocator final : at::Allocator
     void * data = nullptr;
     try
     {
-      data = c10::tpu::TPUAlloc ( nbytes );
+      data = tpu::TPUAlloc ( nbytes );
     }
     catch ( c10::Error & e )
     {
@@ -36,7 +36,7 @@ struct C10_API DefaultTPUAllocator final : at::Allocator
       return;
     }
     profiledTPUMemoryReporter().Delete ( ptr );
-    c10::tpu::TPUFree ( ptr );
+    tpu::TPUFree ( ptr );
   }
 };
 

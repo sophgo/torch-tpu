@@ -21,14 +21,12 @@ Tensor _copy_from_tpu ( const Tensor & self, const Tensor & dst,
   if ( self.device().type() == DeviceType::CPU &&
        dst.device().type() == DeviceType::PrivateUse1 )
   {
-    c10::tpu::TPUCopyHostToDevice ( dst.data_ptr(), self.data_ptr(),
-                                    dst.nbytes() );
+    tpu::TPUCopyHostToDevice ( dst.data_ptr(), self.data_ptr(), dst.nbytes() );
   }
   else if ( self.device().type() == DeviceType::PrivateUse1 &&
             dst.device().type() == DeviceType::CPU )
   {
-    c10::tpu::TPUCopyDeviceToHost ( dst.data_ptr(), self.data_ptr(),
-                                    dst.nbytes() );
+    tpu::TPUCopyDeviceToHost ( dst.data_ptr(), self.data_ptr(), dst.nbytes() );
   }
   else
   {

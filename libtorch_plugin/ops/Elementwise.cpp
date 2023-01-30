@@ -13,7 +13,15 @@ Tensor & add_Tensor_tpu ( const Tensor & input1,
 {
   CHECK_TENSOR_IN_DEVICE ( input1 );
   CHECK_TENSOR_IN_DEVICE ( input2 );
-  LOG ( FATAL ) << "Not implemented";
+  if ( input1.dtype() == caffe2::TypeMeta::Make<float>() &&
+       input2.dtype() == caffe2::TypeMeta::Make<float>() )
+  {
+    //LOG ( FATAL ) << "Not implemented";
+  }
+  else
+  {
+    LOG ( FATAL ) << "Unsupported data type";
+  }
   return out;
 }
 TORCH_LIBRARY_IMPL ( aten, PrivateUse1, m )

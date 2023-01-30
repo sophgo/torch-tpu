@@ -34,14 +34,14 @@ struct TPUGuardImpl final : public c10::impl::DeviceGuardImplInterface
     Device old_device = getDevice();
     if ( old_device.index() != d.index() )
     {
-      c10::tpu::TPUSetDeviceIndex ( d.index() );
+      ::tpu::TPUSetDeviceIndex ( d.index() );
     }
     return old_device;
   }
 
   Device getDevice() const override
   {
-    int device = c10::tpu::TPUGetDeviceIndex ();
+    int device = ::tpu::TPUGetDeviceIndex ();
     return Device ( DeviceType::PrivateUse1, device );
   }
 
@@ -51,13 +51,13 @@ struct TPUGuardImpl final : public c10::impl::DeviceGuardImplInterface
     Device current_device = getDevice();
     if ( current_device != d )
     {
-      c10::tpu::TPUSetDeviceIndex ( d.index() );
+      ::tpu::TPUSetDeviceIndex ( d.index() );
     }
   }
 
   void uncheckedSetDevice ( Device d ) const noexcept override
   {
-    c10::tpu::TPUSetDeviceIndex ( d.index() );
+    ::tpu::TPUSetDeviceIndex ( d.index() );
   }
 
   Stream getStream ( Device ) const noexcept override
@@ -75,7 +75,7 @@ struct TPUGuardImpl final : public c10::impl::DeviceGuardImplInterface
 
   DeviceIndex deviceCount() const noexcept override
   {
-    return c10::tpu::TPUGetDeviceCount();
+    return ::tpu::TPUGetDeviceCount();
   }
 
   // Event-related functions

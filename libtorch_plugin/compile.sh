@@ -3,6 +3,7 @@ g++ test.cpp \
 TPUGuardImpl.cpp \
 TPUAllocator.cpp \
 TPUDeviceManager.cpp \
+TPUModule.cpp \
 ops/*.cpp \
 -I/opt/sophon/libsophon-current/include/ \
 -I../libtorch/include/torch/csrc/api/include/ \

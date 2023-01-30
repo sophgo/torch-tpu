@@ -7,8 +7,6 @@
 #define ERROR_CODE(Err) " ( TPU error code: " << Err << ")"
 #define TPU_DEVICE_INDEX_BITS 8
 
-namespace c10
-{
 namespace tpu
 {
 
@@ -127,9 +125,10 @@ public:
                     << GetDeviceIndex() << " with size = " << Size << "bytes"
                     << ERROR_CODE ( Status );
     }
-    Mutex_.unlock();
     unsigned long long Addr = UnifiedAddr ( Mem.u.device.device_addr,
                                             GetDeviceIndex() );
+    AddrMemMap_.emplace ( Addr, Mem );
+    Mutex_.unlock();
     return ( void * ) Addr;
   }
 
@@ -147,16 +146,20 @@ public:
       LOG ( FATAL ) << "TPU handle of device #" << Index
                     << " is null";
     }
-    unsigned long long Addr = GetAddrByUnifiedAddr (
-                              ( unsigned long long ) Ptr );
-    bm_device_mem_t Mem = bm_mem_from_device ( Addr, 0 );
-    bm_free_device ( Handle, Mem );
+    auto Iter = AddrMemMap_.find ( ( unsigned long long ) Ptr );
+    if ( Iter == AddrMemMap_.end() )
+    {
+      LOG ( FATAL ) << "Memory of address = " << Ptr << " is not found";
+    }
+    bm_free_device ( Handle, Iter->second );
+    AddrMemMap_.erase ( Iter );
     Mutex_.unlock();
   }
 
   void CopyHostToDevice ( void * Dst, const void * Src, size_t Size )
   {
-    bm_handle_t Handle = GetDeviceHandle();
+    int Index = GetDeviceIndexByUnifiedAddr ( ( unsigned long long ) Dst );
+    bm_handle_t Handle = GetDeviceHandle ( Index );
     if ( Handle == nullptr )
     {
       LOG ( FATAL ) << "TPU handle of device #" << GetDeviceIndex()
@@ -176,7 +179,8 @@ public:
 
   void CopyDeviceToHost ( void * Dst, const void * Src, size_t Size )
   {
-    bm_handle_t Handle = GetDeviceHandle();
+    int Index = GetDeviceIndexByUnifiedAddr ( ( unsigned long long ) Src );
+    bm_handle_t Handle = GetDeviceHandle ( Index );
     if ( Handle == nullptr )
     {
       LOG ( FATAL ) << "TPU handle of device #" << GetDeviceIndex()
@@ -198,9 +202,12 @@ private:
   std::vector<bm_handle_t> Handles_;
   int Index_;
   static std::mutex Mutex_;
+  static std::unordered_map<unsigned long long, bm_device_mem_t> AddrMemMap_;
 };
 
 std::mutex TPUDeviceManager::Mutex_;
+std::unordered_map<unsigned long long, bm_device_mem_t>
+TPUDeviceManager::AddrMemMap_;
 
 static thread_local TPUDeviceManager ThreadLocalTPUDeviceManager;
 
@@ -239,7 +246,7 @@ void TPUCopyHostToDevice ( void * Dst, const void * Src, size_t Size )
   ThreadLocalTPUDeviceManager.CopyHostToDevice ( Dst, Src, Size );
 }
 
-void TPUCopyDeviceToHost ( void *Dst, const void *Src, size_t Size )
+void TPUCopyDeviceToHost ( void * Dst, const void * Src, size_t Size )
 {
   ThreadLocalTPUDeviceManager.CopyDeviceToHost ( Dst, Src, Size );
 }
@@ -251,4 +258,3 @@ bool TPUPtrIsInCurrentDevice ( const void * Ptr )
 }
 
 } // namespace tpu
-} // namespace c10
