@@ -14,15 +14,28 @@ Tensor & add_Tensor_tpu ( const Tensor & input1,
 {
   CHECK_TENSOR_IN_DEVICE ( input1 );
   CHECK_TENSOR_IN_DEVICE ( input2 );
-  if ( input1.dtype() == caffe2::TypeMeta::Make<float>() &&
-       input2.dtype() == caffe2::TypeMeta::Make<float>() )
-  {
-    //LOG ( FATAL ) << "Not implemented";
-  }
-  else
-  {
-    LOG ( FATAL ) << "Unsupported data type";
-  }
+  auto ADesc = tpu::TPUGenerateTensorDesc ( input1 );
+  auto BDesc = tpu::TPUGenerateTensorDesc ( input2 );
+  auto CDesc = tpu::TPUGenerateTensorDesc ( out );
+  auto Handle = tpu::TPUGetDeviceHandle();
+  float Alpha1 = 1.f;
+  float Alpha2 = alpha.toDouble();
+  float Beta = 0.f;
+  OpTensorDescriptor_t Op = { .op_code = 1 };
+  std::cout << "add_Tensor_tpu" << std::endl;
+#if 1
+  sgdnn_eltwise_forward ( Handle,
+                          &Alpha1,
+                          ADesc,
+                          input1.data_ptr(),
+                          &Alpha2,
+                          BDesc,
+                          input2.data_ptr(),
+                          &Beta,
+                          CDesc,
+                          out.data_ptr(),
+                          Op );
+#endif
   return out;
 }
 TORCH_LIBRARY_IMPL ( aten, PrivateUse1, m )
