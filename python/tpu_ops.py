@@ -435,7 +435,6 @@ class LinearFunc(Function):
     @staticmethod
     def backward(ctx, grad_output):
         input, weight = ctx.saved_tensors
-        grad_input = grad_weight = grad_bias = None
         batch = ctx.batch
         in_features = ctx.in_features
         out_features = ctx.out_features
@@ -445,8 +444,6 @@ class LinearFunc(Function):
         grad_input_np = np.ones(input.shape, dtype = np.float16)
         grad_weight_np = np.ones(weight.shape, dtype = np.float16)
         grad_bias_np = np.ones(out_features, dtype = np.float16)
-        import pdb
-        pdb.set_trace()
         sgdnn.linear_backward(input_np,
                               weight_np,
                               grad_output_np,
@@ -457,6 +454,7 @@ class LinearFunc(Function):
                               in_features,
                               out_features,
                               1, 1, 1)
+        grad_input = grad_weight = grad_bias = None
         grad_input = torch.from_numpy(grad_input_np).reshape((batch, in_features))
         grad_weight = torch.from_numpy(grad_weight_np).reshape((out_features, in_features))
         grad_bias = torch.from_numpy(grad_bias_np)
@@ -469,16 +467,15 @@ class ReluFunc(Function):
     @staticmethod
     def forward(ctx, input):
         ctx.save_for_backward(input)
-        return F.Relu(input)
+        return F.relu(input)
 
     @staticmethod
     def backward(ctx, grad_output):
-        input = ctx.saved_tensors
+        input = ctx.saved_tensors[0]
         n = input.shape[0]
         c = input.shape[1]
         h = input.shape[2]
         w = input.shape[3]
-        grad_input = None
         input_np = np.asarray(input.half().data.flatten())
         grad_output_np = np.asarray(grad_output.half().data.flatten())
         grad_input_np = np.ones(input.shape, dtype = np.float16)
@@ -486,7 +483,8 @@ class ReluFunc(Function):
                             grad_output_np,
                             grad_input_np,
                             n, c, h, w,
-                            1)
+                            1)   
+        grad_input = None
         grad_input = torch.from_numpy(grad_input_np).reshape((n, c, h, w))
         return grad_input
 

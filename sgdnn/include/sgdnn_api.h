@@ -181,9 +181,9 @@ bm_status_t sgdnn_eltwise_backward(
 
 bm_status_t sgdnn_linear_backward(
     bm_handle_t        handle,
-    bm_device_mem_t    grad_output,
     bm_device_mem_t    input,
     bm_device_mem_t    weight,
+    bm_device_mem_t    grad_output,
     bm_device_mem_t    grad_input,
     bm_device_mem_t    grad_weight,
     bm_device_mem_t    grad_bias,
