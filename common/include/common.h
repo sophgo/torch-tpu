@@ -126,8 +126,6 @@ typedef enum {
 
 #define LAST_INI_REG_VAL 0x76125438
 
-void print_trace();
-
 #ifndef USING_CMODEL
     #ifdef __arm__
         extern jmp_buf error_stat;
