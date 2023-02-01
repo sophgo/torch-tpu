@@ -14,6 +14,8 @@ if ( tpu::TPUPtrIsInCurrentDevice ( t.data_ptr() ) == false )      \
 }                                                                  \
 while ( 0 )
 
+#define ADDR_IN_DEVICE(t) tpu::TPUGetAddrInDevice( t.data_ptr() )
+
 namespace tpu
 {
 

@@ -257,4 +257,9 @@ bool TPUPtrIsInCurrentDevice ( const void * Ptr )
   return ThreadLocalTPUDeviceManager.GetDeviceIndex() == Index;
 }
 
+void * TPUGetAddrInDevice ( const void * Ptr )
+{
+  return ( void * ) GetAddrByUnifiedAddr ( ( unsigned long long ) Ptr );
+}
+
 } // namespace tpu
