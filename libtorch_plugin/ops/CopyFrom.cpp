@@ -1,4 +1,5 @@
 #include <torch/library.h>
+#include <torch/torch.h>
 #include <ATen/core/TensorBase.h>
 #include <TPUDeviceManager.h>
 #include <c10/util/Logging.h>
@@ -14,33 +15,61 @@ Tensor _copy_from_tpu ( const Tensor & self, const Tensor & dst,
   {
     LOG ( FATAL ) << "TPU only supports contiguous memory copy for now";
   }
-  if ( self.nbytes() != dst.nbytes() )
+  if ( self.dtype() == dst.dtype() )
   {
-    LOG ( FATAL ) << "Sizes of src and dst are different";
-  }
-  if ( self.device().type() == DeviceType::CPU &&
-       dst.device().type() == DeviceType::PrivateUse1 )
-  {
-    tpu::TPUCopyHostToDevice ( dst.data_ptr(), self.data_ptr(), dst.nbytes() );
-  }
-  else if ( self.device().type() == DeviceType::PrivateUse1 &&
-            dst.device().type() == DeviceType::CPU )
-  {
-    tpu::TPUCopyDeviceToHost ( dst.data_ptr(), self.data_ptr(), dst.nbytes() );
-  }
-  else if ( self.device().type() == DeviceType::PrivateUse1 &&
-            dst.device().type() == DeviceType::PrivateUse1 )
-  {
-    tpu::TPUCopyDeviceToDevice ( dst.data_ptr(), self.data_ptr(),
+    if ( self.device().type() == DeviceType::CPU &&
+         dst.device().type() == DeviceType::PrivateUse1 )
+    {
+      tpu::TPUCopyHostToDevice ( dst.data_ptr(), self.data_ptr(),
                                  dst.nbytes() );
+    }
+    else if ( self.device().type() == DeviceType::PrivateUse1 &&
+              dst.device().type() == DeviceType::CPU )
+    {
+      tpu::TPUCopyDeviceToHost ( dst.data_ptr(), self.data_ptr(),
+                                 dst.nbytes() );
+    }
+    else if ( self.device().type() == DeviceType::PrivateUse1 &&
+              dst.device().type() == DeviceType::PrivateUse1 )
+    {
+      tpu::TPUCopyDeviceToDevice ( dst.data_ptr(), self.data_ptr(),
+                                   dst.nbytes() );
+    }
+    else
+    {
+      LOG ( FATAL ) << "Unsupported copy from device " << self.device()
+                    << " to device " << dst.device();
+    }
   }
   else
   {
-    LOG ( FATAL ) << "Unsupported copy from device " << self.device()
-                  << " to device " << dst.device();
+    if ( self.device().type() == DeviceType::CPU &&
+         dst.device().type() == DeviceType::PrivateUse1 )
+    {
+      // SELF CPU -> SELF TPU -> DST TPU
+      auto SelfTPU = self.to ( dst.device() );
+      _copy_from_tpu ( SelfTPU, dst, non_blocking );
+    }
+    else if ( self.device().type() == DeviceType::PrivateUse1 &&
+              dst.device().type() == DeviceType::CPU )
+    {
+      // SELF TPU -> DST TPU -> DST CPU
+      auto DstTPU = self.to ( dst.dtype() );
+      _copy_from_tpu ( DstTPU, dst, non_blocking );
+    }
+    else if ( self.device().type() == DeviceType::PrivateUse1 &&
+              dst.device().type() == DeviceType::PrivateUse1 )
+    {
+      LOG ( FATAL ) << "Cast from " << self.dtype()
+                    << " to " << dst.dtype() << " is not implemented";
+    }
+    else
+    {
+      LOG ( FATAL ) << "Unsupported copy from device " << self.device()
+                    << " to device " << dst.device();
+    }
   }
-  auto tensor = dst;
-  return tensor;
+  return dst;
 }
 TORCH_LIBRARY_IMPL ( aten, PrivateUse1, m )
 {
