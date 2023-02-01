@@ -2,6 +2,7 @@
 #include <ATen/core/TensorBase.h>
 #include <ATen/EmptyTensor.h>
 #include <TPUAllocator.h>
+#include <TPUDeviceManager.h>
 
 namespace at
 {
@@ -12,6 +13,13 @@ Tensor empty_strided_tpu ( IntArrayRef                size,
                            c10::optional<Device>      device_opt,
                            c10::optional<bool>        pin_memory_opt )
 {
+  int DeviceIndex = device_or_default ( device_opt ).index();
+  if ( DeviceIndex == -1 )
+  {
+    DeviceIndex = 0;
+  }
+  int CurrentDeviceIndex = tpu::TPUGetDeviceIndex();
+  tpu::TPUSetDeviceIndex ( DeviceIndex );
   auto scalar_type = dtype_or_default ( dtype_opt );
   auto pin_memory = pinned_memory_or_default ( pin_memory_opt );
   at::detail::check_size_nonnegative ( size );
@@ -28,6 +36,7 @@ Tensor empty_strided_tpu ( IntArrayRef                size,
   auto tensor = detail::make_tensor_base<TensorImpl> (
                 std::move ( storage_impl ), ks, dtype );
   tensor.unsafeGetTensorImpl()->set_sizes_and_strides ( size, stride );
+  tpu::TPUSetDeviceIndex ( CurrentDeviceIndex );
   return tensor;
 }
 TORCH_LIBRARY_IMPL ( aten, PrivateUse1, m )
@@ -43,6 +52,13 @@ c10::optional<Device>             device_opt,
 c10::optional<bool>               pin_memory_opt,
 c10::optional<c10::MemoryFormat>  memory_format_opt )
 {
+  int DeviceIndex = device_or_default ( device_opt ).index();
+  if ( DeviceIndex == -1 )
+  {
+    DeviceIndex = 0;
+  }
+  int CurrentDeviceIndex = tpu::TPUGetDeviceIndex();
+  tpu::TPUSetDeviceIndex ( DeviceIndex );
   auto scalar_type = dtype_or_default ( dtype_opt );
   auto pin_memory = pinned_memory_or_default ( pin_memory_opt );
   constexpr c10::DispatchKeySet ks ( c10::DispatchKey::PrivateUse1 );
@@ -73,6 +89,7 @@ c10::optional<c10::MemoryFormat>  memory_format_opt )
       *memory_format_opt );
     }
   }
+  tpu::TPUSetDeviceIndex ( CurrentDeviceIndex );
   return tensor;
 }
 TORCH_LIBRARY_IMPL ( aten, PrivateUse1, m )
