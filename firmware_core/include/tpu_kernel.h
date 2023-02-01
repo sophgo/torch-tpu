@@ -1,5 +1,5 @@
-#ifndef _TPU_H_
-#define _TPU_H_
+#ifndef _TPU_KERNEL_H_
+#define _TPU_KERNEL_H_
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -8,59 +8,75 @@ extern "C" {
 typedef void (*tpu_kernel_func_t)(const void *);
 void tpu_register_kernel_func(const char *name, tpu_kernel_func_t func);
 void tpu_dump_registered_kernel_funcs();
-#define TPUKERNEL_FUNC_REGISTER(func)                               \
+#define TPUKERNEL_FUNC_REGISTER(func)                              \
 __attribute__((constructor)) void tpu_kernel_register_##func() {   \
     tpu_register_kernel_func(#func, func);                         \
 }
-#if (defined(USING_FW_SIMULATION))
-#define TPUKERNEL_LOG(format, ...)
-#define TPUKERNEL_ASSERT(assertion) do {                              \
-    if (!(assertion)) {                                              \
-        TPUKERNEL_LOG("%s:%d: %s: Assertion \"%s\" failed.\n",        \
-                     __FILE__, __LINE__,  __FUNCTION__, #assertion); \
-        while (1);                                                   \
-    }                                                                \
-} while(0)
-#elif (defined(USING_CMODEL))
-#include <stdio.h>
-#include <stdlib.h>
-extern void print_trace();
-extern int get_atomic_cmodel_assert_enable();
-#define TPUKERNEL_LOG(format, ...) printf(format, ##__VA_ARGS__)
-#define TPUKERNEL_ASSERT(assertion) do {                                 \
-    if (get_atomic_cmodel_assert_enable()) {                             \
-        if (!(assertion)) {                                              \
+
+#if defined(USING_CMODEL)
+  #include <stdio.h>
+  #include <stdlib.h>
+  extern void __print_trace();
+  extern int get_atomic_cmodel_assert_enable();
+  #define TPUKERNEL_LOG(format, ...) printf(format, ##__VA_ARGS__)
+#define TPUKERNEL_ASSERT_INFO(assertion, fmt, args...)                       \
+    do                                                                       \
+    {                                                                        \
+        if (get_atomic_cmodel_assert_enable())                               \
+        {                                                                    \
+            if (!(assertion))                                                \
+            {                                                                \
+                TPUKERNEL_LOG("[ERR] " fmt, ##args);                         \
+                TPUKERNEL_LOG("%s:%d: %s: Assertion \"%s\" failed.\n",       \
+                              __FILE__, __LINE__, __FUNCTION__, #assertion); \
+                __print_trace();                                             \
+                exit(233);                                                   \
+            }                                                                \
+        }                                                                    \
+    } while (0)
+#elif defined(USING_FW_DEBUG)
+  #include <stdio.h>
+  #include <stdlib.h>
+  #define TPUKERNEL_LOG(format, ...) printf(format, ##__VA_ARGS__)
+#define TPUKERNEL_ASSERT_INFO(assertion, fmt, args...)                   \
+    do                                                                   \
+    {                                                                    \
+        if (!(assertion))                                                \
+        {                                                                \
+            TPUKERNEL_LOG("[ERR] " fmt, ##args);                         \
             TPUKERNEL_LOG("%s:%d: %s: Assertion \"%s\" failed.\n",       \
-                         __FILE__, __LINE__,  __FUNCTION__, #assertion); \
-            print_trace();                                               \
-            exit(233);                                                   \
+                          __FILE__, __LINE__, __FUNCTION__, #assertion); \
+            while (1)                                                    \
+                ;                                                        \
         }                                                                \
-    }                                                                    \
-} while(0)
+    } while (0)
 #else
-extern void fw_log(char *, ...);
-//#define TPUKERNEL_LOG(format, ...) fw_log((char *)format, ##__VA_ARGS__)
-#include <stdio.h>
-#include <stdlib.h>
-#define TPUKERNEL_LOG(format, ...) printf(format, ##__VA_ARGS__)
-#define TPUKERNEL_ASSERT(assertion) do {                              \
-    if (!(assertion)) {                                              \
-        TPUKERNEL_LOG("%s:%d: %s: Assertion \"%s\" failed.\n",        \
-                     __FILE__, __LINE__,  __FUNCTION__, #assertion); \
-        while (1);                                                   \
-    }                                                                \
-} while(0)
+  #include <stdio.h>
+  #define TPUKERNEL_LOG(format, ...)
+#define TPUKERNEL_ASSERT_INFO(assertion, fmt, args...)                   \
+    do                                                                   \
+    {                                                                    \
+        if (!(assertion))                                                \
+        {                                                                \
+            TPUKERNEL_LOG("[ERR] " fmt, ##args);                         \
+            TPUKERNEL_LOG("%s:%d: %s: Assertion \"%s\" failed.\n",       \
+                          __FILE__, __LINE__, __FUNCTION__, #assertion); \
+            while (1)                                                    \
+                ;                                                        \
+        }                                                                \
+    } while (0)
 #endif
+
+#define TPUKERNEL_ASSERT(assertion) TPUKERNEL_ASSERT_INFO(assertion, "")
+
 #define TPUKERNEL_ERR(fmt, args...)              \
-do {                                            \
+do {                                             \
     TPUKERNEL_LOG("[ERR] " fmt, ##args);         \
     TPUKERNEL_ASSERT(0);                         \
 } while(0)
-#if defined (USING_FW_DEBUG)
+
 #define TPUKERNEL_DBG(fmt, args...) TPUKERNEL_LOG("[DBG] " fmt, ##args)
-#else
-#define TPUKERNEL_DBG(fmt, args...)
-#endif
+
 #ifndef UNUSED
 #define UNUSED(x) (void)(x)
 #endif
@@ -94,11 +110,42 @@ do {                                            \
 #ifndef LOCAL_MEM_BANKS
 #define LOCAL_MEM_BANKS tpu_bank_num()
 #endif
+#ifndef LOCAL_MEM_START_ADDR
+#define LOCAL_MEM_START_ADDR tpu_local_mem_get_start_addr()
+#endif
+
 #ifndef L2_SRAM_SIZE
 #define L2_SRAM_SIZE tpu_l2_sram_size()
 #endif
 #ifndef BANK_SIZE
 #define BANK_SIZE  (LOCAL_MEM_SIZE / LOCAL_MEM_BANKS)
+#endif
+#ifndef LOCAL_BANK_SIZE
+#define LOCAL_BANK_SIZE  (LOCAL_MEM_SIZE / LOCAL_MEM_BANKS)
+#endif
+
+#ifndef L2_SRAM_START_ADDR
+#define L2_SRAM_START_ADDR tpu_l2_sram_get_start_addr()
+#endif
+
+#ifndef EU_NUM
+#define EU_NUM tpu_eu_num(DT_FP32)
+#endif
+
+#ifndef EU_NUM_32BIT
+#define EU_NUM_32BIT tpu_eu_num(DT_FP32)
+#endif
+
+#ifndef EU_NUM_16BIT
+#define EU_NUM_16BIT tpu_eu_num(DT_FP16)
+#endif
+
+#ifndef EU_NUM_8BIT
+#define EU_NUM_8BIT tpu_eu_num(DT_INT8)
+#endif
+
+#ifndef ALIGN_BYTES
+#define ALIGN_BYTES (EU_NUM*sizeof(float))
 #endif
 /*
  * Example:
@@ -118,45 +165,6 @@ void tpu_set_parallel_id_node(void *bd_node, void* gdma_node);
 void tpu_get_parallel_id_node(void *bd_node, void* gdma_node);
 void tpu_enable_check_id_node();
 void tpu_disable_check_id_node();
-typedef struct {
-    int n, c, h, w;
-} dim4;
-typedef struct {
-    int h, w;
-} dim2;
-typedef struct {
-    int top, bottom, left, right;
-} padding_t;
-typedef struct {
-    int start, end;
-} range_t;
-typedef union {
-    unsigned short bits;
-    struct {
-        unsigned short frac : 10; // mantissa
-        unsigned short exp  : 5;  // exponent
-        unsigned short sign : 1;  // sign
-    } format;
-} float16;
-typedef union {
-    unsigned short bits;
-    struct {
-        unsigned short frac : 7;  // mantissa
-        unsigned short exp  : 8;  // exponent
-        unsigned short sign : 1;  // sign
-    } format;
-} bfloat16;
-typedef union {
-    char           s8;
-    unsigned char  u8;
-    short          s16;
-    unsigned short u16;
-    float16        f16;
-    bfloat16       bf16;
-    int            s32;
-    unsigned int   u32;
-    float          f32;
-} scalar_t;
 typedef enum {
     TENSOR,
     SCALAR,
@@ -194,11 +202,15 @@ int tpu_bank_num();
 
 int tpu_eu_num(data_type_t dtype);
 
+int tpu_gdma_shape_limit(int dim);
+
 int tpu_local_mem_size_per_npu();
 
 int tpu_l2_sram_size();
 
 unsigned long long tpu_l2_sram_get_start_addr();
+
+unsigned long long tpu_global_mem_get_start_addr();
 
 unsigned int tpu_local_mem_get_start_addr();
 
@@ -239,6 +251,12 @@ void tpu_line_aligned_stride(
 
 void tpu_continuous_stride(dim4 *stride, const dim4  *shape);
 
+int tpu_get_local_cstride(int h, int w, bool align, data_type_t dtype);
+
+int tpu_get_local_nstride(int c_stride, int c, int start_idx);
+
+int tpu_get_local_size(const dim4* shape, data_type_t dtype, int start_idx, bool align);
+
 bool tpu_is_data_type_signed(data_type_t dtype);
 
 bool tpu_is_data_type_int(data_type_t dtype);
@@ -250,6 +268,10 @@ bool tpu_is_data_type_unsigned_int(data_type_t dtype);
 bool tpu_is_data_type_fp(data_type_t dtype);
 
 int tpu_data_type_size(data_type_t dtype);
+
+int tpu_data_type_bits(data_type_t dtype);
+
+void tpu_local_shape_5d_to_4d(const dim5* shape_5d, dim4* shape_4d);
 
 scalar_t tpu_int_cast(
     scalar_t     src,
@@ -286,11 +308,33 @@ bool tpu_range_overlapped(const range_t *r0, const range_t *r1);
 
 bool tpu_any_range_overlapped(const range_t *ranges, int num);
 
+int tpu_npu_c_offset(int c, int c_stride, data_type_t dtype);
+
+int tpu_unified_c_offset(int c, int c_stride, data_type_t dtype);
+
 ////////////////////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////////////
 // GDMA FUNCTIONS
 ////////////////////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////////////
+void tpu_gdma_general_cpy_S2L(
+    local_addr_t   dst_addr,
+    system_addr_t  src_addr,
+    const dim4    *dst_shape,
+    const dim4    *src_shape,
+    const dim4    *dst_stride,
+    const dim4    *src_stride,
+    data_type_t    dtype);
+
+void tpu_gdma_general_cpy_L2S(
+    system_addr_t  dst_addr,
+    local_addr_t   src_addr,
+    const dim4    *dst_shape,
+    const dim4    *src_shape,
+    const dim4    *dst_stride,
+    const dim4    *src_stride,
+    data_type_t    dtype);
+
 void tpu_gdma_cpy_S2L(
     local_addr_t   dst_addr,
     system_addr_t  src_addr,
@@ -399,6 +443,15 @@ void tpu_gdma_mask_select_L2S(
     data_type_t    mask_dtype);
 
 void tpu_gdma_mask_select_S2S(
+    global_addr_t  dst_addr,
+    global_addr_t  src_addr,
+    addr_t         mask_addr,
+    int            mask_in_lmem,
+    const dim4    *shape,
+    data_type_t    data_dtype,
+    data_type_t    mask_dtype);
+
+unsigned int tpu_gdma_mask_select_S2S_with_ret(
     global_addr_t  dst_addr,
     global_addr_t  src_addr,
     addr_t         mask_addr,
@@ -630,6 +683,94 @@ void tpu_gdma_system_cpy(
     system_addr_t  src_addr,
     unsigned int   count,
     data_type_t    dtype);
+
+void tpu_gdma_reverse_S2S(
+    system_addr_t dst_addr,
+    system_addr_t src_addr,
+    const dim4 *shape,
+    const dim4 *dst_stride,
+    const dim4 *src_stride,
+    int reverse_axis,
+    data_type_t dtype);
+
+void tpu_gdma_reverse_S2L(
+    local_addr_t dst_addr,
+    system_addr_t src_addr,
+    const dim4 *shape,
+    const dim4 *dst_stride,
+    const dim4 *src_stride,
+    int reverse_axis,
+    data_type_t dtype);
+
+void tpu_gdma_reverse_L2S(
+    system_addr_t dst_addr,
+    local_addr_t src_addr,
+    const dim4 *shape,
+    const dim4 *dst_stride,
+    const dim4 *src_stride,
+    int reverse_axis,
+    data_type_t dtype);
+
+void tpu_gdma_reverse_L2L(
+    local_addr_t dst_addr,
+    local_addr_t src_addr,
+    const dim4 *shape,
+    const dim4 *dst_stride,
+    const dim4 *src_stride,
+    int reverse_axis,
+    data_type_t dtype);
+
+void tpu_gdma_compress_normal_L2S(
+    global_addr_t dst_addr,
+    local_addr_t src_addr,
+    const dim4 *shape,
+    const dim4 *src_stride,
+    data_type_t dtype,
+    unsigned char bias0,
+    unsigned char bias1,
+    bool zero_guard);
+
+int tpu_gdma_compress_normal_max_bytes(const dim4* shape, data_type_t dtype);
+
+void tpu_gdma_decompress_normal_S2L(
+    local_addr_t dst_addr,
+    global_addr_t src_addr,
+    const dim4 *shape,
+    const dim4 *dst_stride,
+    data_type_t dtype,
+    unsigned char bias0,
+    unsigned char bias1,
+    bool zero_guard);
+
+void tpu_gdma_compress_RACU_L2S(
+    global_addr_t dst_racu_addr,
+    global_addr_t dst_meta_addr,
+    local_addr_t src_addr,
+    const dim4* shape,
+    dim4* dst_racu_stride,
+    dim4* dst_meta_stride,
+    const dim4* src_stride,
+    data_type_t dtype,
+    unsigned char bias0,
+    unsigned char bias1,
+    bool zero_guard);
+
+void tpu_gdma_decompress_RACU_S2L(
+    local_addr_t dst_addr,
+    global_addr_t src_racu_addr,
+    global_addr_t src_meta_addr,
+    const dim4* shape,
+    const dim4* dst_stride,
+    const dim4* src_racu_stride,
+    const dim4* src_meta_stride,
+    data_type_t dtype,
+    unsigned char bias0,
+    unsigned char bias1,
+    bool zero_guard);
+
+int tpu_gdma_compress_RACU_max_meta_bytes(const dim4* shape, data_type_t dtype);
+
+int tpu_gdma_compress_RACU_max_racu_bytes(const dim4* shape, data_type_t dtype);
 
 ////////////////////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////////////
@@ -1416,6 +1557,25 @@ void tpu_bdc_int8_asym_pc_quant_conv2d(
     data_type_t       kzp_dtype,
     bool              result_add);
 
+void tpu_bdc_int8_asym_quant_conv2d_kernel_const(
+    local_addr_t      output_addr,
+    local_addr_t      input_addr,
+    scalar_t          C,
+    scalar_t          kzp_val,
+    scalar_t          pad_val,
+    const dim4       *input_shape,
+    const dim4       *input_stride,
+    int               output_c,
+    const dim2       *kernel,
+    const padding_t  *padding,
+    const dim2       *stride,
+    const dim2       *dilation,
+    data_type_t       output_dtype,
+    data_type_t       input_dtype,
+    data_type_t       weight_dtype,
+    data_type_t       kzp_dtype,
+    bool              result_add);
+
 void tpu_bdc_int8_asym_quant_conv2d_for_deconv2d(
     local_addr_t      output_addr,
     local_addr_t      input_addr,
@@ -1494,6 +1654,204 @@ void tpu_bdc_int8_sym_quant_conv2d_for_deconv2d(
     unsigned char     rshift,
     bool              has_bias,
     bool              result_relu);
+
+// only supported bm1686
+void tpu_bdc_conv2d_requant_pc(
+    local_addr_t      output_addr,
+    local_addr_t      input_addr,
+    local_addr_t      weight_addr,
+    local_addr_t      bias_addr,
+    local_addr_t      requant_addr,
+    const dim4       *input_shape,
+    const dim4       *input_stride,
+    int               output_c,
+    const dim2       *kernel,
+    const padding_t  *padding,
+    const dim2       *stride,
+    const dim2       *dilation,
+    data_type_t       output_dtype,
+    data_type_t       input_dtype,
+    data_type_t       weight_dtype,
+    data_type_t       bias_dtype,
+    bool              has_bias,
+    bool              result_relu,
+    bool              has_requant,
+    bool              sym_range);
+// only supported bm1686
+void tpu_bdc_conv2d_requant_C(
+    local_addr_t      output_addr,
+    local_addr_t      input_addr,
+    local_addr_t      weight_addr,
+    local_addr_t      bias_addr,
+    const dim4       *input_shape,
+    const dim4       *input_stride,
+    int               output_c,
+    const dim2       *kernel,
+    const padding_t  *padding,
+    const dim2       *stride,
+    const dim2       *dilation,
+    data_type_t       output_dtype,
+    data_type_t       input_dtype,
+    data_type_t       weight_dtype,
+    data_type_t       bias_dtype,
+    int               multiplier,
+    char              rshift,
+    short             output_zp,
+    bool              has_bias,
+    bool              result_relu,
+    bool              has_requant,
+    bool              sym_range);
+
+void tpu_bdc_conv2d_requant_pc_asym_pc(
+    local_addr_t      output_addr,
+    local_addr_t      input_addr,
+    local_addr_t      weight_addr,
+    local_addr_t      bias_addr,
+    local_addr_t      kzp_addr,
+    local_addr_t      pad_addr,
+    local_addr_t      requant_addr,
+    const dim4       *input_shape,
+    const dim4       *input_stride,
+    int               output_c,
+    const dim2       *kernel,
+    const padding_t  *padding,
+    const dim2       *stride,
+    const dim2       *dilation,
+    data_type_t       output_dtype,
+    data_type_t       input_dtype,
+    data_type_t       weight_dtype,
+    data_type_t       bias_dtype,
+    bool              has_requant,
+    bool              has_bias,
+    bool              result_relu,
+    bool              result_add,
+    bool              sym_range,
+    rounding_mode_t   rounding_mode);
+
+void tpu_bdc_conv2d_requant_C_asym_pc(
+    local_addr_t      output_addr,
+    local_addr_t      input_addr,
+    local_addr_t      weight_addr,
+    local_addr_t      bias_addr,
+    local_addr_t      kzp_addr,
+    local_addr_t      pad_addr,
+    const dim4       *input_shape,
+    const dim4       *input_stride,
+    int               output_c,
+    const dim2       *kernel,
+    const padding_t  *padding,
+    const dim2       *stride,
+    const dim2       *dilation,
+    data_type_t       output_dtype,
+    data_type_t       input_dtype,
+    data_type_t       weight_dtype,
+    data_type_t       bias_dtype,
+    int               multiplier,
+    char              rshift,
+    short             output_zp,
+    bool              has_requant,
+    bool              has_bias,
+    bool              result_relu,
+    bool              result_add,
+    bool              sym_range,
+    rounding_mode_t   rounding_mode);
+
+void tpu_bdc_conv2d_requant_C_asym_C(
+    local_addr_t      output_addr,
+    local_addr_t      input_addr,
+    local_addr_t      weight_addr,
+    local_addr_t      bias_addr,
+    scalar_t          kzp_val,
+    scalar_t          pad_val,
+    const dim4       *input_shape,
+    const dim4       *input_stride,
+    int               output_c,
+    const dim2       *kernel,
+    const padding_t  *padding,
+    const dim2       *stride,
+    const dim2       *dilation,
+    data_type_t       output_dtype,
+    data_type_t       input_dtype,
+    data_type_t       weight_dtype,
+    data_type_t       bias_dtype,
+    int               multiplier,
+    char              rshift,
+    short             output_zp,
+    bool              has_requant,
+    bool              has_bias,
+    bool              result_relu,
+    bool              result_add,
+    bool              sym_range,
+    rounding_mode_t   rounding_mode);
+
+void tpu_bdc_conv2d_requant_pc_asym_C(
+    local_addr_t      output_addr,
+    local_addr_t      input_addr,
+    local_addr_t      weight_addr,
+    local_addr_t      bias_addr,
+    local_addr_t      requant_addr,
+    scalar_t          kzp_val,
+    scalar_t          pad_val,
+    const dim4       *input_shape,
+    const dim4       *input_stride,
+    int               output_c,
+    const dim2       *kernel,
+    const padding_t  *padding,
+    const dim2       *stride,
+    const dim2       *dilation,
+    data_type_t       output_dtype,
+    data_type_t       input_dtype,
+    data_type_t       weight_dtype,
+    data_type_t       bias_dtype,
+    bool              has_requant,
+    bool              has_bias,
+    bool              result_relu,
+    bool              result_add,
+    bool              sym_range,
+    rounding_mode_t   rounding_mode);
+
+void tpu_bdc_depthwise2d_requant_pc_asym_C(
+    local_addr_t      output_addr,
+    local_addr_t      input_addr,
+    local_addr_t      weight_addr,
+    local_addr_t      bias_addr,
+    local_addr_t      requant_addr,
+    scalar_t          pad_val,
+    const dim4       *input_shape,
+    const dim2       *kernel,
+    const padding_t  *padding,
+    const dim2       *stride,
+    const dim2       *dilation,
+    data_type_t       output_dtype,
+    data_type_t       input_dtype,
+    data_type_t       weight_dtype,
+    data_type_t       bias_dtype,
+    bool              has_bias,
+    bool              has_requant,
+    bool              result_relu,
+    bool              sym_range,
+    rounding_mode_t   rounding_mode);
+
+void tpu_bdc_depthwise2d_requant_C_sym_C(
+    local_addr_t      output_addr,
+    local_addr_t      input_addr,
+    local_addr_t      weight_addr,
+    local_addr_t      bias_addr,
+    scalar_t          pad_val,
+    const dim4       *input_shape,
+    const dim2       *kernel,
+    const padding_t  *padding,
+    const dim2       *stride,
+    const dim2       *dilation,
+    data_type_t       output_dtype,
+    data_type_t       input_dtype,
+    data_type_t       weight_dtype,
+    data_type_t       bias_dtype,
+    unsigned char     rshift,
+    bool              has_bias,
+    bool              result_relu,
+    bool              sym_range,
+    rounding_mode_t   rounding_mode);
 
 void tpu_bdc_int8_max_pool2d(
     local_addr_t      output_addr,
@@ -2230,6 +2588,14 @@ void tpu_bdc_fp_mul_C(
     const dim4   *src_stride,
     data_type_t   dtype);
 
+void tpu_bdc_fp_square(
+    local_addr_t  dst_addr,
+    local_addr_t  src_addr,
+    const dim4   *shape,
+    const dim4   *dst_stride,
+    const dim4   *src_stride,
+    data_type_t   dtype);
+
 void tpu_bdc_fp32_div(
     local_addr_t  dst_addr,
     local_addr_t  src0_addr,
@@ -2282,6 +2648,66 @@ void tpu_bdc_fp32_tunable_C_div(
     const dim4   *dst_stride,
     const dim4   *src_stride,
     int           num_iter);
+
+void tpu_bdc_fp_div(
+    local_addr_t  dst_addr,
+    local_addr_t  src0_addr,
+    local_addr_t  src1_addr,
+    const dim4   *shape,
+    const dim4   *dst_stride,
+    const dim4   *src0_stride,
+    const dim4   *src1_stride,
+    data_type_t   dtype);
+
+void tpu_bdc_fp_div_C(
+    local_addr_t  dst_addr,
+    local_addr_t  src_addr,
+    scalar_t      C,
+    const dim4   *shape,
+    const dim4   *dst_stride,
+    const dim4   *src_stride,
+    data_type_t   dtype);
+
+void tpu_bdc_fp_C_div(
+    local_addr_t  dst_addr,
+    local_addr_t  src_addr,
+    scalar_t      C,
+    const dim4   *shape,
+    const dim4   *dst_stride,
+    const dim4   *src_stride,
+    data_type_t   dtype);
+
+void tpu_bdc_fp_tunable_div(
+    local_addr_t  dst_addr,
+    local_addr_t  src0_addr,
+    local_addr_t  src1_addr,
+    const dim4   *shape,
+    const dim4   *dst_stride,
+    const dim4   *src0_stride,
+    const dim4   *src1_stride,
+    data_type_t   dtype,
+    int           num_iter);
+
+void tpu_bdc_fp_tunable_div_C(
+    local_addr_t  dst_addr,
+    local_addr_t  src_addr,
+    scalar_t      C,
+    const dim4   *shape,
+    const dim4   *dst_stride,
+    const dim4   *src_stride,
+    data_type_t   dtype,
+    int           num_iter);
+
+void tpu_bdc_fp_tunable_C_div(
+    local_addr_t  dst_addr,
+    local_addr_t  src_addr,
+    scalar_t      C,
+    const dim4   *shape,
+    const dim4   *dst_stride,
+    const dim4   *src_stride,
+    data_type_t   dtype,
+    int           num_iter);
+
 
 void tpu_bdc_fp32_mac(
     local_addr_t  dst_addr,
@@ -2813,6 +3239,23 @@ void tpu_bdc_fp32_tunable_reciprocal(
     const dim4   *src_stride,
     int           num_iter);
 
+void tpu_bdc_fp_tunable_reciprocal(
+    local_addr_t  dst_addr,
+    local_addr_t  src_addr,
+    const dim4   *shape,
+    const dim4   *dst_stride,
+    const dim4   *src_stride,
+    data_type_t   dtype,
+    int           num_iter);
+
+void tpu_bdc_fp_reciprocal(
+    local_addr_t  dst_addr,
+    local_addr_t  src_addr,
+    const dim4   *shape,
+    const dim4   *dst_stride,
+    const dim4   *src_stride,
+    data_type_t   dtype);
+
 void tpu_bdc_fp32_compensate_reciprocal(
     local_addr_t  dst_addr,
     local_addr_t  src_addr,
@@ -2843,6 +3286,32 @@ void tpu_bdc_fp32_tunable_rsqrt(
     local_addr_t  dst_addr,
     local_addr_t  src_addr,
     const dim4   *shape,
+    int           num_iter);
+
+void tpu_bdc_fp_rsqrt(
+    local_addr_t  dst_addr,
+    local_addr_t  src_addr,
+    const dim4   *shape,
+    data_type_t   dtype);
+
+void tpu_bdc_fp_tunable_rsqrt(
+    local_addr_t  dst_addr,
+    local_addr_t  src_addr,
+    const dim4   *shape,
+    data_type_t   dtype,
+    int           num_iter);
+
+void tpu_bdc_fp_sqrt(
+    local_addr_t  dst_addr,
+    local_addr_t  src_addr,
+    const dim4   *shape,
+    data_type_t   dtype);
+
+void tpu_bdc_fp_tunable_sqrt(
+    local_addr_t  dst_addr,
+    local_addr_t  src_addr,
+    const dim4   *shape,
+    data_type_t   dtype,
     int           num_iter);
 
 void tpu_bdc_fp32_sqrt(
@@ -3038,6 +3507,17 @@ void tpu_bdc_arithmetic_sequence_distribute(
     int           start,
     int           step,
     int           num);
+
+void tpu_bdc_arithmetic_sequence_distribute_aligned(
+    local_addr_t  dst_addr,
+    int           start,
+    int           step,
+    int           num);
+
+void tpu_bdc_generate_arithmetic_sequence(
+    local_addr_t dst_addr,
+    int          num,
+    data_type_t  dtype);
 
 void tpu_bdc_arithmetic_sequence_general(
     local_addr_t  dst_addr,
@@ -3261,13 +3741,21 @@ void tpu_bdc_fp32_sigmoid(
     local_addr_t  table_addr,
     const dim4   *shape);
 
-void tpu_bdc_fp32_hsigmoid(
+void tpu_bdc_fp_hsigmoid(
     local_addr_t  dst_addr,
     local_addr_t  src_addr,
     local_addr_t  work0_addr,
     const dim4   *shape,
-    float         scope,
-    float         offset);
+    float         alpha,
+    float         beta,
+    data_type_t   dtype);
+
+void tpu_bdc_fp_hswish(
+    local_addr_t dst_addr,
+    local_addr_t src_addr,
+    local_addr_t work0_addr,
+    const dim4 *shape,
+    data_type_t dtype);
 
 void tpu_bdc_fp_isfinite(
     local_addr_t  dst_addr,
@@ -3441,6 +3929,18 @@ void tpu_hau_sort_specific_index(
     bool           descended,
     data_type_t    dtype);
 
+void tpu_hau_sort_general(
+        system_addr_t src_data_addr,
+        system_addr_t src_idx_addr,
+        system_addr_t dst_data_addr,
+        system_addr_t dst_idx_addr,
+        int dtype_flags,   // 0:fp32 1:int32 2:uint32
+        int len,
+        int is_descend,
+        int idx_enable,
+        int idx_auto,
+        int topk);
+
 void tpu_hau_hard_nms(
     system_addr_t  output_addr,
     system_addr_t  input_addr,
@@ -3473,6 +3973,8 @@ void tpu_invalidate_cache(system_addr_t address,
 
 void tpu_flush_cache(system_addr_t address,
                      unsigned long long size);
+
+int tpu_cache_line_size();
 
 #ifdef __cplusplus
 }

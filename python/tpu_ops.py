@@ -21,7 +21,7 @@ from torch.nn.modules.utils import _single, _pair, _triple, _quadruple
 from typing import Optional, List, Tuple, Union
 
 sys.path.append(r"./build/sgdnn")
-import sgdnn
+import sgdnn_pybind
 
 # support single number or tuple for parameter
 def get_parameter(para, idx):
@@ -94,22 +94,22 @@ class Conv2dFunc(Function):
         padding_w = get_parameter(padding, 1)
 
         grad_bias_enable = 0 if bias is None else 1
-        sgdnn.conv_backward(grad_out_np,
-                            input_np,
-                            weight_32IC_np,
-                            grad_input_np,
-                            grad_weight_np,
-                            grad_bias_np,
-                            input.shape[0], input.shape[1],
-                            input.shape[2], input.shape[3],
-                            grad_output.shape[1],
-                            grad_output.shape[2],
-                            grad_output.shape[3],
-                            groups,
-                            weight.shape[2], weight.shape[3],
-                            stride_h, stride_w, dilation_h, dilation_w,
-                            padding_h, padding_h, padding_w, padding_w,
-                            0, 1, 1, grad_bias_enable);
+        sgdnn_pybind.conv_backward(grad_out_np,
+                                     input_np,
+                                     weight_32IC_np,
+                                     grad_input_np,
+                                     grad_weight_np,
+                                     grad_bias_np,
+                                     input.shape[0], input.shape[1],
+                                     input.shape[2], input.shape[3],
+                                     grad_output.shape[1],
+                                     grad_output.shape[2],
+                                     grad_output.shape[3],
+                                     groups,
+                                     weight.shape[2], weight.shape[3],
+                                     stride_h, stride_w, dilation_h, dilation_w,
+                                     padding_h, padding_h, padding_w, padding_w,
+                                     0, 1, 1, grad_bias_enable);
 
         grad_input = torch.from_numpy(grad_input_np).reshape(input.shape)
         grad_weight = torch.from_numpy(grad_weight_np).reshape(weight.shape[1], weight.shape[0], weight.shape[2], weight.shape[3])
@@ -156,16 +156,16 @@ class BatchNorm2dFunc(Function):
         grad_input_np = np.ones(input.shape, dtype = np.float16)
         grad_weight_np = np.ones(weight.shape, dtype = np.float16)
         grad_bias_np = np.ones(weight.shape, dtype = np.float16)
-        sgdnn.batchnorm_backward(grad_out_np,
-                                 input_np,
-                                 weight_np,
-                                 mean_np,
-                                 invstd_np,
-                                 grad_input_np,
-                                 grad_weight_np,
-                                 grad_bias_np,
-                                 n,c,h,w,
-                                 1, 1, 1)
+        sgdnn_pybind.batchnorm_backward(grad_out_np,
+                                          input_np,
+                                          weight_np,
+                                          mean_np,
+                                          invstd_np,
+                                          grad_input_np,
+                                          grad_weight_np,
+                                          grad_bias_np,
+                                          n,c,h,w,
+                                          1, 1, 1)
         # test fp32
         # grad_out_np = np.asarray(grad_output.data.flatten())
         # input_np = np.asarray(input.data.flatten())
@@ -239,20 +239,20 @@ class AvgPool2dFunc(Function):
         pad_w = get_parameter(padding, 1)
 
         divisor = kh * kw if divisor_override is None else divisor_override
-        sgdnn.avgpool_backward(grad_out_np,
-                               grad_input_np,
-                               input.shape[0],
-                               input.shape[1],
-                               input.shape[2],
-                               input.shape[3],
-                               grad_output.shape[2],
-                               grad_output.shape[3],
-                               kh, kw,
-                               stride_h, stride_w,
-                               pad_h, pad_w,
-                               ceil_mode,
-                               count_include_pad,
-                               divisor);
+        sgdnn_pybind.avgpool_backward(grad_out_np,
+                                        grad_input_np,
+                                        input.shape[0],
+                                        input.shape[1],
+                                        input.shape[2],
+                                        input.shape[3],
+                                        grad_output.shape[2],
+                                        grad_output.shape[3],
+                                        kh, kw,
+                                        stride_h, stride_w,
+                                        pad_h, pad_w,
+                                        ceil_mode,
+                                        count_include_pad,
+                                        divisor);
 
         grad_input = torch.from_numpy(grad_input_np).reshape(input.shape)
         return grad_input, None, None, None, None, None, None
@@ -294,18 +294,18 @@ class AdaptiveAvgPool2dFunc(Function):
 
         grad_out_np = np.asarray(grad_output.half().data.flatten())
 
-        sgdnn.avgpool_backward(grad_out_np,
-                               grad_input_np,
-                               input.shape[0],
-                               input.shape[1],
-                               ih, iw,
-                               oh, ow,
-                               kh, kw,
-                               stride_h, stride_w,
-                               0, 0,
-                               False,
-                               True,
-                               kh * kw);
+        sgdnn_pybind.avgpool_backward(grad_out_np,
+                                        grad_input_np,
+                                        input.shape[0],
+                                        input.shape[1],
+                                        ih, iw,
+                                        oh, ow,
+                                        kh, kw,
+                                        stride_h, stride_w,
+                                        0, 0,
+                                        False,
+                                        True,
+                                        kh * kw);
 
         grad_input = torch.from_numpy(grad_input_np).reshape(input.shape)
         return grad_input, None
@@ -353,21 +353,21 @@ class MaxPool2dFunc(Function):
         output_np = np.asarray(output.data.flatten())
         grad_out_np = np.asarray(grad_output.data.flatten())
 
-        sgdnn.maxpool_backward_f32(input_np,
-                                   output_np,
-                                   grad_out_np,
-                                   grad_input_np,
-                                   input.shape[0],
-                                   input.shape[1],
-                                   input.shape[2],
-                                   input.shape[3],
-                                   grad_output.shape[2],
-                                   grad_output.shape[3],
-                                   kh, kw,
-                                   stride_h, stride_w,
-                                   pad_h, pad_w,
-                                   dh, dw,
-                                   ceil_mode);
+        sgdnn_pybind.maxpool_backward_f32(input_np,
+                                            output_np,
+                                            grad_out_np,
+                                            grad_input_np,
+                                            input.shape[0],
+                                            input.shape[1],
+                                            input.shape[2],
+                                            input.shape[3],
+                                            grad_output.shape[2],
+                                            grad_output.shape[3],
+                                            kh, kw,
+                                            stride_h, stride_w,
+                                            pad_h, pad_w,
+                                            dh, dw,
+                                            ceil_mode);
 
         grad_input = torch.from_numpy(grad_input_np).reshape(input.shape)
         return grad_input, None, None, None, None, None
@@ -406,16 +406,16 @@ class EltwiseFunc(Function):
         grad_output_np = np.asarray(grad_output.half().data.flatten())
         grad_input_a_np = np.ones(input_a.shape, dtype = np.float16)
         grad_input_b_np = np.ones(input_b.shape, dtype = np.float16)
-        sgdnn.eltwise_backward(input_a_np,
-                              input_b_np,
-                              grad_output_np,
-                              grad_input_a_np,
-                              grad_input_b_np,
-                              n, c, h, w,
-                              op_code,
-                              coeff_a,
-                              coeff_b,
-                              1,1)
+        sgdnn_pybind.eltwise_backward(input_a_np,
+                                        input_b_np,
+                                        grad_output_np,
+                                        grad_input_a_np,
+                                        grad_input_b_np,
+                                        n, c, h, w,
+                                        op_code,
+                                        coeff_a,
+                                        coeff_b,
+                                        1,1)
         grad_input_a = torch.from_numpy(grad_input_a_np).reshape(input_a.shape)
         grad_input_b = torch.from_numpy(grad_input_b_np).reshape(input_b.shape)
         return grad_input_a, grad_input_b, None, None, None
@@ -444,16 +444,16 @@ class LinearFunc(Function):
         grad_input_np = np.ones(input.shape, dtype = np.float16)
         grad_weight_np = np.ones(weight.shape, dtype = np.float16)
         grad_bias_np = np.ones(out_features, dtype = np.float16)
-        sgdnn.linear_backward(input_np,
-                              weight_np,
-                              grad_output_np,
-                              grad_input_np,
-                              grad_weight_np,
-                              grad_bias_np,
-                              batch,
-                              in_features,
-                              out_features,
-                              1, 1, 1)
+        sgdnn_pybind.linear_backward(input_np,
+                                       weight_np,
+                                       grad_output_np,
+                                       grad_input_np,
+                                       grad_weight_np,
+                                       grad_bias_np,
+                                       batch,
+                                       in_features,
+                                       out_features,
+                                       1, 1, 1)
         grad_input = grad_weight = grad_bias = None
         grad_input = torch.from_numpy(grad_input_np).reshape((batch, in_features))
         grad_weight = torch.from_numpy(grad_weight_np).reshape((out_features, in_features))
@@ -479,11 +479,11 @@ class ReluFunc(Function):
         input_np = np.asarray(input.half().data.flatten())
         grad_output_np = np.asarray(grad_output.half().data.flatten())
         grad_input_np = np.ones(input.shape, dtype = np.float16)
-        sgdnn.relu_backward(input_np,
-                            grad_output_np,
-                            grad_input_np,
-                            n, c, h, w,
-                            1)   
+        sgdnn_pybind.relu_backward(input_np,
+                                     grad_output_np,
+                                     grad_input_np,
+                                     n, c, h, w,
+                                     1)   
         grad_input = None
         grad_input = torch.from_numpy(grad_input_np).reshape((n, c, h, w))
         return grad_input
