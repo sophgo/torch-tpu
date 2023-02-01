@@ -44,6 +44,8 @@ void TPUCopyHostToDevice ( void * Dst, const void * Src, size_t Size );
  */
 void TPUCopyDeviceToHost ( void * Dst, const void * Src, size_t Size );
 
+void TPUCopyDeviceToDevice ( void * Dst, const void * Src, size_t Size );
+
 bool TPUPtrIsInCurrentDevice ( const void * Ptr );
 
 void * TPUGetAddrInDevice ( const void * Ptr );

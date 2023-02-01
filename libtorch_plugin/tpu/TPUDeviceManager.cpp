@@ -4,6 +4,8 @@
 #include <c10/util/Logging.h>
 #include <TPUDeviceManager.h>
 
+#include <iostream>
+
 #define ERROR_CODE(Err) " ( TPU error code: " << Err << ")"
 #define TPU_DEVICE_INDEX_BITS 8
 
@@ -143,8 +145,7 @@ public:
     bm_handle_t Handle = GetDeviceHandle ( Index );
     if ( Handle == nullptr )
     {
-      LOG ( FATAL ) << "TPU handle of device #" << Index
-                    << " is null";
+      LOG ( FATAL ) << "TPU handle of device #" << Index << " is null";
     }
     auto Iter = AddrMemMap_.find ( ( unsigned long long ) Ptr );
     if ( Iter == AddrMemMap_.end() )
@@ -162,17 +163,17 @@ public:
     bm_handle_t Handle = GetDeviceHandle ( Index );
     if ( Handle == nullptr )
     {
-      LOG ( FATAL ) << "TPU handle of device #" << GetDeviceIndex()
-                    << " is null";
+      LOG ( FATAL ) << "TPU handle of device #" << Index << " is null";
     }
-    bm_device_mem_t DstMem = bm_mem_from_device (
-                             ( unsigned long long ) Dst, Size );
+    bm_device_mem_t DstMem =
+    bm_mem_from_device ( GetAddrByUnifiedAddr ( ( unsigned long long ) Dst ),
+                         Size );
     bm_status_t Status = BM_SUCCESS;
     Status = bm_memcpy_s2d ( Handle, DstMem, ( void * ) Src );
     if ( Status != BM_SUCCESS )
     {
       LOG ( FATAL ) << "Failed to copy memory from host to TPU device #"
-                    << GetDeviceIndex() << " with size = " << Size << "bytes"
+                    << Index << " with size = " << Size << "bytes"
                     << ERROR_CODE ( Status );
     }
   }
@@ -183,17 +184,55 @@ public:
     bm_handle_t Handle = GetDeviceHandle ( Index );
     if ( Handle == nullptr )
     {
-      LOG ( FATAL ) << "TPU handle of device #" << GetDeviceIndex()
-                    << " is null";
+      LOG ( FATAL ) << "TPU handle of device #" << Index << " is null";
     }
-    bm_device_mem_t SrcMem = bm_mem_from_device (
-                             ( unsigned long long ) Src, Size );
+    bm_device_mem_t SrcMem =
+    bm_mem_from_device ( GetAddrByUnifiedAddr ( ( unsigned long long ) Src ),
+                         Size );
     bm_status_t Status = BM_SUCCESS;
     Status = bm_memcpy_d2s ( Handle, Dst, SrcMem );
     if ( Status != BM_SUCCESS )
     {
       LOG ( FATAL ) << "Failed to copy memory from TPU device #"
-                    << GetDeviceIndex() << " to host with size = " << Size
+                    << Index << " to host with size = " << Size
+                    << "bytes" << ERROR_CODE ( Status );
+    }
+  }
+
+  void CopyDeviceToDevice ( void * Dst, const void * Src, size_t Size )
+  {
+    int DstIndex = GetDeviceIndexByUnifiedAddr ( ( unsigned long long ) Dst );
+    int SrcIndex = GetDeviceIndexByUnifiedAddr ( ( unsigned long long ) Src );
+    bm_handle_t DstHandle = GetDeviceHandle ( DstIndex );
+    if ( DstHandle == nullptr )
+    {
+      LOG ( FATAL ) << "TPU handle of device #" << DstIndex << " is null";
+    }
+    bm_handle_t SrcHandle = GetDeviceHandle ( SrcIndex );
+    if ( SrcHandle == nullptr )
+    {
+      LOG ( FATAL ) << "TPU handle of device #" << SrcIndex << " is null";
+    }
+    bm_device_mem_t DstMem =
+    bm_mem_from_device ( GetAddrByUnifiedAddr ( ( unsigned long long ) Dst ),
+                         Size );
+    bm_device_mem_t SrcMem =
+    bm_mem_from_device ( GetAddrByUnifiedAddr ( ( unsigned long long ) Src ),
+                         Size );
+    bm_status_t Status = BM_SUCCESS;
+    if ( DstIndex == SrcIndex )
+    {
+      Status = bm_memcpy_d2d_byte ( DstHandle, DstMem, 0, SrcMem, 0, Size );
+    }
+    else
+    {
+      Status = bm_memcpy_c2c ( SrcHandle, DstHandle, SrcMem, DstMem, false );
+    }
+    if ( Status != BM_SUCCESS )
+    {
+      LOG ( FATAL ) << "Failed to copy memory from TPU device #"
+                    << SrcIndex << " to TPU device #" << DstIndex
+                    << " with size = " << Size
                     << "bytes" << ERROR_CODE ( Status );
     }
   }
@@ -203,6 +242,7 @@ private:
   int Index_;
   static std::mutex Mutex_;
   static std::unordered_map<unsigned long long, bm_device_mem_t> AddrMemMap_;
+
 };
 
 std::mutex TPUDeviceManager::Mutex_;
@@ -260,6 +300,11 @@ bool TPUPtrIsInCurrentDevice ( const void * Ptr )
 void * TPUGetAddrInDevice ( const void * Ptr )
 {
   return ( void * ) GetAddrByUnifiedAddr ( ( unsigned long long ) Ptr );
+}
+
+void TPUCopyDeviceToDevice ( void * Dst, const void * Src, size_t Size )
+{
+  ThreadLocalTPUDeviceManager.CopyDeviceToDevice ( Dst, Src, Size );
 }
 
 } // namespace tpu

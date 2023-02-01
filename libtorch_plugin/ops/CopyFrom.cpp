@@ -28,6 +28,12 @@ Tensor _copy_from_tpu ( const Tensor & self, const Tensor & dst,
   {
     tpu::TPUCopyDeviceToHost ( dst.data_ptr(), self.data_ptr(), dst.nbytes() );
   }
+  else if ( self.device().type() == DeviceType::PrivateUse1 &&
+            dst.device().type() == DeviceType::PrivateUse1 )
+  {
+    tpu::TPUCopyDeviceToDevice ( dst.data_ptr(), self.data_ptr(),
+                                 dst.nbytes() );
+  }
   else
   {
     LOG ( FATAL ) << "Unsupported copy from device " << self.device()

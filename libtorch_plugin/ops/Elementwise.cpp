@@ -5,6 +5,8 @@
 #include <TPUTorchUtils.h>
 #include <sgdnn_api.h>
 
+#define ERROR_CODE(Err) " ( TPU error code: " << Err << ")"
+
 namespace at
 {
 Tensor & add_Tensor_tpu ( const Tensor & input1,
@@ -22,17 +24,22 @@ Tensor & add_Tensor_tpu ( const Tensor & input1,
   float Alpha2 = alpha.toDouble();
   float Beta = 0.f;
   OpTensorDescriptor_t Op = { .op_code = 1 };
-  sgdnn_eltwise_forward ( Handle,
-                          &Alpha1,
-                          ADesc,
-                          ADDR_IN_DEVICE ( input1 ),
-                          &Alpha2,
-                          BDesc,
-                          ADDR_IN_DEVICE ( input2 ),
-                          &Beta,
-                          CDesc,
-                          ADDR_IN_DEVICE ( out ),
-                          Op );
+  bm_status_t Status = BM_SUCCESS;
+  Status = sgdnn_eltwise_forward ( Handle,
+                                   &Alpha1,
+                                   ADesc,
+                                   ADDR_IN_DEVICE ( input1 ),
+                                   &Alpha2,
+                                   BDesc,
+                                   ADDR_IN_DEVICE ( input2 ),
+                                   &Beta,
+                                   CDesc,
+                                   ADDR_IN_DEVICE ( out ),
+                                   Op );
+  if ( Status != BM_SUCCESS )
+  {
+    LOG ( FATAL ) << ERROR_CODE ( Status );
+  }
   return out;
 }
 TORCH_LIBRARY_IMPL ( aten, PrivateUse1, m )
