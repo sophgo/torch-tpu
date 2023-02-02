@@ -25,6 +25,10 @@ const at::Tensor & Tensor )
   TensorDescriptor_t Desc = { 0 };
   if ( Tensor.dtype() == caffe2::TypeMeta::Make<float>() )
   {
+    Desc.dtype = 0;
+  }
+  else if ( Tensor.dtype() == caffe2::TypeMeta::Make<at::Half>() )
+  {
     Desc.dtype = 1;
   }
   else

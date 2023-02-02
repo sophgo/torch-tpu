@@ -1,4 +1,5 @@
 #include <torch/library.h>
+#include <torch/torch.h>
 #include <ATen/core/TensorBase.h>
 #include <ATen/EmptyTensor.h>
 #include <TPUDeviceManager.h>
@@ -14,31 +15,39 @@ Tensor & add_Tensor_tpu ( const Tensor & input1,
                           const Scalar & alpha,
                           Tensor & out )
 {
-  CHECK_TENSOR_IN_DEVICE ( input1 );
-  CHECK_TENSOR_IN_DEVICE ( input2 );
-  auto ADesc = tpu::TPUGenerateTensorDesc ( input1 );
-  auto BDesc = tpu::TPUGenerateTensorDesc ( input2 );
-  auto CDesc = tpu::TPUGenerateTensorDesc ( out );
-  auto Handle = tpu::TPUGetDeviceHandle();
-  float Alpha1 = 1.f;
-  float Alpha2 = alpha.toDouble();
-  float Beta = 0.f;
-  OpTensorDescriptor_t Op = { .op_code = 1 };
-  bm_status_t Status = BM_SUCCESS;
-  Status = sgdnn_eltwise_forward ( Handle,
-                                   &Alpha1,
-                                   ADesc,
-                                   ADDR_IN_DEVICE ( input1 ),
-                                   &Alpha2,
-                                   BDesc,
-                                   ADDR_IN_DEVICE ( input2 ),
-                                   &Beta,
-                                   CDesc,
-                                   ADDR_IN_DEVICE ( out ),
-                                   Op );
-  if ( Status != BM_SUCCESS )
+  if ( input1.device().type() == DeviceType::PrivateUse1 &&
+       input2.device().type() == DeviceType::PrivateUse1 )
   {
-    LOG ( FATAL ) << ERROR_CODE ( Status );
+    CHECK_TENSOR_IN_DEVICE ( input1 );
+    CHECK_TENSOR_IN_DEVICE ( input2 );
+    auto ADesc = tpu::TPUGenerateTensorDesc ( input1 );
+    auto BDesc = tpu::TPUGenerateTensorDesc ( input2 );
+    auto CDesc = tpu::TPUGenerateTensorDesc ( out );
+    auto Handle = tpu::TPUGetDeviceHandle();
+    float Alpha1 = 1.f;
+    float Alpha2 = alpha.toDouble();
+    float Beta = 0.f;
+    OpTensorDescriptor_t Op = { .op_code = 1 };
+    bm_status_t Status = BM_SUCCESS;
+    Status = sgdnn_eltwise_forward ( Handle,
+                                     &Alpha1,
+                                     ADesc,
+                                     ADDR_IN_DEVICE ( input1 ),
+                                     &Alpha2,
+                                     BDesc,
+                                     ADDR_IN_DEVICE ( input2 ),
+                                     &Beta,
+                                     CDesc,
+                                     ADDR_IN_DEVICE ( out ),
+                                     Op );
+    if ( Status != BM_SUCCESS )
+    {
+      LOG ( FATAL ) << ERROR_CODE ( Status );
+    }
+  }
+  else
+  {
+    LOG ( FATAL ) << "Inputs are all required in TPU device for now";
   }
   return out;
 }
