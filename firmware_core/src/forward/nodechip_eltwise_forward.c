@@ -10,7 +10,7 @@
 #define ELTWISE_OP_WEIGHTED_ADD 1
 #define ELTWISE_OP_MAX 2
 
-void nodechip_eltwise_twoinput_cal(
+void nodechip_eltwise_twoinput_cal_forward(
     global_addr_t   bottom_A_global_offset,
     global_addr_t   bottom_B_global_offset,
     global_addr_t   top_global_offset,
@@ -267,7 +267,7 @@ void nodechip_eltwise_twoinput_cal(
     } // while
 }
 
-void nodechip_eltwise(
+void nodechip_eltwise_forward(
     global_addr_t*  bottom_global_offset,
     global_addr_t   top_global_offset,
     global_addr_t   mask_global_offset,
@@ -300,7 +300,7 @@ void nodechip_eltwise(
           bottom_A_coeff.s32 = coeff[idx];
           scalar_t mask_index_t;
           mask_index_t.s32 = mask_index[idx];
-          nodechip_eltwise_twoinput_cal(
+          nodechip_eltwise_twoinput_cal_forward(
               bottom_A_addr,
               bottom_B_addr,
               top_global_offset,
@@ -336,7 +336,7 @@ void nodechip_eltwise(
             bottom_B_coeff.s32 = coeff[idx + 1];
             scalar_t mask_index_t;
             mask_index_t.s32 = mask_index[idx];
-            nodechip_eltwise_twoinput_cal(
+            nodechip_eltwise_twoinput_cal_forward(
                 bottom_A_addr,
                 bottom_B_addr,
                 top_global_offset,
@@ -371,7 +371,7 @@ void tpu_kernel_api_eltwise_forward(const void* args) {
     TPUKERNEL_ASSERT(idtype == odtype);
     data_type_t dtype = idtype;
 
-    nodechip_eltwise(
+    nodechip_eltwise_forward(
         bottom_global_offset,
         api->output_global_addr,
         api->mask_global_addr,
