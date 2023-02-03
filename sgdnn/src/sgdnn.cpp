@@ -529,10 +529,10 @@ bm_status_t sgdnn_eltwise_forward(
     assert(A_h == B_h && B_h == C_h);
     assert(A_w == B_w && B_w == C_w);
 
-    float alpha_A = ((float*)alpha1)[0];
-    float alpha_B = ((float*)alpha2)[0];
-    float beta_C = ((float*)beta)[0];
-    assert(beta_C == 0.0f);
+    DataUnion alpha_A, alpha_B;
+    alpha_A.f32val = ((float*)alpha1)[0];
+    alpha_B.f32val = ((float*)alpha2)[0];
+    assert(((float*)beta)[0] == 0.0f);
 
     sg_data_type_t dtype_A = (sg_data_type_t)(aDesc.dtype);
     sg_data_type_t dtype_B = (sg_data_type_t)(bDesc.dtype);
@@ -548,7 +548,8 @@ bm_status_t sgdnn_eltwise_forward(
         2,// input number
         A_n, A_c, A_h, A_w,
         op_code,
-        alpha_A, alpha_B,
+        alpha_A.i32val,
+        alpha_B.i32val,
         0, 0, 0,
         0,
         dtype_A,
@@ -600,10 +601,10 @@ bm_status_t sgdnn_eltwise_backward(
     assert(A_h == B_h && B_h == C_h);
     assert(A_w == B_w && B_w == C_w);
 
-    float alpha_A = ((float*)alpha1)[0];
-    float alpha_B = ((float*)alpha2)[0];
-    float beta_C = ((float*)beta)[0];
-    assert(beta_C == 0.0f);
+    int alpha_A = ((int*)alpha1)[0];
+    int alpha_B = ((int*)alpha2)[0];
+    int beta_C = ((int*)beta)[0];
+    assert(beta_C == 0);
 
     sg_data_type_t dtype_A = (sg_data_type_t)(aDesc.dtype);
     sg_data_type_t dtype_B = (sg_data_type_t)(bDesc.dtype);
@@ -1065,14 +1066,12 @@ PYBIND11_MODULE(sgdnn_pybind, m)
           aDesc.shape[2] = h;
           aDesc.shape[3] = w;
 
-          float alpha1[1] = {(float)coeff_a};
-          float alpha2[1] = {(float)coeff_b};
-          float beta[1] = {0.0f};
+          int beta[1] = {0};
 
           bm_status_t status = sgdnn_eltwise_backward(handle,
-                               &alpha1, aDesc,
+                               &coeff_a, aDesc,
                                ((void*)(input_a_mem.u.device.device_addr)),
-                               &alpha2, aDesc,// use real bDesc later
+                               &coeff_b, aDesc,// use real bDesc later
                                ((void*)(input_b_mem.u.device.device_addr)),
                                &beta, aDesc,// use real cDesc later
                                ((void*)(grad_output_mem.u.device.device_addr)),

@@ -97,8 +97,8 @@ typedef struct{
     int                tensor_h;
     int                tensor_w;
     int                op_code;
-    float              coeff_A;
-    float              coeff_B;
+    int                coeff_A;
+    int                coeff_B;
     int                need_mask;
     int                mask_index_A;
     int                mask_index_B;
@@ -119,8 +119,8 @@ typedef struct{
     unsigned long long grad_inputB_global_addr;
     int                shape[4];
     int                op_code;
-    float              coeff_a;
-    float              coeff_b;
+    int                coeff_a;
+    int                coeff_b;
     int                grad_input_a_enable;
     int                grad_input_b_enable;
     sg_data_type_t     idtype;//dtype for input && grad_input
