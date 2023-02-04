@@ -20,12 +20,14 @@ struct C10_API DefaultTPUAllocator final : at::Allocator
       throw e;
     }
     profiledTPUMemoryReporter().New ( data, nbytes );
+    auto Device = at::Device ( at::DeviceType::PrivateUse1 );
+    Device.set_index ( tpu::TPUGetDeviceIndex() );
     return
     {
       data,
       data,
       &ReportAndDelete,
-      at::Device ( at::DeviceType::PrivateUse1 )
+      Device
     };
   }
 
@@ -59,7 +61,8 @@ void SetTPUAllocator ( at::Allocator * alloc, uint8_t priority )
 // Global default TPU Allocator
 static DefaultTPUAllocator g_tpu_alloc;
 
-at::Allocator * GetDefaultTPUAllocator() {
+at::Allocator * GetDefaultTPUAllocator()
+{
   return &g_tpu_alloc;
 }
 
@@ -82,8 +85,9 @@ void ProfiledTPUMemoryReporter::New ( void * ptr, size_t nbytes )
   }
   if ( profile_memory )
   {
-    reportMemoryUsageToProfiler (
-    ptr, nbytes, allocated, 0, c10::Device ( c10::DeviceType::PrivateUse1 ) );
+    auto Device = at::Device ( at::DeviceType::PrivateUse1 );
+    Device.set_index ( tpu::TPUGetDeviceIndex() );
+    reportMemoryUsageToProfiler ( ptr, nbytes, allocated, 0, Device );
   }
 }
 
@@ -121,8 +125,9 @@ void ProfiledTPUMemoryReporter::Delete ( void * ptr )
   }
   if ( profile_memory )
   {
-    reportMemoryUsageToProfiler (
-    ptr, -nbytes, allocated, 0, c10::Device ( c10::DeviceType::PrivateUse1 ) );
+    auto Device = at::Device ( at::DeviceType::PrivateUse1 );
+    Device.set_index ( tpu::TPUGetDeviceIndex() );
+    reportMemoryUsageToProfiler ( ptr, -nbytes, allocated, 0, Device );
   }
 }
 
@@ -141,11 +146,13 @@ void ProfiledTPUMemoryReporter::OutOfMemory ( size_t nbytes )
   }
   if ( profile_memory )
   {
+    auto Device = at::Device ( at::DeviceType::PrivateUse1 );
+    Device.set_index ( tpu::TPUGetDeviceIndex() );
     reportOutOfMemoryToProfiler (
     static_cast<int64_t> ( nbytes ),
     static_cast<int64_t> ( allocated ),
     0,
-    c10::Device ( c10::DeviceType::PrivateUse1 ) );
+    Device );
   }
 }
 } // namespace c10
