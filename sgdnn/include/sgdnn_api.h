@@ -2,7 +2,7 @@
 #define SGDNN_API_H
 
 #include "bmlib_runtime.h"
-#include "common.h"
+#include "common_def.h"
 #include "sg_api_struct.h"
 
 #if defined(__cplusplus)

@@ -5,7 +5,7 @@ option(DEBUG "option for debug" ON)
 option(USING_CMODEL "option for using cmodel" ON)
 option(PCIE_MODE "option for pcie mode" OFF)
 option(SOC_MODE "run on soc platform" OFF)
-option(ENABLE_PYBIND "enable sgdnn pybind" OFF)
+option(ENABLE_PYBIND "enable sgdnn pybind" ON)
 
 if(DEBUG)
   set(CMAKE_BUILD_TYPE "Debug")

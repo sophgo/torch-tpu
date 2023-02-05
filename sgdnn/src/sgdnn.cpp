@@ -3,11 +3,7 @@
 #include <assert.h>
 #include <memory>
 #include <string.h>
-#include "sg_fp16.h"
-
-#ifdef USING_CMODEL
-#include "sg_stas_gen_util.h"
-#endif
+#include "tpu_fp16.h"
 
 bm_status_t sgdnn_conv_forward(
     bm_handle_t        handle,
@@ -126,7 +122,6 @@ bm_status_t sgdnn_conv_backward(
     sg_data_type_t     dtype
   ) {
 
-    //sg_set_profile_dump(true);
     auto dtype_size = [](int dtype) {
         int size = 1;
         if (dtype == SG_DTYPE_INT8 || dtype == SG_DTYPE_UINT8) size = 1;
@@ -411,7 +406,7 @@ bm_status_t sgdnn_avgpool_backward(
         ceil_mode == true ? 1 : 0,
         count_include_pad == true ? 1 : 0,
         divisor_override,
-    };
+        dtype};
 
     tpu_kernel_launch_sync(handle, "tpu_kernel_api_avgpool_backward", &api, sizeof(api));
 
@@ -479,8 +474,7 @@ bm_status_t sgdnn_maxpool_backward(
         {pad_h, pad_w},
         {dilation_h, dilation_w},
         ceil_mode == true ? 1 : 0,
-        dtype
-    };
+        dtype};
 
     tpu_kernel_launch_sync(handle, "tpu_kernel_api_maxpool_backward", &api, sizeof(api));
 
@@ -754,7 +748,7 @@ bm_status_t sgdnn_relu_backward(
 
 namespace py = pybind11;
 
-//typedef fp16 float16;
+typedef fp16 float16;
 
 namespace pybind11 { namespace detail {
 

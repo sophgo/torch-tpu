@@ -7,8 +7,7 @@
 #include <string.h>
 #include <stdlib.h>
 #include <math.h>
-#include "op_code.h"
-#include "common_def.h"
+#include "fp16.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -32,7 +31,7 @@ typedef u32 stride_type;
 typedef u32 size_type;
 
 typedef void *P_COMMAND;
-#include "sg_api_struct.h"
+
 typedef union {
   uint16_t bits;
   struct {
@@ -78,14 +77,6 @@ typedef union {
   bf16 bf16val;
 } DataUnion;
 
-typedef struct REG_ID {
-    unsigned short where;  /* low bit index. */
-    unsigned short len;    /* bit length. */
-} reg_id_t;
-typedef struct REG_PACK {
-    reg_id_t id;         /* register id. */
-    u64 val;    /* value to be read or written. */
-} reg_pack_t;
 
 typedef enum {
     ROUND_HALF_TO_EVEN = 0, // -1.5 -> -2, -2.5 -> -2, 3.5 -> 4,
@@ -97,21 +88,15 @@ typedef enum {
     ROUND_HALF_DOWN = 6, // 1.5 -> 1, -1.5 -> -2
 } ROUND_MODE;
 
-#define __TRUE__     (1)
-#define __FALSE__    (0)
-#define BD_ID(id)    (id[0])
-#define GDMA_ID(id)  (id[1])
-#define WORD_SIZE    (32)
-#define DWORD_SIZE   (64)
-#define WORD_BITS    (5)
-#define WORD_MASK    (0x1f)
-#define LANE_SEC     ((NPU_NUM - 1) / WORD_SIZE + 1)
-
 //#define INT8_SIZE 1
-#define INT32_SIZE 4
 #define FLOAT_SIZE 4
 //#define FLOAT_BITWIDTH 32
 //#define GET_U64(U32_H, U32_L) (((u64)(U32_H) << 32) | (u64)(U32_L))
+
+#define __ALIGN_MASK(x, mask) (((x) + (mask)) & ~(mask))
+#ifndef ALIGN
+#define ALIGN(x, a) __ALIGN_MASK(x, (__typeof__(x))(a)-1)
+#endif
 
 #define sg_min(x, y) (((x)) < ((y)) ? (x) : (y))
 #define sg_max(x, y) (((x)) > ((y)) ? (x) : (y))
@@ -120,36 +105,21 @@ typedef enum {
   b ^= a;              \
   a ^= b
 
-#define NO_USE 0
-#define UNUSED(x) (void)(x)
-#define INLINE inline
-
-#define LAST_INI_REG_VAL 0x76125438
-
-#ifndef USING_CMODEL
-    #ifdef __arm__
-        extern jmp_buf error_stat;
-        extern void fw_log(char *fmt, ...);
-        #define hang(_ret) {              \
-            fw_log("ASSERT %s: %s: %d: %s\n", __FILE__, __func__, __LINE__, #_cond); \
-            longjmp(error_stat,1);   \
-        }
-    #else
-        #define hang(_ret) while (1)
-    #endif
-#else
-    #define hang(_ret) exit(_ret)
-#endif
+#define SG_IS_NAN(x) ((((x >> 23) & 0xff) == 0xff) && ((x & 0x7fffff) != 0))
 
 #ifdef USING_CMODEL
+  u8 *get_global_memaddr(int);
+  u8 *get_local_memaddr_by_node(int, int);
+  u8 *get_static_memaddr_by_node(int);
+  u8 *get_l2_memaddr(int);
   #define GET_GLOBAL_ADDR(ADDR) \
-    ((u8 *)get_global_memaddr(get_cur_nodechip_idx()) + (ADDR) - GLOBAL_MEM_START_ADDR)
+    ((u8 *)get_global_memaddr(0) + (ADDR) - GLOBAL_MEM_START_ADDR)
   #define GET_LOCAL_ADDR(LOCALMEM_IDX, LOCALMEM_OFFSET) \
-    ((u8 *)get_local_memaddr_by_node(get_cur_nodechip_idx(), LOCALMEM_IDX) + (LOCALMEM_OFFSET))
+    ((u8 *)get_local_memaddr_by_node(0, LOCALMEM_IDX) + (LOCALMEM_OFFSET))
   #define GET_SMEM_ADDR(ADDR) \
-    ((u8 *)get_static_memaddr_by_node(get_cur_nodechip_idx()) + (ADDR) - STATIC_MEM_START_ADDR)
+    ((u8 *)get_static_memaddr_by_node(0) + (ADDR) - STATIC_MEM_START_ADDR)
   #define GET_L2_SRAM_ADDR(ADDR) \
-    ((u8 *)get_l2_sram(get_cur_nodechip_idx()) + (ADDR) - L2_SRAM_START_ADDR)
+    ((u8 *)get_l2_sram(0) + (ADDR) - L2_SRAM_START_ADDR)
 #else
   #define GET_GLOBAL_ADDR(ADDR) \
     ((u8 *)GLOBAL_MEM_START_ADDR_ARM + (ADDR) - GLOBAL_MEM_START_ADDR)
@@ -190,8 +160,7 @@ typedef struct inst_profile {
   int gdma_direction;
   int src_format;
   int dst_format;
-  double op_dyn_energy; //nJ
-  double sram_rw_energy; // nJ
+  double power;
   double compute_ability;
   bool b_gdma_use_l2;
 } INST_PROFILE;
@@ -201,8 +170,8 @@ typedef struct cmd_id_node {
   unsigned int gdma_cmd_id;
   bool in_parallel_state;
 #if defined(SG_STAS_GEN) || defined(SG_TV_GEN)
-  long long cycle_count;
-  long long cur_op_cycle;
+  unsigned int cycle_count;
+  unsigned int cur_op_cycle;
 #endif
 #ifdef SG_STAS_GEN
   char cmd_name[16];
@@ -231,16 +200,6 @@ static inline void set_gdma_cmd_info(CMD_ID_NODE *pid_node, int n, int c, int h,
 #endif
 
 typedef enum {
-    INT8 = 0,
-    FP16 = 1,
-    FP32 = 2,
-    INT16 = 3,
-    INT32 = 4,
-    BFP16 = 5,
-    PREC_END
-} PREC;
-
-typedef enum {
   ENGINE_BD   = 0,
   ENGINE_GDMA = 1,
   ENGINE_GDE  = 2,
@@ -250,34 +209,22 @@ typedef enum {
   ENGINE_END
 } ENGINE_ID;
 
-typedef enum host_cdma_dir { HOST2CHIP, CHIP2HOST, CHIP2CHIP } HOST_CDMA_DIR;
-
-INLINE static int ceiling_func(int numerator, int denominator) {
-  return (numerator + denominator - 1) / denominator;
-}
-
-INLINE static int ceiling_func_shift(int numerator, int shift) {
-  return (numerator + (1 << shift) - 1) >> shift;
-}
-
-INLINE static int get_bytesize(PREC precison) {
-  int bytesize = 4;
-  if (precison == INT8) {
-    bytesize = 1;
-  } else if (precison == INT16 || precison == FP16 || precison == BFP16) {
-    bytesize = 2;
-  }
-  return bytesize;
-}
-
-INLINE static void pipeline_move(int *array, int num) {
-  for (int i = num - 1; i > 0; i--) {
-    array[i] = array[i - 1];
-  }
-}
+typedef enum {
+  STORAGE_MODE_1N_FP32    = 0,
+  STORAGE_MODE_1N_INT8    = 1,
+  STORAGE_MODE_1N_INT16   = 2,
+  STORAGE_MODE_2N_INT16   = 3,
+  STORAGE_MODE_4N_INT8    = 4,
+  STORAGE_MODE_2IC_FP32   = 5,  // special for 2IC weight
+  STORAGE_MODE_4N_4IC_4OC = 6,
+  STORAGE_MODE_4N_INT16   = 7,
+  STORAGE_MODE_UNINITILIZED,
+  STORAGE_MODE_END
+} TENSOR_STORAGE_MODE;
 
 #ifdef __cplusplus
 }
 #endif
 
 #endif
+

@@ -2,6 +2,7 @@ source scripts/envsetup.sh
 mkdir build
 (re)build_all
 cmodel:
+  export BMLIB_CMODEL_PATH=./third_party/lib/libbm1684x_cmodel.so
   set_cmodel_firmware ./build/firmware_core/libfirmware_cmodel.so
 
 pcie_mode or soc_mode build_firmware:

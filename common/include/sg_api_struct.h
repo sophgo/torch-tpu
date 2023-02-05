@@ -61,6 +61,7 @@ typedef struct {
     int                ceil_mode;
     int                count_include_pad;
     int                divisor_override;
+    sg_data_type_t     dtype;
 #ifndef WIN32
 } __attribute__((packed)) sg_api_avgpool_backward_t;
 #else
@@ -79,7 +80,7 @@ typedef struct {
     int                pad[2];
     int                dilation[2];
     int                ceil_mode;
-    sg_data_type_t     dtype;
+    sg_data_type_t     data_type;
 #ifndef WIN32
 } __attribute__((packed)) sg_api_maxpool_backward_t;
 #else
