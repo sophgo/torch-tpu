@@ -1,6 +1,7 @@
 #include "common.h"
 #include "sg_api_struct.h"
 #include "common_def.h"
+#include "tpu_utils.h"
 #include "tpu_kernel.h"
 
 static inline bool is_local_mem_enough(
@@ -790,21 +791,22 @@ void nodechip_weight_reorder(
 
 // grad_out deconv (trans)weight => grad_input
 void nodechip_conv_backward_input(
-    global_addr_t    grad_out_global_addr,
-    global_addr_t    grad_input_global_addr,
-    global_addr_t    forward_weight_global_addr,
+    global_addr_t       grad_out_global_addr,
+    global_addr_t       grad_input_global_addr,
+    global_addr_t       forward_weight_global_addr,
     // need weight_reordered_addr
-    global_addr_t    weight_reordered_global_addr,
-    const int        groups,
-    const dim4       *grad_input_shape,
-    const dim4       *grad_out_shape,
-    const dim2       *kernel,
-    const dim2       *stride,
-    const dim2       *dilation,
-    const padding_t  *pad
+    global_addr_t       weight_reordered_global_addr,
+    const int           groups,
+    const dim4          *grad_input_shape,
+    const dim4          *grad_out_shape,
+    const dim2          *kernel,
+    const dim2          *stride,
+    const dim2          *dilation,
+    const padding_t     *pad,
+    const data_type_t   dtype
  ) {
 
-    const data_type_t idtype = DT_FP16, odtype = DT_FP16;
+    const data_type_t idtype = dtype, odtype = dtype;
 
     dim4 ishape = {.n = grad_out_shape->n,
                    .c = grad_out_shape->c,
@@ -874,16 +876,19 @@ void nodechip_conv_backward_input(
     TPUKERNEL_DBG("out ping local addr = 0x%5x, bank id = %d\n", oaddr_ping, oaddr_ping / BANK_SIZE);
     TPUKERNEL_DBG("out pong local addr = 0x%5x, bank id = %d\n", oaddr_pong, oaddr_pong / BANK_SIZE);
 
-    nodechip_weight_reorder(forward_weight_global_addr,
-                            weight_reordered_global_addr,
-                            oc,
-                            ic,
-                            kh,
-                            kw,
-                            idtype);
+    if (dtype == DT_FP16) {
+        nodechip_weight_reorder(forward_weight_global_addr,
+                                weight_reordered_global_addr,
+                                oc,
+                                ic,
+                                kh,
+                                kw,
+                                idtype);
+    }
 
     global_addr_t input_global_addr = grad_out_global_addr;
-    global_addr_t weight_global_addr = weight_reordered_global_addr;
+    global_addr_t weight_global_addr = dtype == DT_FP32 ? forward_weight_global_addr
+                                                        : weight_reordered_global_addr;
     global_addr_t output_global_addr = grad_input_global_addr;
 
     bool ping = true;
@@ -1227,21 +1232,22 @@ void nodechip_grad_output_reorder(
 // forward_input op grad_out => grad_weight
 // [ic, n, ih, iw] conv [oc, n, oh, ow] => [ic, oc, kh, kw]
 void nodechip_conv_backward_weight(
-    global_addr_t    forward_input_global_addr,
-    global_addr_t    grad_out_global_addr,
-    global_addr_t    grad_out_reordered_global_addr,
-    global_addr_t    grad_weight_global_addr,
-    global_addr_t    grad_bias_global_addr,
-    const int        groups,
-    const dim4       *forward_input_shape,
-    const dim4       *grad_out_shape,
-    const dim2       *forward_kernel,
-    const dim2       *forward_stride,
-    const dim2       *forward_dilation,
-    const padding_t  *pad,
-    bool             grad_bias_enable
+    global_addr_t       forward_input_global_addr,
+    global_addr_t       grad_out_global_addr,
+    global_addr_t       grad_out_reordered_global_addr,
+    global_addr_t       grad_weight_global_addr,
+    global_addr_t       grad_bias_global_addr,
+    const int           groups,
+    const dim4          *forward_input_shape,
+    const dim4          *grad_out_shape,
+    const dim2          *forward_kernel,
+    const dim2          *forward_stride,
+    const dim2          *forward_dilation,
+    const padding_t     *pad,
+    bool                grad_bias_enable,
+    data_type_t         dtype
  ) {
-    const data_type_t idtype = DT_FP16, odtype = DT_FP16;
+    const data_type_t idtype = dtype, odtype = dtype;
 
     dim2 stride, dilation;
     stride.h = forward_dilation->h;
@@ -1374,16 +1380,19 @@ void nodechip_conv_backward_weight(
     dim4 wstride;
     tpu_compact_stride(&wstride, 0, &wshape);
 
-    nodechip_grad_output_reorder(grad_out_global_addr,
-                                 grad_out_reordered_global_addr,
-                                 ic,
-                                 oc,
-                                 kh,
-                                 kw,
-                                 idtype);
+    if (dtype == DT_FP32) {
+        nodechip_grad_output_reorder(grad_out_global_addr,
+                                     grad_out_reordered_global_addr,
+                                     ic,
+                                     oc,
+                                     kh,
+                                     kw,
+                                     idtype);
+    }
 
     global_addr_t input_global_addr = forward_input_global_addr;
-    global_addr_t weight_global_addr = grad_out_reordered_global_addr;
+    global_addr_t weight_global_addr = dtype == DT_FP32 ? grad_out_global_addr
+                                                        : grad_out_reordered_global_addr;
     global_addr_t output_global_addr = grad_weight_global_addr;
 
     int last_nslice = 0;
@@ -1687,36 +1696,41 @@ void nodechip_conv_backward_weight(
 }
 
 void nodechip_conv_backward(
-    global_addr_t    grad_out_global_addr,
-    global_addr_t    input_global_addr,
-    global_addr_t    weight_global_addr,
-    global_addr_t    grad_input_global_addr,
-    global_addr_t    grad_weight_global_addr,
-    global_addr_t    grad_bias_global_addr,
-    global_addr_t    buffer_global_addr,
-    const dim4       *input_shape,
-    const dim4       *grad_out_shape,
-    const dim2       *kernel,
-    const dim2       *stride,
-    const dim2       *dilation,
-    const padding_t  *pad,
-    bool             grad_input_enable,
-    bool             grad_weight_enable,
-    bool             grad_bias_enable
+    global_addr_t       grad_out_global_addr,
+    global_addr_t       input_global_addr,
+    global_addr_t       weight_global_addr,
+    global_addr_t       grad_input_global_addr,
+    global_addr_t       grad_weight_global_addr,
+    global_addr_t       grad_bias_global_addr,
+    global_addr_t       buffer_global_addr,
+    const dim4          *input_shape,
+    const dim4          *grad_out_shape,
+    const dim2          *kernel,
+    const dim2          *stride,
+    const dim2          *dilation,
+    const padding_t     *pad,
+    const int           groups,
+    bool                grad_input_enable,
+    bool                grad_weight_enable,
+    bool                grad_bias_enable,
+    data_type_t         dtype
  ) {
+
+    TPUKERNEL_ASSERT(groups == 1);
     if (grad_input_enable) {
         nodechip_conv_backward_input(
             grad_out_global_addr,
             grad_input_global_addr,
             weight_global_addr,
             buffer_global_addr,
-            1,//groups TODO
+            groups,//groups TODO
             input_shape,
             grad_out_shape,
             kernel,
             stride,
             dilation,
-            pad);
+            pad,
+            dtype);
     }
     if (grad_weight_enable) {
         nodechip_conv_backward_weight(
@@ -1725,14 +1739,15 @@ void nodechip_conv_backward(
             buffer_global_addr,
             grad_weight_global_addr,
             grad_bias_global_addr,
-            1,//groups TODO
+            groups,//groups TODO
             input_shape,
             grad_out_shape,
             kernel,
             stride,
             dilation,
             pad,
-            grad_bias_enable);
+            grad_bias_enable,
+            dtype);
     }
 }
 
@@ -1763,9 +1778,11 @@ void tpu_kernel_api_conv_backward(const void* args) {
         &stride,
         &dilation,
         &pad,
+        api->groups,
         api->grad_input_enable == 1 ? true : false,
         api->grad_weight_enable == 1 ? true : false,
-        api->grad_bias_enable == 1 ? true : false);
+        api->grad_bias_enable == 1 ? true : false,
+        tpu_type_convert(api->dtype));
     tpu_poll();
 }
 

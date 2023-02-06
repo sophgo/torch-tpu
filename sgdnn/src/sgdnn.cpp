@@ -89,6 +89,73 @@ bm_status_t sgdnn_conv_forward(
     return BM_SUCCESS;
 }
 
+bm_status_t sgdnn_conv_forward_cudnn(
+    bm_handle_t                     handle,
+    const void                     *alpha,
+    const TensorDescriptor_t        xDesc,
+    const void                     *x,
+    const FilterDescriptor_t        wDesc,
+    const void                     *w,
+    const ConvolutionDescriptor_t   convDesc,
+    //ConvlutionFwdAlgo_t             algo,
+    //void                           *workspace,
+    //size_t                          workSpaceSizeInBytes,
+    const void                     *beta,
+    const TensorDescriptor_t        yDesc,
+    void                           *y) {
+
+    assert(xDesc.ndims == 4 && yDesc.ndims == 4);
+    int n = xDesc.shape[0];
+    int ic = xDesc.shape[1];
+    int ih = xDesc.shape[2];
+    int iw = xDesc.shape[3];
+
+    int oc = wDesc.oc;
+    assert(xDesc.shape[1] == wDesc.ic);
+    int kh = wDesc.kh;
+    int kw = wDesc.kw;
+
+    int pad_h = convDesc.pad_h;
+    int pad_w = convDesc.pad_w;
+    int stride_h = convDesc.stride_h;
+    int stride_w = convDesc.stride_w;
+    int dh = convDesc.dilation_h;
+    int dw = convDesc.dilation_w;
+
+    int groups = convDesc.groups;
+
+    int alpha_ = ((int*)alpha)[0];
+    assert(alpha_ == 1);
+    int beta_ = ((int*)beta)[0];
+    assert(beta_ == 0 || beta_ == 1);
+    bool result_add = beta_ == 1;
+
+    sg_data_type_t idtype = (sg_data_type_t)(xDesc.dtype);
+    sg_data_type_t odtype = (sg_data_type_t)(yDesc.dtype);
+    sg_api_conv_forward_t api = {
+        (unsigned long long)x,
+        (unsigned long long)w,
+        0,
+        (unsigned long long)y,
+        {n, ic, ih, iw},
+        groups,
+        oc,
+        {kh, kw},
+        {stride_h, stride_w},
+        {dh, dw},
+        {pad_h, pad_h, pad_w, pad_w},//pad
+        0,//has_bias
+        0,//if_relu
+        0,//upper_limit
+        result_add ? 1 : 0,
+        idtype,
+        odtype};
+
+    tpu_kernel_launch_sync(handle, "tpu_kernel_api_conv_forward", &api, sizeof(api));
+
+    return BM_SUCCESS;
+}
+
 bm_status_t sgdnn_conv_backward(
     bm_handle_t        handle,
     bm_device_mem_t    grad_output,
@@ -165,12 +232,13 @@ bm_status_t sgdnn_conv_backward(
         bm_mem_get_device_addr(buffer_mem),
         {n, ic, ih, iw},
         {n, oc, oh, ow},
+        groups,
         {kh, kw},
         {stride_h, stride_w},
         {dh, dw},
         {pad_ht, pad_hb, pad_wl, pad_wr},
-        1, 1, 1
-    };
+        1, 1, 1,
+        dtype};
 
     tpu_kernel_launch_sync(handle, "tpu_kernel_api_conv_backward", &api, sizeof(api));
 
@@ -185,6 +253,81 @@ bm_status_t sgdnn_conv_backward(
     return BM_SUCCESS;
 }
 
+bm_status_t sgdnn_conv_backward_cudnn(
+    bm_handle_t                     handle,
+    const void                     *alpha,
+    const void                     *beta,
+    const TensorDescriptor_t        xDesc,
+    const void                     *x,
+    void                           *dx,
+    const FilterDescriptor_t        wDesc,
+    const void                     *w,
+    void                           *dw,
+    const TensorDescriptor_t        dbDesc,
+    void                           *db,
+    const TensorDescriptor_t        dyDesc,
+    const void                     *dy,
+    const ConvolutionDescriptor_t   convDesc,
+    void                           *buffer,//workSpace
+    bool                            dx_enable,
+    bool                            dw_enable,
+    bool                            db_enable
+ ) {
+
+    assert(xDesc.ndims == 4 && dyDesc.ndims == 4);
+    int n = xDesc.shape[0];
+    int ic = xDesc.shape[1];
+    int ih = xDesc.shape[2];
+    int iw = xDesc.shape[3];
+
+    int oh = dyDesc.shape[2];
+    int ow = dyDesc.shape[3];
+
+    int oc = wDesc.oc;
+    assert(xDesc.shape[1] == wDesc.ic);
+    int kh = wDesc.kh;
+    int kw = wDesc.kw;
+
+    int pad_h = convDesc.pad_h;
+    int pad_w = convDesc.pad_w;
+    int stride_h = convDesc.stride_h;
+    int stride_w = convDesc.stride_w;
+    int dilation_h = convDesc.dilation_h;
+    int dilation_w = convDesc.dilation_w;
+
+    int groups = convDesc.groups;
+    assert(groups == 1);
+
+    sg_data_type_t idtype = (sg_data_type_t)(xDesc.dtype);
+    sg_data_type_t wdtype = (sg_data_type_t)(wDesc.dtype);
+    sg_data_type_t odtype = (sg_data_type_t)(dyDesc.dtype);
+    assert(idtype == wdtype && wdtype == odtype);
+
+    sg_api_conv_backward_t api = {
+        (unsigned long long)x,
+        (unsigned long long)w,
+        (unsigned long long)dy,
+        (unsigned long long)dx,
+        (unsigned long long)dw,
+        (unsigned long long)db,
+        (unsigned long long)buffer,//buffer
+        {n, ic, ih, iw},//ishape
+        {n, oc, oh, ow},//oshape
+        groups,
+        {kh, kw},
+        {stride_h, stride_w},
+        {dilation_h, dilation_w},
+        {pad_h, pad_h, pad_w, pad_w},
+        dx_enable,
+        dw_enable,
+        db_enable,
+        idtype};
+
+    tpu_kernel_launch_sync(handle, "tpu_kernel_api_conv_backward", &api, sizeof(api));
+
+    return BM_SUCCESS;
+}
+
 bm_status_t sgdnn_batchnorm_backward(
     bm_handle_t        handle,
     bm_device_mem_t    grad_output,
@@ -195,9 +338,9 @@ bm_status_t sgdnn_batchnorm_backward(
     bm_device_mem_t    grad_input,
     bm_device_mem_t    grad_weight,
     bm_device_mem_t    grad_bias,
-    int                n,  
-    int                c,  
-    int                h,  
+    int                n,
+    int                c,
+    int                h,
     int                w,
     bool               input_need_grad,
     bool               weight_need_grad,
@@ -355,7 +498,58 @@ bm_status_t sgdnn_pooling_forward(
     DEVICE_MEM_DEL_INPUT(handle, input, input_mem);
     return BM_SUCCESS;
 }
+/*
+bm_status_t sgdnn_pooling_forward_cudnn(
+    bm_handle_t                 handle,
+    const PoolingDescriptor_t   poolingDesc,
+    const void                 *alpha,
+    const TensorDescriptor_t    xDesc,
+    const void                 *x,
+    const void                 *beta,
+    const TensorDescriptor_t    yDesc,
+    void                       *y
+ ) {
 
+    assert(xDesc.ndims == 4 && yDesc.ndims == 4);
+    int n = xDesc.shape[0];
+    int c = xDesc.shape[1];
+    int ih = xDesc.shape[2];
+    int iw = xDesc.shape[3];
+
+    int pooling_mode = (PoolingMode_t)poolingDesc.mode;
+    int kh = poolingDesc.kh;
+    int kw = poolingDesc.kw;
+    int pad_h = poolingDesc.pad_h;
+    int pad_w = poolingDesc.pad_w;
+    int stride_h = poolingDesc.stride_h;
+    int stride_w = poolingDesc.stride_w;
+
+    sg_data_type_t idtype = (sg_data_type_t)xDesc.dtype;
+    sg_data_type_t odtype = (sg_data_type_t)yDesc.dtype;
+    assert(idtype == odtype);
+
+    sg_api_pooling_forward_t api = {
+        (unsigned long long)x,
+        (unsigned long long)y,
+        0,//max_mask
+        n, c, ih, iw,
+        ,//oh, ow
+        kh, kw,
+        pad_h, pad_w, pad_h, pad_w,
+        stride_h, stride_w,
+        1, 1,//dilation_h && dilation_w
+        pooling_mode == 0,
+        ,//avgpool_mode
+        0,//if_mask_max
+        0,//if_relu
+        0,//relu_upper_limit
+        idtype};
+
+    tpu_kernel_launch_sync(handle, "tpu_kernel_api_pooling_forward", &api, sizeof(api));
+
+    return BM_SUCCESS;
+}
+*/
 bm_status_t sgdnn_avgpool_backward(
     bm_handle_t        handle,
     bm_device_mem_t    grad_output,
@@ -484,20 +678,39 @@ bm_status_t sgdnn_maxpool_backward(
     DEVICE_MEM_DEL_INPUT(handle, grad_output, grad_output_mem);
     return BM_SUCCESS;
 }
+/*
+bm_status_t sgdnn_pooling_backward(
+    bm_handle_t                 handle,
+    const PoolingDescriptor_t   poolingDesc,
+    const void                 *alpha,
+    const void                 *beta,
+    const TensorDescriptot_t    yDesc,
+    const void                 *y,
+    const TensorDescriptor_t    dyDesc,
+    const void                 *dy,
+    const TensorDescriptor_t    xDesc,
+    const void                 *x,
+    const TensorDescriptor_t    dxDesc,
+    void                       *dx
+ ) {
 
+    int pooling_mode = (PoolingMode_t)poolingDesc.mode;
+
+}
+*/
 // C = op(alpha1[0] * A, alpha2[0] * B) + beta[0] * C
 bm_status_t sgdnn_eltwise_forward(
-    bm_handle_t                handle,
-    const void*                alpha1,
-    const TensorDescriptor_t   aDesc,
-    const void*                A,
-    const void*                alpha2,
-    const TensorDescriptor_t   bDesc,
-    const void*                B,
-    const void*                beta,
-    const TensorDescriptor_t   cDesc,
-    void*                      C,
-    const OpTensorDescriptor_t opTensorDesc
+    bm_handle_t                 handle,
+    const void*                 alpha1,
+    const TensorDescriptor_t    aDesc,
+    const void*                 A,
+    const void*                 alpha2,
+    const TensorDescriptor_t    bDesc,
+    const void*                 B,
+    const void*                 beta,
+    const TensorDescriptor_t    cDesc,
+    void*                       C,
+    const OpTensorDescriptor_t  opTensorDesc
 ) {
 
     int op_code = opTensorDesc.op_code;

@@ -9,6 +9,37 @@
 extern "C" {
 #endif
 
+typedef struct{
+    int         dtype;
+    int         ndims;
+    int         shape[FW_MAX_SHAPE_DIMS];
+    int         stride[FW_MAX_SHAPE_DIMS];
+    int         format;
+} TensorDescriptor_t;
+
+typedef struct{
+    int         op_code;
+} OpTensorDescriptor_t;
+
+typedef struct{
+    int     oc;
+    int     ic;
+    int     kh;
+    int     kw;
+    sg_data_type_t  dtype;
+} FilterDescriptor_t;
+
+typedef struct{
+    int     pad_h;
+    int     pad_w;
+    int     stride_h;//u
+    int     stride_w;//v
+    int     dilation_h;
+    int     dilation_w;
+    int     groups;
+    sg_data_type_t  computeType;
+} ConvolutionDescriptor_t;
+
 bm_status_t sgdnn_conv_forward(
     bm_handle_t        handle,
     bm_device_mem_t    input,
@@ -37,6 +68,21 @@ bm_status_t sgdnn_conv_forward(
     bool               result_add,
     sg_data_type_t     idtype,
     sg_data_type_t     odtype);
+
+bm_status_t sgdnn_conv_forward_cudnn(
+    bm_handle_t                     handle,
+    const void                     *alpha,
+    const TensorDescriptor_t        xDesc,
+    const void                     *x,
+    const FilterDescriptor_t        wDesc,
+    const void                     *w,
+    const ConvolutionDescriptor_t   convDesc,
+    //ConvlutionFwdAlgo_t             algo,
+    //void                           *workspace,
+    //size_t                          workSpaceSizeInBytes,
+    const void                     *beta,
+    const TensorDescriptor_t        yDesc,
+    void                           *y);
 
 bm_status_t sgdnn_conv_backward(
     bm_handle_t        handle,
@@ -69,6 +115,26 @@ bm_status_t sgdnn_conv_backward(
     bool               weight_need_grad,
     bool               bias_need_grad,
     sg_data_type_t     dtype);
+
+bm_status_t sgdnn_conv_backward_cudnn(
+    bm_handle_t                     handle,
+    const void                     *alpha,
+    const void                     *beta,
+    const TensorDescriptor_t        xDesc,
+    const void                     *x,
+    void                           *dx,
+    const FilterDescriptor_t        wDesc,
+    const void                     *w,
+    void                           *dw,
+    const TensorDescriptor_t        dbDesc,
+    void                           *db,
+    const TensorDescriptor_t        dyDesc,
+    const void                     *dy,
+    const ConvolutionDescriptor_t   convDesc,
+    void                           *buffer,
+    bool                            dx_enable,
+    bool                            dw_enable,
+    bool                            db_enable);
 
 bm_status_t sgdnn_batchnorm_backward(
     bm_handle_t        handle,
@@ -160,18 +226,6 @@ bm_status_t sgdnn_maxpool_backward(
     int                dilation_w,
     bool               ceil_mode,
     sg_data_type_t     dtype);
-
-typedef struct{
-    int         dtype;
-    int         ndims;
-    int         shape[FW_MAX_SHAPE_DIMS];
-    int         stride[FW_MAX_SHAPE_DIMS];
-    int         format;
-} __attribute__((packed)) TensorDescriptor_t;
-
-typedef struct{
-    int         op_code;
-} __attribute__((packed)) OpTensorDescriptor_t;
 
 bm_status_t sgdnn_eltwise_forward(
     bm_handle_t                handle,
