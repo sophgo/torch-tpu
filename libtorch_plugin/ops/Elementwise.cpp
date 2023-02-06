@@ -10,10 +10,11 @@
 
 namespace at
 {
-Tensor & add_Tensor_tpu ( const Tensor & input1,
-                          const Tensor & input2,
-                          const Scalar & alpha,
-                          Tensor & out )
+Tensor & binary_Tensor_tpu ( const Tensor & input1,
+                             const Tensor & input2,
+                             const Scalar & alpha,
+                             Tensor & out,
+                             const OpTensorDescriptor_t & op )
 {
   if ( input1.device().type() == DeviceType::PrivateUse1 &&
        input2.device().type() == DeviceType::PrivateUse1 )
@@ -27,7 +28,6 @@ Tensor & add_Tensor_tpu ( const Tensor & input1,
     float Alpha1 = 1.f;
     float Alpha2 = alpha.toDouble();
     float Beta = 0.f;
-    OpTensorDescriptor_t Op = { .op_code = 1 };
     bm_status_t Status = BM_SUCCESS;
     Status = sgdnn_eltwise_forward ( Handle,
                                      &Alpha1,
@@ -39,7 +39,7 @@ Tensor & add_Tensor_tpu ( const Tensor & input1,
                                      &Beta,
                                      CDesc,
                                      ADDR_IN_DEVICE ( out ),
-                                     Op );
+                                     op );
     if ( Status != BM_SUCCESS )
     {
       LOG ( FATAL ) << ERROR_CODE ( Status );
@@ -50,6 +50,14 @@ Tensor & add_Tensor_tpu ( const Tensor & input1,
     LOG ( FATAL ) << "Inputs are all required in TPU device for now";
   }
   return out;
+}
+Tensor & add_Tensor_tpu ( const Tensor & input1,
+                          const Tensor & input2,
+                          const Scalar & alpha,
+                          Tensor & out )
+{
+  OpTensorDescriptor_t Op = { .op_code = 1 };
+  return binary_Tensor_tpu ( input1, input2, alpha, out, Op );
 }
 TORCH_LIBRARY_IMPL ( aten, PrivateUse1, m )
 {

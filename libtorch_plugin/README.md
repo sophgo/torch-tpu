@@ -2,3 +2,7 @@
 
 wget https://download.pytorch.org/libtorch/cpu/libtorch-shared-with-deps-1.13.1%2Bcpu.zip
 
+2. Unzip
+
+unzip libtorch-shared-with-deps-xxxx.zip
+

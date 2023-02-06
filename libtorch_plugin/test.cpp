@@ -5,6 +5,7 @@
 int main()
 {
   torch::Device Device ( "privateuseone:0" );
+  //torch::Device Device ( "cpu" );
 #if 0
   std::string ModelPath = "./Resnet50_Own.pt";
   auto Resnet50 = std::make_shared<tpu::TorchscriptModule> ( ModelPath );
@@ -17,16 +18,19 @@ int main()
   {
     A.data_ptr<float>() [i] = i;
   }
+#if 0
   A = A.to ( torch::kFloat16 );
   for ( int i = 0; i < A.numel(); ++i )
   {
     std::cout << A.data_ptr<at::Half>() [i] << " ";
   }
   std::cout << std::endl;
-  A = A.to ( Device );
-  auto E = A.to ( Device );
-  auto B = A.add ( A );
-  auto BB = B.to ( torch::Device ( "cpu" ) ).to ( torch::kFloat );
+#endif
+  A = A.to ( Device ).set_requires_grad ( true );
+  auto B = A + A;
+  auto E = torch::ones ( {1, 1, 10, 10} ).to ( Device );
+  B.backward ( E );
+  auto BB = A.grad().to ( torch::Device ( "cpu" ) );
   for ( int i = 0; i < BB.numel(); ++i )
   {
     std::cout << BB.data_ptr<float>() [i] << " ";
