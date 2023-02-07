@@ -13,6 +13,7 @@ int main()
   tpu::MoveModuleToTPUDevice ( *Resnet50 );
   Resnet50->forward ( A );
 #else
+  auto T = torch::empty ( {1, 1, 10, 10}, Device );
   auto A = torch::randn ( {1, 1, 10, 10} );
   for ( int i = 0; i < A.numel(); ++i )
   {

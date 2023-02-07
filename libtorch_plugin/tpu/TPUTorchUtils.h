@@ -16,6 +16,8 @@ while ( 0 )
 
 #define ADDR_IN_DEVICE(t) tpu::TPUGetAddrInDevice( t.data_ptr() )
 
+#define TPU_ERROR_CODE(Err) " ( TPU error code: " << Err << ")"
+
 namespace tpu
 {
 
@@ -42,6 +44,54 @@ const at::Tensor & Tensor )
     Desc.stride[i] = Tensor.stride ( i );
   }
   return Desc;
+}
+
+static inline void TPUCompareResult ( const at::Tensor & Got,
+                                      const at::Tensor & Exp )
+{
+  if ( Got.dtype() != Exp.dtype() )
+  {
+    LOG ( FATAL ) << "Tensor comparing failed: Got data type = "
+                  << Got.dtype() << ", Exp data type = " << Exp.dtype();
+  }
+  if ( Got.sizes() != Exp.sizes() )
+  {
+    LOG ( FATAL ) << "Tensor comparing failed: Got shpae = "
+                  << Got.sizes() << ", Exp shape = " << Exp.sizes();
+  }
+  if ( Got.dtype() == caffe2::TypeMeta::Make<float>() )
+  {
+    auto AbsErr = torch::abs ( torch::sub ( Got, Exp ) );
+    auto AbsExp = torch::abs ( Exp );
+    auto RltAbsErr = torch::div ( AbsErr, AbsExp );
+    auto GotPtr = Got.data_ptr<float>();
+    auto ExpPtr = Exp.data_ptr<float>();
+    auto AbsErrPtr = AbsErr.data_ptr<float>();
+    auto AbsExpPtr = AbsExp.data_ptr<float>();
+    auto RltAbsErrPtr = RltAbsErr.data_ptr<float>();
+    for ( auto i = 0; i < Got.numel(); ++i )
+    {
+      if ( AbsErrPtr[i] == 0.f )
+      {
+        continue;
+      }
+      if ( AbsExpPtr[i] == 0.f && AbsErrPtr[i] == 0.f )
+      {
+        continue;
+      }
+      if ( AbsExpPtr[i] != 0.f && RltAbsErrPtr[i] <= 1e-2 )
+      {
+        continue;
+      }
+      LOG ( FATAL ) << "Tensor comparing failed: Got = " << GotPtr[i]
+                    << ", Exp = " << ExpPtr[i]
+                    << ", index = " << i;
+    }
+  }
+  else
+  {
+    LOG ( FATAL ) << "Unsupported data type " << Got.dtype();
+  }
 }
 
 } // namespace tpu

@@ -6,8 +6,6 @@
 #include <TPUTorchUtils.h>
 #include <sgdnn_api.h>
 
-#define ERROR_CODE(Err) " ( TPU error code: " << Err << ")"
-
 namespace at
 {
 Tensor & binary_Tensor_tpu ( const Tensor & input1,
@@ -42,7 +40,7 @@ Tensor & binary_Tensor_tpu ( const Tensor & input1,
                                      op );
     if ( Status != BM_SUCCESS )
     {
-      LOG ( FATAL ) << ERROR_CODE ( Status );
+      LOG ( FATAL ) << TPU_ERROR_CODE ( Status );
     }
   }
   else
@@ -56,11 +54,21 @@ Tensor & add_Tensor_tpu ( const Tensor & input1,
                           const Scalar & alpha,
                           Tensor & out )
 {
+#if 1
+  auto Input1CPU = input1.to ( torch::Device ( "cpu" ) );
+  auto Input2CPU = input2.to ( torch::Device ( "cpu" ) );
+  auto OutputExp = torch::add ( Input1CPU, Input2CPU, alpha );
+#endif
   OpTensorDescriptor_t Op = { .op_code = 1 };
-  return binary_Tensor_tpu ( input1, input2, alpha, out, Op );
+  auto & output = binary_Tensor_tpu ( input1, input2, alpha, out, Op );
+#if 1
+  auto OutputGot = output.to ( torch::Device ( "cpu" ) );
+  tpu::TPUCompareResult ( OutputGot, OutputExp );
+#endif
+  return output;
 }
 TORCH_LIBRARY_IMPL ( aten, PrivateUse1, m )
 {
   m.impl ( "add.out", add_Tensor_tpu );
 }
-}
+} // namespace at
