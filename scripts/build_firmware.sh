@@ -31,9 +31,9 @@ cp -r ${CURRENT_DIR}/target-ram.lds ${OUTPUT_DIR}
 pushd ${OUTPUT_DIR}
 make -f Makefile.device
 if [ $? -ne 0 ]; then echo "Failed to make firmware!"; exit -1; fi
-#source ${CURRENT_DIR}/version_info.sh
-#python3 ${CURRENT_DIR}/firmware_pack.py bm1684x.bin .
-#rm -rf bm1684x.bin
+source ${CURRENT_DIR}/version_info.sh
+python3 ${CURRENT_DIR}/firmware_pack.py bm1684x.bin .
+rm -rf bm1684x.bin
 #rm -rf build
 #rm -rf device
 popd
