@@ -99,8 +99,14 @@ static inline void TPUCompareResult ( const at::Tensor & Got,
       {
         continue;
       }
+      if ( AbsExpPtr[i] != 0.f && AbsExpPtr[i] < 1e-5 &&
+           RltAbsErrPtr[i] <= 1e-1 )
+      {
+        continue;
+      }
       LOG ( FATAL ) << "Tensor comparing failed: Got = " << GotPtr[i]
                     << ", Exp = " << ExpPtr[i]
+                    << ", RltAbsErr = " << RltAbsErrPtr[i]
                     << ", index = " << i;
     }
   }

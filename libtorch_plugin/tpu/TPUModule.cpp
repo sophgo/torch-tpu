@@ -1,14 +1,13 @@
 #include <TPUModule.h>
 #include <TPUDeviceManager.h>
+#include <TPUTorchUtils.h>
 
 namespace tpu
 {
 
 void MoveModuleToTPUDevice ( torch::nn::Module & Module )
 {
-  torch::Device Device ( "privateuseone" );
-  int CurrentDeviceIndex = tpu::TPUGetDeviceIndex();
-  Device.set_index ( CurrentDeviceIndex );
+  auto Device = tpu::TPUGetCurrentDevice();
   for ( auto & Mod : Module.named_children() )
   {
     MoveModuleToTPUDevice ( *Mod.value() );
