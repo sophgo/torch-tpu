@@ -63,7 +63,41 @@ Tensor conv2d_tpu ( const Tensor & input_,
   }
   else
   {
-    LOG ( FATAL ) << "TPU Convolution2d is not implemented";
+    auto Handle = tpu::TPUGetDeviceHandle();
+    bm_status_t Status = BM_SUCCESS;
+    float Alpha = 1.f;
+    float Beta = 0.f;
+    auto XDesc = tpu::TPUGenerateTensorDesc ( input_ );
+    auto ConvOutputShape = at::native::conv_output_size (
+                           input_.sizes(),
+                           weight.sizes(),
+                           padding,
+                           stride,
+                           dilation );
+    Tensor Output = torch::empty ( ConvOutputShape,
+                                   tpu::TPUGetCurrentDevice() );
+    auto YDesc = tpu::TPUGenerateTensorDesc ( Output );
+    FilterDescriptor_t WDesc =
+    {
+      .oc = ( int ) weight.size ( 0 ),
+      .ic = ( int ) weight.size ( 1 ),
+      .kh = ( int ) weight.size ( 2 ),
+      .kw = ( int ) weight.size ( 3 ),
+      .dtype = ( sg_data_type_t ) tpu::TPUConvertDType ( weight.dtype() )
+    };
+#if 0
+    Status = sgdnn_conv_forward_cudnn ( Handle,
+                                        &Alpha,
+                                        XDesc,
+                                        ADDR_IN_DEVICE ( input_ ),
+                                        const FilterDescriptor_t        wDesc,
+                                        ADDR_IN_DEVICE ( weight ),
+                                        const ConvolutionDescriptor_t   convDesc,
+                                        &Beta,
+                                        YDesc,
+                                        ADDR_IN_DEVICE ( Output ) );
+#endif
+    LOG ( FATAL ) << "TPU convolution is implemented";
   }
   return is_batched ? output : output.squeeze ( 0 );
 }

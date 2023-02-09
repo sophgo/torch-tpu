@@ -3,6 +3,7 @@
 #include <ATen/core/TensorBase.h>
 #include <c10/util/Logging.h>
 #include <sgdnn_api.h>
+#include <TPUDeviceManager.h>
 
 #define CHECK_TENSOR_IN_DEVICE(t) \
 do                                                                 \
@@ -25,22 +26,33 @@ while ( 0 )
 namespace tpu
 {
 
+static inline at::Device TPUGetCurrentDevice()
+{
+  return at::Device ( at::DeviceType::PrivateUse1, tpu::TPUGetDeviceIndex() );
+}
+
+static inline int TPUConvertDType ( caffe2::TypeMeta dtype )
+{
+  if ( dtype == caffe2::TypeMeta::Make<float>() )
+  {
+    return 0;
+  }
+  else if ( dtype == caffe2::TypeMeta::Make<at::Half>() )
+  {
+    return 1;
+  }
+  else
+  {
+    LOG ( FATAL ) << "Unsupported data type " << dtype;
+  }
+  return -1;
+}
+
 static inline TensorDescriptor_t TPUGenerateTensorDesc (
 const at::Tensor & Tensor )
 {
   TensorDescriptor_t Desc = { 0 };
-  if ( Tensor.dtype() == caffe2::TypeMeta::Make<float>() )
-  {
-    Desc.dtype = 0;
-  }
-  else if ( Tensor.dtype() == caffe2::TypeMeta::Make<at::Half>() )
-  {
-    Desc.dtype = 1;
-  }
-  else
-  {
-    LOG ( FATAL ) << "Unsupported data type " << Tensor.dtype();
-  }
+  Desc.dtype = TPUConvertDType ( Tensor.dtype() );
   Desc.ndims = Tensor.dim();
   for ( auto i = 0; i < Tensor.dim(); ++i )
   {
