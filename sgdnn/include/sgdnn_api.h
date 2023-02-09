@@ -76,6 +76,8 @@ bm_status_t sgdnn_conv_forward_cudnn(
     const void                     *x,
     const FilterDescriptor_t        wDesc,
     const void                     *w,
+    const TensorDescriptor_t        bDesc,
+    const void                     *b,
     const ConvolutionDescriptor_t   convDesc,
     //ConvlutionFwdAlgo_t             algo,
     //void                           *workspace,

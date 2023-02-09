@@ -89,6 +89,7 @@ bm_status_t sgdnn_conv_forward(
     return BM_SUCCESS;
 }
 
+//dstValue = alpha[0]*result + beta[0]*priorDstValue
 bm_status_t sgdnn_conv_forward_cudnn(
     bm_handle_t                     handle,
     const void                     *alpha,
@@ -96,6 +97,8 @@ bm_status_t sgdnn_conv_forward_cudnn(
     const void                     *x,
     const FilterDescriptor_t        wDesc,
     const void                     *w,
+    const TensorDescriptor_t        bDesc,
+    const void                     *b,
     const ConvolutionDescriptor_t   convDesc,
     //ConvlutionFwdAlgo_t             algo,
     //void                           *workspace,
@@ -124,18 +127,18 @@ bm_status_t sgdnn_conv_forward_cudnn(
 
     int groups = convDesc.groups;
 
-    int alpha_ = ((int*)alpha)[0];
-    assert(alpha_ == 1);
-    int beta_ = ((int*)beta)[0];
-    assert(beta_ == 0 || beta_ == 1);
-    bool result_add = beta_ == 1;
+    float alpha_ = ((float*)alpha)[0];
+    assert(alpha_ == 1.0f);
+    float beta_ = ((float*)beta)[0];
+    assert(beta_ == 0.0f || beta_ == 1.0f);
+    bool result_add = beta_ == 1.0f;
 
     sg_data_type_t idtype = (sg_data_type_t)(xDesc.dtype);
     sg_data_type_t odtype = (sg_data_type_t)(yDesc.dtype);
     sg_api_conv_forward_t api = {
         (unsigned long long)x,
         (unsigned long long)w,
-        0,
+        (unsigned long long)b,
         (unsigned long long)y,
         {n, ic, ih, iw},
         groups,
@@ -144,7 +147,7 @@ bm_status_t sgdnn_conv_forward_cudnn(
         {stride_h, stride_w},
         {dh, dw},
         {pad_h, pad_h, pad_w, pad_w},//pad
-        0,//has_bias
+        b != NULL ? 1 : 0,//has_bias?
         0,//if_relu
         0,//upper_limit
         result_add ? 1 : 0,
