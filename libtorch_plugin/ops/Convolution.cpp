@@ -2,6 +2,7 @@
 #include <torch/torch.h>
 #include <ATen/core/TensorBase.h>
 #include <ATen/EmptyTensor.h>
+#include <ATen/native/ConvUtils.h>
 #include <TPUDeviceManager.h>
 #include <TPUTorchUtils.h>
 #include <sgdnn_api.h>
@@ -12,7 +13,7 @@ namespace at
 static std::tuple<Tensor, bool> batchify (
 const Tensor & input,
 const int64_t num_spatial_dims,
-const std::string& func_name )
+const std::string & func_name )
 {
   const auto dim_count_no_batch = num_spatial_dims + 1;
   const auto dim_count_batch = dim_count_no_batch + 1;
@@ -38,6 +39,8 @@ Tensor conv2d_tpu ( const Tensor & input_,
                     IntArrayRef dilation,
                     int64_t groups )
 {
+  CHECK_TENSOR_IN_DEVICE ( input_ );
+  CHECK_TENSOR_IN_DEVICE ( weight );
   // See [Note: hacky wrapper removal for optional tensor]
   c10::MaybeOwned<Tensor> bias_maybe_owned =
   at::borrow_from_optional_tensor ( bias_opt );
@@ -65,4 +68,12 @@ Tensor conv2d_tpu ( const Tensor & input_,
   return is_batched ? output : output.squeeze ( 0 );
 }
 
+TORCH_LIBRARY_IMPL ( aten, PrivateUse1, m )
+{
+  m.impl ( "conv2d", conv2d_tpu );
+}
+TORCH_LIBRARY_IMPL ( aten, AutogradPrivateUse1, m )
+{
+  m.impl ( "conv2d", conv2d_tpu );
+}
 } // namespace at

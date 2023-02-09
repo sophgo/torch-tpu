@@ -7,6 +7,10 @@
 #define CHECK_TENSOR_IN_DEVICE(t) \
 do                                                                 \
 {                                                                  \
+if ( t.device().type() != DeviceType::PrivateUse1 )                \
+{                                                                  \
+  LOG ( FATAL ) << #t << " is not in TPU device";                  \
+}                                                                  \
 if ( tpu::TPUPtrIsInCurrentDevice ( t.data_ptr() ) == false )      \
 {                                                                  \
   LOG ( FATAL ) << #t << " is not in current device";              \
@@ -56,7 +60,7 @@ static inline void TPUCompareResult ( const at::Tensor & Got,
   }
   if ( Got.sizes() != Exp.sizes() )
   {
-    LOG ( FATAL ) << "Tensor comparing failed: Got shpae = "
+    LOG ( FATAL ) << "Tensor comparing failed: Got shape = "
                   << Got.sizes() << ", Exp shape = " << Exp.sizes();
   }
   if ( Got.dtype() == caffe2::TypeMeta::Make<float>() )

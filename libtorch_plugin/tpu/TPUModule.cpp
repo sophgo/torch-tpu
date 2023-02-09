@@ -1,22 +1,29 @@
 #include <TPUModule.h>
+#include <TPUDeviceManager.h>
 
 namespace tpu
 {
 
 void MoveModuleToTPUDevice ( torch::nn::Module & Module )
 {
-  static const torch::Device Device ( "privateuseone" );
+  torch::Device Device ( "privateuseone" );
+  int CurrentDeviceIndex = tpu::TPUGetDeviceIndex();
+  Device.set_index ( CurrentDeviceIndex );
   for ( auto & Mod : Module.named_children() )
   {
     MoveModuleToTPUDevice ( *Mod.value() );
   }
   for ( auto & Par : Module.named_parameters ( false ) )
   {
-    Par.value().to ( Device );
+    auto tmp = Par->to ( Device );
+    Par->unsafeGetTensorImpl()->_change_backend_component_keys ( Device );
+    Par->unsafeGetTensorImpl()->set_storage_keep_dtype ( tmp.storage() );
   }
   for ( auto & Buf : Module.named_buffers ( false ) )
   {
-    Buf.value().to ( Device );
+    auto tmp = Buf->to ( Device );
+    Buf->unsafeGetTensorImpl()->_change_backend_component_keys ( Device );
+    Buf->unsafeGetTensorImpl()->set_storage_keep_dtype ( tmp.storage() );
   }
 }
 
