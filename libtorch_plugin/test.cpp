@@ -7,10 +7,10 @@ int main()
 {
   auto Device = tpu::TPUGetCurrentDevice();
   //torch::Device Device ( "cpu" );
-#if 0
-  std::string ModelPath = "./Resnet50_Own.pt";
+#if 1
+  std::string ModelPath = "../Resnet50_Own.pt";
   auto Resnet50 = std::make_shared<tpu::TorchscriptModule> ( ModelPath );
-  auto A = torch::randn ( { 1, 3, 224, 224 } ).to ( Device );
+  auto A = torch::ones ( { 1, 3, 224, 224 } ).to ( Device );
   tpu::MoveModuleToTPUDevice ( *Resnet50 );
   Resnet50->forward ( A );
 #else

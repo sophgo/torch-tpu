@@ -21,6 +21,7 @@ Tensor & binary_Tensor_tpu ( const Tensor & input1,
   {
     CHECK_TENSOR_IN_DEVICE ( input1 );
     CHECK_TENSOR_IN_DEVICE ( input2 );
+    CHECK_TENSOR_IN_DEVICE ( out );
     auto ADesc = tpu::TPUGenerateTensorDesc ( input1 );
     auto BDesc = tpu::TPUGenerateTensorDesc ( input2 );
     auto CDesc = tpu::TPUGenerateTensorDesc ( out );
