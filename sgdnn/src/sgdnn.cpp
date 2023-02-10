@@ -208,14 +208,16 @@ bm_status_t sgdnn_conv_backward(
     bm_device_mem_t grad_input_mem, grad_weight_mem, grad_bias_mem;
     u64 grad_output_size = (u64)n * oc * oh * ow * dtype_size(dtype);
     u64 input_size = (u64)n * ic * ih * iw * dtype_size(dtype);
-    u64 weight_size = (u64)oc * ALIGN(ic, 32) * kh * kw * dtype_size(dtype);
+    u64 weight_size = (u64)oc * (dtype == SG_DTYPE_FP32 ? ic : ALIGN(ic, 32)) * kh * kw * dtype_size(dtype);
     u64 grad_input_size = input_size;
     //grad_weight arrange as [ic, oc, kh, kw]
     u64 grad_weight_size = (u64)ic * oc * kh * kw * dtype_size(dtype);
     u64 grad_bias_size = (u64)oc * dtype_size(dtype);
-    u64 weight_32oc_size = ALIGN(oc, 32) * kh * kw * ic * dtype_size(dtype);
-    u64 grad_out_32n_size = ALIGN(n, 32) * oh * ow * oc * dtype_size(dtype);
-    u64 buffer_size = sg_max(weight_32oc_size, grad_out_32n_size);//use for weight reorder
+
+    // cal buffer size
+    u64 weight_reorder_size = (dtype == SG_DTYPE_FP32 ? oc : ALIGN(oc, 32)) * kh * kw * ic * dtype_size(dtype);
+    u64 grad_out_reorder_size = (dtype == SG_DTYPE_FP32 ? n : ALIGN(n, 32)) * oh * ow * oc * dtype_size(dtype);
+    u64 buffer_size = dtype == SG_DTYPE_FP32 ? 0 : sg_max(weight_reorder_size, grad_out_reorder_size);//use for weight reorder
 
     DEVICE_MEM_NEW_INPUT(handle, grad_output, grad_output_size, grad_output_mem);
     DEVICE_MEM_NEW_INPUT(handle, input, input_size, input_mem);
@@ -271,11 +273,21 @@ bm_status_t sgdnn_conv_backward_cudnn(
     const TensorDescriptor_t        dyDesc,
     const void                     *dy,
     const ConvolutionDescriptor_t   convDesc,
-    void                           *buffer,//workSpace
     bool                            dx_enable,
     bool                            dw_enable,
     bool                            db_enable
  ) {
+
+    auto dtype_size = [](int dtype) {
+        int size = 1;
+        if (dtype == SG_DTYPE_INT8 || dtype == SG_DTYPE_UINT8) size = 1;
+        else if (dtype == SG_DTYPE_INT16 || dtype == SG_DTYPE_UINT16 ||
+                 dtype == SG_DTYPE_FP16 || dtype == SG_DTYPE_BFP16)
+            size = 2;
+        else if (dtype == SG_DTYPE_FP32 || dtype == SG_DTYPE_INT32 || dtype == SG_DTYPE_UINT32)
+            size = 4;
+        return size;
+    };
 
     assert(xDesc.ndims == 4 && dyDesc.ndims == 4);
     int n = xDesc.shape[0];
@@ -306,6 +318,15 @@ bm_status_t sgdnn_conv_backward_cudnn(
     sg_data_type_t odtype = (sg_data_type_t)(dyDesc.dtype);
     assert(idtype == wdtype && wdtype == odtype);
 
+    // cal buffer size
+    u64 weight_reorder_size = (wdtype == SG_DTYPE_FP32 ? oc : ALIGN(oc, 32)) * kh * kw * ic * dtype_size(wdtype);
+    u64 grad_out_reorder_size = (odtype == SG_DTYPE_FP32 ? n : ALIGN(n, 32)) * oh * ow * oc * dtype_size(odtype);
+    u64 buffer_size = idtype == SG_DTYPE_FP32 ? 0 : sg_max(weight_reorder_size, grad_out_reorder_size);//use for weight reorder
+
+    bm_device_mem_t buffer_mem;
+    bm_status_t status = bm_malloc_device_byte(handle, &buffer_mem, buffer_size);
+    assert(status == BM_SUCCESS);
+
     sg_api_conv_backward_t api = {
         (unsigned long long)x,
         (unsigned long long)w,
@@ -313,7 +334,7 @@ bm_status_t sgdnn_conv_backward_cudnn(
         (unsigned long long)dx,
         (unsigned long long)dw,
         (unsigned long long)db,
-        (unsigned long long)buffer,//buffer
+        bm_mem_get_device_addr(buffer_mem),
         {n, ic, ih, iw},//ishape
         {n, oc, oh, ow},//oshape
         groups,
@@ -328,6 +349,7 @@ bm_status_t sgdnn_conv_backward_cudnn(
 
     tpu_kernel_launch_sync(handle, "tpu_kernel_api_conv_backward", &api, sizeof(api));
 
+    bm_free_device(handle, buffer_mem);
     return BM_SUCCESS;
 }
 
@@ -519,7 +541,7 @@ bm_status_t sgdnn_pooling_forward_cudnn(
     int ih = xDesc.shape[2];
     int iw = xDesc.shape[3];
 
-    int pooling_mode = (PoolingMode_t)poolingDesc.mode;
+    int pooling_mode = (PoolingMode)poolingDesc.mode;
     int kh = poolingDesc.kh;
     int kw = poolingDesc.kw;
     int pad_h = poolingDesc.pad_h;
