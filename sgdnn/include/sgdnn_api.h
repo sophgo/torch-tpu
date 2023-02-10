@@ -40,6 +40,21 @@ typedef struct{
     sg_data_type_t  computeType;
 } ConvolutionDescriptor_t;
 
+typedef enum {
+    Pooling_MAX = 0,
+    Pooling_AVERAGE = 1,
+} PoolingMode;
+
+typedef struct{
+    int         kh;
+    int         kw;
+    int         pad_h;
+    int         pad_w;
+    int         stride_h;
+    int         stride_w;
+    PoolingMode mode;
+} PoolingDescriptor_t;
+
 bm_status_t sgdnn_conv_forward(
     bm_handle_t        handle,
     bm_device_mem_t    input,
@@ -133,7 +148,6 @@ bm_status_t sgdnn_conv_backward_cudnn(
     const TensorDescriptor_t        dyDesc,
     const void                     *dy,
     const ConvolutionDescriptor_t   convDesc,
-    void                           *buffer,
     bool                            dx_enable,
     bool                            dw_enable,
     bool                            db_enable);
