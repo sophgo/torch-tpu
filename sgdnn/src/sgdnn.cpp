@@ -353,6 +353,75 @@ bm_status_t sgdnn_conv_backward_cudnn(
     return BM_SUCCESS;
 }
 
+
+bm_status_t sgdnn_batchnorm_forward(
+    bm_handle_t        handle,
+    bm_device_mem_t    input,
+    bm_device_mem_t    running_mean,
+    bm_device_mem_t    running_var,
+    bm_device_mem_t    weight,
+    bm_device_mem_t    bias,
+    bm_device_mem_t    batch_mean,
+    bm_device_mem_t    batch_invstd,
+    bm_device_mem_t    output,
+    int                n,
+    int                c,
+    int                h,
+    int                w,
+    float              momentum,
+    float              eps,
+    sg_data_type_t     dtype)
+{
+    auto dtype_size = [](int dtype) {
+        int size = 1;
+        if (dtype == SG_DTYPE_INT8 || dtype == SG_DTYPE_UINT8) size = 1;
+        else if (dtype == SG_DTYPE_INT16 || dtype == SG_DTYPE_UINT16 ||
+                 dtype == SG_DTYPE_FP16 || dtype == SG_DTYPE_BFP16)
+            size = 2;
+        else if (dtype == SG_DTYPE_FP32 || dtype == SG_DTYPE_INT32 || dtype == SG_DTYPE_UINT32)
+            size = 4;
+        return size;};
+
+    bm_device_mem_t input_mem, running_mean_mem, running_var_mem, weight_mem, bias_mem;
+    bm_device_mem_t batch_mean_mem, batch_invstd_mem, output_mem;
+    u64 param_size = (u64)n * c * h * w * dtype_size(dtype);
+    u64 c_param_size = (u64)c * dtype_size(dtype);
+
+    DEVICE_MEM_NEW_INPUT(handle, input, param_size, input_mem);
+    DEVICE_MEM_NEW_INPUT(handle, running_mean, c_param_size, running_mean_mem);
+    DEVICE_MEM_NEW_INPUT(handle, running_var, c_param_size, running_var_mem);
+    DEVICE_MEM_NEW_INPUT(handle, weight, c_param_size, weight_mem);
+    DEVICE_MEM_NEW_INPUT(handle, bias, c_param_size, bias_mem);
+    DEVICE_MEM_NEW_OUTPUT(handle, batch_mean, c_param_size, batch_mean_mem);
+    DEVICE_MEM_NEW_OUTPUT(handle, batch_invstd, c_param_size, batch_invstd_mem);
+    DEVICE_MEM_NEW_OUTPUT(handle, output, param_size, output_mem);
+
+    sg_api_batchnorm_forward_t api = {
+        bm_mem_get_device_addr(input_mem),
+        bm_mem_get_device_addr(running_mean_mem),
+        bm_mem_get_device_addr(running_var_mem),
+        bm_mem_get_device_addr(weight_mem),
+        bm_mem_get_device_addr(bias_mem),
+        bm_mem_get_device_addr(batch_mean_mem),
+        bm_mem_get_device_addr(batch_invstd_mem),
+        bm_mem_get_device_addr(output_mem),
+        {n, c, h, w},
+        momentum,
+        eps,
+        dtype};
+    tpu_kernel_launch_sync(handle, "tpu_kernel_api_batchnorm_forward", &api, sizeof(api));
+
+    DEVICE_MEM_DEL_INPUT(handle, input, input_mem);
+    DEVICE_MEM_DEL_INPUT(handle, running_mean, running_mean_mem);
+    DEVICE_MEM_DEL_INPUT(handle, running_var, running_var_mem);
+    DEVICE_MEM_DEL_INPUT(handle, weight, weight_mem);
+    DEVICE_MEM_DEL_INPUT(handle, bias, bias_mem);
+    DEVICE_MEM_DEL_OUTPUT(handle, batch_mean, batch_mean_mem);
+    DEVICE_MEM_DEL_OUTPUT(handle, batch_invstd, batch_invstd_mem);
+    DEVICE_MEM_DEL_OUTPUT(handle, output, output_mem);
+    return BM_SUCCESS;
+}
+
 bm_status_t sgdnn_batchnorm_backward(
     bm_handle_t        handle,
     bm_device_mem_t    grad_output,
@@ -973,6 +1042,49 @@ bm_status_t sgdnn_relu_backward(
     return BM_SUCCESS;
 }
 
+bm_status_t sgdnn_cross_entropy_backward(
+    bm_handle_t        handle,
+    bm_device_mem_t    input,
+    bm_device_mem_t    target,
+    bm_device_mem_t    grad_input,
+    int                batch,
+    int                cls_num,
+    int                reduction,
+    sg_data_type_t     dtype)
+{
+    auto dtype_size = [](int dtype) {
+        int size = 1;
+        if (dtype == SG_DTYPE_INT8 || dtype == SG_DTYPE_UINT8) size = 1;
+        else if (dtype == SG_DTYPE_INT16 || dtype == SG_DTYPE_UINT16 ||
+                 dtype == SG_DTYPE_FP16 || dtype == SG_DTYPE_BFP16)
+            size = 2;
+        else if (dtype == SG_DTYPE_FP32 || dtype == SG_DTYPE_INT32 || dtype == SG_DTYPE_UINT32)
+            size = 4;
+        return size;};
+
+    bm_device_mem_t input_mem, target_mem;
+    bm_device_mem_t grad_input_mem;
+    u64 size = (u64)batch * cls_num * dtype_size(dtype);
+
+    DEVICE_MEM_NEW_INPUT(handle, input, size, input_mem);
+    DEVICE_MEM_NEW_INPUT(handle, target, size, target_mem);
+    DEVICE_MEM_NEW_OUTPUT(handle, grad_input, size, grad_input_mem);
+
+    sg_api_crossentropy_backward_t api = {
+        bm_mem_get_device_addr(input_mem),
+        bm_mem_get_device_addr(target_mem),
+        bm_mem_get_device_addr(grad_input_mem),
+        batch, cls_num, reduction, dtype};
+
+    tpu_kernel_launch_sync(handle, "tpu_kernel_api_cross_entropy_backward", &api, sizeof(api));
+
+    DEVICE_MEM_DEL_INPUT(handle, input, input_mem);
+    DEVICE_MEM_DEL_INPUT(handle, target, target_mem);
+    DEVICE_MEM_DEL_OUTPUT(handle, grad_input, grad_input_mem);
+
+    return BM_SUCCESS;
+}
+
 #ifdef ENABLE_PYBIND
 // pybind11 register c++ half-precision floating point as numpy.float16
 // https://github.com/pybind/pybind11/issues/1776
@@ -1069,6 +1181,57 @@ PYBIND11_MODULE(sgdnn_pybind, m)
         bm_dev_free(handle);
     });
 
+
+    m.def("batchnorm_forward", [](py::array_t<float> input,
+                                    py::array_t<float> running_mean,
+                                    py::array_t<float> running_var,
+                                    py::array_t<float> weight,
+                                    py::array_t<float> bias,
+                                    py::array_t<float> batch_mean,
+                                    py::array_t<float> batch_invstd,
+                                    py::array_t<float> output,
+                                    int n, int c, int h, int w,
+                                    float momentum,
+                                    float eps) {
+            py::buffer_info input_buf = input.request();
+            float *input_fp = (float *)input_buf.ptr;
+            py::buffer_info running_mean_buf = running_mean.request();
+            float *running_mean_fp = (float *)running_mean_buf.ptr;
+            py::buffer_info running_var_buf = running_var.request();
+            float *running_var_fp = (float *)running_var_buf.ptr;
+            py::buffer_info weight_buf = weight.request();
+            float *weight_fp = (float *)weight_buf.ptr;
+            py::buffer_info bias_buf = bias.request();
+            float *bias_fp = (float *)bias_buf.ptr;
+            py::buffer_info batch_mean_buf = batch_mean.request();
+            float *batch_mean_fp = (float *)batch_mean_buf.ptr;
+            py::buffer_info batch_invstd_buf = batch_invstd.request();
+            float *batch_invstd_fp = (float *)batch_invstd_buf.ptr;
+            py::buffer_info output_buf = output.request();
+            float *output_fp = (float *)output_buf.ptr;
+
+            bm_handle_t handle;
+            bm_dev_request(&handle, 0);
+
+            bm_status_t status = sgdnn_batchnorm_forward(handle,
+                                bm_mem_from_system(input_fp),
+                                bm_mem_from_system(running_mean_fp),
+                                bm_mem_from_system(running_var_fp),
+                                bm_mem_from_system(weight_fp),
+                                bm_mem_from_system(bias_fp),
+                                bm_mem_from_system(batch_mean_fp),
+                                bm_mem_from_system(batch_invstd_fp),
+                                bm_mem_from_system(output_fp),
+                                n, c, h, w,
+                                momentum,
+                                eps,
+                                (sg_data_type_t)0);
+
+            UNUSED(status);
+            assert(status == BM_SUCCESS);
+            bm_dev_free(handle);
+        });
+
     m.def("batchnorm_backward", [](py::array_t<float16> grad_output,
                                     py::array_t<float16> input,
                                     py::array_t<float16> weight,
@@ -1115,6 +1278,58 @@ PYBIND11_MODULE(sgdnn_pybind, m)
                               weight_grad_enable,
                               bias_grad_enable,
                               (sg_data_type_t)1);
+
+          UNUSED(status);
+          assert(status == BM_SUCCESS);
+          bm_dev_free(handle);
+    });
+
+    m.def("batchnorm_backward_fp32", [](py::array_t<float> grad_output,
+                                        py::array_t<float> input,
+                                        py::array_t<float> weight,
+                                        py::array_t<float> mean,
+                                        py::array_t<float> invstd,
+                                        py::array_t<float> grad_input,
+                                        py::array_t<float> grad_weight,
+                                        py::array_t<float> grad_bias,
+                                        int n, int c, int h, int w,
+                                        bool input_grad_enable,
+                                        bool weight_grad_enable,
+                                        bool bias_grad_enable) {
+          py::buffer_info grad_output_buf = grad_output.request();
+          float *grad_output_fp32 = (float *)grad_output_buf.ptr;
+          py::buffer_info input_buf = input.request();
+          float *input_fp32 = (float *)input_buf.ptr;
+          py::buffer_info weight_buf = weight.request();
+          float *weight_fp32 = (float *)weight_buf.ptr;
+          py::buffer_info mean_buf = mean.request();
+          float *mean_fp32 = (float *)mean_buf.ptr;
+          py::buffer_info invstd_buf = invstd.request();
+          float *invstd_fp32 = (float *)invstd_buf.ptr;
+          py::buffer_info grad_input_buf = grad_input.request();
+          float *grad_input_fp32 = (float *)grad_input_buf.ptr;
+          py::buffer_info grad_weight_buf = grad_weight.request();
+          float *grad_weight_fp32 = (float *)grad_weight_buf.ptr;
+          py::buffer_info grad_bias_buf = grad_bias.request();
+          float *grad_bias_fp32 = (float *)grad_bias_buf.ptr;
+
+          bm_handle_t handle;
+          bm_dev_request(&handle, 0);
+
+          bm_status_t status = sgdnn_batchnorm_backward(handle,
+                              bm_mem_from_system(grad_output_fp32),
+                              bm_mem_from_system(input_fp32),
+                              bm_mem_from_system(weight_fp32),
+                              bm_mem_from_system(mean_fp32),
+                              bm_mem_from_system(invstd_fp32),
+                              bm_mem_from_system(grad_input_fp32),
+                              bm_mem_from_system(grad_weight_fp32),
+                              bm_mem_from_system(grad_bias_fp32),
+                              n, c, h, w,
+                              input_grad_enable,
+                              weight_grad_enable,
+                              bias_grad_enable,
+                              (sg_data_type_t)0);
 
           UNUSED(status);
           assert(status == BM_SUCCESS);
@@ -1394,6 +1609,34 @@ PYBIND11_MODULE(sgdnn_pybind, m)
                             n, c, h, w,
                             input_grad_enable,
                             (sg_data_type_t)1);
+
+        UNUSED(status);
+        assert(status == BM_SUCCESS);
+        bm_dev_free(handle);
+    });
+
+    m.def("cross_entropy_backward", [](py::array_t<float> input,
+                                    py::array_t<float> target,
+                                    py::array_t<float> grad_input,
+                                    int batch,
+                                    int cls_num,
+                                    int reduction) {
+        py::buffer_info input_buf = input.request();
+        float *input_fp = (float *)input_buf.ptr;
+        py::buffer_info target_buf = target.request();
+        float *target_fp = (float *)target_buf.ptr;
+        py::buffer_info grad_input_buf = grad_input.request();
+        float *grad_input_fp = (float *)grad_input_buf.ptr;
+
+        bm_handle_t handle;
+        bm_dev_request(&handle, 0);
+
+        bm_status_t status = sgdnn_cross_entropy_backward(handle,
+                            bm_mem_from_system(input_fp),
+                            bm_mem_from_system(target_fp),
+                            bm_mem_from_system(grad_input_fp),
+                            batch, cls_num, reduction,
+                            (sg_data_type_t)0);
 
         UNUSED(status);
         assert(status == BM_SUCCESS);

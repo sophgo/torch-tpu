@@ -152,6 +152,24 @@ bm_status_t sgdnn_conv_backward_cudnn(
     bool                            dw_enable,
     bool                            db_enable);
 
+bm_status_t sgdnn_batchnorm_forward(
+    bm_handle_t        handle,
+    bm_device_mem_t    input,
+    bm_device_mem_t    running_mean,
+    bm_device_mem_t    running_var,
+    bm_device_mem_t    weight,
+    bm_device_mem_t    bias,
+    bm_device_mem_t    batch_mean,
+    bm_device_mem_t    batch_invstd,
+    bm_device_mem_t    output,
+    int                n,
+    int                c,
+    int                h,
+    int                w,
+    float              momentum,
+    float              eps,
+    sg_data_type_t     dtype);
+
 bm_status_t sgdnn_batchnorm_backward(
     bm_handle_t        handle,
     bm_device_mem_t    grad_output,
@@ -299,6 +317,16 @@ bm_status_t sgdnn_relu_backward(
     int                h,
     int                w,
     bool               input_need_grad,
+    sg_data_type_t     dtype);
+
+bm_status_t sgdnn_cross_entropy_backward(
+    bm_handle_t        handle,
+    bm_device_mem_t    input,
+    bm_device_mem_t    target,
+    bm_device_mem_t    grad_input,
+    int                batch,
+    int                cls,
+    bool               reduction,
     sg_data_type_t     dtype);
 
 #if defined(__cplusplus)

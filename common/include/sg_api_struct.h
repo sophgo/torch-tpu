@@ -166,6 +166,20 @@ typedef struct {
 
 typedef struct {
     unsigned long long input_global_addr;
+    unsigned long long target_global_addr;
+    unsigned long long grad_input_global_addr;
+    int                batch;
+    int                cls_num;
+    int                reduction;
+    sg_data_type_t     dtype;
+#ifndef WIN32
+} __attribute__((packed)) sg_api_crossentropy_backward_t;
+#else
+} sg_api_softmax_backward_t;
+#endif
+
+typedef struct {
+    unsigned long long input_global_addr;
     unsigned long long weight_global_addr;
     unsigned long long bias_global_addr;
     unsigned long long output_global_addr;
@@ -186,6 +200,25 @@ typedef struct {
 } __attribute__((packed)) sg_api_conv_forward_t;
 #else
 } sg_api_conv_forward_t;
+#endif
+
+typedef struct{
+    unsigned long long input_global_addr;
+    unsigned long long running_mean_global_addr;
+    unsigned long long running_var_global_addr;
+    unsigned long long weight_global_addr;
+    unsigned long long bias_global_addr;
+    unsigned long long batch_mean_global_addr;
+    unsigned long long batch_invstd_global_addr;
+    unsigned long long output_global_addr;
+    int                shape[4];
+    float              momentum;
+    float              eps;
+    sg_data_type_t     dtype;
+#ifndef WIN32
+} __attribute__((packed)) sg_api_batchnorm_forward_t;
+#else
+} sg_api_batchnorm_forward_t;
 #endif
 
 typedef struct sg_api_pooling_forward {
