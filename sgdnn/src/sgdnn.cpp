@@ -324,8 +324,10 @@ bm_status_t sgdnn_conv_backward_cudnn(
     u64 buffer_size = idtype == SG_DTYPE_FP32 ? 0 : sg_max(weight_reorder_size, grad_out_reorder_size);//use for weight reorder
 
     bm_device_mem_t buffer_mem;
-    bm_status_t status = bm_malloc_device_byte(handle, &buffer_mem, buffer_size);
-    assert(status == BM_SUCCESS);
+    if (buffer_size > 0) {
+        bm_status_t status = bm_malloc_device_byte(handle, &buffer_mem, buffer_size);
+        assert(status == BM_SUCCESS);
+    }
 
     sg_api_conv_backward_t api = {
         (unsigned long long)x,
