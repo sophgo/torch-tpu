@@ -13,223 +13,97 @@ namespace at
 {
 
 static std::tuple<Tensor, bool> batchify (
-const Tensor & input,
-const int64_t num_spatial_dims,
+const Tensor      & input,
+const int64_t       num_spatial_dims,
 const std::string & func_name )
 {
   const auto dim_count_no_batch = num_spatial_dims + 1;
   const auto dim_count_batch = dim_count_no_batch + 1;
   const auto is_batched = ( input.dim() == dim_count_batch );
   TORCH_CHECK ( input.dim() == dim_count_no_batch || is_batched,
-                "Expected ",
-                dim_count_no_batch,
-                "D (unbatched) or ",
-                dim_count_batch,
-                "D (batched) input to ",
-                func_name,
-                ", but got input of size: ",
-                input.sizes() );
-  return std::make_tuple ( is_batched ? input : input.unsqueeze ( 0 ),
-                           is_batched );
+                "Expected ", dim_count_no_batch, "D (unbatched) or ",
+                dim_count_batch, "D (batched) input to ", func_name,
+                ", but got input of size: ", input.sizes() );
+  return std::make_tuple ( is_batched ? input : input.unsqueeze ( 0 ), is_batched );
 }
 
-Tensor convolution_tpu ( const Tensor & input_,
-                         const Tensor & weight,
-                         const c10::optional<Tensor> & bias_opt,
-                         IntArrayRef stride,
-                         IntArrayRef padding,
-                         IntArrayRef dilation,
-                         const bool transposed,
-                         const IntArrayRef output_padding,
-                         int64_t groups )
+Tensor convolution_tpu (
+const Tensor                & input_,
+const Tensor                & weight,
+const c10::optional<Tensor> & bias_opt,
+IntArrayRef                   stride,
+IntArrayRef                   padding,
+IntArrayRef                   dilation,
+const bool                    transposed,
+const IntArrayRef             output_padding,
+int64_t                       groups )
 {
+  TORCH_CHECK ( at::isComplexType ( input_.scalar_type() ) == false,
+                "Complex convolution is unsupported by TPU" );
+  CHECK_TENSOR_IN_DEVICE ( input_ );
+  CHECK_TENSOR_IN_DEVICE ( weight );
+  c10::MaybeOwned<Tensor> bias_maybe_owned = borrow_from_optional_tensor ( bias_opt );
+  const Tensor & bias = *bias_maybe_owned;
+  TORCH_CHECK ( !bias.defined() || bias.dtype() == input_.dtype(),
+                "Input type (", input_.dtype().name(), ") and bias type (",
+                bias.dtype().name(), ") should be the same" );
+  if ( bias.defined() )
+  {
+    CHECK_TENSOR_IN_DEVICE ( bias );
+  }
+  auto num_spatial_dims = weight.dim() - 2;
+  Tensor input;
+  bool is_batched;
+  auto func_name = "conv" + std::to_string ( num_spatial_dims ) + "d";
+  if ( transposed == true )
+  {
+    func_name += "_transposed";
+  }
+  std::tie ( input, is_batched ) = batchify ( input_, num_spatial_dims, func_name );
+#ifdef TPU_LIBTORCH_OP_COMPARE
+  auto input_cpu = input.to ( torch::Device ( "cpu" ) );
+  auto weight_cpu = weight.to ( torch::Device ( "cpu" ) );
+  Tensor bias_cpu;
+  if ( bias.defined() )
+  {
+    bias_cpu = bias.to ( torch::Device ( "cpu" ) );
+  }
+  auto output_exp = torch::convolution (
+                    input_cpu,
+                    weight_cpu,
+                    c10::optional<Tensor> ( bias_cpu ),
+                    stride,
+                    padding,
+                    dilation,
+                    transposed,
+                    output_padding,
+                    groups );
+#endif
+  Tensor output;
   if ( transposed == true )
   {
     LOG ( FATAL ) << "TPU transposed convolution is not implemented";
   }
   else
   {
-    CHECK_TENSOR_IN_DEVICE ( input_ );
-    CHECK_TENSOR_IN_DEVICE ( weight );
-    int convdims = weight.dim() - 2;
-    if ( convdims != 2 )
+    if ( num_spatial_dims != 2 )
     {
-      LOG ( FATAL ) << convdims << "D convolution is unsupported by TPU";
+      LOG ( FATAL ) << "TPU " << num_spatial_dims << "D convolution is not implemented";
     }
-    // See [Note: hacky wrapper removal for optional tensor]
-    c10::MaybeOwned<Tensor> bias_maybe_owned =
-    at::borrow_from_optional_tensor ( bias_opt );
-    const Tensor & bias = *bias_maybe_owned;
-    TORCH_CHECK (
-    !bias.defined() || bias.dtype() == input_.dtype(),
-    "Input type (",
-    input_.dtype().name(),
-    ") and bias type (",
-    bias.dtype().name(),
-    ") should be the same" );
-    if ( bias.defined() )
-    {
-      CHECK_TENSOR_IN_DEVICE ( bias );
-    }
-    Tensor input;
-    bool is_batched;
-    std::tie ( input, is_batched ) =
-    batchify ( input_, /*num_spatial_dims=*/ 2, "conv2d" );
-#ifdef TPU_LIBTORCH_OP_COMPARE
-    auto InputCPU = input.to ( torch::Device ( "cpu" ) );
-    auto WeightCPU = weight.to ( torch::Device ( "cpu" ) );
-    at::Tensor BiasCPU;
-    c10::optional<Tensor> BiasOpt;
-    if ( bias.defined() )
-    {
-      BiasCPU = bias.to ( torch::Device ( "cpu" ) );
-      BiasOpt = BiasCPU;
-    }
-    auto OutputExp = torch::conv2d ( InputCPU,
-                                     WeightCPU,
-                                     BiasOpt,
-                                     stride,
-                                     padding,
-                                     dilation,
-                                     groups );
-#endif
-    Tensor output;
-    if ( at::isComplexType ( input_.scalar_type() ) )
-    {
-      LOG ( FATAL ) << "Complex convolution is unsupported";
-    }
-    else
-    {
-      auto Handle = tpu::TPUGetDeviceHandle();
-      bm_status_t Status = BM_SUCCESS;
-      float Alpha = 1.f;
-      float Beta = 0.f;
-      auto XDesc = tpu::TPUGenerateTensorDesc ( input );
-      auto ConvOutputShape = at::native::conv_output_size (
-                             input.sizes(),
-                             weight.sizes(),
-                             padding,
-                             stride,
-                             dilation );
-      output = torch::empty ( ConvOutputShape,
-                              tpu::TPUGetCurrentDevice() );
-      auto YDesc = tpu::TPUGenerateTensorDesc ( output );
-      FilterDescriptor_t WDesc =
-      {
-        .oc = ( int ) weight.size ( 0 ),
-        .ic = ( int ) weight.size ( 1 ),
-        .kh = ( int ) weight.size ( 2 ),
-        .kw = ( int ) weight.size ( 3 ),
-        .dtype = ( sg_data_type_t ) tpu::TPUConvertDType ( weight.dtype() )
-      };
-      TensorDescriptor_t BDesc;
-      if ( bias.defined() )
-      {
-        tpu::TPUGenerateTensorDesc ( bias );
-      }
-      ConvolutionDescriptor_t ConvDesc =
-      {
-        .pad_h = ( int ) padding[0],
-        .pad_w = ( int ) padding[1],
-        .stride_h = ( int ) stride[0],
-        .stride_w = ( int ) stride[1],
-        .dilation_h = ( int ) dilation[0],
-        .dilation_w = ( int ) dilation[1],
-        .groups = ( int ) groups,
-        .computeType = ( sg_data_type_t ) tpu::TPUConvertDType ( input.dtype() )
-      };
-      Status = sgdnn_conv_forward_cudnn (
-               Handle,
-               &Alpha,
-               XDesc,
-               ADDR_IN_DEVICE ( input ),
-               WDesc,
-               ADDR_IN_DEVICE ( weight ),
-               BDesc,
-               bias.defined() ? ADDR_IN_DEVICE ( bias ) : nullptr,
-               ConvDesc,
-               &Beta,
-               YDesc,
-               ADDR_IN_DEVICE ( output ) );
-    }
-#ifdef TPU_LIBTORCH_OP_COMPARE
-    auto OutputGot = output.to ( torch::Device ( "cpu" ) );
-    tpu::TPUCompareResult ( OutputGot, OutputExp );
-#endif
-    return is_batched ? output : output.squeeze ( 0 );
-  }
-}
-
-TORCH_LIBRARY_IMPL ( aten, PrivateUse1, m )
-{
-  m.impl ( "convolution_overrideable", convolution_tpu );
-}
-
-std::tuple<Tensor, Tensor, Tensor> convolution_backward_overrideable_tpu (
-const Tensor & grad_output,
-const Tensor & input,
-const Tensor & weight,
-IntArrayRef stride,
-IntArrayRef padding,
-IntArrayRef dilation,
-bool transposed,
-IntArrayRef output_padding,
-int64_t groups,
-std::array<bool, 3> output_mask )
-{
-  if ( transposed == true )
-  {
-    LOG ( FATAL ) << "Transposed convolution backward is unsupported by TPU";
-  }
-  else
-  {
-    CHECK_TENSOR_IN_DEVICE ( grad_output );
-    CHECK_TENSOR_IN_DEVICE ( input );
-    CHECK_TENSOR_IN_DEVICE ( weight );
-    int convdims = weight.dim() - 2;
-    if ( convdims != 2 )
-    {
-      LOG ( FATAL ) << convdims
-                    << "D transposed convolution is unsupported by TPU";
-    }
-#ifdef TPU_LIBTORCH_OP_COMPARE
-    auto InputCPU = input.to ( torch::Device ( "cpu" ) );
-    auto WeightCPU = weight.to ( torch::Device ( "cpu" ) );
-    auto GradOutputCPU = grad_output.to ( torch::Device ( "cpu" ) );
-    at::OptionalIntArrayRef bias_sizes_opt ( { weight.size ( 0 ) } );
-    auto OutputsExp = torch::convolution_backward (
-                      GradOutputCPU,
-                      InputCPU,
-                      WeightCPU,
-                      bias_sizes_opt,
-                      stride,
-                      padding,
-                      dilation,
-                      transposed,
-                      output_padding,
-                      groups,
-                      output_mask );
-#endif
-    auto Handle = tpu::TPUGetDeviceHandle();
-    bm_status_t Status = BM_SUCCESS;
-    float Alpha = 1.f;
-    float Beta = 0.f;
-    auto XDesc = tpu::TPUGenerateTensorDesc ( input );
-    auto DYDesc = tpu::TPUGenerateTensorDesc ( grad_output );
-    Tensor DX, DW, DB;
-    if ( output_mask[0] == true )
-    {
-      DX = empty ( input.sizes(), tpu::TPUGetCurrentDevice() );
-    }
-    if ( output_mask[1] == true )
-    {
-      DW = empty ( weight.sizes(), tpu::TPUGetCurrentDevice() );
-    }
-    if ( output_mask[2] == true )
-    {
-      DB = empty ( { weight.size ( 0 ) }, tpu::TPUGetCurrentDevice() );
-    }
-    FilterDescriptor_t WDesc =
+    auto handle = tpu::TPUGetDeviceHandle();
+    bm_status_t status = BM_SUCCESS;
+    float alpha = 1.f;
+    float beta = 0.f;
+    auto input_desc = tpu::TPUGenerateTensorDesc ( input );
+    auto output_shape = at::native::conv_output_size (
+                        input.sizes(),
+                        weight.sizes(),
+                        padding,
+                        stride,
+                        dilation );
+    output = torch::empty ( output_shape, tpu::TPUGetCurrentDevice() );
+    auto output_desc = tpu::TPUGenerateTensorDesc ( output );
+    FilterDescriptor_t weight_desc =
     {
       .oc = ( int ) weight.size ( 0 ),
       .ic = ( int ) weight.size ( 1 ),
@@ -237,12 +111,12 @@ std::array<bool, 3> output_mask )
       .kw = ( int ) weight.size ( 3 ),
       .dtype = ( sg_data_type_t ) tpu::TPUConvertDType ( weight.dtype() )
     };
-    TensorDescriptor_t DBDesc;
-    if ( output_mask[2] == true )
+    TensorDescriptor_t bias_desc;
+    if ( bias.defined() )
     {
-      tpu::TPUGenerateTensorDesc ( DB );
+      bias_desc = tpu::TPUGenerateTensorDesc ( bias );
     }
-    ConvolutionDescriptor_t ConvDesc =
+    ConvolutionDescriptor_t conv_desc =
     {
       .pad_h = ( int ) padding[0],
       .pad_w = ( int ) padding[1],
@@ -253,48 +127,193 @@ std::array<bool, 3> output_mask )
       .groups = ( int ) groups,
       .computeType = ( sg_data_type_t ) tpu::TPUConvertDType ( input.dtype() )
     };
-    Status = sgdnn_conv_backward_cudnn (
-             Handle,
-             &Alpha,
-             &Beta,
-             XDesc,
+    status = sgdnn_conv_forward_cudnn (
+             handle,
+             &alpha,
+             input_desc,
              ADDR_IN_DEVICE ( input ),
-             output_mask[0] ? ADDR_IN_DEVICE ( DX ) : nullptr,
-             WDesc,
+             weight_desc,
              ADDR_IN_DEVICE ( weight ),
-             output_mask[1] ? ADDR_IN_DEVICE ( DW ) : nullptr,
-             DBDesc,
-             output_mask[2] ? ADDR_IN_DEVICE ( DB ) : nullptr,
-             DYDesc,
+             bias_desc,
+             bias.defined() ? ADDR_IN_DEVICE ( bias ) : nullptr,
+             conv_desc,
+             &beta,
+             output_desc,
+             ADDR_IN_DEVICE ( output ) );
+  }
+#ifdef TPU_LIBTORCH_OP_COMPARE
+  auto output_got = output.to ( torch::Device ( "cpu" ) );
+  std::cout << "Comparing convolution:"
+            << " input shape = " << input.sizes()
+            << " input dtype = " << input.dtype()
+            << " weight shape = " << weight.sizes()
+            << " weight dtype = " << weight.dtype()
+            << " bias shape = " << bias.sizes()
+            << " bias dtype = " << bias.dtype()
+            << " output shape = " << output.sizes()
+            << " output dtype = " << output.dtype()
+            << " stride = " << stride
+            << " padding = " << padding
+            << " dilation = " << dilation
+            << " groups = " << groups
+            << std::endl;
+  tpu::TPUCompareResult ( output_got, output_exp );
+#endif
+  return is_batched ? output : output.squeeze ( 0 );
+}
+TORCH_LIBRARY_IMPL ( aten, PrivateUse1, m )
+{
+  m.impl ( "convolution_overrideable", convolution_tpu );
+}
+
+std::tuple<Tensor, Tensor, Tensor> convolution_backward_overrideable_tpu (
+const Tensor      & grad_output,
+const Tensor      & input,
+const Tensor      & weight,
+IntArrayRef         stride,
+IntArrayRef         padding,
+IntArrayRef         dilation,
+bool                transposed,
+IntArrayRef         output_padding,
+int64_t             groups,
+std::array<bool, 3> output_mask )
+{
+  TORCH_CHECK ( at::isComplexType ( input.scalar_type() ) == false,
+                "Complex convolution backward is unsupported by TPU" );
+  CHECK_TENSOR_IN_DEVICE ( grad_output );
+  CHECK_TENSOR_IN_DEVICE ( input );
+  CHECK_TENSOR_IN_DEVICE ( weight );
+  auto num_spatial_dims = weight.dim() - 2;
+  Tensor grad_input, grad_weight, grad_bias;
+  if ( output_mask[0] == true )
+  {
+    grad_input = empty ( input.sizes(), tpu::TPUGetCurrentDevice() );
+  }
+  if ( output_mask[1] == true )
+  {
+    grad_weight = empty ( weight.sizes(), tpu::TPUGetCurrentDevice() );
+  }
+  if ( output_mask[2] == true )
+  {
+    grad_bias = empty ( { weight.size ( 0 ) }, tpu::TPUGetCurrentDevice() );
+  }
+#ifdef TPU_LIBTORCH_OP_COMPARE
+  auto input_cpu = input.to ( torch::Device ( "cpu" ) );
+  auto weight_cpu = weight.to ( torch::Device ( "cpu" ) );
+  auto grad_output_cpu = grad_output.to ( torch::Device ( "cpu" ) );
+  at::OptionalIntArrayRef bias_sizes_opt ( { weight.size ( 0 ) } );
+  auto outputs_exp = torch::convolution_backward (
+                     grad_output_cpu,
+                     input_cpu,
+                     weight_cpu,
+                     bias_sizes_opt,
+                     stride,
+                     padding,
+                     dilation,
+                     transposed,
+                     output_padding,
+                     groups,
+                     output_mask );
+#endif
+  if ( transposed == true )
+  {
+    LOG ( FATAL ) << "TPU transposed convolution backward is not implemented";
+  }
+  else
+  {
+    if ( num_spatial_dims != 2 )
+    {
+      LOG ( FATAL ) << "TPU " << num_spatial_dims << "D transposed convolution backward is not implemented";
+    }
+    auto handle = tpu::TPUGetDeviceHandle();
+    bm_status_t status = BM_SUCCESS;
+    float alpha = 1.f;
+    float beta = 0.f;
+    auto input_desc = tpu::TPUGenerateTensorDesc ( input );
+    auto grad_output_desc = tpu::TPUGenerateTensorDesc ( grad_output );
+    FilterDescriptor_t weight_desc =
+    {
+      .oc = ( int ) weight.size ( 0 ),
+      .ic = ( int ) weight.size ( 1 ),
+      .kh = ( int ) weight.size ( 2 ),
+      .kw = ( int ) weight.size ( 3 ),
+      .dtype = ( sg_data_type_t ) tpu::TPUConvertDType ( weight.dtype() )
+    };
+    TensorDescriptor_t grad_bias_desc;
+    if ( output_mask[2] == true )
+    {
+      grad_bias_desc = tpu::TPUGenerateTensorDesc ( grad_bias );
+    }
+    ConvolutionDescriptor_t conv_desc =
+    {
+      .pad_h = ( int ) padding[0],
+      .pad_w = ( int ) padding[1],
+      .stride_h = ( int ) stride[0],
+      .stride_w = ( int ) stride[1],
+      .dilation_h = ( int ) dilation[0],
+      .dilation_w = ( int ) dilation[1],
+      .groups = ( int ) groups,
+      .computeType = ( sg_data_type_t ) tpu::TPUConvertDType ( input.dtype() )
+    };
+    status = sgdnn_conv_backward_cudnn (
+             handle,
+             &alpha,
+             &beta,
+             input_desc,
+             ADDR_IN_DEVICE ( input ),
+             output_mask[0] ? ADDR_IN_DEVICE ( grad_input ) : nullptr,
+             weight_desc,
+             ADDR_IN_DEVICE ( weight ),
+             output_mask[1] ? ADDR_IN_DEVICE ( grad_weight ) : nullptr,
+             grad_bias_desc,
+             output_mask[2] ? ADDR_IN_DEVICE ( grad_bias ) : nullptr,
+             grad_output_desc,
              ADDR_IN_DEVICE ( grad_output ),
-             ConvDesc,
+             conv_desc,
              output_mask[0],
              output_mask[1],
              output_mask[2] );
-#ifdef TPU_LIBTORCH_OP_COMPARE
-    if ( output_mask[1] == true )
-    {
-      std::cout << "Compare weight\n";
-      auto DWGot = DW.to ( torch::Device ( "cpu" ) );
-      tpu::TPUCompareResult ( DWGot, std::get<1> ( OutputsExp ) );
-    }
-    if ( output_mask[2] == true )
-    {
-      std::cout << "Compare bias\n";
-      auto DBGot = DB.to ( torch::Device ( "cpu" ) );
-      tpu::TPUCompareResult ( DBGot, std::get<2> ( OutputsExp ) );
-    }
-    if ( output_mask[0] == true )
-    {
-      std::cout << "Compare input\n";
-      auto DXGot = DX.to ( torch::Device ( "cpu" ) );
-      tpu::TPUCompareResult ( DXGot, std::get<0> ( OutputsExp ) );
-    }
-#endif
-    return std::tuple<Tensor, Tensor, Tensor> ( DX, DW, DB );
   }
+#ifdef TPU_LIBTORCH_OP_COMPARE
+  std::cout << "Comparing convolution backward:"
+            << " grad_output shape = " << grad_output.sizes()
+            << " grad_output dtype = " << grad_output.dtype()
+            << " input shape = " << input.sizes()
+            << " input dtype = " << input.dtype()
+            << " weight shape = " << weight.sizes()
+            << " weight dtype = " << weight.dtype()
+            << " grad_input shape = " << grad_input.sizes()
+            << " grad_input dtype = " << grad_input.dtype()
+            << " grad_weight shape = " << grad_weight.sizes()
+            << " grad_weight dtype = " << grad_weight.dtype()
+            << " grad_bias shape = " << grad_bias.sizes()
+            << " grad_bias dtype = " << grad_bias.dtype()
+            << " stride = " << stride
+            << " padding = " << padding
+            << " dilation = " << dilation
+            << " groups = " << groups
+            << std::endl;
+  if ( output_mask[1] == true )
+  {
+    std::cout << "Compare grad_weight\n";
+    auto grad_weight_got = grad_weight.to ( torch::Device ( "cpu" ) );
+    tpu::TPUCompareResult ( grad_weight_got, std::get<1> ( outputs_exp ) );
+  }
+  if ( output_mask[2] == true )
+  {
+    std::cout << "Compare grad_bias\n";
+    auto grad_bias_got = grad_bias.to ( torch::Device ( "cpu" ) );
+    tpu::TPUCompareResult ( grad_bias_got, std::get<2> ( outputs_exp ) );
+  }
+  if ( output_mask[0] == true )
+  {
+    std::cout << "Compare grad_input\n";
+    auto grad_input_got = grad_input.to ( torch::Device ( "cpu" ) );
+    tpu::TPUCompareResult ( grad_input_got, std::get<0> ( outputs_exp ) );
+  }
+#endif
+  return std::tuple<Tensor, Tensor, Tensor> ( grad_input, grad_weight, grad_bias );
 }
-
 TORCH_LIBRARY_IMPL ( aten, PrivateUse1, m )
 {
   m.impl ( "convolution_backward_overrideable",

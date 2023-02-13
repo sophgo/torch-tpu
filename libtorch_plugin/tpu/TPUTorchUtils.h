@@ -14,7 +14,7 @@ if ( t.device().type() != DeviceType::PrivateUse1 )                \
 }                                                                  \
 if ( tpu::TPUPtrIsInCurrentDevice ( t.data_ptr() ) == false )      \
 {                                                                  \
-  LOG ( FATAL ) << #t << " is not in current device";              \
+  LOG ( FATAL ) << #t << " is not in current TPU device";          \
 }                                                                  \
 }                                                                  \
 while ( 0 )
