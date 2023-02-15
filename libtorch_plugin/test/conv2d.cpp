@@ -1,6 +1,5 @@
 #include <torch/torch.h>
-#include <torch/script.h>
-#include <TPUModule.h>
+#include <ATen/native/ConvUtils.h>
 #include <TPUTorchUtils.h>
 
 static inline void test ( at::IntArrayRef input_shape,
@@ -35,21 +34,16 @@ static inline void test ( at::IntArrayRef input_shape,
                     false,
                     at::IntArrayRef ( { 0, 0 } ),
                     groups );
-  at::Tensor output_tpu;
-  for ( int i = 0; i < 1000; ++i )
-  {
-    std::cout << i << std::endl;
-    output_tpu = torch::convolution (
-                 input_tpu,
-                 weight_tpu,
-                 c10::optional<at::Tensor> ( bias_tpu ),
-                 stride,
-                 padding,
-                 dilation,
-                 false,
-                 at::IntArrayRef ( { 0, 0 } ),
-                 groups );
-  }
+  auto output_tpu = torch::convolution (
+                    input_tpu,
+                    weight_tpu,
+                    c10::optional<at::Tensor> ( bias_tpu ),
+                    stride,
+                    padding,
+                    dilation,
+                    false,
+                    at::IntArrayRef ( { 0, 0 } ),
+                    groups );
   auto output_got = output_tpu.to ( torch::Device ( "cpu" ) );
   auto output_exp = output_cpu;
   std::cout << "Comparing convolution:"
@@ -71,43 +65,8 @@ static inline void test ( at::IntArrayRef input_shape,
 
 int main()
 {
-  auto Device = tpu::TPUGetCurrentDevice();
-  //torch::Device Device ( "cpu" );
-#if 1
   const int batch = 64;
-  test ( {batch, 3, 224, 224}, {64, 3, 7, 7}, {2, 2}, {3, 3}, {1, 1}, 1, false );
-  //std::string ModelPath = "../Resnet50_Own.pt";
-  //auto Resnet50 = std::make_shared<tpu::TorchscriptModule> ( ModelPath );
-  //auto A = torch::ones ( { 1, 3, 224, 224 } ).to ( Device );
-  //tpu::MoveModuleToTPUDevice ( *Resnet50 );
-  //Resnet50->forward ( A );
-#else
-  auto T = torch::empty ( {2, 3, 4, 5}, Device );
-  auto A = torch::randn ( {2, 3, 4, 5} );
-//  for ( int i = 0; i < A.numel(); ++i )
-//  {
-//    A.data_ptr<float>() [i] = i;
-//  }
-#if 0
-  A = A.to ( torch::kFloat16 );
-  for ( int i = 0; i < A.numel(); ++i )
-  {
-    std::cout << A.data_ptr<at::Half>() [i] << " ";
-  }
-  std::cout << std::endl;
-#endif
-  auto InputCPU = torch::ones ( {64, 3, 3, 3} );
-  auto Input = InputCPU.to ( Device );
-  Input.set_requires_grad ( true );
-  torch::nn::Conv2d Conv2d ( torch::nn::Conv2dOptions ( 3, 32, {2, 2} ) );
-  tpu::MoveModuleToTPUDevice ( *Conv2d );
-  auto Output = Conv2d->forward ( Input );
-  auto E = torch::ones ( Output.sizes() ).to ( Device );
-  std::cout << Output.grad_fn() << std::endl;
-  std::cout << Output.grad_fn()->name() << std::endl;
-  //Output.set_requires_grad ( true );
-  Output.backward ( E );
-  auto OO = Input.grad();
-#endif
+  // input shape, weight shape, stride, padding, dilation, groups, has bias
+  test ( { batch, 3, 224, 224 }, { 64, 3, 7, 7 }, { 2, 2 }, { 3, 3 }, { 1, 1 }, 1, false );
   return 0;
 }
