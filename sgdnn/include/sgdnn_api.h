@@ -45,6 +45,13 @@ typedef enum {
     Pooling_AVERAGE = 1,
 } PoolingMode;
 
+typedef enum {
+  BatchNorm_Spatial = 0,
+  BatchNorm_Spatial_Persistent = 0,
+  BatchNorm_Per_Activation = 0,
+} BatchNormMode;
+
+
 typedef struct{
     int         kh;
     int         kw;
@@ -159,6 +166,8 @@ bm_status_t sgdnn_batchnorm_forward(
     bm_device_mem_t    running_var,
     bm_device_mem_t    weight,
     bm_device_mem_t    bias,
+    bm_device_mem_t    updated_mean,
+    bm_device_mem_t    updated_var,
     bm_device_mem_t    batch_mean,
     bm_device_mem_t    batch_invstd,
     bm_device_mem_t    output,
@@ -169,6 +178,25 @@ bm_status_t sgdnn_batchnorm_forward(
     float              momentum,
     float              eps,
     sg_data_type_t     dtype);
+
+bm_status_t sgdnn_batchnorm_forward_cudnn(
+    bm_handle_t                      handle,
+    BatchNormMode                    mode,
+    const void                      *alpha,
+    const void                      *beta,
+    const void                      *x,
+    const void                      *bnScale,
+    const void                      *bnBias,
+    void                            *resultRunningMean,
+    void                            *resultRunningVariance,
+    void                            *resultSaveMean,
+    void                            *resultSaveInvVariance,
+    void                            *y,
+    const TensorDescriptor_t         xDesc,
+    const TensorDescriptor_t         yDesc,
+    const TensorDescriptor_t         bnScaleBiasMeanVarDesc,
+    double                           exponentialAverageFactor,
+    double                           epsilon);
 
 bm_status_t sgdnn_batchnorm_backward(
     bm_handle_t        handle,
