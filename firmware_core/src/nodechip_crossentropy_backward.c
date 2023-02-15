@@ -3,10 +3,6 @@
 #include "common_def.h"
 #include "tpu_utils.h"
 #include "tpu_kernel.h"
-#ifdef USING_CMODEL
-#include "cmodel_memory.h"
-#endif
-
 /**
  * Cross Etropy Loss (include Softmax):
  * 

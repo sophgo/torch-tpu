@@ -47,10 +47,9 @@ typedef enum {
 
 typedef enum {
   BatchNorm_Spatial = 0,
-  BatchNorm_Spatial_Persistent = 0,
-  BatchNorm_Per_Activation = 0,
+  BatchNorm_Spatial_Persistent = 1,
+  BatchNorm_Per_Activation = 2,
 } BatchNormMode;
-
 
 typedef struct{
     int         kh;

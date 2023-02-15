@@ -188,6 +188,17 @@ class Test_Backward_Ops(object):
             output = BatchNorm2d(tpu_input, running_mean, running_var, weight, bias)
             output.backward(grad_output)
             
+            ## only test backward
+            # mean = torch.mean(tpu_input, dim=(0,2,3)).reshape(weight.shape)
+            # var = torch.var(tpu_input, dim=(0,2,3), unbiased = False).reshape(weight.shape)
+            # invstd = 1/torch.sqrt(var+1e-5)
+            # grad_input_ref, grad_weight_ref, grad_bias_ref = torch.ops.aten.native_batch_norm_backward(
+            #     grad_output, tpu_input, weight, None, None, mean, invstd, True, 1e-5, [True,True,True])
+            # print("case:",i)
+            # grad_compare(tpu_input.grad, grad_input_ref, 1e-1)
+            # grad_compare(weight.grad, grad_weight_ref, 1e-1)
+            # grad_compare(bias.grad, grad_bias_ref, 1e-1)
+            #           
             # pytorch reference
             torch_input = torch.rand((n, c, h, w), requires_grad = True)
             torch_rmean = torch.rand(c, requires_grad = False)
@@ -218,15 +229,6 @@ class Test_Backward_Ops(object):
             grad_compare(weight.grad, torch_weight.grad, 1e-1)
             grad_compare(bias.grad, torch_bias.grad, 1e-1)
 
-            # mean = torch.mean(tpu_input, dim=(0,2,3)).reshape(weight.shape)
-            # var = torch.var(tpu_input, dim=(0,2,3), unbiased = False).reshape(weight.shape)
-            # invstd = 1/torch.sqrt(var+1e-5)
-            # grad_input_ref, grad_weight_ref, grad_bias_ref = torch.ops.aten.native_batch_norm_backward(
-            #     grad_output, tpu_input, weight, None, None, mean, invstd, True, 1e-5, [True,True,True])
-            # print("case:",i)
-            # grad_compare(tpu_input.grad, grad_input_ref, 1e-1)
-            # grad_compare(weight.grad, grad_weight_ref, 1e-1)
-            # grad_compare(bias.grad, grad_bias_ref, 1e-1)
     
     def test_eltwise_backward(self):
         torch.manual_seed(0)
