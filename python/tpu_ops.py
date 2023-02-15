@@ -130,74 +130,97 @@ class tpu_conv2d(nn.Conv2d):
 
 class BatchNorm2dFunc(Function):
     @staticmethod
-    def forward(ctx, input, running_mean, running_var, weight, bias, training=True, momentum=0.1, eps=1e-5):
-        reduced_dims = [i for i in range(input.dim()) if i!=1]
-        mean = torch.mean(input, dim=reduced_dims).reshape(weight.shape)
-        var = torch.var(input, dim=reduced_dims, unbiased = False).reshape(weight.shape)
-        invstd = 1/torch.sqrt(var+eps)
-        ctx.save_for_backward(input, weight, mean, invstd)
-        return F.batch_norm(input, running_mean, running_var, weight, bias, True, momentum, eps)
+    def forward(ctx, input, running_mean, running_var, weight, bias, momentum=0.1, eps=1e-5, training=True):
+        # reduced_dims = [i for i in range(input.dim()) if i!=1]
+        # mean = torch.mean(input, dim=reduced_dims).reshape(weight.shape)
+        # var = torch.var(input, dim=reduced_dims, unbiased = False).reshape(weight.shape)
+        # invstd = 1/torch.sqrt(var+eps)
+        # ctx.save_for_backward(input, weight, mean, invstd)
+        # return F.batch_norm(input, running_mean, running_var, weight, bias, True, momentum, eps)
+        
+        # input
+        input_np = np.asarray(input.data.flatten())
+        running_mean_np = np.asarray(running_mean.data.flatten())
+        running_var_np = np.asarray(running_var.data.flatten())
+        weight_np = np.asarray(weight.data.flatten())
+        bias_np = np.asarray(bias.data.flatten())
+        # output
+        batch_mean_np = np.ones(weight.shape, dtype = np.float32)
+        batch_invstd_np = np.ones(weight.shape, dtype = np.float32)
+        output_np = np.ones(input.shape, dtype = np.float32)
+        sgdnn_pybind.batchnorm_forward(input_np,
+                                        running_mean_np,
+                                        running_var_np,
+                                        weight_np,
+                                        bias_np,
+                                        batch_mean_np,
+                                        batch_invstd_np,
+                                        output_np,
+                                        input.shape[0],
+                                        input.shape[1],
+                                        input.shape[2],
+                                        input.shape[3],
+                                        momentum,
+                                        eps)
+        running_mean = torch.from_numpy(running_mean_np).reshape(weight.shape)
+        running_var = torch.from_numpy(running_var_np).reshape(weight.shape)
+        batch_mean = torch.from_numpy(batch_mean_np).reshape(weight.shape)
+        batch_invstd = torch.from_numpy(batch_invstd_np).reshape(weight.shape)
+        output = torch.from_numpy(output_np).reshape(input.shape)
+        ctx.save_for_backward(input, weight, batch_mean, batch_invstd)
+        return output
 
     @staticmethod
     def backward(ctx, grad_output):
         input, weight, mean, invstd = ctx.saved_tensors
-        grad_input = grad_weight = grad_bias = None
-        n = input.shape[0]
-        c = input.shape[1]
-        h = input.shape[2]
-        w = input.shape[3]
-        
         # test fp16
-        grad_out_np = np.asarray(grad_output.half().data.flatten())
-        input_np = np.asarray(input.half().data.flatten())
-        weight_np = np.asarray(weight.half().data.flatten())
-        mean_np = np.asarray(mean.half().data.flatten())
-        invstd_np = np.asarray(invstd.half().data.flatten())
-        grad_input_np = np.ones(input.shape, dtype = np.float16)
-        grad_weight_np = np.ones(weight.shape, dtype = np.float16)
-        grad_bias_np = np.ones(weight.shape, dtype = np.float16)
-        sgdnn_pybind.batchnorm_backward(grad_out_np,
-                                          input_np,
-                                          weight_np,
-                                          mean_np,
-                                          invstd_np,
-                                          grad_input_np,
-                                          grad_weight_np,
-                                          grad_bias_np,
-                                          n,c,h,w,
-                                          1, 1, 1)
+        # grad_out_np = np.asarray(grad_output.half().data.flatten())
+        # input_np = np.asarray(input.half().data.flatten())
+        # weight_np = np.asarray(weight.half().data.flatten())
+        # mean_np = np.asarray(mean.half().data.flatten())
+        # invstd_np = np.asarray(invstd.half().data.flatten())
+        # grad_input_np = np.ones(input.shape, dtype = np.float16)
+        # grad_weight_np = np.ones(weight.shape, dtype = np.float16)
+        # grad_bias_np = np.ones(weight.shape, dtype = np.float16)
+        # sgdnn_pybind.batchnorm_backward(grad_out_np,
+        #                                   input_np,
+        #                                   weight_np,
+        #                                   mean_np,
+        #                                   invstd_np,
+        #                                   grad_input_np,
+        #                                   grad_weight_np,
+        #                                   grad_bias_np,
+        #                                   n,c,h,w,
+        #                                   1, 1, 1)
         # test fp32
-        # grad_out_np = np.asarray(grad_output.data.flatten())
-        # input_np = np.asarray(input.data.flatten())
-        # weight_np = np.asarray(weight.data.flatten())
-        # mean_np = np.asarray(mean.data.flatten())
-        # invstd_np = np.asarray(invstd.data.flatten())
-        # grad_input_np = np.ones(input.shape, dtype = np.float32)
-        # grad_weight_np = np.ones(weight.shape, dtype = np.float32)
-        # grad_bias_np = np.ones(weight.shape, dtype = np.float32)
-        # # import pdb
-        # # pdb.set_trace()
-        # sgdnn.batchnorm_backward_fp32(grad_out_np,
-        #                               input_np,
-        #                               weight_np,
-        #                               mean_np,
-        #                               invstd_np,
-        #                               grad_input_np,
-        #                               grad_weight_np,
-        #                               grad_bias_np,
-        #                               n,c,h,w,
-        #                               1, 1, 1)
+        grad_out_np = np.asarray(grad_output.data.flatten())
+        input_np = np.asarray(input.data.flatten())
+        weight_np = np.asarray(weight.data.flatten())
+        mean_np = np.asarray(mean.data.flatten())
+        invstd_np = np.asarray(invstd.data.flatten())
+        grad_input_np = np.ones(input.shape, dtype = np.float32)
+        grad_weight_np = np.ones(weight.shape, dtype = np.float32)
+        grad_bias_np = np.ones(weight.shape, dtype = np.float32)
+        sgdnn_pybind.batchnorm_backward_fp32(grad_out_np,
+                                            input_np,
+                                            weight_np,
+                                            mean_np,
+                                            invstd_np,
+                                            grad_input_np,
+                                            grad_weight_np,
+                                            grad_bias_np,
+                                            input.shape[0],
+                                            input.shape[1],
+                                            input.shape[2],
+                                            input.shape[3],
+                                            1, 1, 1)
         grad_input = torch.from_numpy(grad_input_np).reshape(input.shape)
         grad_weight = torch.from_numpy(grad_weight_np).reshape(weight.shape)
         grad_bias = torch.from_numpy(grad_bias_np).reshape(weight.shape)
         return grad_input, None, None, grad_weight, grad_bias, None, None, None
 
-def BatchNorm2d(input, running_mean, running_var, weight, bias, training=True, momentum=0.1, eps=1e-5):
-    return BatchNorm2dFunc.apply(input, running_mean, running_var, weight, bias, training, momentum, eps)
-
-class tpu_batchnorm2d(nn.BatchNorm2d):
-    def _batchnorm_forward(self, input: Tensor, weight: Tensor, bias: Tensor):
-        return BatchNorm2d(input, weight, bias, self.training, self.momentum, self.eps)
+def BatchNorm2d(input, running_mean, running_var, weight, bias, momentum=0.1, eps=1e-5, training=True):
+    return BatchNorm2dFunc.apply(input, running_mean, running_var, weight, bias, momentum, eps, training)
 
 class AvgPool2dFunc(Function):
     # Note that both forward and backward are @staticmethods
@@ -490,3 +513,31 @@ class ReluFunc(Function):
 
 def Relu(input):
     return ReluFunc.apply(input)
+
+class CrossEntropyFunc(Function):
+    @staticmethod
+    def forward(ctx, input, target, reduction_op=0):
+        ctx.reduction_op = reduction_op
+        ctx.save_for_backward(input, target)
+        return F.cross_entropy(input, target)
+
+    @staticmethod
+    def backward(ctx,loss):
+        input, target= ctx.saved_tensors
+        reduction = ctx.reduction_op
+        batch = input.shape[0]
+        cls_num = input.shape[1]
+        input_np = np.asarray(input.data.flatten())
+        target_np = np.asarray(target.data.flatten())
+        grad_input_np = np.ones(input.shape,dtype=np.float32)
+        sgdnn_pybind.cross_entropy_backward(input_np,
+                                           target_np,
+                                           grad_input_np,
+                                           batch,
+                                           cls_num,
+                                           reduction)
+        grad_input = torch.from_numpy(grad_input_np).reshape((batch, cls_num))
+        return grad_input, None, None
+
+def CrossEntropy(input, target, reduction=0):
+    return CrossEntropyFunc.apply(input, target, reduction)
