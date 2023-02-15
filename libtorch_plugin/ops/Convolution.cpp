@@ -7,8 +7,6 @@
 #include <TPUTorchUtils.h>
 #include <sgdnn_api.h>
 
-//#define TPU_LIBTORCH_OP_COMPARE TRUE
-
 namespace at
 {
 

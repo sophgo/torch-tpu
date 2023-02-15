@@ -106,7 +106,11 @@ public:
   void * Alloc ( size_t Size ) const
   {
     Mutex_.lock();
-    if ( Size == 0 ) { return nullptr; }
+    if ( Size == 0 )
+    {
+      Mutex_.unlock();
+      return nullptr;
+    }
     if ( Size >= ( 1UL << 32 ) )
     {
       LOG ( FATAL ) << "TPU only allows to allocate memory with size "
@@ -139,6 +143,8 @@ public:
     Mutex_.lock();
     if ( Ptr == nullptr )
     {
+      Mutex_.unlock();
+      std::cout << "Free Unlock" << std::endl;
       return;
     }
     int Index = GetDeviceIndexByUnifiedAddr ( ( unsigned long long ) Ptr );

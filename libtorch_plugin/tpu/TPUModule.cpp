@@ -18,12 +18,15 @@ void MoveModuleToTPUDevice ( torch::nn::Module & Module )
     Par->unsafeGetTensorImpl()->_change_backend_component_keys ( Device );
     Par->unsafeGetTensorImpl()->set_storage_keep_dtype ( tmp.storage() );
   }
-#if 0
+#if 1
   for ( auto & Buf : Module.named_buffers ( false ) )
   {
-    auto tmp = Buf->to ( Device );
-    Buf->unsafeGetTensorImpl()->_change_backend_component_keys ( Device );
-    Buf->unsafeGetTensorImpl()->set_storage_keep_dtype ( tmp.storage() );
+    if ( Buf.key() == "running_mean" || Buf.key() == "running_var" )
+    {
+      auto tmp = Buf->to ( Device );
+      Buf->unsafeGetTensorImpl()->_change_backend_component_keys ( Device );
+      Buf->unsafeGetTensorImpl()->set_storage_keep_dtype ( tmp.storage() );
+    }
   }
 #endif
 }
