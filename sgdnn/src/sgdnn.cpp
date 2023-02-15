@@ -5,6 +5,14 @@
 #include <string.h>
 #include "tpu_fp16.h"
 
+#define ASSERT_SAME_DIMS(A, B)            \
+  assert(A.ndims == B.ndims);             \
+
+#define ASSERT_SAME_SHAPE(A, B)           \
+  assert(A.ndims == B.ndims);             \
+  for (int dim = 0; dim < A.ndims; dim++) \
+    assert(A.shape[dim] == B.shape[dim]); \
+
 bm_status_t sgdnn_conv_forward(
     bm_handle_t        handle,
     bm_device_mem_t    input,
@@ -351,7 +359,9 @@ bm_status_t sgdnn_conv_backward_cudnn(
 
     tpu_kernel_launch_sync(handle, "tpu_kernel_api_conv_backward", &api, sizeof(api));
 
-    bm_free_device(handle, buffer_mem);
+    if (buffer_size > 0) {
+        bm_free_device(handle, buffer_mem);
+    }
     return BM_SUCCESS;
 }
 
@@ -670,7 +680,7 @@ bm_status_t sgdnn_pooling_forward(
     DEVICE_MEM_DEL_INPUT(handle, input, input_mem);
     return BM_SUCCESS;
 }
-/*
+
 bm_status_t sgdnn_pooling_forward_cudnn(
     bm_handle_t                 handle,
     const PoolingDescriptor_t   poolingDesc,
@@ -687,8 +697,10 @@ bm_status_t sgdnn_pooling_forward_cudnn(
     int c = xDesc.shape[1];
     int ih = xDesc.shape[2];
     int iw = xDesc.shape[3];
+    int oh = yDesc.shape[2];
+    int ow = yDesc.shape[3];
 
-    int pooling_mode = (PoolingMode)poolingDesc.mode;
+    int pooling_mode = (PoolingMode_t)poolingDesc.mode;
     int kh = poolingDesc.kh;
     int kw = poolingDesc.kw;
     int pad_h = poolingDesc.pad_h;
@@ -705,13 +717,13 @@ bm_status_t sgdnn_pooling_forward_cudnn(
         (unsigned long long)y,
         0,//max_mask
         n, c, ih, iw,
-        ,//oh, ow
+        oh, ow,
         kh, kw,
         pad_h, pad_w, pad_h, pad_w,
         stride_h, stride_w,
         1, 1,//dilation_h && dilation_w
-        pooling_mode == 0,
-        ,//avgpool_mode
+        pooling_mode == Pooling_AVERAGE,
+        0,//avgpool_mode
         0,//if_mask_max
         0,//if_relu
         0,//relu_upper_limit
@@ -721,7 +733,7 @@ bm_status_t sgdnn_pooling_forward_cudnn(
 
     return BM_SUCCESS;
 }
-*/
+
 bm_status_t sgdnn_avgpool_backward(
     bm_handle_t        handle,
     bm_device_mem_t    grad_output,
@@ -850,13 +862,13 @@ bm_status_t sgdnn_maxpool_backward(
     DEVICE_MEM_DEL_INPUT(handle, grad_output, grad_output_mem);
     return BM_SUCCESS;
 }
-/*
-bm_status_t sgdnn_pooling_backward(
+
+bm_status_t sgdnn_pooling_backward_cudnn(
     bm_handle_t                 handle,
     const PoolingDescriptor_t   poolingDesc,
     const void                 *alpha,
     const void                 *beta,
-    const TensorDescriptot_t    yDesc,
+    const TensorDescriptor_t    yDesc,
     const void                 *y,
     const TensorDescriptor_t    dyDesc,
     const void                 *dy,
@@ -866,10 +878,66 @@ bm_status_t sgdnn_pooling_backward(
     void                       *dx
  ) {
 
-    int pooling_mode = (PoolingMode_t)poolingDesc.mode;
+    ASSERT_SAME_SHAPE(xDesc, dxDesc);
+    ASSERT_SAME_SHAPE(yDesc, dyDesc);
+    assert(xDesc.ndims == 4 && yDesc.ndims == 4);
 
+    int n = xDesc.shape[0];
+    int c = xDesc.shape[1];
+    int ih = xDesc.shape[2];
+    int iw = xDesc.shape[3];
+    int oh = yDesc.shape[2];
+    int ow = yDesc.shape[3];
+
+    int pooling_mode = (PoolingMode_t)poolingDesc.mode;
+    int kh = poolingDesc.kh;
+    int kw = poolingDesc.kw;
+    int pad_h = poolingDesc.pad_h;
+    int pad_w = poolingDesc.pad_w;
+    int stride_h = poolingDesc.stride_h;
+    int stride_w = poolingDesc.stride_w;
+
+    assert(xDesc.dtype == yDesc.dtype);
+    assert(xDesc.dtype == dxDesc.dtype);
+    assert(yDesc.dtype == dyDesc.dtype);
+    sg_data_type_t dtype = (sg_data_type_t)(xDesc.dtype);
+
+    if (pooling_mode == Pooling_MAX) {
+        sg_api_maxpool_backward_t api = {
+            (unsigned long long)x,
+            (unsigned long long)y,
+            (unsigned long long)dy,
+            (unsigned long long)dx,
+            {n, c, ih, iw},
+            {n, c, oh, ow},
+            {kh, kw},
+            {stride_h, stride_w},
+            {pad_h, pad_w},
+            {1, 1},//{dilation_h, dilation_w},
+            0,//ceil_mode
+            dtype};
+
+        tpu_kernel_launch_sync(handle, "tpu_kernel_api_maxpool_backward", &api, sizeof(api));
+    } else if (pooling_mode == Pooling_AVERAGE) {
+        sg_api_avgpool_backward_t api = {
+            (unsigned long long)dy,
+            (unsigned long long)dx,
+            {n, c, ih, iw},
+            {n, c, oh, ow},
+            {kh, kw},
+            {stride_h, stride_w},
+            {pad_h, pad_w},
+            0,//ceil_mode
+            1,//count_include_pad
+            kh * kw,//divisor_override
+            dtype};
+
+        tpu_kernel_launch_sync(handle, "tpu_kernel_api_avgpool_backward", &api, sizeof(api));
+    }
+
+    return BM_SUCCESS;
 }
-*/
+
 // C = op(alpha1[0] * A, alpha2[0] * B) + beta[0] * C
 bm_status_t sgdnn_eltwise_forward(
     bm_handle_t                 handle,

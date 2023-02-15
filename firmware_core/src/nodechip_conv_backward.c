@@ -1380,7 +1380,7 @@ void nodechip_conv_backward_weight(
     dim4 wstride;
     tpu_compact_stride(&wstride, 0, &wshape);
 
-    if (dtype == DT_FP32) {
+    if (dtype == DT_FP16) {
         nodechip_grad_output_reorder(grad_out_global_addr,
                                      grad_out_reordered_global_addr,
                                      ic,

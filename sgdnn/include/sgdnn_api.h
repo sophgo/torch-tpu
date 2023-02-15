@@ -43,7 +43,7 @@ typedef struct{
 typedef enum {
     Pooling_MAX = 0,
     Pooling_AVERAGE = 1,
-} PoolingMode;
+} PoolingMode_t;
 
 typedef enum {
   BatchNorm_Spatial = 0,
@@ -52,13 +52,13 @@ typedef enum {
 } BatchNormMode;
 
 typedef struct{
-    int         kh;
-    int         kw;
-    int         pad_h;
-    int         pad_w;
-    int         stride_h;
-    int         stride_w;
-    PoolingMode mode;
+    int             kh;
+    int             kw;
+    int             pad_h;
+    int             pad_w;
+    int             stride_h;
+    int             stride_w;
+    PoolingMode_t   mode;
 } PoolingDescriptor_t;
 
 bm_status_t sgdnn_conv_forward(
