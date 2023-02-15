@@ -295,6 +295,12 @@ std::array<bool, 3> output_mask )
             << " dilation = " << dilation
             << " groups = " << groups
             << std::endl;
+  if ( output_mask[0] == true )
+  {
+    std::cout << "Compare grad_input\n";
+    auto grad_input_got = grad_input.to ( torch::Device ( "cpu" ) );
+    tpu::TPUCompareResult ( grad_input_got, std::get<0> ( outputs_exp ) );
+  }
   if ( output_mask[1] == true )
   {
     std::cout << "Compare grad_weight\n";
@@ -306,12 +312,6 @@ std::array<bool, 3> output_mask )
     std::cout << "Compare grad_bias\n";
     auto grad_bias_got = grad_bias.to ( torch::Device ( "cpu" ) );
     tpu::TPUCompareResult ( grad_bias_got, std::get<2> ( outputs_exp ) );
-  }
-  if ( output_mask[0] == true )
-  {
-    std::cout << "Compare grad_input\n";
-    auto grad_input_got = grad_input.to ( torch::Device ( "cpu" ) );
-    tpu::TPUCompareResult ( grad_input_got, std::get<0> ( outputs_exp ) );
   }
 #endif
   return std::tuple<Tensor, Tensor, Tensor> ( grad_input, grad_weight, grad_bias );
