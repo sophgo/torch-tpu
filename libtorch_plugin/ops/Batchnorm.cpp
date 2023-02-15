@@ -20,10 +20,11 @@ double                        eps )
 {
   c10::MaybeOwned<Tensor> weight_maybe_owned = at::borrow_from_optional_tensor ( weight_opt );
   const Tensor & weight = *weight_maybe_owned;
-  const Tensor & bias = c10::value_or_else ( bias_opt, [] {return Tensor();} );
-  const Tensor & running_mean = c10::value_or_else ( running_mean_opt, [] {return Tensor();} );
-  const Tensor & running_var = c10::value_or_else ( running_var_opt, [] {return Tensor();} );
+  const Tensor & bias = c10::value_or_else ( bias_opt, [] { return Tensor(); } );
+  const Tensor & running_mean = c10::value_or_else ( running_mean_opt, [] { return Tensor(); } );
+  const Tensor & running_var = c10::value_or_else ( running_var_opt, [] { return Tensor(); } );
   auto num_features = input.size ( 1 );
+  TORCH_CHECK ( training == true, "Batchnorm only supports training mode for now" );
   LOG ( FATAL ) << "Bathnorm is unsupported by TPU";
 }
 TORCH_LIBRARY_IMPL ( aten, PrivateUse1, m )
