@@ -1,5 +1,4 @@
 #include <torch/torch.h>
-#include <ATen/native/ConvUtils.h>
 #include <TPUTorchUtils.h>
 
 static inline void test ( at::IntArrayRef     grad_output_shape,
@@ -88,7 +87,7 @@ static inline void test ( at::IntArrayRef     grad_output_shape,
   }
   if ( output_mask[2] == true )
   {
-    std::cout << "Compare grad_bias\n";
+    std::cout << "Compare grad_bias" << std::endl;
     tpu::TPUCompareResult ( grad_bias_got, grad_bias_exp );
   }
 }
