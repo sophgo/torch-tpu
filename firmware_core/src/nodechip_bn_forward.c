@@ -277,7 +277,7 @@ void batchnorm_forward_split_hw(
     for(int nhwidx=0; nhwidx < 3 * nhwslice; nhwidx++)
     {
         bool if_last = (nhwidx == nhwslice-1)||(nhwidx == 2*nhwslice-1)||(nhwidx == 3*nhwslice-1);
-        int nhwsecs = if_last ? nhw - nhwidx * nhw_secs : nhw_secs;
+        int nhwsecs = if_last ? nhw - (nhwslice-1) * nhw_secs : nhw_secs;
         dim4 shape = {1, c, 1, nhwsecs};
         dim4 cshape = {1, c, 1, 1};
         dim4 aligned_stride;
@@ -338,7 +338,7 @@ void batchnorm_forward_split_hw(
                 &aligned_stride,
                 &global_stride,
                 dtype);
-            scale.f32 = 1.f;
+            scale.f32 = 1.f/nhw;
             tpu_bdc_fp_avg_pool2d(
                 pooling_buffer,
                 input_local_addr,
@@ -438,12 +438,12 @@ void batchnorm_forward_split_hw(
                     &compact_stride,
                     dtype);
                 tpu_gdma_compact_L2S(
-                    running_mean_global_addr,
+                    updated_mean_global_addr,
                     running_mean_local_addr,
                     &cshape,
                     dtype);
                 tpu_gdma_compact_L2S(
-                    running_var_global_addr,
+                    updated_var_global_addr,
                     running_var_local_addr,
                     &cshape,
                     dtype);
@@ -502,7 +502,7 @@ void batchnorm_forward_split_hw(
             }
             tpu_gdma_cpy_S2L(
                 input_local_addr,
-                input_global_addr + (nhwidx-2*nhwslice) * nhw_secs * tpu_data_type_size(dtype),
+                input_global_addr + (nhwidx - 2 * nhwslice) * nhw_secs * tpu_data_type_size(dtype),
                 &shape,
                 &aligned_stride,
                 &global_stride,
@@ -604,7 +604,7 @@ void nodechip_batchnorm_forward_training(
         {   
             TPUKERNEL_ASSERT(is_local_mem_enough(shape.n, shape.c, tpu_eu_num(dtype), 0, dtype));
             batchnorm_forward_split_hw(
-                input_global_addr,
+                output_global_addr,
                 running_mean_global_addr,
                 running_var_global_addr,
                 weight_global_addr,
@@ -613,7 +613,7 @@ void nodechip_batchnorm_forward_training(
                 updated_var_global_addr,
                 batch_mean_global_addr,
                 batch_invstd_global_addr,
-                output_global_addr,
+                input_global_addr,
                 new_shape,
                 momentum,
                 eps,
