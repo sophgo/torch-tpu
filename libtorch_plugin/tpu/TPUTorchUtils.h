@@ -4,6 +4,7 @@
 #include <c10/util/Logging.h>
 #include <sgdnn_api.h>
 #include <TPUDeviceManager.h>
+#include <sys/time.h>
 
 #define CHECK_TENSOR_IN_DEVICE(t)                                  \
 do                                                                 \
@@ -145,5 +146,11 @@ static inline void TPUCompareResult ( const at::Tensor & Got,
     LOG ( FATAL ) << "Unsupported data type " << Got.dtype();
   }
 }
+
+struct Timer
+{
+  struct timeval start;
+  struct timeval end;
+};
 
 } // namespace tpu

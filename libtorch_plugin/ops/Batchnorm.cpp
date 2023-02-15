@@ -139,13 +139,13 @@ double                        eps )
             << " save_invstd shape = " << save_invstd.sizes()
             << " save_invstd dtype = " << save_invstd.dtype()
             << std::endl;
-  std::cout << "Compare output\n";
+  std::cout << "Compare output" << std::endl;
   auto output_got = output.to ( torch::Device ( "cpu" ) );
   tpu::TPUCompareResult ( output_got, std::get<0> ( outputs_exp ) );
-  std::cout << "Compare save_mean\n";
+  std::cout << "Compare save_mean" << std::endl;
   auto save_mean_got = save_mean.to ( torch::Device ( "cpu" ) );
   tpu::TPUCompareResult ( save_mean_got, std::get<1> ( outputs_exp ) );
-  std::cout << "Compare save_invstd\n";
+  std::cout << "Compare save_invstd" << std::endl;
   auto save_invstd_got = save_invstd.to ( torch::Device ( "cpu" ) );
   tpu::TPUCompareResult ( save_invstd_got, std::get<2> ( outputs_exp ) );
 #endif

@@ -186,17 +186,18 @@ std::array<bool, 3> output_mask )
   Tensor grad_input, grad_weight, grad_bias;
   if ( output_mask[0] == true )
   {
-    auto grad_input_options = torch::TensorOptions ( tpu::TPUGetCurrentDevice() ).dtype ( grad_input.dtype() );
+    auto grad_input_options = torch::TensorOptions ( tpu::TPUGetCurrentDevice() ).dtype ( input.dtype() );
     grad_input = empty ( input.sizes(), grad_input_options );
   }
   if ( output_mask[1] == true )
   {
-    auto grad_weight_options = torch::TensorOptions ( tpu::TPUGetCurrentDevice() ).dtype ( grad_weight.dtype() );
+    auto grad_weight_options = torch::TensorOptions ( tpu::TPUGetCurrentDevice() ).dtype ( weight.dtype() );
     grad_weight = empty ( weight.sizes(), grad_weight_options );
   }
   if ( output_mask[2] == true )
   {
-    auto grad_bias_options = torch::TensorOptions ( tpu::TPUGetCurrentDevice() ).dtype ( grad_bias.dtype() );
+    // We assume that weight and bias have the same data type
+    auto grad_bias_options = torch::TensorOptions ( tpu::TPUGetCurrentDevice() ).dtype ( weight.dtype() );
     grad_bias = empty ( { weight.size ( 0 ) }, grad_bias_options );
   }
 #ifdef TPU_LIBTORCH_OP_COMPARE
@@ -297,19 +298,19 @@ std::array<bool, 3> output_mask )
             << std::endl;
   if ( output_mask[0] == true )
   {
-    std::cout << "Compare grad_input\n";
+    std::cout << "Compare grad_input" << std::endl;
     auto grad_input_got = grad_input.to ( torch::Device ( "cpu" ) );
     tpu::TPUCompareResult ( grad_input_got, std::get<0> ( outputs_exp ) );
   }
   if ( output_mask[1] == true )
   {
-    std::cout << "Compare grad_weight\n";
+    std::cout << "Compare grad_weight" << std::endl;
     auto grad_weight_got = grad_weight.to ( torch::Device ( "cpu" ) );
     tpu::TPUCompareResult ( grad_weight_got, std::get<1> ( outputs_exp ) );
   }
   if ( output_mask[2] == true )
   {
-    std::cout << "Compare grad_bias\n";
+    std::cout << "Compare grad_bias" << std::endl;
     auto grad_bias_got = grad_bias.to ( torch::Device ( "cpu" ) );
     tpu::TPUCompareResult ( grad_bias_got, std::get<2> ( outputs_exp ) );
   }
