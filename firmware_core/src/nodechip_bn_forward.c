@@ -582,7 +582,7 @@ void nodechip_batchnorm_forward_training(
             for(int cidx=0; cidx < cslice; cidx++)
             {
                 batchnorm_forward_split_c(
-                    output_global_addr + cidx * csecs * shape.h * shape.w * tpu_data_type_size(dtype),
+                    output_global_addr + cidx * csecs * shape.n * shape.h * shape.w * tpu_data_type_size(dtype),
                     running_mean_global_addr + cidx * csecs * tpu_data_type_size(dtype),
                     running_var_global_addr + cidx * csecs * tpu_data_type_size(dtype),
                     weight_global_addr + cidx * csecs * tpu_data_type_size(dtype),
@@ -591,7 +591,7 @@ void nodechip_batchnorm_forward_training(
                     updated_var_global_addr + cidx * csecs * tpu_data_type_size(dtype),
                     batch_mean_global_addr + cidx * csecs * tpu_data_type_size(dtype),
                     batch_invstd_global_addr + cidx * csecs * tpu_data_type_size(dtype),
-                    input_global_addr + cidx * csecs * shape.h * shape.w * tpu_data_type_size(dtype),
+                    input_global_addr + cidx * csecs * shape.n * shape.h * shape.w * tpu_data_type_size(dtype),
                     new_shape,
                     shape.n*shape.h*shape.w,
                     cidx == cslice-1 ? shape.c - cidx * csecs : csecs,
@@ -622,7 +622,6 @@ void nodechip_batchnorm_forward_training(
     }
     else
     {
-        dim4 ori_shape = {1, shape.c, 1, shape.n*shape.h*shape.w};
         batchnorm_forward_split_c(
             output_global_addr,
             running_mean_global_addr,
@@ -634,7 +633,7 @@ void nodechip_batchnorm_forward_training(
             batch_mean_global_addr,
             batch_invstd_global_addr,
             input_global_addr,
-            ori_shape,
+            new_shape,
             shape.n*shape.h*shape.w,
             shape.c,
             momentum,

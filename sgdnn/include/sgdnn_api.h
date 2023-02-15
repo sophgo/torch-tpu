@@ -183,19 +183,19 @@ bm_status_t sgdnn_batchnorm_forward_cudnn(
     BatchNormMode                    mode,
     const void                      *alpha,
     const void                      *beta,
+    const TensorDescriptor_t         xDesc,
     const void                      *x,
+    const TensorDescriptor_t         yDesc,
+    void                            *y,
+    const TensorDescriptor_t         bnScaleBiasMeanVarDesc,
     const void                      *bnScale,
     const void                      *bnBias,
+    double                           exponentialAverageFactor,
     void                            *resultRunningMean,
     void                            *resultRunningVariance,
+    double                           epsilon,
     void                            *resultSaveMean,
-    void                            *resultSaveInvVariance,
-    void                            *y,
-    const TensorDescriptor_t         xDesc,
-    const TensorDescriptor_t         yDesc,
-    const TensorDescriptor_t         bnScaleBiasMeanVarDesc,
-    double                           exponentialAverageFactor,
-    double                           epsilon);
+    void                            *resultSaveInvVariance);
 
 bm_status_t sgdnn_batchnorm_backward(
     bm_handle_t        handle,
