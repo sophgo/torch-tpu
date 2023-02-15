@@ -1265,6 +1265,8 @@ PYBIND11_MODULE(sgdnn_pybind, m)
                                     py::array_t<float> running_var,
                                     py::array_t<float> weight,
                                     py::array_t<float> bias,
+                                    py::array_t<float> updated_mean,
+                                    py::array_t<float> updated_var,
                                     py::array_t<float> batch_mean,
                                     py::array_t<float> batch_invstd,
                                     py::array_t<float> output,
@@ -1281,6 +1283,10 @@ PYBIND11_MODULE(sgdnn_pybind, m)
             float *weight_fp = (float *)weight_buf.ptr;
             py::buffer_info bias_buf = bias.request();
             float *bias_fp = (float *)bias_buf.ptr;
+            py::buffer_info updated_mean_buf = updated_mean.request();
+            float *updated_mean_fp = (float *)updated_mean_buf.ptr;
+            py::buffer_info updated_var_buf = updated_var.request();
+            float *updated_var_fp = (float *)updated_var_buf.ptr;
             py::buffer_info batch_mean_buf = batch_mean.request();
             float *batch_mean_fp = (float *)batch_mean_buf.ptr;
             py::buffer_info batch_invstd_buf = batch_invstd.request();
@@ -1297,6 +1303,8 @@ PYBIND11_MODULE(sgdnn_pybind, m)
                                 bm_mem_from_system(running_var_fp),
                                 bm_mem_from_system(weight_fp),
                                 bm_mem_from_system(bias_fp),
+                                bm_mem_from_system(updated_mean_fp),
+                                bm_mem_from_system(updated_var_fp),
                                 bm_mem_from_system(batch_mean_fp),
                                 bm_mem_from_system(batch_invstd_fp),
                                 bm_mem_from_system(output_fp),

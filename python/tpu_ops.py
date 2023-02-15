@@ -153,6 +153,8 @@ class BatchNorm2dFunc(Function):
                                         running_var_np,
                                         weight_np,
                                         bias_np,
+                                        running_mean_np,
+                                        running_var_np,
                                         batch_mean_np,
                                         batch_invstd_np,
                                         output_np,
