@@ -432,23 +432,23 @@ bm_status_t sgdnn_batchnorm_forward(
 
 
 bm_status_t sgdnn_batchnorm_forward_cudnn(
-    bm_handle_t                      handle,
-    BatchNormMode                    mode,
-    const void                      *alpha,
-    const void                      *beta,
-    const void                      *x,
-    const void                      *bnScale,
-    const void                      *bnBias,
-    void                            *resultRunningMean,
-    void                            *resultRunningVariance,
-    void                            *resultSaveMean,
-    void                            *resultSaveInvVariance,
-    void                            *y,
-    const TensorDescriptor_t         xDesc,
-    const TensorDescriptor_t         yDesc,
-    const TensorDescriptor_t         bnScaleBiasMeanVarDesc,
-    double                           exponentialAverageFactor,
-    double                           epsilon)
+      bm_handle_t                      handle,
+      BatchNormMode                    mode,
+      const void                      *alpha,
+      const void                      *beta,
+      const TensorDescriptor_t         xDesc,
+      const void                      *x,
+      const TensorDescriptor_t         yDesc,
+      void                            *y,
+      const TensorDescriptor_t         bnScaleBiasMeanVarDesc,
+      const void                      *bnScale,
+      const void                      *bnBias,
+      double                           exponentialAverageFactor,
+      void                            *resultRunningMean,
+      void                            *resultRunningVariance,
+      double                           epsilon,
+      void                            *resultSaveMean,
+      void                            *resultSaveInvVariance)
 {
     unsigned long long input        = (unsigned long long)x;
     unsigned long long weight       = (unsigned long long)bnScale;
