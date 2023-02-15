@@ -7,7 +7,7 @@
 #include <TPUTorchUtils.h>
 #include <sgdnn_api.h>
 
-#define TPU_LIBTORCH_OP_COMPARE TRUE
+//#define TPU_LIBTORCH_OP_COMPARE TRUE
 
 namespace at
 {
@@ -101,7 +101,8 @@ int64_t                       groups )
                         padding,
                         stride,
                         dilation );
-    output = torch::empty ( output_shape, tpu::TPUGetCurrentDevice() );
+    auto output_options = torch::TensorOptions ( tpu::TPUGetCurrentDevice() ).dtype ( input.dtype() );
+    output = torch::empty ( output_shape, output_options );
     auto output_desc = tpu::TPUGenerateTensorDesc ( output );
     FilterDescriptor_t weight_desc =
     {
@@ -187,15 +188,18 @@ std::array<bool, 3> output_mask )
   Tensor grad_input, grad_weight, grad_bias;
   if ( output_mask[0] == true )
   {
-    grad_input = empty ( input.sizes(), tpu::TPUGetCurrentDevice() );
+    auto grad_input_options = torch::TensorOptions ( tpu::TPUGetCurrentDevice() ).dtype ( grad_input.dtype() );
+    grad_input = empty ( input.sizes(), grad_input_options );
   }
   if ( output_mask[1] == true )
   {
-    grad_weight = empty ( weight.sizes(), tpu::TPUGetCurrentDevice() );
+    auto grad_weight_options = torch::TensorOptions ( tpu::TPUGetCurrentDevice() ).dtype ( grad_weight.dtype() );
+    grad_weight = empty ( weight.sizes(), grad_weight_options );
   }
   if ( output_mask[2] == true )
   {
-    grad_bias = empty ( { weight.size ( 0 ) }, tpu::TPUGetCurrentDevice() );
+    auto grad_bias_options = torch::TensorOptions ( tpu::TPUGetCurrentDevice() ).dtype ( grad_bias.dtype() );
+    grad_bias = empty ( { weight.size ( 0 ) }, grad_bias_options );
   }
 #ifdef TPU_LIBTORCH_OP_COMPARE
   auto input_cpu = input.to ( torch::Device ( "cpu" ) );
@@ -316,7 +320,6 @@ std::array<bool, 3> output_mask )
 }
 TORCH_LIBRARY_IMPL ( aten, PrivateUse1, m )
 {
-  m.impl ( "convolution_backward_overrideable",
-           convolution_backward_overrideable_tpu );
+  m.impl ( "convolution_backward_overrideable", convolution_backward_overrideable_tpu );
 }
 } // namespace at
