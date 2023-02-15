@@ -355,7 +355,6 @@ bm_status_t sgdnn_conv_backward_cudnn(
     return BM_SUCCESS;
 }
 
-
 bm_status_t sgdnn_batchnorm_forward(
     bm_handle_t        handle,
     bm_device_mem_t    input,
@@ -363,6 +362,8 @@ bm_status_t sgdnn_batchnorm_forward(
     bm_device_mem_t    running_var,
     bm_device_mem_t    weight,
     bm_device_mem_t    bias,
+    bm_device_mem_t    updated_mean,
+    bm_device_mem_t    updated_var,
     bm_device_mem_t    batch_mean,
     bm_device_mem_t    batch_invstd,
     bm_device_mem_t    output,
@@ -385,7 +386,7 @@ bm_status_t sgdnn_batchnorm_forward(
         return size;};
 
     bm_device_mem_t input_mem, running_mean_mem, running_var_mem, weight_mem, bias_mem;
-    bm_device_mem_t batch_mean_mem, batch_invstd_mem, output_mem;
+    bm_device_mem_t updated_mean_mem, updated_var_mem, batch_mean_mem, batch_invstd_mem, output_mem;
     u64 param_size = (u64)n * c * h * w * dtype_size(dtype);
     u64 c_param_size = (u64)c * dtype_size(dtype);
 
@@ -394,6 +395,8 @@ bm_status_t sgdnn_batchnorm_forward(
     DEVICE_MEM_NEW_INPUT(handle, running_var, c_param_size, running_var_mem);
     DEVICE_MEM_NEW_INPUT(handle, weight, c_param_size, weight_mem);
     DEVICE_MEM_NEW_INPUT(handle, bias, c_param_size, bias_mem);
+    DEVICE_MEM_NEW_OUTPUT(handle, updated_mean, c_param_size, updated_mean_mem);
+    DEVICE_MEM_NEW_OUTPUT(handle, updated_var, c_param_size, updated_var_mem);
     DEVICE_MEM_NEW_OUTPUT(handle, batch_mean, c_param_size, batch_mean_mem);
     DEVICE_MEM_NEW_OUTPUT(handle, batch_invstd, c_param_size, batch_invstd_mem);
     DEVICE_MEM_NEW_OUTPUT(handle, output, param_size, output_mem);
@@ -404,6 +407,8 @@ bm_status_t sgdnn_batchnorm_forward(
         bm_mem_get_device_addr(running_var_mem),
         bm_mem_get_device_addr(weight_mem),
         bm_mem_get_device_addr(bias_mem),
+        bm_mem_get_device_addr(updated_mean_mem),
+        bm_mem_get_device_addr(updated_var_mem),
         bm_mem_get_device_addr(batch_mean_mem),
         bm_mem_get_device_addr(batch_invstd_mem),
         bm_mem_get_device_addr(output_mem),
@@ -411,6 +416,7 @@ bm_status_t sgdnn_batchnorm_forward(
         momentum,
         eps,
         dtype};
+
     tpu_kernel_launch_sync(handle, "tpu_kernel_api_batchnorm_forward", &api, sizeof(api));
 
     DEVICE_MEM_DEL_INPUT(handle, input, input_mem);
@@ -418,9 +424,79 @@ bm_status_t sgdnn_batchnorm_forward(
     DEVICE_MEM_DEL_INPUT(handle, running_var, running_var_mem);
     DEVICE_MEM_DEL_INPUT(handle, weight, weight_mem);
     DEVICE_MEM_DEL_INPUT(handle, bias, bias_mem);
+    DEVICE_MEM_DEL_OUTPUT(handle, updated_mean, updated_mean_mem);
+    DEVICE_MEM_DEL_OUTPUT(handle, updated_var, updated_var_mem);
     DEVICE_MEM_DEL_OUTPUT(handle, batch_mean, batch_mean_mem);
     DEVICE_MEM_DEL_OUTPUT(handle, batch_invstd, batch_invstd_mem);
-    DEVICE_MEM_DEL_OUTPUT(handle, output, output_mem);
+    DEVICE_MEM_DEL_OUTPUT(handle, output, output_mem); 
+    return BM_SUCCESS;
+}
+
+
+bm_status_t sgdnn_batchnorm_forward_cudnn(
+    bm_handle_t                      handle,
+    BatchNormMode                    mode,
+    const void                      *alpha,
+    const void                      *beta,
+    const void                      *x,
+    const void                      *bnScale,
+    const void                      *bnBias,
+    void                            *resultRunningMean,
+    void                            *resultRunningVariance,
+    void                            *resultSaveMean,
+    void                            *resultSaveInvVariance,
+    void                            *y,
+    const TensorDescriptor_t         xDesc,
+    const TensorDescriptor_t         yDesc,
+    const TensorDescriptor_t         bnScaleBiasMeanVarDesc,
+    double                           exponentialAverageFactor,
+    double                           epsilon)
+{
+    unsigned long long input        = (unsigned long long)x;
+    unsigned long long weight       = (unsigned long long)bnScale;
+    unsigned long long bias         = (unsigned long long)bnBias;
+    unsigned long long running_mean = (unsigned long long)resultRunningMean;
+    unsigned long long running_var  = (unsigned long long)resultRunningVariance;
+    unsigned long long batch_mean   = (unsigned long long)resultSaveMean;
+    unsigned long long batch_invstd = (unsigned long long)resultSaveInvVariance;
+    unsigned long long output       = (unsigned long long)y;
+
+    float alpha_ = ((float*)alpha)[0];
+    assert(alpha_ == 1.0f);
+    float beta_ = ((float*)beta)[0];
+    assert(beta_ == 0.0f || beta_ == 1.0f);
+
+    assert(xDesc.ndims == 4 && yDesc.ndims == 4);
+    int n = xDesc.shape[0];
+    int c = xDesc.shape[1];
+    int h = xDesc.shape[2];
+    int w = xDesc.shape[3];
+    
+    float momentum = exponentialAverageFactor;
+    float eps = epsilon;
+    
+    sg_data_type_t idtype = (sg_data_type_t)(xDesc.dtype);
+    sg_data_type_t odtype = (sg_data_type_t)(yDesc.dtype);
+    sg_data_type_t wdtype = (sg_data_type_t)(bnScaleBiasMeanVarDesc.dtype);
+    assert(idtype == wdtype && wdtype == odtype);
+
+    sg_api_batchnorm_forward_t api = {
+        input,
+        running_mean,
+        running_var,
+        weight,
+        bias,
+        running_mean,
+        running_var,
+        batch_mean,
+        batch_invstd,
+        output,
+        {n, c, h, w},
+        momentum,
+        eps,
+        idtype};
+
+    tpu_kernel_launch_sync(handle, "tpu_kernel_api_batchnorm_forward", &api, sizeof(api));
     return BM_SUCCESS;
 }
 
