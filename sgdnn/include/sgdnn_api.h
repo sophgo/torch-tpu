@@ -9,6 +9,31 @@
 extern "C" {
 #endif
 
+typedef enum {
+    Pooling_MAX = 0,
+    Pooling_AVERAGE = 1,
+} PoolingMode_t;
+
+typedef enum {
+  BatchNorm_Spatial = 0,
+  BatchNorm_Spatial_Persistent = 1,
+  BatchNorm_Per_Activation = 2,
+} BatchNormMode;
+
+typedef enum {
+  Activation_Sigmoid = 0,
+  Activation_Relu = 1,
+  Activation_Tanh = 2,
+  Activation_Clipped_Relu = 3,
+  Activation_Elu = 4,
+  Activation_Swish = 5,
+} ActivationMode_t;
+
+typedef enum {
+    Not_Propagate_Nan = 0,
+    Propagate_Nan = 1,
+} NanPropagation_t;
+
 typedef struct{
     int         dtype;
     int         ndims;
@@ -40,16 +65,11 @@ typedef struct{
     sg_data_type_t  computeType;
 } ConvolutionDescriptor_t;
 
-typedef enum {
-    Pooling_MAX = 0,
-    Pooling_AVERAGE = 1,
-} PoolingMode_t;
-
-typedef enum {
-  BatchNorm_Spatial = 0,
-  BatchNorm_Spatial_Persistent = 1,
-  BatchNorm_Per_Activation = 2,
-} BatchNormMode;
+typedef struct{
+    ActivationMode_t    mode;
+    NanPropagation_t    reluNanOpt;
+    double              coef;//upper_limit when clipped
+} ActivationDescriptor_t;
 
 typedef struct{
     int             kh;
@@ -369,6 +389,20 @@ bm_status_t sgdnn_relu_backward(
     int                w,
     bool               input_need_grad,
     sg_data_type_t     dtype);
+
+bm_status_t sgdnn_activation_backward_cudnn(
+    bm_handle_t                      handle,
+    ActivationDescriptor_t           activationDesc,
+    const void                      *alpha,
+    const TensorDescriptor_t         yDesc,
+    const void                      *y,
+    const TensorDescriptor_t         dyDesc,
+    const void                      *dy,
+    const TensorDescriptor_t         xDesc,
+    const void                      *x,
+    const void                      *beta,
+    const TensorDescriptor_t         dxDesc,
+    void                            *dx);
 
 bm_status_t sgdnn_cross_entropy_backward(
     bm_handle_t        handle,

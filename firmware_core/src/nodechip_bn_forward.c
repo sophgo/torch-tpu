@@ -128,7 +128,6 @@ void batchnorm_forward_split_c(
         batch_mean_local_addr,
         &cshape,
         dtype);
-    tpu_poll();
     tpu_bdc_fp_sub_bias_sqr(
         output_local_addr,
         input_local_addr,
@@ -268,6 +267,18 @@ void batchnorm_forward_split_hw(
 {
     int c = ori_shape.c;
     int nhw = ori_shape.w;
+    int c_param_size = ALIGN(DIV_UP(c, NPU_NUM) * tpu_data_type_size(dtype), 4);
+    int pooling_size = DIV_UP(c, NPU_NUM) * 64;
+
+    local_addr_t batch_mean_local_addr = 0;
+    local_addr_t batch_var_local_addr = batch_mean_local_addr + c_param_size;
+    local_addr_t running_mean_local_addr = batch_var_local_addr + c_param_size;
+    local_addr_t running_var_local_addr = running_mean_local_addr + c_param_size;
+    local_addr_t bias_local_addr = running_mean_local_addr;
+    local_addr_t weight_local_addr = running_var_local_addr;
+    local_addr_t pooling_buffer = ALIGN(c_param_size * 4, 64);
+    local_addr_t input_local_addr = ALIGN(pooling_buffer + pooling_size, BANK_SIZE);
+
     int nhw_secs = ALIGN(nhw, tpu_eu_num(dtype))-tpu_eu_num(dtype);
     while(!is_local_mem_enough(1, c, nhw_secs, 0, dtype))
     {
@@ -291,18 +302,6 @@ void batchnorm_forward_split_hw(
         dim2 pooling_stride = {1, 1};
         dim2 pooling_dilation = {1, 1};
         padding_t pooling_padding = {0, 0, 0, 0};
-
-        int c_param_size = ALIGN(DIV_UP(c, NPU_NUM) * tpu_data_type_size(dtype), 4);
-        int pooling_size = DIV_UP(c, NPU_NUM) * 64;
-
-        local_addr_t batch_mean_local_addr = 0;
-        local_addr_t batch_var_local_addr = batch_mean_local_addr + c_param_size;
-        local_addr_t running_mean_local_addr = batch_var_local_addr + c_param_size;
-        local_addr_t running_var_local_addr = running_mean_local_addr + c_param_size;
-        local_addr_t bias_local_addr = running_mean_local_addr;
-        local_addr_t weight_local_addr = running_var_local_addr;
-        local_addr_t pooling_buffer = ALIGN(c_param_size * 4, 64);
-        local_addr_t input_local_addr = ALIGN(pooling_buffer + pooling_size, BANK_SIZE);
 
         if(!nhwidx)
         {
@@ -371,7 +370,7 @@ void batchnorm_forward_split_hw(
         {
             tpu_gdma_cpy_S2L(
                 input_local_addr,
-                input_global_addr + (nhwidx-nhwslice) * nhw_secs * tpu_data_type_size(dtype),
+                input_global_addr + (nhwidx - nhwslice) * nhw_secs * tpu_data_type_size(dtype),
                 &shape,
                 &aligned_stride,
                 &global_stride,
@@ -402,9 +401,9 @@ void batchnorm_forward_split_hw(
                 &compact_stride,
                 NULL,
                 dtype);
-            if(nhwidx==nhwslice*2-1)
+            if(nhwidx == nhwslice * 2 - 1)
             {
-                scale.f32 = 1.f-momentum;
+                scale.f32 = 1-momentum;
                 tpu_bdc_fp_mul_C(
                     running_mean_local_addr,
                     running_mean_local_addr,
@@ -499,6 +498,13 @@ void batchnorm_forward_split_hw(
                     bias_global_addr,
                     &cshape,
                     dtype);
+                tpu_bdc_neg(
+                    batch_mean_local_addr,
+                    batch_mean_local_addr,
+                    &cshape,
+                    &compact_stride,
+                    &compact_stride,
+                    dtype);
             }
             tpu_gdma_cpy_S2L(
                 input_local_addr,
@@ -506,13 +512,6 @@ void batchnorm_forward_split_hw(
                 &shape,
                 &aligned_stride,
                 &global_stride,
-                dtype);
-            tpu_bdc_neg(
-                batch_mean_local_addr,
-                batch_mean_local_addr,
-                &cshape,
-                &compact_stride,
-                &compact_stride,
                 dtype);
             tpu_bdc_fp_bias(
                 input_local_addr,
@@ -534,7 +533,7 @@ void batchnorm_forward_split_hw(
                 &shape,
                 dtype);
             tpu_gdma_cpy_L2S(
-                output_global_addr + (nhwidx-2*nhwslice) * nhw_secs * tpu_data_type_size(dtype),
+                output_global_addr + (nhwidx - 2 * nhwslice) * nhw_secs * tpu_data_type_size(dtype),
                 input_local_addr,
                 &shape,
                 &global_stride,

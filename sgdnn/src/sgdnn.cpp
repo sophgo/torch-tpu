@@ -1272,6 +1272,62 @@ bm_status_t sgdnn_relu_backward(
     return BM_SUCCESS;
 }
 
+bm_status_t sgdnn_activation_backward_cudnn(
+    bm_handle_t                      handle,
+    ActivationDescriptor_t           activationDesc,
+    const void                      *alpha,
+    const TensorDescriptor_t         yDesc,
+    const void                      *y,
+    const TensorDescriptor_t         dyDesc,
+    const void                      *dy,
+    const TensorDescriptor_t         xDesc,
+    const void                      *x,
+    const void                      *beta,
+    const TensorDescriptor_t         dxDesc,
+    void                            *dx)
+{
+    assert(activationDesc.mode == Activation_Relu);
+
+    if(activationDesc.mode == Activation_Relu)
+    {
+        unsigned long long input         = (unsigned long long)x;
+        unsigned long long grad_output   = (unsigned long long)dy;
+        unsigned long long grad_input    = (unsigned long long)dx;
+
+        float alpha_ = ((float*)alpha)[0];
+        assert(alpha_ == 1.0f);
+        float beta_ = ((float*)beta)[0];
+        assert(beta_ == 0.0f || beta_ == 1.0f);
+
+        assert(dyDesc.ndims == 4);
+        assert( xDesc.ndims == 4);
+        assert(dxDesc.ndims == 4);
+
+        int n = xDesc.shape[0];
+        int c = xDesc.shape[1];
+        int h = xDesc.shape[2];
+        int w = xDesc.shape[3];
+
+        sg_data_type_t dydtype = (sg_data_type_t)(dyDesc.dtype);
+        sg_data_type_t xdtype = (sg_data_type_t)(xDesc.dtype);
+        sg_data_type_t dxdtype = (sg_data_type_t)(dxDesc.dtype);
+        assert(dydtype == 1);
+        assert(xdtype == 1);
+        assert(dxdtype == 1);
+
+        sg_api_relu_backward_t api = {
+            input,
+            grad_output,
+            grad_input,
+            {n, c, h, w},
+            xdtype};
+
+        tpu_kernel_launch_sync(handle, "tpu_kernel_api_relu_backward", &api, sizeof(api));
+        return BM_SUCCESS;
+    }
+    return BM_SUCCESS;
+}
+
 bm_status_t sgdnn_cross_entropy_backward(
     bm_handle_t        handle,
     bm_device_mem_t    input,
