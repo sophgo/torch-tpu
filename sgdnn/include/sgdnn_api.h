@@ -216,6 +216,30 @@ bm_status_t sgdnn_batchnorm_backward(
     bool               bias_need_grad,
     sg_data_type_t     dtype);
 
+bm_status_t sgdnn_batchnorm_backward_cudnn(
+    bm_handle_t                      handle,
+    BatchNormMode                    mode,
+    const void                      *alphaDataDiff,
+    const void                      *betaDataDiff,
+    const void                      *alphaParamDiff,
+    const void                      *betaParamDiff,
+    const TensorDescriptor_t         xDesc,
+    const void                      *x,
+    const TensorDescriptor_t         dyDesc,
+    const void                      *dy,
+    const TensorDescriptor_t         dxDesc,
+    void                            *dx,
+    const TensorDescriptor_t         bnScaleBiasDiffDesc,
+    const void                      *bnScale,
+    void                            *resultBnScaleDiff,
+    void                            *resultBnBiasDiff,
+    double                           epsilon,
+    const void                      *savedMean,
+    const void                      *savedInvVariance,
+    bool                             dx_enable,
+    bool                             dw_enable,
+    bool                             db_enable);
+
 bm_status_t sgdnn_pooling_forward(
     bm_handle_t         handle,
     bm_device_mem_t     input,

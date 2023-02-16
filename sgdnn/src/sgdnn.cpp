@@ -442,25 +442,24 @@ bm_status_t sgdnn_batchnorm_forward(
     return BM_SUCCESS;
 }
 
-
 bm_status_t sgdnn_batchnorm_forward_cudnn(
-      bm_handle_t                      handle,
-      BatchNormMode                    mode,
-      const void                      *alpha,
-      const void                      *beta,
-      const TensorDescriptor_t         xDesc,
-      const void                      *x,
-      const TensorDescriptor_t         yDesc,
-      void                            *y,
-      const TensorDescriptor_t         bnScaleBiasMeanVarDesc,
-      const void                      *bnScale,
-      const void                      *bnBias,
-      double                           exponentialAverageFactor,
-      void                            *resultRunningMean,
-      void                            *resultRunningVariance,
-      double                           epsilon,
-      void                            *resultSaveMean,
-      void                            *resultSaveInvVariance)
+    bm_handle_t                      handle,
+    BatchNormMode                    mode,
+    const void                      *alpha,
+    const void                      *beta,
+    const TensorDescriptor_t         xDesc,
+    const void                      *x,
+    const TensorDescriptor_t         yDesc,
+    void                            *y,
+    const TensorDescriptor_t         bnScaleBiasMeanVarDesc,
+    const void                      *bnScale,
+    const void                      *bnBias,
+    double                           exponentialAverageFactor,
+    void                            *resultRunningMean,
+    void                            *resultRunningVariance,
+    double                           epsilon,
+    void                            *resultSaveMean,
+    void                            *resultSaveInvVariance)
 {
     unsigned long long input        = (unsigned long long)x;
     unsigned long long weight       = (unsigned long long)bnScale;
@@ -471,12 +470,14 @@ bm_status_t sgdnn_batchnorm_forward_cudnn(
     unsigned long long batch_invstd = (unsigned long long)resultSaveInvVariance;
     unsigned long long output       = (unsigned long long)y;
 
+    assert(mode == BatchNorm_Spatial);
     float alpha_ = ((float*)alpha)[0];
     assert(alpha_ == 1.0f);
     float beta_ = ((float*)beta)[0];
     assert(beta_ == 0.0f || beta_ == 1.0f);
 
     assert(xDesc.ndims == 4 && yDesc.ndims == 4);
+    assert(bnScaleBiasMeanVarDesc.ndims ==1 );
     int n = xDesc.shape[0];
     int c = xDesc.shape[1];
     int h = xDesc.shape[2];
@@ -577,6 +578,89 @@ bm_status_t sgdnn_batchnorm_backward(
     DEVICE_MEM_DEL_OUTPUT(handle, grad_weight, grad_weight_mem);
     DEVICE_MEM_DEL_OUTPUT(handle, grad_bias, grad_bias_mem);
 
+    return BM_SUCCESS;
+}
+
+bm_status_t sgdnn_batchnorm_backward_cudnn(
+    bm_handle_t                      handle,
+    BatchNormMode                    mode,
+    const void                      *alphaDataDiff,
+    const void                      *betaDataDiff,
+    const void                      *alphaParamDiff,
+    const void                      *betaParamDiff,
+    const TensorDescriptor_t         xDesc,
+    const void                      *x,
+    const TensorDescriptor_t         dyDesc,
+    const void                      *dy,
+    const TensorDescriptor_t         dxDesc,
+    void                            *dx,
+    const TensorDescriptor_t         bnScaleBiasDiffDesc,
+    const void                      *bnScale,
+    void                            *resultBnScaleDiff,
+    void                            *resultBnBiasDiff,
+    double                           epsilon,
+    const void                      *savedMean,
+    const void                      *savedInvVariance,
+    bool                             dx_enable,
+    bool                             dw_enable,
+    bool                             db_enable)
+{
+    unsigned long long grad_output   = (unsigned long long)dy;
+    unsigned long long input         = (unsigned long long)x;
+    unsigned long long weight        = (unsigned long long)bnScale;
+    unsigned long long saved_mean    = (unsigned long long)savedMean;
+    unsigned long long saved_invstd  = (unsigned long long)savedInvVariance;
+    unsigned long long grad_input    = (unsigned long long)dx;
+    unsigned long long grad_weight   = (unsigned long long)resultBnScaleDiff;
+    unsigned long long grad_bias     = (unsigned long long)resultBnBiasDiff;
+
+    assert(mode == BatchNorm_Spatial);
+    
+    float alpha_data = ((float*)alphaDataDiff)[0];
+    assert(alpha_data == 1.0f);
+    float alpha_param = ((float*)alphaParamDiff)[0];
+    assert(alpha_param == 1.0f);
+    float beta_data = ((float*)betaDataDiff)[0];
+    assert(beta_data == 0.0f);
+    float beta_param = ((float*)betaParamDiff)[0];
+    assert(beta_param == 0.0f);
+    
+    assert(dyDesc.ndims == 4);
+    assert( xDesc.ndims == 4);
+    assert(dxDesc.ndims == 4);
+
+    int n = xDesc.shape[0];
+    int c = xDesc.shape[1];
+    int h = xDesc.shape[2];
+    int w = xDesc.shape[3];
+
+    assert(bnScaleBiasDiffDesc.ndims == 1);
+    
+    sg_data_type_t dydtype = (sg_data_type_t)(dyDesc.dtype);
+    sg_data_type_t xdtype = (sg_data_type_t)(xDesc.dtype);
+    sg_data_type_t dxdtype = (sg_data_type_t)(dxDesc.dtype);
+    sg_data_type_t wdtype = (sg_data_type_t)(bnScaleBiasDiffDesc.dtype);
+    
+    assert(dydtype == 0);
+    assert(xdtype == 0);
+    assert(dxdtype == 0);
+    assert(wdtype == 0);
+
+    sg_api_batchnorm_backward_t api = {
+        grad_output,
+        input,
+        weight,
+        saved_mean,
+        saved_invstd,
+        grad_input,
+        grad_weight,
+        grad_bias,
+        {n, c, h, w},
+        dx_enable,
+        dw_enable,
+        db_enable};
+
+    tpu_kernel_launch_sync(handle, "tpu_kernel_api_batchnorm_backward", &api, sizeof(api));
     return BM_SUCCESS;
 }
 
