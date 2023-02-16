@@ -6,8 +6,6 @@
 #include <TPUTorchUtils.h>
 #include <sgdnn_api.h>
 
-#define TPU_LIBTORCH_OP_COMPARE TRUE
-
 namespace at
 {
 
@@ -148,6 +146,18 @@ double                        eps )
   std::cout << "Compare save_invstd" << std::endl;
   auto save_invstd_got = save_invstd.to ( torch::Device ( "cpu" ) );
   tpu::TPUCompareResult ( save_invstd_got, std::get<2> ( outputs_exp ) );
+  if ( running_mean.defined() )
+  {
+    auto running_mean_got = running_mean.to ( torch::Device ( "cpu" ) );
+    std::cout << "Compare running_mean" << std::endl;
+    tpu::TPUCompareResult ( running_mean_got, running_mean_cpu );
+  }
+  if ( running_var.defined() )
+  {
+    auto running_var_got = running_var.to ( torch::Device ( "cpu" ) );
+    std::cout << "Compare running_mean" << std::endl;
+    tpu::TPUCompareResult ( running_var_got, running_var_cpu );
+  }
 #endif
   return std::tuple<Tensor, Tensor, Tensor> ( output, save_mean, save_invstd );
 }
