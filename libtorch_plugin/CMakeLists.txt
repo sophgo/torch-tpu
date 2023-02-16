@@ -39,8 +39,15 @@ target_link_libraries(libtorch_plugin sgdnn)
 #endif()
 
 add_executable(test test.cpp)
+
 target_link_libraries(test libtorch_plugin)
+
+# Test
 add_executable(test_conv2d test/conv2d.cpp)
 target_link_libraries(test_conv2d libtorch_plugin)
 add_executable(test_conv2d_backward test/conv2d_backward.cpp)
 target_link_libraries(test_conv2d_backward libtorch_plugin)
+
+# Benchmar
+add_executable(benchmark_conv2d benchmark/conv2d.cpp)
+target_link_libraries(benchmark_conv2d libtorch_plugin)
