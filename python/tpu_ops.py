@@ -112,8 +112,9 @@ class Conv2dFunc(Function):
                                      0, 1, 1, grad_bias_enable);
 
         grad_input = torch.from_numpy(grad_input_np).reshape(input.shape)
-        grad_weight = torch.from_numpy(grad_weight_np).reshape(weight.shape[1], weight.shape[0], weight.shape[2], weight.shape[3])
-        grad_weight = torch.transpose(grad_weight, 0, 1)
+        grad_weight = torch.from_numpy(grad_weight_np).reshape(weight.shape)
+        #grad_weight = torch.from_numpy(grad_weight_np).reshape(weight.shape[1], weight.shape[0], weight.shape[2], weight.shape[3])
+        #grad_weight = torch.transpose(grad_weight, 0, 1)
         if bias is not None:
             grad_bias = torch.from_numpy(grad_bias_np)
 

@@ -923,20 +923,34 @@ void nodechip_conv_backward_input(
             ocend = ocstart + ocslice;
 
             // move weight to local memory
-            dim4 wshape = {
-                1,
-                ocslice,
-                (idtype == DT_FP32 ? ic : DIV_UP(ic, 32)) * kernel->h * kernel->w,
-                idtype == DT_FP32 ? 1 : 32};
-            dim4 wstride;
-            tpu_compact_stride(&wstride, 0, &wshape);
-            tpu_gdma_cpy_S2L(
-                    waddr,
-                    weight_global_addr + (gidx * oc + ocstart) * wstride.c * tpu_data_type_size(idtype),
-                    &wshape,
-                    &wstride,
-                    NULL,
-                    idtype);
+            if (tpu_data_type_size(idtype) == 2) {
+                dim4 wshape = {
+                    1,
+                    ocslice,
+                    (idtype == DT_FP32 ? ic : DIV_UP(ic, 32)) * kernel->h * kernel->w,
+                    idtype == DT_FP32 ? 1 : 32};
+                dim4 wstride;
+                tpu_compact_stride(&wstride, 0, &wshape);
+                tpu_gdma_cpy_S2L(
+                        waddr,
+                        weight_global_addr + (gidx * oc + ocstart) * wstride.c * tpu_data_type_size(idtype),
+                        &wshape,
+                        &wstride,
+                        NULL,
+                        idtype);
+            } else if (tpu_data_type_size(idtype) == 4) {
+                dim4 wshape = {1, ocslice, ic, kh * kw};
+                dim4 wshape_local;
+                tpu_compact_stride(&wshape_local, 0, &wshape);
+                dim4 wshape_global = {.n = oc * ic * kh * kw, .c = kh * kw, .h = oc * kh * kw, .w = 1};
+                tpu_gdma_cpy_S2L(
+                        waddr,
+                        weight_global_addr + (gidx * oc + ocstart) * kh * kw * tpu_data_type_size(idtype),
+                        &wshape,
+                        &wshape_local,
+                        &wshape_global,
+                        idtype);
+            }
 
             bool parallel_branch = false;
             int nstart = 0;
@@ -1367,11 +1381,18 @@ void nodechip_conv_backward_weight(
         iw,
         1};
 
-    dim4 ostride = {
-        oshape.c * oshape.h * oshape.w,
+    //dim4 ostride = {
+    //    oshape.c * oshape.h * oshape.w,
+    //    oshape.h * oshape.w,
+    //    oshape.w,
+    //    1};
+
+    dim4 ostride_nc_trans = {
+        oshape.n * oshape.h * oshape.w,
         oshape.h * oshape.w,
         oshape.w,
         1};
+
     dim4 wshape = {
         1,
         oc,
@@ -1452,32 +1473,48 @@ void nodechip_conv_backward_weight(
                             (idtype == DT_FP32 ? ic : DIV_UP(ic, 32)) * khslice * kwslice,
                             idtype == DT_FP32 ? 1 : 32};
 
-                        dim4 wslice_stride;
-                        tpu_compact_stride(&wslice_stride, 0, &wslice_shape);
                         if (load_weight) {
-                            if (idtype == DT_FP16 && ic > 32 && split_kernel) {
-                                for (int icidx = 0; icidx < DIV_UP(ic, 32); icidx++) {
-                                    dim4 per32ic_wslice_shape = {1, ocslice, khslice * kwslice, 32};
+                            if (tpu_data_type_size(idtype) == 2) {
+                                dim4 wslice_stride;
+                                tpu_compact_stride(&wslice_stride, 0, &wslice_shape);
+                                if (idtype == DT_FP16 && ic > 32 && split_kernel) {
+                                    for (int icidx = 0; icidx < DIV_UP(ic, 32); icidx++) {
+                                        dim4 per32ic_wslice_shape = {1, ocslice, khslice * kwslice, 32};
+                                        tpu_gdma_cpy_S2L(
+                                            ping_in ? waddr_ping + icidx * khslice * kwslice *32 * tpu_data_type_size(idtype)
+                                                    : waddr_pong + icidx * khslice * kwslice *32 * tpu_data_type_size(idtype),
+                                            weight_global_addr +
+                                                ((gidx * oc + ocstart) * wstride.c +
+                                                 (icidx * kh * kw + khstart * kw + kwstart) * 32) * tpu_data_type_size(idtype),
+                                            &per32ic_wslice_shape,
+                                            &wslice_stride,
+                                            &wstride,
+                                            idtype);
+                                    }
+                                } else {
                                     tpu_gdma_cpy_S2L(
-                                        ping_in ? waddr_ping + icidx * khslice * kwslice *32 * tpu_data_type_size(idtype)
-                                                : waddr_pong + icidx * khslice * kwslice *32 * tpu_data_type_size(idtype),
+                                        ping_in ? waddr_ping : waddr_pong,
                                         weight_global_addr +
                                             ((gidx * oc + ocstart) * wstride.c +
-                                             (icidx * kh * kw + khstart * kw + kwstart) * 32) * tpu_data_type_size(idtype),
-                                        &per32ic_wslice_shape,
+                                             (khstart * kw + kwstart) * (idtype == DT_FP32 ? 1 : 32)) * tpu_data_type_size(idtype),
+                                        &wslice_shape,
                                         &wslice_stride,
                                         &wstride,
                                         idtype);
                                 }
-                            } else {
+                            } else if (tpu_data_type_size(idtype) == 4) {
+                                dim4 wslice_shape_fp32 = {ic, ocslice, khslice, kwslice};
+                                dim4 wslice_stride_global = {.n = oc * kh * kw, .c = kh * kw, .h = kw, .w = 1};
+                                dim4 wslice_stride_local = {.n = khslice * kwslice, .c = khslice * kwslice, .h = kwslice, .w = 1};
                                 tpu_gdma_cpy_S2L(
                                     ping_in ? waddr_ping : waddr_pong,
                                     weight_global_addr +
-                                        ((gidx * oc + ocstart) * wstride.c +
-                                         (khstart * kw + kwstart) * (idtype == DT_FP32 ? 1 : 32)) * tpu_data_type_size(idtype),
-                                    &wslice_shape,
-                                    &wslice_stride,//NULL?
-                                    &wstride,
+                                        ((gidx * oc + ocstart) * wslice_stride_global.c +
+                                        khstart * wslice_stride_global.h +
+                                        kwstart) * tpu_data_type_size(idtype),
+                                    &wslice_shape_fp32,
+                                    &wslice_stride_local,
+                                    &wslice_stride_global,
                                     idtype);
                             }
                         }
@@ -1612,6 +1649,7 @@ void nodechip_conv_backward_weight(
                     }
                 }
                 if (nidx > 0 || ocidx > 0) {
+                    /*
                     dim4 last_oslice_shape = {last_nslice, last_ocslice, oh, ow};
                     tpu_gdma_cpy_L2S(
                         output_global_addr +
@@ -1620,6 +1658,17 @@ void nodechip_conv_backward_weight(
                         ping_out ? oaddr_pong : oaddr_ping,
                         &last_oslice_shape,
                         &ostride,
+                        NULL,
+                        odtype);
+                    */
+                    dim4 last_oslice_shape = {last_ocslice, last_nslice, oh, ow};
+                    tpu_gdma_cpy_nc_trans_L2S(
+                        output_global_addr +
+                            (last_nstart * ostride_nc_trans.c +
+                             (gidx * oc + last_ocstart) * ostride_nc_trans.n) * tpu_data_type_size(odtype),
+                        ping_out ? oaddr_pong : oaddr_ping,
+                        &last_oslice_shape,
+                        &ostride_nc_trans,//&ostride,
                         NULL,
                         odtype);
                     if (grad_bias_enable && nidx == 0 && ocidx > 0) {
@@ -1657,6 +1706,7 @@ void nodechip_conv_backward_weight(
         }
         tpu_parallel_end();
         // move last output to global memory
+        /*
         dim4 last_oslice_shape = {last_nslice, last_ocslice, oh, ow};
         tpu_gdma_cpy_L2S(
             output_global_addr +
@@ -1666,6 +1716,17 @@ void nodechip_conv_backward_weight(
             ping_out ? oaddr_pong : oaddr_ping,
             &last_oslice_shape,
             &ostride,
+            NULL,
+            odtype);
+        */
+        dim4 last_oslice_shape = {last_ocslice, last_nslice, oh, ow};
+        tpu_gdma_cpy_nc_trans_L2S(
+            output_global_addr +
+                (last_nstart * ostride_nc_trans.c +
+                 (gidx * oc + last_ocstart) * ostride_nc_trans.n) * tpu_data_type_size(odtype),
+            ping_out ? oaddr_pong : oaddr_ping,
+            &last_oslice_shape,
+            &ostride_nc_trans,
             NULL,
             odtype);
         if (grad_bias_enable) {
