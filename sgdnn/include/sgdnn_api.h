@@ -69,7 +69,7 @@ typedef struct{
 
 typedef struct{
     ActivationMode_t    mode;
-    NanPropagation_t    reluNanOpt;
+    NanPropagation_t    NanOpt;
     double              coef;//upper_limit when clipped
 } ActivationDescriptor_t;
 
@@ -364,7 +364,7 @@ bm_status_t sgdnn_eltwise_backward(
     bool               input_a_need_grad,
     bool               input_b_need_grad,
     sg_data_type_t     dtype);
-    
+
 bm_status_t sgdnn_eltwise_backward_cudnn(
     bm_handle_t                handle,
     const void*                alpha1,
@@ -398,6 +398,17 @@ bm_status_t sgdnn_linear_backward(
     bool               bias_need_grad,
     sg_data_type_t     dtype);
 
+bm_status_t sgdnn_relu_forward(
+    bm_handle_t        handle,
+    bm_device_mem_t    input,
+    bm_device_mem_t    output,
+    int                n,
+    int                c,
+    int                h,
+    int                w,
+    float              upper_limit,
+    sg_data_type_t     dtype);
+
 bm_status_t sgdnn_relu_backward(
     bm_handle_t        handle,
     bm_device_mem_t    input,
@@ -409,6 +420,16 @@ bm_status_t sgdnn_relu_backward(
     int                w,
     bool               input_need_grad,
     sg_data_type_t     dtype);
+
+bm_status_t sgdnn_activation_forward_cudnn(
+    bm_handle_t                     handle,
+    ActivationDescriptor_t          activationDesc,
+    const void                     *alpha,
+    const TensorDescriptor_t        xDesc,
+    const void                     *x,
+    const void                     *beta,
+    const TensorDescriptor_t        yDesc,
+    void                           *y);
 
 bm_status_t sgdnn_activation_backward_cudnn(
     bm_handle_t                      handle,

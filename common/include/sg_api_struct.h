@@ -92,31 +92,6 @@ typedef struct {
 typedef struct{
     unsigned long long inputA_global_addr;
     unsigned long long inputB_global_addr;
-    unsigned long long output_global_addr;
-    unsigned long long mask_global_addr;
-    int                input_num;
-    int                tensor_n;
-    int                tensor_c;
-    int                tensor_h;
-    int                tensor_w;
-    int                op_code;
-    int                coeff_A;
-    int                coeff_B;
-    int                need_mask;
-    int                mask_index_A;
-    int                mask_index_B;
-    int                if_relu;
-    sg_data_type_t     idtype;//dtype for inputA&&inputB
-    sg_data_type_t     odtype;//dtype for output
-#ifndef WIN32
-} __attribute__((packed)) sg_api_eltwise_forward_t;
-#else
-} sg_api_eltwise_forward_t;
-#endif
-
-typedef struct{
-    unsigned long long inputA_global_addr;
-    unsigned long long inputB_global_addr;
     unsigned long long grad_output_global_addr;
     unsigned long long grad_inputA_global_addr;
     unsigned long long grad_inputB_global_addr;
@@ -223,7 +198,7 @@ typedef struct{
 } sg_api_batchnorm_forward_t;
 #endif
 
-typedef struct sg_api_pooling_forward {
+typedef struct {
     unsigned long long input_global_addr;
     unsigned long long output_global_addr;
     unsigned long long max_mask_global_addr;
@@ -253,6 +228,57 @@ typedef struct sg_api_pooling_forward {
 } __attribute__((packed)) sg_api_pooling_forward_t;
 #else
 } sg_api_pooling_forward_t;
+#endif
+
+typedef struct{
+    unsigned long long inputA_global_addr;
+    unsigned long long inputB_global_addr;
+    unsigned long long output_global_addr;
+    unsigned long long mask_global_addr;
+    int                input_num;
+    int                tensor_n;
+    int                tensor_c;
+    int                tensor_h;
+    int                tensor_w;
+    int                op_code;
+    int                coeff_A;
+    int                coeff_B;
+    int                need_mask;
+    int                mask_index_A;
+    int                mask_index_B;
+    int                if_relu;
+    sg_data_type_t     idtype;//dtype for inputA&&inputB
+    sg_data_type_t     odtype;//dtype for output
+#ifndef WIN32
+} __attribute__((packed)) sg_api_eltwise_forward_t;
+#else
+} sg_api_eltwise_forward_t;
+#endif
+
+typedef struct {
+    unsigned long long input_global_addr;
+    unsigned long long output_global_addr;
+    int                shape[4];
+    float              upper_limit;
+    sg_data_type_t     dtype;
+#ifndef WIN32
+} __attribute__((packed)) sg_api_relu_forward_t;
+#else
+} sg_api_relu_forward_t;
+#endif
+
+typedef struct {
+    unsigned long long input_global_addr;
+    unsigned long long weight_global_addr;
+    unsigned long long bias_global_addr;
+    unsigned long long output_global_addr;
+    int                batch;
+    int                in_features;
+    int                out_features;
+#ifndef WIN32
+} __attribute__((packed)) sg_api_linear_forward_t;
+#else
+} sg_api_linear_forward_t;
 #endif
 
 #pragma pack(pop)

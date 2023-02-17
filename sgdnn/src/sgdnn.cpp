@@ -1338,6 +1338,54 @@ bm_status_t sgdnn_relu_backward(
     return BM_SUCCESS;
 }
 
+bm_status_t sgdnn_activation_forward_cudnn(
+    bm_handle_t                     handle,
+    ActivationDescriptor_t          activationDesc,
+    const void                     *alpha,
+    const TensorDescriptor_t        xDesc,
+    const void                     *x,
+    const void                     *beta,
+    const TensorDescriptor_t        yDesc,
+    void                           *y)
+{
+    assert(activationDesc.mode == Activation_Relu);
+
+    if(activationDesc.mode == Activation_Relu)
+    {
+        unsigned long long input    = (unsigned long long)x;
+        unsigned long long output   = (unsigned long long)y;
+
+        float alpha_ = ((float*)alpha)[0];
+        assert(alpha_ == 1.0f);
+        float beta_ = ((float*)beta)[0];
+        assert(beta_ == 0.0f || beta_ == 1.0f);
+        
+        float upper_limit = activationDesc.coef;
+        assert(xDesc.ndims == 4);
+        assert(yDesc.ndims == 4);
+        int n = xDesc.shape[0];
+        int c = xDesc.shape[1];
+        int h = xDesc.shape[2];
+        int w = xDesc.shape[3];
+        
+        sg_data_type_t ydtype = (sg_data_type_t)(yDesc.dtype);
+        sg_data_type_t xdtype = (sg_data_type_t)(xDesc.dtype);
+        assert(xdtype == 1);
+        assert(ydtype == 1);
+
+        sg_api_relu_forward_t api = {
+            input,
+            output,
+            {n, c, h, w},
+            upper_limit,
+            xdtype};
+
+        tpu_kernel_launch_sync(handle, "tpu_kernel_api_relu_forward", &api, sizeof(api));
+        return BM_SUCCESS;
+    }
+    return BM_ERR_NOFEATURE;
+}
+
 bm_status_t sgdnn_activation_backward_cudnn(
     bm_handle_t                      handle,
     ActivationDescriptor_t           activationDesc,
@@ -1364,11 +1412,14 @@ bm_status_t sgdnn_activation_backward_cudnn(
         assert(alpha_ == 1.0f);
         float beta_ = ((float*)beta)[0];
         assert(beta_ == 0.0f || beta_ == 1.0f);
+        
+        float upper_limit = activationDesc.coef;
+        //TODO: clipped_relu_backward
+        assert(upper_limit==0);
 
         assert(dyDesc.ndims == 4);
         assert( xDesc.ndims == 4);
         assert(dxDesc.ndims == 4);
-
         int n = xDesc.shape[0];
         int c = xDesc.shape[1];
         int h = xDesc.shape[2];
@@ -1391,7 +1442,7 @@ bm_status_t sgdnn_activation_backward_cudnn(
         tpu_kernel_launch_sync(handle, "tpu_kernel_api_relu_backward", &api, sizeof(api));
         return BM_SUCCESS;
     }
-    return BM_SUCCESS;
+    return BM_ERR_NOFEATURE;
 }
 
 bm_status_t sgdnn_cross_entropy_backward(

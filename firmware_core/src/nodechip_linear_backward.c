@@ -234,7 +234,8 @@ void nodechip_linear_backward(
 void tpu_kernel_api_linear_backward(const void *args)
 {
     sg_api_linear_backward_t *api = (sg_api_linear_backward_t *)args;
-
+    data_type_t dtype = DT_FP16;
+    
     tpu_initialize();
     nodechip_linear_backward(
             api->input_global_addr,
@@ -249,7 +250,7 @@ void tpu_kernel_api_linear_backward(const void *args)
             api->grad_input_enable,
             api->grad_weight_enable,
             api->grad_bias_enable,
-            DT_FP16);
+            dtype);
     tpu_poll();
 }
 TPUKERNEL_FUNC_REGISTER(tpu_kernel_api_linear_backward);
