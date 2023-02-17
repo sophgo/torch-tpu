@@ -26,6 +26,8 @@ static inline void benchmark ( at::IntArrayRef input_shape,
     bias_tpu = bias_cpu.to ( tpu::TPUGetCurrentDevice() );
   }
   at::Tensor output_tpu;
+  tpu::Timer timer;
+  timer.Start();
   for ( int i = 0; i < loops; ++i )
   {
     output_tpu = torch::convolution (
@@ -39,7 +41,9 @@ static inline void benchmark ( at::IntArrayRef input_shape,
                  at::IntArrayRef ( { 0, 0 } ),
                  groups );
   }
+  unsigned long elapsed_us_per_loop = ( double ) timer.ElapsedUS() / loops;
   std::cout << "Benchmarking convolution:"
+            << " Elapsed time = " << elapsed_us_per_loop << "us"
             << " input shape = " << input_tpu.sizes()
             << " input dtype = " << input_tpu.dtype()
             << " weight shape = " << weight_tpu.sizes()
@@ -58,7 +62,7 @@ static inline void benchmark ( at::IntArrayRef input_shape,
 int main()
 {
   const int batch = 64;
-  loops = 100;
+  loops = 500;
   // input shape, weight shape, stride, padding, dilation, groups, has bias
   // Resnet50
   benchmark ( { batch,    3, 224, 224 }, {   64,    3, 7, 7 }, { 2, 2 }, { 3, 3 }, { 1, 1 }, 1, false );

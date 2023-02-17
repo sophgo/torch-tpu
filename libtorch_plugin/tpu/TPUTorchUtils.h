@@ -149,8 +149,23 @@ static inline void TPUCompareResult ( const at::Tensor & Got,
 
 struct Timer
 {
-  struct timeval start;
-  struct timeval end;
+  Timer & Start()
+  {
+    gettimeofday ( &timer, NULL );
+    return *this;
+  }
+  unsigned long ElapsedUS()
+  {
+    struct timeval end;
+    gettimeofday ( &end, NULL );
+    return ( end.tv_sec - timer.tv_sec ) * 1000000UL + ( end.tv_usec - timer.tv_usec );
+  }
+  unsigned long ElapsedMS()
+  {
+    return ElapsedUS() / 1000;
+  }
+private:
+  struct timeval timer;
 };
 
 } // namespace tpu

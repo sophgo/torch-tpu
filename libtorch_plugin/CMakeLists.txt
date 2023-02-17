@@ -50,6 +50,8 @@ target_link_libraries(test_conv2d_backward libtorch_plugin)
 add_executable(test_batchnorm test/batchnorm.cpp)
 target_link_libraries(test_batchnorm libtorch_plugin)
 
-# Benchmar
+# Benchmark
 add_executable(benchmark_conv2d benchmark/conv2d.cpp)
 target_link_libraries(benchmark_conv2d libtorch_plugin)
+add_executable(benchmark_conv2d_backward benchmark/conv2d_backward.cpp)
+target_link_libraries(benchmark_conv2d_backward libtorch_plugin)
