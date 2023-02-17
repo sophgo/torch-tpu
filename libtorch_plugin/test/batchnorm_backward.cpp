@@ -26,7 +26,7 @@ static inline void test ( at::IntArrayRef     input_shape,
   auto save_invstd_cpu = torch::randn ( { num_features } );
   auto save_mean_tpu = save_mean_cpu.to ( tpu::TPUGetCurrentDevice() );
   auto save_invstd_tpu = save_invstd_cpu.to ( tpu::TPUGetCurrentDevice() );
-  auto outputs_cpu = native_batch_norm_backward (
+  auto outputs_cpu = torch::native_batch_norm_backward (
                      grad_output_cpu,
                      input_cpu,
                      c10::optional<at::Tensor> ( weight_cpu ),
@@ -37,7 +37,7 @@ static inline void test ( at::IntArrayRef     input_shape,
                      true,
                      eps,
                      output_mask );
-  auto outputs_tpu = native_batch_norm_backward (
+  auto outputs_tpu = torch::native_batch_norm_backward (
                      grad_output_tpu,
                      input_tpu,
                      c10::optional<at::Tensor> ( weight_tpu ),
@@ -103,17 +103,17 @@ static inline void test ( at::IntArrayRef     input_shape,
 int main()
 {
   const int batch = 64;
-  test ( { batch,   64, 112, 112 }, 1e-5, true, { true, true, true } );
-  test ( { batch,   64,  56,  56 }, 1e-5, true, { true, true, true } );
-  test ( { batch,  256,  56,  56 }, 1e-5, true, { true, true, true } );
-  test ( { batch,  128,  56,  56 }, 1e-5, true, { true, true, true } );
-  test ( { batch,  128,  28,  28 }, 1e-5, true, { true, true, true } );
-  test ( { batch,  512,  28,  28 }, 1e-5, true, { true, true, true } );
-  test ( { batch,  256,  28,  28 }, 1e-5, true, { true, true, true } );
-  test ( { batch,  256,  14,  14 }, 1e-5, true, { true, true, true } );
-  test ( { batch, 1024,  14,  14 }, 1e-5, true, { true, true, true } );
-  test ( { batch,  512,  14,  14 }, 1e-5, true, { true, true, true } );
-  test ( { batch,  512,   7,   7 }, 1e-5, true, { true, true, true } );
-  test ( { batch, 2048,   7,   7 }, 1e-5, true, { true, true, true } );
+  test ( { batch,   64, 112, 112 }, 1e-5, true, { true, true, true } ); // 0
+  test ( { batch,   64,  56,  56 }, 1e-5, true, { true, true, true } ); // 1
+  test ( { batch,  256,  56,  56 }, 1e-5, true, { true, true, true } ); // 2
+  test ( { batch,  128,  56,  56 }, 1e-5, true, { true, true, true } ); // 3
+  test ( { batch,  128,  28,  28 }, 1e-5, true, { true, true, true } ); // 4
+  test ( { batch,  512,  28,  28 }, 1e-5, true, { true, true, true } ); // 5
+  test ( { batch,  256,  28,  28 }, 1e-5, true, { true, true, true } ); // 6
+  test ( { batch,  256,  14,  14 }, 1e-5, true, { true, true, true } ); // 7
+  test ( { batch, 1024,  14,  14 }, 1e-5, true, { true, true, true } ); // 8
+  test ( { batch,  512,  14,  14 }, 1e-5, true, { true, true, true } ); // 9
+  test ( { batch,  512,   7,   7 }, 1e-5, true, { true, true, true } ); // 10
+  test ( { batch, 2048,   7,   7 }, 1e-5, true, { true, true, true } ); // 11
   return 0;
 }

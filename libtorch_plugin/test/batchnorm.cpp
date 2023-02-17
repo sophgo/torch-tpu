@@ -22,7 +22,7 @@ static inline void test ( at::IntArrayRef input_shape,
     running_mean_tpu = running_mean_cpu.to ( tpu::TPUGetCurrentDevice() );
     running_var_tpu = running_var_cpu.to ( tpu::TPUGetCurrentDevice() );
   }
-  auto outputs_cpu = native_batch_norm (
+  auto outputs_cpu = torch::native_batch_norm (
                      input_cpu,
                      c10::optional<at::Tensor> ( weight_cpu ),
                      c10::optional<at::Tensor> ( bias_cpu ),
@@ -31,7 +31,7 @@ static inline void test ( at::IntArrayRef input_shape,
                      true,
                      momentum,
                      eps );
-  auto outputs_tpu = native_batch_norm (
+  auto outputs_tpu = torch::native_batch_norm (
                      input_tpu,
                      c10::optional<at::Tensor> ( weight_tpu ),
                      c10::optional<at::Tensor> ( bias_tpu ),
@@ -86,17 +86,17 @@ static inline void test ( at::IntArrayRef input_shape,
 int main()
 {
   const int batch = 64;
-  test ( { batch,   64, 112, 112 }, 0.1, 1e-5, true );
-  test ( { batch,   64,  56,  56 }, 0.1, 1e-5, true );
-  test ( { batch,  256,  56,  56 }, 0.1, 1e-5, true );
-  test ( { batch,  128,  56,  56 }, 0.1, 1e-5, true );
-  test ( { batch,  128,  28,  28 }, 0.1, 1e-5, true );
-  test ( { batch,  512,  28,  28 }, 0.1, 1e-5, true );
-  test ( { batch,  256,  28,  28 }, 0.1, 1e-5, true );
-  test ( { batch,  256,  14,  14 }, 0.1, 1e-5, true );
-  test ( { batch, 1024,  14,  14 }, 0.1, 1e-5, true );
-  test ( { batch,  512,  14,  14 }, 0.1, 1e-5, true );
-  test ( { batch,  512,   7,   7 }, 0.1, 1e-5, true );
-  test ( { batch, 2048,   7,   7 }, 0.1, 1e-5, true );
+  test ( { batch,   64, 112, 112 }, 0.1, 1e-5, true ); // 0
+  test ( { batch,   64,  56,  56 }, 0.1, 1e-5, true ); // 1
+  test ( { batch,  256,  56,  56 }, 0.1, 1e-5, true ); // 2
+  test ( { batch,  128,  56,  56 }, 0.1, 1e-5, true ); // 3
+  test ( { batch,  128,  28,  28 }, 0.1, 1e-5, true ); // 4
+  test ( { batch,  512,  28,  28 }, 0.1, 1e-5, true ); // 5
+  test ( { batch,  256,  28,  28 }, 0.1, 1e-5, true ); // 6
+  test ( { batch,  256,  14,  14 }, 0.1, 1e-5, true ); // 7
+  test ( { batch, 1024,  14,  14 }, 0.1, 1e-5, true ); // 8
+  test ( { batch,  512,  14,  14 }, 0.1, 1e-5, true ); // 9
+  test ( { batch,  512,   7,   7 }, 0.1, 1e-5, true ); // 10
+  test ( { batch, 2048,   7,   7 }, 0.1, 1e-5, true ); // 11
   return 0;
 }
