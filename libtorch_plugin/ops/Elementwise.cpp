@@ -14,7 +14,7 @@ Tensor & binary_Tensor_tpu ( const Tensor & input1,
                              const Tensor & input2,
                              const Scalar & alpha,
                              Tensor & out,
-                             const OpTensorDescriptor_t & op )
+                             const EltwiseOpMode_t & op )
 {
   if ( input1.device().type() == DeviceType::PrivateUse1 &&
        input2.device().type() == DeviceType::PrivateUse1 )
@@ -30,17 +30,17 @@ Tensor & binary_Tensor_tpu ( const Tensor & input1,
     float Alpha2 = alpha.toDouble();
     float Beta = 0.f;
     bm_status_t Status = BM_SUCCESS;
-    Status = sgdnn_eltwise_forward ( Handle,
-                                     &Alpha1,
-                                     ADesc,
-                                     ADDR_IN_DEVICE ( input1 ),
-                                     &Alpha2,
-                                     BDesc,
-                                     ADDR_IN_DEVICE ( input2 ),
-                                     &Beta,
-                                     CDesc,
-                                     ADDR_IN_DEVICE ( out ),
-                                     op );
+    Status = sgdnn_eltwise_forward_cudnn ( Handle,
+                                          &Alpha1,
+                                          ADesc,
+                                          ADDR_IN_DEVICE ( input1 ),
+                                          &Alpha2,
+                                          BDesc,
+                                          ADDR_IN_DEVICE ( input2 ),
+                                          &Beta,
+                                          CDesc,
+                                          ADDR_IN_DEVICE ( out ),
+                                          op );
     if ( Status != BM_SUCCESS )
     {
       LOG ( FATAL ) << TPU_ERROR_CODE ( Status );
@@ -62,7 +62,7 @@ Tensor & add_Tensor_tpu ( const Tensor & input1,
   auto Input2CPU = input2.to ( torch::Device ( "cpu" ) );
   auto OutputExp = torch::add ( Input1CPU, Input2CPU, alpha );
 #endif
-  OpTensorDescriptor_t Op = { .op_code = 1 };
+  EltwiseOpMode_t Op = OP_ELTWISE_COEF_ADD;
   auto & output = binary_Tensor_tpu ( input1, input2, alpha, out, Op );
 #ifdef TPU_LIBTORCH_OP_COMPARE
   auto OutputGot = output.to ( torch::Device ( "cpu" ) );

@@ -9,6 +9,12 @@
 extern "C" {
 #endif
 
+typedef enum{
+    OP_ELTWISE_PRODUCT = 0,
+    OP_ELTWISE_COEF_ADD = 1,
+    OP_ELTWISE_MAX = 2,
+} EltwiseOpMode_t;
+
 typedef enum {
     Pooling_MAX = 0,
     Pooling_AVERAGE = 1,
@@ -18,7 +24,7 @@ typedef enum {
   BatchNorm_Spatial = 0,
   BatchNorm_Spatial_Persistent = 1,
   BatchNorm_Per_Activation = 2,
-} BatchNormMode;
+} BatchNormMode_t;
 
 typedef enum {
   Activation_Sigmoid = 0,
@@ -41,10 +47,6 @@ typedef struct{
     int         stride[FW_MAX_SHAPE_DIMS];
     int         format;
 } TensorDescriptor_t;
-
-typedef struct{
-    int         op_code;
-} OpTensorDescriptor_t;
 
 typedef struct{
     int     oc;
@@ -200,7 +202,7 @@ bm_status_t sgdnn_batchnorm_forward(
 
 bm_status_t sgdnn_batchnorm_forward_cudnn(
     bm_handle_t                      handle,
-    BatchNormMode                    mode,
+    BatchNormMode_t                  mode,
     const void                      *alpha,
     const void                      *beta,
     const TensorDescriptor_t         xDesc,
@@ -238,7 +240,7 @@ bm_status_t sgdnn_batchnorm_backward(
 
 bm_status_t sgdnn_batchnorm_backward_cudnn(
     bm_handle_t                      handle,
-    BatchNormMode                    mode,
+    BatchNormMode_t                  mode,
     const void                      *alphaDataDiff,
     const void                      *betaDataDiff,
     const void                      *alphaParamDiff,
@@ -332,7 +334,7 @@ bm_status_t sgdnn_maxpool_backward(
     bool               ceil_mode,
     sg_data_type_t     dtype);
 
-bm_status_t sgdnn_eltwise_forward(
+bm_status_t sgdnn_eltwise_forward_cudnn(
     bm_handle_t                handle,
     const void*                alpha1,
     const TensorDescriptor_t   aDesc,
@@ -343,9 +345,27 @@ bm_status_t sgdnn_eltwise_forward(
     const void*                beta,
     const TensorDescriptor_t   cDesc,
     void*                      C,
-    const OpTensorDescriptor_t opTensorDesc);
+    const EltwiseOpMode_t      opTensorDesc);
 
 bm_status_t sgdnn_eltwise_backward(
+    bm_handle_t        handle,
+    bm_device_mem_t    input_a,
+    bm_device_mem_t    input_b,
+    bm_device_mem_t    grad_output,
+    bm_device_mem_t    grad_input_a,
+    bm_device_mem_t    grad_input_b,
+    int                n,
+    int                c,
+    int                h,
+    int                w,
+    int                op_code,
+    int                coeff_a,
+    int                coeff_b,
+    bool               input_a_need_grad,
+    bool               input_b_need_grad,
+    sg_data_type_t     dtype);
+    
+bm_status_t sgdnn_eltwise_backward_cudnn(
     bm_handle_t                handle,
     const void*                alpha1,
     const TensorDescriptor_t   aDesc,
@@ -360,7 +380,7 @@ bm_status_t sgdnn_eltwise_backward(
     void*                      grad_input_b,
     bool                       grad_input_a_enable,
     bool                       grad_input_b_enable,
-    const OpTensorDescriptor_t opTensorDesc);
+    const EltwiseOpMode_t      opTensorDesc);
 
 bm_status_t sgdnn_linear_backward(
     bm_handle_t        handle,

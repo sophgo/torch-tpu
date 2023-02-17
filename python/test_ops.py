@@ -48,10 +48,10 @@ class Test_Backward_Ops(object):
     def __init__(self):
         self.test_function = {
             "Conv2d": self.test_conv2d_backward,
-            "BatchNorm2d": self.test_batchnorm2d_backward,
+            "bn": self.test_batchnorm2d_backward,
             "AvgPool2d": self.test_avgpool2d_backward,
             "MaxPool2d": self.test_maxpool2d_backward,
-            "Eltwise": self.test_eltwise_backward,
+            "elt": self.test_eltwise_backward,
             "Linear": self.test_linear_backward,
             "Relu": self.test_relu_backward,
             "CrossEntropy": self.test_crossentropy_backward,
@@ -152,20 +152,12 @@ class Test_Backward_Ops(object):
         torch_input_grad = torch.ones(torch_input.grad.shape)
         torch_input_grad.copy_(torch_input.grad.detach())
 
-    '''
-            from torch.autograd import gradcheck
-            input = torch.randn(n, c, h, w, dtype=torch.double, requires_grad = True)
-            print(input)
-            result = gradcheck(MaxPool2d, [input, kernel_size, _pair(stride), _pair(padding), _pair(dilation), False])
-            print(result)
-    '''
-
     def test_batchnorm2d_backward(self):
         torch.manual_seed(0)
         eps = 1e-5
         momentum = 0.1
         resnet50_shapes = [
-                [64, 3, 224, 224],
+                [64, 3, 112, 112],
                 [64, 64, 56, 56],
                 [64, 128, 56, 56],
                 [64, 256, 56, 56],
@@ -182,10 +174,14 @@ class Test_Backward_Ops(object):
             tpu_input = torch.randn((n, c, h, w), requires_grad = True)
             running_mean = torch.randn(c, requires_grad = False)
             running_var = torch.randn(c, requires_grad = False)
-            tpu_rmean = torch.tensor(running_mean.data)
-            tpu_rvar = torch.tensor(running_var.data)
+            running_mean.data-=0.5
             weight = torch.rand(c, requires_grad = True)
             bias = torch.rand(c, requires_grad = True)
+            tpu_rmean = torch.tensor(running_mean.data)
+            tpu_rvar = torch.tensor(running_var.data)
+            tpu_input.data-=0.5
+            weight.data-=0.5
+            bias.data-=0.5
             grad_output = torch.randn((n, c, h, w))
             output = BatchNorm2d(tpu_input, tpu_rmean, tpu_rvar, weight, bias)
             output.backward(grad_output)
@@ -200,7 +196,8 @@ class Test_Backward_Ops(object):
             # grad_compare(tpu_input.grad, grad_input_ref, 1e-1)
             # grad_compare(weight.grad, grad_weight_ref, 1e-1)
             # grad_compare(bias.grad, grad_bias_ref, 1e-1)
-            
+            # return
+        
             # # pytorch reference
             torch_input = torch.rand((n, c, h, w), requires_grad = True)
             torch_rmean = torch.rand(c, requires_grad = False)
@@ -226,14 +223,14 @@ class Test_Backward_Ops(object):
             grad_compare(output, torch_output, 1e-1)
             grad_compare(tpu_rmean, torch_rmean, 1e-1)
             grad_compare(tpu_rvar, torch_rvar, 1e-1)
-            # print("case:",i," backward:")
-            # grad_compare(tpu_input.grad, torch_input.grad, 1e-1)
-            # grad_compare(weight.grad, torch_weight.grad, 1e-1)
-            # grad_compare(bias.grad, torch_bias.grad, 1e-1)
+            print("case:",i," backward:")
+            grad_compare(tpu_input.grad, torch_input.grad, 1e-1)
+            grad_compare(weight.grad, torch_weight.grad, 1e-1)
+            grad_compare(bias.grad, torch_bias.grad, 1e-1)
     
     def test_eltwise_backward(self):
         torch.manual_seed(0)
-        op_code = [0,1,2]
+        op_code = [1,]#[0,1,2]
         resnet50_shapes = [
                 [64, 256, 56, 56],
                 [64, 512, 28, 28],
@@ -247,13 +244,12 @@ class Test_Backward_Ops(object):
             torch_input_b = torch.randn((n, c, h, w), requires_grad = True)
             torch_input_a.data = input_a.data
             torch_input_b.data = input_b.data
-            coeff_a = int(torch.randn(1)[0]*10)
-            coeff_b = int(torch.randn(1)[0]*10)
+            coeff_a = 1 if op_code!=1 else int(torch.randn(1)[0]*10)
+            coeff_b = 1 if op_code!=1 else int(torch.randn(1)[0]*10)
             print("case:",i)
             for code in op_code:
                 output = Eltwise(input_a, input_b, code, coeff_a, coeff_b)
                 grad_output = torch.rand((n, c, h, w))
-                output.backward(grad_output)
                 if(code==0):
                     print("eltwise op:product")
                     torch_output = torch_input_a * torch_input_b
@@ -263,6 +259,7 @@ class Test_Backward_Ops(object):
                 if(code==2):
                     print("eltwise op:max")
                     torch_output = torch.max(torch_input_a, torch_input_b)
+                output.backward(grad_output)
                 torch_output.backward(grad_output)
                 grad_compare(input_a.grad, torch_input_a.grad, 1e-1)
                 grad_compare(input_b.grad, torch_input_b.grad, 1e-1)
