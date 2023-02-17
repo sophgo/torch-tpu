@@ -1505,7 +1505,7 @@ void nodechip_conv_backward_weight(
                             } else if (tpu_data_type_size(idtype) == 4) {
                                 dim4 wslice_shape_fp32 = {ic, ocslice, khslice, kwslice};
                                 dim4 wslice_stride_global = {.n = oc * kh * kw, .c = kh * kw, .h = kw, .w = 1};
-                                dim4 wslice_stride_local = {.n = khslice * kwslice, .c = khslice * kwslice, .h = kwslice, .w = 1};
+                                dim4 wslice_stride_local = {.n = khslice * kwslice, .c = ic * khslice * kwslice, .h = kwslice, .w = 1};
                                 tpu_gdma_cpy_S2L(
                                     ping_in ? waddr_ping : waddr_pong,
                                     weight_global_addr +
