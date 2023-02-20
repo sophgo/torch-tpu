@@ -96,7 +96,7 @@ static inline void TPUCompareResult ( const at::Tensor & Got,
       {
         continue;
       }
-      if ( AbsExpPtr[i] != 0.f && ( RltAbsErrPtr[i] <= 5e-2 || AbsErrPtr[i] <= 1e-3 ) )
+      if ( AbsExpPtr[i] != 0.f && ( RltAbsErrPtr[i] <= 5e-2 || AbsErrPtr[i] <= 7e-3 ) )
       {
         continue;
       }

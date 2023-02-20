@@ -30,4 +30,22 @@ TORCH_LIBRARY_IMPL ( aten, PrivateUse1, m )
 {
   m.impl ( "addmm.out", addmm_out_tpu );
 }
+
+Tensor & mm_out_tpu ( const Tensor & mat1,
+                      const Tensor & mat2,
+                      Tensor       & output )
+{
+  CHECK_TENSOR_IN_DEVICE ( output );
+  CHECK_TENSOR_IN_DEVICE ( mat1 );
+  CHECK_TENSOR_IN_DEVICE ( mat2 );
+  auto mat1_cpu = mat1.to ( torch::Device ( "cpu" ) );
+  auto mat2_cpu = mat2.to ( torch::Device ( "cpu" ) );
+  auto output_cpu = mm ( mat1_cpu, mat2_cpu );
+  output = output_cpu.to ( tpu::TPUGetCurrentDevice() );
+  return output;
+}
+TORCH_LIBRARY_IMPL ( aten, PrivateUse1, m )
+{
+  m.impl ( "mm.out", mm_out_tpu );
+}
 } // namespace at

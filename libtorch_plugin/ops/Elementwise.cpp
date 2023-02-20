@@ -46,10 +46,10 @@ Tensor & binary_Tensor_tpu ( const Tensor          & input1,
   }
   return out;
 }
-Tensor & add_Tensor_tpu ( const Tensor & input1,
-                          const Tensor & input2,
-                          const Scalar & alpha,
-                          Tensor       & out )
+Tensor & add_out_tpu ( const Tensor & input1,
+                       const Tensor & input2,
+                       const Scalar & alpha,
+                       Tensor       & out )
 {
 #ifdef TPU_LIBTORCH_OP_COMPARE
   auto input1_cpu = input1.to ( torch::Device ( "cpu" ) );
@@ -66,6 +66,21 @@ Tensor & add_Tensor_tpu ( const Tensor & input1,
 }
 TORCH_LIBRARY_IMPL ( aten, PrivateUse1, m )
 {
-  m.impl ( "add.out", add_Tensor_tpu );
+  m.impl ( "add.out", add_out_tpu );
+}
+
+Tensor & div_out_tpu ( const Tensor & input1,
+                       const Tensor & input2,
+                       Tensor       & output )
+{
+  auto input1_cpu = input1.to ( torch::Device ( "cpu" ) );
+  auto input2_cpu = input2.to ( torch::Device ( "cpu" ) );
+  auto output_cpu = torch::div ( input1_cpu, input2_cpu );
+  output = output_cpu.to ( tpu::TPUGetCurrentDevice() );
+  return output;
+}
+TORCH_LIBRARY_IMPL ( aten, PrivateUse1, m )
+{
+  m.impl ( "div.out", div_out_tpu );
 }
 } // namespace at
