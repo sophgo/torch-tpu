@@ -36,6 +36,8 @@ def assertEqual(got, exp, threshold=0.001, name=None):
             print("\033[1;31;40maverage error\033[0m:{:.4f}".format((got - exp).abs().sum()/exp.numel()))
             print("\033[1;31;40mrelative error\033[0m:{:.4f}%".format(((got-exp)/exp).abs().sum()/exp.numel()*100))
             print("exp {}\ngot {}".format(exp.flatten()[:5], got.flatten()[:5]))
+            print("exp {}\n".format(exp.flatten()))
+            print("got {}\n".format(got.flatten()))
         else:
             print("{} compare success, max_difference:{}".format(name if name is not None else '',(got - exp).abs().max()))
 
@@ -59,22 +61,23 @@ class Test_Backward_Ops(object):
 
     def test_conv2d_backward(self):
         torch.manual_seed(0)
-        n = 31
-        ic = 2048#1024#2#64
-        ih = 7#7#4#64#14
-        iw = 7#7#4#64#14
-        oc = 512#1024#1#3#2#64#64
-        kh = 1
-        kw = 1
+        n = 64
+        ic = 3
+        ih = 224
+        iw = 224
+        oc = 64
+        kh = 7
+        kw = 7
 
         dilation = 1
         groups = 1
-        padding = 0
-        stride = 1
+        padding = 3
+        stride = 2
 
         input = torch.randn(n, ic, ih, iw, requires_grad = True)
         weight = torch.randn(oc, ic, kh, kw, requires_grad = True)
-        bias = torch.randn(oc, requires_grad = True)
+        bias = None
+        #bias = torch.randn(oc, requires_grad = True)
         bias_size = [oc, ]
 
         output = Conv2d(input, weight, bias, stride, padding, dilation, groups)

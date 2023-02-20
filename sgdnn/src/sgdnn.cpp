@@ -194,9 +194,9 @@ bm_status_t sgdnn_conv_backward(
     int                pad_wl,
     int                pad_wr,
     bool               if_relu,
-    bool               input_need_grad,
-    bool               weight_need_grad,
-    bool               bias_need_grad,
+    bool               grad_input_enable,
+    bool               grad_weight_enable,
+    bool               grad_bias_enable,
     sg_data_type_t     dtype
   ) {
 
@@ -250,7 +250,9 @@ bm_status_t sgdnn_conv_backward(
         {stride_h, stride_w},
         {dh, dw},
         {pad_ht, pad_hb, pad_wl, pad_wr},
-        1, 1, 1,
+        grad_input_enable,
+        grad_weight_enable,
+        grad_bias_enable,
         dtype};
 
     tpu_kernel_launch_sync(handle, "tpu_kernel_api_conv_backward", &api, sizeof(api));
@@ -1907,6 +1909,7 @@ PYBIND11_MODULE(sgdnn_pybind, m)
         bm_dev_free(handle);
     });
 
+    /*
     m.def("eltwise_backward", [](py::array_t<float16> input_a,
                                  py::array_t<float16> input_b,
                                  py::array_t<float16> grad_output,
@@ -2038,6 +2041,7 @@ PYBIND11_MODULE(sgdnn_pybind, m)
           assert(status == BM_SUCCESS);
           bm_dev_free(handle);
     });
+    */
 
     m.def("linear_backward", [](py::array_t<float16> input,
                                 py::array_t<float16> weight,
