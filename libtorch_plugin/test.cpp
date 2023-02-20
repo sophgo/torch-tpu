@@ -5,14 +5,32 @@
 
 int main()
 {
+  int batch = 1;
   auto Device = tpu::TPUGetCurrentDevice();
   //torch::Device Device ( "cpu" );
 #if 1
   std::string ModelPath = "../Resnet50_Own.pt";
-  auto Resnet50 = std::make_shared<tpu::TorchscriptModule> ( ModelPath );
-  auto A = torch::ones ( { 1, 3, 224, 224 } ).to ( Device );
-  tpu::MoveModuleToTPUDevice ( *Resnet50 );
-  Resnet50->forward ( A );
+  auto Resnet50CPU = std::make_shared<tpu::TorchscriptModule> ( ModelPath );
+  auto Resnet50TPU = std::make_shared<tpu::TorchscriptModule> ( ModelPath );
+  tpu::MoveModuleToTPUDevice ( *Resnet50TPU );
+  auto InputCPU = torch::ones ( { batch, 3, 224, 224 } );
+  auto InputTPU = InputCPU.to ( Device );
+  int Loops = 100;
+  tpu::Timer timer;
+  timer.Start();
+  for ( int i = 0; i < Loops; ++i )
+  {
+    auto OutputCPU = Resnet50CPU->forward ( InputCPU );
+  }
+  unsigned long elapsed_us_per_loop = ( double ) timer.ElapsedUS() / Loops;
+  std::cout << "CPU Elapsed time = " << elapsed_us_per_loop << "us" << std::endl;
+  timer.Start();
+  for ( int i = 0; i < Loops; ++i )
+  {
+    auto OutputTPU = Resnet50TPU->forward ( InputTPU );
+  }
+  elapsed_us_per_loop = ( double ) timer.ElapsedUS() / Loops;
+  std::cout << "TPU Elapsed time = " << elapsed_us_per_loop << "us" << std::endl;
 #else
   auto T = torch::empty ( {2, 3, 4, 5}, Device );
   auto A = torch::randn ( {2, 3, 4, 5} );

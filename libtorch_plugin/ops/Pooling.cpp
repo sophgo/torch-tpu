@@ -10,18 +10,35 @@ namespace at
 {
 
 std::tuple<Tensor, Tensor> max_pool2d_with_indices_tpu (
-const Tensor & self,
+const Tensor & input,
 IntArrayRef    kernel_size,
 IntArrayRef    stride,
 IntArrayRef    padding,
 IntArrayRef    dilation,
 bool           ceil_mode )
 {
-  CHECK_TENSOR_IN_DEVICE ( self );
-  std::cout << "This is max_pool2d_with_indices_tpu" << std::endl;
+  CHECK_TENSOR_IN_DEVICE ( input );
+  std::tuple<Tensor, Tensor> outputs;
+#if 1
+  auto input_cpu = input.to ( torch::Device ( "cpu" ) );
+  auto outputs_cpu = max_pool2d_with_indices (
+                     input_cpu,
+                     kernel_size,
+                     stride,
+                     padding,
+                     dilation,
+                     ceil_mode );
+  outputs = std::tuple<Tensor, Tensor> (
+            std::get<0> ( outputs_cpu ).to ( tpu::TPUGetCurrentDevice() ),
+            std::get<1> ( outputs_cpu ).to ( tpu::TPUGetCurrentDevice() ) );
+#else
+  LOG ( FATAL ) << "TPU max_pool2d_with_indices is not implemented";
+#endif
+  return outputs;
 }
 TORCH_LIBRARY_IMPL ( aten, PrivateUse1, m )
 {
   m.impl ( "max_pool2d_with_indices", max_pool2d_with_indices_tpu );
 }
+
 } // namespace at

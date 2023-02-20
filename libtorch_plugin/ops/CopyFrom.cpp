@@ -11,6 +11,7 @@ namespace at
 Tensor _copy_from_tpu ( const Tensor & self, const Tensor & dst,
                         bool non_blocking )
 {
+  auto output = dst;
   if ( self.is_contiguous() == false || dst.is_contiguous() == false )
   {
     LOG ( FATAL ) << "TPU only supports contiguous memory copy for now";
@@ -69,7 +70,7 @@ Tensor _copy_from_tpu ( const Tensor & self, const Tensor & dst,
                     << " to device " << dst.device();
     }
   }
-  return dst;
+  return output;
 }
 TORCH_LIBRARY_IMPL ( aten, PrivateUse1, m )
 {
