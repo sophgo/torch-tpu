@@ -1292,6 +1292,49 @@ bm_status_t sgdnn_linear_backward(
     return BM_SUCCESS;
 }
 
+bm_status_t sgdnn_relu_forward(
+    bm_handle_t        handle,
+    bm_device_mem_t    input,
+    bm_device_mem_t    output,
+    float              upper_limit,
+    int                n,
+    int                c,
+    int                h,
+    int                w, 
+    sg_data_type_t     dtype)
+{
+    auto dtype_size = [](int dtype) {
+        int size = 1;
+        if (dtype == SG_DTYPE_INT8 || dtype == SG_DTYPE_UINT8) size = 1;
+        else if (dtype == SG_DTYPE_INT16 || dtype == SG_DTYPE_UINT16 ||
+                 dtype == SG_DTYPE_FP16 || dtype == SG_DTYPE_BFP16)
+            size = 2;
+        else if (dtype == SG_DTYPE_FP32 || dtype == SG_DTYPE_INT32 || dtype == SG_DTYPE_UINT32)
+            size = 4;
+        return size;};
+
+    bm_device_mem_t input_mem;
+    bm_device_mem_t output_mem;
+    u64 size = (u64)n * c * h * w * dtype_size(dtype);
+
+    DEVICE_MEM_NEW_INPUT(handle, input, size, input_mem);
+    DEVICE_MEM_NEW_OUTPUT(handle, output, size, output_mem);
+
+    sg_api_relu_forward_t api = {
+        bm_mem_get_device_addr(input_mem),
+        bm_mem_get_device_addr(output_mem),
+        {n, c, h, w},
+        upper_limit,
+        (sg_data_type_t)1};
+
+    tpu_kernel_launch_sync(handle, "tpu_kernel_api_relu_forward", &api, sizeof(api));
+
+    DEVICE_MEM_DEL_INPUT(handle, input, input_mem);
+    DEVICE_MEM_DEL_OUTPUT(handle, output, output_mem);
+
+    return BM_SUCCESS;
+}
+
 bm_status_t sgdnn_relu_backward(
     bm_handle_t        handle,
     bm_device_mem_t    input,
@@ -1327,7 +1370,7 @@ bm_status_t sgdnn_relu_backward(
         bm_mem_get_device_addr(grad_output_mem),
         bm_mem_get_device_addr(grad_input_mem),
         {n, c, h, w},
-        1};
+        dtype};
 
     tpu_kernel_launch_sync(handle, "tpu_kernel_api_relu_backward", &api, sizeof(api));
 
@@ -1370,8 +1413,7 @@ bm_status_t sgdnn_activation_forward_cudnn(
         
         sg_data_type_t ydtype = (sg_data_type_t)(yDesc.dtype);
         sg_data_type_t xdtype = (sg_data_type_t)(xDesc.dtype);
-        assert(xdtype == 1);
-        assert(ydtype == 1);
+        assert(xdtype == ydtype);
 
         sg_api_relu_forward_t api = {
             input,
@@ -1428,9 +1470,7 @@ bm_status_t sgdnn_activation_backward_cudnn(
         sg_data_type_t dydtype = (sg_data_type_t)(dyDesc.dtype);
         sg_data_type_t xdtype = (sg_data_type_t)(xDesc.dtype);
         sg_data_type_t dxdtype = (sg_data_type_t)(dxDesc.dtype);
-        assert(dydtype == 1);
-        assert(xdtype == 1);
-        assert(dxdtype == 1);
+        assert(dydtype == xdtype && xdtype == dxdtype);
 
         sg_api_relu_backward_t api = {
             input,
@@ -2047,28 +2087,51 @@ PYBIND11_MODULE(sgdnn_pybind, m)
         bm_dev_free(handle);
     });
 
-    m.def("relu_backward", [](py::array_t<float16> input,
-                              py::array_t<float16> grad_output,
-                              py::array_t<float16> grad_input,
+    m.def("relu_forward", [](py::array_t<float16> input,
+                             py::array_t<float16> output,
+                             float upper_limit,
+                             int n, int c, int h, int w) {
+        py::buffer_info input_buf = input.request();
+        float16 *input_fp16 = (float16 *)input_buf.ptr;
+        py::buffer_info output_buf = output.request();
+        float16 *output_fp16 = (float16 *)output_buf.ptr;
+
+        bm_handle_t handle;
+        bm_dev_request(&handle, 0);
+
+        bm_status_t status = sgdnn_relu_forward(handle,
+                            bm_mem_from_system(input_fp16),
+                            bm_mem_from_system(output_fp16),
+                            upper_limit,
+                            n, c, h, w,
+                            (sg_data_type_t)1);
+        UNUSED(status);
+        assert(status == BM_SUCCESS);
+        bm_dev_free(handle);
+    });
+
+    m.def("relu_backward", [](py::array_t<float> input,
+                              py::array_t<float> grad_output,
+                              py::array_t<float> grad_input,
                               int n, int c, int h, int w,
                               bool input_grad_enable) {
         py::buffer_info input_buf = input.request();
-        float16 *input_fp16 = (float16 *)input_buf.ptr;
+        float *input_fp = (float *)input_buf.ptr;
         py::buffer_info grad_output_buf = grad_output.request();
-        float16 *grad_output_fp16 = (float16 *)grad_output_buf.ptr;
+        float *grad_output_fp = (float *)grad_output_buf.ptr;
         py::buffer_info grad_input_buf = grad_input.request();
-        float16 *grad_input_fp16 = (float16 *)grad_input_buf.ptr;
+        float *grad_input_fp = (float *)grad_input_buf.ptr;
 
         bm_handle_t handle;
         bm_dev_request(&handle, 0);
 
         bm_status_t status = sgdnn_relu_backward(handle,
-                            bm_mem_from_system(input_fp16),
-                            bm_mem_from_system(grad_output_fp16),
-                            bm_mem_from_system(grad_input_fp16),
+                            bm_mem_from_system(input_fp),
+                            bm_mem_from_system(grad_output_fp),
+                            bm_mem_from_system(grad_input_fp),
                             n, c, h, w,
                             input_grad_enable,
-                            (sg_data_type_t)1);
+                            (sg_data_type_t)0);
 
         UNUSED(status);
         assert(status == BM_SUCCESS);

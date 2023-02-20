@@ -132,7 +132,7 @@ typedef struct {
     unsigned long long grad_output_global_addr;
     unsigned long long grad_input_global_addr;
     int                shape[4];
-    int                grad_input_enable;
+    sg_data_type_t     dtype;
 #ifndef WIN32
 } __attribute__((packed)) sg_api_relu_backward_t;
 #else

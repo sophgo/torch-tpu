@@ -4,7 +4,7 @@
 void tpu_kernel_api_relu_forward(const void *args)
 {
     sg_api_relu_forward_t *api = (sg_api_relu_forward_t *)args;
-    data_type_t dtype = DT_FP16;
+    // data_type_t dtype = DT_FP16;
 
     tpu_initialize();
     nodechip_relu_parallel(
@@ -15,7 +15,7 @@ void tpu_kernel_api_relu_forward(const void *args)
             api->shape[1],
             api->shape[2],
             api->shape[3],
-            dtype);
+            api->dtype?DT_FP16:DT_FP32);
     tpu_poll();
 }
 TPUKERNEL_FUNC_REGISTER(tpu_kernel_api_relu_forward);
