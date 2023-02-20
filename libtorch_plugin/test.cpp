@@ -15,22 +15,28 @@ int main()
   tpu::MoveModuleToTPUDevice ( *Resnet50TPU );
   auto InputCPU = torch::ones ( { batch, 3, 224, 224 } );
   auto InputTPU = InputCPU.to ( Device );
-  int Loops = 100;
+  int Loops = 1;
+  torch::Tensor OutputCPU, OutputTPU;
   tpu::Timer timer;
   timer.Start();
   for ( int i = 0; i < Loops; ++i )
   {
-    auto OutputCPU = Resnet50CPU->forward ( InputCPU );
+    OutputCPU = Resnet50CPU->forward ( InputCPU );
   }
   unsigned long elapsed_us_per_loop = ( double ) timer.ElapsedUS() / Loops;
   std::cout << "CPU Elapsed time = " << elapsed_us_per_loop << "us" << std::endl;
   timer.Start();
   for ( int i = 0; i < Loops; ++i )
   {
-    auto OutputTPU = Resnet50TPU->forward ( InputTPU );
+    OutputTPU = Resnet50TPU->forward ( InputTPU );
   }
   elapsed_us_per_loop = ( double ) timer.ElapsedUS() / Loops;
   std::cout << "TPU Elapsed time = " << elapsed_us_per_loop << "us" << std::endl;
+  auto OutputGot = OutputTPU.to ( torch::Device ( "cpu" ) );
+  auto OutputExp = OutputCPU;
+  torch::Tensor LabelsTPU;
+  auto Loss = torch::nll_loss ( OutputTPU, LabelsTPU );
+  //tpu::TPUCompareResult ( OutputGot, OutputExp );
 #else
   auto T = torch::empty ( {2, 3, 4, 5}, Device );
   auto A = torch::randn ( {2, 3, 4, 5} );

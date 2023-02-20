@@ -14,11 +14,6 @@ namespace at
 Tensor & relu__tpu ( Tensor & self )
 {
   CHECK_TENSOR_IN_DEVICE ( self );
-#if 1
-  auto self_cpu = self.to ( torch::Device ( "cpu" ) );
-  self_cpu = relu_ ( self_cpu );
-  self = self_cpu.to ( tpu::TPUGetCurrentDevice() );
-#else
 #ifdef TPU_LIBTORCH_OP_COMPARE
   auto self_cpu = self.to ( torch::Device ( "cpu" ) );
   auto & output_exp = relu_ ( self_cpu );
@@ -50,7 +45,6 @@ Tensor & relu__tpu ( Tensor & self )
             << std::endl;
   auto output_got = self.to ( torch::Device ( "cpu" ) );
   tpu::TPUCompareResult ( output_got, output_exp );
-#endif
 #endif
   return self;
 }

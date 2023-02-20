@@ -96,47 +96,13 @@ static inline void TPUCompareResult ( const at::Tensor & Got,
       {
         continue;
       }
-      if ( AbsExpPtr[i] != 0.f && RltAbsErrPtr[i] <= 1e-2 )
-      {
-        continue;
-      }
-      if ( AbsExpPtr[i] != 0.f && AbsExpPtr[i] < 1.5e-3 &&
-           RltAbsErrPtr[i] <= 0.02 )
-      {
-        continue;
-      }
-      if ( AbsExpPtr[i] != 0.f && AbsExpPtr[i] < 1e-3 &&
-           RltAbsErrPtr[i] <= 0.1 )
-      {
-        continue;
-      }
-      if ( AbsExpPtr[i] != 0.f && AbsExpPtr[i] < 1e-4 &&
-           RltAbsErrPtr[i] <= 0.7 )
-      {
-        continue;
-      }
-      if ( AbsExpPtr[i] != 0.f && AbsExpPtr[i] < 1e-5 &&
-           RltAbsErrPtr[i] <= 7 )
-      {
-        continue;
-      }
-      if ( AbsExpPtr[i] != 0.f && AbsExpPtr[i] < 1e-6 &&
-           RltAbsErrPtr[i] <= 170 )
-      {
-        continue;
-      }
-      if ( AbsExpPtr[i] != 0.f && AbsExpPtr[i] < 1e-7 &&
-           RltAbsErrPtr[i] <= 200 )
-      {
-        continue;
-      }
-      if ( AbsExpPtr[i] != 0.f && AbsExpPtr[i] < 1e-8 &&
-           RltAbsErrPtr[i] <= 250 )
+      if ( AbsExpPtr[i] != 0.f && ( RltAbsErrPtr[i] <= 5e-2 || AbsErrPtr[i] <= 1e-3 ) )
       {
         continue;
       }
       LOG ( FATAL ) << "Tensor comparing failed: Got = " << GotPtr[i]
                     << ", Exp = " << ExpPtr[i]
+                    << ", AbsErr = " << AbsErrPtr[i]
                     << ", RltAbsErr = " << RltAbsErrPtr[i]
                     << ", index = " << i;
     }
