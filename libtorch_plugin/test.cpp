@@ -5,17 +5,19 @@
 
 int main()
 {
-  int batch = 1;
-  auto Device = tpu::TPUGetCurrentDevice();
-  //torch::Device Device ( "cpu" );
+  int Batch = 1;
+  int Loops = 1;
+  auto TPU = tpu::TPUGetCurrentDevice();
+  auto CPU = torch::Device ( "cpu" );
 #if 1
   std::string ModelPath = "../Resnet50_Own.pt";
   auto Resnet50CPU = std::make_shared<tpu::TorchscriptModule> ( ModelPath );
   auto Resnet50TPU = std::make_shared<tpu::TorchscriptModule> ( ModelPath );
   tpu::MoveModuleToTPUDevice ( *Resnet50TPU );
-  auto InputCPU = torch::ones ( { batch, 3, 224, 224 } );
-  auto InputTPU = InputCPU.to ( Device );
-  int Loops = 1;
+  auto InputCPU = torch::ones ( { Batch, 3, 224, 224 } );
+  auto InputTPU = InputCPU.to ( TPU );
+  InputCPU.set_requires_grad ( true );
+  InputTPU.set_requires_grad ( true );
   torch::Tensor OutputCPU, OutputTPU;
   tpu::Timer timer;
   timer.Start();
@@ -24,46 +26,64 @@ int main()
     OutputCPU = Resnet50CPU->forward ( InputCPU );
   }
   unsigned long elapsed_us_per_loop = ( double ) timer.ElapsedUS() / Loops;
-  std::cout << "CPU Elapsed time = " << elapsed_us_per_loop << "us" << std::endl;
+  std::cout << "Resnet50(Batch = " << Batch << ") Forward CPU Elapsed time = " << elapsed_us_per_loop << "us" << std::endl;
   timer.Start();
   for ( int i = 0; i < Loops; ++i )
   {
     OutputTPU = Resnet50TPU->forward ( InputTPU );
   }
   elapsed_us_per_loop = ( double ) timer.ElapsedUS() / Loops;
-  std::cout << "TPU Elapsed time = " << elapsed_us_per_loop << "us" << std::endl;
-  auto OutputGot = OutputTPU.to ( torch::Device ( "cpu" ) );
+  std::cout << "Resnet50(Batch = " << Batch << ") Forward TPU Elapsed time = " << elapsed_us_per_loop << "us" << std::endl;
+  auto OutputGot = OutputTPU.to ( CPU );
   auto OutputExp = OutputCPU;
-  torch::Tensor LabelsTPU;
-  auto Loss = torch::nll_loss ( OutputTPU, LabelsTPU );
-  //tpu::TPUCompareResult ( OutputGot, OutputExp );
-#else
-  auto T = torch::empty ( {2, 3, 4, 5}, Device );
-  auto A = torch::randn ( {2, 3, 4, 5} );
-//  for ( int i = 0; i < A.numel(); ++i )
-//  {
-//    A.data_ptr<float>() [i] = i;
-//  }
-#if 0
-  A = A.to ( torch::kFloat16 );
-  for ( int i = 0; i < A.numel(); ++i )
+  tpu::TPUCompareResult ( OutputGot, OutputExp );
+  //torch::Tensor LabelsTPU;
+  //auto Loss = torch::nll_loss ( OutputTPU, LabelsTPU );
+  auto BackwardInputCPU = torch::ones ( OutputTPU.sizes() );
+  auto BackwardInputTPU = BackwardInputCPU.to ( TPU );
+  timer.Start();
+  for ( int i = 0; i < Loops; ++i )
   {
-    std::cout << A.data_ptr<at::Half>() [i] << " ";
+    OutputCPU.backward ( BackwardInputCPU );
+  }
+  elapsed_us_per_loop = ( double ) timer.ElapsedUS() / Loops;
+  std::cout << "Resnet50(Batch = " << Batch << ") Backward CPU Elapsed time = " << elapsed_us_per_loop << "us" << std::endl;
+  timer.Start();
+  for ( int i = 0; i < Loops; ++i )
+  {
+    OutputTPU.backward ( BackwardInputTPU );
+  }
+  elapsed_us_per_loop = ( double ) timer.ElapsedUS() / Loops;
+  std::cout << "Resnet50(Batch = " << Batch << ") Backward TPU Elapsed time = " << elapsed_us_per_loop << "us" << std::endl;
+  std::cout << InputTPU.grad().device() << std::endl;
+  std::cout << InputCPU.grad().device() << std::endl;
+  auto GradInputGot = InputTPU.grad().to ( CPU );
+  auto GradInputExp = InputCPU.grad();
+  tpu::TPUCompareResult ( GradInputGot, GradInputExp );
+#else
+#if 0
+#endif
+  auto InputCPU = torch::ones ( {1, 3, 3, 3} );
+  auto InputTPU = InputCPU.to ( TPU );
+  InputCPU.set_requires_grad ( true );
+  InputTPU.set_requires_grad ( true );
+  torch::nn::Conv2d Conv2dTPU ( torch::nn::Conv2dOptions ( 3, 32, {2, 2} ) );
+  //auto OutputCPU = Conv2dCPU->forward ( InputCPU );
+  //auto Conv2dTPU ( Conv2dCPU );
+  tpu::MoveModuleToTPUDevice ( *Conv2dTPU );
+  auto OutputTPU = Conv2dTPU->forward ( InputTPU );
+  auto LossCPU = torch::ones ( OutputTPU.sizes() );
+  auto LossTPU = LossCPU.to ( TPU );
+  //Output.set_requires_grad ( true );
+  //OutputCPU.backward ( GradInputCPU );
+  std::cout << "OutputTPU requires grad = " << OutputTPU.requires_grad() << std::endl;
+  OutputTPU.backward ( LossTPU );
+  auto GradInputGot = InputTPU.grad().to ( CPU );
+  for ( auto i = 0; i < GradInputGot.numel(); ++i )
+  {
+    std::cout << GradInputGot.data_ptr<float>() [i] << " ";
   }
   std::cout << std::endl;
-#endif
-  auto InputCPU = torch::ones ( {64, 3, 3, 3} );
-  auto Input = InputCPU.to ( Device );
-  Input.set_requires_grad ( true );
-  torch::nn::Conv2d Conv2d ( torch::nn::Conv2dOptions ( 3, 32, {2, 2} ) );
-  tpu::MoveModuleToTPUDevice ( *Conv2d );
-  auto Output = Conv2d->forward ( Input );
-  auto E = torch::ones ( Output.sizes() ).to ( Device );
-  std::cout << Output.grad_fn() << std::endl;
-  std::cout << Output.grad_fn()->name() << std::endl;
-  //Output.set_requires_grad ( true );
-  Output.backward ( E );
-  auto OO = Input.grad();
 #endif
   return 0;
 }

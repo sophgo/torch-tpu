@@ -41,4 +41,36 @@ TORCH_LIBRARY_IMPL ( aten, PrivateUse1, m )
   m.impl ( "max_pool2d_with_indices", max_pool2d_with_indices_tpu );
 }
 
+Tensor max_pool2d_with_indices_backward_tpu (
+const Tensor & grad_output,
+const Tensor & input,
+IntArrayRef    kernel_size,
+IntArrayRef    stride,
+IntArrayRef    padding,
+IntArrayRef    dilation,
+bool           ceil_mode,
+const Tensor & indices )
+{
+  CHECK_TENSOR_IN_DEVICE ( grad_output );
+  CHECK_TENSOR_IN_DEVICE ( input );
+  CHECK_TENSOR_IN_DEVICE ( indices );
+  auto grad_output_cpu = grad_output.to ( torch::Device ( "cpu" ) );
+  auto input_cpu = input.to ( torch::Device ( "cpu" ) );
+  auto indices_cpu = indices.to ( torch::Device ( "cpu" ) );
+  auto grad_input_cpu = max_pool2d_with_indices_backward (
+                        grad_output_cpu,
+                        input_cpu,
+                        kernel_size,
+                        stride,
+                        padding,
+                        dilation,
+                        ceil_mode,
+                        indices_cpu );
+  auto grad_input = grad_input_cpu.to ( tpu::TPUGetCurrentDevice() );
+  return grad_input;
+}
+TORCH_LIBRARY_IMPL ( aten, PrivateUse1, m )
+{
+  m.impl ( "max_pool2d_with_indices_backward", max_pool2d_with_indices_backward_tpu );
+}
 } // namespace at
