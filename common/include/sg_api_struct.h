@@ -281,5 +281,17 @@ typedef struct {
 } sg_api_linear_forward_t;
 #endif
 
+typedef struct {
+    unsigned long long input_global_addr;
+    unsigned long long target_global_addr;
+    unsigned long long loss_global_addr;
+    int                batch;
+    int                cls_num;
+    int                reduction;
+    sg_data_type_t     dtype;
+#ifndef WIN32
+} __attribute__((packed)) sg_api_crossentropy_forward_t;
+#endif
+
 #pragma pack(pop)
 #endif  // SG_API_STRUCT_H

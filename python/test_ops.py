@@ -325,27 +325,31 @@ class Test_Backward_Ops(object):
                 [64, 2000],
                 ]
         for i, [batch, cls_num] in enumerate(fc_shapes):
+            """
+            if label is class indices, need cast to one-hot code or probabilities target
+            label = torch.randint(cls_num, (batch,))
+            """
             tpu_input = torch.randn((batch, cls_num), requires_grad = True)
-            # if label is class indices, need cast to one-hot code or probabilities target
-            # label = torch.randint(cls_num, (batch,))
-            target = torch.rand(batch, cls_num).softmax(dim=1)
+            tpu_input.data-=0.5
+            target = torch.randn(batch, cls_num)
+            target.data-=0.5
+            target = target.softmax(dim=1)
             output = CrossEntropy(tpu_input, target, reduction)
             loss = output.data
             output.backward(loss)
-            # pytorch reference
+
+            # pytorch reference         
             torch_input = torch.rand((batch, cls_num), requires_grad = True)
             torch_input.data = tpu_input.data
-            # loss=0
-            # for j in range(batch):
-            #     loss+=torch.log(torch_input.softmax(dim=1)[j][label[j]])
-            # loss/=-batch
             if reduction:
-                torch_output = torch.nn.functional.cross_entropy(torch_input, target, reduction="sum")
+                torch_loss = torch.nn.functional.cross_entropy(torch_input, target, reduction="sum")
             else:
-                torch_output = torch.nn.functional.cross_entropy(torch_input, target, reduction="mean")
-            torch_output.backward()
+                torch_loss = torch.nn.functional.cross_entropy(torch_input, target, reduction="mean")
+            torch_loss.backward()
             print("case:",i)
+            grad_compare(loss, torch_loss, 1e-1)
             grad_compare(tpu_input.grad, torch_input.grad, 1e-1)
+
 
 if __name__ == "__main__":
     test = Test_Backward_Ops()

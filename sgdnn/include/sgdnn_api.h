@@ -455,6 +455,16 @@ bm_status_t sgdnn_cross_entropy_backward(
     bool               reduction,
     sg_data_type_t     dtype);
 
+bm_status_t sgdnn_cross_entropy_forward(
+    bm_handle_t        handle,
+    bm_device_mem_t    input,
+    bm_device_mem_t    target,
+    bm_device_mem_t    loss,
+    int                batch,
+    int                cls,
+    bool               reduction,
+    sg_data_type_t     dtype);
+
 #if defined(__cplusplus)
 }
 #endif

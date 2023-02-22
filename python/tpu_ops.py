@@ -520,14 +520,28 @@ def Relu(input):
 class CrossEntropyFunc(Function):
     @staticmethod
     def forward(ctx, input, target, reduction_op=0):
+        # ctx.reduction_op = reduction_op
+        # ctx.save_for_backward(input, target)
+        # return F.cross_entropy(input, target)
+        batch = input.shape[0]
+        cls_num = input.shape[1]
+        input_np = np.asarray(input.data.flatten())
+        target_np = np.asarray(target.data.flatten())
+        loss_np = np.ones(1, dtype=np.float32)
+        sgdnn_pybind.cross_entropy_forward(input_np,
+                                           target_np,
+                                           loss_np,
+                                           batch,
+                                           cls_num,
+                                           reduction_op)
         ctx.reduction_op = reduction_op
         ctx.save_for_backward(input, target)
-        return F.cross_entropy(input, target)
+        loss = torch.from_numpy(loss_np)
+        return loss
 
     @staticmethod
     def backward(ctx,loss):
         input, target= ctx.saved_tensors
-        reduction = ctx.reduction_op
         batch = input.shape[0]
         cls_num = input.shape[1]
         input_np = np.asarray(input.data.flatten())
@@ -538,7 +552,7 @@ class CrossEntropyFunc(Function):
                                            grad_input_np,
                                            batch,
                                            cls_num,
-                                           reduction)
+                                           ctx.reduction_op)
         grad_input = torch.from_numpy(grad_input_np).reshape((batch, cls_num))
         return grad_input, None, None
 

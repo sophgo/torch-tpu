@@ -1487,6 +1487,49 @@ bm_status_t sgdnn_activation_backward_cudnn(
     return BM_ERR_NOFEATURE;
 }
 
+bm_status_t sgdnn_cross_entropy_forward(
+    bm_handle_t        handle,
+    bm_device_mem_t    input,
+    bm_device_mem_t    target,
+    bm_device_mem_t    loss,
+    int                batch,
+    int                cls_num,
+    int                reduction,
+    sg_data_type_t     dtype)
+{
+    auto dtype_size = [](int dtype) {
+        int size = 1;
+        if (dtype == SG_DTYPE_INT8 || dtype == SG_DTYPE_UINT8) size = 1;
+        else if (dtype == SG_DTYPE_INT16 || dtype == SG_DTYPE_UINT16 ||
+                 dtype == SG_DTYPE_FP16 || dtype == SG_DTYPE_BFP16)
+            size = 2;
+        else if (dtype == SG_DTYPE_FP32 || dtype == SG_DTYPE_INT32 || dtype == SG_DTYPE_UINT32)
+            size = 4;
+        return size;};
+
+    bm_device_mem_t input_mem, target_mem;
+    bm_device_mem_t loss_mem;
+    u64 size = (u64)batch * cls_num * dtype_size(dtype);
+
+    DEVICE_MEM_NEW_INPUT(handle, input, size, input_mem);
+    DEVICE_MEM_NEW_INPUT(handle, target, size, target_mem);
+    DEVICE_MEM_NEW_OUTPUT(handle, loss, dtype_size(dtype), loss_mem);
+
+    sg_api_crossentropy_backward_t api = {
+        bm_mem_get_device_addr(input_mem),
+        bm_mem_get_device_addr(target_mem),
+        bm_mem_get_device_addr(loss_mem),
+        batch, cls_num, reduction, dtype};
+
+    tpu_kernel_launch_sync(handle, "tpu_kernel_api_cross_entropy_forward", &api, sizeof(api));
+
+    DEVICE_MEM_DEL_INPUT(handle, input, input_mem);
+    DEVICE_MEM_DEL_INPUT(handle, target, target_mem);
+    DEVICE_MEM_DEL_OUTPUT(handle, loss, loss_mem);
+
+    return BM_SUCCESS;
+}
+
 bm_status_t sgdnn_cross_entropy_backward(
     bm_handle_t        handle,
     bm_device_mem_t    input,
@@ -2142,6 +2185,34 @@ PYBIND11_MODULE(sgdnn_pybind, m)
         bm_dev_free(handle);
     });
 
+    m.def("cross_entropy_forward", [](py::array_t<float> input,
+                                    py::array_t<float> target,
+                                    py::array_t<float> loss,
+                                    int batch,
+                                    int cls_num,
+                                    int reduction) {
+        py::buffer_info input_buf = input.request();
+        float *input_fp = (float *)input_buf.ptr;
+        py::buffer_info target_buf = target.request();
+        float *target_fp = (float *)target_buf.ptr;
+        py::buffer_info loss_buf = loss.request();
+        float *loss_fp = (float *)loss_buf.ptr;
+
+        bm_handle_t handle;
+        bm_dev_request(&handle, 0);
+
+        bm_status_t status = sgdnn_cross_entropy_forward(handle,
+                            bm_mem_from_system(input_fp),
+                            bm_mem_from_system(target_fp),
+                            bm_mem_from_system(loss_fp),
+                            batch, cls_num, reduction,
+                            (sg_data_type_t)0);
+
+        UNUSED(status);
+        assert(status == BM_SUCCESS);
+        bm_dev_free(handle);
+    });
+    
     m.def("cross_entropy_backward", [](py::array_t<float> input,
                                     py::array_t<float> target,
                                     py::array_t<float> grad_input,
