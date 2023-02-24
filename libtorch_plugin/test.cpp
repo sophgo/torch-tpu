@@ -14,13 +14,16 @@ int main()
   auto Resnet50CPU = std::make_shared<tpu::TorchscriptModule> ( ModelPath );
   auto Resnet50TPU = std::make_shared<tpu::TorchscriptModule> ( ModelPath );
   tpu::MoveModuleToTPUDevice ( *Resnet50TPU );
+  Resnet50CPU->train();
+  Resnet50TPU->train();
   auto InputCPU = torch::ones ( { Batch, 3, 224, 224 } );
-  auto InputTPU = InputCPU.to ( TPU );
+  auto InputTPU = torch::ones ( { Batch, 3, 224, 224 } ).to ( TPU );
   InputCPU.set_requires_grad ( true );
   InputTPU.set_requires_grad ( true );
   torch::Tensor OutputCPU, OutputTPU;
   tpu::Timer timer;
   timer.Start();
+  tpu::OpTimer::Instance().Clear();
   for ( int i = 0; i < Loops; ++i )
   {
     OutputCPU = Resnet50CPU->forward ( InputCPU );
@@ -40,7 +43,7 @@ int main()
   //torch::Tensor LabelsTPU;
   //auto Loss = torch::nll_loss ( OutputTPU, LabelsTPU );
   auto BackwardInputCPU = torch::ones ( OutputTPU.sizes() );
-  auto BackwardInputTPU = BackwardInputCPU.to ( TPU );
+  auto BackwardInputTPU = torch::ones ( OutputTPU.sizes() ).to ( TPU );
   timer.Start();
   for ( int i = 0; i < Loops; ++i )
   {
@@ -55,8 +58,7 @@ int main()
   }
   elapsed_us_per_loop = ( double ) timer.ElapsedUS() / Loops;
   std::cout << "Resnet50(Batch = " << Batch << ") Backward TPU Elapsed time = " << elapsed_us_per_loop << "us" << std::endl;
-  std::cout << InputTPU.grad().device() << std::endl;
-  std::cout << InputCPU.grad().device() << std::endl;
+  tpu::OpTimer::Instance().Dump();
   auto GradInputGot = InputTPU.grad().to ( CPU );
   auto GradInputExp = InputCPU.grad();
   tpu::TPUCompareResult ( GradInputGot, GradInputExp );

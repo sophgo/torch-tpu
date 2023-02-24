@@ -25,6 +25,7 @@ file(GLOB_RECURSE SRCS
   tpu/TPUAllocator.cpp
   tpu/TPUDeviceManager.cpp
   tpu/TPUModule.cpp
+  tpu/TPUTorchUtils.cpp
   ops/*.cpp
 )
 

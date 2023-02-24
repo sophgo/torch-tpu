@@ -17,9 +17,9 @@ static inline void test ( at::IntArrayRef     grad_output_shape,
   auto input_tpu = input_cpu.to ( tpu::TPUGetCurrentDevice() );
   auto weight_tpu = weight_cpu.to ( tpu::TPUGetCurrentDevice() );
   auto outputs_cpu = torch::convolution_backward (
-                     grad_output_cpu,
-                     input_cpu,
-                     weight_cpu,
+                     grad_output_cpu.to ( torch::kDouble ),
+                     input_cpu.to ( torch::kDouble ),
+                     weight_cpu.to ( torch::kDouble ),
                      at::OptionalIntArrayRef ( { weight_shape[0] } ),
                      stride,
                      padding,
@@ -45,17 +45,17 @@ static inline void test ( at::IntArrayRef     grad_output_shape,
   if ( output_mask[0] == true )
   {
     grad_input_got = std::get<0> ( outputs_tpu ).to ( torch::Device ( "cpu" ) );
-    grad_input_exp = std::get<0> ( outputs_cpu );
+    grad_input_exp = std::get<0> ( outputs_cpu ).to ( torch::kFloat );
   }
   if ( output_mask[1] == true )
   {
     grad_weight_got = std::get<1> ( outputs_tpu ).to ( torch::Device ( "cpu" ) );
-    grad_weight_exp = std::get<1> ( outputs_cpu );
+    grad_weight_exp = std::get<1> ( outputs_cpu ).to ( torch::kFloat );
   }
   if ( output_mask[2] == true )
   {
     grad_bias_got = std::get<2> ( outputs_tpu ).to ( torch::Device ( "cpu" ) );
-    grad_bias_exp = std::get<2> ( outputs_cpu );
+    grad_bias_exp = std::get<2> ( outputs_cpu ).to ( torch::kFloat );
   }
   std::cout << "Comparing convolution backward:"
             << " grad_output shape = " << grad_output_tpu.sizes()

@@ -17,6 +17,7 @@ IntArrayRef    padding,
 IntArrayRef    dilation,
 bool           ceil_mode )
 {
+  //std::cout << "Maxpooling" << std::endl;
   CHECK_TENSOR_IN_DEVICE ( input );
   std::tuple<Tensor, Tensor> outputs;
 #if 1
