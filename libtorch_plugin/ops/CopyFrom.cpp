@@ -8,69 +8,56 @@
 
 namespace at
 {
-Tensor _copy_from_tpu ( const Tensor & self, const Tensor & dst,
-                        bool non_blocking )
+Tensor _copy_from_tpu ( const Tensor & src, const Tensor & dst, bool non_blocking )
 {
-  auto output = dst;
-  if ( self.is_contiguous() == false || dst.is_contiguous() == false )
+  TORCH_CHECK ( non_blocking == false );
+  if ( src.is_contiguous() == false || dst.is_contiguous() == false )
   {
     LOG ( FATAL ) << "TPU only supports contiguous memory copy for now";
   }
-  if ( self.dtype() == dst.dtype() )
+  if ( src.dtype() == dst.dtype() )
   {
-    if ( self.device().type() == DeviceType::CPU &&
-         dst.device().type() == DeviceType::PrivateUse1 )
+    TORCH_CHECK ( src.nbytes() == dst.nbytes() );
+    if ( src.device().type() == DeviceType::CPU && dst.device().type() == DeviceType::PrivateUse1 )
     {
-      tpu::TPUCopyHostToDevice ( dst.data_ptr(), self.data_ptr(),
-                                 dst.nbytes() );
+      tpu::TPUCopyHostToDevice ( dst.data_ptr(), src.data_ptr(), dst.nbytes() );
     }
-    else if ( self.device().type() == DeviceType::PrivateUse1 &&
-              dst.device().type() == DeviceType::CPU )
+    else if ( src.device().type() == DeviceType::PrivateUse1 && dst.device().type() == DeviceType::CPU )
     {
-      tpu::TPUCopyDeviceToHost ( dst.data_ptr(), self.data_ptr(),
-                                 dst.nbytes() );
+      tpu::TPUCopyDeviceToHost ( dst.data_ptr(), src.data_ptr(), dst.nbytes() );
     }
-    else if ( self.device().type() == DeviceType::PrivateUse1 &&
-              dst.device().type() == DeviceType::PrivateUse1 )
+    else if ( src.device().type() == DeviceType::PrivateUse1 && dst.device().type() == DeviceType::PrivateUse1 )
     {
-      tpu::TPUCopyDeviceToDevice ( dst.data_ptr(), self.data_ptr(),
-                                   dst.nbytes() );
+      tpu::TPUCopyDeviceToDevice ( dst.data_ptr(), src.data_ptr(), dst.nbytes() );
     }
     else
     {
-      LOG ( FATAL ) << "Unsupported copy from device " << self.device()
+      LOG ( FATAL ) << "Unsupported copy from device " << src.device()
                     << " to device " << dst.device();
     }
   }
   else
   {
-    if ( self.device().type() == DeviceType::CPU &&
-         dst.device().type() == DeviceType::PrivateUse1 )
+    if ( src.device().type() == DeviceType::CPU && dst.device().type() == DeviceType::PrivateUse1 )
     {
-      // SELF CPU -> SELF TPU -> DST TPU
-      auto SelfTPU = self.to ( dst.device() );
-      _copy_from_tpu ( SelfTPU, dst, non_blocking );
+      _copy_from_tpu ( src.to ( dst.device() ), dst, non_blocking );
     }
-    else if ( self.device().type() == DeviceType::PrivateUse1 &&
-              dst.device().type() == DeviceType::CPU )
+    else if ( src.device().type() == DeviceType::PrivateUse1 &&  dst.device().type() == DeviceType::CPU )
     {
-      // SELF TPU -> DST TPU -> DST CPU
-      auto DstTPU = self.to ( dst.dtype() );
-      _copy_from_tpu ( DstTPU, dst, non_blocking );
+      _copy_from_tpu ( src.to ( dst.dtype() ), dst, non_blocking );
     }
-    else if ( self.device().type() == DeviceType::PrivateUse1 &&
-              dst.device().type() == DeviceType::PrivateUse1 )
+    else if ( src.device().type() == DeviceType::PrivateUse1 && dst.device().type() == DeviceType::PrivateUse1 )
     {
-      LOG ( FATAL ) << "Cast from " << self.dtype()
+      LOG ( FATAL ) << "Cast from " << src.dtype()
                     << " to " << dst.dtype() << " is not implemented";
     }
     else
     {
-      LOG ( FATAL ) << "Unsupported copy from device " << self.device()
+      LOG ( FATAL ) << "Unsupported copy from device " << src.device()
                     << " to device " << dst.device();
     }
   }
-  return output;
+  return dst;
 }
 TORCH_LIBRARY_IMPL ( aten, PrivateUse1, m )
 {

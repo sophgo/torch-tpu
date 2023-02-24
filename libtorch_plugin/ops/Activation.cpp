@@ -8,11 +8,21 @@
 #include <sgdnn_api.h>
 #include <limits.h>
 
+//#define TPU_LIBTORCH_OP_COMPARE
+#define TPU_OP_TIMING
+
 namespace at
 {
 
 Tensor & relu__tpu ( Tensor & self )
 {
+  //std::cout << "ReLU" << std::endl;
+#if 0
+  auto self_cpu = self.to ( torch::Device ( "cpu" ) );
+  relu_ ( self_cpu );
+  self = self_cpu.to ( tpu::TPUGetCurrentDevice() );
+  return self;
+#else
   CHECK_TENSOR_IN_DEVICE ( self );
 #ifdef TPU_LIBTORCH_OP_COMPARE
   auto self_cpu = self.to ( torch::Device ( "cpu" ) );
@@ -29,6 +39,9 @@ Tensor & relu__tpu ( Tensor & self )
     .NanOpt = Not_Propagate_Nan,
     .coef = std::numeric_limits<double>::max()
   };
+#ifdef TPU_OP_TIMING
+  auto timer = tpu::Timer().Start();
+#endif
   status = sgdnn_activation_forward_cudnn (
            handle,
            activation_desc,
@@ -38,6 +51,9 @@ Tensor & relu__tpu ( Tensor & self )
            &beta,
            self_desc,
            ADDR_IN_DEVICE ( self ) );
+#ifdef TPU_OP_TIMING
+  tpu::OpTimer::Instance().AddTime ( tpu::RELU, timer.ElapsedUS() );
+#endif
 #ifdef TPU_LIBTORCH_OP_COMPARE
   std::cout << "Comparing inplace relu:"
             << " self shape = " << self.sizes()
@@ -47,6 +63,7 @@ Tensor & relu__tpu ( Tensor & self )
   tpu::TPUCompareResult ( output_got, output_exp );
 #endif
   return self;
+#endif
 }
 TORCH_LIBRARY_IMPL ( aten, PrivateUse1, m )
 {
@@ -81,6 +98,9 @@ Tensor       & grad_input )
     .NanOpt = Not_Propagate_Nan,
     .coef = threshold.toDouble()
   };
+#ifdef TPU_OP_TIMING
+  auto timer = tpu::Timer().Start();
+#endif
   status = sgdnn_activation_backward_cudnn (
            handle,
            activation_desc,
@@ -94,6 +114,9 @@ Tensor       & grad_input )
            &beta,
            grad_input_desc,
            ADDR_IN_DEVICE ( grad_input ) );
+#ifdef TPU_OP_TIMING
+  tpu::OpTimer::Instance().AddTime ( tpu::RELU_BACKWARD, timer.ElapsedUS() );
+#endif
 #ifdef TPU_LIBTORCH_OP_COMPARE
   std::cout << "Comparing threshold backward:"
             << " grad_output shape = " << grad_output.sizes()

@@ -14,12 +14,14 @@ Tensor & binary_Tensor_tpu ( const Tensor          & input1,
                              Tensor                & out,
                              const EltwiseOpMode_t & op )
 {
-  if ( input1.device().type() == DeviceType::PrivateUse1 &&
-       input2.device().type() == DeviceType::PrivateUse1 )
+  if ( input1.device().type() == DeviceType::PrivateUse1 && input2.device().type() == DeviceType::PrivateUse1 )
   {
     CHECK_TENSOR_IN_DEVICE ( input1 );
+    TORCH_CHECK ( input1.is_contiguous() );
     CHECK_TENSOR_IN_DEVICE ( input2 );
+    TORCH_CHECK ( input2.is_contiguous() );
     CHECK_TENSOR_IN_DEVICE ( out );
+    TORCH_CHECK ( out.is_contiguous() );
     auto input1_desc = tpu::TPUGenerateTensorDesc ( input1 );
     auto input2_desc = tpu::TPUGenerateTensorDesc ( input2 );
     auto output_desc = tpu::TPUGenerateTensorDesc ( out );
@@ -51,6 +53,7 @@ Tensor & add_out_tpu ( const Tensor & input1,
                        const Scalar & alpha,
                        Tensor       & out )
 {
+  //std::cout << "Add" << std::endl;
 #ifdef TPU_LIBTORCH_OP_COMPARE
   auto input1_cpu = input1.to ( torch::Device ( "cpu" ) );
   auto input2_cpu = input2.to ( torch::Device ( "cpu" ) );
@@ -76,7 +79,7 @@ Tensor & div_out_tpu ( const Tensor & input1,
   auto input1_cpu = input1.to ( torch::Device ( "cpu" ) );
   auto input2_cpu = input2.to ( torch::Device ( "cpu" ) );
   auto output_cpu = torch::div ( input1_cpu, input2_cpu );
-  output = output_cpu.to ( tpu::TPUGetCurrentDevice() );
+  output = output_cpu.contiguous().to ( tpu::TPUGetCurrentDevice() );
   return output;
 }
 TORCH_LIBRARY_IMPL ( aten, PrivateUse1, m )

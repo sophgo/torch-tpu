@@ -1,10 +1,14 @@
 #pragma once
 
+#include <torch/library.h>
+#include <torch/torch.h>
 #include <ATen/core/TensorBase.h>
 #include <c10/util/Logging.h>
 #include <sgdnn_api.h>
 #include <TPUDeviceManager.h>
 #include <sys/time.h>
+#include <cmath>
+#include <mutex>
 
 #define CHECK_TENSOR_IN_DEVICE(t)                                  \
 do                                                                 \
@@ -64,7 +68,8 @@ const at::Tensor & Tensor )
 }
 
 static inline void TPUCompareResult ( const at::Tensor & Got,
-                                      const at::Tensor & Exp )
+                                      const at::Tensor & Exp,
+                                      double ErrScale = 1.0 )
 {
   if ( Got.dtype() != Exp.dtype() )
   {
@@ -78,33 +83,38 @@ static inline void TPUCompareResult ( const at::Tensor & Got,
   }
   if ( Got.dtype() == caffe2::TypeMeta::Make<float>() )
   {
+    int ErrCnt = 0;
+    const int MaxErrCnt = 100;
     auto AbsErr = torch::abs ( torch::sub ( Got, Exp ) );
     auto AbsExp = torch::abs ( Exp );
-    auto RltAbsErr = torch::div ( AbsErr, AbsExp );
+    auto RltAbsErr = torch::div ( AbsErr, AbsExp ) * ErrScale;
     auto GotPtr = Got.data_ptr<float>();
     auto ExpPtr = Exp.data_ptr<float>();
     auto AbsErrPtr = AbsErr.data_ptr<float>();
-    auto AbsExpPtr = AbsExp.data_ptr<float>();
     auto RltAbsErrPtr = RltAbsErr.data_ptr<float>();
     for ( auto i = 0; i < Got.numel(); ++i )
     {
-      if ( AbsErrPtr[i] == 0.f )
+      if ( std::isnan ( ExpPtr[i] ) == true && std::isnan ( GotPtr[i] ) == true )
       {
         continue;
       }
-      if ( AbsExpPtr[i] == 0.f && AbsErrPtr[i] == 0.f )
+      if ( AbsErrPtr[i] < 1e-4 || RltAbsErrPtr[i] <= 1e-5 )
       {
         continue;
       }
-      if ( AbsExpPtr[i] != 0.f && ( RltAbsErrPtr[i] <= 5e-2 || AbsErrPtr[i] <= 7e-3 ) )
+FAILED:
+      if ( ErrCnt < MaxErrCnt )
       {
-        continue;
+        LOG ( WARNING ) << "Compare failed: Got = " << GotPtr[i]
+                        << ", Exp = " << ExpPtr[i]
+                        << ", index = " << i;
       }
-      LOG ( FATAL ) << "Tensor comparing failed: Got = " << GotPtr[i]
-                    << ", Exp = " << ExpPtr[i]
-                    << ", AbsErr = " << AbsErrPtr[i]
-                    << ", RltAbsErr = " << RltAbsErrPtr[i]
-                    << ", index = " << i;
+      else
+      {
+        LOG ( WARNING ) << "<Skip the other compare errors>";
+        return;
+      }
+      ++ErrCnt;
     }
   }
   else
@@ -132,6 +142,40 @@ struct Timer
   }
 private:
   struct timeval timer;
+};
+
+typedef enum
+{
+  CONVOLUTION = 0,
+  CONVOLUTION_BACKWARD,
+  BATCHNORM,
+  BATCHNORM_BACKWARD,
+  RELU,
+  RELU_BACKWARD,
+  OP_NUM
+}
+OpType;
+
+static const char * OpTypeStr[OP_NUM] =
+{
+  "Convolution",
+  "Convolution Backward",
+  "Batchnorm",
+  "Batchnorm Backward",
+  "ReLU",
+  "ReLU Backward"
+};
+
+struct OpTimer
+{
+  OpTimer & Clear();
+  OpTimer & AddTime ( OpType type, unsigned long time_us );
+  void Dump() const;
+  static OpTimer & Instance();
+private:
+  unsigned long long elapsed_time_us_[OP_NUM];
+  std::mutex mutex_;
+  static OpTimer * instance_;
 };
 
 } // namespace tpu

@@ -1,5 +1,6 @@
 #include <TPUAllocator.h>
 #include <TPUDeviceManager.h>
+#include <TPUTorchUtils.h>
 
 namespace c10
 {
@@ -20,15 +21,7 @@ struct C10_API DefaultTPUAllocator final : at::Allocator
       throw e;
     }
     profiledTPUMemoryReporter().New ( data, nbytes );
-    auto Device = at::Device ( at::DeviceType::PrivateUse1 );
-    Device.set_index ( tpu::TPUGetDeviceIndex() );
-    return
-    {
-      data,
-      data,
-      &ReportAndDelete,
-      Device
-    };
+    return { data, data, &ReportAndDelete, tpu::TPUGetCurrentDevice() };
   }
 
   static void ReportAndDelete ( void * ptr )

@@ -24,9 +24,9 @@ static inline void test ( at::IntArrayRef input_shape,
     bias_tpu = bias_cpu.to ( tpu::TPUGetCurrentDevice() );
   }
   auto output_cpu = torch::convolution (
-                    input_cpu,
-                    weight_cpu,
-                    c10::optional<at::Tensor> ( bias_cpu ),
+                    input_cpu.to ( torch::kDouble ),
+                    weight_cpu.to ( torch::kDouble ),
+                    has_bias ? c10::optional<at::Tensor> ( bias_cpu.to ( torch::kDouble ) ) : c10::optional<at::Tensor>(),
                     stride,
                     padding,
                     dilation,
@@ -44,7 +44,7 @@ static inline void test ( at::IntArrayRef input_shape,
                     at::IntArrayRef ( { 0, 0 } ),
                     groups );
   auto output_got = output_tpu.to ( torch::Device ( "cpu" ) );
-  auto output_exp = output_cpu;
+  auto output_exp = output_cpu.to ( torch::kFloat );
   std::cout << "Comparing convolution:"
             << " input shape = " << input_tpu.sizes()
             << " input dtype = " << input_tpu.dtype()
@@ -59,7 +59,11 @@ static inline void test ( at::IntArrayRef input_shape,
             << " dilation = " << dilation
             << " groups = " << groups
             << std::endl;
+#if 0
+  tpu::TPUCompareResult ( output_got, output_exp, 1.0 / ( ( double ) weight_tpu.size ( 1 ) * weight_tpu.size ( 2 ) * weight_tpu.size ( 3 ) ) );
+#else
   tpu::TPUCompareResult ( output_got, output_exp );
+#endif
 }
 
 int main()
