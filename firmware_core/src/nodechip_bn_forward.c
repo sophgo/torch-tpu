@@ -554,6 +554,7 @@ void nodechip_batchnorm_forward_training(
     global_addr_t batch_mean_global_addr,
     global_addr_t batch_invstd_global_addr,
     global_addr_t output_global_addr,
+    global_addr_t buffer_global_addr,
     dim4          shape,
     float         momentum,
     float         eps,
@@ -562,7 +563,7 @@ void nodechip_batchnorm_forward_training(
     dim4 trans_shape = {shape.c, shape.n, shape.h, shape.w};
     dim4 new_shape = {1, shape.c, 1, shape.n*shape.h*shape.w};
     tpu_gdma_cpy_nc_trans_S2S(
-        output_global_addr,
+        buffer_global_addr,
         input_global_addr,
         &trans_shape,
         NULL,
@@ -581,7 +582,7 @@ void nodechip_batchnorm_forward_training(
             for(int cidx=0; cidx < cslice; cidx++)
             {
                 batchnorm_forward_split_c(
-                    output_global_addr + cidx * csecs * shape.n * shape.h * shape.w * tpu_data_type_size(dtype),
+                    buffer_global_addr + cidx * csecs * shape.n * shape.h * shape.w * tpu_data_type_size(dtype),
                     running_mean_global_addr + cidx * csecs * tpu_data_type_size(dtype),
                     running_var_global_addr + cidx * csecs * tpu_data_type_size(dtype),
                     weight_global_addr + cidx * csecs * tpu_data_type_size(dtype),
@@ -590,7 +591,7 @@ void nodechip_batchnorm_forward_training(
                     updated_var_global_addr + cidx * csecs * tpu_data_type_size(dtype),
                     batch_mean_global_addr + cidx * csecs * tpu_data_type_size(dtype),
                     batch_invstd_global_addr + cidx * csecs * tpu_data_type_size(dtype),
-                    input_global_addr + cidx * csecs * shape.n * shape.h * shape.w * tpu_data_type_size(dtype),
+                    buffer_global_addr + cidx * csecs * shape.n * shape.h * shape.w * tpu_data_type_size(dtype),
                     new_shape,
                     shape.n*shape.h*shape.w,
                     cidx == cslice-1 ? shape.c - cidx * csecs : csecs,
@@ -603,7 +604,7 @@ void nodechip_batchnorm_forward_training(
         {   
             TPUKERNEL_ASSERT(is_local_mem_enough(shape.n, shape.c, tpu_eu_num(dtype), 0, dtype));
             batchnorm_forward_split_hw(
-                output_global_addr,
+                buffer_global_addr,
                 running_mean_global_addr,
                 running_var_global_addr,
                 weight_global_addr,
@@ -612,7 +613,7 @@ void nodechip_batchnorm_forward_training(
                 updated_var_global_addr,
                 batch_mean_global_addr,
                 batch_invstd_global_addr,
-                input_global_addr,
+                buffer_global_addr,
                 new_shape,
                 momentum,
                 eps,
@@ -622,7 +623,7 @@ void nodechip_batchnorm_forward_training(
     else
     {
         batchnorm_forward_split_c(
-            output_global_addr,
+            buffer_global_addr,
             running_mean_global_addr,
             running_var_global_addr,
             weight_global_addr,
@@ -631,7 +632,7 @@ void nodechip_batchnorm_forward_training(
             updated_var_global_addr,
             batch_mean_global_addr,
             batch_invstd_global_addr,
-            input_global_addr,
+            buffer_global_addr,
             new_shape,
             shape.n*shape.h*shape.w,
             shape.c,
@@ -641,7 +642,7 @@ void nodechip_batchnorm_forward_training(
     }
     tpu_gdma_cpy_nc_trans_S2S(
         output_global_addr,
-        input_global_addr,
+        buffer_global_addr,
         &shape,
         NULL,
         NULL,
@@ -666,6 +667,7 @@ void tpu_kernel_api_batchnorm_forward(const void* args)
         api->batch_mean_global_addr,
         api->batch_invstd_global_addr,
         api->output_global_addr,
+        api->buffer_global_addr,
         shape,
         api->momentum,
         api->eps,

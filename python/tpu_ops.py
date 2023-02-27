@@ -165,6 +165,8 @@ class BatchNorm2dFunc(Function):
                                         input.shape[3],
                                         momentum,
                                         eps)
+        input = torch.from_numpy(input_np).reshape(input.shape)
+        weight = torch.from_numpy(weight_np).reshape(weight.shape)
         running_mean = torch.from_numpy(running_mean_np).reshape(weight.shape)
         running_var = torch.from_numpy(running_var_np).reshape(weight.shape)
         batch_mean = torch.from_numpy(batch_mean_np).reshape(weight.shape)

@@ -160,7 +160,7 @@ class Test_Backward_Ops(object):
         eps = 1e-5
         momentum = 0.1
         resnet50_shapes = [
-                [64, 3, 112, 112],
+                [64, 64, 112, 112],
                 [64, 64, 56, 56],
                 [64, 128, 56, 56],
                 [64, 256, 56, 56],
@@ -186,6 +186,17 @@ class Test_Backward_Ops(object):
             weight.data-=0.5
             bias.data-=0.5
             grad_output = torch.randn((n, c, h, w))
+            torch_input = torch.rand((n, c, h, w), requires_grad = True)
+            torch_rmean = torch.rand(c, requires_grad = False)
+            torch_rvar = torch.rand(c, requires_grad = False)
+            torch_weight = torch.rand(c, requires_grad = True)
+            torch_bias = torch.rand(c, requires_grad = True)
+            torch_input.data = tpu_input.data
+            torch_rmean.data = running_mean.data
+            torch_rvar.data = running_var.data
+            torch_weight.data = weight.data
+            torch_bias.data = bias.data
+            
             output = BatchNorm2d(tpu_input, tpu_rmean, tpu_rvar, weight, bias)
             output.backward(grad_output)
             
@@ -202,16 +213,6 @@ class Test_Backward_Ops(object):
             # return
         
             # # pytorch reference
-            torch_input = torch.rand((n, c, h, w), requires_grad = True)
-            torch_rmean = torch.rand(c, requires_grad = False)
-            torch_rvar = torch.rand(c, requires_grad = False)
-            torch_weight = torch.rand(c, requires_grad = True)
-            torch_bias = torch.rand(c, requires_grad = True)
-            torch_input.data = tpu_input.data
-            torch_rmean.data = running_mean.data
-            torch_rvar.data = running_var.data
-            torch_weight.data = weight.data
-            torch_bias.data = bias.data
             torch_output = torch.nn.functional.batch_norm(
                 torch_input,
                 torch_rmean,
