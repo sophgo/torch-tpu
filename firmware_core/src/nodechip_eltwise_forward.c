@@ -1,6 +1,7 @@
 #include "common.h"
 #include "sg_api_struct.h"
 #include "common_def.h"
+#include "tpu_utils.h"
 #include "tpu_kernel.h"
 
 #define ELTWISE_OP_DOT_MUL 0
@@ -85,14 +86,13 @@ void nodechip_eltwise_twoinput_cal_forward(
     unsigned long long global_step = 0;
     dim4 local_stride;
     dim4 tensor_dim;
-    const int COL_MAX = 65536;
     while(left_count > 0) {
-        if (left_count >= total_mem) {
+        if (left_count >= (total_mem / tpu_data_type_size(dtype) * NPU_NUM)) {
             col = NPU_NUM * sec_len;
-            row = total_mem/(sec_len * (dtype == DT_FP32 ? 4 : 2));
-        } else if (left_count > COL_MAX) {
-            col = COL_MAX;
-            row = 1;
+            row = total_mem / (col * (dtype == DT_FP32 ? 4 : 2));
+        } else if (left_count > (tpu_eu_num(dtype) * NPU_NUM)) {
+            col = NPU_NUM * sec_len;
+            row = left_count / col;
         } else {
             col = left_count;
             row = 1;
@@ -363,8 +363,8 @@ void tpu_kernel_api_eltwise_forward(const void* args) {
     int coeff[2] = {api->coeff_A, api->coeff_B};
     int mask_index[2] = {api->mask_index_A, api->mask_index_B};
 
-    data_type_t idtype = api->idtype;
-    data_type_t odtype = api->odtype;
+    data_type_t idtype = tpu_type_convert(api->idtype);
+    data_type_t odtype = tpu_type_convert(api->odtype);
     TPUKERNEL_ASSERT(idtype == odtype);
     data_type_t dtype = idtype;
 
