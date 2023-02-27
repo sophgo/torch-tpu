@@ -150,7 +150,7 @@ typedef struct {
 #ifndef WIN32
 } __attribute__((packed)) sg_api_crossentropy_backward_t;
 #else
-} sg_api_softmax_backward_t;
+} sg_api_crossentropy_backward_t;
 #endif
 
 typedef struct {
@@ -291,6 +291,8 @@ typedef struct {
     sg_data_type_t     dtype;
 #ifndef WIN32
 } __attribute__((packed)) sg_api_crossentropy_forward_t;
+#else
+} sg_api_crossentropy_forward_t;
 #endif
 
 #pragma pack(pop)

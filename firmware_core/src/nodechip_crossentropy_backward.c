@@ -4,7 +4,7 @@
 #include "tpu_utils.h"
 #include "tpu_kernel.h"
 /**
- * Cross Etropy Loss (include Softmax):
+ * Cross Entropy Loss (include Softmax):
  * 
  * backward:
  * input(batch, cls_num)
@@ -158,7 +158,7 @@ void tpu_kernel_api_cross_entropy_backward(const void *args)
     sg_api_crossentropy_backward_t *api = (sg_api_crossentropy_backward_t *)args;
     
     int reduction = api->reduction;
-    TPUKERNEL_ASSERT(reduction==0||reduction==1||reduction==2);
+    TPUKERNEL_ASSERT(reduction==0||reduction==1);
     TPUKERNEL_ASSERT(!api->dtype);
     tpu_initialize();
     nodechip_cross_entropy_backward(
@@ -168,7 +168,7 @@ void tpu_kernel_api_cross_entropy_backward(const void *args)
         api->batch,
         api->cls_num,
         reduction,
-        tpu_type_convert(api->dtype));
+        DT_FP32);
     tpu_poll();
 }
 TPUKERNEL_FUNC_REGISTER(tpu_kernel_api_cross_entropy_backward);

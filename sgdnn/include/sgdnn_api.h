@@ -40,6 +40,17 @@ typedef enum {
     Propagate_Nan = 1,
 } NanPropagation_t;
 
+typedef enum {
+  Softmax_Per_Instance = 0,
+  Softmax_Per_Chanel = 1,
+} SoftmaxMode_t;
+
+typedef enum {
+  Mean_Reduction = 0,
+  Sum_Reduction = 1,
+  None_Reduction = 2,
+} CrossEntropyMode_t;
+
 typedef struct{
     int         dtype;
     int         ndims;
@@ -445,16 +456,6 @@ bm_status_t sgdnn_activation_backward_cudnn(
     const TensorDescriptor_t         dxDesc,
     void                            *dx);
 
-bm_status_t sgdnn_cross_entropy_backward(
-    bm_handle_t        handle,
-    bm_device_mem_t    input,
-    bm_device_mem_t    target,
-    bm_device_mem_t    grad_input,
-    int                batch,
-    int                cls,
-    bool               reduction,
-    sg_data_type_t     dtype);
-
 bm_status_t sgdnn_cross_entropy_forward(
     bm_handle_t        handle,
     bm_device_mem_t    input,
@@ -465,6 +466,42 @@ bm_status_t sgdnn_cross_entropy_forward(
     bool               reduction,
     sg_data_type_t     dtype);
 
+bm_status_t sgdnn_cross_entropy_forward_cudnn(
+    bm_handle_t                      handle,
+    SoftmaxMode_t                    softmax_mode,
+    CrossEntropyMode_t               crossentropy_mode,
+    const void                      *alpha,
+    const TensorDescriptor_t         xDesc,
+    const void                      *x,
+    const void                      *beta,
+    const TensorDescriptor_t         yDesc,
+    void                            *y,
+    const TensorDescriptor_t         labelDesc,
+    void                            *label);
+
+bm_status_t sgdnn_cross_entropy_backward(
+    bm_handle_t        handle,
+    bm_device_mem_t    input,
+    bm_device_mem_t    target,
+    bm_device_mem_t    grad_input,
+    int                batch,
+    int                cls,
+    bool               reduction,
+    sg_data_type_t     dtype);
+
+bm_status_t sgdnn_cross_entropy_backward_cudnn(
+    bm_handle_t                      handle,
+    SoftmaxMode_t                    softmax_mode,
+    CrossEntropyMode_t               crossentropy_mode,
+    const void                      *alpha,
+    const TensorDescriptor_t         xDesc,
+    const void                      *xData,
+    const TensorDescriptor_t         labelDesc,
+    void                            *label,
+    const void                      *beta,
+    const TensorDescriptor_t         dxDesc,
+    void                            *dx);
+    
 #if defined(__cplusplus)
 }
 #endif
