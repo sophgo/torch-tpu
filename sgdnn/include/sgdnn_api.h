@@ -203,7 +203,6 @@ bm_status_t sgdnn_batchnorm_forward(
     bm_device_mem_t    batch_mean,
     bm_device_mem_t    batch_invstd,
     bm_device_mem_t    output,
-    bm_device_mem_t    buffer,
     int                n,
     int                c,
     int                h,
@@ -229,8 +228,7 @@ bm_status_t sgdnn_batchnorm_forward_cudnn(
     void                            *resultRunningVariance,
     double                           epsilon,
     void                            *resultSaveMean,
-    void                            *resultSaveInvVariance
-    void                            *dataBuffer);
+    void                            *resultSaveInvVariance);
 
 bm_status_t sgdnn_batchnorm_backward(
     bm_handle_t        handle,

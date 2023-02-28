@@ -379,7 +379,6 @@ bm_status_t sgdnn_batchnorm_forward(
     bm_device_mem_t    batch_mean,
     bm_device_mem_t    batch_invstd,
     bm_device_mem_t    output,
-    bm_device_mem_t    buffer,
     int                n,
     int                c,
     int                h,
@@ -465,8 +464,7 @@ bm_status_t sgdnn_batchnorm_forward_cudnn(
     void                            *resultRunningVariance,
     double                           epsilon,
     void                            *resultSaveMean,
-    void                            *resultSaveInvVariance,
-    void                            *dataBuffer)
+    void                            *resultSaveInvVariance)
 {
     unsigned long long input        = (unsigned long long)x;
     unsigned long long weight       = (unsigned long long)bnScale;
@@ -476,7 +474,6 @@ bm_status_t sgdnn_batchnorm_forward_cudnn(
     unsigned long long batch_mean   = (unsigned long long)resultSaveMean;
     unsigned long long batch_invstd = (unsigned long long)resultSaveInvVariance;
     unsigned long long output       = (unsigned long long)y;
-    unsigned long long buffer       = (unsigned long long)dataBuffer;
 
     assert(mode == BatchNorm_Spatial);
     float alpha_ = ((float*)alpha)[0];
@@ -499,6 +496,11 @@ bm_status_t sgdnn_batchnorm_forward_cudnn(
     sg_data_type_t wdtype = (sg_data_type_t)(bnScaleBiasMeanVarDesc.dtype);
     assert(idtype == wdtype && wdtype == odtype);
 
+    u64 buffer_size = (u64)n * c * h * w * 4;
+    bm_device_mem_t buffer_mem;
+    bm_status_t status = bm_malloc_device_byte(handle, &buffer_mem, buffer_size);
+    assert(status == BM_SUCCESS);
+
     sg_api_batchnorm_forward_t api = {
         input,
         running_mean,
@@ -510,7 +512,7 @@ bm_status_t sgdnn_batchnorm_forward_cudnn(
         batch_mean,
         batch_invstd,
         output,
-        buffer,
+        bm_mem_get_device_addr(buffer_mem),
         {n, c, h, w},
         momentum,
         eps,
