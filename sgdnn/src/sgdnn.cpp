@@ -519,6 +519,7 @@ bm_status_t sgdnn_batchnorm_forward_cudnn(
         idtype};
 
     tpu_kernel_launch_sync(handle, "tpu_kernel_api_batchnorm_forward", &api, sizeof(api));
+    bm_free_device(handle, buffer_mem);
     return BM_SUCCESS;
 }
 
