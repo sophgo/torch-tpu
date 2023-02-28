@@ -198,10 +198,19 @@ void batchnorm_forward_split_c(
         ep,
         &cshape,
         dtype);
-    tpu_bdc_fp32_rsqrt(
-        pooling_buffer,
-        pooling_buffer,
-        &cshape);
+    //tpu_bdc_fp32_rsqrt(
+    //    pooling_buffer,
+    //    pooling_buffer,
+    //    &cshape);
+    unsigned char* var_data = (unsigned char*)malloc(csecs*sizeof(float));
+    for(int i=0; i<csecs; i++)
+    {
+        memcpy(var_data + i * sizeof(float), GET_LOCAL_ADDR(i%64, pooling_buffer + i/64*64), sizeof(float));
+        float buffer = ((float*)var_data)[i];
+        ((float*)var_data)[i] = 1/sqrt(buffer);
+        memcpy(GET_LOCAL_ADDR(i%64, pooling_buffer + i/64 * 64), var_data + i * sizeof(float), sizeof(float));
+    }
+    free(var_data);
     tpu_bdc_cpy(
         batch_invstd_local_addr,
         pooling_buffer,
@@ -464,11 +473,21 @@ void batchnorm_forward_split_hw(
                     NULL,
                     &compact_stride,
                     dtype);
-                tpu_bdc_fp32_rsqrt(
-                    pooling_buffer,
-                    pooling_buffer,
-                    &cshape);
-                tpu_gdma_cpy_L2S(
+                //tpu_bdc_fp32_rsqrt(
+                //    pooling_buffer,
+                //    pooling_buffer,
+                //    &cshape);
+                unsigned char* var_data = (unsigned char*)malloc(c*sizeof(float));
+                for(int i=0; i<c; i++)
+                {
+                    memcpy(var_data + i * sizeof(float), GET_LOCAL_ADDR(i%64, pooling_buffer+i/64*64), sizeof(float));
+                    float buffer = ((float*)var_data)[i];
+                    printf("%f",buffer);
+                    ((float*)var_data)[i] = 1/sqrt(buffer);
+                    memcpy(GET_LOCAL_ADDR(i%64, pooling_buffer+i/64*64), var_data + i * sizeof(float), sizeof(float));
+                }
+                free(var_data);
+		tpu_gdma_cpy_L2S(
                     batch_invstd_global_addr,
                     pooling_buffer,
                     &cshape,
