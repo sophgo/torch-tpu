@@ -118,7 +118,6 @@ double                        eps )
 #endif
   auto output_options = torch::TensorOptions ( tpu::TPUGetCurrentDevice() ).dtype ( input.dtype() );
   auto output = torch::empty ( input.sizes(), output_options );
-  auto buffer = torch::empty ( input.sizes(), output_options );
   auto other_options = torch::TensorOptions ( tpu::TPUGetCurrentDevice() ).dtype ( weight.dtype() );
   auto save_mean = torch::empty ( c10::IntArrayRef ( { num_features } ), other_options );
   auto save_invstd = torch::empty ( c10::IntArrayRef ( { num_features } ), other_options );
@@ -149,8 +148,7 @@ double                        eps )
            running_var.defined() ? ADDR_IN_DEVICE ( running_var ) : nullptr,
            eps,
            ADDR_IN_DEVICE ( save_mean ),
-           ADDR_IN_DEVICE ( save_invstd ),
-           ADDR_IN_DEVICE ( buffer ));
+           ADDR_IN_DEVICE ( save_invstd ) );
 #ifdef TPU_OP_TIMING
   tpu::OpTimer::Instance().AddTime ( tpu::BATCHNORM, timer.ElapsedUS() );
 #endif
