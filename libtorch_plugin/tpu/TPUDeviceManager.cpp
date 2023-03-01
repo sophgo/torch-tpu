@@ -6,7 +6,6 @@
 
 #include <iostream>
 
-#define ERROR_CODE(Err) " ( TPU error code: " << Err << ")"
 #define TPU_DEVICE_INDEX_BITS 6
 #define TPU_GLOBAL_ADDR_BITS (64 - TPU_DEVICE_INDEX_BITS)
 
@@ -15,8 +14,7 @@
 namespace tpu
 {
 
-static inline unsigned long long UnifiedAddr (
-unsigned long long Addr, int Index )
+static inline unsigned long long UnifiedAddr ( unsigned long long Addr, int Index )
 {
   TORCH_CHECK ( Addr < ( 1UL << TPU_GLOBAL_ADDR_BITS ) );
   return ( ( ( unsigned long long ) Index ) << TPU_GLOBAL_ADDR_BITS ) | Addr;
@@ -37,25 +35,16 @@ class TPUDeviceManager
 public:
   TPUDeviceManager()
   {
-    bm_status_t Status = BM_SUCCESS;
     int DeviceCount = 0;
-    Status = bm_dev_getcount ( &DeviceCount );
-    if ( Status != BM_SUCCESS )
-    {
-      LOG ( FATAL ) << "Failed to get TPU device count"
-                    << ERROR_CODE ( Status );
-    }
+    bm_status_t Status = bm_dev_getcount ( &DeviceCount );
+    TORCH_CHECK ( Status == BM_SUCCESS, "Failed to get TPU device count" );
     if ( DeviceCount > 0 )
     {
       Handles_.resize ( DeviceCount, nullptr );
       for ( int i = 0; i < DeviceCount; ++i )
       {
         Status = bm_dev_request ( &Handles_[i], i );
-        if ( Status != BM_SUCCESS )
-        {
-          LOG ( FATAL ) << "Failed to request tpu device #" << i
-                        << ERROR_CODE ( Status );
-        }
+        TORCH_CHECK ( Status == BM_SUCCESS, "Failed to request tpu device #", i );
       }
       Index_ = 0;
     }
@@ -113,18 +102,13 @@ public:
       Mutex_.unlock();
       return nullptr;
     }
-#if 0
-    auto Size_ = ( ( ( Size - 1 ) >> 16 ) + 1 ) << 16;
-#else
-    auto Size_ = Size;
-#endif
-    TORCH_CHECK ( Size_ < ( 1UL << 32 ), "TPU only allows to allocate memory with size smaller than (2^32) bytes" );
+    TORCH_CHECK ( Size < ( 1UL << 32 ), "TPU only allows to allocate memory with size smaller than (2^32) bytes" );
     bm_handle_t Handle = GetDeviceHandle();
     TORCH_CHECK ( Handle != nullptr, "TPU handle of device #", GetDeviceIndex(), " is null" );
     bm_device_mem_t Mem;
-    bm_status_t Status = bm_malloc_device_byte ( Handle, &Mem, ( unsigned int ) Size_ );
-    TORCH_CHECK ( Status == BM_SUCCESS, "Failed to allocate memory on TPU device #", GetDeviceIndex(), " size = ", Size_, "bytes" );
-    unsigned long long Addr = UnifiedAddr ( Mem.u.device.device_addr, GetDeviceIndex() );
+    bm_status_t Status = bm_malloc_device_byte ( Handle, &Mem, ( unsigned int ) Size );
+    TORCH_CHECK ( Status == BM_SUCCESS, "Failed to allocate memory on TPU device #", GetDeviceIndex(), " size = ", Size, "bytes" );
+    unsigned long long Addr = UnifiedAddr ( bm_mem_get_device_addr ( Mem ), GetDeviceIndex() );
     AddrMemMap_.emplace ( Addr, Mem );
 #ifdef SHOW_INFO
     std::cout << "Alloc addr = " << ( void * ) Addr << " size = " << Size << std::endl;
@@ -146,7 +130,7 @@ public:
     TORCH_CHECK ( Handle != nullptr, "TPU handle of device #", GetDeviceIndex(), " is null" );
     auto Iter = AddrMemMap_.find ( ( unsigned long long ) Ptr );
     TORCH_CHECK ( Iter != AddrMemMap_.end(), "Memory of address = ", Ptr, " is not found" );
-    TORCH_CHECK ( GetAddrByUnifiedAddr ( ( unsigned long long ) Ptr ) == Iter->second.u.device.device_addr );
+    // TORCH_CHECK ( GetAddrByUnifiedAddr ( ( unsigned long long ) Ptr ) == bm_mem_get_device_addr ( Iter->second ) );
     bm_free_device ( Handle, Iter->second );
     AddrMemMap_.erase ( Iter );
 #ifdef SHOW_INFO
@@ -180,8 +164,7 @@ public:
     bm_handle_t Handle = GetDeviceHandle ( Index );
     TORCH_CHECK ( Handle != nullptr, "TPU handle of device #", GetDeviceIndex(), " is null" );
     bm_device_mem_t SrcMem = bm_mem_from_device ( GetAddrByUnifiedAddr ( ( unsigned long long ) Src ), Size );
-    bm_status_t Status = BM_SUCCESS;
-    Status = bm_memcpy_d2s ( Handle, Dst, SrcMem );
+    bm_status_t Status = bm_memcpy_d2s ( Handle, Dst, SrcMem );
     TORCH_CHECK ( Status == BM_SUCCESS, "Failed to copy memory from TPU device #", Index, " to host size = ", Size, "bytes" );
 #if 0
     bm_device_sync ( Handle );
@@ -190,24 +173,18 @@ public:
 
   void CopyDeviceToDevice ( void * Dst, const void * Src, size_t Size )
   {
+#ifdef SHOW_INFO
+    std::cout << "Copy Device = " << Src << " to Device = " << Dst << " Size = " << Size << std::endl;
+#endif
+    TORCH_CHECK ( false );
     int DstIndex = GetDeviceIndexByUnifiedAddr ( ( unsigned long long ) Dst );
     int SrcIndex = GetDeviceIndexByUnifiedAddr ( ( unsigned long long ) Src );
     bm_handle_t DstHandle = GetDeviceHandle ( DstIndex );
-    if ( DstHandle == nullptr )
-    {
-      LOG ( FATAL ) << "TPU handle of device #" << DstIndex << " is null";
-    }
+    TORCH_CHECK ( DstHandle != nullptr, "TPU handle of device #", DstIndex, " is null" );
     bm_handle_t SrcHandle = GetDeviceHandle ( SrcIndex );
-    if ( SrcHandle == nullptr )
-    {
-      LOG ( FATAL ) << "TPU handle of device #" << SrcIndex << " is null";
-    }
-    bm_device_mem_t DstMem =
-    bm_mem_from_device ( GetAddrByUnifiedAddr ( ( unsigned long long ) Dst ),
-                         Size );
-    bm_device_mem_t SrcMem =
-    bm_mem_from_device ( GetAddrByUnifiedAddr ( ( unsigned long long ) Src ),
-                         Size );
+    TORCH_CHECK ( SrcHandle != nullptr, "TPU handle of device #", SrcIndex, " is null" );
+    auto DstMem = bm_mem_from_device ( GetAddrByUnifiedAddr ( ( unsigned long long ) Dst ), Size );
+    auto SrcMem = bm_mem_from_device ( GetAddrByUnifiedAddr ( ( unsigned long long ) Src ), Size );
     bm_status_t Status = BM_SUCCESS;
     if ( DstIndex == SrcIndex )
     {
@@ -217,13 +194,8 @@ public:
     {
       Status = bm_memcpy_c2c ( SrcHandle, DstHandle, SrcMem, DstMem, false );
     }
-    if ( Status != BM_SUCCESS )
-    {
-      LOG ( FATAL ) << "Failed to copy memory from TPU device #"
-                    << SrcIndex << " to TPU device #" << DstIndex
-                    << " with size = " << Size
-                    << "bytes" << ERROR_CODE ( Status );
-    }
+    TORCH_CHECK ( Status == BM_SUCCESS, "Failed to copy memory from TPU device #", SrcIndex,
+                  " to TPU device #", DstIndex, " size = ", Size, "bytes" );
 #if 0
     if ( DstIndex == SrcIndex )
     {

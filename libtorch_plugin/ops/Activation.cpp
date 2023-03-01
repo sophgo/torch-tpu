@@ -79,6 +79,13 @@ Tensor       & grad_input )
   CHECK_TENSOR_IN_DEVICE ( grad_output );
   CHECK_TENSOR_IN_DEVICE ( input );
   CHECK_TENSOR_IN_DEVICE ( grad_input );
+#if 0
+  auto grad_output_cpu = grad_output.to ( torch::Device ( "cpu" ) );
+  auto input_cpu = input.to ( torch::Device ( "cpu" ) );
+  grad_input = threshold_backward ( grad_output_cpu, input_cpu, threshold );
+  grad_input = grad_input.to ( tpu::TPUGetCurrentDevice() );
+  return grad_input;
+#else
 #ifdef TPU_LIBTORCH_OP_COMPARE
   auto grad_output_cpu = grad_output.to ( torch::Device ( "cpu" ) );
   auto input_cpu = input.to ( torch::Device ( "cpu" ) );
@@ -131,6 +138,7 @@ Tensor       & grad_input )
   tpu::TPUCompareResult ( grad_input_got, grad_input_exp );
 #endif
   return grad_input;
+#endif
 }
 TORCH_LIBRARY_IMPL ( aten, PrivateUse1, m )
 {

@@ -52,6 +52,7 @@ IntArrayRef    dilation,
 bool           ceil_mode,
 const Tensor & indices )
 {
+  //std::cout << "Maxpooling Backward" << std::endl;
   CHECK_TENSOR_IN_DEVICE ( grad_output );
   CHECK_TENSOR_IN_DEVICE ( input );
   CHECK_TENSOR_IN_DEVICE ( indices );

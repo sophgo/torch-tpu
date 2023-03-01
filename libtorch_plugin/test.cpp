@@ -13,14 +13,19 @@ int main()
   std::string ModelPath = "../Resnet50_Own.pt";
   auto Resnet50CPU = std::make_shared<tpu::TorchscriptModule> ( ModelPath );
   auto Resnet50TPU = std::make_shared<tpu::TorchscriptModule> ( ModelPath );
-  tpu::MoveModuleToTPUDevice ( *Resnet50TPU );
   Resnet50CPU->train();
   Resnet50TPU->train();
+  tpu::MoveModuleToTPUDevice ( *Resnet50TPU );
+  torch::optim::SGD optimizerCPU ( Resnet50CPU->parameters(), /*lr=*/0.01 );
+  torch::optim::SGD optimizerTPU ( Resnet50TPU->parameters(), /*lr=*/0.01 );
+  optimizerCPU.zero_grad();
+  optimizerTPU.zero_grad();
   auto InputCPU = torch::ones ( { Batch, 3, 224, 224 } );
   auto InputTPU = torch::ones ( { Batch, 3, 224, 224 } ).to ( TPU );
   InputCPU.set_requires_grad ( true );
   InputTPU.set_requires_grad ( true );
   torch::Tensor OutputCPU, OutputTPU;
+  unsigned long elapsed_us_per_loop = 0;
   tpu::Timer timer;
   timer.Start();
   tpu::OpTimer::Instance().Clear();
@@ -28,7 +33,7 @@ int main()
   {
     OutputCPU = Resnet50CPU->forward ( InputCPU );
   }
-  unsigned long elapsed_us_per_loop = ( double ) timer.ElapsedUS() / Loops;
+  elapsed_us_per_loop = ( double ) timer.ElapsedUS() / Loops;
   std::cout << "Resnet50(Batch = " << Batch << ") Forward CPU Elapsed time = " << elapsed_us_per_loop << "us" << std::endl;
   timer.Start();
   for ( int i = 0; i < Loops; ++i )

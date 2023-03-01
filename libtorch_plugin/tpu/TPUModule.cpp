@@ -14,6 +14,7 @@ void MoveModuleToTPUDevice ( torch::nn::Module & Module )
   }
   for ( auto & Par : Module.named_parameters ( false ) )
   {
+    //std::cout << Par.key() << std::endl;
     auto tmp = Par->to ( Device );
     Par->unsafeGetTensorImpl()->_change_backend_component_keys ( Device );
     Par->unsafeGetTensorImpl()->set_storage_keep_dtype ( tmp.storage() );
@@ -21,6 +22,7 @@ void MoveModuleToTPUDevice ( torch::nn::Module & Module )
 #if 1
   for ( auto & Buf : Module.named_buffers ( false ) )
   {
+    //std::cout << Buf.key() << std::endl;
     if ( Buf.key() == "running_mean" || Buf.key() == "running_var" )
     {
       auto tmp = Buf->to ( Device );
@@ -54,8 +56,7 @@ void TorchscriptModule::Register()
 {
   for ( const auto & Mod : Module_.named_children() )
   {
-    register_module ( Mod.name,
-                      std::make_shared<TorchscriptModule> ( Mod.value ) );
+    register_module ( Mod.name, std::make_shared<TorchscriptModule> ( Mod.value ) );
   }
   for ( const auto & Par : Module_.named_parameters ( false ) )
   {

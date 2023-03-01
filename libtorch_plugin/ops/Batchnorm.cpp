@@ -8,8 +8,9 @@
 
 #include <unistd.h>
 
-#define TPU_LIBTORCH_OP_COMPARE
+//#define TPU_LIBTORCH_OP_COMPARE
 #define TPU_OP_TIMING
+//#define SAVE_TENSOR
 
 namespace at
 {
@@ -24,7 +25,8 @@ bool                          training,
 double                        momentum,
 double                        eps )
 {
-  //std::cout << "Batchnorm" << std::endl;
+  static int count = 0;
+  //std::cout << "Batchnorm " << count << std::endl;
   c10::MaybeOwned<Tensor> weight_maybe_owned = at::borrow_from_optional_tensor ( weight_opt );
   const Tensor & weight = *weight_maybe_owned;
   const Tensor & bias = c10::value_or_else ( bias_opt, [] { return Tensor(); } );
@@ -41,70 +43,71 @@ double                        eps )
   if ( weight.defined() )
   {
     CHECK_TENSOR_IN_DEVICE ( weight );
-    TORCH_CHECK ( weight.is_contiguous() );
   }
   if ( bias.defined() )
   {
     CHECK_TENSOR_IN_DEVICE ( bias );
-    TORCH_CHECK ( bias.is_contiguous() );
   }
   if ( running_mean.defined() )
   {
     CHECK_TENSOR_IN_DEVICE ( running_mean );
-    TORCH_CHECK ( running_mean.is_contiguous() );
   }
   if ( running_var.defined() )
   {
     CHECK_TENSOR_IN_DEVICE ( running_var );
-    TORCH_CHECK ( running_var.is_contiguous() );
   }
-#if 1
+#if 0
+  auto running_mean_cpu = running_mean.defined() ? TENSOR_TO_CPU ( running_mean ) : Tensor();
+  auto running_var_cpu = running_var.defined() ? TENSOR_TO_CPU ( running_var ) : Tensor();
   auto outputs_cpu = native_batch_norm (
-                     input.to ( torch::Device ( "cpu" ) ),
-                     c10::optional<Tensor> ( weight.defined() ? weight.to ( torch::Device ( "cpu" ) ) : Tensor() ),
-                     c10::optional<Tensor> ( bias.defined() ? bias.to ( torch::Device ( "cpu" ) ) : Tensor() ),
-                     c10::optional<Tensor> ( running_mean.defined() ? running_mean.to ( torch::Device ( "cpu" ) ) : Tensor() ),
-                     c10::optional<Tensor> ( running_var.defined() ? running_var.to ( torch::Device ( "cpu" ) ) : Tensor() ),
+                     TENSOR_TO_CPU ( input ),
+                     c10::optional<Tensor> ( weight.defined() ? TENSOR_TO_CPU ( weight ) : Tensor() ),
+                     c10::optional<Tensor> ( bias.defined() ? TENSOR_TO_CPU ( bias ) : Tensor() ),
+                     c10::optional<Tensor> ( running_mean_cpu ),
+                     c10::optional<Tensor> ( running_var_cpu ),
                      training,
                      momentum,
                      eps );
   if ( running_mean.defined() )
   {
-    //const_cast<Tensor &> ( running_mean ) = running_mean_cpu.to ( tpu::TPUGetCurrentDevice() );
+    const_cast<Tensor &> ( running_mean ) = running_mean_cpu.to ( tpu::TPUGetCurrentDevice() );
   }
   if ( running_var.defined() )
   {
-    //const_cast<Tensor &> ( running_var ) = running_var_cpu.to ( tpu::TPUGetCurrentDevice() );
+    const_cast<Tensor &> ( running_var ) = running_var_cpu.to ( tpu::TPUGetCurrentDevice() );
   }
-#if 0
-  auto output2 = std::get<2> ( outputs_cpu ).contiguous().to ( tpu::TPUGetCurrentDevice() );
-  auto output1 = std::get<1> ( outputs_cpu ).contiguous().to ( tpu::TPUGetCurrentDevice() );
-  auto output0 = std::get<0> ( outputs_cpu ).contiguous().to ( tpu::TPUGetCurrentDevice() );
-#else
-  auto output0 = std::get<0> ( outputs_cpu ).contiguous().to ( tpu::TPUGetCurrentDevice() );
-  auto output1 = std::get<1> ( outputs_cpu ).contiguous().to ( tpu::TPUGetCurrentDevice() );
-  auto output2 = std::get<2> ( outputs_cpu ).contiguous().to ( tpu::TPUGetCurrentDevice() );
+  auto output = std::get<0> ( outputs_cpu ).contiguous().to ( tpu::TPUGetCurrentDevice() );
+  auto save_mean = std::get<1> ( outputs_cpu ).contiguous().to ( tpu::TPUGetCurrentDevice() );
+  auto save_invstd = std::get<2> ( outputs_cpu ).contiguous().to ( tpu::TPUGetCurrentDevice() );
+#ifdef SAVE_TENSOR
+  tpu::SaveTensorToBinaryFile ( input, "Batchnorm_Input_" + std::to_string ( count ) );
+  tpu::SaveTensorToBinaryFile ( weight, "Batchnorm_Weight_" + std::to_string ( count ) );
+  tpu::SaveTensorToBinaryFile ( bias, "Batchnorm_Bias_" + std::to_string ( count ) );
+  tpu::SaveTensorToBinaryFile ( output, "Batchnorm_Output_" + std::to_string ( count ) );
+  tpu::SaveTensorToBinaryFile ( save_mean, "Batchnorm_SaveMean_" + std::to_string ( count ) );
+  tpu::SaveTensorToBinaryFile ( save_invstd, "Batchnorm_SaveInvStd_" + std::to_string ( count ) );
 #endif
-  return std::tuple<Tensor, Tensor, Tensor> ( output0, output1, output2 );
+  ++count;
+  return std::tuple<Tensor, Tensor, Tensor> ( output, save_mean, save_invstd );
 #else
-#ifndef TPU_LIBTORCH_OP_COMPARE
-  auto input_cpu = input.to ( torch::Device ( "cpu" ) );
+#ifdef TPU_LIBTORCH_OP_COMPARE
+  auto input_cpu = input.to ( torch::Device ( "cpu" ) ).to ( torch::kDouble );
   at::Tensor weight_cpu, bias_cpu, running_mean_cpu, running_var_cpu;
   if ( weight.defined() )
   {
-    weight_cpu = weight.to ( torch::Device ( "cpu" ) );
+    weight_cpu = weight.to ( torch::Device ( "cpu" ) ).to ( torch::kDouble );
   }
   if ( bias.defined() )
   {
-    bias_cpu = bias.to ( torch::Device ( "cpu" ) );
+    bias_cpu = bias.to ( torch::Device ( "cpu" ) ).to ( torch::kDouble );
   }
   if ( running_mean.defined() )
   {
-    running_mean_cpu = running_mean.to ( torch::Device ( "cpu" ) );
+    running_mean_cpu = running_mean.to ( torch::Device ( "cpu" ) ).to ( torch::kDouble );
   }
   if ( running_var.defined() )
   {
-    running_var_cpu = running_var.to ( torch::Device ( "cpu" ) );
+    running_var_cpu = running_var.to ( torch::Device ( "cpu" ) ).to ( torch::kDouble );
   }
   auto outputs_exp = native_batch_norm (
                      input_cpu,
@@ -152,7 +155,7 @@ double                        eps )
 #ifdef TPU_OP_TIMING
   tpu::OpTimer::Instance().AddTime ( tpu::BATCHNORM, timer.ElapsedUS() );
 #endif
-#ifndef TPU_LIBTORCH_OP_COMPARE
+#ifdef TPU_LIBTORCH_OP_COMPARE
   std::cout << "Comparing batchnorm:"
             << " input shape = " << input.sizes()
             << " input dtype = " << input.dtype()
@@ -173,29 +176,30 @@ double                        eps )
             << std::endl;
   std::cout << "Compare output" << std::endl;
   auto output_got = output.to ( torch::Device ( "cpu" ) );
-  auto output_exp = std::get<0> ( outputs_exp );
+  auto output_exp = std::get<0> ( outputs_exp ).to ( torch::kFloat );
   tpu::TPUCompareResult ( output_got, output_exp, 1.0 / ( ( double ) input.size ( 0 ) * input.size ( 2 ) * input.size ( 3 ) )  );
   std::cout << "Compare save_mean" << std::endl;
   auto save_mean_got = save_mean.to ( torch::Device ( "cpu" ) );
-  auto save_mean_exp = std::get<1> ( outputs_exp );
+  auto save_mean_exp = std::get<1> ( outputs_exp ).to ( torch::kFloat );
   tpu::TPUCompareResult ( save_mean_got, save_mean_exp, 1.0 / ( ( double ) input.size ( 0 ) * input.size ( 2 ) * input.size ( 3 ) )  );
   std::cout << "Compare save_invstd" << std::endl;
   auto save_invstd_got = save_invstd.to ( torch::Device ( "cpu" ) );
-  auto save_invstd_exp = std::get<2> ( outputs_exp );
+  auto save_invstd_exp = std::get<2> ( outputs_exp ).to ( torch::kFloat );
   tpu::TPUCompareResult ( save_invstd_got, save_invstd_exp, 1.0 / ( ( double ) input.size ( 0 ) * input.size ( 2 ) * input.size ( 3 ) )  );
   if ( running_mean.defined() )
   {
     auto running_mean_got = running_mean.to ( torch::Device ( "cpu" ) );
     std::cout << "Compare running_mean" << std::endl;
-    tpu::TPUCompareResult ( running_mean_got, running_mean_cpu, 1.0 / ( ( double ) input.size ( 0 ) * input.size ( 2 ) * input.size ( 3 ) ) );
+    tpu::TPUCompareResult ( running_mean_got, running_mean_cpu.to ( torch::kFloat ), 1.0 / ( ( double ) input.size ( 0 ) * input.size ( 2 ) * input.size ( 3 ) ) );
   }
   if ( running_var.defined() )
   {
     auto running_var_got = running_var.to ( torch::Device ( "cpu" ) );
     std::cout << "Compare running_mean" << std::endl;
-    tpu::TPUCompareResult ( running_var_got, running_var_cpu, 1.0 / ( ( double ) input.size ( 0 ) * input.size ( 2 ) * input.size ( 3 ) ) );
+    tpu::TPUCompareResult ( running_var_got, running_var_cpu.to ( torch::kFloat ), 1.0 / ( ( double ) input.size ( 0 ) * input.size ( 2 ) * input.size ( 3 ) ) );
   }
 #endif
+  ++count;
   return std::tuple<Tensor, Tensor, Tensor> ( output, save_mean, save_invstd );
 #endif
 }
@@ -216,6 +220,8 @@ bool                          training,
 double                        eps,
 std::array<bool, 3>           output_mask )
 {
+  static int count = 0;
+  //std::cout << "Batchnorm Backward " << count << std::endl;
   c10::MaybeOwned<Tensor> weight_maybe_owned = at::borrow_from_optional_tensor ( weight_opt );
   const Tensor & weight = *weight_maybe_owned;
   const Tensor & save_mean = c10::value_or_else ( save_mean_opt, [] { return Tensor(); } );
@@ -228,23 +234,18 @@ std::array<bool, 3>           output_mask )
   TORCH_CHECK ( save_invstd.defined(), "save_invstd must be defined" );
   auto num_features = input.size ( 1 );
   CHECK_TENSOR_IN_DEVICE ( grad_output );
-  TORCH_CHECK ( grad_output.is_contiguous() );
   CHECK_TENSOR_IN_DEVICE ( input );
-  TORCH_CHECK ( input.is_contiguous() );
   if ( weight.defined() )
   {
     CHECK_TENSOR_IN_DEVICE ( weight );
-    TORCH_CHECK ( weight.is_contiguous() );
   }
   if ( save_mean.defined() )
   {
     CHECK_TENSOR_IN_DEVICE ( save_mean );
-    TORCH_CHECK ( save_mean.is_contiguous() );
   }
   if ( save_invstd.defined() )
   {
     CHECK_TENSOR_IN_DEVICE ( save_invstd );
-    TORCH_CHECK ( save_invstd.is_contiguous() );
   }
 #if 0
   auto outputs_cpu = native_batch_norm_backward (
@@ -263,7 +264,7 @@ std::array<bool, 3>           output_mask )
          output_mask[1] ? std::get<1> ( outputs_cpu ).to ( tpu::TPUGetCurrentDevice() ) : Tensor(),
          output_mask[2] ? std::get<2> ( outputs_cpu ).to ( tpu::TPUGetCurrentDevice() ) : Tensor() );
 #else
-#ifndef TPU_LIBTORCH_OP_COMPARE
+#ifdef TPU_LIBTORCH_OP_COMPARE
   auto grad_output_cpu = grad_output.to ( torch::Device ( "cpu" ) ).to ( torch::kDouble );
   auto input_cpu = input.to ( torch::Device ( "cpu" ) ).to ( torch::kDouble );
   at::Tensor weight_cpu, running_mean_cpu, running_var_cpu, save_mean_cpu, save_invstd_cpu;
@@ -366,7 +367,7 @@ std::array<bool, 3>           output_mask )
 #ifdef TPU_OP_TIMING
   tpu::OpTimer::Instance().AddTime ( tpu::BATCHNORM_BACKWARD, timer.ElapsedUS() );
 #endif
-#ifndef TPU_LIBTORCH_OP_COMPARE
+#ifdef TPU_LIBTORCH_OP_COMPARE
   std::cout << "Comparing batchnorm backward:"
             << " grad_output shape = " << grad_output.sizes()
             << " grad_output dtype = " << grad_output.dtype()
@@ -404,6 +405,26 @@ std::array<bool, 3>           output_mask )
     tpu::TPUCompareResult ( grad_bias_got, std::get<2> ( outputs_exp ).to ( torch::kFloat ), 1.0 / ( ( double ) input.size ( 0 ) * input.size ( 2 ) * input.size ( 3 ) ) );
   }
 #endif
+#ifdef SAVE_TENSOR
+  tpu::SaveTensorToBinaryFile ( grad_output, "Batchnorm_Backward_GradOutput_" + std::to_string ( count ) );
+  tpu::SaveTensorToBinaryFile ( input, "Batchnorm_Backward_Input_" + std::to_string ( count ) );
+  tpu::SaveTensorToBinaryFile ( weight, "Batchnorm_Backward_Weight_" + std::to_string ( count ) );
+  tpu::SaveTensorToBinaryFile ( save_mean, "Batchnorm_Backward_SaveMean_" + std::to_string ( count ) );
+  tpu::SaveTensorToBinaryFile ( save_invstd, "Batchnorm_Backward_SaveInvStd_" + std::to_string ( count ) );
+  if ( output_mask[0] == true )
+  {
+    tpu::SaveTensorToBinaryFile ( grad_input, "Convolution_Backward_GradInput_" + std::to_string ( count ) );
+  }
+  if ( output_mask[1] == true )
+  {
+    tpu::SaveTensorToBinaryFile ( grad_weight, "Convolution_Backward_GradWeight_" + std::to_string ( count ) );
+  }
+  if ( output_mask[2] == true )
+  {
+    tpu::SaveTensorToBinaryFile ( grad_bias, "Convolution_Backward_GradBias_" + std::to_string ( count ) );
+  }
+#endif
+  ++count;
   return std::tuple<Tensor, Tensor, Tensor> ( grad_input, grad_weight, grad_bias );
 #endif
 }

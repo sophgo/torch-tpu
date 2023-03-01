@@ -41,4 +41,44 @@ OpTimer & OpTimer::Instance()
   return *instance_;
 }
 
+TensorWatcher * TensorWatcher::instance_ = nullptr;
+
+void TensorWatcher::AddTensor ( const at::Tensor & Tensor )
+{
+  tensors_.push_back ( Tensor );
+  tensors_cpu_.push_back ( TENSOR_TO_CPU ( Tensor ) );
+}
+
+bool TensorWatcher::Watch() const
+{
+  for ( auto I = 0; I < tensors_.size(); ++I )
+  {
+    if ( tensors_[I].defined() )
+    {
+      auto tensor_cpu = TENSOR_TO_CPU ( tensors_[I] );
+      auto ptr_saved = ( unsigned char * ) tensors_cpu_[I].data_ptr();
+      auto ptr_current = ( unsigned char * ) tensor_cpu.data_ptr();
+      for ( auto i = 0; i < tensors_[I].nbytes(); ++i )
+      {
+        if ( ptr_saved[i] != ptr_current[i] )
+        {
+          std::cout << "Exp[" << i << "] = " << ( int ) ptr_saved[i]
+                    << " Got[" << i << "] = " << ( int ) ptr_current[i] << std::endl;
+          return false;
+        }
+      }
+    }
+  }
+  return true;
+}
+
+TensorWatcher & TensorWatcher::Instance()
+{
+  if ( instance_ == nullptr )
+  {
+    instance_ = new TensorWatcher;
+  }
+  return *instance_;
+}
+
 } // namespace tpu

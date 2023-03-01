@@ -6,6 +6,8 @@
 #include <TPUTorchUtils.h>
 #include <sgdnn_api.h>
 
+//#define TPU_LIBTORCH_OP_COMPARE
+
 namespace at
 {
 Tensor & binary_Tensor_tpu ( const Tensor          & input1,
@@ -17,11 +19,8 @@ Tensor & binary_Tensor_tpu ( const Tensor          & input1,
   if ( input1.device().type() == DeviceType::PrivateUse1 && input2.device().type() == DeviceType::PrivateUse1 )
   {
     CHECK_TENSOR_IN_DEVICE ( input1 );
-    TORCH_CHECK ( input1.is_contiguous() );
     CHECK_TENSOR_IN_DEVICE ( input2 );
-    TORCH_CHECK ( input2.is_contiguous() );
     CHECK_TENSOR_IN_DEVICE ( out );
-    TORCH_CHECK ( out.is_contiguous() );
     auto input1_desc = tpu::TPUGenerateTensorDesc ( input1 );
     auto input2_desc = tpu::TPUGenerateTensorDesc ( input2 );
     auto output_desc = tpu::TPUGenerateTensorDesc ( out );
@@ -29,18 +28,19 @@ Tensor & binary_Tensor_tpu ( const Tensor          & input1,
     float alpha1 = 1.f;
     float alpha2 = alpha.toDouble();
     float beta = 0.f;
-    bm_status_t status = BM_SUCCESS;
-    status = sgdnn_eltwise_forward_cudnn ( handle,
-                                           &alpha1,
-                                           input1_desc,
-                                           ADDR_IN_DEVICE ( input1 ),
-                                           &alpha2,
-                                           input2_desc,
-                                           ADDR_IN_DEVICE ( input2 ),
-                                           &beta,
-                                           output_desc,
-                                           ADDR_IN_DEVICE ( out ),
-                                           op );
+    bm_status_t status = sgdnn_eltwise_forward_cudnn (
+                         handle,
+                         &alpha1,
+                         input1_desc,
+                         ADDR_IN_DEVICE ( input1 ),
+                         &alpha2,
+                         input2_desc,
+                         ADDR_IN_DEVICE ( input2 ),
+                         &beta,
+                         output_desc,
+                         ADDR_IN_DEVICE ( out ),
+                         op );
+    TORCH_CHECK ( status == BM_SUCCESS );
   }
   else
   {
@@ -53,7 +53,12 @@ Tensor & add_out_tpu ( const Tensor & input1,
                        const Scalar & alpha,
                        Tensor       & out )
 {
-  //std::cout << "Add" << std::endl;
+  static int count = 0;
+  //std::cout << "Add " << count << std::endl;
+#if 0
+  out = torch::add ( input1.to ( torch::Device ( "cpu" ) ), input2.to ( torch::Device ( "cpu" ) ), alpha ).to ( tpu::TPUGetCurrentDevice() );
+  return out;
+#else
 #ifdef TPU_LIBTORCH_OP_COMPARE
   auto input1_cpu = input1.to ( torch::Device ( "cpu" ) );
   auto input2_cpu = input2.to ( torch::Device ( "cpu" ) );
@@ -65,7 +70,9 @@ Tensor & add_out_tpu ( const Tensor & input1,
   auto output_got = output.to ( torch::Device ( "cpu" ) );
   tpu::TPUCompareResult ( output_got, output_exp );
 #endif
-  return output;
+  ++count;
+  return out;
+#endif
 }
 TORCH_LIBRARY_IMPL ( aten, PrivateUse1, m )
 {

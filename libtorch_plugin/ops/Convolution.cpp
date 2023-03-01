@@ -9,6 +9,7 @@
 
 //#define TPU_LIBTORCH_OP_COMPARE
 #define TPU_OP_TIMING
+//#define SAVE_TENSOR
 
 namespace at
 {
@@ -39,7 +40,8 @@ const bool                    transposed,
 const IntArrayRef             output_padding,
 int64_t                       groups )
 {
-  //std::cout << "Convolution" << std::endl;
+  static int count = 0;
+  //std::cout << "Convolution " << count << std::endl;
 #if 0
   c10::MaybeOwned<Tensor> bias_maybe_owned = borrow_from_optional_tensor ( bias_opt );
   const Tensor & bias = *bias_maybe_owned;
@@ -55,12 +57,9 @@ int64_t                       groups )
                     groups );
   return output_cpu.to ( tpu::TPUGetCurrentDevice() );
 #else
-  TORCH_CHECK ( at::isComplexType ( input_.scalar_type() ) == false,
-                "Complex convolution is unsupported by TPU" );
+  TORCH_CHECK ( at::isComplexType ( input_.scalar_type() ) == false, "Complex convolution is unsupported by TPU" );
   CHECK_TENSOR_IN_DEVICE ( input_ );
-  TORCH_CHECK ( input_.is_contiguous() );
   CHECK_TENSOR_IN_DEVICE ( weight );
-  TORCH_CHECK ( weight.is_contiguous() );
   c10::MaybeOwned<Tensor> bias_maybe_owned = borrow_from_optional_tensor ( bias_opt );
   const Tensor & bias = *bias_maybe_owned;
   TORCH_CHECK ( !bias.defined() || bias.dtype() == input_.dtype(),
@@ -69,7 +68,6 @@ int64_t                       groups )
   if ( bias.defined() )
   {
     CHECK_TENSOR_IN_DEVICE ( bias );
-    TORCH_CHECK ( bias.is_contiguous() );
   }
   auto num_spatial_dims = weight.dim() - 2;
   Tensor input;
@@ -186,6 +184,16 @@ int64_t                       groups )
             << std::endl;
   tpu::TPUCompareResult ( output_got, output_exp, 1.0 / ( ( double ) weight.size ( 1 ) * weight.size ( 2 ) * weight.size ( 3 ) ) );
 #endif
+#ifdef SAVE_TENSOR
+  tpu::SaveTensorToBinaryFile ( input_, "Convolution_Input_" + std::to_string ( count ) );
+  tpu::SaveTensorToBinaryFile ( weight, "Convolution_Weight_" + std::to_string ( count ) );
+  if ( bias.defined() )
+  {
+    tpu::SaveTensorToBinaryFile ( bias, "Convolution_Bias_" + std::to_string ( count ) );
+  }
+  tpu::SaveTensorToBinaryFile ( output, "Convolution_Output_" + std::to_string ( count ) );
+#endif
+  ++count;
   return is_batched ? output : output.squeeze ( 0 );
 #endif
 }
@@ -206,6 +214,8 @@ IntArrayRef         output_padding,
 int64_t             groups,
 std::array<bool, 3> output_mask )
 {
+  static int count = 0;
+  //std::cout << "Convolution Backward " << count << std::endl;
 #if 0
   auto outputs_cpu =  torch::convolution_backward (
                       grad_output.to ( torch::Device ( "cpu" ) ),
@@ -371,6 +381,24 @@ std::array<bool, 3> output_mask )
     tpu::TPUCompareResult ( grad_bias_got, std::get<2> ( outputs_exp ).to ( torch::kFloat ) );
   }
 #endif
+#ifdef SAVE_TENSOR
+  tpu::SaveTensorToBinaryFile ( grad_output, "Convolution_Backward_GradOutput_" + std::to_string ( count ) );
+  tpu::SaveTensorToBinaryFile ( input, "Convolution_Backward_Input_" + std::to_string ( count ) );
+  tpu::SaveTensorToBinaryFile ( weight, "Convolution_Backward_Weight_" + std::to_string ( count ) );
+  if ( output_mask[0] == true )
+  {
+    tpu::SaveTensorToBinaryFile ( grad_input, "Convolution_Backward_GradInput_" + std::to_string ( count ) );
+  }
+  if ( output_mask[1] == true )
+  {
+    tpu::SaveTensorToBinaryFile ( grad_weight, "Convolution_Backward_GradWeight_" + std::to_string ( count ) );
+  }
+  if ( output_mask[2] == true )
+  {
+    tpu::SaveTensorToBinaryFile ( grad_bias, "Convolution_Backward_GradBias_" + std::to_string ( count ) );
+  }
+#endif
+  ++count;
   return std::tuple<Tensor, Tensor, Tensor> ( grad_input, grad_weight, grad_bias );
 #endif
 }

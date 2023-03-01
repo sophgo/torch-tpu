@@ -9,20 +9,21 @@
 #include <sys/time.h>
 #include <cmath>
 #include <mutex>
+#include <fstream>
+#include <vector>
 
-#define CHECK_TENSOR_IN_DEVICE(t)                                  \
-do                                                                 \
-{                                                                  \
-if ( t.device().type() != DeviceType::PrivateUse1 )                \
-{                                                                  \
-  LOG ( FATAL ) << #t << " is not in TPU device";                  \
-}                                                                  \
-if ( tpu::TPUPtrIsInCurrentDevice ( t.data_ptr() ) == false )      \
-{                                                                  \
-  LOG ( FATAL ) << #t << " is not in current TPU device";          \
-}                                                                  \
-}                                                                  \
+#define CHECK_TENSOR_IN_DEVICE(t)                                                                                \
+do                                                                                                               \
+{                                                                                                                \
+TORCH_CHECK ( t.device().type() == DeviceType::PrivateUse1, #t, " is not in TPU device" );                       \
+TORCH_CHECK ( tpu::TPUPtrIsInCurrentDevice ( t.data_ptr() ) == true, #t, " is not in current TPU device"  );     \
+TORCH_CHECK ( t.is_contiguous() == true, #t, " is not contiguous" );                                             \
+}                                                                                                                \
 while ( 0 )
+
+#define TENSOR_TO_CPU(t) ( ( t ).to ( torch::Device ( "cpu" ) ) )
+
+#define TENSOR_TO_TPU(t) ( ( t ).to ( tpu::TPUGetCurrentDevice() ) )
 
 #define ADDR_IN_DEVICE(t) tpu::TPUGetAddrInDevice( t.data_ptr() )
 
@@ -34,6 +35,19 @@ namespace tpu
 static inline at::Device TPUGetCurrentDevice()
 {
   return at::Device ( at::DeviceType::PrivateUse1, tpu::TPUGetDeviceIndex() );
+}
+
+static inline bool HasInfOrNan()
+{
+}
+
+static inline void SaveTensorToBinaryFile ( const at::Tensor & Tensor, const std::string & Path )
+{
+  auto TensorCPU = TENSOR_TO_CPU ( Tensor ).contiguous();
+  std::ofstream fout ( Path, std::ios::out | std::ios::binary );
+  TORCH_CHECK ( fout.is_open() == true, "Failed to open file ", Path );
+  fout.write ( ( char * ) TensorCPU.data_ptr(), TensorCPU.nbytes() );
+  fout.close();
 }
 
 static inline int TPUConvertDType ( caffe2::TypeMeta dtype )
@@ -53,8 +67,7 @@ static inline int TPUConvertDType ( caffe2::TypeMeta dtype )
   return -1;
 }
 
-static inline TensorDescriptor_t TPUGenerateTensorDesc (
-const at::Tensor & Tensor )
+static inline TensorDescriptor_t TPUGenerateTensorDesc ( const at::Tensor & Tensor )
 {
   TensorDescriptor_t Desc = { 0 };
   Desc.dtype = TPUConvertDType ( Tensor.dtype() );
@@ -84,10 +97,12 @@ static inline void TPUCompareResult ( const at::Tensor & Got,
   if ( Got.dtype() == caffe2::TypeMeta::Make<float>() )
   {
     int ErrCnt = 0;
-    const int MaxErrCnt = 100;
-    auto AbsErr = torch::abs ( torch::sub ( Got, Exp ) );
+    const auto MaxErrCnt = 100;//Got.numel();
+    auto Err = torch::sub ( Got, Exp );
+    auto AbsErr = torch::abs ( Err );
     auto AbsExp = torch::abs ( Exp );
     auto RltAbsErr = torch::div ( AbsErr, AbsExp ) * ErrScale;
+    auto ErrPtr = Err.data_ptr<float>();
     auto GotPtr = Got.data_ptr<float>();
     auto ExpPtr = Exp.data_ptr<float>();
     auto AbsErrPtr = AbsErr.data_ptr<float>();
@@ -107,6 +122,7 @@ FAILED:
       {
         LOG ( WARNING ) << "Compare failed: Got = " << GotPtr[i]
                         << ", Exp = " << ExpPtr[i]
+                        << ", Err = " << ErrPtr[i]
                         << ", index = " << i;
       }
       else
@@ -173,9 +189,34 @@ struct OpTimer
   void Dump() const;
   static OpTimer & Instance();
 private:
+  OpTimer() {}
   unsigned long long elapsed_time_us_[OP_NUM];
   std::mutex mutex_;
   static OpTimer * instance_;
 };
+
+struct TensorWatcher
+{
+  void AddTensor ( const at::Tensor & Tensor );
+  bool Watch() const;
+  static TensorWatcher & Instance();
+private:
+  TensorWatcher() {}
+  std::vector<at::Tensor> tensors_;
+  std::vector<at::Tensor> tensors_cpu_;
+  static TensorWatcher * instance_;
+};
+
+template<typename T>
+static inline void DumpTensor ( const at::Tensor & Tensor )
+{
+  auto TensorCPU = TENSOR_TO_CPU ( Tensor );
+  auto Ptr = TensorCPU.data_ptr<T>();
+  for ( auto i = 0; i < Tensor.numel(); ++i )
+  {
+    std::cout << Ptr[i] << " ";
+  }
+  std::cout << std::endl;
+}
 
 } // namespace tpu
