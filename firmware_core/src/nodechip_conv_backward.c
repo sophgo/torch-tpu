@@ -2182,6 +2182,7 @@ void nodechip_conv_backward_weight_depthwise(
 }
 
 typedef struct{
+    int nsecs;
     int ocsecs;
     int icsecs;
 } grad_weight_1x1_secs_info_t;
@@ -2200,7 +2201,9 @@ void grad_weight_1x1_data_split(
     grad_weight_1x1_secs_info_t  *secs_info
 ) {
 
-    const int nslice = 1;
+    int nslice = 1;
+    secs_info->nsecs = n;
+
     secs_info->ocsecs = 1;
     secs_info->icsecs = 1;
 
@@ -2222,7 +2225,30 @@ void grad_weight_1x1_data_split(
                               ALIGN(wsize, BANK_SIZE) * 2 +
                               ALIGN(osize, BANK_SIZE) * 2 +
                               ALIGN(buffer_size, BANK_SIZE);
-    if (total_size <= (unsigned int)LOCAL_MEM_SIZE) return;
+    //if (total_size <= (unsigned int)LOCAL_MEM_SIZE) return;
+    if (total_size <= (unsigned int)LOCAL_MEM_SIZE) {
+        nslice = n;
+        secs_info->nsecs = 1;
+        bool first_time = true;
+        while(1) {
+            if (!first_time) {
+                secs_info->nsecs++;
+                nslice = DIV_UP(n, secs_info->nsecs);
+            }
+            unsigned int other_size = ALIGN(osize, BANK_SIZE) * 2;
+            if (secs_info->nsecs > 1) other_size += ALIGN(osize, BANK_SIZE);
+            unsigned int some_n_isize = nslice * DIV_UP(icslice, NPU_NUM) *
+                                        tpu_aligned_feature_size(ih, iw, dtype);
+            unsigned int some_n_wsize = nslice * DIV_UP(icslice, NPU_NUM) *
+                                        oh * ow * tpu_data_type_size(dtype);
+            unsigned int some_n_total_size = ALIGN(some_n_isize, BANK_SIZE) * 2 +
+                                             ALIGN(some_n_wsize, BANK_SIZE) * 2 +
+                                             other_size;
+            if (some_n_total_size <= (unsigned int)LOCAL_MEM_SIZE) break;
+            first_time = false;
+        }
+        return;
+    }
 
     unsigned int per_oc_isize = isize;
     unsigned int per_oc_wsize = wsize;
@@ -2234,10 +2260,35 @@ void grad_weight_1x1_data_split(
                                      ALIGN(per_oc_buffer_size, BANK_SIZE);
 
     TPUKERNEL_ASSERT(per_oc_total_size <= (unsigned int)LOCAL_MEM_SIZE);
+    //TODO
+    // if nsecs == 1, can no need buffer, ocslice can larger
     ocslice = ((unsigned int)LOCAL_MEM_SIZE -
                ALIGN(per_oc_isize, BANK_SIZE) * 2 -
                ALIGN(per_oc_wsize, BANK_SIZE) * 2) / 3 / per_oc_osize;
     secs_info->ocsecs = DIV_UP(oc, ocslice);
+
+    nslice = n;
+    secs_info->nsecs = 1;
+    bool first_time = true;
+    while(1) {
+        if (!first_time) {
+                secs_info->nsecs++;
+                nslice = DIV_UP(n, secs_info->nsecs);
+        }
+        unsigned int some_oc_osize = ocslice * DIV_UP(icslice, NPU_NUM) *
+                                     tpu_aligned_feature_size(kh, kw, dtype);
+        unsigned int other_size = ALIGN(some_oc_osize, BANK_SIZE) * 2;
+        if (secs_info->nsecs > 1) other_size += ALIGN(some_oc_osize, BANK_SIZE);
+        unsigned int some_n_isize = nslice * DIV_UP(icslice, NPU_NUM) *
+                                    tpu_aligned_feature_size(ih, iw, dtype);
+        unsigned int some_n_wsize = nslice * DIV_UP(icslice, NPU_NUM) *
+                                    oh * ow * tpu_data_type_size(dtype);
+        unsigned int some_n_total_size = ALIGN(some_n_isize, BANK_SIZE) * 2 +
+                                         ALIGN(some_n_wsize, BANK_SIZE) * 2 +
+                                         other_size;
+        if (some_n_total_size <= (unsigned int)LOCAL_MEM_SIZE) break;
+        first_time = false;
+    }
 
     //(TODO) split kernel
 }
@@ -2292,7 +2343,7 @@ void nodechip_conv_backward_weight_1x1(
         &secs_info);
 
     //(TODO) support split hw
-    int nslice = 1;
+    int nslice = DIV_UP(n, secs_info.nsecs);
     int ocslice = DIV_UP(oc, secs_info.ocsecs);
     int icslice = DIV_UP(ic, secs_info.icsecs);
     icslice = secs_info.icsecs > 1 ? ALIGN(icslice, NPU_NUM) : icslice;
@@ -2313,7 +2364,7 @@ void nodechip_conv_backward_weight_1x1(
     TPUKERNEL_ASSERT(oaddr_pong + osize <= (unsigned int)LOCAL_MEM_SIZE);
 
     local_addr_t buffer_addr = 0;
-    if (n > 1) {
+    if (secs_info.nsecs > 1) {
         unsigned int buffer_size = osize;
         buffer_addr = ALIGN(oaddr_pong + osize, BANK_SIZE);
         TPUKERNEL_ASSERT(buffer_addr + buffer_size <= (unsigned int)LOCAL_MEM_SIZE);
@@ -2352,31 +2403,34 @@ void nodechip_conv_backward_weight_1x1(
             dim4 oslice_stride;
             tpu_aligned_stride(&oslice_stride, 0, &oslice_shape, dtype);
 
-            for (int n_idx = 0; n_idx < n; n_idx++) {
+            int nstart = 0;
+            int nend = 0;
+            for (int n_idx = 0; n_idx < secs_info.nsecs; n_idx++) {
+                nstart = nend;
+                nslice = n / secs_info.nsecs + ((n % secs_info.nsecs) > n_idx);
+                nend = nstart + nslice;
+
+                // load forward input [n', ic', ih, iw]
+                dim4 islice_shape = {nslice, icslice, ih, iw};
+                tpu_gdma_cpy_S2L(
+                    ping_in ? iaddr_ping : iaddr_pong,
+                    input_global_addr +
+                        (nstart * istride.n +
+                         icstart * istride.c) * tpu_data_type_size(dtype),
+                    &islice_shape,
+                    NULL,
+                    &istride,
+                    dtype);
 
                 for (int ocslice_idx = 0; ocslice_idx < ocslice; ocslice_idx++) {
 
-                    // load forward input [1, ic', ih, iw]
-                    dim4 islice_shape = {1, icslice, ih, iw};
-                    if (ocslice_idx == 0) {
-                        tpu_gdma_cpy_S2L(
-                            ping_in ? iaddr_ping : iaddr_pong,
-                            input_global_addr +
-                                (n_idx * istride.n +
-                                 icstart * istride.c) * tpu_data_type_size(dtype),
-                            &islice_shape,
-                            NULL,
-                            NULL,
-                            dtype);
-                    }
-
-                    // load grad_out [1, 1, oh, ow]
-                    dim4 wslice_cbcast_shape = {1, icslice, oh, ow};
-                    dim4 wstride_cbcast_global = {0, 0, ow, 1};
+                    // load grad_out [n, 1, oh, ow]
+                    dim4 wslice_cbcast_shape = {nslice, icslice, oh, ow};
+                    dim4 wstride_cbcast_global = {oc * oh * ow, 0, ow, 1};
                     tpu_gdma_channel_bcast_S2L(
                         ping_weight ? waddr_ping : waddr_pong,
                         weight_global_addr +
-                            (n_idx * wstride.n +
+                            (nstart * wstride.n +
                              (ocstart + ocslice_idx) * wstride.c) * tpu_data_type_size(dtype),
                         &wslice_cbcast_shape,
                         NULL,
@@ -2385,16 +2439,16 @@ void nodechip_conv_backward_weight_1x1(
 
                     if (parallel_branch) {
                         tpu_parallel_end();
-                    };
+                    }
                     tpu_parallel_start();
                     parallel_branch = true;
 
-                    dim4 slice_shape = {1, icslice, oh, ow};
+                    dim4 slice_shape = {nslice, icslice, oh, ow};
                     dim4 A_stride;
                     tpu_aligned_stride(&A_stride, 0, &islice_shape, dtype);
                     A_stride.w = stride.w;
                     A_stride.h = islice_shape.w * stride.h;
-                    // [1, ic', ih, iw] * [1, 1, oh, ow] => [1, ic', oh, ow]
+                    // [n', ic', ih, iw] * [n', 1, oh, ow] => [n', ic', oh, ow]
                     tpu_bdc_fp_mul(
                         ping_weight ? waddr_ping : waddr_pong,
                         ping_in ? iaddr_ping : iaddr_pong,
@@ -2405,8 +2459,8 @@ void nodechip_conv_backward_weight_1x1(
                         NULL,
                         dtype);
 
-                    // [1, ic', oh, ow] => [1, ic', 1, ow] => [1, ic', 1, 1]
-                    dim4 pooling_shape = {1, icslice, oh, ow};
+                    // [n', ic', oh, ow] => [n', ic', 1, ow] => [n', ic', 1, 1]
+                    dim4 pooling_shape = {nslice, icslice, oh, ow};
                     dim2 pooling_kernel = {oh, 1};
                     dim2 pooling_stride = {1, 1};
                     dim2 pooling_dilation = {1, 1};
@@ -2428,10 +2482,10 @@ void nodechip_conv_backward_weight_1x1(
                     pooling_kernel.h = 1;
                     pooling_kernel.w = pooling_shape.w;
                     tpu_bdc_fp_avg_pool2d(
-                        n_idx > 0 ? buffer_addr + ocslice_idx * oslice_stride.c * tpu_data_type_size(dtype)
-                                  : ping_out ? oaddr_ping + ocslice_idx * oslice_stride.c * tpu_data_type_size(dtype)
-                                             : oaddr_pong + ocslice_idx * oslice_stride.c * tpu_data_type_size(dtype),
-                        //ping_in ? iaddr_ping : iaddr_pong,
+                        //n_idx > 0 ? buffer_addr + ocslice_idx * oslice_stride.c * tpu_data_type_size(dtype)
+                        //          : ping_out ? oaddr_ping + ocslice_idx * oslice_stride.c * tpu_data_type_size(dtype)
+                        //                     : oaddr_pong + ocslice_idx * oslice_stride.c * tpu_data_type_size(dtype),
+                        ping_weight ? waddr_ping : waddr_pong,
                         ping_weight ? waddr_ping : waddr_pong,
                         &pooling_shape,
                         &pooling_kernel,
@@ -2441,6 +2495,34 @@ void nodechip_conv_backward_weight_1x1(
                         dtype,
                         tpu_cast(scale, dtype, DT_FP32, RM_HALF_AWAY_FROM_ZERO));
 
+                    //[n', ic', 1, 1] => [1, ic', 1, n']
+                    dim4 trans_shape = {nslice, icslice, 1, 1};
+                    dim4 trans_dst_stride = {1, ALIGN(nslice, tpu_eu_num(dtype)), 2, 1};
+                    tpu_bdc_cpy(
+                        ping_weight ? waddr_ping : waddr_pong,
+                        ping_weight ? waddr_ping : waddr_pong,
+                        &trans_shape,
+                        &trans_dst_stride,
+                        NULL,
+                        dtype);
+
+                    //[1, ic', 1, n'] => [1, ic', 1, 1]
+                    pooling_shape.w = nslice;
+                    pooling_shape.n = 1;
+                    pooling_kernel.h = 1;
+                    pooling_kernel.w = nslice;
+                    tpu_bdc_fp_avg_pool2d(
+                        n_idx > 0 ? buffer_addr + ocslice_idx * oslice_stride.c * tpu_data_type_size(dtype)
+                                  : ping_out ? oaddr_ping + ocslice_idx * oslice_stride.c * tpu_data_type_size(dtype)
+                                             : oaddr_pong + ocslice_idx * oslice_stride.c * tpu_data_type_size(dtype),
+                        ping_weight ? waddr_ping : waddr_pong,
+                        &pooling_shape,
+                        &pooling_kernel,
+                        &pooling_padding,
+                        &pooling_stride,
+                        &pooling_dilation,
+                        dtype,
+                        tpu_cast(scale, dtype, DT_FP32, RM_HALF_AWAY_FROM_ZERO));
                     ping_weight = !ping_weight;
                 }
                 if (n_idx > 0) {
@@ -2739,7 +2821,8 @@ void nodechip_conv_backward_weight_use_conv(
     int ocend = 0;
     for (int oc_idx = 0; oc_idx < secs_info.ocsecs; oc_idx++) {
         ocstart = ocend;
-        ocslice = MIN(ocslice, oc - ocend);
+        ocslice = DIV_UP(oc, secs_info.ocsecs);
+        ocslice = MIN(ALIGN(ocslice, NPU_NUM), oc - ocend);
         ocend = ocstart + ocslice;
 
         dim4 wslice_shape = {1,
@@ -2929,7 +3012,22 @@ void nodechip_conv_backward(
                                     input_shape->h, input_shape->w,
                                     grad_out_shape->h, grad_out_shape->w,
                                     kernel->h, kernel->w, dtype);
-            if (can_use_conv) {
+            if (kernel->h == 1 && kernel->w == 1 &&
+                       dilation->h == 1 && dilation->w == 1 &&
+                       pad->top == 0 && pad->bottom == 0 && pad->left == 0 && pad->right == 0) {
+                nodechip_conv_backward_weight_1x1(
+                    input_global_addr,
+                    grad_out_global_addr,
+                    grad_weight_global_addr,
+                    groups,
+                    input_shape,
+                    grad_out_shape,
+                    kernel,
+                    stride,
+                    dilation,
+                    pad,
+                    dtype);
+            } else if (can_use_conv) {
                 nodechip_conv_backward_weight_use_conv(
                     input_global_addr,
                     grad_out_global_addr,
@@ -2943,21 +3041,6 @@ void nodechip_conv_backward(
                     dilation,
                     pad,
                     dtype);
-            //} else if (kernel->h == 1 && kernel->w == 1 &&
-            //           dilation->h == 1 && dilation->w == 1 &&
-            //           pad->top == 0 && pad->bottom == 0 && pad->left == 0 && pad->right == 0) {
-            //    nodechip_conv_backward_weight_1x1(
-            //        input_global_addr,
-            //        grad_out_global_addr,
-            //        grad_weight_global_addr,
-            //        groups,
-            //        input_shape,
-            //        grad_out_shape,
-            //        kernel,
-            //        stride,
-            //        dilation,
-            //        pad,
-            //        dtype);
             } else {
                 nodechip_conv_backward_weight_depthwise(
                     input_global_addr,
