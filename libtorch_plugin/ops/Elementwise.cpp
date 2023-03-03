@@ -6,8 +6,6 @@
 #include <TPUTorchUtils.h>
 #include <sgdnn_api.h>
 
-//#define TPU_LIBTORCH_OP_COMPARE
-
 namespace at
 {
 Tensor & binary_Tensor_tpu ( const Tensor          & input1,
@@ -56,20 +54,13 @@ Tensor & add_out_tpu ( const Tensor & input1,
   static int count = 0;
   //std::cout << "Add " << count << std::endl;
 #if 0
-  out = torch::add ( input1.to ( torch::Device ( "cpu" ) ), input2.to ( torch::Device ( "cpu" ) ), alpha ).to ( tpu::TPUGetCurrentDevice() );
+  auto out_cpu = torch::add ( input1.to ( torch::Device ( "cpu" ) ), input2.to ( torch::Device ( "cpu" ) ), alpha );
+  tpu::TPUCopyHostToDevice ( out.data_ptr(), out_cpu.contiguous().data_ptr(), out.nbytes() );
+  ++count;
   return out;
 #else
-#ifdef TPU_LIBTORCH_OP_COMPARE
-  auto input1_cpu = input1.to ( torch::Device ( "cpu" ) );
-  auto input2_cpu = input2.to ( torch::Device ( "cpu" ) );
-  auto output_exp = torch::add ( input1_cpu, input2_cpu, alpha );
-#endif
   EltwiseOpMode_t op = OP_ELTWISE_COEF_ADD;
   auto & output = binary_Tensor_tpu ( input1, input2, alpha, out, op );
-#ifdef TPU_LIBTORCH_OP_COMPARE
-  auto output_got = output.to ( torch::Device ( "cpu" ) );
-  tpu::TPUCompareResult ( output_got, output_exp );
-#endif
   ++count;
   return out;
 #endif
@@ -79,15 +70,26 @@ TORCH_LIBRARY_IMPL ( aten, PrivateUse1, m )
   m.impl ( "add.out", add_out_tpu );
 }
 
+Tensor & mul_out_tpu ( const Tensor & input1,
+                       const Tensor & input2,
+                       Tensor       & out )
+{
+  auto out_cpu = torch::mul ( input1.to ( torch::Device ( "cpu" ) ), input2.to ( torch::Device ( "cpu" ) ) );
+  tpu::TPUCopyHostToDevice ( out.data_ptr(), out_cpu.contiguous().data_ptr(), out.nbytes() );
+  return out;
+}
+TORCH_LIBRARY_IMPL ( aten, PrivateUse1, m )
+{
+  m.impl ( "mul.out", mul_out_tpu );
+}
+
 Tensor & div_out_tpu ( const Tensor & input1,
                        const Tensor & input2,
-                       Tensor       & output )
+                       Tensor       & out )
 {
-  auto input1_cpu = input1.to ( torch::Device ( "cpu" ) );
-  auto input2_cpu = input2.to ( torch::Device ( "cpu" ) );
-  auto output_cpu = torch::div ( input1_cpu, input2_cpu );
-  output = output_cpu.contiguous().to ( tpu::TPUGetCurrentDevice() );
-  return output;
+  auto out_cpu = torch::div ( input1.to ( torch::Device ( "cpu" ) ), input2.to ( torch::Device ( "cpu" ) ) );
+  tpu::TPUCopyHostToDevice ( out.data_ptr(), out_cpu.contiguous().data_ptr(), out.nbytes() );
+  return out;
 }
 TORCH_LIBRARY_IMPL ( aten, PrivateUse1, m )
 {

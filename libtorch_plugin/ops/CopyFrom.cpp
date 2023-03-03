@@ -48,8 +48,7 @@ Tensor _copy_from_tpu ( const Tensor & src, const Tensor & dst, bool non_blockin
     }
     else if ( src.device().type() == DeviceType::PrivateUse1 && dst.device().type() == DeviceType::PrivateUse1 )
     {
-      LOG ( FATAL ) << "Cast from " << src.dtype()
-                    << " to " << dst.dtype() << " is not implemented";
+      TORCH_CHECK ( false, "Cast from ", src.dtype(), " to ", dst.dtype(), " is not implemented" );
     }
     else
     {

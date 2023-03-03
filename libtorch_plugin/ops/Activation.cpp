@@ -8,7 +8,6 @@
 #include <sgdnn_api.h>
 #include <limits.h>
 
-//#define TPU_LIBTORCH_OP_COMPARE
 #define TPU_OP_TIMING
 
 namespace at
@@ -16,18 +15,16 @@ namespace at
 
 Tensor & relu__tpu ( Tensor & self )
 {
-  //std::cout << "ReLU" << std::endl;
+  static int count = 0;
+  //std::cout << "ReLU " << count << std::endl;
+  CHECK_TENSOR_IN_DEVICE ( self );
 #if 0
   auto self_cpu = self.to ( torch::Device ( "cpu" ) );
-  relu_ ( self_cpu );
-  self = self_cpu.to ( tpu::TPUGetCurrentDevice() );
+  self_cpu = relu_ ( self_cpu );
+  tpu::TPUCopyHostToDevice ( self.data_ptr(), self_cpu.contiguous().data_ptr(), self.nbytes() );
+  ++count;
   return self;
 #else
-  CHECK_TENSOR_IN_DEVICE ( self );
-#ifdef TPU_LIBTORCH_OP_COMPARE
-  auto self_cpu = self.to ( torch::Device ( "cpu" ) );
-  auto & output_exp = relu_ ( self_cpu );
-#endif
   auto handle = tpu::TPUGetDeviceHandle();
   bm_status_t status = BM_SUCCESS;
   float alpha = 1.f;
@@ -54,14 +51,7 @@ Tensor & relu__tpu ( Tensor & self )
 #ifdef TPU_OP_TIMING
   tpu::OpTimer::Instance().AddTime ( tpu::RELU, timer.ElapsedUS() );
 #endif
-#ifdef TPU_LIBTORCH_OP_COMPARE
-  std::cout << "Comparing inplace relu:"
-            << " self shape = " << self.sizes()
-            << " self dtype = " << self.dtype()
-            << std::endl;
-  auto output_got = self.to ( torch::Device ( "cpu" ) );
-  tpu::TPUCompareResult ( output_got, output_exp );
-#endif
+  ++count;
   return self;
 #endif
 }
@@ -80,17 +70,10 @@ Tensor       & grad_input )
   CHECK_TENSOR_IN_DEVICE ( input );
   CHECK_TENSOR_IN_DEVICE ( grad_input );
 #if 0
-  auto grad_output_cpu = grad_output.to ( torch::Device ( "cpu" ) );
-  auto input_cpu = input.to ( torch::Device ( "cpu" ) );
-  grad_input = threshold_backward ( grad_output_cpu, input_cpu, threshold );
-  grad_input = grad_input.to ( tpu::TPUGetCurrentDevice() );
+  auto grad_input_cpu = threshold_backward ( TENSOR_TO_CPU ( grad_output ), TENSOR_TO_CPU ( input ), threshold );
+  tpu::TPUCopyHostToDevice ( grad_input.data_ptr(), grad_input_cpu.contiguous().data_ptr(), grad_input.nbytes() );
   return grad_input;
 #else
-#ifdef TPU_LIBTORCH_OP_COMPARE
-  auto grad_output_cpu = grad_output.to ( torch::Device ( "cpu" ) );
-  auto input_cpu = input.to ( torch::Device ( "cpu" ) );
-  auto grad_input_exp = threshold_backward ( grad_output_cpu, input_cpu, threshold );
-#endif
   auto handle = tpu::TPUGetDeviceHandle();
   bm_status_t status = BM_SUCCESS;
   float alpha = 1.f;
@@ -123,19 +106,6 @@ Tensor       & grad_input )
            ADDR_IN_DEVICE ( grad_input ) );
 #ifdef TPU_OP_TIMING
   tpu::OpTimer::Instance().AddTime ( tpu::RELU_BACKWARD, timer.ElapsedUS() );
-#endif
-#ifdef TPU_LIBTORCH_OP_COMPARE
-  std::cout << "Comparing threshold backward:"
-            << " grad_output shape = " << grad_output.sizes()
-            << " grad_output dtype = " << grad_output.dtype()
-            << " input shape = " << input.sizes()
-            << " input dtype = " << input.dtype()
-            << " grad_input shape = " << grad_input.sizes()
-            << " grad_input dtype = " << grad_input.dtype()
-            << " threshold = " << threshold
-            << std::endl;
-  auto grad_input_got = grad_input.to ( torch::Device ( "cpu" ) );
-  tpu::TPUCompareResult ( grad_input_got, grad_input_exp );
 #endif
   return grad_input;
 #endif

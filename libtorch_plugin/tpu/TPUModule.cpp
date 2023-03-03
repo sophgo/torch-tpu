@@ -68,4 +68,26 @@ void TorchscriptModule::Register()
   }
 }
 
+void DumpParameterValues ( torch::nn::Module & Module, const std::string & Name )
+{
+  for ( auto & Mod : Module.named_children() )
+  {
+    DumpParameterValues ( *Mod.value(), Name );
+  }
+  for ( auto & Par : Module.named_parameters ( false ) )
+  {
+    if ( Par.key() == Name )
+    {
+      auto ParCPU = Par->to ( torch::Device ( "cpu" ) );
+      auto DumpNum = Par->numel() < 10 ? Par->numel() : 10;
+      std::cout << Name << std::endl;
+      for ( auto i = 0; i < DumpNum; ++i )
+      {
+        std::cout << ParCPU.data_ptr<float>() [i] << " ";
+      }
+      std::cout << std::endl;
+    }
+  }
+}
+
 } // namespace tpu

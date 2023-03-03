@@ -176,7 +176,6 @@ public:
 #ifdef SHOW_INFO
     std::cout << "Copy Device = " << Src << " to Device = " << Dst << " Size = " << Size << std::endl;
 #endif
-    TORCH_CHECK ( false );
     int DstIndex = GetDeviceIndexByUnifiedAddr ( ( unsigned long long ) Dst );
     int SrcIndex = GetDeviceIndexByUnifiedAddr ( ( unsigned long long ) Src );
     bm_handle_t DstHandle = GetDeviceHandle ( DstIndex );

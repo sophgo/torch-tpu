@@ -8,6 +8,8 @@ namespace tpu
 
 void MoveModuleToTPUDevice ( torch::nn::Module & Module );
 
+void DumpParameterValues ( torch::nn::Module & Module, const std::string & Name );
+
 class TorchscriptModule : public torch::nn::Module
 {
 public:

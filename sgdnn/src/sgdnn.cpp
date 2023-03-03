@@ -1050,22 +1050,62 @@ bm_status_t sgdnn_eltwise_forward_cudnn(
 ) {
 
     int op_code = opTensorDesc;
+    int A_n, A_c, A_h, A_w, B_n, B_c, B_h, B_w, C_n, C_c, C_h, C_w;
+    if (aDesc.ndims == 4 && bDesc.ndims == 4 && cDesc.ndims == 4)
+    {
+       A_n = aDesc.shape[0];
+       A_c = aDesc.shape[1];
+       A_h = aDesc.shape[2];
+       A_w = aDesc.shape[3];
 
-    assert(aDesc.ndims == 4 && bDesc.ndims == 4 && cDesc.ndims == 4);
-    int A_n = aDesc.shape[0];
-    int A_c = aDesc.shape[1];
-    int A_h = aDesc.shape[2];
-    int A_w = aDesc.shape[3];
+       B_n = bDesc.shape[0];
+       B_c = bDesc.shape[1];
+       B_h = bDesc.shape[2];
+       B_w = bDesc.shape[3];
 
-    int B_n = bDesc.shape[0];
-    int B_c = bDesc.shape[1];
-    int B_h = bDesc.shape[2];
-    int B_w = bDesc.shape[3];
+       C_n = cDesc.shape[0];
+       C_c = cDesc.shape[1];
+       C_h = cDesc.shape[2];
+       C_w = cDesc.shape[3];
+    }
+    else if (aDesc.ndims == 1 && bDesc.ndims == 1 && cDesc.ndims == 1)
+    {
+       A_n = 1;
+       A_c = aDesc.shape[0];
+       A_h = 1;
+       A_w = 1;
 
-    int C_n = cDesc.shape[0];
-    int C_c = cDesc.shape[1];
-    int C_h = cDesc.shape[2];
-    int C_w = cDesc.shape[3];
+       B_n = 1;
+       B_c = bDesc.shape[0];
+       B_h = 1;
+       B_w = 1;
+
+       C_n = 1;
+       C_c = cDesc.shape[0];
+       C_h = 1;
+       C_w = 1;
+     }
+     else if (aDesc.ndims == 2 && bDesc.ndims == 2 && cDesc.ndims == 2)
+     {
+       A_n = 1;
+       A_c = aDesc.shape[0];
+       A_h = 1;
+       A_w = aDesc.shape[1];
+
+       B_n = 1;
+       B_c = bDesc.shape[0];
+       B_h = 1;
+       B_w = bDesc.shape[1];
+
+       C_n = 1;
+       C_c = cDesc.shape[0];
+       C_h = 1;
+       C_w = cDesc.shape[1];
+     }
+     else
+     {
+       assert(false);
+     }
 
     assert(A_n == B_n && B_n == C_n);
     assert(A_c == B_c && B_c == C_c);

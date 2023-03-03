@@ -7,9 +7,7 @@
 #include <TPUTorchUtils.h>
 #include <sgdnn_api.h>
 
-//#define TPU_LIBTORCH_OP_COMPARE
 #define TPU_OP_TIMING
-//#define SAVE_TENSOR
 
 namespace at
 {
@@ -46,16 +44,17 @@ int64_t                       groups )
   c10::MaybeOwned<Tensor> bias_maybe_owned = borrow_from_optional_tensor ( bias_opt );
   const Tensor & bias = *bias_maybe_owned;
   auto output_cpu = torch::convolution (
-                    input_.to ( torch::Device ( "cpu" ) ),
-                    weight.to ( torch::Device ( "cpu" ) ),
-                    c10::optional<Tensor> ( bias.defined() ? bias.to ( torch::Device ( "cpu" ) ) : Tensor() ),
+                    TENSOR_TO_CPU ( input_ ),
+                    TENSOR_TO_CPU ( weight ),
+                    c10::optional<Tensor> ( bias.defined() ? TENSOR_TO_CPU ( bias ) : Tensor() ),
                     stride,
                     padding,
                     dilation,
                     transposed,
                     output_padding,
                     groups );
-  return output_cpu.to ( tpu::TPUGetCurrentDevice() );
+  ++count;
+  return TENSOR_TO_TPU ( output_cpu );
 #else
   TORCH_CHECK ( at::isComplexType ( input_.scalar_type() ) == false, "Complex convolution is unsupported by TPU" );
   CHECK_TENSOR_IN_DEVICE ( input_ );
@@ -78,25 +77,6 @@ int64_t                       groups )
     func_name += "_transposed";
   }
   std::tie ( input, is_batched ) = batchify ( input_, num_spatial_dims, func_name );
-#ifdef TPU_LIBTORCH_OP_COMPARE
-  auto input_cpu = input.to ( torch::Device ( "cpu" ) ).to ( torch::kDouble );
-  auto weight_cpu = weight.to ( torch::Device ( "cpu" ) ).to ( torch::kDouble );
-  Tensor bias_cpu;
-  if ( bias.defined() )
-  {
-    bias_cpu = bias.to ( torch::Device ( "cpu" ) ).to ( torch::kDouble );
-  }
-  auto output_exp = torch::convolution (
-                    input_cpu,
-                    weight_cpu,
-                    c10::optional<Tensor> ( bias_cpu ),
-                    stride,
-                    padding,
-                    dilation,
-                    transposed,
-                    output_padding,
-                    groups ).to ( torch::kFloat );
-#endif
   Tensor output;
   if ( transposed == true )
   {
@@ -166,33 +146,6 @@ int64_t                       groups )
     tpu::OpTimer::Instance().AddTime ( tpu::CONVOLUTION, timer.ElapsedUS() );
 #endif
   }
-#ifdef TPU_LIBTORCH_OP_COMPARE
-  auto output_got = output.to ( torch::Device ( "cpu" ) );
-  std::cout << "Comparing convolution:"
-            << " input shape = " << input.sizes()
-            << " input dtype = " << input.dtype()
-            << " weight shape = " << weight.sizes()
-            << " weight dtype = " << weight.dtype()
-            << " bias shape = " << bias.sizes()
-            << " bias dtype = " << bias.dtype()
-            << " output shape = " << output.sizes()
-            << " output dtype = " << output.dtype()
-            << " stride = " << stride
-            << " padding = " << padding
-            << " dilation = " << dilation
-            << " groups = " << groups
-            << std::endl;
-  tpu::TPUCompareResult ( output_got, output_exp, 1.0 / ( ( double ) weight.size ( 1 ) * weight.size ( 2 ) * weight.size ( 3 ) ) );
-#endif
-#ifdef SAVE_TENSOR
-  tpu::SaveTensorToBinaryFile ( input_, "Convolution_Input_" + std::to_string ( count ) );
-  tpu::SaveTensorToBinaryFile ( weight, "Convolution_Weight_" + std::to_string ( count ) );
-  if ( bias.defined() )
-  {
-    tpu::SaveTensorToBinaryFile ( bias, "Convolution_Bias_" + std::to_string ( count ) );
-  }
-  tpu::SaveTensorToBinaryFile ( output, "Convolution_Output_" + std::to_string ( count ) );
-#endif
   ++count;
   return is_batched ? output : output.squeeze ( 0 );
 #endif
@@ -218,9 +171,9 @@ std::array<bool, 3> output_mask )
   //std::cout << "Convolution Backward " << count << std::endl;
 #if 0
   auto outputs_cpu =  torch::convolution_backward (
-                      grad_output.to ( torch::Device ( "cpu" ) ),
-                      input.to ( torch::Device ( "cpu" ) ),
-                      weight.to ( torch::Device ( "cpu" ) ),
+                      TENSOR_TO_CPU ( grad_output ),
+                      TENSOR_TO_CPU ( input ),
+                      TENSOR_TO_CPU ( weight ),
                       at::OptionalIntArrayRef ( { weight.size ( 0 ) } ),
                       stride,
                       padding,
@@ -229,10 +182,11 @@ std::array<bool, 3> output_mask )
                       output_padding,
                       groups,
                       output_mask );
+  ++count;
   return std::tuple<Tensor, Tensor, Tensor> (
-         output_mask[0] ? std::get<0> ( outputs_cpu ).to ( tpu::TPUGetCurrentDevice() ) : Tensor(),
-         output_mask[1] ? std::get<1> ( outputs_cpu ).to ( tpu::TPUGetCurrentDevice() ) : Tensor(),
-         output_mask[2] ? std::get<2> ( outputs_cpu ).to ( tpu::TPUGetCurrentDevice() ) : Tensor() );
+         output_mask[0] ? TENSOR_TO_TPU ( std::get<0> ( outputs_cpu ) ) : Tensor(),
+         output_mask[1] ? TENSOR_TO_TPU ( std::get<1> ( outputs_cpu ) ) : Tensor(),
+         output_mask[2] ? TENSOR_TO_TPU ( std::get<2> ( outputs_cpu ) ) : Tensor() );
 #else
   TORCH_CHECK ( at::isComplexType ( input.scalar_type() ) == false,
                 "Complex convolution backward is unsupported by TPU" );
@@ -260,24 +214,6 @@ std::array<bool, 3> output_mask )
     auto grad_bias_options = torch::TensorOptions ( tpu::TPUGetCurrentDevice() ).dtype ( weight.dtype() );
     grad_bias = empty ( { weight.size ( 0 ) }, grad_bias_options );
   }
-#ifdef TPU_LIBTORCH_OP_COMPARE
-  auto input_cpu = input.to ( torch::Device ( "cpu" ) ).to ( torch::kDouble );
-  auto weight_cpu = weight.to ( torch::Device ( "cpu" ) ).to ( torch::kDouble );
-  auto grad_output_cpu = grad_output.to ( torch::Device ( "cpu" ) ).to ( torch::kDouble );
-  at::OptionalIntArrayRef bias_sizes_opt ( { weight.size ( 0 ) } );
-  auto outputs_exp = torch::convolution_backward (
-                     grad_output_cpu,
-                     input_cpu,
-                     weight_cpu,
-                     bias_sizes_opt,
-                     stride,
-                     padding,
-                     dilation,
-                     transposed,
-                     output_padding,
-                     groups,
-                     output_mask );
-#endif
   if ( transposed == true )
   {
     LOG ( FATAL ) << "TPU transposed convolution backward is not implemented";
@@ -343,61 +279,6 @@ std::array<bool, 3> output_mask )
     tpu::OpTimer::Instance().AddTime ( tpu::CONVOLUTION_BACKWARD, timer.ElapsedUS() );
 #endif
   }
-#ifdef TPU_LIBTORCH_OP_COMPARE
-  std::cout << "Comparing convolution backward:"
-            << " grad_output shape = " << grad_output.sizes()
-            << " grad_output dtype = " << grad_output.dtype()
-            << " input shape = " << input.sizes()
-            << " input dtype = " << input.dtype()
-            << " weight shape = " << weight.sizes()
-            << " weight dtype = " << weight.dtype()
-            << " grad_input shape = " << grad_input.sizes()
-            << " grad_input dtype = " << grad_input.dtype()
-            << " grad_weight shape = " << grad_weight.sizes()
-            << " grad_weight dtype = " << grad_weight.dtype()
-            << " grad_bias shape = " << grad_bias.sizes()
-            << " grad_bias dtype = " << grad_bias.dtype()
-            << " stride = " << stride
-            << " padding = " << padding
-            << " dilation = " << dilation
-            << " groups = " << groups
-            << std::endl;
-  if ( output_mask[0] == true )
-  {
-    std::cout << "Compare grad_input" << std::endl;
-    auto grad_input_got = grad_input.to ( torch::Device ( "cpu" ) );
-    tpu::TPUCompareResult ( grad_input_got, std::get<0> ( outputs_exp ).to ( torch::kFloat ), 1.0 / ( ( double ) weight.size ( 0 ) * weight.size ( 2 ) * weight.size ( 3 ) ) );
-  }
-  if ( output_mask[1] == true )
-  {
-    std::cout << "Compare grad_weight" << std::endl;
-    auto grad_weight_got = grad_weight.to ( torch::Device ( "cpu" ) );
-    tpu::TPUCompareResult ( grad_weight_got, std::get<1> ( outputs_exp ).to ( torch::kFloat ), 1.0 / ( ( double ) grad_output.size ( 0 ) * grad_output.size ( 2 ) * grad_output.size ( 3 ) ) );
-  }
-  if ( output_mask[2] == true )
-  {
-    std::cout << "Compare grad_bias" << std::endl;
-    auto grad_bias_got = grad_bias.to ( torch::Device ( "cpu" ) );
-    tpu::TPUCompareResult ( grad_bias_got, std::get<2> ( outputs_exp ).to ( torch::kFloat ) );
-  }
-#endif
-#ifdef SAVE_TENSOR
-  tpu::SaveTensorToBinaryFile ( grad_output, "Convolution_Backward_GradOutput_" + std::to_string ( count ) );
-  tpu::SaveTensorToBinaryFile ( input, "Convolution_Backward_Input_" + std::to_string ( count ) );
-  tpu::SaveTensorToBinaryFile ( weight, "Convolution_Backward_Weight_" + std::to_string ( count ) );
-  if ( output_mask[0] == true )
-  {
-    tpu::SaveTensorToBinaryFile ( grad_input, "Convolution_Backward_GradInput_" + std::to_string ( count ) );
-  }
-  if ( output_mask[1] == true )
-  {
-    tpu::SaveTensorToBinaryFile ( grad_weight, "Convolution_Backward_GradWeight_" + std::to_string ( count ) );
-  }
-  if ( output_mask[2] == true )
-  {
-    tpu::SaveTensorToBinaryFile ( grad_bias, "Convolution_Backward_GradBias_" + std::to_string ( count ) );
-  }
-#endif
   ++count;
   return std::tuple<Tensor, Tensor, Tensor> ( grad_input, grad_weight, grad_bias );
 #endif
