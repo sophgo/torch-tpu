@@ -9,8 +9,9 @@
 #include <torch/torch.h>
 #include <tuple>
 #include <vector>
-
+#include <TPUModule.h>
 #include "cifar10.h"
+#include <torch/data/transforms.h>
 /*
 template <typename T>
 float measure_inference_latency(std::shared_ptr<T> model, torch::Device& device,
@@ -62,7 +63,7 @@ void evaluate_model(std::shared_ptr<T1> model,
     // https://pytorch.org/cppdocs/api/typedef_namespacetorch_1abf2c764801b507b6a105664a2406a410.html#typedef-torch-nogradguard
     torch::NoGradGuard no_grad;
     model->eval();
-    model->to(device);
+    //model->to(device);
 
     int64_t num_running_corrects = 0;
     int64_t num_samples = 0;
@@ -72,8 +73,8 @@ void evaluate_model(std::shared_ptr<T1> model,
     for (torch::data::Example<>& batch : *test_data_loader)
     {
         torch::Tensor inputs = batch.data.to(device);
-        torch::Tensor labels = batch.target.to(device);
-        torch::Tensor outputs = model->forward(inputs);
+        torch::Tensor labels = batch.target;
+        torch::Tensor outputs = model->forward(inputs).to(torch::Device("cpu"));
         torch::Tensor preds = std::get<1>(torch::max(outputs, 1));
         num_running_corrects += torch::sum(preds == labels).item<int64_t>();
         // A related GCC bug:
@@ -101,7 +102,7 @@ train_model(std::shared_ptr<T1> model, T2& train_data_loader,
             float learning_rate = 1e-1, int64_t num_epochs = 200)
 {
     model->train();
-    model->to(device);
+    //model->to(device);
 
     torch::nn::CrossEntropyLoss criterion{};
 
@@ -118,7 +119,7 @@ train_model(std::shared_ptr<T1> model, T2& train_data_loader,
 
     std::cout << std::fixed;
 
-    evaluate_model(model, test_data_loader, criterion, device);
+    //evaluate_model(model, test_data_loader, criterion, device);
     //std::tuple<float, float> eval_result =
     //    evaluate_model(model, test_data_loader, criterion, device);
     //std::cout << std::setprecision(6) << "Epoch: " << std::setfill('0')
@@ -138,15 +139,14 @@ train_model(std::shared_ptr<T1> model, T2& train_data_loader,
         // Iterate the data loader to yield batches from the dataset.
         for (torch::data::Example<>& batch : *train_data_loader)
         {
-            torch::Tensor inputs = batch.data.to(device);
-            torch::Tensor labels = batch.target.to(device);
+            torch::Tensor inputs = batch.data.to(device);//.to(torch::Device("cpu"));
+            torch::Tensor labels = batch.target;//.to(device);
             // Reset gradients.
             optimizer.zero_grad();
             // Execute the model on the input data.
-            torch::Tensor outputs = model->forward(inputs);
-            // Compute a loss value to judge the prediction of our model.
+	    torch::Tensor outputs = model->forward(inputs).to(torch::Device("cpu"));
+	    // Compute a loss value to judge the prediction of our model.
             torch::Tensor loss = criterion(outputs, labels);
-
             torch::Tensor preds = std::get<1>(torch::max(outputs, 1));
             num_running_corrects += torch::sum(preds == labels).item<int64_t>();
             num_samples += inputs.size(0);
@@ -188,29 +188,6 @@ train_model(std::shared_ptr<T1> model, T2& train_data_loader,
     return model;
 }
 
-struct Net : torch::nn::Module
-{
-  torch::jit::Module module_;
-  Net ( const torch::jit::Module &module )
-  {
-    module_ = module;
-    for ( const auto &mod : module_.named_children() )
-    {
-      register_module ( mod.name, std::make_shared<Net> ( mod.value ) );
-    }
-    for ( const auto &par : module_.named_parameters ( false ) )
-    {
-      register_parameter ( par.name, par.value );
-    }
-  }
-  torch::Tensor forward ( const torch::Tensor &Input )
-  {
-    std::vector<torch::jit::IValue> Inputs;
-    Inputs.push_back ( Input );
-    return module_.forward ( Inputs ).toTensor();
-  }
-};
-
 int main()
 {
     const int64_t random_seed{0};
@@ -230,12 +207,8 @@ int main()
     CIFAR10 train_set{dataset_root, CIFAR10::Mode::kTrain};
     CIFAR10 test_set{dataset_root, CIFAR10::Mode::kTest};
 
-    torch::Device device("cpu");
-    if (torch::cuda::is_available())
-    {
-        device = torch::Device("cuda:0");
-    }
-
+    auto device = torch::Device ( "privateuseone:0" );
+    //device = torch::Device("cpu");
     // This might be different from the PyTorch API.
     // We did transform for the dataset directly instead of doing transform in
     // dataloader. Currently there is no augmentation options such as random
@@ -250,7 +223,7 @@ int main()
         test_set
             .map(torch::data::transforms::Normalize<>({0.4914, 0.4822, 0.4465},
                                                       {0.2023, 0.1994, 0.2010}))
-            .map(torch::data::transforms::Stack<>());
+	    .map(torch::data::transforms::Stack<>());
 
     auto train_data_loader = torch::data::make_data_loader(
         std::move(train_set_transformed), torch::data::DataLoaderOptions()
@@ -266,8 +239,8 @@ int main()
 
     //std::shared_ptr<ResNet<BasicBlock>> model = resnet18(/*num_classes = */ 10);
     std::string ModelPath = "../../model.pt";
-    auto model = std::make_shared<Net> ( torch::jit::load ( ModelPath ) );
-
+    auto model = std::make_shared<tpu::TorchscriptModule> ( ModelPath );
+    tpu::MoveModuleToTPUDevice ( *model );
     std::cout << "Training Model..." << std::endl;
     model = train_model(model, train_data_loader, test_data_loader, device,
                         learning_rate, num_epochs);
