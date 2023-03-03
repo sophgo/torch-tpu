@@ -54,7 +54,7 @@ double                        eps )
   {
     CHECK_TENSOR_IN_DEVICE ( running_var );
   }
-#if 1
+#if 0
   auto running_mean_cpu = running_mean.defined() ? TENSOR_TO_CPU ( running_mean ) : Tensor();
   auto running_var_cpu = running_var.defined() ? TENSOR_TO_CPU ( running_var ) : Tensor();
   auto outputs_cpu = native_batch_norm (

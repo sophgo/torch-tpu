@@ -11,7 +11,9 @@
 #include <vector>
 #include <TPUModule.h>
 #include "cifar10.h"
-#include <torch/data/transforms.h>
+#include <sys/time.h>
+
+#define ELAPSED_US(start, end) (( end.tv_sec - start.tv_sec ) * 1000000UL + ( end.tv_usec - start.tv_usec ))
 /*
 template <typename T>
 float measure_inference_latency(std::shared_ptr<T> model, torch::Device& device,
@@ -56,206 +58,220 @@ float measure_inference_latency(std::shared_ptr<T> model, torch::Device& device,
 */
 
 template <typename T1, typename T2, typename T3>
-void evaluate_model(std::shared_ptr<T1> model,
-                                        T2& test_data_loader, T3& criterion,
-                                        torch::Device& device)
+void evaluate_model ( std::shared_ptr<T1> model,
+                      T2& test_data_loader, T3& criterion,
+                      torch::Device& device )
 {
-    // https://pytorch.org/cppdocs/api/typedef_namespacetorch_1abf2c764801b507b6a105664a2406a410.html#typedef-torch-nogradguard
-    torch::NoGradGuard no_grad;
-    model->eval();
-    //model->to(device);
-
-    int64_t num_running_corrects = 0;
-    int64_t num_samples = 0;
-    float running_loss = 0;
-
-    // Iterate the data loader to yield batches from the dataset.
-    for (torch::data::Example<>& batch : *test_data_loader)
-    {
-        torch::Tensor inputs = batch.data.to(device);
-        torch::Tensor labels = batch.target;
-        torch::Tensor outputs = model->forward(inputs).to(torch::Device("cpu"));
-        torch::Tensor preds = std::get<1>(torch::max(outputs, 1));
-        num_running_corrects += torch::sum(preds == labels).item<int64_t>();
-        // A related GCC bug:
-        // https://discuss.pytorch.org/t/convert-c10-scalar-to-int/120513/2
-        torch::Tensor loss_tensor = criterion(outputs, labels);
-        float loss = loss_tensor.item<float>();
-        num_samples += inputs.size(0);
-        running_loss += loss * inputs.size(0);
-    }
-
-    float eval_accuracy =
-        static_cast<float>(num_running_corrects) / num_samples;
-    float eval_loss = running_loss / num_samples;
-
-    std::cout << std::setprecision(6) << "Epoch: " << std::setfill('0')
-              << std::setw(3) << 0 << " Eval Loss: " << eval_loss
-              << " Eval Acc: " << eval_accuracy << std::endl;
-    //return {eval_accuracy, eval_loss};
+  // https://pytorch.org/cppdocs/api/typedef_namespacetorch_1abf2c764801b507b6a105664a2406a410.html#typedef-torch-nogradguard
+  torch::NoGradGuard no_grad;
+  model->eval();
+  //model->to(device);
+  int64_t num_running_corrects = 0;
+  int64_t num_samples = 0;
+  float running_loss = 0;
+  // Iterate the data loader to yield batches from the dataset.
+  for ( torch::data::Example<>& batch : *test_data_loader )
+  {
+    torch::Tensor inputs = batch.data.to ( device );
+    torch::Tensor labels = batch.target;
+    torch::Tensor outputs = model->forward ( inputs ).to ( torch::Device ( "cpu" ) );
+    torch::Tensor preds = std::get<1> ( torch::max ( outputs, 1 ) );
+    num_running_corrects += torch::sum ( preds == labels ).item<int64_t>();
+    // A related GCC bug:
+    // https://discuss.pytorch.org/t/convert-c10-scalar-to-int/120513/2
+    torch::Tensor loss_tensor = criterion ( outputs, labels );
+    float loss = loss_tensor.item<float>();
+    num_samples += inputs.size ( 0 );
+    running_loss += loss * inputs.size ( 0 );
+  }
+  float eval_accuracy =
+  static_cast<float> ( num_running_corrects ) / num_samples;
+  float eval_loss = running_loss / num_samples;
+  std::cout << std::setprecision ( 6 ) << "Epoch: " << std::setfill ( '0' )
+            << std::setw ( 3 ) << 0 << " Eval Loss: " << eval_loss
+            << " Eval Acc: " << eval_accuracy << std::endl;
+  //return {eval_accuracy, eval_loss};
 }
 
 template <typename T1, typename T2, typename T3>
 std::shared_ptr<T1>
-train_model(std::shared_ptr<T1> model, T2& train_data_loader,
-            T3& test_data_loader, torch::Device& device,
-            float learning_rate = 1e-1, int64_t num_epochs = 200)
+train_model ( std::shared_ptr<T1> model, T2& train_data_loader,
+              T3& test_data_loader, torch::Device& device,
+              float learning_rate = 1e-1, int64_t num_epochs = 200 )
 {
+  model->train();
+  //model->to(device);
+  torch::nn::CrossEntropyLoss criterion{};
+  // SGD optimizer
+  // https://pytorch.org/cppdocs/api/structtorch_1_1optim_1_1_s_g_d_options.html#_CPPv4N5torch5optim10SGDOptionsE
+  torch::optim::SGD optimizer{model->parameters(),
+                              torch::optim::SGDOptions ( /*lr=*/learning_rate )
+                              .momentum ( 0.9 )
+                              .weight_decay ( 1e-4 ) };
+  // Requires LibTorch >= 1.90
+  // torch::optim::LRScheduler scheduler{optimizer, 50, 0.1};
+  model->eval();
+  std::cout << std::fixed;
+  //evaluate_model(model, test_data_loader, criterion, device);
+  //std::tuple<float, float> eval_result =
+  //    evaluate_model(model, test_data_loader, criterion, device);
+  //std::cout << std::setprecision(6) << "Epoch: " << std::setfill('0')
+  //          << std::setw(3) << 0 << " Eval Loss: " << std::get<1>(eval_result)
+  //          << " Eval Acc: " << std::get<0>(eval_result) << std::endl;
+  for ( size_t epoch = 1; epoch <= num_epochs; epoch++ )
+  {
     model->train();
-    //model->to(device);
-
-    torch::nn::CrossEntropyLoss criterion{};
-
-    // SGD optimizer
-    // https://pytorch.org/cppdocs/api/structtorch_1_1optim_1_1_s_g_d_options.html#_CPPv4N5torch5optim10SGDOptionsE
-    torch::optim::SGD optimizer{model->parameters(),
-                                torch::optim::SGDOptions(/*lr=*/learning_rate)
-                                    .momentum(0.9)
-                                    .weight_decay(1e-4)};
-    // Requires LibTorch >= 1.90
-    // torch::optim::LRScheduler scheduler{optimizer, 50, 0.1};
-
+    int64_t num_running_corrects = 0;
+    int64_t num_samples = 0;
+    float running_loss = 0;
+    int64_t num_batch = 0;
+    // Iterate the data loader to yield batches from the dataset.
+    unsigned long long DataToTPUElapsedUS = 0;
+    unsigned long long ClearGradientElapsedUS = 0;
+    unsigned long long ForwardElapsedUS = 0;
+    unsigned long long ComputeLossElapsedUS = 0;
+    unsigned long long ComputeOthersElapsedUS = 0;
+    unsigned long long BackwardElapsedUS = 0;
+    unsigned long long UpdateGradientElapsedUS = 0;
+    struct timeval TimeStart, TimeEnd;
+    for ( torch::data::Example<>& batch : *train_data_loader )
+    {
+      gettimeofday ( &TimeStart, NULL );
+      torch::Tensor inputs = batch.data.to ( device ); //.to(torch::Device("cpu"));
+      torch::Tensor labels = batch.target;//.to(device);
+      gettimeofday ( &TimeEnd, NULL );
+      DataToTPUElapsedUS += ELAPSED_US ( TimeStart, TimeEnd );
+      // Reset gradients.
+      gettimeofday ( &TimeStart, NULL );
+      optimizer.zero_grad();
+      gettimeofday ( &TimeEnd, NULL );
+      ClearGradientElapsedUS += ELAPSED_US ( TimeStart, TimeEnd );
+      // Execute the model on the input data.
+      gettimeofday ( &TimeStart, NULL );
+      torch::Tensor outputs = model->forward ( inputs ).to ( torch::Device ( "cpu" ) );
+      gettimeofday ( &TimeEnd, NULL );
+      ForwardElapsedUS += ELAPSED_US ( TimeStart, TimeEnd );
+      // Compute a loss value to judge the prediction of our model.
+      gettimeofday ( &TimeStart, NULL );
+      torch::Tensor loss = criterion ( outputs, labels );
+      gettimeofday ( &TimeEnd, NULL );
+      ComputeLossElapsedUS += ELAPSED_US ( TimeStart, TimeEnd );
+      // Other computations
+      gettimeofday ( &TimeStart, NULL );
+      torch::Tensor preds = std::get<1> ( torch::max ( outputs, 1 ) );
+      num_running_corrects += torch::sum ( preds == labels ).item<int64_t>();
+      num_samples += inputs.size ( 0 );
+      running_loss += loss.item<float>() * inputs.size ( 0 );
+      gettimeofday ( &TimeEnd, NULL );
+      ComputeOthersElapsedUS += ELAPSED_US ( TimeStart, TimeEnd );
+      // Compute gradients of the loss w.r.t. the parameters of our model.
+      gettimeofday ( &TimeStart, NULL );
+      loss.backward();
+      gettimeofday ( &TimeEnd, NULL );
+      BackwardElapsedUS += ELAPSED_US ( TimeStart, TimeEnd );
+      // Update the parameters based on the calculated gradients.
+      gettimeofday ( &TimeStart, NULL );
+      optimizer.step();
+      gettimeofday ( &TimeEnd, NULL );
+      UpdateGradientElapsedUS += ELAPSED_US ( TimeStart, TimeEnd );
+      float train_batch_loss = running_loss / num_samples;
+      std::cout << std::setprecision ( 6 ) << "Epoch: " << std::setfill ( '0' )
+                << std::setw ( 3 ) << epoch << " Batch: " << num_batch
+                << " Loss: " << train_batch_loss << std::endl;
+      num_batch++;
+    }
+    DataToTPUElapsedUS = DataToTPUElapsedUS / ( double ) num_batch;
+    ClearGradientElapsedUS = ClearGradientElapsedUS / ( double ) num_batch;
+    ForwardElapsedUS = ForwardElapsedUS / ( double ) num_batch;
+    ComputeLossElapsedUS = ComputeLossElapsedUS / ( double ) num_batch;
+    ComputeOthersElapsedUS = ComputeOthersElapsedUS / ( double ) num_batch;
+    BackwardElapsedUS = BackwardElapsedUS / ( double ) num_batch;
+    UpdateGradientElapsedUS = UpdateGradientElapsedUS / ( double ) num_batch;
+    std::cout << "DataToTPUElapsedUS = " << DataToTPUElapsedUS << "ms" << std::endl;
+    std::cout << "ClearGradientElapsedUS = " << ClearGradientElapsedUS << "ms" << std::endl;
+    std::cout << "ForwardElapsedUS = " << ForwardElapsedUS << "ms" << std::endl;
+    std::cout << "ComputeLossElapsedUS = " << ComputeLossElapsedUS << "ms" << std::endl;
+    std::cout << "ComputeOthersElapsedUS = " << ComputeOthersElapsedUS << "ms" << std::endl;
+    std::cout << "BackwardElapsedUS = " << BackwardElapsedUS << "ms" << std::endl;
+    std::cout << "UpdateGradientElapsedUS = " << UpdateGradientElapsedUS << "ms" << std::endl;
+    float train_accuracy =
+    static_cast<float> ( num_running_corrects ) / num_samples;
+    float train_loss = running_loss / num_samples;
+    std::cout << std::setprecision ( 6 ) << "Epoch: " << std::setfill ( '0' )
+              << std::setw ( 3 ) << epoch << " Train Loss: " << train_loss
+              << " Train Acc: " << train_accuracy;
     model->eval();
-
-    std::cout << std::fixed;
-
-    //evaluate_model(model, test_data_loader, criterion, device);
+    evaluate_model ( model, test_data_loader, criterion, device );
     //std::tuple<float, float> eval_result =
     //    evaluate_model(model, test_data_loader, criterion, device);
     //std::cout << std::setprecision(6) << "Epoch: " << std::setfill('0')
-    //          << std::setw(3) << 0 << " Eval Loss: " << std::get<1>(eval_result)
+    //          << std::setw(3) << epoch << " Train Loss: " << train_loss
+    //          << " Train Acc: " << train_accuracy
+    //          << " Eval Loss: " << std::get<1>(eval_result)
     //          << " Eval Acc: " << std::get<0>(eval_result) << std::endl;
-
-    for (size_t epoch = 1; epoch <= num_epochs; epoch++)
-    {
-        model->train();
-
-        int64_t num_running_corrects = 0;
-        int64_t num_samples = 0;
-        float running_loss = 0;
-
-        int64_t num_batch = 0;
-
-        // Iterate the data loader to yield batches from the dataset.
-        for (torch::data::Example<>& batch : *train_data_loader)
-        {
-            torch::Tensor inputs = batch.data.to(device);//.to(torch::Device("cpu"));
-            torch::Tensor labels = batch.target;//.to(device);
-            // Reset gradients.
-            optimizer.zero_grad();
-            // Execute the model on the input data.
-	    torch::Tensor outputs = model->forward(inputs).to(torch::Device("cpu"));
-	    // Compute a loss value to judge the prediction of our model.
-            torch::Tensor loss = criterion(outputs, labels);
-            torch::Tensor preds = std::get<1>(torch::max(outputs, 1));
-            num_running_corrects += torch::sum(preds == labels).item<int64_t>();
-            num_samples += inputs.size(0);
-            running_loss += loss.item<float>() * inputs.size(0);
-
-            // Compute gradients of the loss w.r.t. the parameters of our model.
-            loss.backward();
-            // Update the parameters based on the calculated gradients.
-            optimizer.step();
-
-            float train_batch_loss = running_loss / num_samples;
-            std::cout << std::setprecision(6) << "Epoch: " << std::setfill('0')
-                      << std::setw(3) << epoch << " Batch: " << num_batch
-                      << " Loss: " << train_batch_loss << std::endl;
-            num_batch++;
-        }
-
-        float train_accuracy =
-            static_cast<float>(num_running_corrects) / num_samples;
-        float train_loss = running_loss / num_samples;
-
-        std::cout << std::setprecision(6) << "Epoch: " << std::setfill('0')
-                  << std::setw(3) << epoch << " Train Loss: " << train_loss
-                  << " Train Acc: " << train_accuracy;
-
-        model->eval();
-        evaluate_model(model, test_data_loader, criterion, device);
-        //std::tuple<float, float> eval_result =
-        //    evaluate_model(model, test_data_loader, criterion, device);
-        //std::cout << std::setprecision(6) << "Epoch: " << std::setfill('0')
-        //          << std::setw(3) << epoch << " Train Loss: " << train_loss
-        //          << " Train Acc: " << train_accuracy
-        //          << " Eval Loss: " << std::get<1>(eval_result)
-        //          << " Eval Acc: " << std::get<0>(eval_result) << std::endl;
-
-        // scheduler.step();
-    }
-
-    return model;
+    // scheduler.step();
+  }
+  return model;
 }
 
 int main()
 {
-    const int64_t random_seed{0};
-    const float learning_rate{1e-1};
-    const int64_t num_epochs{100};
-    torch::manual_seed(random_seed);
-    // torch::cuda::manual_seed(random_seed);
-    const int64_t batch_size{64};
-    const int64_t num_workers{4};
-    const std::string dataset_root{"../../dataset/cifar-10-batches-bin"};
-    //std::filesystem::path model_dir{"../../saved_models"};
-    //std::filesystem::path model_file_name{"resnet.pt"};
-    //std::filesystem::path model_file_path = model_dir / model_file_name;
-
-    //std::filesystem::create_directories(model_dir);
-
-    CIFAR10 train_set{dataset_root, CIFAR10::Mode::kTrain};
-    CIFAR10 test_set{dataset_root, CIFAR10::Mode::kTest};
-
-    auto device = torch::Device ( "privateuseone:0" );
-    //device = torch::Device("cpu");
-    // This might be different from the PyTorch API.
-    // We did transform for the dataset directly instead of doing transform in
-    // dataloader. Currently there is no augmentation options such as random
-    // crop.
-    auto train_set_transformed =
-        train_set
-            .map(torch::data::transforms::Normalize<>({0.4914, 0.4822, 0.4465},
-                                                      {0.2023, 0.1994, 0.2010}))
-            .map(torch::data::transforms::Stack<>());
-
-    auto test_set_transformed =
-        test_set
-            .map(torch::data::transforms::Normalize<>({0.4914, 0.4822, 0.4465},
-                                                      {0.2023, 0.1994, 0.2010}))
-	    .map(torch::data::transforms::Stack<>());
-
-    auto train_data_loader = torch::data::make_data_loader(
-        std::move(train_set_transformed), torch::data::DataLoaderOptions()
-                                              .batch_size(batch_size)
-                                              .workers(num_workers)
-                                              .enforce_ordering(true));
-
-    auto test_data_loader = torch::data::make_data_loader(
-        std::move(test_set_transformed), torch::data::DataLoaderOptions()
-                                             .batch_size(batch_size)
-                                             .workers(num_workers)
-                                             .enforce_ordering(true));
-
-    //std::shared_ptr<ResNet<BasicBlock>> model = resnet18(/*num_classes = */ 10);
-    std::string ModelPath = "../../model.pt";
-    auto model = std::make_shared<tpu::TorchscriptModule> ( ModelPath );
-    tpu::MoveModuleToTPUDevice ( *model );
-    std::cout << "Training Model..." << std::endl;
-    model = train_model(model, train_data_loader, test_data_loader, device,
-                        learning_rate, num_epochs);
-    std::cout << "Training Finished." << std::endl;
-
-    //torch::save(model, model_file_path);
-    torch::save(model, "../../model_new.pt");
-    //torch::load(model, model_file_path);
-
-    //const std::vector<int64_t> input_size{1, 3, 32, 32};
-    //std::cout << "Measuring Latency..." << std::endl;
-    //float latency =
-    //    measure_inference_latency(model, device, input_size, 100, 10);
-
-    //std::cout << "Inference Latency (BS = " << input_size.at(0)
-    //          << "): " << std::setprecision(4) << latency << " [ms / image]"
-    //          << std::endl;
+  const int64_t random_seed{0};
+  const float learning_rate{1e-1};
+  const int64_t num_epochs{100};
+  torch::manual_seed ( random_seed );
+  // torch::cuda::manual_seed(random_seed);
+  const int64_t batch_size{64};
+  const int64_t num_workers{4};
+  const std::string dataset_root{"../../dataset/cifar-10-batches-bin"};
+  //std::filesystem::path model_dir{"../../saved_models"};
+  //std::filesystem::path model_file_name{"resnet.pt"};
+  //std::filesystem::path model_file_path = model_dir / model_file_name;
+  //std::filesystem::create_directories(model_dir);
+  CIFAR10 train_set{dataset_root, CIFAR10::Mode::kTrain};
+  CIFAR10 test_set{dataset_root, CIFAR10::Mode::kTest};
+  auto device = torch::Device ( "privateuseone:0" );
+  //device = torch::Device("cpu");
+  // This might be different from the PyTorch API.
+  // We did transform for the dataset directly instead of doing transform in
+  // dataloader. Currently there is no augmentation options such as random
+  // crop.
+  auto train_set_transformed =
+  train_set
+  .map ( torch::data::transforms::Normalize<> ( {0.4914, 0.4822, 0.4465},
+  {0.2023, 0.1994, 0.2010} ) )
+  .map ( torch::data::transforms::Stack<>() );
+  auto test_set_transformed =
+  test_set
+  .map ( torch::data::transforms::Normalize<> ( {0.4914, 0.4822, 0.4465},
+  {0.2023, 0.1994, 0.2010} ) )
+  .map ( torch::data::transforms::Stack<>() );
+  auto train_data_loader = torch::data::make_data_loader (
+                           std::move ( train_set_transformed ), torch::data::DataLoaderOptions()
+                           .batch_size ( batch_size )
+                           .workers ( num_workers )
+                           .enforce_ordering ( true ) );
+  auto test_data_loader = torch::data::make_data_loader (
+                          std::move ( test_set_transformed ), torch::data::DataLoaderOptions()
+                          .batch_size ( batch_size )
+                          .workers ( num_workers )
+                          .enforce_ordering ( true ) );
+  //std::shared_ptr<ResNet<BasicBlock>> model = resnet18(/*num_classes = */ 10);
+  std::string ModelPath = "../../model.pt";
+  auto model = std::make_shared<tpu::TorchscriptModule> ( ModelPath );
+  tpu::MoveModuleToTPUDevice ( *model );
+  std::cout << "Training Model..." << std::endl;
+  model = train_model ( model, train_data_loader, test_data_loader, device,
+                        learning_rate, num_epochs );
+  std::cout << "Training Finished." << std::endl;
+  //torch::save(model, model_file_path);
+  torch::save ( model, "../../model_new.pt" );
+  //torch::load(model, model_file_path);
+  //const std::vector<int64_t> input_size{1, 3, 32, 32};
+  //std::cout << "Measuring Latency..." << std::endl;
+  //float latency =
+  //    measure_inference_latency(model, device, input_size, 100, 10);
+  //std::cout << "Inference Latency (BS = " << input_size.at(0)
+  //          << "): " << std::setprecision(4) << latency << " [ms / image]"
+  //          << std::endl;
 }

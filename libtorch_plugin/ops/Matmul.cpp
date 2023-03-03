@@ -23,7 +23,7 @@ Tensor & addmm_out_tpu ( const Tensor & input,
   auto mat1_cpu = mat1.to ( torch::Device ( "cpu" ) );
   auto mat2_cpu = mat2.to ( torch::Device ( "cpu" ) );
   auto output_cpu = addmm ( input_cpu, mat1_cpu, mat2_cpu, beta, alpha );
-  output = output_cpu.to ( tpu::TPUGetCurrentDevice() );
+  tpu::TPUCopyHostToDevice ( output.data_ptr(), output_cpu.contiguous().data_ptr(), output.nbytes() );
   return output;
 }
 TORCH_LIBRARY_IMPL ( aten, PrivateUse1, m )
@@ -41,7 +41,7 @@ Tensor & mm_out_tpu ( const Tensor & mat1,
   auto mat1_cpu = mat1.to ( torch::Device ( "cpu" ) );
   auto mat2_cpu = mat2.to ( torch::Device ( "cpu" ) );
   auto output_cpu = mm ( mat1_cpu, mat2_cpu );
-  output = output_cpu.to ( tpu::TPUGetCurrentDevice() );
+  tpu::TPUCopyHostToDevice ( output.data_ptr(), output_cpu.contiguous().data_ptr(), output.nbytes() );
   return output;
 }
 TORCH_LIBRARY_IMPL ( aten, PrivateUse1, m )
