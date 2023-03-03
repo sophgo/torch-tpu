@@ -397,7 +397,7 @@ bm_status_t sgdnn_batchnorm_forward(
             size = 4;
         return size;};
 
-    bm_device_mem_t input_mem, running_mean_mem, running_var_mem, weight_mem, bias_mem, buffer_mem;
+    bm_device_mem_t input_mem, running_mean_mem, running_var_mem, weight_mem, bias_mem;
     bm_device_mem_t updated_mean_mem, updated_var_mem, batch_mean_mem, batch_invstd_mem, output_mem;
     u64 param_size = (u64)n * c * h * w * dtype_size(dtype);
     u64 c_param_size = (u64)c * dtype_size(dtype);
@@ -412,7 +412,6 @@ bm_status_t sgdnn_batchnorm_forward(
     DEVICE_MEM_NEW_OUTPUT(handle, batch_mean, c_param_size, batch_mean_mem);
     DEVICE_MEM_NEW_OUTPUT(handle, batch_invstd, c_param_size, batch_invstd_mem);
     DEVICE_MEM_NEW_OUTPUT(handle, output, param_size, output_mem);
-    DEVICE_MEM_NEW_BUFFER(handle, buffer_mem, param_size);
 
     sg_api_batchnorm_forward_t api = {
         bm_mem_get_device_addr(input_mem),
@@ -425,7 +424,6 @@ bm_status_t sgdnn_batchnorm_forward(
         bm_mem_get_device_addr(batch_mean_mem),
         bm_mem_get_device_addr(batch_invstd_mem),
         bm_mem_get_device_addr(output_mem),
-        bm_mem_get_device_addr(buffer_mem),
         {n, c, h, w},
         momentum,
         eps,
@@ -443,7 +441,6 @@ bm_status_t sgdnn_batchnorm_forward(
     DEVICE_MEM_DEL_OUTPUT(handle, batch_mean, batch_mean_mem);
     DEVICE_MEM_DEL_OUTPUT(handle, batch_invstd, batch_invstd_mem);
     DEVICE_MEM_DEL_OUTPUT(handle, output, output_mem); 
-    DEVICE_MEM_DEL_BUFFER(handle, buffer_mem); 
     return BM_SUCCESS;
 }
 
@@ -496,11 +493,6 @@ bm_status_t sgdnn_batchnorm_forward_cudnn(
     sg_data_type_t wdtype = (sg_data_type_t)(bnScaleBiasMeanVarDesc.dtype);
     assert(idtype == wdtype && wdtype == odtype);
 
-    u64 buffer_size = (u64)n * c * h * w * 4;
-    bm_device_mem_t buffer_mem;
-    bm_status_t status = bm_malloc_device_byte(handle, &buffer_mem, buffer_size);
-    assert(status == BM_SUCCESS);
-
     sg_api_batchnorm_forward_t api = {
         input,
         running_mean,
@@ -512,14 +504,12 @@ bm_status_t sgdnn_batchnorm_forward_cudnn(
         batch_mean,
         batch_invstd,
         output,
-        bm_mem_get_device_addr(buffer_mem),
         {n, c, h, w},
         momentum,
         eps,
         idtype};
 
     tpu_kernel_launch_sync(handle, "tpu_kernel_api_batchnorm_forward", &api, sizeof(api));
-    bm_free_device(handle, buffer_mem);
     return BM_SUCCESS;
 }
 

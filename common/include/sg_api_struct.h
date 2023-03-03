@@ -188,7 +188,6 @@ typedef struct{
     unsigned long long batch_mean_global_addr;
     unsigned long long batch_invstd_global_addr;
     unsigned long long output_global_addr;
-    unsigned long long buffer_global_addr;
     int                shape[4];
     float              momentum;
     float              eps;

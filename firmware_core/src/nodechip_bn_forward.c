@@ -3,8 +3,7 @@
 #include "common_def.h"
 #include "tpu_kernel.h"
 #include "tpu_defs.h"
-#include <math.h>
-#include <string.h>
+
 /**
  * batchnorm_forward_training:
  * 1. output = ((input - batch_mean) / sqrt(batch_var + eps) * weight + bias
@@ -25,7 +24,7 @@ static inline bool is_local_mem_enough(
 {
     int c_param_size = DIV_UP(c, NPU_NUM) * tpu_data_type_size(dtype);
     int pooling_size = DIV_UP(c, NPU_NUM) * 64;
-    int param_size = DIV_UP(c, NPU_NUM) * tpu_aligned_feature_size(n, hw, dtype);
+    int param_size = n * DIV_UP(c, NPU_NUM) * tpu_aligned_feature_size(1, hw, dtype);
     int total_size = split_c ? ALIGN(ALIGN(c_param_size * 7, 64) + pooling_size, BANK_SIZE)
                              + ALIGN(param_size, BANK_SIZE) * 2
                              : ALIGN(ALIGN(c_param_size * 4, 64) + pooling_size, BANK_SIZE)
@@ -45,35 +44,45 @@ void batchnorm_forward_split_c(
     global_addr_t batch_invstd_global_addr,
     global_addr_t output_global_addr,
     dim4          ori_shape,
-    int           nhw,
     int           csecs,
     float         momentum,
     float         eps,
     data_type_t   dtype)
 {
-    dim4 shape = {1, csecs, 1, nhw};
+    int n = ori_shape.n;
+    int h = ori_shape.h;
+    int w = ori_shape.w;
+    dim4 input_shape = {n, csecs, h, w};
+    dim4 pooling_shape = {1, csecs, n, ALIGN(h * w, tpu_eu_num(dtype))};
     dim4 cshape = {1, csecs, 1, 1};
+    dim4 compact_stride;
     dim4 aligned_stride;
     dim4 global_stride;
-    dim4 compact_stride;
-    tpu_aligned_stride(&aligned_stride, 0, &shape, dtype);
-    tpu_continuous_stride(&global_stride, &ori_shape);
+    dim4 zero_stride = {0, 1, 0, 0};
     tpu_compact_stride(&compact_stride, 0, &cshape);
-    scalar_t scale = {.f32 = 1.f/nhw};
+    tpu_aligned_stride(&aligned_stride, 0, &input_shape, dtype);
+    tpu_continuous_stride(&global_stride ,&ori_shape);
+    dim4 local_stride = aligned_stride;
+    if(csecs > NPU_NUM)
+    {
+        local_stride.n = local_stride.c;
+        local_stride.c *= n;
+    }
+    scalar_t scale = {.f32 = 0};
     scalar_t ep = {.f32 = eps};
-    dim2 pooling_kernel = {1, nhw};
+    dim2 pooling_kernel = {pooling_shape.h, pooling_shape.w};
     dim2 pooling_stride = {1, 1};
     dim2 pooling_dilation = {1, 1};
     padding_t pooling_padding = {0, 0, 0, 0};
-
     int c_param_size = ALIGN(DIV_UP(csecs, NPU_NUM) * tpu_data_type_size(dtype), 4);
     int pooling_size = DIV_UP(csecs, NPU_NUM) * 64;
-    int param_size = DIV_UP(csecs,NPU_NUM) * tpu_aligned_feature_size(nhw, 1, DT_FP32);
+    int param_size = n * DIV_UP(csecs, NPU_NUM) * tpu_aligned_feature_size(h, w, dtype);
+    
     //param (1,c,1,1) compact
     local_addr_t batch_mean_local_addr = 0;
-    local_addr_t batch_invstd_local_addr = batch_mean_local_addr + c_param_size;
-    local_addr_t save_var_local_addr = batch_invstd_local_addr + c_param_size;
-    local_addr_t running_mean_local_addr = save_var_local_addr + c_param_size;
+    local_addr_t batch_var_local_addr = batch_mean_local_addr + c_param_size;
+    local_addr_t batch_invstd_local_addr = batch_var_local_addr + c_param_size;
+    local_addr_t running_mean_local_addr = batch_invstd_local_addr + c_param_size;
     local_addr_t running_var_local_addr = running_mean_local_addr + c_param_size;
     local_addr_t weight_local_addr = running_var_local_addr + c_param_size;
     local_addr_t bias_local_addr = weight_local_addr + c_param_size;
@@ -81,14 +90,22 @@ void batchnorm_forward_split_c(
     //param (n,c,h,w) aligned
     local_addr_t input_local_addr = ALIGN(pooling_buffer + pooling_size, BANK_SIZE);
     local_addr_t output_local_addr = input_local_addr + ALIGN(param_size, BANK_SIZE);
-
-    tpu_gdma_cpy_S2L(
-        input_local_addr,
-        input_global_addr,
-        &shape,
-        &aligned_stride,
-        &global_stride,
-        dtype);
+    if((h * w) % (tpu_eu_num(DT_FP32)))
+    {
+        tpu_parallel_start();
+        tpu_bdc_set_C(
+            input_local_addr,
+            scale,
+            &pooling_shape,
+            NULL,
+            dtype);
+        tpu_bdc_set_C(
+            output_local_addr,
+            scale,
+            &pooling_shape,
+            NULL,
+            dtype);
+    }
     tpu_gdma_compact_S2L(
         weight_local_addr,
         weight_global_addr,
@@ -109,10 +126,19 @@ void batchnorm_forward_split_c(
         running_var_global_addr,
         &cshape,
         dtype);
+    if(tpu_is_parallel_state()){tpu_parallel_end();}
+    tpu_gdma_cpy_S2L(
+        input_local_addr,
+        input_global_addr,
+        &input_shape,
+        &local_stride,
+        &global_stride,
+        dtype);
+    scale.f32 = 1.f/(n*h*w);
     tpu_bdc_fp_avg_pool2d(
         pooling_buffer,
         input_local_addr,
-        &shape,
+        &pooling_shape,
         &pooling_kernel,
         &pooling_padding,
         &pooling_stride,
@@ -126,22 +152,29 @@ void batchnorm_forward_split_c(
         &compact_stride,
         NULL,
         dtype);
-    tpu_gdma_compact_L2S(
-        batch_mean_global_addr,
-        batch_mean_local_addr,
-        &cshape,
-        dtype);
-    tpu_bdc_fp_sub_bias_sqr(
+    tpu_bdc_fp_sub(
         output_local_addr,
         input_local_addr,
         batch_mean_local_addr,
-        &shape,
+        &input_shape,
+        &local_stride,
+        &local_stride,
+        &zero_stride,
+        dtype);
+    tpu_bdc_fp_mul(
+        output_local_addr,
+        output_local_addr,
+        output_local_addr,
+        &input_shape,
+        &local_stride,
+        &local_stride,
+        &local_stride,
         dtype);
     scale.f32 = 1.f;
     tpu_bdc_fp_avg_pool2d(
         pooling_buffer,
         output_local_addr,
-        &shape,
+        &pooling_shape,
         &pooling_kernel,
         &pooling_padding,
         &pooling_stride,
@@ -149,7 +182,7 @@ void batchnorm_forward_split_c(
         dtype,
         scale);
     tpu_bdc_cpy(
-        save_var_local_addr,
+        batch_var_local_addr,
         pooling_buffer,
         &cshape,
         &compact_stride,
@@ -182,11 +215,17 @@ void batchnorm_forward_split_c(
         &compact_stride);
     tpu_bdc_fp32_mac_C(
         running_var_local_addr,
-        save_var_local_addr,
-        momentum/(nhw-1.f),
+        batch_var_local_addr,
+        momentum/(n*h*w-1.f),
         &cshape,
         &compact_stride,
         &compact_stride);
+    tpu_parallel_start();
+    tpu_gdma_compact_L2S(
+        batch_mean_global_addr,
+        batch_mean_local_addr,
+        &cshape,
+        dtype);
     tpu_gdma_compact_L2S(
         updated_mean_global_addr,
         running_mean_local_addr,
@@ -198,7 +237,7 @@ void batchnorm_forward_split_c(
         &cshape,
         dtype);
     // save batch stats
-    scale.f32 = 1.f/nhw;
+    scale.f32 = 1.f/(n*h*w);
     tpu_bdc_fp_scale_bias_C(
         pooling_buffer,
         pooling_buffer,
@@ -217,43 +256,56 @@ void batchnorm_forward_split_c(
         &compact_stride,
         NULL,
         dtype);
+    tpu_bdc_fp_sub(
+        input_local_addr,
+        input_local_addr,
+        batch_mean_local_addr,
+        &input_shape,
+        &local_stride,
+        &local_stride,
+        &zero_stride,
+        dtype);
+    tpu_bdc_fp_mul(
+        input_local_addr,
+        input_local_addr,
+        batch_invstd_local_addr,
+        &input_shape,
+        &local_stride,
+        &local_stride,
+        &zero_stride,
+        dtype);
+    tpu_parallel_end();
+    tpu_parallel_start();
     tpu_gdma_compact_L2S(
         batch_invstd_global_addr,
         batch_invstd_local_addr,
         &cshape,
         dtype);
-    tpu_bdc_neg(
-        batch_mean_local_addr,
-        batch_mean_local_addr,
-        &cshape,
-        &compact_stride,
-        &compact_stride,
-        dtype);
-    tpu_bdc_fp_bias(
-        input_local_addr,
-        input_local_addr,
-        batch_mean_local_addr,
-        &shape,
-        dtype);
-    tpu_bdc_fp_scale(
-        input_local_addr,
-        input_local_addr,
-        batch_invstd_local_addr,
-        &shape,
-        dtype);
-    tpu_bdc_fp_scale_bias(
+    tpu_bdc_fp_mul(
         input_local_addr,
         input_local_addr,
         weight_local_addr,
-        bias_local_addr,
-        &shape,
+        &input_shape,
+        &local_stride,
+        &local_stride,
+        &zero_stride,
         dtype);
+    tpu_bdc_fp_add(
+        input_local_addr,
+        input_local_addr,
+        bias_local_addr,
+        &input_shape,
+        &local_stride,
+        &local_stride,
+        &zero_stride,
+        dtype);
+    tpu_parallel_end();
     tpu_gdma_cpy_L2S(
         output_global_addr,
         input_local_addr,
-        &shape,
+        &input_shape,
         &global_stride,
-        &aligned_stride,
+        &local_stride,
         dtype);
 }
 
@@ -273,11 +325,11 @@ void batchnorm_forward_split_hw(
     float         eps,
     data_type_t   dtype)
 {
+    int n = ori_shape.n;
     int c = ori_shape.c;
-    int nhw = ori_shape.w;
+    int hw = ori_shape.h * ori_shape.w;
     int c_param_size = ALIGN(DIV_UP(c, NPU_NUM) * tpu_data_type_size(dtype), 4);
     int pooling_size = DIV_UP(c, NPU_NUM) * 64;
-
     local_addr_t batch_mean_local_addr = 0;
     local_addr_t batch_var_local_addr = batch_mean_local_addr + c_param_size;
     local_addr_t running_mean_local_addr = batch_var_local_addr + c_param_size;
@@ -286,33 +338,44 @@ void batchnorm_forward_split_hw(
     local_addr_t weight_local_addr = running_var_local_addr;
     local_addr_t pooling_buffer = ALIGN(c_param_size * 4, 64);
     local_addr_t input_local_addr = ALIGN(pooling_buffer + pooling_size, BANK_SIZE);
-
-    int nhw_secs = ALIGN(nhw, tpu_eu_num(dtype))-tpu_eu_num(dtype);
-    while(!is_local_mem_enough(1, c, nhw_secs, 0, dtype))
+    
+    // loop 1&2: accumulate batch_stats
+    // loop  3 : compute output
+    int hw_secs = ALIGN(hw, tpu_eu_num(dtype))-tpu_eu_num(dtype);
+    while(!is_local_mem_enough(n, c, hw_secs, 0, dtype))
     {
-        nhw_secs-=tpu_eu_num(dtype);
+        hw_secs-=tpu_eu_num(dtype);
     }
-    int nhwslice = DIV_UP(nhw, nhw_secs);
-    for(int nhwidx=0; nhwidx < 3 * nhwslice; nhwidx++)
+    int hwslice = DIV_UP(hw, hw_secs);
+    for(int hwidx=0; hwidx < 3 * hwslice; hwidx++)
     {
-        bool if_last = (nhwidx == nhwslice-1)||(nhwidx == 2*nhwslice-1)||(nhwidx == 3*nhwslice-1);
-        int nhwsecs = if_last ? nhw - (nhwslice-1) * nhw_secs : nhw_secs;
-        dim4 shape = {1, c, 1, nhwsecs};
+        bool if_last = (hwidx == hwslice-1)||(hwidx == 2 * hwslice-1)||(hwidx == 3 * hwslice-1);
+        int hwsecs = if_last ? hw - (hwslice-1) * hw_secs : hw_secs;
+        TPUKERNEL_ASSERT(!(hwsecs%tpu_eu_num(dtype)));
+        dim4 input_shape = {n, c, 1, hwsecs};
+        dim4 pooling_shape = {1, c, n, hwsecs};
         dim4 cshape = {1, c, 1, 1};
-        dim4 aligned_stride;
+        dim4 local_stride;
         dim4 global_stride;
         dim4 compact_stride;
-        tpu_aligned_stride(&aligned_stride, 0, &shape, dtype);
+        dim4 zero_stride = {0, 1, 0, 0};
+        tpu_aligned_stride(&local_stride, 0, &input_shape, dtype);
         tpu_continuous_stride(&global_stride, &ori_shape);
         tpu_compact_stride(&compact_stride, 0, &cshape);
-        scalar_t scale = {.f32 = 0};
-        dim2 pooling_kernel = {1, nhwsecs};
+        if(c > NPU_NUM)
+        {
+            local_stride.n = local_stride.c;
+            local_stride.c *= n;
+        }
+        scalar_t scale = {.f32 = 0.f};
+        scalar_t ep = {.f32 = eps};
+        dim2 pooling_kernel = {pooling_shape.h, pooling_shape.w};
         dim2 pooling_stride = {1, 1};
         dim2 pooling_dilation = {1, 1};
         padding_t pooling_padding = {0, 0, 0, 0};
-
-        if(!nhwidx)
+        if(!hwidx)
         {
+            tpu_parallel_start();
             tpu_bdc_set_C(
                 batch_mean_local_addr,
                 scale,
@@ -336,26 +399,28 @@ void batchnorm_forward_split_hw(
                 &cshape,
                 dtype);
         }
-        if(nhwidx < nhwslice)
+        if(hwidx < hwslice)
         {
             tpu_gdma_cpy_S2L(
                 input_local_addr,
-                input_global_addr + nhwidx * nhw_secs * tpu_data_type_size(dtype),
-                &shape,
-                &aligned_stride,
+                input_global_addr + hwidx * hw_secs * tpu_data_type_size(dtype),
+                &input_shape,
+                &local_stride,
                 &global_stride,
                 dtype);
+            if(tpu_is_parallel_state()){tpu_parallel_end();}
             scale.f32 = 1.f;
             tpu_bdc_fp_avg_pool2d(
                 pooling_buffer,
                 input_local_addr,
-                &shape,
+                &pooling_shape,
                 &pooling_kernel,
                 &pooling_padding,
                 &pooling_stride,
                 &pooling_dilation,
                 dtype,
                 scale);
+            tpu_parallel_start();
             tpu_bdc_fp_add(
                 batch_mean_local_addr,
                 batch_mean_local_addr,
@@ -365,9 +430,9 @@ void batchnorm_forward_split_hw(
                 &compact_stride,
                 NULL,
                 dtype);
-            if(nhwidx==nhwslice-1)
+            if(hwidx==hwslice-1)
             {
-                scale.f32 = 1.f/nhw;
+                scale.f32 = 1.f/(n*hw);
                 tpu_bdc_fp_mul_C(
                     batch_mean_local_addr,
                     batch_mean_local_addr,
@@ -376,6 +441,7 @@ void batchnorm_forward_split_hw(
                     &compact_stride,
                     &compact_stride,
                     dtype);
+                if(tpu_is_parallel_state()){tpu_parallel_end();}
                 tpu_gdma_compact_L2S(
                     batch_mean_global_addr,
                     batch_mean_local_addr,
@@ -383,32 +449,46 @@ void batchnorm_forward_split_hw(
                     dtype);
             }
         }
-        else if(nhwidx < 2 * nhwslice)
+        else if(hwidx < 2 * hwslice)
         {
             tpu_gdma_cpy_S2L(
                 input_local_addr,
-                input_global_addr + (nhwidx - nhwslice) * nhw_secs * tpu_data_type_size(dtype),
-                &shape,
-                &aligned_stride,
+                input_global_addr + (hwidx - hwslice) * hw_secs * tpu_data_type_size(dtype),
+                &input_shape,
+                &local_stride,
                 &global_stride,
                 dtype);
-            tpu_bdc_fp_sub_bias_sqr(
+            if(tpu_is_parallel_state()){tpu_parallel_end();}
+            tpu_bdc_fp_sub(
                 input_local_addr,
                 input_local_addr,
                 batch_mean_local_addr,
-                &shape,
+                &input_shape,
+                &local_stride,
+                &local_stride,
+                &zero_stride,
+                dtype);
+            tpu_bdc_fp_mul(
+                input_local_addr,
+                input_local_addr,
+                input_local_addr,
+                &input_shape,
+                &local_stride,
+                &local_stride,
+                &local_stride,
                 dtype);
             scale.f32 = 1.f;
             tpu_bdc_fp_avg_pool2d(
                 pooling_buffer,
                 input_local_addr,
-                &shape,
+                &pooling_shape,
                 &pooling_kernel,
                 &pooling_padding,
                 &pooling_stride,
                 &pooling_dilation,
                 dtype,
                 scale);
+            tpu_parallel_start();
             tpu_bdc_fp_add(
                 batch_var_local_addr,
                 batch_var_local_addr,
@@ -418,8 +498,9 @@ void batchnorm_forward_split_hw(
                 &compact_stride,
                 NULL,
                 dtype);
-            if(nhwidx == nhwslice * 2 - 1)
+            if(hwidx == 2 * hwslice - 1)
             {
+                if(tpu_is_parallel_state()){tpu_parallel_end();}
                 scale.f32 = 1-momentum;
                 tpu_bdc_fp_mul_C(
                     running_mean_local_addr,
@@ -447,10 +528,11 @@ void batchnorm_forward_split_hw(
                 tpu_bdc_fp32_mac_C(
                     running_var_local_addr,
                     batch_var_local_addr,
-                    momentum/(nhw-1.f),
+                    momentum/(n*hw-1.f),
                     &cshape,
                     &compact_stride,
                     &compact_stride);
+                tpu_parallel_start();
                 tpu_gdma_compact_L2S(
                     updated_mean_global_addr,
                     running_mean_local_addr,
@@ -461,46 +543,6 @@ void batchnorm_forward_split_hw(
                     running_var_local_addr,
                     &cshape,
                     dtype);
-                scale.f32 = 1.f/nhw;
-                tpu_bdc_fp_mul_C(
-                    batch_var_local_addr,
-                    batch_var_local_addr,
-                    scale,
-                    &cshape,
-                    &compact_stride,
-                    &compact_stride,
-                    dtype);
-                scale.f32 = eps;
-                tpu_bdc_fp_add_C(
-                    pooling_buffer,
-                    batch_var_local_addr,
-                    scale,
-                    &cshape,
-                    NULL,
-                    &compact_stride,
-                    dtype);
-                tpu_bdc_fp32_rsqrt(
-                    pooling_buffer,
-                    pooling_buffer,
-                    &cshape);
-                tpu_bdc_cpy(
-                    batch_var_local_addr,
-                    pooling_buffer,
-                    &cshape,
-                    &compact_stride,
-                    NULL,
-                    dtype);
-                tpu_gdma_compact_L2S(
-                    batch_invstd_global_addr,
-                    batch_var_local_addr,
-                    &cshape,
-                    dtype);
-            }
-        }
-        else
-        {
-            if(nhwidx==2*nhwslice)
-            {
                 tpu_gdma_compact_S2L(
                     weight_local_addr,
                     weight_global_addr,
@@ -518,43 +560,79 @@ void batchnorm_forward_split_hw(
                     &compact_stride,
                     &compact_stride,
                     dtype);
+                tpu_bdc_cpy(
+                    pooling_buffer,
+                    batch_var_local_addr,
+                    &cshape,
+                    NULL,
+                    &compact_stride,
+                    dtype);
+                scale.f32 = 1.f/(n*hw);
+                tpu_bdc_fp_scale_bias_C(
+                    pooling_buffer,
+                    pooling_buffer,
+                    scale,
+                    ep,
+                    &cshape,
+                    dtype);
+                tpu_bdc_fp32_rsqrt(
+                    pooling_buffer,
+                    pooling_buffer,
+                    &cshape);
+                tpu_bdc_cpy(
+                    batch_var_local_addr,
+                    pooling_buffer,
+                    &cshape,
+                    &compact_stride,
+                    NULL,
+                    dtype);
+                if(tpu_is_parallel_state()){tpu_parallel_end();}
+                tpu_gdma_compact_L2S(
+                    batch_invstd_global_addr,
+                    batch_var_local_addr,
+                    &cshape,
+                    dtype);
             }
+        }
+        else
+        {
             tpu_gdma_cpy_S2L(
                 input_local_addr,
-                input_global_addr + (nhwidx - 2 * nhwslice) * nhw_secs * tpu_data_type_size(dtype),
-                &shape,
-                &aligned_stride,
+                input_global_addr + (hwidx - 2 * hwslice) * hw_secs * tpu_data_type_size(dtype),
+                &input_shape,
+                NULL,
                 &global_stride,
                 dtype);
             tpu_bdc_fp_bias(
                 input_local_addr,
                 input_local_addr,
                 batch_mean_local_addr,
-                &shape,
+                &input_shape,
                 dtype);
             tpu_bdc_fp_scale(
                 input_local_addr,
                 input_local_addr,
                 batch_var_local_addr,
-                &shape,
+                &input_shape,
                 dtype);
             tpu_bdc_fp_scale_bias(
                 input_local_addr,
                 input_local_addr,
                 weight_local_addr,
                 bias_local_addr,
-                &shape,
+                &input_shape,
                 dtype);
             tpu_gdma_cpy_L2S(
-                output_global_addr + (nhwidx - 2 * nhwslice) * nhw_secs * tpu_data_type_size(dtype),
+                output_global_addr + (hwidx - 2 * hwslice) * hw_secs * tpu_data_type_size(dtype),
                 input_local_addr,
-                &shape,
+                &input_shape,
                 &global_stride,
-                &aligned_stride,
+                NULL,
                 dtype);
         }
     }
 }
+
 
 void nodechip_batchnorm_forward_training(
     global_addr_t input_global_addr,
@@ -567,21 +645,11 @@ void nodechip_batchnorm_forward_training(
     global_addr_t batch_mean_global_addr,
     global_addr_t batch_invstd_global_addr,
     global_addr_t output_global_addr,
-    global_addr_t buffer_global_addr,
     dim4          shape,
     float         momentum,
     float         eps,
     data_type_t   dtype)
 {
-    dim4 trans_shape = {shape.c, shape.n, shape.h, shape.w};
-    dim4 new_shape = {1, shape.c, 1, shape.n*shape.h*shape.w};
-    tpu_gdma_cpy_nc_trans_S2S(
-        buffer_global_addr,
-        input_global_addr,
-        &trans_shape,
-        NULL,
-        NULL,
-        dtype);
     if(!is_local_mem_enough(shape.n, shape.c, shape.h*shape.w, 1, dtype))
     {
         if(is_local_mem_enough(shape.n, NPU_NUM, shape.h*shape.w, 1, dtype))
@@ -595,7 +663,7 @@ void nodechip_batchnorm_forward_training(
             for(int cidx=0; cidx < cslice; cidx++)
             {
                 batchnorm_forward_split_c(
-                    buffer_global_addr + cidx * csecs * shape.n * shape.h * shape.w * tpu_data_type_size(dtype),
+                    input_global_addr + cidx * csecs * shape.h * shape.w * tpu_data_type_size(dtype),
                     running_mean_global_addr + cidx * csecs * tpu_data_type_size(dtype),
                     running_var_global_addr + cidx * csecs * tpu_data_type_size(dtype),
                     weight_global_addr + cidx * csecs * tpu_data_type_size(dtype),
@@ -604,9 +672,8 @@ void nodechip_batchnorm_forward_training(
                     updated_var_global_addr + cidx * csecs * tpu_data_type_size(dtype),
                     batch_mean_global_addr + cidx * csecs * tpu_data_type_size(dtype),
                     batch_invstd_global_addr + cidx * csecs * tpu_data_type_size(dtype),
-                    buffer_global_addr + cidx * csecs * shape.n * shape.h * shape.w * tpu_data_type_size(dtype),
-                    new_shape,
-                    shape.n*shape.h*shape.w,
+                    output_global_addr + cidx * csecs * shape.h * shape.w * tpu_data_type_size(dtype),
+                    shape,
                     cidx == cslice-1 ? shape.c - cidx * csecs : csecs,
                     momentum,
                     eps,
@@ -617,7 +684,7 @@ void nodechip_batchnorm_forward_training(
         {   
             TPUKERNEL_ASSERT(is_local_mem_enough(shape.n, shape.c, tpu_eu_num(dtype), 0, dtype));
             batchnorm_forward_split_hw(
-                buffer_global_addr,
+                input_global_addr,
                 running_mean_global_addr,
                 running_var_global_addr,
                 weight_global_addr,
@@ -626,8 +693,8 @@ void nodechip_batchnorm_forward_training(
                 updated_var_global_addr,
                 batch_mean_global_addr,
                 batch_invstd_global_addr,
-                buffer_global_addr,
-                new_shape,
+                output_global_addr,
+                shape,
                 momentum,
                 eps,
                 dtype);
@@ -636,7 +703,7 @@ void nodechip_batchnorm_forward_training(
     else
     {
         batchnorm_forward_split_c(
-            buffer_global_addr,
+            input_global_addr,
             running_mean_global_addr,
             running_var_global_addr,
             weight_global_addr,
@@ -645,21 +712,13 @@ void nodechip_batchnorm_forward_training(
             updated_var_global_addr,
             batch_mean_global_addr,
             batch_invstd_global_addr,
-            buffer_global_addr,
-            new_shape,
-            shape.n*shape.h*shape.w,
+            output_global_addr,
+            shape,
             shape.c,
             momentum,
             eps,
             dtype);
     }
-    tpu_gdma_cpy_nc_trans_S2S(
-        output_global_addr,
-        buffer_global_addr,
-        &shape,
-        NULL,
-        NULL,
-        dtype);
 }
 
 void tpu_kernel_api_batchnorm_forward(const void* args)
@@ -680,7 +739,6 @@ void tpu_kernel_api_batchnorm_forward(const void* args)
         api->batch_mean_global_addr,
         api->batch_invstd_global_addr,
         api->output_global_addr,
-        api->buffer_global_addr,
         shape,
         api->momentum,
         api->eps,
