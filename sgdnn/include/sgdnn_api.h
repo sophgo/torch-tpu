@@ -51,6 +51,11 @@ typedef enum {
   None_Reduction = 2,
 } CrossEntropyMode_t;
 
+typedef enum {
+  Reorder_To_32ic = 0,
+  Reorder_To_32oc = 1,
+} ConvWeightReorderMode_t;
+
 typedef struct{
     int         dtype;
     int         ndims;
@@ -509,6 +514,14 @@ bm_status_t sgdnn_dtype_convert(
     const TensorDescriptor_t         yDesc,
     const void                      *yData,
     sg_round_mode_t                  round_mode);
+
+bm_status_t sgdnn_conv_weight_reorder(
+    bm_handle_t                      handle,
+    const TensorDescriptor_t         xDesc,
+    const void                      *xData,
+    const TensorDescriptor_t         yDesc,
+    const void                      *yData,
+    ConvWeightReorderMode_t          reorder_mode);
 
 #if defined(__cplusplus)
 }
