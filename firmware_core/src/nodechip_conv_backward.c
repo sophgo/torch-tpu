@@ -1096,6 +1096,7 @@ void nodechip_grad_output_reorder(
     TPUKERNEL_ASSERT(ALIGN(kh * kw, tpu_eu_num(dtype)) <= 4 * BANK_SIZE);
     TPUKERNEL_ASSERT(DIV_UP(kh * kw, NPU_NUM) * ALIGN(1 * 1, tpu_eu_num(dtype)) <= 4 * BANK_SIZE);
 
+    //(TODO) optimize icslice = 32?
     unsigned int ic_size = DIV_UP(ic, NPU_NUM) * tpu_aligned_feature_size(kh, kw, dtype);
     unsigned int ic_size_cwtrans = DIV_UP(kh * kw, NPU_NUM) * tpu_aligned_feature_size(1, ic, dtype);
     unsigned int max_ic_size = MAX(ic_size, ic_size_cwtrans);
@@ -1185,7 +1186,7 @@ void nodechip_grad_output_reorder(
 
             dim4 cw_dst_shape = {ocslice, kh * kw, 1, icslice};
             // [oc, ic, 1, kh * kw] => [oc, kh * kw, 1, ic]
-            if (cw_dst_shape.w <= cw_dst_shape.c) {
+            if (cw_dst_shape.w >= cw_dst_shape.c) {
                 tpu_bdc_cw_trans(
                     ping ? oaddr_ping : oaddr_pong,
                     ping ? iaddr_ping : iaddr_pong,

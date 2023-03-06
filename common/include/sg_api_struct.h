@@ -309,5 +309,16 @@ typedef struct {
 } sg_api_dtype_convert_t;
 #endif
 
+typedef struct {
+    unsigned long long input_global_addr;
+    unsigned long long output_global_addr;
+    int                shape[4];
+    int                reorder_mode;
+#ifndef WIN32
+} __attribute__((packed)) sg_api_conv_weight_reorder_t;
+#else
+} sg_api_conv_weight_reorder_t;
+#endif
+
 #pragma pack(pop)
 #endif  // SG_API_STRUCT_H
