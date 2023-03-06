@@ -453,7 +453,7 @@ void batchnorm_forward_split_n(
                 input_global_addr + nidx * n_secs * c * hw * tpu_data_type_size(dtype),
                 &input_shape,
                 c > 64 ? &local_stride : NULL,
-                &global_stride,
+                NULL,//&global_stride,
                 dtype);
             if(tpu_is_parallel_state()){tpu_parallel_end();}
             scale.f32 = 1.f;
@@ -519,7 +519,7 @@ void batchnorm_forward_split_n(
                 input_global_addr + (nidx - nslice) * n_secs * c * hw * tpu_data_type_size(dtype),
                 &input_shape,
                 c > 64 ? &local_stride : NULL,
-                &global_stride,
+                NULL,//&global_stride,
                 dtype);
             if(tpu_is_parallel_state()){tpu_parallel_end();}
             tpu_bdc_fp_sub(
@@ -680,7 +680,7 @@ void batchnorm_forward_split_n(
                 input_global_addr + (nidx - 2 * nslice) * n_secs * c * hw * tpu_data_type_size(dtype),
                 &input_shape,
                 NULL,
-                &global_stride,
+                NULL,//&global_stride,
                 dtype);
             tpu_bdc_fp_bias(
                 input_local_addr,
@@ -705,7 +705,7 @@ void batchnorm_forward_split_n(
                 output_global_addr + (nidx - 2 * nslice) * n_secs * c * hw * tpu_data_type_size(dtype),
                 input_local_addr,
                 &input_shape,
-                &global_stride,
+                NULL,//&global_stride,
                 NULL,
                 dtype);
         }
