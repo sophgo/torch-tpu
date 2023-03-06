@@ -501,7 +501,15 @@ bm_status_t sgdnn_cross_entropy_backward_cudnn(
     const void                      *beta,
     const TensorDescriptor_t         dxDesc,
     void                            *dx);
-    
+
+bm_status_t sgdnn_dtype_convert(
+    bm_handle_t                      handle,
+    const TensorDescriptor_t         xDesc,
+    const void                      *xData,
+    const TensorDescriptor_t         yDesc,
+    const void                      *yData,
+    sg_round_mode_t                  round_mode);
+
 #if defined(__cplusplus)
 }
 #endif

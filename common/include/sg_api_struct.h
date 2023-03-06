@@ -295,5 +295,19 @@ typedef struct {
 } sg_api_crossentropy_forward_t;
 #endif
 
+typedef struct {
+    unsigned long long input_global_addr;
+    unsigned long long output_global_addr;
+    int                shape[4];
+    int                dims;
+    sg_data_type_t     idtype;
+    sg_data_type_t     odtype;
+    sg_round_mode_t    round_mode;
+#ifndef WIN32
+} __attribute__((packed)) sg_api_dtype_convert_t;
+#else
+} sg_api_dtype_convert_t;
+#endif
+
 #pragma pack(pop)
 #endif  // SG_API_STRUCT_H
