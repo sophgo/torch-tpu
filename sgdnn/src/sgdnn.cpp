@@ -143,26 +143,108 @@ bm_status_t sgdnn_conv_forward_cudnn(
 
     sg_data_type_t idtype = (sg_data_type_t)(xDesc.dtype);
     sg_data_type_t odtype = (sg_data_type_t)(yDesc.dtype);
-    sg_api_conv_forward_t api = {
-        (unsigned long long)x,
-        (unsigned long long)w,
-        (unsigned long long)b,
-        (unsigned long long)y,
-        {n, ic, ih, iw},
-        groups,
-        oc,
-        {kh, kw},
-        {stride_h, stride_w},
-        {dh, dw},
-        {pad_h, pad_h, pad_w, pad_w},//pad
-        b != NULL ? 1 : 0,//has_bias?
-        0,//if_relu
-        0,//upper_limit
-        result_add ? 1 : 0,
-        idtype,
-        odtype};
 
-    tpu_kernel_launch_sync(handle, "tpu_kernel_api_conv_forward", &api, sizeof(api));
+    sg_data_type_t compute_type = (sg_data_type_t)(convDesc.computeType);
+
+    if (compute_type == SG_DTYPE_FP32) {
+
+        sg_api_conv_forward_t api = {
+            (unsigned long long)x,
+            (unsigned long long)w,
+            (unsigned long long)b,
+            (unsigned long long)y,
+            {n, ic, ih, iw},
+            groups,
+            oc,
+            {kh, kw},
+            {stride_h, stride_w},
+            {dh, dw},
+            {pad_h, pad_h, pad_w, pad_w},//pad
+            b != NULL ? 1 : 0,//has_bias?
+            0,//if_relu
+            0,//upper_limit
+            result_add ? 1 : 0,
+            idtype,
+            odtype};
+
+        tpu_kernel_launch_sync(handle, "tpu_kernel_api_conv_forward", &api, sizeof(api));
+
+    } else if (compute_type == SG_DTYPE_FP16) {
+
+        int dtype_size = 2;
+
+        bm_device_mem_t x_fp16, w_fp16, w_32ic_fp16;
+        u64 x_fp16_size = (u64)n * ic * ih * iw * dtype_size;
+        u64 w_fp16_size = (u64)oc * ic * kh * kw * dtype_size;
+        u64 w_32ic_fp16_size = (u64)oc * ALIGN(ic, 32) * kh * kw * dtype_size;
+
+        bm_status_t status_x = bm_malloc_device_byte(handle, &x_fp16, x_fp16_size);
+        assert(status_x == BM_SUCCESS);
+        bm_status_t status_w = bm_malloc_device_byte(handle, &w_fp16, w_fp16_size);
+        assert(status_w == BM_SUCCESS);
+        bm_status_t status_w_32ic = bm_malloc_device_byte(handle, &w_32ic_fp16, w_32ic_fp16_size);
+        assert(status_w_32ic == BM_SUCCESS);
+
+        sg_api_dtype_convert_t cast_x_api = {
+            (unsigned long long)x,
+            bm_mem_get_device_addr(x_fp16),
+            {n, ic, ih, iw},
+            4,
+            SG_DTYPE_FP32,
+            SG_DTYPE_FP16,
+            SG_ROUND_EVEN};
+
+        tpu_kernel_launch_sync(handle, "tpu_kernel_api_dtype_convert",
+                               &cast_x_api, sizeof(cast_x_api));
+
+        sg_api_dtype_convert_t cast_w_api = {
+            (unsigned long long)w,
+            bm_mem_get_device_addr(w_fp16),
+            {oc, ic, kh, kw},
+            4,
+            SG_DTYPE_FP32,
+            SG_DTYPE_FP16,
+            SG_ROUND_EVEN};
+
+        tpu_kernel_launch_sync(handle, "tpu_kernel_api_dtype_convert",
+                               &cast_w_api, sizeof(cast_w_api));
+
+        sg_api_conv_weight_reorder_t conv_weight_reorder_api = {
+            bm_mem_get_device_addr(w_fp16),
+            bm_mem_get_device_addr(w_32ic_fp16),
+            {oc, ic, kh, kw},
+            Reorder_To_32ic};
+
+        tpu_kernel_launch_sync(handle,
+                               "tpu_kernel_api_conv_weight_reorder",
+                               &conv_weight_reorder_api,
+                               sizeof(conv_weight_reorder_api));
+
+        sg_api_conv_forward_t api = {
+            bm_mem_get_device_addr(x_fp16),
+            bm_mem_get_device_addr(w_32ic_fp16),
+            (unsigned long long)b,
+            (unsigned long long)y,
+            {n, ic, ih, iw},
+            groups,
+            oc,
+            {kh, kw},
+            {stride_h, stride_w},
+            {dh, dw},
+            {pad_h, pad_h, pad_w, pad_w},//pad
+            b != NULL ? 1 : 0,//has_bias?
+            0,//if_relu
+            0,//upper_limit
+            result_add ? 1 : 0,
+            SG_DTYPE_FP16,
+            SG_DTYPE_FP32};
+
+        tpu_kernel_launch_sync(handle, "tpu_kernel_api_conv_forward", &api, sizeof(api));
+
+        bm_free_device(handle, x_fp16);
+        bm_free_device(handle, w_fp16);
+        bm_free_device(handle, w_32ic_fp16);
+    }
 
     return BM_SUCCESS;
 }
@@ -216,7 +298,8 @@ bm_status_t sgdnn_conv_backward(
     bm_device_mem_t grad_input_mem, grad_weight_mem, grad_bias_mem;
     u64 grad_output_size = (u64)n * oc * oh * ow * dtype_size(dtype);
     u64 input_size = (u64)n * ic * ih * iw * dtype_size(dtype);
-    u64 weight_size = (u64)oc * (dtype == SG_DTYPE_FP32 ? ic : ALIGN(ic, 32)) * kh * kw * dtype_size(dtype);
+    //u64 weight_size = (u64)oc * (dtype == SG_DTYPE_FP32 ? ic : ALIGN(ic, 32)) * kh * kw * dtype_size(dtype);
+    u64 weight_size = (u64)oc * ic * kh * kw * dtype_size(dtype);
     u64 grad_input_size = input_size;
     //grad_weight arrange as [ic, oc, kh, kw]
     u64 grad_weight_size = (u64)ic * oc * kh * kw * dtype_size(dtype);
@@ -339,27 +422,163 @@ bm_status_t sgdnn_conv_backward_cudnn(
         assert(status == BM_SUCCESS);
     }
 
-    sg_api_conv_backward_t api = {
-        (unsigned long long)x,
-        (unsigned long long)w,
-        (unsigned long long)dy,
-        (unsigned long long)dx,
-        (unsigned long long)dw,
-        (unsigned long long)db,
-        bm_mem_get_device_addr(buffer_mem),
-        {n, ic, ih, iw},//ishape
-        {n, oc, oh, ow},//oshape
-        groups,
-        {kh, kw},
-        {stride_h, stride_w},
-        {dilation_h, dilation_w},
-        {pad_h, pad_h, pad_w, pad_w},
-        dx_enable,
-        dw_enable,
-        db_enable,
-        idtype};
+    sg_data_type_t compute_type = (sg_data_type_t)(convDesc.computeType);
 
-    tpu_kernel_launch_sync(handle, "tpu_kernel_api_conv_backward", &api, sizeof(api));
+    if (compute_type == SG_DTYPE_FP32) {
+
+        sg_api_conv_backward_t api = {
+            (unsigned long long)x,
+            (unsigned long long)w,
+            (unsigned long long)dy,
+            (unsigned long long)dx,
+            (unsigned long long)dw,
+            (unsigned long long)db,
+            bm_mem_get_device_addr(buffer_mem),
+            {n, ic, ih, iw},//ishape
+            {n, oc, oh, ow},//oshape
+            groups,
+            {kh, kw},
+            {stride_h, stride_w},
+            {dilation_h, dilation_w},
+            {pad_h, pad_h, pad_w, pad_w},
+            dx_enable,
+            dw_enable,
+            db_enable,
+            SG_DTYPE_FP32};
+
+        tpu_kernel_launch_sync(handle, "tpu_kernel_api_conv_backward", &api, sizeof(api));
+
+    } else if (compute_type == SG_DTYPE_FP16) {
+
+        int dtype_size = 2;
+
+        bm_device_mem_t x_fp16, w_fp16, dy_fp16;
+        bm_device_mem_t dx_fp16, dw_fp16, db_fp16;
+        u64 x_fp16_size = (u64)n * ic * ih * iw * dtype_size;
+        u64 w_fp16_size = (u64)oc * ic * kh * kw * dtype_size;
+        u64 dy_fp16_size = (u64)n * oc * oh * ow * dtype_size;
+        u64 dx_fp16_size = x_fp16_size;
+        u64 dw_fp16_size = w_fp16_size;
+        u64 db_fp16_size = oc * dtype_size;
+
+        bm_status_t status_x = bm_malloc_device_byte(handle, &x_fp16, x_fp16_size);
+        assert(status_x == BM_SUCCESS);
+        bm_status_t status_w = bm_malloc_device_byte(handle, &w_fp16, w_fp16_size);
+        assert(status_w == BM_SUCCESS);
+        bm_status_t status_dy = bm_malloc_device_byte(handle, &dy_fp16, dy_fp16_size);
+        assert(status_dy == BM_SUCCESS);
+        bm_status_t status_dx = bm_malloc_device_byte(handle, &dx_fp16, dx_fp16_size);
+        assert(status_dx == BM_SUCCESS);
+        bm_status_t status_dw = bm_malloc_device_byte(handle, &dw_fp16, dw_fp16_size);
+        assert(status_dw == BM_SUCCESS);
+        if (db_enable) {
+            bm_status_t status_db = bm_malloc_device_byte(handle, &db_fp16, db_fp16_size);
+            assert(status_db == BM_SUCCESS);
+        }
+
+        sg_api_dtype_convert_t cast_x_api = {
+            (unsigned long long)x,
+            bm_mem_get_device_addr(x_fp16),
+            {n, ic, ih, iw},
+            4,
+            SG_DTYPE_FP32,
+            SG_DTYPE_FP16,
+            SG_ROUND_EVEN};
+
+        tpu_kernel_launch_sync(handle, "tpu_kernel_api_dtype_convert",
+                               &cast_x_api, sizeof(cast_x_api));
+
+        sg_api_dtype_convert_t cast_w_api = {
+            (unsigned long long)w,
+            bm_mem_get_device_addr(w_fp16),
+            {oc, ic, kh, kw},
+            4,
+            SG_DTYPE_FP32,
+            SG_DTYPE_FP16,
+            SG_ROUND_EVEN};
+
+        tpu_kernel_launch_sync(handle, "tpu_kernel_api_dtype_convert",
+                               &cast_w_api, sizeof(cast_w_api));
+
+        sg_api_dtype_convert_t cast_dy_api = {
+            (unsigned long long)dy,
+            bm_mem_get_device_addr(dy_fp16),
+            {n, oc, oh, ow},
+            4,
+            SG_DTYPE_FP32,
+            SG_DTYPE_FP16,
+            SG_ROUND_EVEN};
+
+        tpu_kernel_launch_sync(handle, "tpu_kernel_api_dtype_convert",
+                               &cast_dy_api, sizeof(cast_dy_api));
+
+        sg_api_conv_backward_t api = {
+            bm_mem_get_device_addr(x_fp16),
+            bm_mem_get_device_addr(w_fp16),
+            bm_mem_get_device_addr(dy_fp16),
+            bm_mem_get_device_addr(dx_fp16),
+            bm_mem_get_device_addr(dw_fp16),
+            bm_mem_get_device_addr(db_fp16),
+            bm_mem_get_device_addr(buffer_mem),
+            {n, ic, ih, iw},//ishape
+            {n, oc, oh, ow},//oshape
+            groups,
+            {kh, kw},
+            {stride_h, stride_w},
+            {dilation_h, dilation_w},
+            {pad_h, pad_h, pad_w, pad_w},
+            dx_enable,
+            dw_enable,
+            db_enable,
+            SG_DTYPE_FP16};
+
+        tpu_kernel_launch_sync(handle, "tpu_kernel_api_conv_backward", &api, sizeof(api));
+
+        sg_api_dtype_convert_t cast_dx_api = {
+            bm_mem_get_device_addr(dx_fp16),
+            (unsigned long long)dx,
+            {n, ic, ih, iw},
+            4,
+            SG_DTYPE_FP16,
+            SG_DTYPE_FP32,
+            SG_ROUND_EVEN};
+
+        tpu_kernel_launch_sync(handle, "tpu_kernel_api_dtype_convert",
+                               &cast_dx_api, sizeof(cast_dx_api));
+
+        sg_api_dtype_convert_t cast_dw_api = {
+            bm_mem_get_device_addr(dw_fp16),
+            (unsigned long long)dw,
+            {oc, ic, kh, kw},
+            4,
+            SG_DTYPE_FP16,
+            SG_DTYPE_FP32,
+            SG_ROUND_EVEN};
+
+        tpu_kernel_launch_sync(handle, "tpu_kernel_api_dtype_convert",
+                               &cast_dw_api, sizeof(cast_dw_api));
+
+        bm_free_device(handle, x_fp16);
+        bm_free_device(handle, w_fp16);
+        bm_free_device(handle, dy_fp16);
+        bm_free_device(handle, dx_fp16);
+        bm_free_device(handle, dw_fp16);
+
+        if (db_enable) {
+            sg_api_dtype_convert_t cast_db_api = {
+                bm_mem_get_device_addr(db_fp16),
+                (unsigned long long)db,
+                {1, oc, 1, 1},
+                4,
+                SG_DTYPE_FP16,
+                SG_DTYPE_FP32,
+                SG_ROUND_EVEN};
+
+            tpu_kernel_launch_sync(handle, "tpu_kernel_api_dtype_convert",
+                                   &cast_db_api, sizeof(cast_db_api));
+            bm_free_device(handle, db_fp16);
+        }
+    }
 
     if (buffer_size > 0) {
         bm_free_device(handle, buffer_mem);
@@ -1797,12 +2016,13 @@ struct type_caster<float16> : npy_scalar_caster<float16> {
 PYBIND11_MODULE(sgdnn_pybind, m)
 {
     m.doc() = "pybind11 sgdnn backward plugin";
-    m.def("conv_backward", [](py::array_t<float16> grad_output,
-                              py::array_t<float16> input,
-                              py::array_t<float16> weight,
-                              py::array_t<float16> grad_input,
-                              py::array_t<float16> grad_weight,
-                              py::array_t<float16> grad_bias,
+
+    m.def("conv_backward", [](py::array_t<float> grad_output,
+                              py::array_t<float> input,
+                              py::array_t<float> weight,
+                              py::array_t<float> grad_input,
+                              py::array_t<float> grad_weight,
+                              py::array_t<float> grad_bias,
                               int n, int ic, int ih, int iw,
                               int oc, int oh, int ow, int groups,
                               int kh, int kw,
@@ -1814,6 +2034,61 @@ PYBIND11_MODULE(sgdnn_pybind, m)
                               bool input_grad_enable,
                               bool weight_grad_enable,
                               bool bias_grad_enable) {
+        py::buffer_info grad_out_buf = grad_output.request();
+        float *grad_out_float = (float *)grad_out_buf.ptr;
+        py::buffer_info input_buf = input.request();
+        float *input_float = (float *)input_buf.ptr;
+        py::buffer_info weight_buf = weight.request();
+        float *weight_float = (float *)weight_buf.ptr;
+        py::buffer_info grad_input_buf = grad_input.request();
+        float *grad_input_float = (float *)grad_input_buf.ptr;
+        py::buffer_info grad_weight_buf = grad_weight.request();
+        float *grad_weight_float = (float *)grad_weight_buf.ptr;
+        py::buffer_info grad_bias_buf = grad_bias.request();
+        float *grad_bias_float = (float *)grad_bias_buf.ptr;
+
+        bm_handle_t handle;
+        bm_dev_request(&handle, 0);
+
+        bm_status_t status = sgdnn_conv_backward(handle,
+                            bm_mem_from_system(grad_out_float),
+                            bm_mem_from_system(input_float),
+                            bm_mem_from_system(weight_float),
+                            bm_mem_from_system(grad_input_float),
+                            bm_mem_from_system(grad_weight_float),
+                            bm_mem_from_system(grad_bias_float),
+                            n, ic, ih, iw, oc, oh, ow,
+                            groups, kh, kw,
+                            stride_h, stride_w, dh, dw,
+                            pad_ht, pad_hb, pad_wl, pad_wr,
+                            if_relu,
+                            input_grad_enable,
+                            weight_grad_enable,
+                            bias_grad_enable,
+                            (sg_data_type_t)0);
+
+        UNUSED(status);
+        //assert(status == BM_SUCCESS);
+        bm_dev_free(handle);
+    });
+
+    m.def("conv_backward_fp16", [](py::array_t<float16> grad_output,
+                                   py::array_t<float16> input,
+                                   py::array_t<float16> weight,
+                                   py::array_t<float16> grad_input,
+                                   py::array_t<float16> grad_weight,
+                                   py::array_t<float16> grad_bias,
+                                   int n, int ic, int ih, int iw,
+                                   int oc, int oh, int ow, int groups,
+                                   int kh, int kw,
+                                   int stride_h, int stride_w,
+                                   int dh, int dw,
+                                   int pad_ht, int pad_hb,
+                                   int pad_wl, int pad_wr,
+                                   bool if_relu,
+                                   bool input_grad_enable,
+                                   bool weight_grad_enable,
+                                   bool bias_grad_enable) {
         py::buffer_info grad_out_buf = grad_output.request();
         float16 *grad_out_fp16 = (float16 *)grad_out_buf.ptr;
         py::buffer_info input_buf = input.request();
@@ -1851,7 +2126,6 @@ PYBIND11_MODULE(sgdnn_pybind, m)
         //assert(status == BM_SUCCESS);
         bm_dev_free(handle);
     });
-
 
     m.def("batchnorm_forward", [](py::array_t<float> input,
                                     py::array_t<float> running_mean,
