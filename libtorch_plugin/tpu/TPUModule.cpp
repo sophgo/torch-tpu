@@ -14,15 +14,12 @@ void MoveModuleToTPUDevice ( torch::nn::Module & Module )
   }
   for ( auto & Par : Module.named_parameters ( false ) )
   {
-    //std::cout << Par.key() << std::endl;
     auto tmp = Par->to ( Device );
     Par->unsafeGetTensorImpl()->_change_backend_component_keys ( Device );
     Par->unsafeGetTensorImpl()->set_storage_keep_dtype ( tmp.storage() );
   }
-#if 1
   for ( auto & Buf : Module.named_buffers ( false ) )
   {
-    //std::cout << Buf.key() << std::endl;
     if ( Buf.key() == "running_mean" || Buf.key() == "running_var" )
     {
       auto tmp = Buf->to ( Device );
@@ -30,7 +27,30 @@ void MoveModuleToTPUDevice ( torch::nn::Module & Module )
       Buf->unsafeGetTensorImpl()->set_storage_keep_dtype ( tmp.storage() );
     }
   }
-#endif
+}
+
+void MoveModuleToCPUDevice ( torch::nn::Module & Module )
+{
+  auto Device = torch::Device ( "cpu" );
+  for ( auto & Mod : Module.named_children() )
+  {
+    MoveModuleToCPUDevice ( *Mod.value() );
+  }
+  for ( auto & Par : Module.named_parameters ( false ) )
+  {
+    auto tmp = Par->to ( Device );
+    Par->unsafeGetTensorImpl()->_change_backend_component_keys ( Device );
+    Par->unsafeGetTensorImpl()->set_storage_keep_dtype ( tmp.storage() );
+  }
+  for ( auto & Buf : Module.named_buffers ( false ) )
+  {
+    if ( Buf.key() == "running_mean" || Buf.key() == "running_var" )
+    {
+      auto tmp = Buf->to ( Device );
+      Buf->unsafeGetTensorImpl()->_change_backend_component_keys ( Device );
+      Buf->unsafeGetTensorImpl()->set_storage_keep_dtype ( tmp.storage() );
+    }
+  }
 }
 
 TorchscriptModule::TorchscriptModule ( const std::string & Path )
@@ -68,26 +88,16 @@ void TorchscriptModule::Register()
   }
 }
 
-void DumpParameterValues ( torch::nn::Module & Module, const std::string & Name )
+static ConvolutionBackwardAccuracy_t kConvolutionBackwardAccuracy = CONVOLUTION_BACKWARD_ACCURACY_FP32;
+
+ConvolutionBackwardAccuracy_t GetConvolutionBackwardAccuracy()
 {
-  for ( auto & Mod : Module.named_children() )
-  {
-    DumpParameterValues ( *Mod.value(), Name );
-  }
-  for ( auto & Par : Module.named_parameters ( false ) )
-  {
-    if ( Par.key() == Name )
-    {
-      auto ParCPU = Par->to ( torch::Device ( "cpu" ) );
-      auto DumpNum = Par->numel() < 10 ? Par->numel() : 10;
-      std::cout << Name << std::endl;
-      for ( auto i = 0; i < DumpNum; ++i )
-      {
-        std::cout << ParCPU.data_ptr<float>() [i] << " ";
-      }
-      std::cout << std::endl;
-    }
-  }
+  return kConvolutionBackwardAccuracy;
+}
+
+void SetConvolutionBackwardAccuracy ( ConvolutionBackwardAccuracy_t Accuracy )
+{
+  kConvolutionBackwardAccuracy = Accuracy;
 }
 
 } // namespace tpu

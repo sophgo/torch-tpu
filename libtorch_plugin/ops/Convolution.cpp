@@ -5,6 +5,7 @@
 #include <ATen/native/ConvUtils.h>
 #include <TPUDeviceManager.h>
 #include <TPUTorchUtils.h>
+#include <TPUModule.h>
 #include <sgdnn_api.h>
 
 #define TPU_OP_TIMING
@@ -252,8 +253,20 @@ std::array<bool, 3> output_mask )
       .dilation_h = ( int ) dilation[0],
       .dilation_w = ( int ) dilation[1],
       .groups = ( int ) groups,
-      .computeType = ( sg_data_type_t ) tpu::TPUConvertDType ( input.dtype() )
     };
+    auto accuracy = tpu::GetConvolutionBackwardAccuracy();
+    if ( accuracy == tpu::CONVOLUTION_BACKWARD_ACCURACY_FP32 )
+    {
+      conv_desc.computeType = SG_DTYPE_FP32;
+    }
+    else if ( accuracy == tpu::CONVOLUTION_BACKWARD_ACCURACY_FP16 )
+    {
+      conv_desc.computeType = SG_DTYPE_FP16;
+    }
+    else
+    {
+      TORCH_CHECK ( false, "Unsupported convolution backward accuracy" );
+    }
 #ifdef TPU_OP_TIMING
     auto timer = tpu::Timer().Start();
 #endif

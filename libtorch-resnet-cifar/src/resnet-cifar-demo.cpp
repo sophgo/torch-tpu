@@ -187,13 +187,13 @@ train_model ( std::shared_ptr<T1> model, T2& train_data_loader,
     ComputeOthersElapsedUS = ComputeOthersElapsedUS / ( double ) num_batch;
     BackwardElapsedUS = BackwardElapsedUS / ( double ) num_batch;
     UpdateGradientElapsedUS = UpdateGradientElapsedUS / ( double ) num_batch;
-    std::cout << "DataToTPUElapsedUS = " << DataToTPUElapsedUS << "ms" << std::endl;
-    std::cout << "ClearGradientElapsedUS = " << ClearGradientElapsedUS << "ms" << std::endl;
-    std::cout << "ForwardElapsedUS = " << ForwardElapsedUS << "ms" << std::endl;
-    std::cout << "ComputeLossElapsedUS = " << ComputeLossElapsedUS << "ms" << std::endl;
-    std::cout << "ComputeOthersElapsedUS = " << ComputeOthersElapsedUS << "ms" << std::endl;
-    std::cout << "BackwardElapsedUS = " << BackwardElapsedUS << "ms" << std::endl;
-    std::cout << "UpdateGradientElapsedUS = " << UpdateGradientElapsedUS << "ms" << std::endl;
+    std::cout << "DataToTPUElapsedUS = " << DataToTPUElapsedUS << "us" << std::endl;
+    std::cout << "ClearGradientElapsedUS = " << ClearGradientElapsedUS << "us" << std::endl;
+    std::cout << "ForwardElapsedUS = " << ForwardElapsedUS << "us" << std::endl;
+    std::cout << "ComputeLossElapsedUS = " << ComputeLossElapsedUS << "us" << std::endl;
+    std::cout << "ComputeOthersElapsedUS = " << ComputeOthersElapsedUS << "us" << std::endl;
+    std::cout << "BackwardElapsedUS = " << BackwardElapsedUS << "us" << std::endl;
+    std::cout << "UpdateGradientElapsedUS = " << UpdateGradientElapsedUS << "us" << std::endl;
     float train_accuracy =
     static_cast<float> ( num_running_corrects ) / num_samples;
     float train_loss = running_loss / num_samples;
@@ -263,6 +263,7 @@ int main()
   std::cout << "Training Model..." << std::endl;
   model = train_model ( model, train_data_loader, test_data_loader, device,
                         learning_rate, num_epochs );
+  tpu::MoveModuleToCPUDevice ( *model );
   std::cout << "Training Finished." << std::endl;
   //torch::save(model, model_file_path);
   torch::save ( model, "../../model_new.pt" );
