@@ -96,7 +96,7 @@ static inline bool split_kh_or_kw(
         int kslice_ext = dh_or_dw * (slice_new - 1) + 1;
         int islice = (oh_or_ow - 1) * stride + kslice_ext;
 
-        unsigned int wsize = MIN(oc, NPU_NUM) * (idtype == DT_FP32 ? ic : ALIGN(ic, 32)) * slice_new * kh_or_kw * tpu_data_type_size(idtype);
+        unsigned int wsize = (idtype == DT_FP32 ? ic : ALIGN(ic, 32)) * slice_new * kh_or_kw * tpu_data_type_size(idtype);
         unsigned int isize = DIV_UP(ic, NPU_NUM) * tpu_aligned_feature_size(islice, ih_or_iw, idtype);
         unsigned int total_size = ALIGN(isize, BANK_SIZE) * 2 +
                                   ALIGN(wsize, BANK_SIZE) * 2 +
@@ -109,7 +109,6 @@ static inline bool split_kh_or_kw(
     --(*secs);
     return true;
 }
-
 
 typedef struct {
     int nsecs;
@@ -281,24 +280,22 @@ static void grad_weight_split(
     unsigned int osize = nslice * DIV_UP(ocslice, NPU_NUM) * tpu_aligned_feature_size(oh, ow, odtype);
     unsigned int grad_bias_size = grad_bias_enable ? DIV_UP(ocslice, NPU_NUM) * tpu_aligned_feature_size(1, 1, idtype): 0;
     unsigned int buffer_size = grad_bias_enable ? DIV_UP(ocslice, NPU_NUM) * tpu_aligned_feature_size(1, 32, idtype) : 0;
-    buffer_size = MAX(buffer_size, osize);// or no need
 
     unsigned int total_size = ALIGN(isize, BANK_SIZE) +
                               ALIGN(wsize, BANK_SIZE) +
                               ALIGN(osize, BANK_SIZE) +
                               ALIGN(grad_bias_size, BANK_SIZE) +
-                              ALIGN(buffer_size, BANK_SIZE);
+                              (buffer_size > 0 ? ALIGN(buffer_size, BANK_SIZE) : 0);
     if (total_size <= (unsigned int)LOCAL_MEM_SIZE) return;
 
     unsigned int pern_isize = DIV_UP(ic, NPU_NUM) * tpu_aligned_feature_size(ih, iw, idtype);
     unsigned int pern_osize = DIV_UP(ocslice, NPU_NUM) * tpu_aligned_feature_size(oh, ow, odtype);
     unsigned int pern_buffer_size = grad_bias_enable ? DIV_UP(ocslice, NPU_NUM) * tpu_aligned_feature_size(1, 32, idtype) : 0;
-    pern_buffer_size = MAX(pern_buffer_size, pern_osize);
     unsigned int pern_total_size = ALIGN(pern_isize, BANK_SIZE) * 2 +
                                    ALIGN(pern_osize, BANK_SIZE) * 2 +
                                    ALIGN(wsize, BANK_SIZE) +
                                    ALIGN(grad_bias_size, BANK_SIZE) +
-                                   ALIGN(pern_buffer_size, BANK_SIZE);
+                                   (pern_buffer_size > 0 ? ALIGN(pern_buffer_size, BANK_SIZE) : 0);
     if (pern_total_size <= (unsigned int)LOCAL_MEM_SIZE) {
         unsigned int nslice_iosize = (unsigned int)LOCAL_MEM_SIZE
                                    - ALIGN(wsize, BANK_SIZE)
@@ -308,10 +305,9 @@ static void grad_weight_split(
             unsigned int nslice_isize = nslice * pern_isize;
             unsigned int nslice_osize = nslice * pern_osize;
             pern_buffer_size = grad_bias_enable ? DIV_UP(ocslice, NPU_NUM) * tpu_aligned_feature_size(1, 32, idtype) : 0;
-            pern_buffer_size = MAX(pern_buffer_size, nslice_osize);
             if (ALIGN(nslice_isize, BANK_SIZE) * 2 +
                 ALIGN(nslice_osize, BANK_SIZE) * 2 +
-                ALIGN(pern_buffer_size, BANK_SIZE) <= nslice_iosize) {
+                (pern_buffer_size > 0 ? ALIGN(pern_buffer_size, BANK_SIZE) : 0) <= nslice_iosize) {
                 break;
             } else {
                 secs_info->nsecs++;
@@ -326,23 +322,35 @@ static void grad_weight_split(
 
     unsigned int pern_64oc_isize = DIV_UP(ic, NPU_NUM) * tpu_aligned_feature_size(ih, iw, idtype);
     unsigned int pern_64oc_osize = tpu_aligned_feature_size(oh, ow, odtype);
-    unsigned int pern_64oc_wsize = MIN(oc, NPU_NUM) * (idtype == DT_FP32 ? ic : ALIGN(ic, 32)) * khslice * kwslice * tpu_data_type_size(idtype);
+    unsigned int pern_64oc_wsize = (idtype == DT_FP32 ? ic : ALIGN(ic, 32)) * khslice * kwslice * tpu_data_type_size(idtype);
     unsigned int pern_64oc_grad_bias_size = grad_bias_enable ? tpu_aligned_feature_size(1, 1, idtype): 0;
     unsigned int pern_64oc_buffer_size = grad_bias_enable ? tpu_aligned_feature_size(1, 32, idtype) : 0;
-    pern_64oc_buffer_size = MAX(pern_64oc_buffer_size, pern_64oc_osize);// or no need
     unsigned int pern_64oc_total_size = ALIGN(pern_64oc_isize, BANK_SIZE) * 2 +
                                         ALIGN(pern_64oc_osize, BANK_SIZE) * 2 +
                                         ALIGN(pern_64oc_wsize, BANK_SIZE) * (oc > NPU_NUM ? 2 : 1) +
                                         ALIGN(pern_64oc_grad_bias_size, BANK_SIZE) * (oc > NPU_NUM ? 2 : 1) +
-                                        ALIGN(pern_64oc_buffer_size, BANK_SIZE);
+                                        (pern_64oc_buffer_size > 0 ? ALIGN(pern_64oc_buffer_size, BANK_SIZE) : 0);
     if (pern_64oc_total_size <= (unsigned int)LOCAL_MEM_SIZE) {
-        unsigned int pern_64oc_free_size = (unsigned int)LOCAL_MEM_SIZE - ALIGN(pern_64oc_isize, BANK_SIZE) * 2;
-        unsigned int pern_64oc_size = ALIGN(pern_64oc_osize, BANK_SIZE) * 2 +
-                                      ALIGN(pern_64oc_wsize, BANK_SIZE) * (oc > NPU_NUM ? 2 : 1) +
-                                      ALIGN(pern_64oc_grad_bias_size, BANK_SIZE) * (oc > NPU_NUM ? 2 : 1) +
-                                      ALIGN(pern_64oc_buffer_size, BANK_SIZE);
-        ocslice = pern_64oc_free_size / pern_64oc_size * NPU_NUM;
-        secs_info->ocsecs = DIV_UP(oc, ocslice);
+        ocslice = oc;
+        secs_info->ocsecs = 1;
+        bool first_time = true;
+        while(1) {
+            if (!first_time) {
+                secs_info->ocsecs++;
+                ocslice = DIV_UP(oc, secs_info->ocsecs);
+            }
+            unsigned int pern_some_64oc_wsize = DIV_UP(ocslice, NPU_NUM) * pern_64oc_wsize;
+            unsigned int pern_some_64oc_osize = DIV_UP(ocslice, NPU_NUM) * pern_64oc_osize;
+            unsigned int pern_some_64oc_grad_bias_size = grad_bias_enable ? pern_64oc_grad_bias_size : 0;
+            unsigned int pern_some_64oc_buffer_size = grad_bias_enable ? pern_64oc_buffer_size : 0;
+            unsigned int pern_some_64oc_total_size = ALIGN(pern_64oc_isize, BANK_SIZE) * 2 +
+                                                     ALIGN(pern_some_64oc_osize, BANK_SIZE) * 2 +
+                                                     ALIGN(pern_some_64oc_wsize, BANK_SIZE) * (secs_info->ocsecs > 1 ? 2 : 1) +
+                                                     ALIGN(pern_some_64oc_grad_bias_size, BANK_SIZE) * (secs_info->ocsecs > 1 ? 2 : 1) +
+                                                     (pern_some_64oc_buffer_size > 0 ? ALIGN(pern_some_64oc_buffer_size, BANK_SIZE) : 0);
+            if (pern_some_64oc_total_size <= (unsigned int)LOCAL_MEM_SIZE) break;
+            first_time = false;
+        }
         return;
     } else {
         ocslice = MIN(NPU_NUM, oc);
@@ -351,8 +359,9 @@ static void grad_weight_split(
 
     //split kh&kw
     bool valid = false;
+    pern_64oc_buffer_size = MAX(pern_64oc_buffer_size, pern_64oc_osize);
     unsigned int other_size = ALIGN(pern_64oc_osize, BANK_SIZE) * 2 +
-                              ALIGN(pern_64oc_grad_bias_size, BANK_SIZE) * (oc > NPU_NUM ? 2 : 1) +
+                              ALIGN(pern_64oc_grad_bias_size, BANK_SIZE) * (secs_info->ocsecs > 1 ? 2 : 1) +
                               ALIGN(pern_64oc_buffer_size, BANK_SIZE);
     valid = split_kh_or_kw(
             &khslice,
@@ -368,15 +377,15 @@ static void grad_weight_split(
             idtype,
             odtype);
     if (!valid) {
-        int khslice_ext = dilation->h * (khslice - 1) + 1;
-        int ihslice = (oh - 1) * stride->h + khslice_ext;
+        int khslice_ext_ = dilation->h * (khslice - 1) + 1;
+        int ihslice_ = MIN((oh - 1) * stride->h + khslice_ext_, ih);
         valid = split_kh_or_kw(
                 &kwslice,
                 &(secs_info->kwsecs),
                 stride->w,
                 ic,
                 oc,
-                ihslice,
+                ihslice_,
                 ow,
                 khslice,
                 dilation->w,
@@ -385,6 +394,38 @@ static void grad_weight_split(
                 odtype);
     }
     TPUKERNEL_ASSERT(valid);
+
+    //can process more n one time
+    TPUKERNEL_ASSERT(secs_info->nsecs == n);
+    TPUKERNEL_ASSERT(nslice == 1);
+    TPUKERNEL_ASSERT(secs_info->ocsecs == DIV_UP(oc, NPU_NUM));
+    TPUKERNEL_ASSERT(ocslice == MIN(oc, NPU_NUM));
+    secs_info->nsecs = 1;
+    nslice = n;
+    bool first_time = true;
+    int khslice_ext = dilation->h * (khslice - 1) + 1;
+    int kwslice_ext = dilation->w * (kwslice - 1) + 1;
+    int ihslice = MIN((oh - 1) * stride->h + khslice_ext, ih);
+    int iwslice = MIN((ow - 1) * stride->w + kwslice_ext, iw);
+    unsigned int some_n_wsize = DIV_UP(ocslice, NPU_NUM) * (idtype == DT_FP32 ? ic : ALIGN(ic, 32)) * khslice * kwslice * tpu_data_type_size(idtype);
+    unsigned int some_n_grad_bias_size = grad_bias_enable ? DIV_UP(ocslice, NPU_NUM) * tpu_aligned_feature_size(1, 1, idtype): 0;
+    unsigned int some_n_buffer_size = grad_bias_enable ? DIV_UP(ocslice, NPU_NUM) * tpu_aligned_feature_size(1, 32, idtype) : 0;
+    while(1) {
+        if (!first_time) {
+            secs_info->nsecs++;
+            nslice = DIV_UP(n, secs_info->nsecs);
+        }
+        unsigned int some_n_isize = nslice * DIV_UP(ic, NPU_NUM) * tpu_aligned_feature_size(ihslice, iwslice, idtype);
+        unsigned int some_n_osize = nslice * DIV_UP(ocslice, NPU_NUM) * tpu_aligned_feature_size(oh, ow, odtype);
+        some_n_buffer_size = MAX(some_n_buffer_size, some_n_osize);
+        unsigned int some_n_total_size = ALIGN(some_n_isize, BANK_SIZE) * 2 +
+                                         ALIGN(some_n_osize, BANK_SIZE) * 2 +
+                                         ALIGN(some_n_wsize, BANK_SIZE) * 2 +
+                                         ALIGN(some_n_grad_bias_size, BANK_SIZE) * (secs_info->ocsecs > 1 ? 2 : 1) +
+                                         ALIGN(some_n_buffer_size, BANK_SIZE);
+        if (some_n_total_size <= (unsigned int)LOCAL_MEM_SIZE) break;
+        first_time = false;
+    }
 }
 
 static void split_deconv_float(
@@ -2714,6 +2755,25 @@ void grad_weight_use_conv_data_split(
                                                    ALIGN(per_ic_some_64oc_osize, BANK_SIZE) * 2;
         if (per_ic_some_64oc_total_size <= (unsigned long long)LOCAL_MEM_SIZE) break;
     }
+
+    // split icslice second
+    secs_info->icsecs = 1;
+    icslice = ic;
+    bool first_time = true;
+    unsigned int some_ic_wsize = DIV_UP(ocslice, NPU_NUM) * (dtype == DT_FP32 ? n : ALIGN(n, 32)) * oh * ow * tpu_data_type_size(dtype);
+    while(1) {
+        if (!first_time) {
+            secs_info->icsecs++;
+            icslice = DIV_UP(ic, secs_info->icsecs);
+        }
+        unsigned int some_ic_isize = icslice * DIV_UP(n, NPU_NUM) * tpu_aligned_feature_size(ih, iw, dtype);
+        unsigned int some_ic_osize = icslice * DIV_UP(ocslice, NPU_NUM) * tpu_aligned_feature_size(kh, kw, dtype);
+        unsigned int some_ic_total_size = ALIGN(some_ic_wsize, BANK_SIZE) +
+                                          ALIGN(some_ic_isize, BANK_SIZE) * 2 +
+                                          ALIGN(some_ic_osize, BANK_SIZE) * 2;
+        if (some_ic_total_size <= (unsigned long long)LOCAL_MEM_SIZE) break;
+        first_time = false;
+    }
 }
 
 // forward_input op grad_out => grad_weight
@@ -2951,6 +3011,34 @@ void nodechip_conv_backward_weight_use_conv(
             dtype);
     }
 }
+
+/*
+//[n, ic, ih, iw] => [ic, n * ih * iw]
+//[n, oc, oh, ow] => [oc, n * oh * ow]
+//for (kh * kw) {
+//  [oc, n * oh * ow] MM2_NT [ic, n * oh * ow] => [oc, ic]
+//}
+//kh * kw * [oc, ic] => [oc, ic, kh, kw]
+//kh * kw * [oc, ic] => [1, oc, kh * kw, ic]
+void nodechip_conv_backward_weight_use_mm2(
+    global_addr_t       forward_input_global_addr,
+    global_addr_t       grad_out_global_addr,
+    global_addr_t       grad_out_reordered_global_addr,
+    global_addr_t       grad_weight_global_addr,
+    const int           groups,
+    const dim4          *forward_input_shape,
+    const dim4          *grad_out_shape,
+    const dim2          *forward_kernel,
+    const dim2          *forward_stride,
+    const dim2          *forward_dilation,
+    const padding_t     *pad,
+    data_type_t         dtype
+ ) {
+
+  //(TODO)
+
+}
+*/
 
 void nodechip_conv_backward(
     global_addr_t       grad_out_global_addr,
