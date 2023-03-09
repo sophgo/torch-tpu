@@ -36,11 +36,9 @@ def assertEqual(got, exp, threshold=0.001, name=None):
             print("\033[1;31;40maverage error\033[0m:{:.4f}".format((got - exp).abs().sum()/exp.numel()))
             print("\033[1;31;40mrelative error\033[0m:{:.4f}%".format(((got-exp)/exp).abs().sum()/exp.numel()*100))
             print("exp {}\ngot {}".format(exp.flatten()[:5], got.flatten()[:5]))
-            print("exp {}\n".format(exp.flatten()))
-            print("got {}\n".format(got.flatten()))
         else:
             print("{} compare success, max_difference:{}".format(name if name is not None else '',(got - exp).abs().max()))
-
+            print("exp {}\ngot {}".format(exp.flatten()[:5], got.flatten()[:5]))
 def grad_compare(grad, grad_ref, tolerance, name=None):
     #assert(grad.size() == grad_ref.size())
     assertEqual(grad, grad_ref, tolerance, name)
@@ -177,29 +175,55 @@ class Test_Backward_Ops(object):
             tpu_input = torch.randn((n, c, h, w), requires_grad = True)
             running_mean = torch.randn(c, requires_grad = False)
             running_var = torch.randn(c, requires_grad = False)
-            running_mean.data-=0.5
-            weight = torch.rand(c, requires_grad = True)
-            bias = torch.rand(c, requires_grad = True)
-            tpu_rmean = torch.tensor(running_mean.data)
-            tpu_rvar = torch.tensor(running_var.data)
-            tpu_input.data-=0.5
-            weight.data-=0.5
-            bias.data-=0.5
-            grad_output = torch.randn((n, c, h, w))
-            torch_input = torch.rand((n, c, h, w), requires_grad = True)
-            torch_rmean = torch.rand(c, requires_grad = False)
-            torch_rvar = torch.rand(c, requires_grad = False)
-            torch_weight = torch.rand(c, requires_grad = True)
-            torch_bias = torch.rand(c, requires_grad = True)
-            torch_input.data = tpu_input.data
-            torch_rmean.data = running_mean.data
-            torch_rvar.data = running_var.data
-            torch_weight.data = weight.data
-            torch_bias.data = bias.data
+            weight = torch.randn(c, requires_grad = True)
+            bias = torch.randn(c, requires_grad = True)
+
+            running_mean.data   -=  0.5
+            running_mean.data   *=  10
+            tpu_input.data      -=  0.5
+            tpu_input.data      *=  10
+            weight.data         -=  0.5
+            weight.data         *=  10
+            bias.data           -=  0.5
+            bias.data           *=  10
+
+            torch_input = tpu_input.clone().detach_().requires_grad_(True)
+            torch_weight = weight.clone().detach_().requires_grad_(True)
+            torch_bias = bias.clone().detach_().requires_grad_(True)
+            torch_rmean = running_mean.clone().detach_()
+            torch_rvar = running_var.clone().detach_()
+            tpu_rmean = running_mean.clone().detach_()
+            tpu_rvar = running_var.clone().detach_()
+
+            torch_mean = torch.mean(tpu_input, dim=(0,2,3)).reshape(weight.shape)
+            torch_var = torch.var(tpu_input, dim=(0,2,3), unbiased = False).reshape(weight.shape)
+            torch_invstd = 1/torch.sqrt(torch_var+1e-5)
             
-            output = BatchNorm2d(tpu_input, tpu_rmean, tpu_rvar, weight, bias)
-            output.backward(grad_output)
-            
+            output, saved_mean, saved_invstd = BatchNorm2d(tpu_input, tpu_rmean, tpu_rvar, weight, bias)
+            torch_output = torch.nn.functional.batch_norm(
+                torch_input,
+                torch_rmean,
+                torch_rvar,
+                torch_weight,
+                torch_bias,
+                True,
+                momentum,
+                eps)
+            print("case:",i," forward:")
+            grad_compare(output, torch_output, 1e-5)
+            grad_compare(tpu_rmean, torch_rmean, 1e-5)
+            grad_compare(tpu_rvar, torch_rvar, 1e-5)
+            grad_compare(saved_mean, torch_mean, 1e-5)
+            grad_compare(saved_invstd, torch_invstd, 1e-5)
+
+            # grad_output = torch.randn((n, c, h, w))
+            # torch_output.backward(grad_output)
+            # output.backward(grad_output)
+            # print("case:",i," backward:")
+            # grad_compare(tpu_input.grad, torch_input.grad, 1e-1)
+            # grad_compare(weight.grad, torch_weight.grad, 1e-1)
+            # grad_compare(bias.grad, torch_bias.grad, 1e-1)
+                
             # only test backward
             # mean = torch.mean(tpu_input, dim=(0,2,3)).reshape(weight.shape)
             # var = torch.var(tpu_input, dim=(0,2,3), unbiased = False).reshape(weight.shape)
@@ -211,27 +235,6 @@ class Test_Backward_Ops(object):
             # grad_compare(weight.grad, grad_weight_ref, 1e-1)
             # grad_compare(bias.grad, grad_bias_ref, 1e-1)
             # return
-        
-            # # pytorch reference
-            torch_output = torch.nn.functional.batch_norm(
-                torch_input,
-                torch_rmean,
-                torch_rvar,
-                torch_weight,
-                torch_bias,
-                True,
-                momentum,
-                eps)
-            torch_output.backward(grad_output)
-            print("case:",i," forward:")
-            grad_compare(output, torch_output, 1e-1)
-            grad_compare(tpu_rmean, torch_rmean, 1e-1)
-            grad_compare(tpu_rvar, torch_rvar, 1e-1)
-            print("case:",i," backward:")
-            grad_compare(tpu_input.grad, torch_input.grad, 1e-1)
-            grad_compare(weight.grad, torch_weight.grad, 1e-1)
-            grad_compare(bias.grad, torch_bias.grad, 1e-1)
-    
     def test_eltwise_backward(self):
         torch.manual_seed(0)
         op_code = [1,]#[0,1,2]

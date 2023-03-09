@@ -31,11 +31,11 @@ static inline bool is_local_mem_enough(
                              + ALIGN(param_size, BANK_SIZE) * 2:
                      split_n ? ALIGN(c_param_size * 4, BANK_SIZE)
                              + ALIGN(c_pooling_size + pooling_size, BANK_SIZE)
-                             + ALIGN(param_size, BANK_SIZE)
+                             + ALIGN(param_size, BANK_SIZE) * 2
                              : ALIGN(c_param_size * 4, BANK_SIZE)
                              + ALIGN(c_pooling_size + pooling_size, BANK_SIZE)
                              + ALIGN(param_size, BANK_SIZE);
-    return total_size < LOCAL_MEM_SIZE;
+    return total_size <= LOCAL_MEM_SIZE;
 }
 
 void batchnorm_forward_split_c(
@@ -353,7 +353,6 @@ void batchnorm_forward_split_c(
         csecs > 64 ? &local_stride : NULL,
         dtype);
 }
-
 void batchnorm_forward_split_n(
     global_addr_t input_global_addr,
     global_addr_t running_mean_global_addr,
@@ -373,10 +372,10 @@ void batchnorm_forward_split_n(
     int n = ori_shape.n;
     int c = ori_shape.c;
     int hw = ori_shape.h * ori_shape.w;
-    int n_secs = n-1;
-    int c_param_size = ALIGN(DIV_UP(c, NPU_NUM) * tpu_data_type_size(dtype), 4);
+    int data_size = tpu_data_type_size(dtype);
+    int c_param_size = ALIGN(DIV_UP(c, NPU_NUM) * data_size, 4);
     int c_pooling_size = DIV_UP(c, NPU_NUM) * 64;
-    TPUKERNEL_ASSERT(!(hw%tpu_eu_num(dtype)));
+
     local_addr_t batch_mean_local_addr = 0;
     local_addr_t batch_var_local_addr = batch_mean_local_addr + c_param_size;
     local_addr_t running_mean_local_addr = batch_var_local_addr + c_param_size;
@@ -384,35 +383,38 @@ void batchnorm_forward_split_n(
     local_addr_t bias_local_addr = running_mean_local_addr;
     local_addr_t weight_local_addr = running_var_local_addr;
     local_addr_t c_pooling_buffer = ALIGN(c_param_size * 4, BANK_SIZE);
-    while(!is_local_mem_enough(n_secs, c, hw, 0, 1, dtype))
-    {
-        n_secs-=1;
-    }
-    int nslice = DIV_UP(ori_shape.n, n_secs);    
     
     // loop 1&2: accumulate batch_stats
     // loop  3 : compute output
-    for(int nidx=0; nidx < 3 * nslice; nidx++)
+    int n_slice = 0;
+    while(is_local_mem_enough(n_slice+1, c, hw, 0, 1, dtype))
     {
-        bool if_last = (nidx == nslice-1)||(nidx == 2 * nslice-1)||(nidx == 3 * nslice-1);
-        int nsecs = if_last ? n - (nslice-1) * n_secs:n_secs; 
-        int pooling_size = nsecs > 1 ? DIV_UP(c, NPU_NUM) * tpu_aligned_feature_size(1, nsecs, dtype) : 0;
-        local_addr_t pooling_buffer = nsecs > 1 ? c_pooling_buffer + c_pooling_size : c_pooling_buffer;
-        local_addr_t input_local_addr = c_pooling_buffer + ALIGN(c_pooling_size + pooling_size, BANK_SIZE);
-        dim4 input_shape = {nsecs, c, 1, hw};
-        dim4 pooling_shape = {1, c, nsecs, hw};
+        n_slice+=1;
+    }
+    int nsecs = DIV_UP(n, 2 * n_slice);
+    for(int nidx=0; nidx < 3 * nsecs; nidx++)
+    {
+        bool if_last = (nidx == nsecs-1)||(nidx == 2 * nsecs-1)||(nidx == 3 * nsecs-1);
+        int nslice = if_last ? n - (nsecs-1) * 2 * n_slice : n_slice; 
+        int pooling_size = nslice > 1 ? DIV_UP(c, NPU_NUM) * tpu_aligned_feature_size(1, nslice, dtype) : 0;
+        int param_size = nslice * DIV_UP(c, NPU_NUM) * tpu_aligned_feature_size(1, hw, dtype);
+
+        local_addr_t pooling_buffer = nslice > 1 ? c_pooling_buffer + c_pooling_size : c_pooling_buffer;
+        local_addr_t ping_addr = c_pooling_buffer + ALIGN(c_pooling_size + pooling_size, BANK_SIZE);
+        local_addr_t pong_addr = ping_addr + ALIGN(param_size, BANK_SIZE);
+
+        dim4 input_shape = {nslice, c, 1, hw};
+        dim4 pooling_shape = {1, c, nslice, hw};
         dim4 cshape = {1, c, 1, 1};
         dim4 local_stride;
-        dim4 global_stride;
-        dim4 compact_stride;
-        dim4 zero_stride = {0, 1, 0, 0};
         tpu_aligned_stride(&local_stride, 0, &input_shape, dtype);
-        tpu_continuous_stride(&global_stride, &ori_shape);
+        dim4 compact_stride;
         tpu_compact_stride(&compact_stride, 0, &cshape);
+        dim4 zero_stride = {0, compact_stride.c, 0, 0};
         if(c > NPU_NUM)
         {
             local_stride.n = local_stride.c;
-            local_stride.c *= nsecs;
+            local_stride.c *= nslice;
         }
         scalar_t scale = {.f32 = 0.f};
         scalar_t ep = {.f32 = eps};
@@ -445,36 +447,56 @@ void batchnorm_forward_split_n(
                 running_var_global_addr,
                 &cshape,
                 dtype);
+            tpu_parallel_end();
         }
-        if(nidx < nslice)
+        if(if_last && tpu_is_parallel_state())
         {
-            tpu_gdma_cpy_S2L(
-                input_local_addr,
-                input_global_addr + nidx * n_secs * c * hw * tpu_data_type_size(dtype),
-                &input_shape,
-                c > 64 ? &local_stride : NULL,
-                NULL,//&global_stride,
-                dtype);
-            if(tpu_is_parallel_state()){tpu_parallel_end();}
-            scale.f32 = 1.f;
-            tpu_bdc_fp_avg_pool2d(
-                pooling_buffer,
-                input_local_addr,
-                &pooling_shape,
-                &pooling_kernel,
-                &pooling_padding,
-                &pooling_stride,
-                &pooling_dilation,
-                dtype,
-                scale);
-            if(nsecs>1)
+            tpu_parallel_end();
+            tpu_poll();
+        }
+        tpu_gdma_cpy_S2L(
+            ping_addr,
+            input_global_addr + 2 * (nidx - ALIGN(nidx+1, nsecs) + nsecs) * n_slice * c * hw * data_size,
+            &input_shape,
+            (c > 64 && nidx < 2 * nsecs) ? &local_stride : NULL,
+            NULL,
+            dtype);
+        if(!if_last)
+        {
+            if(tpu_is_parallel_state())
             {
-                pooling_shape.w = pooling_shape.h;
-                pooling_shape.h = 1;
-                pooling_kernel.w = pooling_shape.w;
+                tpu_parallel_end();
+                tpu_poll();
+            }
+            tpu_parallel_start();
+            tpu_gdma_cpy_S2L(
+                pong_addr,
+                input_global_addr + (2 * (nidx - ALIGN(nidx+1, nsecs) + nsecs) + 1) * n_slice * c * hw * data_size,
+                &input_shape,
+                (c > 64 && nidx < 2 * nsecs) ? &local_stride : NULL,
+                NULL,
+                dtype);
+        }
+        if(nidx < nsecs)
+        {
+            scale.f32 = 1.f;
+            for(int pong = 0; pong < 2-if_last; pong++)
+            {
+                if(pong)
+                {
+                    pooling_shape.w = hw;
+                    pooling_shape.h = nslice;
+                    pooling_kernel.w = pooling_shape.w;
+                    if(tpu_is_parallel_state())
+                    {
+                        tpu_parallel_end();
+                        tpu_poll();
+                    }
+                    tpu_parallel_start();
+                }
                 tpu_bdc_fp_avg_pool2d(
-                    c_pooling_buffer,
                     pooling_buffer,
+                    pong ? pong_addr : ping_addr,
                     &pooling_shape,
                     &pooling_kernel,
                     &pooling_padding,
@@ -482,18 +504,33 @@ void batchnorm_forward_split_n(
                     &pooling_dilation,
                     dtype,
                     scale);
+                if(nslice>1)
+                {
+                    pooling_shape.w = pooling_shape.h;
+                    pooling_shape.h = 1;
+                    pooling_kernel.w = pooling_shape.w;
+                    tpu_bdc_fp_avg_pool2d(
+                        c_pooling_buffer,
+                        pooling_buffer,
+                        &pooling_shape,
+                        &pooling_kernel,
+                        &pooling_padding,
+                        &pooling_stride,
+                        &pooling_dilation,
+                        dtype,
+                        scale);
+                }
+                tpu_bdc_fp_add(
+                    batch_mean_local_addr,
+                    batch_mean_local_addr,
+                    c_pooling_buffer,
+                    &cshape,
+                    &compact_stride,
+                    &compact_stride,
+                    NULL,
+                    dtype);
             }
-            tpu_parallel_start();
-            tpu_bdc_fp_add(
-                batch_mean_local_addr,
-                batch_mean_local_addr,
-                c_pooling_buffer,
-                &cshape,
-                &compact_stride,
-                &compact_stride,
-                NULL,
-                dtype);
-            if(nidx==nslice-1)
+            if(nidx==nsecs-1)
             {
                 scale.f32 = 1.f/(n*hw);
                 tpu_bdc_fp_mul_C(
@@ -504,7 +541,6 @@ void batchnorm_forward_split_n(
                     &compact_stride,
                     &compact_stride,
                     dtype);
-                if(tpu_is_parallel_state()){tpu_parallel_end();}
                 tpu_gdma_compact_L2S(
                     batch_mean_global_addr,
                     batch_mean_local_addr,
@@ -512,53 +548,44 @@ void batchnorm_forward_split_n(
                     dtype);
             }
         }
-        else if(nidx < 2 * nslice)
+        else if(nidx < 2 * nsecs)
         {
-            tpu_gdma_cpy_S2L(
-                input_local_addr,
-                input_global_addr + (nidx - nslice) * n_secs * c * hw * tpu_data_type_size(dtype),
-                &input_shape,
-                c > 64 ? &local_stride : NULL,
-                NULL,//&global_stride,
-                dtype);
-            if(tpu_is_parallel_state()){tpu_parallel_end();}
-            tpu_bdc_fp_sub(
-                input_local_addr,
-                input_local_addr,
-                batch_mean_local_addr,
-                &input_shape,
-                c > 64 ? &local_stride : NULL,
-                c > 64 ? &local_stride : NULL,
-                &zero_stride,
-                dtype);
-            tpu_bdc_fp_mul(
-                input_local_addr,
-                input_local_addr,
-                input_local_addr,
-                &input_shape,
-                c > 64 ? &local_stride : NULL,
-                c > 64 ? &local_stride : NULL,
-                c > 64 ? &local_stride : NULL,
-                dtype);
-            scale.f32 = 1.f;
-            tpu_bdc_fp_avg_pool2d(
-                pooling_buffer,
-                input_local_addr,
-                &pooling_shape,
-                &pooling_kernel,
-                &pooling_padding,
-                &pooling_stride,
-                &pooling_dilation,
-                dtype,
-                scale);
-            if(nsecs>1)
-            {
-                pooling_shape.w = pooling_shape.h;
-                pooling_shape.h = 1;
-                pooling_kernel.w = pooling_shape.w;
+            for(int pong=0; pong < 2-if_last; pong++)
+            {                
+                if(pong)
+                {
+                    pooling_shape.w = hw;
+                    pooling_shape.h = nslice;
+                    pooling_kernel.w = pooling_shape.w;
+                    if(tpu_is_parallel_state())
+                    {
+                        tpu_parallel_end();
+                        tpu_poll();
+                    }
+                    tpu_parallel_start();
+                }
+                tpu_bdc_fp_sub(
+                    pong ? pong_addr : ping_addr,
+                    pong ? pong_addr : ping_addr,
+                    batch_mean_local_addr,
+                    &input_shape,
+                    c > 64 ? &local_stride : NULL,
+                    c > 64 ? &local_stride : NULL,
+                    &zero_stride,
+                    dtype);
+                tpu_bdc_fp_mul(
+                    pong ? pong_addr : ping_addr,
+                    pong ? pong_addr : ping_addr,
+                    pong ? pong_addr : ping_addr,
+                    &input_shape,
+                    c > 64 ? &local_stride : NULL,
+                    c > 64 ? &local_stride : NULL,
+                    c > 64 ? &local_stride : NULL,
+                    dtype);
+                scale.f32 = 1.f;
                 tpu_bdc_fp_avg_pool2d(
-                    c_pooling_buffer,
                     pooling_buffer,
+                    pong ? pong_addr : ping_addr,
                     &pooling_shape,
                     &pooling_kernel,
                     &pooling_padding,
@@ -566,21 +593,35 @@ void batchnorm_forward_split_n(
                     &pooling_dilation,
                     dtype,
                     scale);
+                if(nslice>1)
+                {
+                    pooling_shape.w = pooling_shape.h;
+                    pooling_shape.h = 1;
+                    pooling_kernel.w = pooling_shape.w;
+                    tpu_bdc_fp_avg_pool2d(
+                        c_pooling_buffer,
+                        pooling_buffer,
+                        &pooling_shape,
+                        &pooling_kernel,
+                        &pooling_padding,
+                        &pooling_stride,
+                        &pooling_dilation,
+                        dtype,
+                        scale);
+                }
+                tpu_bdc_fp_add(
+                    batch_var_local_addr,
+                    batch_var_local_addr,
+                    c_pooling_buffer,
+                    &cshape,
+                    &compact_stride,
+                    &compact_stride,
+                    NULL,
+                    dtype);
             }
-            tpu_parallel_start();
-            tpu_bdc_fp_add(
-                batch_var_local_addr,
-                batch_var_local_addr,
-                c_pooling_buffer,
-                &cshape,
-                &compact_stride,
-                &compact_stride,
-                NULL,
-                dtype);
-            if(nidx == 2 * nslice - 1)
+            if(nidx == 2 * nsecs - 1)
             {
-                if(tpu_is_parallel_state()){tpu_parallel_end();}
-                scale.f32 = 1-momentum;
+                scale.f32 = 1.f-momentum;
                 tpu_bdc_fp_mul_C(
                     running_mean_local_addr,
                     running_mean_local_addr,
@@ -611,7 +652,6 @@ void batchnorm_forward_split_n(
                     &cshape,
                     &compact_stride,
                     &compact_stride);
-                tpu_parallel_start();
                 tpu_gdma_compact_L2S(
                     updated_mean_global_addr,
                     running_mean_local_addr,
@@ -665,7 +705,6 @@ void batchnorm_forward_split_n(
                     &compact_stride,
                     NULL,
                     dtype);
-                if(tpu_is_parallel_state()){tpu_parallel_end();}
                 tpu_gdma_compact_L2S(
                     batch_invstd_global_addr,
                     batch_var_local_addr,
@@ -675,39 +714,59 @@ void batchnorm_forward_split_n(
         }
         else
         {
-            tpu_gdma_cpy_S2L(
-                input_local_addr,
-                input_global_addr + (nidx - 2 * nslice) * n_secs * c * hw * tpu_data_type_size(dtype),
-                &input_shape,
-                NULL,
-                NULL,//&global_stride,
-                dtype);
-            tpu_bdc_fp_bias(
-                input_local_addr,
-                input_local_addr,
-                batch_mean_local_addr,
-                &input_shape,
-                dtype);
-            tpu_bdc_fp_scale(
-                input_local_addr,
-                input_local_addr,
-                batch_var_local_addr,
-                &input_shape,
-                dtype);
-            tpu_bdc_fp_scale_bias(
-                input_local_addr,
-                input_local_addr,
-                weight_local_addr,
-                bias_local_addr,
-                &input_shape,
-                dtype);
+            for(int pong = 0; pong < 2-if_last; pong++)
+            {
+                if(pong)
+                {
+                    if(tpu_is_parallel_state())
+                    {
+                        tpu_parallel_end();
+                        tpu_poll();
+                    }
+                    tpu_parallel_start();
+                }
+                tpu_bdc_fp_bias(
+                    pong ? pong_addr : ping_addr,
+                    pong ? pong_addr : ping_addr,
+                    batch_mean_local_addr,
+                    &input_shape,
+                    dtype);
+                tpu_bdc_fp_scale(
+                    pong ? pong_addr : ping_addr,
+                    pong ? pong_addr : ping_addr,
+                    batch_var_local_addr,
+                    &input_shape,
+                    dtype);
+                tpu_bdc_fp_scale_bias(
+                    pong ? pong_addr : ping_addr,
+                    pong ? pong_addr : ping_addr,
+                    weight_local_addr,
+                    bias_local_addr,
+                    &input_shape,
+                    dtype);
+            }
             tpu_gdma_cpy_L2S(
-                output_global_addr + (nidx - 2 * nslice) * n_secs * c * hw * tpu_data_type_size(dtype),
-                input_local_addr,
+                output_global_addr + 2 * (nidx - 2 * nsecs) * n_slice * c * hw * data_size,
+                ping_addr,
                 &input_shape,
-                NULL,//&global_stride,
+                NULL,
                 NULL,
                 dtype);
+            if(!if_last)
+            {
+                if(tpu_is_parallel_state())
+                {
+                    tpu_parallel_end();
+                    tpu_poll();
+                }
+                tpu_gdma_cpy_L2S(
+                    output_global_addr + (2 * (nidx - 2 * nsecs) + 1)* n_slice * c * hw * data_size,
+                    pong_addr,
+                    &input_shape,
+                    NULL,
+                    NULL,
+                    dtype);
+            }
         }
     }
 }
@@ -1117,7 +1176,7 @@ void nodechip_batchnorm_forward_training(
                     dtype);
             }
         }
-        else if(is_local_mem_enough(1, shape.c, shape.h*shape.w, 0, 1, dtype))
+        else if(shape.n && is_local_mem_enough(1, shape.c, shape.h*shape.w, 0, 1, dtype))
         {
             batchnorm_forward_split_n(
                 input_global_addr,
