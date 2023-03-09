@@ -306,8 +306,8 @@ bm_status_t sgdnn_conv_backward(
     u64 grad_bias_size = (u64)oc * dtype_size(dtype);
 
     // cal buffer size
-    u64 weight_reorder_size = (dtype == SG_DTYPE_FP32 ? oc : ALIGN(oc, 32)) * kh * kw * ic * dtype_size(dtype);
-    u64 grad_out_reorder_size = (dtype == SG_DTYPE_FP32 ? n : ALIGN(n, 32)) * oh * ow * oc * dtype_size(dtype);
+    u64 weight_reorder_size = ALIGN(oc, 32) * kh * kw * ic * dtype_size(SG_DTYPE_FP16);
+    u64 grad_out_reorder_size = ALIGN(n, 32) * oh * ow * oc * dtype_size(SG_DTYPE_FP16);
     u64 buffer_size = dtype == SG_DTYPE_FP32 ? 0 : sg_max(weight_reorder_size, grad_out_reorder_size);//use for weight reorder
 
     DEVICE_MEM_NEW_INPUT(handle, grad_output, grad_output_size, grad_output_mem);
@@ -412,17 +412,18 @@ bm_status_t sgdnn_conv_backward_cudnn(
     assert(idtype == wdtype && wdtype == odtype);
 
     // cal buffer size
-    u64 weight_reorder_size = (wdtype == SG_DTYPE_FP32 ? oc : ALIGN(oc, 32)) * kh * kw * ic * dtype_size(wdtype);
-    u64 grad_out_reorder_size = (odtype == SG_DTYPE_FP32 ? n : ALIGN(n, 32)) * oh * ow * oc * dtype_size(odtype);
-    u64 buffer_size = idtype == SG_DTYPE_FP32 ? 0 : sg_max(weight_reorder_size, grad_out_reorder_size);//use for weight reorder
+    sg_data_type_t compute_type = (sg_data_type_t)(convDesc.computeType);
+    bool need_buffer = idtype == SG_DTYPE_FP16 || compute_type == SG_DTYPE_FP16;
+
+    u64 weight_reorder_size = ALIGN(oc, 32) * kh * kw * ic * dtype_size(SG_DTYPE_FP16);
+    u64 grad_out_reorder_size = ALIGN(n, 32) * oh * ow * oc * dtype_size(SG_DTYPE_FP16);
+    u64 buffer_size = need_buffer ? sg_max(weight_reorder_size, grad_out_reorder_size) : 0;//use for weight reorder
 
     bm_device_mem_t buffer_mem;
     if (buffer_size > 0) {
         bm_status_t status = bm_malloc_device_byte(handle, &buffer_mem, buffer_size);
         assert(status == BM_SUCCESS);
     }
-
-    sg_data_type_t compute_type = (sg_data_type_t)(convDesc.computeType);
 
     if (compute_type == SG_DTYPE_FP32) {
 

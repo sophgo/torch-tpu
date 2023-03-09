@@ -128,6 +128,8 @@ class Conv2dFunc(Function):
 
         #grad_input_np = np.ones(input.shape, dtype = np.float32)
         #grad_weight_np = np.ones(weight.shape, dtype = np.float32)
+        #oc = weight.shape[0]
+        #grad_bias_np = np.ones((oc,), dtype = np.float16)
         #grad_bias_np = np.ones(bias.shape, dtype = np.float32)
 
         #grad_bias_enable = 0 if bias is None else 1
