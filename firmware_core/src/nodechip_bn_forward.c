@@ -1176,7 +1176,7 @@ void nodechip_batchnorm_forward_training(
                     dtype);
             }
         }
-        else if(shape.n && is_local_mem_enough(1, shape.c, shape.h*shape.w, 0, 1, dtype))
+        else if(shape.n>1 && is_local_mem_enough(1, shape.c, shape.h*shape.w, 0, 1, dtype))
         {
             batchnorm_forward_split_n(
                 input_global_addr,
