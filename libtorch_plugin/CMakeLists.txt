@@ -60,3 +60,8 @@ add_executable(benchmark_conv2d benchmark/conv2d.cpp)
 target_link_libraries(benchmark_conv2d libtorch_plugin)
 add_executable(benchmark_conv2d_backward benchmark/conv2d_backward.cpp)
 target_link_libraries(benchmark_conv2d_backward libtorch_plugin)
+
+# Model test
+add_executable(test_resnet50 test_model/resnet50.cpp)
+target_link_libraries(test_resnet50 libtorch_plugin)
+

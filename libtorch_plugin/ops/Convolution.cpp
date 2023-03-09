@@ -125,8 +125,20 @@ int64_t                       groups )
       .dilation_h = ( int ) dilation[0],
       .dilation_w = ( int ) dilation[1],
       .groups = ( int ) groups,
-      .computeType = ( sg_data_type_t ) tpu::TPUConvertDType ( input.dtype() )
     };
+    auto accuracy = tpu::GetConvolutionForwardAccuracy();
+    if ( accuracy == tpu::ALGORITHM_ACCURACY_FP32 )
+    {
+      conv_desc.computeType = SG_DTYPE_FP32;
+    }
+    else if ( accuracy == tpu::ALGORITHM_ACCURACY_FP16 )
+    {
+      conv_desc.computeType = SG_DTYPE_FP16;
+    }
+    else
+    {
+      TORCH_CHECK ( false, "Unsupported convolution forward accuracy" );
+    }
 #ifdef TPU_OP_TIMING
     auto timer = tpu::Timer().Start();
 #endif
@@ -255,11 +267,11 @@ std::array<bool, 3> output_mask )
       .groups = ( int ) groups,
     };
     auto accuracy = tpu::GetConvolutionBackwardAccuracy();
-    if ( accuracy == tpu::CONVOLUTION_BACKWARD_ACCURACY_FP32 )
+    if ( accuracy == tpu::ALGORITHM_ACCURACY_FP32 )
     {
       conv_desc.computeType = SG_DTYPE_FP32;
     }
-    else if ( accuracy == tpu::CONVOLUTION_BACKWARD_ACCURACY_FP16 )
+    else if ( accuracy == tpu::ALGORITHM_ACCURACY_FP16 )
     {
       conv_desc.computeType = SG_DTYPE_FP16;
     }

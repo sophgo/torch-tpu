@@ -8,14 +8,16 @@ namespace tpu
 
 typedef enum
 {
-  CONVOLUTION_BACKWARD_ACCURACY_FP32 = 0x0,
-  CONVOLUTION_BACKWARD_ACCURACY_FP16,
-  CONVOLUTION_BACKWARD_ACCURACY_AMP
+  ALGORITHM_ACCURACY_FP32 = 0x0,
+  ALGORITHM_ACCURACY_FP16,
 }
-ConvolutionBackwardAccuracy_t;
+AlgorithmAccuracy_t;
 
-ConvolutionBackwardAccuracy_t GetConvolutionBackwardAccuracy();
-void SetConvolutionBackwardAccuracy ( ConvolutionBackwardAccuracy_t Accuracy );
+AlgorithmAccuracy_t GetConvolutionBackwardAccuracy();
+void SetConvolutionBackwardAccuracy ( AlgorithmAccuracy_t Accuracy );
+
+AlgorithmAccuracy_t GetConvolutionForwardAccuracy();
+void SetConvolutionForwardAccuracy ( AlgorithmAccuracy_t Accuracy );
 
 void MoveModuleToTPUDevice ( torch::nn::Module & Module );
 

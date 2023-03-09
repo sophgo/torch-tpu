@@ -88,16 +88,28 @@ void TorchscriptModule::Register()
   }
 }
 
-static ConvolutionBackwardAccuracy_t kConvolutionBackwardAccuracy = CONVOLUTION_BACKWARD_ACCURACY_FP32;
+static AlgorithmAccuracy_t kConvolutionBackwardAccuracy = ALGORITHM_ACCURACY_FP32;
 
-ConvolutionBackwardAccuracy_t GetConvolutionBackwardAccuracy()
+AlgorithmAccuracy_t GetConvolutionBackwardAccuracy()
 {
   return kConvolutionBackwardAccuracy;
 }
 
-void SetConvolutionBackwardAccuracy ( ConvolutionBackwardAccuracy_t Accuracy )
+void SetConvolutionBackwardAccuracy ( AlgorithmAccuracy_t Accuracy )
 {
   kConvolutionBackwardAccuracy = Accuracy;
+}
+
+static AlgorithmAccuracy_t kConvolutionForwardAccuracy = ALGORITHM_ACCURACY_FP32;
+
+AlgorithmAccuracy_t GetConvolutionForwardAccuracy()
+{
+  return kConvolutionForwardAccuracy;
+}
+
+void SetConvolutionForwardAccuracy ( AlgorithmAccuracy_t Accuracy )
+{
+  kConvolutionForwardAccuracy = Accuracy;
 }
 
 } // namespace tpu
