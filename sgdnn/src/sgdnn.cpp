@@ -448,6 +448,10 @@ bm_status_t sgdnn_conv_backward_cudnn(
 
         tpu_kernel_launch_sync(handle, "tpu_kernel_api_conv_backward", &api, sizeof(api));
 
+        if (buffer_size > 0) {
+            bm_free_device(handle, buffer_mem);
+        }
+
     } else if (compute_type == SG_DTYPE_FP16) {
 
         int dtype_size = 2;
@@ -558,12 +562,6 @@ bm_status_t sgdnn_conv_backward_cudnn(
         tpu_kernel_launch_sync(handle, "tpu_kernel_api_dtype_convert",
                                &cast_dw_api, sizeof(cast_dw_api));
 
-        bm_free_device(handle, x_fp16);
-        bm_free_device(handle, w_fp16);
-        bm_free_device(handle, dy_fp16);
-        bm_free_device(handle, dx_fp16);
-        bm_free_device(handle, dw_fp16);
-
         if (db_enable) {
             sg_api_dtype_convert_t cast_db_api = {
                 bm_mem_get_device_addr(db_fp16),
@@ -576,13 +574,21 @@ bm_status_t sgdnn_conv_backward_cudnn(
 
             tpu_kernel_launch_sync(handle, "tpu_kernel_api_dtype_convert",
                                    &cast_db_api, sizeof(cast_db_api));
+        }
+
+        if (buffer_size > 0) {
+            bm_free_device(handle, buffer_mem);
+        }
+        bm_free_device(handle, dx_fp16);
+        bm_free_device(handle, dw_fp16);
+        if (db_enable) {
             bm_free_device(handle, db_fp16);
         }
+        bm_free_device(handle, x_fp16);
+        bm_free_device(handle, w_fp16);
+        bm_free_device(handle, dy_fp16);
     }
 
-    if (buffer_size > 0) {
-        bm_free_device(handle, buffer_mem);
-    }
     return BM_SUCCESS;
 }
 
