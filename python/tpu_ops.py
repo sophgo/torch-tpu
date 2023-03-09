@@ -92,12 +92,14 @@ class Conv2dFunc(Function):
 
         grad_input_np = np.ones(input.shape, dtype = np.float16)
         grad_weight_np = np.ones(weight.shape, dtype = np.float16)
-        grad_bias_np = np.ones(bias.shape, dtype = np.float16)
+        oc = weight.shape[0]
+        grad_bias_np = np.ones((oc,), dtype = np.float16)
 
         grad_bias_enable = 0 if bias is None else 1
         sgdnn_pybind.conv_backward_fp16(grad_out_np,
                                         input_np,
                                         weight_np,
+                                        #weight_32IC_np,
                                         grad_input_np,
                                         grad_weight_np,
                                         grad_bias_np,

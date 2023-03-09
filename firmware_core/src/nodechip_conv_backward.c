@@ -661,7 +661,7 @@ void nodechip_weight_reorder_to_32oc(
                                          kh * kw,
                                          DIV_UP(ocslice, 32),
                                          32};
-            dim4 reordered_stride = {DIV_UP(oc, 32) * kh * kw, 32, kh * kw * 32, 1};
+            dim4 reordered_stride = {DIV_UP(oc, 32) * kh * kw * 32, 32, kh * kw * 32, 1};
             tpu_gdma_cpy_L2S(
                 output_global_addr +
                     last_icstart * DIV_UP(oc, 32) * kh * kw * 32 * tpu_data_type_size(dtype),
@@ -680,7 +680,7 @@ void nodechip_weight_reorder_to_32oc(
                                  kh * kw,
                                  DIV_UP(ocslice, 32),
                                  32};
-    dim4 reordered_stride = {DIV_UP(oc, 32) * kh * kw, 32, kh * kw * 32, 1};
+    dim4 reordered_stride = {DIV_UP(oc, 32) * kh * kw * 32, 32, kh * kw * 32, 1};
     tpu_gdma_cpy_L2S(
         output_global_addr +
             last_icstart * DIV_UP(oc, 32) * kh * kw * 32 * tpu_data_type_size(dtype),
