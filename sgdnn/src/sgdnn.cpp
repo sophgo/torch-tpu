@@ -5,6 +5,17 @@
 #include <string.h>
 #include "tpu_fp16.h"
 
+static inline int dtype_size(sg_data_type_t dtype) {
+    int size = 1;
+    if (dtype == SG_DTYPE_INT8 || dtype == SG_DTYPE_UINT8) size = 1;
+    else if (dtype == SG_DTYPE_INT16 || dtype == SG_DTYPE_UINT16 ||
+             dtype == SG_DTYPE_FP16 || dtype == SG_DTYPE_BFP16)
+        size = 2;
+    else if (dtype == SG_DTYPE_FP32 || dtype == SG_DTYPE_INT32 || dtype == SG_DTYPE_UINT32)
+        size = 4;
+    return size;
+}
+
 #define ASSERT_SAME_DIMS(A, B)            \
   assert(A.ndims == B.ndims);             \
 
@@ -282,17 +293,6 @@ bm_status_t sgdnn_conv_backward(
     sg_data_type_t     dtype
   ) {
 
-    auto dtype_size = [](int dtype) {
-        int size = 1;
-        if (dtype == SG_DTYPE_INT8 || dtype == SG_DTYPE_UINT8) size = 1;
-        else if (dtype == SG_DTYPE_INT16 || dtype == SG_DTYPE_UINT16 ||
-                 dtype == SG_DTYPE_FP16 || dtype == SG_DTYPE_BFP16)
-            size = 2;
-        else if (dtype == SG_DTYPE_FP32 || dtype == SG_DTYPE_INT32 || dtype == SG_DTYPE_UINT32)
-            size = 4;
-        return size;
-    };
-
     bm_device_mem_t grad_output_mem;
     bm_device_mem_t input_mem, weight_mem, buffer_mem;
     bm_device_mem_t grad_input_mem, grad_weight_mem, grad_bias_mem;
@@ -370,17 +370,6 @@ bm_status_t sgdnn_conv_backward_cudnn(
     bool                            dw_enable,
     bool                            db_enable
  ) {
-
-    auto dtype_size = [](int dtype) {
-        int size = 1;
-        if (dtype == SG_DTYPE_INT8 || dtype == SG_DTYPE_UINT8) size = 1;
-        else if (dtype == SG_DTYPE_INT16 || dtype == SG_DTYPE_UINT16 ||
-                 dtype == SG_DTYPE_FP16 || dtype == SG_DTYPE_BFP16)
-            size = 2;
-        else if (dtype == SG_DTYPE_FP32 || dtype == SG_DTYPE_INT32 || dtype == SG_DTYPE_UINT32)
-            size = 4;
-        return size;
-    };
 
     assert(xDesc.ndims == 4 && dyDesc.ndims == 4);
     int n = xDesc.shape[0];
@@ -613,15 +602,6 @@ bm_status_t sgdnn_batchnorm_forward(
     float              eps,
     sg_data_type_t     dtype)
 {
-    auto dtype_size = [](int dtype) {
-        int size = 1;
-        if (dtype == SG_DTYPE_INT8 || dtype == SG_DTYPE_UINT8) size = 1;
-        else if (dtype == SG_DTYPE_INT16 || dtype == SG_DTYPE_UINT16 ||
-                 dtype == SG_DTYPE_FP16 || dtype == SG_DTYPE_BFP16)
-            size = 2;
-        else if (dtype == SG_DTYPE_FP32 || dtype == SG_DTYPE_INT32 || dtype == SG_DTYPE_UINT32)
-            size = 4;
-        return size;};
 
     bm_device_mem_t input_mem, running_mean_mem, running_var_mem, weight_mem, bias_mem;
     bm_device_mem_t updated_mean_mem, updated_var_mem, batch_mean_mem, batch_invstd_mem, output_mem;
@@ -758,15 +738,6 @@ bm_status_t sgdnn_batchnorm_backward(
     bool               bias_need_grad,
     sg_data_type_t     dtype)
 {
-    auto dtype_size = [](int dtype) {
-        int size = 1;
-        if (dtype == SG_DTYPE_INT8 || dtype == SG_DTYPE_UINT8) size = 1;
-        else if (dtype == SG_DTYPE_INT16 || dtype == SG_DTYPE_UINT16 ||
-                 dtype == SG_DTYPE_FP16 || dtype == SG_DTYPE_BFP16)
-            size = 2;
-        else if (dtype == SG_DTYPE_FP32 || dtype == SG_DTYPE_INT32 || dtype == SG_DTYPE_UINT32)
-            size = 4;
-        return size;};
 
     bm_device_mem_t grad_output_mem, input_mem, weight_mem, mean_mem, invstd_mem;
     bm_device_mem_t grad_input_mem, grad_weight_mem, grad_bias_mem;
@@ -920,17 +891,6 @@ bm_status_t sgdnn_pooling_forward(
     float               relu_upper_limit,
     sg_data_type_t      dtype) {
 
-    auto dtype_size = [](int dtype) {
-        int size = 1;
-        if (dtype == SG_DTYPE_INT8 || dtype == SG_DTYPE_UINT8) size = 1;
-        else if (dtype == SG_DTYPE_INT16 || dtype == SG_DTYPE_UINT16 ||
-                 dtype == SG_DTYPE_FP16 || dtype == SG_DTYPE_BFP16)
-            size = 2;
-        else if (dtype == SG_DTYPE_FP32 || dtype == SG_DTYPE_INT32 || dtype == SG_DTYPE_UINT32)
-            size = 4;
-        return size;
-    };
-
     if (output_h == 0 || output_w == 0) {
         output_h = (input_h + pad_h + pad_h_after - kh) / stride_h + 1;
         output_w = (input_w + pad_w + pad_w_after - kw) / stride_w + 1;
@@ -1068,16 +1028,6 @@ bm_status_t sgdnn_avgpool_backward(
     sg_data_type_t     dtype
   ) {
 
-    auto dtype_size = [](int dtype) {
-        int size = 1;
-        if (dtype == SG_DTYPE_INT8 || dtype == SG_DTYPE_UINT8) size = 1;
-        else if (dtype == SG_DTYPE_INT16 || dtype == SG_DTYPE_UINT16 ||
-                 dtype == SG_DTYPE_FP16 || dtype == SG_DTYPE_BFP16)
-            size = 2;
-        else if (dtype == SG_DTYPE_FP32 || dtype == SG_DTYPE_INT32 || dtype == SG_DTYPE_UINT32)
-            size = 4;
-        return size;};
-
     bm_device_mem_t grad_output_mem, grad_input_mem;
     u64 grad_output_size = (u64)n * c * oh * ow * dtype_size(dtype);
     u64 grad_input_size = (u64)n * c * ih * iw * dtype_size(dtype);
@@ -1128,17 +1078,6 @@ bm_status_t sgdnn_maxpool_backward(
     bool               ceil_mode,
     sg_data_type_t     dtype
   ) {
-
-    auto dtype_size = [](int dtype) {
-        int size = 1;
-        if (dtype == SG_DTYPE_INT8 || dtype == SG_DTYPE_UINT8) size = 1;
-        else if (dtype == SG_DTYPE_INT16 || dtype == SG_DTYPE_UINT16 ||
-                 dtype == SG_DTYPE_FP16 || dtype == SG_DTYPE_BFP16)
-            size = 2;
-        else if (dtype == SG_DTYPE_FP32 || dtype == SG_DTYPE_INT32 || dtype == SG_DTYPE_UINT32)
-            size = 4;
-        return size;
-    };
 
     bm_device_mem_t forward_input_mem, forward_output_mem;
     bm_device_mem_t grad_input_mem, grad_output_mem;
@@ -1377,15 +1316,6 @@ bm_status_t sgdnn_eltwise_backward(
     bool               input_b_need_grad,
     sg_data_type_t     dtype)
 {
-    auto dtype_size = [](int dtype) {
-        int size = 1;
-        if (dtype == SG_DTYPE_INT8 || dtype == SG_DTYPE_UINT8) size = 1;
-        else if (dtype == SG_DTYPE_INT16 || dtype == SG_DTYPE_UINT16 ||
-                 dtype == SG_DTYPE_FP16 || dtype == SG_DTYPE_BFP16)
-            size = 2;
-        else if (dtype == SG_DTYPE_FP32 || dtype == SG_DTYPE_INT32 || dtype == SG_DTYPE_UINT32)
-            size = 4;
-        return size;};
 
     bm_device_mem_t input_a_mem, input_b_mem, grad_output_mem;
     bm_device_mem_t grad_input_a_mem, grad_input_b_mem;
@@ -1513,15 +1443,6 @@ bm_status_t sgdnn_linear_backward(
     bool               bias_need_grad,
     sg_data_type_t     dtype)
 {
-    auto dtype_size = [](int dtype) {
-        int size = 1;
-        if (dtype == SG_DTYPE_INT8 || dtype == SG_DTYPE_UINT8) size = 1;
-        else if (dtype == SG_DTYPE_INT16 || dtype == SG_DTYPE_UINT16 ||
-                 dtype == SG_DTYPE_FP16 || dtype == SG_DTYPE_BFP16)
-            size = 2;
-        else if (dtype == SG_DTYPE_FP32 || dtype == SG_DTYPE_INT32 || dtype == SG_DTYPE_UINT32)
-            size = 4;
-        return size;};
 
     bm_device_mem_t grad_output_mem, input_mem, weight_mem;
     bm_device_mem_t grad_input_mem, grad_weight_mem, grad_bias_mem;
@@ -1571,15 +1492,6 @@ bm_status_t sgdnn_relu_forward(
     int                w, 
     sg_data_type_t     dtype)
 {
-    auto dtype_size = [](int dtype) {
-        int size = 1;
-        if (dtype == SG_DTYPE_INT8 || dtype == SG_DTYPE_UINT8) size = 1;
-        else if (dtype == SG_DTYPE_INT16 || dtype == SG_DTYPE_UINT16 ||
-                 dtype == SG_DTYPE_FP16 || dtype == SG_DTYPE_BFP16)
-            size = 2;
-        else if (dtype == SG_DTYPE_FP32 || dtype == SG_DTYPE_INT32 || dtype == SG_DTYPE_UINT32)
-            size = 4;
-        return size;};
 
     bm_device_mem_t input_mem;
     bm_device_mem_t output_mem;
@@ -1615,15 +1527,6 @@ bm_status_t sgdnn_relu_backward(
     bool               input_need_grad,
     sg_data_type_t     dtype)
 {
-    auto dtype_size = [](int dtype) {
-        int size = 1;
-        if (dtype == SG_DTYPE_INT8 || dtype == SG_DTYPE_UINT8) size = 1;
-        else if (dtype == SG_DTYPE_INT16 || dtype == SG_DTYPE_UINT16 ||
-                 dtype == SG_DTYPE_FP16 || dtype == SG_DTYPE_BFP16)
-            size = 2;
-        else if (dtype == SG_DTYPE_FP32 || dtype == SG_DTYPE_INT32 || dtype == SG_DTYPE_UINT32)
-            size = 4;
-        return size;};
 
     bm_device_mem_t grad_output_mem, input_mem;
     bm_device_mem_t grad_input_mem;
@@ -1763,15 +1666,6 @@ bm_status_t sgdnn_cross_entropy_forward(
     int                reduction,
     sg_data_type_t     dtype)
 {
-    auto dtype_size = [](int dtype) {
-        int size = 1;
-        if (dtype == SG_DTYPE_INT8 || dtype == SG_DTYPE_UINT8) size = 1;
-        else if (dtype == SG_DTYPE_INT16 || dtype == SG_DTYPE_UINT16 ||
-                 dtype == SG_DTYPE_FP16 || dtype == SG_DTYPE_BFP16)
-            size = 2;
-        else if (dtype == SG_DTYPE_FP32 || dtype == SG_DTYPE_INT32 || dtype == SG_DTYPE_UINT32)
-            size = 4;
-        return size;};
 
     bm_device_mem_t input_mem, target_mem;
     bm_device_mem_t loss_mem;
@@ -1847,15 +1741,6 @@ bm_status_t sgdnn_cross_entropy_backward(
     int                reduction,
     sg_data_type_t     dtype)
 {
-    auto dtype_size = [](int dtype) {
-        int size = 1;
-        if (dtype == SG_DTYPE_INT8 || dtype == SG_DTYPE_UINT8) size = 1;
-        else if (dtype == SG_DTYPE_INT16 || dtype == SG_DTYPE_UINT16 ||
-                 dtype == SG_DTYPE_FP16 || dtype == SG_DTYPE_BFP16)
-            size = 2;
-        else if (dtype == SG_DTYPE_FP32 || dtype == SG_DTYPE_INT32 || dtype == SG_DTYPE_UINT32)
-            size = 4;
-        return size;};
 
     bm_device_mem_t input_mem, target_mem;
     bm_device_mem_t grad_input_mem;
@@ -2056,6 +1941,9 @@ PYBIND11_MODULE(sgdnn_pybind, m)
 
         bm_handle_t handle;
         bm_dev_request(&handle, 0);
+
+
+
 
         bm_status_t status = sgdnn_conv_backward(handle,
                             bm_mem_from_system(grad_out_float),
@@ -2416,7 +2304,6 @@ PYBIND11_MODULE(sgdnn_pybind, m)
         bm_dev_free(handle);
     });
 
-    /*
     m.def("eltwise_backward", [](py::array_t<float16> input_a,
                                  py::array_t<float16> input_b,
                                  py::array_t<float16> grad_output,
@@ -2486,19 +2373,9 @@ PYBIND11_MODULE(sgdnn_pybind, m)
           bm_handle_t handle;
           bm_dev_request(&handle, 0);
 
-          auto dtype_size = [](int dtype) {
-              int size = 1;
-              if (dtype == SG_DTYPE_INT8 || dtype == SG_DTYPE_UINT8) size = 1;
-              else if (dtype == SG_DTYPE_INT16 || dtype == SG_DTYPE_UINT16 ||
-                       dtype == SG_DTYPE_FP16 || dtype == SG_DTYPE_BFP16)
-                  size = 2;
-              else if (dtype == SG_DTYPE_FP32 || dtype == SG_DTYPE_INT32 || dtype == SG_DTYPE_UINT32)
-                  size = 4;
-              return size;};
-
           bm_device_mem_t input_a_mem, input_b_mem, grad_output_mem;
           bm_device_mem_t grad_input_a_mem, grad_input_b_mem;
- 
+
           u64 param_size = (u64)n * c * h * w * dtype_size(SG_DTYPE_FP16);
 
           DEVICE_MEM_NEW_INPUT(handle, bm_mem_from_system(input_a_fp16), param_size, input_a_mem);
@@ -2548,7 +2425,6 @@ PYBIND11_MODULE(sgdnn_pybind, m)
           assert(status == BM_SUCCESS);
           bm_dev_free(handle);
     });
-    */
 
     m.def("linear_backward", [](py::array_t<float16> input,
                                 py::array_t<float16> weight,

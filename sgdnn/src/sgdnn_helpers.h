@@ -10,7 +10,6 @@
     bm_status_t ret = (bm_status_t)call;                                                   \
     if (ret != BM_SUCCESS) {                                                  \
       bmlib_log("BM_CHECK",16,"TPU_CHECK_RET fail %s: %s: %d\n", __FILE__, __func__, __LINE__); \
-      return ret;                                                             \
     }                                                                         \
   } while (0)
 #else
