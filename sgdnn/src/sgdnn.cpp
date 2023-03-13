@@ -402,6 +402,7 @@ bm_status_t sgdnn_conv_backward_cudnn(
 
     // cal buffer size
     sg_data_type_t compute_type = (sg_data_type_t)(convDesc.computeType);
+
     bool need_buffer = idtype == SG_DTYPE_FP16 || compute_type == SG_DTYPE_FP16;
 
     u64 weight_reorder_size = ALIGN(oc, 32) * kh * kw * ic * dtype_size(SG_DTYPE_FP16);
@@ -414,7 +415,8 @@ bm_status_t sgdnn_conv_backward_cudnn(
         assert(status == BM_SUCCESS);
     }
 
-    if (compute_type == SG_DTYPE_FP32) {
+    if ((idtype == SG_DTYPE_FP32 && compute_type == SG_DTYPE_FP32) ||
+        (idtype == SG_DTYPE_FP16 && compute_type == SG_DTYPE_FP16)) {
 
         sg_api_conv_backward_t api = {
             (unsigned long long)x,
@@ -434,7 +436,7 @@ bm_status_t sgdnn_conv_backward_cudnn(
             dx_enable,
             dw_enable,
             db_enable,
-            SG_DTYPE_FP32};
+            idtype};
 
         tpu_kernel_launch_sync(handle, "tpu_kernel_api_conv_backward", &api, sizeof(api));
 
@@ -442,7 +444,7 @@ bm_status_t sgdnn_conv_backward_cudnn(
             bm_free_device(handle, buffer_mem);
         }
 
-    } else if (compute_type == SG_DTYPE_FP16) {
+    } else if (idtype == SG_DTYPE_FP32 && compute_type == SG_DTYPE_FP16) {
 
         int dtype_size = 2;
 
@@ -1941,9 +1943,6 @@ PYBIND11_MODULE(sgdnn_pybind, m)
 
         bm_handle_t handle;
         bm_dev_request(&handle, 0);
-
-
-
 
         bm_status_t status = sgdnn_conv_backward(handle,
                             bm_mem_from_system(grad_out_float),
