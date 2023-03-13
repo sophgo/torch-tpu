@@ -1189,6 +1189,64 @@ bm_status_t sgdnn_pooling_backward_cudnn(
     return BM_SUCCESS;
 }
 
+bm_status_t sgdnn_binary_cudnn(
+    bm_handle_t                 handle,
+    const void*                 alpha1,
+    const TensorDescriptor_t    aDesc,
+    const void*                 A,
+    const void*                 alpha2,
+    const TensorDescriptor_t    bDesc,
+    const void*                 B,
+    const void*                 beta,
+    const TensorDescriptor_t    cDesc,
+    void*                       C,
+    bool                        const_binary,
+    sg_binary_type_t            binary_type) 
+{
+    DataUnion alpha_A, alpha_B;
+    alpha_A.f32val = ((float*)alpha1)[0];
+    alpha_B.f32val = ((float*)alpha2)[0];
+    assert(((float*)beta)[0] == 0.0f);
+
+    sg_data_type_t dtype_A = (sg_data_type_t)(aDesc.dtype);
+    sg_data_type_t dtype_B = (sg_data_type_t)(bDesc.dtype);
+    sg_data_type_t dtype_C = (sg_data_type_t)(cDesc.dtype);
+    assert(dtype_A == dtype_B && dtype_B == dtype_C);
+
+    assert(aDesc.ndims == bDesc.ndims && bDesc.ndims == cDesc.ndims);
+    int dims = aDesc.ndims;
+
+    if(const_binary)
+    {
+        assert(aDesc.shape == cDesc.shape);
+        bool is_inversed = false;
+        sg_api_const_binary_float_t api = {
+            (unsigned long long)A,
+            (unsigned long long)C,
+            aDesc.shape,
+            dims,
+            binary_type,
+            dtype_A,
+            alpha_A.f32val,
+            is_inversed};
+        tpu_kernel_launch_sync(handle, "tpu_kernel_api_const_binary", &api, sizeof(api));
+    }
+    else
+    {
+        sg_api_bcbinary_float_t api = {
+            (unsigned long long)A,
+            (unsigned long long)B,
+            (unsigned long long)C,
+            aDesc.shape,
+            bDesc.shape,
+            dims,
+            dtype_A,
+            binary_type};
+        tpu_kernel_launch_sync(handle, "tpu_kernel_api_bcbinary_float", &api, sizeof(api));    
+    }
+    return BM_SUCCESS;
+}
+
 // C = op(alpha1[0] * A, alpha2[0] * B) + beta[0] * C
 bm_status_t sgdnn_eltwise_forward_cudnn(
     bm_handle_t                 handle,

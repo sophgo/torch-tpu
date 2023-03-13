@@ -320,5 +320,35 @@ typedef struct {
 } sg_api_conv_weight_reorder_t;
 #endif
 
+typedef struct {
+    unsigned long long A_global_addr;
+    unsigned long long B_global_addr;
+    unsigned long long res_global_addr;
+    int A_shape[FW_MAX_SHAPE_DIMS];
+    int B_shape[FW_MAX_SHAPE_DIMS];
+    int dims;
+    sg_data_type_t dtype;
+    sg_binary_type_t binary_type;
+#ifndef WIN32
+} __attribute__((packed)) sg_api_bcbinary_float_t;
+#else
+} sg_api_bcbinary_float_t;
+#endif
+
+typedef struct {
+    unsigned long long input_addr;
+    unsigned long long output_addr;
+    int shape[FW_MAX_SHAPE_DIMS];
+    int dims;
+    sg_binary_type_t binary_type;
+    sg_data_type_t dtype;
+    float const_value;
+    int is_inversed;
+#ifndef WIN32
+} __attribute__((packed)) sg_api_const_binary_float_t;
+#else
+} sg_api_const_binary_float_t;
+#endif
+
 #pragma pack(pop)
 #endif  // SG_API_STRUCT_H

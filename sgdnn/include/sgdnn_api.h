@@ -523,6 +523,20 @@ bm_status_t sgdnn_conv_weight_reorder(
     const void                      *yData,
     ConvWeightReorderMode_t          reorder_mode);
 
+bm_status_t sgdnn_binary(
+    bm_handle_t                 handle,
+    const void*                 alpha1,
+    const TensorDescriptor_t    aDesc,
+    const void*                 A,
+    const void*                 alpha2,
+    const TensorDescriptor_t    bDesc,
+    const void*                 B,
+    const void*                 beta,
+    const TensorDescriptor_t    cDesc,
+    void*                       C,
+    bool                        const_binary,
+    sg_binary_type_t            binary_type);
+
 #if defined(__cplusplus)
 }
 #endif
