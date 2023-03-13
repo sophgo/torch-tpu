@@ -148,6 +148,7 @@ bm_status_t sgdnn_conv_forward_cudnn(
 
     float alpha_ = ((float*)alpha)[0];
     assert(alpha_ == 1.0f);
+    UNUSED(alpha_);
     float beta_ = ((float*)beta)[0];
     assert(beta_ == 0.0f || beta_ == 1.0f);
     bool result_add = beta_ == 1.0f;
@@ -189,12 +190,9 @@ bm_status_t sgdnn_conv_forward_cudnn(
         u64 w_fp16_size = (u64)oc * ic * kh * kw * dtype_size;
         u64 w_32ic_fp16_size = (u64)oc * ALIGN(ic, 32) * kh * kw * dtype_size;
 
-        bm_status_t status_x = bm_malloc_device_byte(handle, &x_fp16, x_fp16_size);
-        assert(status_x == BM_SUCCESS);
-        bm_status_t status_w = bm_malloc_device_byte(handle, &w_fp16, w_fp16_size);
-        assert(status_w == BM_SUCCESS);
-        bm_status_t status_w_32ic = bm_malloc_device_byte(handle, &w_32ic_fp16, w_32ic_fp16_size);
-        assert(status_w_32ic == BM_SUCCESS);
+        DEVICE_MEM_NEW_BUFFER(handle, x_fp16, x_fp16_size);
+        DEVICE_MEM_NEW_BUFFER(handle, w_fp16, w_fp16_size);
+        DEVICE_MEM_NEW_BUFFER(handle, w_32ic_fp16, w_32ic_fp16_size);
 
         sg_api_dtype_convert_t cast_x_api = {
             (unsigned long long)x,
@@ -399,6 +397,8 @@ bm_status_t sgdnn_conv_backward_cudnn(
     sg_data_type_t wdtype = (sg_data_type_t)(wDesc.dtype);
     sg_data_type_t odtype = (sg_data_type_t)(dyDesc.dtype);
     assert(idtype == wdtype && wdtype == odtype);
+    UNUSED(wdtype);
+    UNUSED(odtype);
 
     // cal buffer size
     sg_data_type_t compute_type = (sg_data_type_t)(convDesc.computeType);
@@ -411,8 +411,7 @@ bm_status_t sgdnn_conv_backward_cudnn(
 
     bm_device_mem_t buffer_mem;
     if (buffer_size > 0) {
-        bm_status_t status = bm_malloc_device_byte(handle, &buffer_mem, buffer_size);
-        assert(status == BM_SUCCESS);
+        DEVICE_MEM_NEW_BUFFER(handle, buffer_mem, buffer_size);
     }
 
     if ((idtype == SG_DTYPE_FP32 && compute_type == SG_DTYPE_FP32) ||
@@ -457,19 +456,13 @@ bm_status_t sgdnn_conv_backward_cudnn(
         u64 dw_fp16_size = w_fp16_size;
         u64 db_fp16_size = oc * dtype_size;
 
-        bm_status_t status_x = bm_malloc_device_byte(handle, &x_fp16, x_fp16_size);
-        assert(status_x == BM_SUCCESS);
-        bm_status_t status_w = bm_malloc_device_byte(handle, &w_fp16, w_fp16_size);
-        assert(status_w == BM_SUCCESS);
-        bm_status_t status_dy = bm_malloc_device_byte(handle, &dy_fp16, dy_fp16_size);
-        assert(status_dy == BM_SUCCESS);
-        bm_status_t status_dx = bm_malloc_device_byte(handle, &dx_fp16, dx_fp16_size);
-        assert(status_dx == BM_SUCCESS);
-        bm_status_t status_dw = bm_malloc_device_byte(handle, &dw_fp16, dw_fp16_size);
-        assert(status_dw == BM_SUCCESS);
+        DEVICE_MEM_NEW_BUFFER(handle, x_fp16, x_fp16_size);
+        DEVICE_MEM_NEW_BUFFER(handle, w_fp16, w_fp16_size);
+        DEVICE_MEM_NEW_BUFFER(handle, dy_fp16, dy_fp16_size);
+        DEVICE_MEM_NEW_BUFFER(handle, dx_fp16, dx_fp16_size);
+        DEVICE_MEM_NEW_BUFFER(handle, dw_fp16, dw_fp16_size);
         if (db_enable) {
-            bm_status_t status_db = bm_malloc_device_byte(handle, &db_fp16, db_fp16_size);
-            assert(status_db == BM_SUCCESS);
+            DEVICE_MEM_NEW_BUFFER(handle, db_fp16, db_fp16_size);
         }
 
         sg_api_dtype_convert_t cast_x_api = {
@@ -985,6 +978,7 @@ bm_status_t sgdnn_pooling_forward_cudnn(
     sg_data_type_t idtype = (sg_data_type_t)xDesc.dtype;
     sg_data_type_t odtype = (sg_data_type_t)yDesc.dtype;
     assert(idtype == odtype);
+    UNUSED(odtype);
 
     sg_api_pooling_forward_t api = {
         (unsigned long long)x,
@@ -1378,6 +1372,7 @@ bm_status_t sgdnn_eltwise_forward_cudnn(
     sg_data_type_t dtype_A = (sg_data_type_t)(aDesc.dtype);
     sg_data_type_t dtype_B = (sg_data_type_t)(bDesc.dtype);
     assert(dtype_A == dtype_B);
+    UNUSED(dtype_B);
 
     sg_data_type_t dtype_C = (sg_data_type_t)(cDesc.dtype);
 
@@ -2045,6 +2040,7 @@ PYBIND11_MODULE(sgdnn_pybind, m)
         bm_handle_t handle;
         bm_dev_request(&handle, 0);
 
+#if 0
         bm_status_t status = sgdnn_conv_backward(handle,
                             bm_mem_from_system(grad_out_float),
                             bm_mem_from_system(input_float),
@@ -2061,6 +2057,95 @@ PYBIND11_MODULE(sgdnn_pybind, m)
                             weight_grad_enable,
                             bias_grad_enable,
                             (sg_data_type_t)0);
+#else
+        sg_data_type_t dtype = SG_DTYPE_FP32;
+        bm_device_mem_t input_mem, weight_mem, grad_out_mem;
+        bm_device_mem_t grad_input_mem, grad_weight_mem, grad_bias_mem;
+        u64 grad_output_size = (u64)n * oc * oh * ow * dtype_size(dtype);
+        u64 input_size = (u64)n * ic * ih * iw * dtype_size(dtype);
+        //u64 weight_size = (u64)oc * (dtype == SG_DTYPE_FP32 ? ic : ALIGN(ic, 32)) * kh * kw * dtype_size(dtype);
+        u64 weight_size = (u64)oc * ic * kh * kw * dtype_size(dtype);
+        u64 grad_input_size = input_size;
+        u64 grad_weight_size = (u64)oc * ic * kh * kw * dtype_size(dtype);
+        u64 grad_bias_size = (u64)oc * dtype_size(dtype);
+
+        DEVICE_MEM_NEW_INPUT(handle, bm_mem_from_system(grad_out_float), grad_output_size, grad_out_mem);
+        DEVICE_MEM_NEW_INPUT(handle, bm_mem_from_system(input_float), input_size, input_mem);
+        DEVICE_MEM_NEW_INPUT(handle, bm_mem_from_system(weight_float), weight_size, weight_mem);
+        DEVICE_MEM_NEW_OUTPUT(handle, bm_mem_from_system(grad_input_float), grad_input_size, grad_input_mem);
+        DEVICE_MEM_NEW_OUTPUT(handle, bm_mem_from_system(grad_weight_float), grad_weight_size, grad_weight_mem);
+        DEVICE_MEM_NEW_OUTPUT(handle, bm_mem_from_system(grad_bias_float), grad_bias_size, grad_bias_mem);
+
+        TensorDescriptor_t xDesc, dyDesc, dbDesc;
+        xDesc.dtype = SG_DTYPE_FP32;
+        xDesc.ndims = 4;
+        xDesc.shape[0] = n;
+        xDesc.shape[1] = ic;
+        xDesc.shape[2] = ih;
+        xDesc.shape[3] = iw;
+
+        dyDesc.dtype = SG_DTYPE_FP32;
+        dyDesc.ndims = 4;
+        dyDesc.shape[0] = n;
+        dyDesc.shape[1] = oc;
+        dyDesc.shape[2] = oh;
+        dyDesc.shape[3] = ow;
+
+        dbDesc.dtype = SG_DTYPE_FP32;
+        dbDesc.ndims = 4;
+        dbDesc.shape[0] = 1;
+        dbDesc.shape[1] = oc;
+        dbDesc.shape[2] = 1;
+        dbDesc.shape[3] = 1;
+
+        FilterDescriptor_t wDesc;
+        wDesc.dtype = SG_DTYPE_FP32;
+        wDesc.oc = oc;
+        wDesc.ic = ic;
+        wDesc.kh = kh;
+        wDesc.kw = kw;
+
+        assert(pad_ht == pad_hb);
+        assert(pad_wl == pad_wr);
+        ConvolutionDescriptor_t convDesc;
+        convDesc.pad_h = pad_ht;
+        convDesc.pad_w = pad_wl;
+        convDesc.stride_h = stride_h;
+        convDesc.stride_w = stride_w;
+        convDesc.dilation_h = dh;
+        convDesc.dilation_w = dw;
+        convDesc.groups = 1;
+        convDesc.computeType = SG_DTYPE_FP32;//SG_DTYPE_FP16 if AMP
+
+        float alpha[1] = {1.0f};
+        float beta[1] = {0.0f};
+
+        bm_status_t status = sgdnn_conv_backward_cudnn(
+                                handle,
+                                alpha,
+                                beta,
+                                xDesc,
+                                ((void*)(input_mem.u.device.device_addr)),
+                                ((void*)(grad_input_mem.u.device.device_addr)),
+                                wDesc,
+                                ((void*)(weight_mem.u.device.device_addr)),
+                                ((void*)(grad_weight_mem.u.device.device_addr)),
+                                dbDesc,
+                                ((void*)(grad_bias_mem.u.device.device_addr)),
+                                dyDesc,
+                                ((void*)(grad_out_mem.u.device.device_addr)),
+                                convDesc,
+                                input_grad_enable,
+                                weight_grad_enable,
+                                bias_grad_enable);
+
+        DEVICE_MEM_DEL_OUTPUT(handle, bm_mem_from_system(grad_input_float), grad_input_mem);
+        DEVICE_MEM_DEL_OUTPUT(handle, bm_mem_from_system(grad_weight_float), grad_weight_mem);
+        DEVICE_MEM_DEL_OUTPUT(handle, bm_mem_from_system(grad_bias_float), grad_bias_mem);
+        DEVICE_MEM_DEL_INPUT(handle, bm_mem_from_system(grad_out_float), grad_out_mem);
+        DEVICE_MEM_DEL_INPUT(handle, bm_mem_from_system(input_float), input_mem);
+        DEVICE_MEM_DEL_INPUT(handle, bm_mem_from_system(weight_float), weight_mem);
+#endif
 
         UNUSED(status);
         //assert(status == BM_SUCCESS);
