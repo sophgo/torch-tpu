@@ -1205,9 +1205,51 @@ bm_status_t sgdnn_binary_cudnn(
     bool                        const_binary,
     sg_binary_type_t            binary_type) 
 {
-    DataUnion alpha_A, alpha_B;
+    int A_n, A_c, A_h, A_w;
+    int B_n, B_c, B_h, B_w;
+    if (aDesc.ndims == 4 && bDesc.ndims == 4 && cDesc.ndims == 4)
+    {
+        A_n = aDesc.shape[0];
+        A_c = aDesc.shape[1];
+        A_h = aDesc.shape[2];
+        A_w = aDesc.shape[3];
+
+        B_n = bDesc.shape[0];
+        B_c = bDesc.shape[1];
+        B_h = bDesc.shape[2];
+        B_w = bDesc.shape[3];
+    }
+    else if (aDesc.ndims == 1 && bDesc.ndims == 1 && cDesc.ndims == 1)
+    {
+        A_n = 1;
+        A_c = aDesc.shape[0];
+        A_h = 1;
+        A_w = 1;
+
+        B_n = 1;
+        B_c = bDesc.shape[0];
+        B_h = 1;
+        B_w = 1;
+        }
+        else if (aDesc.ndims == 2 && bDesc.ndims == 2 && cDesc.ndims == 2)
+        {
+        A_n = 1;
+        A_c = aDesc.shape[0];
+        A_h = 1;
+        A_w = aDesc.shape[1];
+
+        B_n = 1;
+        B_c = bDesc.shape[0];
+        B_h = 1;
+        B_w = bDesc.shape[1];
+        }
+        else
+        {
+        assert(false);
+        }
+
+    DataUnion alpha_A;
     alpha_A.f32val = ((float*)alpha1)[0];
-    alpha_B.f32val = ((float*)alpha2)[0];
     assert(((float*)beta)[0] == 0.0f);
 
     sg_data_type_t dtype_A = (sg_data_type_t)(aDesc.dtype);
@@ -1221,26 +1263,27 @@ bm_status_t sgdnn_binary_cudnn(
     if(const_binary)
     {
         assert(aDesc.shape == cDesc.shape);
-        bool is_inversed = false;
+        float const_value = alpha_A.f32val;
         sg_api_const_binary_float_t api = {
             (unsigned long long)A,
             (unsigned long long)C,
-            aDesc.shape,
+            {A_n, A_c, A_h, A_w},
             dims,
             binary_type,
             dtype_A,
-            alpha_A.f32val,
-            is_inversed};
+            const_value,
+            0};
         tpu_kernel_launch_sync(handle, "tpu_kernel_api_const_binary", &api, sizeof(api));
     }
     else
     {
+        // int shape_a[FW_MAX_SHAPE_DIMS] = aDesc.shape;
         sg_api_bcbinary_float_t api = {
             (unsigned long long)A,
             (unsigned long long)B,
             (unsigned long long)C,
-            aDesc.shape,
-            bDesc.shape,
+            {A_n, A_c, A_h, A_w},
+            {B_n, B_c, B_h, B_w},
             dims,
             dtype_A,
             binary_type};

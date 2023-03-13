@@ -324,8 +324,8 @@ typedef struct {
     unsigned long long A_global_addr;
     unsigned long long B_global_addr;
     unsigned long long res_global_addr;
-    int A_shape[FW_MAX_SHAPE_DIMS];
-    int B_shape[FW_MAX_SHAPE_DIMS];
+    int A_shape[4];
+    int B_shape[4];
     int dims;
     sg_data_type_t dtype;
     sg_binary_type_t binary_type;
@@ -338,7 +338,7 @@ typedef struct {
 typedef struct {
     unsigned long long input_addr;
     unsigned long long output_addr;
-    int shape[FW_MAX_SHAPE_DIMS];
+    int shape[4];
     int dims;
     sg_binary_type_t binary_type;
     sg_data_type_t dtype;
