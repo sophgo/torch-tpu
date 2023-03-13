@@ -24,6 +24,7 @@ static inline int dtype_size(sg_data_type_t dtype) {
   for (int dim = 0; dim < A.ndims; dim++) \
     assert(A.shape[dim] == B.shape[dim]); \
 
+//use for pybind test, deprecate after
 bm_status_t sgdnn_conv_forward(
     bm_handle_t        handle,
     bm_device_mem_t    input,
@@ -258,6 +259,7 @@ bm_status_t sgdnn_conv_forward_cudnn(
     return BM_SUCCESS;
 }
 
+//use for pybind test, deprecate after
 bm_status_t sgdnn_conv_backward(
     bm_handle_t        handle,
     bm_device_mem_t    grad_output,
@@ -417,27 +419,29 @@ bm_status_t sgdnn_conv_backward_cudnn(
     if ((idtype == SG_DTYPE_FP32 && compute_type == SG_DTYPE_FP32) ||
         (idtype == SG_DTYPE_FP16 && compute_type == SG_DTYPE_FP16)) {
 
-        sg_api_conv_backward_t api = {
-            (unsigned long long)x,
-            (unsigned long long)w,
-            (unsigned long long)dy,
-            (unsigned long long)dx,
-            (unsigned long long)dw,
-            (unsigned long long)db,
-            bm_mem_get_device_addr(buffer_mem),
-            {n, ic, ih, iw},//ishape
-            {n, oc, oh, ow},//oshape
-            groups,
-            {kh, kw},
-            {stride_h, stride_w},
-            {dilation_h, dilation_w},
-            {pad_h, pad_h, pad_w, pad_w},
-            dx_enable,
-            dw_enable,
-            db_enable,
-            idtype};
+        if (dx_enable || dw_enable || db_enable) {
+            sg_api_conv_backward_t api = {
+                (unsigned long long)x,
+                (unsigned long long)w,
+                (unsigned long long)dy,
+                (unsigned long long)dx,
+                (unsigned long long)dw,
+                (unsigned long long)db,
+                bm_mem_get_device_addr(buffer_mem),
+                {n, ic, ih, iw},//ishape
+                {n, oc, oh, ow},//oshape
+                groups,
+                {kh, kw},
+                {stride_h, stride_w},
+                {dilation_h, dilation_w},
+                {pad_h, pad_h, pad_w, pad_w},
+                dx_enable,
+                dw_enable,
+                db_enable,
+                idtype};
 
-        tpu_kernel_launch_sync(handle, "tpu_kernel_api_conv_backward", &api, sizeof(api));
+            tpu_kernel_launch_sync(handle, "tpu_kernel_api_conv_backward", &api, sizeof(api));
+        }
 
         if (buffer_size > 0) {
             bm_free_device(handle, buffer_mem);
@@ -456,96 +460,102 @@ bm_status_t sgdnn_conv_backward_cudnn(
         u64 dw_fp16_size = w_fp16_size;
         u64 db_fp16_size = oc * dtype_size;
 
-        DEVICE_MEM_NEW_BUFFER(handle, x_fp16, x_fp16_size);
-        DEVICE_MEM_NEW_BUFFER(handle, w_fp16, w_fp16_size);
-        DEVICE_MEM_NEW_BUFFER(handle, dy_fp16, dy_fp16_size);
-        DEVICE_MEM_NEW_BUFFER(handle, dx_fp16, dx_fp16_size);
-        DEVICE_MEM_NEW_BUFFER(handle, dw_fp16, dw_fp16_size);
-        if (db_enable) {
-            DEVICE_MEM_NEW_BUFFER(handle, db_fp16, db_fp16_size);
+        if (dx_enable || dw_enable || db_enable) {
+            DEVICE_MEM_NEW_BUFFER(handle, x_fp16, x_fp16_size);
+            DEVICE_MEM_NEW_BUFFER(handle, w_fp16, w_fp16_size);
+            DEVICE_MEM_NEW_BUFFER(handle, dy_fp16, dy_fp16_size);
+        }
+        if (dx_enable) DEVICE_MEM_NEW_BUFFER(handle, dx_fp16, dx_fp16_size);
+        if (dw_enable) DEVICE_MEM_NEW_BUFFER(handle, dw_fp16, dw_fp16_size);
+        if (db_enable) DEVICE_MEM_NEW_BUFFER(handle, db_fp16, db_fp16_size);
+
+        if (dx_enable || dw_enable || db_enable) {
+            sg_api_dtype_convert_t cast_x_api = {
+                (unsigned long long)x,
+                bm_mem_get_device_addr(x_fp16),
+                {n, ic, ih, iw},
+                4,
+                SG_DTYPE_FP32,
+                SG_DTYPE_FP16,
+                SG_ROUND_EVEN};
+
+            tpu_kernel_launch_sync(handle, "tpu_kernel_api_dtype_convert",
+                                   &cast_x_api, sizeof(cast_x_api));
+
+            sg_api_dtype_convert_t cast_w_api = {
+                (unsigned long long)w,
+                bm_mem_get_device_addr(w_fp16),
+                {oc, ic, kh, kw},
+                4,
+                SG_DTYPE_FP32,
+                SG_DTYPE_FP16,
+                SG_ROUND_EVEN};
+
+            tpu_kernel_launch_sync(handle, "tpu_kernel_api_dtype_convert",
+                                   &cast_w_api, sizeof(cast_w_api));
+
+            sg_api_dtype_convert_t cast_dy_api = {
+                (unsigned long long)dy,
+                bm_mem_get_device_addr(dy_fp16),
+                {n, oc, oh, ow},
+                4,
+                SG_DTYPE_FP32,
+                SG_DTYPE_FP16,
+                SG_ROUND_EVEN};
+
+            tpu_kernel_launch_sync(handle, "tpu_kernel_api_dtype_convert",
+                                   &cast_dy_api, sizeof(cast_dy_api));
+
+            sg_api_conv_backward_t api = {
+                bm_mem_get_device_addr(x_fp16),
+                bm_mem_get_device_addr(w_fp16),
+                bm_mem_get_device_addr(dy_fp16),
+                bm_mem_get_device_addr(dx_fp16),
+                bm_mem_get_device_addr(dw_fp16),
+                bm_mem_get_device_addr(db_fp16),
+                bm_mem_get_device_addr(buffer_mem),
+                {n, ic, ih, iw},//ishape
+                {n, oc, oh, ow},//oshape
+                groups,
+                {kh, kw},
+                {stride_h, stride_w},
+                {dilation_h, dilation_w},
+                {pad_h, pad_h, pad_w, pad_w},
+                dx_enable,
+                dw_enable,
+                db_enable,
+                SG_DTYPE_FP16};
+
+            tpu_kernel_launch_sync(handle, "tpu_kernel_api_conv_backward", &api, sizeof(api));
         }
 
-        sg_api_dtype_convert_t cast_x_api = {
-            (unsigned long long)x,
-            bm_mem_get_device_addr(x_fp16),
-            {n, ic, ih, iw},
-            4,
-            SG_DTYPE_FP32,
-            SG_DTYPE_FP16,
-            SG_ROUND_EVEN};
+        if (dx_enable) {
+            sg_api_dtype_convert_t cast_dx_api = {
+                bm_mem_get_device_addr(dx_fp16),
+                (unsigned long long)dx,
+                {n, ic, ih, iw},
+                4,
+                SG_DTYPE_FP16,
+                SG_DTYPE_FP32,
+                SG_ROUND_EVEN};
 
-        tpu_kernel_launch_sync(handle, "tpu_kernel_api_dtype_convert",
-                               &cast_x_api, sizeof(cast_x_api));
+            tpu_kernel_launch_sync(handle, "tpu_kernel_api_dtype_convert",
+                                   &cast_dx_api, sizeof(cast_dx_api));
+        }
 
-        sg_api_dtype_convert_t cast_w_api = {
-            (unsigned long long)w,
-            bm_mem_get_device_addr(w_fp16),
-            {oc, ic, kh, kw},
-            4,
-            SG_DTYPE_FP32,
-            SG_DTYPE_FP16,
-            SG_ROUND_EVEN};
+        if (dw_enable) {
+            sg_api_dtype_convert_t cast_dw_api = {
+                bm_mem_get_device_addr(dw_fp16),
+                (unsigned long long)dw,
+                {oc, ic, kh, kw},
+                4,
+                SG_DTYPE_FP16,
+                SG_DTYPE_FP32,
+                SG_ROUND_EVEN};
 
-        tpu_kernel_launch_sync(handle, "tpu_kernel_api_dtype_convert",
-                               &cast_w_api, sizeof(cast_w_api));
-
-        sg_api_dtype_convert_t cast_dy_api = {
-            (unsigned long long)dy,
-            bm_mem_get_device_addr(dy_fp16),
-            {n, oc, oh, ow},
-            4,
-            SG_DTYPE_FP32,
-            SG_DTYPE_FP16,
-            SG_ROUND_EVEN};
-
-        tpu_kernel_launch_sync(handle, "tpu_kernel_api_dtype_convert",
-                               &cast_dy_api, sizeof(cast_dy_api));
-
-        sg_api_conv_backward_t api = {
-            bm_mem_get_device_addr(x_fp16),
-            bm_mem_get_device_addr(w_fp16),
-            bm_mem_get_device_addr(dy_fp16),
-            bm_mem_get_device_addr(dx_fp16),
-            bm_mem_get_device_addr(dw_fp16),
-            bm_mem_get_device_addr(db_fp16),
-            bm_mem_get_device_addr(buffer_mem),
-            {n, ic, ih, iw},//ishape
-            {n, oc, oh, ow},//oshape
-            groups,
-            {kh, kw},
-            {stride_h, stride_w},
-            {dilation_h, dilation_w},
-            {pad_h, pad_h, pad_w, pad_w},
-            dx_enable,
-            dw_enable,
-            db_enable,
-            SG_DTYPE_FP16};
-
-        tpu_kernel_launch_sync(handle, "tpu_kernel_api_conv_backward", &api, sizeof(api));
-
-        sg_api_dtype_convert_t cast_dx_api = {
-            bm_mem_get_device_addr(dx_fp16),
-            (unsigned long long)dx,
-            {n, ic, ih, iw},
-            4,
-            SG_DTYPE_FP16,
-            SG_DTYPE_FP32,
-            SG_ROUND_EVEN};
-
-        tpu_kernel_launch_sync(handle, "tpu_kernel_api_dtype_convert",
-                               &cast_dx_api, sizeof(cast_dx_api));
-
-        sg_api_dtype_convert_t cast_dw_api = {
-            bm_mem_get_device_addr(dw_fp16),
-            (unsigned long long)dw,
-            {oc, ic, kh, kw},
-            4,
-            SG_DTYPE_FP16,
-            SG_DTYPE_FP32,
-            SG_ROUND_EVEN};
-
-        tpu_kernel_launch_sync(handle, "tpu_kernel_api_dtype_convert",
-                               &cast_dw_api, sizeof(cast_dw_api));
+            tpu_kernel_launch_sync(handle, "tpu_kernel_api_dtype_convert",
+                                   &cast_dw_api, sizeof(cast_dw_api));
+        }
 
         if (db_enable) {
             sg_api_dtype_convert_t cast_db_api = {
@@ -564,14 +574,14 @@ bm_status_t sgdnn_conv_backward_cudnn(
         if (buffer_size > 0) {
             bm_free_device(handle, buffer_mem);
         }
-        bm_free_device(handle, dx_fp16);
-        bm_free_device(handle, dw_fp16);
-        if (db_enable) {
-            bm_free_device(handle, db_fp16);
+        if (dx_enable) bm_free_device(handle, dx_fp16);
+        if (dw_enable) bm_free_device(handle, dw_fp16);
+        if (db_enable) bm_free_device(handle, db_fp16);
+        if (dx_enable || dw_enable || db_enable) {
+            bm_free_device(handle, x_fp16);
+            bm_free_device(handle, w_fp16);
+            bm_free_device(handle, dy_fp16);
         }
-        bm_free_device(handle, x_fp16);
-        bm_free_device(handle, w_fp16);
-        bm_free_device(handle, dy_fp16);
     }
 
     return BM_SUCCESS;
