@@ -10,10 +10,28 @@ extern "C" {
 #endif
 
 typedef enum{
-    OP_ELTWISE_PRODUCT = 0,
-    OP_ELTWISE_COEF_ADD = 1,
-    OP_ELTWISE_MAX = 2,
+    OP_ELTWISE_PRODUCT     = 0,
+    OP_ELTWISE_COEF_ADD    = 1,
+    OP_ELTWISE_MAX         = 2,
 } EltwiseOpMode_t;
+
+typedef enum {
+    OP_BINARY_ADD          = 0,
+    OP_BINARY_SUB          = 1,
+    OP_BINARY_MUL          = 2,
+    OP_BINARY_DIV          = 3,
+    OP_BINARY_MAX          = 4,
+    OP_BINARY_MIN          = 10000,
+    OP_BINARY_GT           = 10001,
+    OP_BINARY_GE           = 10002,
+    OP_BINARY_LT           = 10003,
+    OP_BINARY_LE           = 10004,
+    OP_BINARY_EQ           = 10005,
+    OP_BINARY_NE           = 10006,
+    OP_BINARY_SQUARED_DIFF = 10007,
+    OP_BINARY_FLOOR_MOD    = 10008,
+    OP_BINARY_FLOOR_DIV    = 10009
+} BinaryOpMode_t;
 
 typedef enum {
     Pooling_MAX = 0,
@@ -523,19 +541,15 @@ bm_status_t sgdnn_conv_weight_reorder(
     const void                      *yData,
     ConvWeightReorderMode_t          reorder_mode);
 
-bm_status_t sgdnn_binary(
+bm_status_t sgdnn_binary_cudnn(
     bm_handle_t                 handle,
-    const void*                 alpha1,
     const TensorDescriptor_t    aDesc,
     const void*                 A,
-    const void*                 alpha2,
     const TensorDescriptor_t    bDesc,
     const void*                 B,
-    const void*                 beta,
     const TensorDescriptor_t    cDesc,
     void*                       C,
-    bool                        const_binary,
-    sg_binary_type_t            binary_type);
+    BinaryOpMode_t              opTensorDesc);
 
 #if defined(__cplusplus)
 }

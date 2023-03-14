@@ -16,8 +16,33 @@ static inline int dtype_size(sg_data_type_t dtype) {
     return size;
 }
 
+static inline sg_binary_type_t tpu_binary_type_convert(BinaryOpMode_t binary_type) {
+    sg_binary_type_t optype = BINARY_ADD;
+    switch (binary_type) {
+    case OP_BINARY_ADD:          optype = BINARY_ADD;           break;
+    case OP_BINARY_SUB:          optype = BINARY_SUB;           break;
+    case OP_BINARY_MUL:          optype = BINARY_MUL;           break;
+    case OP_BINARY_DIV:          optype = BINARY_DIV;           break;
+    case OP_BINARY_MAX:          optype = BINARY_MAX;           break;
+    case OP_BINARY_MIN:          optype = BINARY_MIN;           break;
+    case OP_BINARY_GT:           optype = BINARY_GT;            break;
+    case OP_BINARY_GE:           optype = BINARY_GE;            break;
+    case OP_BINARY_LT:           optype = BINARY_LT;            break;
+    case OP_BINARY_LE:           optype = BINARY_LE;            break;
+    case OP_BINARY_EQ:           optype = BINARY_EQ;            break;
+    case OP_BINARY_NE:           optype = BINARY_NE;            break;
+    case OP_BINARY_SQUARED_DIFF: optype = BINARY_SQUARED_DIFF;  break;
+    case OP_BINARY_FLOOR_MOD:    optype = BINARY_FLOOR_MOD;     break;
+    case OP_BINARY_FLOOR_DIV:    optype = BINARY_FLOOR_DIV;     break;
+    default:
+        assert(0);
+        break;
+    }
+    return optype;
+}
+
 #define ASSERT_SAME_DIMS(A, B)            \
-  assert(A.ndims == B.ndims);             \
+  assert(A.ndims == Bndims         );             \
 
 #define ASSERT_SAME_SHAPE(A, B)           \
   assert(A.ndims == B.ndims);             \
@@ -1197,101 +1222,119 @@ bm_status_t sgdnn_pooling_backward_cudnn(
 
 bm_status_t sgdnn_binary_cudnn(
     bm_handle_t                 handle,
-    const void*                 alpha1,
     const TensorDescriptor_t    aDesc,
     const void*                 A,
-    const void*                 alpha2,
     const TensorDescriptor_t    bDesc,
     const void*                 B,
-    const void*                 beta,
     const TensorDescriptor_t    cDesc,
     void*                       C,
-    bool                        const_binary,
-    sg_binary_type_t            binary_type) 
+    BinaryOpMode_t              opTensorDesc) 
 {
-    int A_n, A_c, A_h, A_w;
-    int B_n, B_c, B_h, B_w;
-    if (aDesc.ndims == 4 && bDesc.ndims == 4 && cDesc.ndims == 4)
-    {
-        A_n = aDesc.shape[0];
-        A_c = aDesc.shape[1];
-        A_h = aDesc.shape[2];
-        A_w = aDesc.shape[3];
+    sg_binary_type_t binary_type = tpu_binary_type_convert(opTensorDesc);
 
-        B_n = bDesc.shape[0];
-        B_c = bDesc.shape[1];
-        B_h = bDesc.shape[2];
-        B_w = bDesc.shape[3];
-    }
-    else if (aDesc.ndims == 1 && bDesc.ndims == 1 && cDesc.ndims == 1)
+    if(aDesc.ndims == bDesc.ndims)
     {
-        A_n = 1;
-        A_c = aDesc.shape[0];
-        A_h = 1;
-        A_w = 1;
+        sg_data_type_t dtype_A = (sg_data_type_t)(aDesc.dtype);
+        sg_data_type_t dtype_B = (sg_data_type_t)(bDesc.dtype);
+        sg_data_type_t dtype_C = (sg_data_type_t)(cDesc.dtype);
+        assert(dtype_A == dtype_B && dtype_B == dtype_C);
 
-        B_n = 1;
-        B_c = bDesc.shape[0];
-        B_h = 1;
-        B_w = 1;
+        int A_n, A_c, A_h, A_w;
+        int B_n, B_c, B_h, B_w;
+        assert(aDesc.ndims == bDesc.ndims && bDesc.ndims == cDesc.ndims);
+        if (aDesc.ndims == 4 && bDesc.ndims == 4 && cDesc.ndims == 4)
+        {
+            A_n = aDesc.shape[0]; A_c = aDesc.shape[1]; A_h = aDesc.shape[2]; A_w = aDesc.shape[3];
+            B_n = bDesc.shape[0]; B_c = bDesc.shape[1]; B_h = bDesc.shape[2]; B_w = bDesc.shape[3];
         }
         else if (aDesc.ndims == 2 && bDesc.ndims == 2 && cDesc.ndims == 2)
         {
-        A_n = 1;
-        A_c = aDesc.shape[0];
-        A_h = 1;
-        A_w = aDesc.shape[1];
-
-        B_n = 1;
-        B_c = bDesc.shape[0];
-        B_h = 1;
-        B_w = bDesc.shape[1];
+            A_n = 1; A_c = aDesc.shape[0]; A_h = 1; A_w = aDesc.shape[1];
+            B_n = 1; B_c = bDesc.shape[0]; B_h = 1; B_w = bDesc.shape[1];
+        }
+        else if (aDesc.ndims == 1 && bDesc.ndims == 1 && cDesc.ndims == 1)
+        {
+            A_n = 1; A_c = aDesc.shape[0]; A_h = 1; A_w = 1;
+            B_n = 1; B_c = bDesc.shape[0]; B_h = 1; B_w = 1; 
         }
         else
         {
-        assert(false);
+            assert(false);
         }
-
-    DataUnion alpha_A;
-    alpha_A.f32val = ((float*)alpha1)[0];
-    assert(((float*)beta)[0] == 0.0f);
-
-    sg_data_type_t dtype_A = (sg_data_type_t)(aDesc.dtype);
-    sg_data_type_t dtype_B = (sg_data_type_t)(bDesc.dtype);
-    sg_data_type_t dtype_C = (sg_data_type_t)(cDesc.dtype);
-    assert(dtype_A == dtype_B && dtype_B == dtype_C);
-
-    assert(aDesc.ndims == bDesc.ndims && bDesc.ndims == cDesc.ndims);
-    int dims = aDesc.ndims;
-
-    if(const_binary)
-    {
-        assert(aDesc.shape == cDesc.shape);
-        float const_value = alpha_A.f32val;
-        sg_api_const_binary_float_t api = {
-            (unsigned long long)A,
-            (unsigned long long)C,
-            {A_n, A_c, A_h, A_w},
-            dims,
-            binary_type,
-            dtype_A,
-            const_value,
-            0};
-        tpu_kernel_launch_sync(handle, "tpu_kernel_api_const_binary", &api, sizeof(api));
-    }
-    else
-    {
-        // int shape_a[FW_MAX_SHAPE_DIMS] = aDesc.shape;
         sg_api_bcbinary_float_t api = {
             (unsigned long long)A,
             (unsigned long long)B,
             (unsigned long long)C,
             {A_n, A_c, A_h, A_w},
             {B_n, B_c, B_h, B_w},
-            dims,
+            4,
             dtype_A,
             binary_type};
-        tpu_kernel_launch_sync(handle, "tpu_kernel_api_bcbinary_float", &api, sizeof(api));    
+        tpu_kernel_launch_sync(handle, "tpu_kernel_api_bcbinary_float", &api, sizeof(api));  
+    }
+    else if((!aDesc.ndims && bDesc.ndims) || (!bDesc.ndims && aDesc.ndims))
+    {
+        const void* tensor = !aDesc.ndims ? B : A;
+        const void* scalar = !aDesc.ndims ? A : B;
+        TensorDescriptor_t tensorDesc = !aDesc.ndims ? bDesc : aDesc;
+        TensorDescriptor_t scalarDesc = !aDesc.ndims ? aDesc : bDesc;
+        
+        float const_value = ((float*)scalar)[0];
+        sg_data_type_t tensor_dtype = (sg_data_type_t)(tensorDesc.dtype);
+        sg_data_type_t scalar_dtype = (sg_data_type_t)(scalarDesc.dtype);
+        switch (scalar_dtype)
+        {
+            case SG_DTYPE_INT8:     const_value = ((s8*) scalar)[0];  break; 
+            case SG_DTYPE_UINT8:    const_value = ((u8*) scalar)[0];  break;  
+            case SG_DTYPE_INT16:    const_value = ((s16*)scalar)[0];  break;  
+            case SG_DTYPE_UINT16:   const_value = ((u16*)scalar)[0];  break; 
+            case SG_DTYPE_INT32:    const_value = ((s32*)scalar)[0];  break;  
+            case SG_DTYPE_UINT32:   const_value = ((u32*)scalar)[0];  break;   
+            case SG_DTYPE_FP32:                                       break;
+            case SG_DTYPE_FP16:     assert(0);                        break; 
+            case SG_DTYPE_BFP16:    assert(0);                        break;     
+            default:                assert(0);                        break;
+        }
+        int n, c, h, w;
+        if (tensorDesc.ndims == 4)
+        {
+            n = tensorDesc.shape[0]; 
+            c = tensorDesc.shape[1]; 
+            h = tensorDesc.shape[2]; 
+            w = tensorDesc.shape[3];
+        }
+        else if (tensorDesc.ndims == 2)
+        {
+            n = 1; 
+            c = tensorDesc.shape[0]; 
+            h = 1; 
+            w = tensorDesc.shape[1];
+        }
+        else if (tensorDesc.ndims == 1)
+        {
+            n = 1; 
+            c = tensorDesc.shape[0]; 
+            h = 1; 
+            w = 1;
+        }
+        else
+        {
+            assert(false);
+        }
+        sg_api_const_binary_float_t api = {
+            (unsigned long long)tensor,
+            (unsigned long long)C,
+            {n, c, h, w},
+            4,
+            binary_type,
+            tensor_dtype,
+            const_value,
+            0};
+        tpu_kernel_launch_sync(handle, "tpu_kernel_api_const_binary", &api, sizeof(api));
+    }
+    else
+    {
+        assert(0);
     }
     return BM_SUCCESS;
 }
