@@ -70,29 +70,4 @@ TORCH_LIBRARY_IMPL ( aten, PrivateUse1, m )
   m.impl ( "add.out", add_out_tpu );
 }
 
-Tensor & mul_out_tpu ( const Tensor & input1,
-                       const Tensor & input2,
-                       Tensor       & out )
-{
-  auto out_cpu = torch::mul ( input1.to ( torch::Device ( "cpu" ) ), input2.to ( torch::Device ( "cpu" ) ) );
-  tpu::TPUCopyHostToDevice ( out.data_ptr(), out_cpu.contiguous().data_ptr(), out.nbytes() );
-  return out;
-}
-TORCH_LIBRARY_IMPL ( aten, PrivateUse1, m )
-{
-  m.impl ( "mul.out", mul_out_tpu );
-}
-
-Tensor & div_out_tpu ( const Tensor & input1,
-                       const Tensor & input2,
-                       Tensor       & out )
-{
-  auto out_cpu = torch::div ( input1.to ( torch::Device ( "cpu" ) ), input2.to ( torch::Device ( "cpu" ) ) );
-  tpu::TPUCopyHostToDevice ( out.data_ptr(), out_cpu.contiguous().data_ptr(), out.nbytes() );
-  return out;
-}
-TORCH_LIBRARY_IMPL ( aten, PrivateUse1, m )
-{
-  m.impl ( "div.out", div_out_tpu );
-}
 } // namespace at
