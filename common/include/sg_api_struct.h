@@ -298,7 +298,7 @@ typedef struct {
 typedef struct {
     unsigned long long input_global_addr;
     unsigned long long output_global_addr;
-    int                shape[4];
+    int                shape[FW_MAX_SHAPE_DIMS];
     int                dims;
     sg_data_type_t     idtype;
     sg_data_type_t     odtype;
