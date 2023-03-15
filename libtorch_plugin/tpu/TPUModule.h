@@ -2,6 +2,7 @@
 
 #include <torch/torch.h>
 #include <torch/script.h>
+#include <vector>
 
 namespace tpu
 {
@@ -32,6 +33,8 @@ public:
   TorchscriptModule ( const torch::jit::Module & Module );
 
   torch::Tensor forward ( const torch::Tensor & Input );
+
+  std::vector<torch::Tensor> forward ( const std::vector<torch::Tensor> & Inputs );
 
 private:
 

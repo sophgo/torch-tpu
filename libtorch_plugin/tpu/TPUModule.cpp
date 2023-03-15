@@ -72,6 +72,33 @@ torch::Tensor TorchscriptModule::forward ( const torch::Tensor & Input )
   return Module_.forward ( Inputs ).toTensor();
 }
 
+std::vector<torch::Tensor> TorchscriptModule::forward ( const std::vector<torch::Tensor> & Inputs )
+{
+  std::vector<torch::jit::IValue> Inputs_;
+  for ( auto i = 0; i < Inputs.size(); ++i )
+  {
+    Inputs_.push_back ( Inputs[i] );
+  }
+  auto Outputs_ = Module_.forward ( Inputs_ );
+  std::vector<torch::Tensor> Outputs;
+  if ( Outputs_.isTensor() )
+  {
+    Outputs = { Outputs_.toTensor() };
+  }
+  else if ( Outputs_.isTuple() )
+  {
+    auto OutputsTuple = Outputs_.toTuple()->elements();
+    TORCH_CHECK ( false );
+#if 0
+    for ( auto it : OutputsTuple )
+    {
+      Outputs.push_back ( it.toTensor() );
+    }
+#endif
+  }
+  return Outputs;
+}
+
 void TorchscriptModule::Register()
 {
   for ( const auto & Mod : Module_.named_children() )

@@ -3,6 +3,7 @@
 #include <ATen/core/TensorBase.h>
 #include <TPUDeviceManager.h>
 #include <c10/util/Logging.h>
+#include <TPUTorchUtils.h>
 
 #include <iostream>
 
@@ -48,12 +49,14 @@ Tensor _copy_from_tpu ( const Tensor & src, const Tensor & dst, bool non_blockin
     }
     else if ( src.device().type() == DeviceType::PrivateUse1 && dst.device().type() == DeviceType::PrivateUse1 )
     {
+      auto handle = tpu::TPUGetDeviceHandle();
+      auto input_desc = tpu::TPUGenerateTensorDesc ( src );
+      auto output_desc = tpu::TPUGenerateTensorDesc ( dst );
       TORCH_CHECK ( false, "Cast from ", src.dtype(), " to ", dst.dtype(), " is not implemented" );
     }
     else
     {
-      LOG ( FATAL ) << "Unsupported copy from device " << src.device()
-                    << " to device " << dst.device();
+      TORCH_CHECK ( false, "Unsupported copy from device ", src.device(), " to device ", dst.device() );
     }
   }
   return dst;
