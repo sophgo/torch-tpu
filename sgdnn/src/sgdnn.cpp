@@ -16,6 +16,22 @@ static inline int dtype_size(sg_data_type_t dtype) {
     return size;
 }
 
+static inline sg_active_type_t tpu_active_type_convert(ActivationMode_t active_type) {
+    sg_active_type_t atype = ACTIVE_RELU;
+    switch (active_type) {
+        case Activation_Sigmoid:    atype = ACTIVE_SIGMOID;     break; 
+        case Activation_Relu:       atype = ACTIVE_RELU;        break;    
+        case Activation_Tanh:       atype = ACTIVE_TANH;        break;    
+        case Activation_Elu:        atype = ACTIVE_ELU;         break;     
+        case Activation_Gelu:       atype = ACTIVE_GELU;        break;    
+        case Activation_Swish:      atype = ACTIVE_SWISH;       break;   
+    default:
+        assert(0);
+        break;
+    }
+    return atype;
+}
+
 static inline sg_binary_type_t tpu_binary_type_convert(BinaryOpMode_t binary_type) {
     sg_binary_type_t optype = BINARY_ADD;
     switch (binary_type) {
@@ -1383,7 +1399,7 @@ bm_status_t sgdnn_binary_cudnn(
             binary_type,
             tensor_dtype,
             const_value,
-            0};
+            !aDesc.ndims};
         tpu_kernel_launch_sync(handle, "tpu_kernel_api_const_binary", &api, sizeof(api));
     }
     else
@@ -1767,8 +1783,6 @@ bm_status_t sgdnn_activation_forward_cudnn(
     const TensorDescriptor_t        yDesc,
     void                           *y)
 {
-    assert(activationDesc.mode == Activation_Relu);
-
     if(activationDesc.mode == Activation_Relu)
     {
         unsigned long long input    = (unsigned long long)x;
@@ -1801,6 +1815,46 @@ bm_status_t sgdnn_activation_forward_cudnn(
         tpu_kernel_launch_sync(handle, "tpu_kernel_api_relu_forward", &api, sizeof(api));
         return BM_SUCCESS;
     }
+    else
+    {
+        sg_active_type_t active_type =  tpu_active_type_convert(activationDesc.mode) ;
+        
+        unsigned long long input    = (unsigned long long)x;
+        unsigned long long output   = (unsigned long long)y;
+
+        int n, c, h, w;
+        if (xDesc.ndims == 4 && yDesc.ndims == 4 )
+        {
+            n = xDesc.shape[0]; c = xDesc.shape[1]; h = xDesc.shape[2]; w = xDesc.shape[3];
+        }
+        else if (xDesc.ndims == 3 && yDesc.ndims == 3 )
+        {
+            n = xDesc.shape[0]; c = xDesc.shape[1]; h = 1; w = xDesc.shape[2];
+        }
+        else if (xDesc.ndims == 2 && yDesc.ndims == 2 )
+        {
+            n = 1; c = xDesc.shape[0]; h = 1; w = xDesc.shape[1];
+        }
+        else if (xDesc.ndims == 1 && yDesc.ndims == 1 )
+        {
+            n = 1; c = xDesc.shape[0]; h = 1; w = 1;
+        }
+        sg_data_type_t ydtype = (sg_data_type_t)(yDesc.dtype);
+        sg_data_type_t xdtype = (sg_data_type_t)(xDesc.dtype);
+        assert(xdtype == ydtype);
+
+        sg_api_active_forward_t api = {
+            input,
+            output,
+            {n, c, h, w},
+            4,
+            xdtype,
+            active_type};
+
+        tpu_kernel_launch_sync(handle, "tpu_kernel_api_active_forward", &api, sizeof(api));
+        return BM_SUCCESS;
+    }
+
     return BM_ERR_NOFEATURE;
 }
 
