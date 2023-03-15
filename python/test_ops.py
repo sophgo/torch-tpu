@@ -172,6 +172,7 @@ class Test_Backward_Ops(object):
                 [64, 2048, 7, 7],
                 ]
         for i, [n, c, h, w] in enumerate(resnet50_shapes):
+            # test forward
             tpu_input = torch.randn((n, c, h, w), requires_grad = True)
             running_mean = torch.randn(c, requires_grad = False)
             running_var = torch.randn(c, requires_grad = False)
@@ -216,25 +217,30 @@ class Test_Backward_Ops(object):
             grad_compare(saved_mean, torch_mean, 1e-5)
             grad_compare(saved_invstd, torch_invstd, 1e-5)
 
+            # test backward
+            # tpu_input = torch.randn((n, c, h, w), requires_grad = True)
+            # weight = torch.randn(c, requires_grad = True)
+            # bias = torch.randn(c, requires_grad = True)
             # grad_output = torch.randn((n, c, h, w))
-            # torch_output.backward(grad_output)
-            # output.backward(grad_output)
-            # print("case:",i," backward:")
-            # grad_compare(tpu_input.grad, torch_input.grad, 1e-1)
-            # grad_compare(weight.grad, torch_weight.grad, 1e-1)
-            # grad_compare(bias.grad, torch_bias.grad, 1e-1)
-                
-            # only test backward
+            # grad_output.data      -=  0.5
+            # grad_output.data      *=  10
+            # tpu_input.data      -=  0.5
+            # tpu_input.data      *=  10
+            # weight.data         -=  0.5
+            # weight.data         *=  10
+            # bias.data         -=  0.5
+            # bias.data         *=  10
             # mean = torch.mean(tpu_input, dim=(0,2,3)).reshape(weight.shape)
             # var = torch.var(tpu_input, dim=(0,2,3), unbiased = False).reshape(weight.shape)
             # invstd = 1/torch.sqrt(var+1e-5)
+            # output = BatchNorm2d(tpu_input, None, None, weight, bias) 
+            # output.backward(grad_output)
             # grad_input_ref, grad_weight_ref, grad_bias_ref = torch.ops.aten.native_batch_norm_backward(
             #     grad_output, tpu_input, weight, None, None, mean, invstd, True, 1e-5, [True,True,True])
             # print("case:",i)
             # grad_compare(tpu_input.grad, grad_input_ref, 1e-1)
             # grad_compare(weight.grad, grad_weight_ref, 1e-1)
             # grad_compare(bias.grad, grad_bias_ref, 1e-1)
-            # return
     def test_eltwise_backward(self):
         torch.manual_seed(0)
         op_code = [1,]#[0,1,2]

@@ -557,12 +557,9 @@ bm_status_t sgdnn_general_matmul(
     const void                      *L,
     const TensorDescriptor_t         RDesc,
     const void                      *R,
-    const TensorDescriptor_t         biasDesc,
-    const void                      *bias,
     const TensorDescriptor_t         YDesc,
     void                            *Y,
-    int                              R_transpose,
-    int                              have_bias);
+    int                              R_transpose);
 
 #if defined(__cplusplus)
 }
