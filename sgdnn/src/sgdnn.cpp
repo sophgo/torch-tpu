@@ -2025,6 +2025,41 @@ bm_status_t sgdnn_conv_weight_reorder(
     return BM_SUCCESS;
 }
 
+bm_status_t sgdnn_general_matmul(
+    bm_handle_t                      handle,
+    const TensorDescriptor_t         LDesc,
+    const void                      *L,
+    const TensorDescriptor_t         RDesc,
+    const void                      *R,
+    const TensorDescriptor_t         YDesc,
+    void                            *Y,
+    int                              R_transpose)
+{
+    assert(LDesc.ndims == 2 && RDesc.ndims == 2 && YDesc.ndims == 2);
+
+    int L_row = LDesc.shape[0];
+    int L_col = LDesc.shape[1];
+    int R_col = RDesc.shape[1];
+
+    sg_data_type_t Ldtype = (sg_data_type_t)(LDesc.dtype);
+    sg_data_type_t Rdtype = (sg_data_type_t)(RDesc.dtype);
+    sg_data_type_t Ydtype = (sg_data_type_t)(YDesc.dtype);
+    assert(Ldtype == Rdtype && Ldtype == Ydtype);
+
+    sg_api_general_matmul_t api = {
+        (unsigned long long)L,
+        (unsigned long long)R,
+        (unsigned long long)Y,
+        L_row,
+        L_col,
+        R_col,
+        R_transpose,
+        Ldtype};
+
+    tpu_kernel_launch_sync(handle, "tpu_kernel_api_general_matmul", &api, sizeof(api));
+    return BM_SUCCESS;
+}
+
 #ifdef ENABLE_PYBIND
 // pybind11 register c++ half-precision floating point as numpy.float16
 // https://github.com/pybind/pybind11/issues/1776

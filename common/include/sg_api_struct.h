@@ -350,5 +350,20 @@ typedef struct {
 } sg_api_const_binary_float_t;
 #endif
 
+typedef struct {
+    unsigned long long L_global_addr;
+    unsigned long long R_global_addr;
+    unsigned long long Y_global_addr;
+    int                L_row_num;
+    int                L_col_num;
+    int                R_col_num;
+    int                R_transpose;
+    sg_data_type_t     dtype;
+#ifndef WIN32
+} __attribute__((packed)) sg_api_general_matmul_t;
+#else
+} sg_api_general_matmul_t;
+#endif
+
 #pragma pack(pop)
 #endif  // SG_API_STRUCT_H

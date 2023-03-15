@@ -551,6 +551,19 @@ bm_status_t sgdnn_binary_cudnn(
     void*                       C,
     BinaryOpMode_t              opTensorDesc);
 
+bm_status_t sgdnn_general_matmul(
+    bm_handle_t                      handle,
+    const TensorDescriptor_t         LDesc,
+    const void                      *L,
+    const TensorDescriptor_t         RDesc,
+    const void                      *R,
+    const TensorDescriptor_t         biasDesc,
+    const void                      *bias,
+    const TensorDescriptor_t         YDesc,
+    void                            *Y,
+    int                              R_transpose,
+    int                              have_bias);
+
 #if defined(__cplusplus)
 }
 #endif
