@@ -19,6 +19,10 @@ float         momentum,
 float         eps,
 data_type_t   dtype )
 {
+  const bool weight_defined = weight_global_addr != 0;
+  const bool bias_defined = bias_global_addr != 0;
+  const bool running_mean_defined = running_mean_global_addr != 0;
+  const bool running_var_defined = running_var_global_addr != 0;
   const int N = shape.n;
   const int C = shape.c;
   const int H = shape.h;
@@ -180,16 +184,19 @@ data_type_t   dtype )
     tpu_bdc_fp_mul_C ( MAddr, VAddr, InvNHW, &CShape, NULL, NULL, dtype );
     /* Move M as MEAN from local to global memory */
     tpu_gdma_cpy_L2S ( batch_mean_global_addr + CDone * DataSize, MAddr, &CShape, NULL, NULL, dtype );
-    /* Move running_mean from global to local memory */
-    tpu_gdma_cpy_S2L ( TAddr, running_mean_global_addr + CDone * DataSize, &CShape, NULL, NULL, dtype );
-    /* S = M * Momentum */
-    tpu_bdc_fp_mul_C ( SAddr, MAddr, Momentum, &CShape, NULL, NULL, dtype );
-    /* T = T * ( 1 - Momentum ) */
-    tpu_bdc_fp_mul_C ( TAddr, TAddr, OneMinusMomentum, &CShape, NULL, NULL, dtype );
-    /* T = T + S */
-    tpu_bdc_fp_add ( TAddr, TAddr, SAddr, &CShape, NULL, NULL, NULL, dtype );
-    /* Move T as UPDATED RUNNING MEAN from local to global memory */
-    tpu_gdma_cpy_L2S ( updated_mean_global_addr + CDone * DataSize, TAddr, &CShape, NULL, NULL, dtype );
+    if ( running_mean_defined )
+    {
+      /* Move running_mean from global to local memory */
+      tpu_gdma_cpy_S2L ( TAddr, running_mean_global_addr + CDone * DataSize, &CShape, NULL, NULL, dtype );
+      /* S = M * Momentum */
+      tpu_bdc_fp_mul_C ( SAddr, MAddr, Momentum, &CShape, NULL, NULL, dtype );
+      /* T = T * ( 1 - Momentum ) */
+      tpu_bdc_fp_mul_C ( TAddr, TAddr, OneMinusMomentum, &CShape, NULL, NULL, dtype );
+      /* T = T + S */
+      tpu_bdc_fp_add ( TAddr, TAddr, SAddr, &CShape, NULL, NULL, NULL, dtype );
+      /* Move T as UPDATED RUNNING MEAN from local to global memory */
+      tpu_gdma_cpy_L2S ( updated_mean_global_addr + CDone * DataSize, TAddr, &CShape, NULL, NULL, dtype );
+    }
     //////////////////////////////////////////////////////////////////////////////
     //////////////////////////////////////////////////////////////////////////////
     /* Compute Var */
@@ -270,18 +277,21 @@ data_type_t   dtype )
     {
       tpu_parallel_end();
     }
-    /* Move running_var from global to local memory */
-    tpu_gdma_cpy_S2L ( PAddr, running_var_global_addr + CDone * DataSize, &CShape, NULL, NULL, dtype );
-    /* T = V / ( N * H * W - 1 ) */
-    tpu_bdc_fp_mul_C ( TAddr, VAddr, InvNHWMinusOne, &CShape, NULL, NULL, dtype );
-    /* S = T * Momentum */
-    tpu_bdc_fp_mul_C ( SAddr, TAddr, Momentum, &CShape, NULL, NULL, dtype );
-    /* P = P * ( 1 - Momentum ) */
-    tpu_bdc_fp_mul_C ( PAddr, PAddr, OneMinusMomentum, &CShape, NULL, NULL, dtype );
-    /* S = S + P */
-    tpu_bdc_fp_add ( SAddr, SAddr, PAddr, &CShape, NULL, NULL, NULL, dtype );
-    /* Move T as UPDATED RUNNING VAR from local to global memory */
-    tpu_gdma_cpy_L2S ( updated_var_global_addr + CDone * DataSize, SAddr, &CShape, NULL, NULL, dtype );
+    if ( running_var_defined )
+    {
+      /* Move running_var from global to local memory */
+      tpu_gdma_cpy_S2L ( PAddr, running_var_global_addr + CDone * DataSize, &CShape, NULL, NULL, dtype );
+      /* T = V / ( N * H * W - 1 ) */
+      tpu_bdc_fp_mul_C ( TAddr, VAddr, InvNHWMinusOne, &CShape, NULL, NULL, dtype );
+      /* S = T * Momentum */
+      tpu_bdc_fp_mul_C ( SAddr, TAddr, Momentum, &CShape, NULL, NULL, dtype );
+      /* P = P * ( 1 - Momentum ) */
+      tpu_bdc_fp_mul_C ( PAddr, PAddr, OneMinusMomentum, &CShape, NULL, NULL, dtype );
+      /* S = S + P */
+      tpu_bdc_fp_add ( SAddr, SAddr, PAddr, &CShape, NULL, NULL, NULL, dtype );
+      /* Move T as UPDATED RUNNING VAR from local to global memory */
+      tpu_gdma_cpy_L2S ( updated_var_global_addr + CDone * DataSize, SAddr, &CShape, NULL, NULL, dtype );
+    }
     /* T = V / ( N * H * W ) */
     tpu_bdc_fp_mul_C ( TAddr, VAddr, InvNHW, &CShape, NULL, NULL, dtype );
     /* T = T + eps */
@@ -290,10 +300,16 @@ data_type_t   dtype )
     tpu_bdc_fp32_rsqrt ( VAddr, TAddr, &CShape );
     /* Move V as INVSTD from local to global memory */
     tpu_gdma_cpy_L2S ( batch_invstd_global_addr + CDone * DataSize, VAddr, &CShape, NULL, NULL, dtype );
-    /* Move weight from global to local */
-    tpu_gdma_cpy_S2L ( TAddr, weight_global_addr + CDone * DataSize, &CShape, NULL, NULL, dtype );
-    /* Move bias from global to local */
-    tpu_gdma_cpy_S2L ( SAddr, bias_global_addr + CDone * DataSize, &CShape, NULL, NULL, dtype );
+    if ( weight_defined )
+    {
+      /* Move weight from global to local */
+      tpu_gdma_cpy_S2L ( TAddr, weight_global_addr + CDone * DataSize, &CShape, NULL, NULL, dtype );
+    }
+    if ( bias_defined )
+    {
+      /* Move bias from global to local */
+      tpu_gdma_cpy_S2L ( SAddr, bias_global_addr + CDone * DataSize, &CShape, NULL, NULL, dtype );
+    }
     //////////////////////////////////////////////////////////////////////////////
     //////////////////////////////////////////////////////////////////////////////
     /* Compute Output */
@@ -329,10 +345,16 @@ data_type_t   dtype )
           tpu_bdc_fp_sub ( IOAddr[IOIndex], IOAddr[IOIndex], MAddr, &Shape, NULL, NULL, &CBcastStride, dtype );
           /* O = O * V */
           tpu_bdc_fp_mul ( IOAddr[IOIndex], IOAddr[IOIndex], VAddr, &Shape, NULL, NULL, &CBcastStride, dtype );
-          /* O = O * T */
-          tpu_bdc_fp_mul ( IOAddr[IOIndex], IOAddr[IOIndex], TAddr, &Shape, NULL, NULL, &CBcastStride, dtype );
-          /* O = O + S */
-          tpu_bdc_fp_add ( IOAddr[IOIndex], IOAddr[IOIndex], SAddr, &Shape, NULL, NULL, &CBcastStride, dtype );
+          if ( weight_defined )
+          {
+            /* O = O * T */
+            tpu_bdc_fp_mul ( IOAddr[IOIndex], IOAddr[IOIndex], TAddr, &Shape, NULL, NULL, &CBcastStride, dtype );
+          }
+          if ( bias_defined )
+          {
+            /* O = O + S */
+            tpu_bdc_fp_add ( IOAddr[IOIndex], IOAddr[IOIndex], SAddr, &Shape, NULL, NULL, &CBcastStride, dtype );
+          }
         }
         else
         {
@@ -340,10 +362,16 @@ data_type_t   dtype )
           tpu_bdc_fp_sub ( OAddr, IAddr, MAddr, &Shape, NULL, NULL, &CBcastStride, dtype );
           /* O = O * V */
           tpu_bdc_fp_mul ( OAddr, OAddr, VAddr, &Shape, NULL, NULL, &CBcastStride, dtype );
-          /* O = O * T */
-          tpu_bdc_fp_mul ( OAddr, OAddr, TAddr, &Shape, NULL, NULL, &CBcastStride, dtype );
-          /* O = O + S */
-          tpu_bdc_fp_add ( OAddr, OAddr, SAddr, &Shape, NULL, NULL, &CBcastStride, dtype );
+          if ( weight_defined )
+          {
+            /* O = O * T */
+            tpu_bdc_fp_mul ( OAddr, OAddr, TAddr, &Shape, NULL, NULL, &CBcastStride, dtype );
+          }
+          if ( bias_defined )
+          {
+            /* O = O + S */
+            tpu_bdc_fp_add ( OAddr, OAddr, SAddr, &Shape, NULL, NULL, &CBcastStride, dtype );
+          }
         }
         /* Move output from local to global */
         if ( Split == true )
@@ -390,6 +418,10 @@ float         momentum,
 float         eps,
 data_type_t   dtype )
 {
+  const bool weight_defined = weight_global_addr != 0;
+  const bool bias_defined = bias_global_addr != 0;
+  const bool running_mean_defined = running_mean_global_addr != 0;
+  const bool running_var_defined = running_var_global_addr != 0;
   const int N = shape.n;
   const int C = shape.c;
   const int H = shape.h;
@@ -532,16 +564,19 @@ data_type_t   dtype )
     tpu_bdc_fp_mul_C ( MAddr, VAddr, InvNHW, &CShape, NULL, NULL, dtype );
     /* Move M as MEAN from local to global memory */
     tpu_gdma_cpy_L2S ( batch_mean_global_addr + CDone * DataSize, MAddr, &CShape, NULL, NULL, dtype );
-    /* Move running_mean from global to local memory */
-    tpu_gdma_cpy_S2L ( TAddr, running_mean_global_addr + CDone * DataSize, &CShape, NULL, NULL, dtype );
-    /* S = M * Momentum */
-    tpu_bdc_fp_mul_C ( SAddr, MAddr, Momentum, &CShape, NULL, NULL, dtype );
-    /* T = T * ( 1 - Momentum ) */
-    tpu_bdc_fp_mul_C ( TAddr, TAddr, OneMinusMomentum, &CShape, NULL, NULL, dtype );
-    /* T = T + S */
-    tpu_bdc_fp_add ( TAddr, TAddr, SAddr, &CShape, NULL, NULL, NULL, dtype );
-    /* Move T as UPDATED RUNNING MEAN from local to global memory */
-    tpu_gdma_cpy_L2S ( updated_mean_global_addr + CDone * DataSize, TAddr, &CShape, NULL, NULL, dtype );
+    if ( running_mean_defined )
+    {
+      /* Move running_mean from global to local memory */
+      tpu_gdma_cpy_S2L ( TAddr, running_mean_global_addr + CDone * DataSize, &CShape, NULL, NULL, dtype );
+      /* S = M * Momentum */
+      tpu_bdc_fp_mul_C ( SAddr, MAddr, Momentum, &CShape, NULL, NULL, dtype );
+      /* T = T * ( 1 - Momentum ) */
+      tpu_bdc_fp_mul_C ( TAddr, TAddr, OneMinusMomentum, &CShape, NULL, NULL, dtype );
+      /* T = T + S */
+      tpu_bdc_fp_add ( TAddr, TAddr, SAddr, &CShape, NULL, NULL, NULL, dtype );
+      /* Move T as UPDATED RUNNING MEAN from local to global memory */
+      tpu_gdma_cpy_L2S ( updated_mean_global_addr + CDone * DataSize, TAddr, &CShape, NULL, NULL, dtype );
+    }
     //////////////////////////////////////////////////////////////////////////////
     //////////////////////////////////////////////////////////////////////////////
     /* Compute Var */
@@ -599,18 +634,21 @@ data_type_t   dtype )
       NTodo -= Shape.n;
       NDone += Shape.n;
     }
-    /* Move running_var from global to local memory */
-    tpu_gdma_cpy_S2L ( PAddr, running_var_global_addr + CDone * DataSize, &CShape, NULL, NULL, dtype );
-    /* T = V / ( N * H * W - 1 ) */
-    tpu_bdc_fp_mul_C ( TAddr, VAddr, InvNHWMinusOne, &CShape, NULL, NULL, dtype );
-    /* S = T * Momentum */
-    tpu_bdc_fp_mul_C ( SAddr, TAddr, Momentum, &CShape, NULL, NULL, dtype );
-    /* P = P * ( 1 - Momentum ) */
-    tpu_bdc_fp_mul_C ( PAddr, PAddr, OneMinusMomentum, &CShape, NULL, NULL, dtype );
-    /* S = S + P */
-    tpu_bdc_fp_add ( SAddr, SAddr, PAddr, &CShape, NULL, NULL, NULL, dtype );
-    /* Move T as UPDATED RUNNING VAR from local to global memory */
-    tpu_gdma_cpy_L2S ( updated_var_global_addr + CDone * DataSize, SAddr, &CShape, NULL, NULL, dtype );
+    if ( running_var_defined )
+    {
+      /* Move running_var from global to local memory */
+      tpu_gdma_cpy_S2L ( PAddr, running_var_global_addr + CDone * DataSize, &CShape, NULL, NULL, dtype );
+      /* T = V / ( N * H * W - 1 ) */
+      tpu_bdc_fp_mul_C ( TAddr, VAddr, InvNHWMinusOne, &CShape, NULL, NULL, dtype );
+      /* S = T * Momentum */
+      tpu_bdc_fp_mul_C ( SAddr, TAddr, Momentum, &CShape, NULL, NULL, dtype );
+      /* P = P * ( 1 - Momentum ) */
+      tpu_bdc_fp_mul_C ( PAddr, PAddr, OneMinusMomentum, &CShape, NULL, NULL, dtype );
+      /* S = S + P */
+      tpu_bdc_fp_add ( SAddr, SAddr, PAddr, &CShape, NULL, NULL, NULL, dtype );
+      /* Move T as UPDATED RUNNING VAR from local to global memory */
+      tpu_gdma_cpy_L2S ( updated_var_global_addr + CDone * DataSize, SAddr, &CShape, NULL, NULL, dtype );
+    }
     /* T = V / ( N * H * W ) */
     tpu_bdc_fp_mul_C ( TAddr, VAddr, InvNHW, &CShape, NULL, NULL, dtype );
     /* T = T + eps */
@@ -619,10 +657,16 @@ data_type_t   dtype )
     tpu_bdc_fp32_rsqrt ( VAddr, TAddr, &CShape );
     /* Move V as INVSTD from local to global memory */
     tpu_gdma_cpy_L2S ( batch_invstd_global_addr + CDone * DataSize, VAddr, &CShape, NULL, NULL, dtype );
-    /* Move weight from global to local */
-    tpu_gdma_cpy_S2L ( TAddr, weight_global_addr + CDone * DataSize, &CShape, NULL, NULL, dtype );
-    /* Move bias from global to local */
-    tpu_gdma_cpy_S2L ( SAddr, bias_global_addr + CDone * DataSize, &CShape, NULL, NULL, dtype );
+    if ( weight_defined )
+    {
+      /* Move weight from global to local */
+      tpu_gdma_cpy_S2L ( TAddr, weight_global_addr + CDone * DataSize, &CShape, NULL, NULL, dtype );
+    }
+    if ( bias_defined )
+    {
+      /* Move bias from global to local */
+      tpu_gdma_cpy_S2L ( SAddr, bias_global_addr + CDone * DataSize, &CShape, NULL, NULL, dtype );
+    }
     //////////////////////////////////////////////////////////////////////////////
     //////////////////////////////////////////////////////////////////////////////
     /* Compute Output */
@@ -644,10 +688,16 @@ data_type_t   dtype )
         tpu_bdc_fp_sub ( OAddr, IAddr, MAddr, &Shape, NULL, NULL, &CBcastStride, dtype );
         /* O = O * V */
         tpu_bdc_fp_mul ( OAddr, OAddr, VAddr, &Shape, NULL, NULL, &CBcastStride, dtype );
-        /* O = O * T */
-        tpu_bdc_fp_mul ( OAddr, OAddr, TAddr, &Shape, NULL, NULL, &CBcastStride, dtype );
-        /* O = O + S */
-        tpu_bdc_fp_add ( OAddr, OAddr, SAddr, &Shape, NULL, NULL, &CBcastStride, dtype );
+        if ( weight_defined )
+        {
+          /* O = O * T */
+          tpu_bdc_fp_mul ( OAddr, OAddr, TAddr, &Shape, NULL, NULL, &CBcastStride, dtype );
+        }
+        if ( bias_defined )
+        {
+          /* O = O + S */
+          tpu_bdc_fp_add ( OAddr, OAddr, SAddr, &Shape, NULL, NULL, &CBcastStride, dtype );
+        }
         /* Move output from local to global */
         global_addr_t OGAddr = output_global_addr + ( NDone * GlobalStride.n + CDone * GlobalStride.c + HDone * GlobalStride.h ) * DataSize;
         tpu_gdma_cpy_L2S ( OGAddr, OAddr, &Shape, &GlobalStride, NULL, dtype );

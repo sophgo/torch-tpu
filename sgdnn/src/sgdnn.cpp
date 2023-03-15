@@ -714,12 +714,23 @@ bm_status_t sgdnn_batchnorm_forward_cudnn(
     float beta_ = ((float*)beta)[0];
     assert(beta_ == 0.0f || beta_ == 1.0f);
 
-    assert(xDesc.ndims == 4 && yDesc.ndims == 4);
+    assert((xDesc.ndims == 4 && yDesc.ndims == 4) || (xDesc.ndims == 3 && yDesc.ndims == 3));
     assert(bnScaleBiasMeanVarDesc.ndims ==1 );
-    int n = xDesc.shape[0];
-    int c = xDesc.shape[1];
-    int h = xDesc.shape[2];
-    int w = xDesc.shape[3];
+    int n, c, h, w;
+    if (xDesc.ndims == 4)
+    {
+      n = xDesc.shape[0];
+      c = xDesc.shape[1];
+      h = xDesc.shape[2];
+      w = xDesc.shape[3];
+    }
+    else if (xDesc.ndims == 3)
+    {
+      n = xDesc.shape[0];
+      c = xDesc.shape[1];
+      h = 1;
+      w = xDesc.shape[2];
+    }
     
     float momentum = exponentialAverageFactor;
     float eps = epsilon;
@@ -745,7 +756,7 @@ bm_status_t sgdnn_batchnorm_forward_cudnn(
         eps,
         idtype};
 
-    tpu_kernel_launch_sync(handle, "tpu_kernel_api_batchnorm_forward", &api, sizeof(api));
+    tpu_kernel_launch_sync(handle, "tpu_kernel_api_batchnorm_forward_v2", &api, sizeof(api));
     return BM_SUCCESS;
 }
 
@@ -1246,6 +1257,11 @@ bm_status_t sgdnn_binary_cudnn(
         {
             A_n = aDesc.shape[0]; A_c = aDesc.shape[1]; A_h = aDesc.shape[2]; A_w = aDesc.shape[3];
             B_n = bDesc.shape[0]; B_c = bDesc.shape[1]; B_h = bDesc.shape[2]; B_w = bDesc.shape[3];
+        }
+        else if (aDesc.ndims == 3 && bDesc.ndims == 3 && cDesc.ndims == 3)
+        {
+            A_n = aDesc.shape[0]; A_c = aDesc.shape[1]; A_h = 1; A_w = aDesc.shape[2];
+            B_n = bDesc.shape[0]; B_c = bDesc.shape[1]; B_h = 1; B_w = bDesc.shape[2];
         }
         else if (aDesc.ndims == 2 && bDesc.ndims == 2 && cDesc.ndims == 2)
         {
