@@ -4,7 +4,7 @@
 #include <TPUDeviceManager.h>
 #include <c10/util/Logging.h>
 #include <TPUTorchUtils.h>
-
+#include <sgdnn_api.h>
 #include <iostream>
 
 namespace at
@@ -52,7 +52,13 @@ Tensor _copy_from_tpu ( const Tensor & src, const Tensor & dst, bool non_blockin
       auto handle = tpu::TPUGetDeviceHandle();
       auto input_desc = tpu::TPUGenerateTensorDesc ( src );
       auto output_desc = tpu::TPUGenerateTensorDesc ( dst );
-      TORCH_CHECK ( false, "Cast from ", src.dtype(), " to ", dst.dtype(), " is not implemented" );
+      auto status = sgdnn_dtype_convert ( handle,
+                                          input_desc,
+                                          ADDR_IN_DEVICE ( src ),
+                                          output_desc,
+                                          ADDR_IN_DEVICE ( dst ),
+                                          SG_ROUND_EVEN );
+      TORCH_CHECK ( status == BM_SUCCESS );
     }
     else
     {

@@ -31,10 +31,6 @@ double                        eps )
   const Tensor & running_mean = c10::value_or_else ( running_mean_opt, [] { return Tensor(); } );
   const Tensor & running_var = c10::value_or_else ( running_var_opt, [] { return Tensor(); } );
   TORCH_CHECK ( training == true, "Batchnorm only supports training mode for now" );
-  TORCH_CHECK ( weight.defined(), "weight must be defined" );
-  TORCH_CHECK ( bias.defined(), "bias must be defined" );
-  TORCH_CHECK ( running_mean.defined(), "running_mean must be defined" );
-  TORCH_CHECK ( running_var.defined(), "running_var must be defined" );
   auto num_features = input.size ( 1 );
   CHECK_TENSOR_IN_DEVICE ( input );
   TORCH_CHECK ( input.is_contiguous() );

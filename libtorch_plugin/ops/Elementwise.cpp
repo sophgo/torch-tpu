@@ -8,6 +8,7 @@
 
 namespace at
 {
+#if 0
 Tensor & binary_Tensor_tpu ( const Tensor          & input1,
                              const Tensor          & input2,
                              const Scalar          & alpha,
@@ -70,4 +71,16 @@ TORCH_LIBRARY_IMPL ( aten, PrivateUse1, m )
   m.impl ( "add.out", add_out_tpu );
 }
 
+Tensor & sub_out_tpu ( const Tensor & input1,
+                       const Tensor & input2,
+                       const Scalar & alpha,
+                       Tensor       & out )
+{
+  return add_out_tpu ( input1, input2, -alpha, out );
+}
+TORCH_LIBRARY_IMPL ( aten, PrivateUse1, m )
+{
+  m.impl ( "sub.out", sub_out_tpu );
+}
+#endif
 } // namespace at
