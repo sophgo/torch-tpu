@@ -8,6 +8,20 @@
 #define FW_MAX_SHAPE_DIMS      8
 #endif
 #define MAX_CONCATLAYER_INPUT_NUM 10
+
+typedef struct {
+    unsigned long long in_global_addr;
+    unsigned long long out_global_addr;
+    int shape[4];
+    int shape_dim;
+    sg_data_type_t dtype;
+    sg_active_type_t active_type;
+#ifndef WIN32
+} __attribute__((packed)) sg_api_active_forward_t;
+#else
+} sg_api_active_forward_t;
+#endif
+
 typedef struct {
     unsigned long long  input_global_addr;
     unsigned long long  weight_global_addr;

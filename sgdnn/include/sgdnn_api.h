@@ -45,12 +45,12 @@ typedef enum {
 } BatchNormMode_t;
 
 typedef enum {
-  Activation_Sigmoid = 0,
-  Activation_Relu = 1,
-  Activation_Tanh = 2,
-  Activation_Clipped_Relu = 3,
-  Activation_Elu = 4,
-  Activation_Swish = 5,
+  Activation_Sigmoid        = 0,
+  Activation_Relu           = 1,
+  Activation_Tanh           = 2,
+  Activation_Elu            = 3,
+  Activation_Gelu           = 4,
+  Activation_Swish          = 5,
 } ActivationMode_t;
 
 typedef enum {
@@ -557,12 +557,9 @@ bm_status_t sgdnn_general_matmul(
     const void                      *L,
     const TensorDescriptor_t         RDesc,
     const void                      *R,
-    const TensorDescriptor_t         biasDesc,
-    const void                      *bias,
     const TensorDescriptor_t         YDesc,
     void                            *Y,
-    int                              R_transpose,
-    int                              have_bias);
+    int                              R_transpose);
 
 #if defined(__cplusplus)
 }
