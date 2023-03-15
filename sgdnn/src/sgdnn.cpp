@@ -1250,6 +1250,37 @@ bm_status_t sgdnn_binary_cudnn(
 {
     sg_binary_type_t binary_type = tpu_binary_type_convert(opTensorDesc);
 
+    if (aDesc.ndims > 0 && bDesc.ndims > 0 && aDesc.ndims > bDesc.ndims)
+    {
+        TensorDescriptor_t bDescSaved = bDesc;
+        int dimgap = aDesc.ndims - bDesc.ndims;
+        int i = 0;
+        for (; i < dimgap; ++i)
+        {
+            const_cast<TensorDescriptor_t &>(bDesc).shape[i] = 1;
+        }
+        for (; i < aDesc.ndims; ++i)
+        {
+            const_cast<TensorDescriptor_t &>(bDesc).shape[i] = bDescSaved.shape[i - dimgap];
+        }
+        const_cast<TensorDescriptor_t &>(bDesc).ndims = aDesc.ndims;
+    }
+    else if (aDesc.ndims > 0 && bDesc.ndims > 0 && aDesc.ndims < bDesc.ndims)
+    {
+        TensorDescriptor_t aDescSaved = aDesc;
+        int dimgap = bDesc.ndims - aDesc.ndims;
+        int i = 0;
+        for (; i < dimgap; ++i)
+        {
+            const_cast<TensorDescriptor_t &>(aDesc).shape[i] = 1;
+        }
+        for (; i < bDesc.ndims; ++i)
+        {
+            const_cast<TensorDescriptor_t &>(aDesc).shape[i] = aDescSaved.shape[i - dimgap];
+        }
+        const_cast<TensorDescriptor_t &>(aDesc).ndims = bDesc.ndims;
+    }
+
     if(aDesc.ndims == bDesc.ndims)
     {
         sg_data_type_t dtype_A = (sg_data_type_t)(aDesc.dtype);
