@@ -1975,24 +1975,19 @@ bm_status_t sgdnn_dtype_convert(
     sg_round_mode_t                  round_mode
  ) {
 
-    assert(xDesc.ndims == 4 && yDesc.ndims == 4);
+    assert(xDesc.ndims == yDesc.ndims);
     for (int idx = 0; idx < xDesc.ndims; idx++) {
         assert(xDesc.shape[idx] == yDesc.shape[idx]);
     }
 
-    int n = xDesc.shape[0];
-    int c = xDesc.shape[1];
-    int h = xDesc.shape[2];
-    int w = xDesc.shape[3];
-
-    sg_api_dtype_convert_t api = {
-        (unsigned long long)xData,
-        (unsigned long long)yData,
-        {n, c, h, w},
-        xDesc.ndims,
-        (sg_data_type_t)xDesc.dtype,
-        (sg_data_type_t)yDesc.dtype,
-        (sg_round_mode_t)round_mode};
+    sg_api_dtype_convert_t api;
+    api.input_global_addr = (unsigned long long)xData;
+    api.output_global_addr = (unsigned long long)yData;
+    memcpy(api.shape, xDesc.shape, xDesc.ndims * sizeof(int));
+    api.dims = xDesc.ndims;
+    api.idtype = (sg_data_type_t)xDesc.dtype;
+    api.odtype = (sg_data_type_t)yDesc.dtype;
+    api.round_mode = (sg_round_mode_t)round_mode;
 
     tpu_kernel_launch_sync(handle, "tpu_kernel_api_dtype_convert", &api, sizeof(api));
     return BM_SUCCESS;
