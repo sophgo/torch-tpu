@@ -210,7 +210,7 @@ class BatchNorm2dFunc(Function):
         batch_invstd = torch.from_numpy(batch_invstd_np).reshape(weight.shape)
         output = torch.from_numpy(output_np).reshape(input.shape)
         ctx.save_for_backward(input, weight, batch_mean, batch_invstd)
-        return output
+        return output, batch_mean, batch_invstd
 
     @staticmethod
     def backward(ctx, grad_output):
