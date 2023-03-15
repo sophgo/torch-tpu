@@ -220,26 +220,27 @@ bm_status_t sgdnn_conv_forward_cudnn(
         DEVICE_MEM_NEW_BUFFER(handle, w_fp16, w_fp16_size);
         DEVICE_MEM_NEW_BUFFER(handle, w_32ic_fp16, w_32ic_fp16_size);
 
-        sg_api_dtype_convert_t cast_x_api = {
-            (unsigned long long)x,
-            bm_mem_get_device_addr(x_fp16),
-            {n, ic, ih, iw},
-            4,
-            SG_DTYPE_FP32,
-            SG_DTYPE_FP16,
-            SG_ROUND_EVEN};
+        sg_api_dtype_convert_t cast_x_api;
+        cast_x_api.input_global_addr = (unsigned long long)x;
+        cast_x_api.output_global_addr = bm_mem_get_device_addr(x_fp16);
+        memcpy(cast_x_api.shape, xDesc.shape, xDesc.ndims * sizeof(int));
+        cast_x_api.dims = xDesc.ndims;
+        cast_x_api.idtype = SG_DTYPE_FP32;
+        cast_x_api.odtype = SG_DTYPE_FP16;
+        cast_x_api.round_mode = SG_ROUND_EVEN;
 
         tpu_kernel_launch_sync(handle, "tpu_kernel_api_dtype_convert",
                                &cast_x_api, sizeof(cast_x_api));
 
-        sg_api_dtype_convert_t cast_w_api = {
-            (unsigned long long)w,
-            bm_mem_get_device_addr(w_fp16),
-            {oc, ic, kh, kw},
-            4,
-            SG_DTYPE_FP32,
-            SG_DTYPE_FP16,
-            SG_ROUND_EVEN};
+        sg_api_dtype_convert_t cast_w_api;
+        cast_w_api.input_global_addr = (unsigned long long)w;
+        cast_w_api.output_global_addr = bm_mem_get_device_addr(w_fp16);
+        int w_shape[4] = {oc, ic, kh, kw};
+        memcpy(cast_w_api.shape, w_shape, 4 * sizeof(int));
+        cast_w_api.dims = 4;
+        cast_w_api.idtype = SG_DTYPE_FP32;
+        cast_w_api.odtype = SG_DTYPE_FP16;
+        cast_w_api.round_mode = SG_ROUND_EVEN;
 
         tpu_kernel_launch_sync(handle, "tpu_kernel_api_dtype_convert",
                                &cast_w_api, sizeof(cast_w_api));
@@ -495,38 +496,40 @@ bm_status_t sgdnn_conv_backward_cudnn(
         if (db_enable) DEVICE_MEM_NEW_BUFFER(handle, db_fp16, db_fp16_size);
 
         if (dx_enable || dw_enable || db_enable) {
-            sg_api_dtype_convert_t cast_x_api = {
-                (unsigned long long)x,
-                bm_mem_get_device_addr(x_fp16),
-                {n, ic, ih, iw},
-                4,
-                SG_DTYPE_FP32,
-                SG_DTYPE_FP16,
-                SG_ROUND_EVEN};
+
+            sg_api_dtype_convert_t cast_x_api;
+            cast_x_api.input_global_addr = (unsigned long long)x;
+            cast_x_api.output_global_addr = bm_mem_get_device_addr(x_fp16);
+            memcpy(cast_x_api.shape, xDesc.shape, xDesc.ndims * sizeof(int));
+            cast_x_api.dims = xDesc.ndims;
+            cast_x_api.idtype = SG_DTYPE_FP32;
+            cast_x_api.odtype = SG_DTYPE_FP16;
+            cast_x_api.round_mode = SG_ROUND_EVEN;
 
             tpu_kernel_launch_sync(handle, "tpu_kernel_api_dtype_convert",
                                    &cast_x_api, sizeof(cast_x_api));
 
-            sg_api_dtype_convert_t cast_w_api = {
-                (unsigned long long)w,
-                bm_mem_get_device_addr(w_fp16),
-                {oc, ic, kh, kw},
-                4,
-                SG_DTYPE_FP32,
-                SG_DTYPE_FP16,
-                SG_ROUND_EVEN};
+            sg_api_dtype_convert_t cast_w_api;
+            cast_w_api.input_global_addr = (unsigned long long)w;
+            cast_w_api.output_global_addr = bm_mem_get_device_addr(w_fp16);
+            int w_shape[4] = {oc, ic, kh, kw};
+            memcpy(cast_w_api.shape, w_shape, 4 * sizeof(int));
+            cast_w_api.dims = 4;
+            cast_w_api.idtype = SG_DTYPE_FP32;
+            cast_w_api.odtype = SG_DTYPE_FP16;
+            cast_w_api.round_mode = SG_ROUND_EVEN;
 
             tpu_kernel_launch_sync(handle, "tpu_kernel_api_dtype_convert",
                                    &cast_w_api, sizeof(cast_w_api));
 
-            sg_api_dtype_convert_t cast_dy_api = {
-                (unsigned long long)dy,
-                bm_mem_get_device_addr(dy_fp16),
-                {n, oc, oh, ow},
-                4,
-                SG_DTYPE_FP32,
-                SG_DTYPE_FP16,
-                SG_ROUND_EVEN};
+            sg_api_dtype_convert_t cast_dy_api;
+            cast_dy_api.input_global_addr = (unsigned long long)dy;
+            cast_dy_api.output_global_addr = bm_mem_get_device_addr(dy_fp16);
+            memcpy(cast_dy_api.shape, dyDesc.shape, dyDesc.ndims * sizeof(int));
+            cast_dy_api.dims = dyDesc.ndims;
+            cast_dy_api.idtype = SG_DTYPE_FP32;
+            cast_dy_api.odtype = SG_DTYPE_FP16;
+            cast_dy_api.round_mode = SG_ROUND_EVEN;
 
             tpu_kernel_launch_sync(handle, "tpu_kernel_api_dtype_convert",
                                    &cast_dy_api, sizeof(cast_dy_api));
@@ -555,42 +558,46 @@ bm_status_t sgdnn_conv_backward_cudnn(
         }
 
         if (dx_enable) {
-            sg_api_dtype_convert_t cast_dx_api = {
-                bm_mem_get_device_addr(dx_fp16),
-                (unsigned long long)dx,
-                {n, ic, ih, iw},
-                4,
-                SG_DTYPE_FP16,
-                SG_DTYPE_FP32,
-                SG_ROUND_EVEN};
+
+            sg_api_dtype_convert_t cast_dx_api;
+            cast_dx_api.input_global_addr = bm_mem_get_device_addr(dx_fp16);
+            cast_dx_api.output_global_addr = (unsigned long long)dx;
+            memcpy(cast_dx_api.shape, xDesc.shape, xDesc.ndims * sizeof(int));
+            cast_dx_api.dims = xDesc.ndims;
+            cast_dx_api.idtype = SG_DTYPE_FP16;
+            cast_dx_api.odtype = SG_DTYPE_FP32;
+            cast_dx_api.round_mode = SG_ROUND_EVEN;
 
             tpu_kernel_launch_sync(handle, "tpu_kernel_api_dtype_convert",
                                    &cast_dx_api, sizeof(cast_dx_api));
         }
 
         if (dw_enable) {
-            sg_api_dtype_convert_t cast_dw_api = {
-                bm_mem_get_device_addr(dw_fp16),
-                (unsigned long long)dw,
-                {oc, ic, kh, kw},
-                4,
-                SG_DTYPE_FP16,
-                SG_DTYPE_FP32,
-                SG_ROUND_EVEN};
+
+            sg_api_dtype_convert_t cast_dw_api;
+            cast_dw_api.input_global_addr = bm_mem_get_device_addr(dw_fp16);
+            cast_dw_api.output_global_addr = (unsigned long long)dw;
+            int dw_shape[4] = {oc, ic, kh, kw};
+            memcpy(cast_dw_api.shape, dw_shape, 4 * sizeof(int));
+            cast_dw_api.dims = 4;
+            cast_dw_api.idtype = SG_DTYPE_FP16;
+            cast_dw_api.odtype = SG_DTYPE_FP32;
+            cast_dw_api.round_mode = SG_ROUND_EVEN;
 
             tpu_kernel_launch_sync(handle, "tpu_kernel_api_dtype_convert",
                                    &cast_dw_api, sizeof(cast_dw_api));
         }
 
         if (db_enable) {
-            sg_api_dtype_convert_t cast_db_api = {
-                bm_mem_get_device_addr(db_fp16),
-                (unsigned long long)db,
-                {1, oc, 1, 1},
-                4,
-                SG_DTYPE_FP16,
-                SG_DTYPE_FP32,
-                SG_ROUND_EVEN};
+
+            sg_api_dtype_convert_t cast_db_api;
+            cast_db_api.input_global_addr = bm_mem_get_device_addr(db_fp16);
+            cast_db_api.output_global_addr = (unsigned long long)db;
+            memcpy(cast_db_api.shape, dbDesc.shape, dbDesc.ndims * sizeof(int));
+            cast_db_api.dims = dbDesc.ndims;
+            cast_db_api.idtype = SG_DTYPE_FP16;
+            cast_db_api.odtype = SG_DTYPE_FP32;
+            cast_db_api.round_mode = SG_ROUND_EVEN;
 
             tpu_kernel_launch_sync(handle, "tpu_kernel_api_dtype_convert",
                                    &cast_db_api, sizeof(cast_db_api));
