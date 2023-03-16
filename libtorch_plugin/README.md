@@ -6,3 +6,10 @@ wget https://download.pytorch.org/libtorch/cpu/libtorch-shared-with-deps-1.13.1%
 
 unzip libtorch-shared-with-deps-xxxx.zip
 
+3. Compile libtorch_plugin
+
+mkdir build && cd build
+
+cmake ..
+
+make -j

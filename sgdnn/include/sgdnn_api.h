@@ -2,12 +2,16 @@
 #define SGDNN_API_H
 
 #include "bmlib_runtime.h"
+#include "common.h"
 #include "common_def.h"
 #include "sg_api_struct.h"
 
 #if defined(__cplusplus)
 extern "C" {
 #endif
+
+void tpu_module_init(bm_handle_t handle);
+void tpu_module_deinit(bm_handle_t handle);
 
 typedef enum{
     OP_ELTWISE_PRODUCT     = 0,
@@ -342,7 +346,7 @@ bm_status_t sgdnn_avgpool_backward(
     int                pad_w,
     bool               ceil_mode,
     bool               count_include_pad,
-    bool               divisor_override,
+    int                divisor_override,
     sg_data_type_t     dtype);
 
 bm_status_t sgdnn_maxpool_backward(
@@ -486,7 +490,7 @@ bm_status_t sgdnn_cross_entropy_forward(
     bm_device_mem_t    loss,
     int                batch,
     int                cls,
-    bool               reduction,
+    int                reduction,
     sg_data_type_t     dtype);
 
 bm_status_t sgdnn_cross_entropy_forward_cudnn(
@@ -509,7 +513,7 @@ bm_status_t sgdnn_cross_entropy_backward(
     bm_device_mem_t    grad_input,
     int                batch,
     int                cls,
-    bool               reduction,
+    int                reduction,
     sg_data_type_t     dtype);
 
 bm_status_t sgdnn_cross_entropy_backward_cudnn(

@@ -3,6 +3,7 @@
 #include <mutex>
 #include <c10/util/Logging.h>
 #include <TPUDeviceManager.h>
+#include <sgdnn_api.h>
 
 #include <iostream>
 
@@ -46,6 +47,7 @@ public:
       {
         Status = bm_dev_request ( &Handles_[i], i );
         TORCH_CHECK ( Status == BM_SUCCESS, "Failed to request tpu device #", i );
+        tpu_module_init(Handles_[i]);
       }
       Index_ = 0;
     }

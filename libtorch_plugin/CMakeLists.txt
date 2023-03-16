@@ -1,7 +1,5 @@
 project(LIBTORCH_PLUGIN CXX)
 
-include($ENV{TRAIN_TOP}/toolchain-cmodel.cmake)
-
 add_compile_options(-std=c++14 -Wno-attributes)
 add_definitions("-D_GLIBCXX_USE_CXX11_ABI=0")
 
@@ -9,16 +7,16 @@ set(CMAKE_BUILD_TYPE "Debug")
 add_definitions(-DDEBUG)
 
 include_directories(/opt/sophon/libsophon-current/include)
-include_directories($ENV{TRAIN_TOP}/libtorch/include/torch/csrc/api/include)
-include_directories($ENV{TRAIN_TOP}/libtorch/include)
+include_directories($ENV{TPUTRAIN_TOP}/libtorch/include/torch/csrc/api/include)
+include_directories($ENV{TPUTRAIN_TOP}/libtorch/include)
 include_directories(${CMAKE_CURRENT_SOURCE_DIR}/tpu)
-include_directories($ENV{TRAIN_TOP}/sgdnn/include)
-include_directories($ENV{TRAIN_TOP}/common/include)
+include_directories($ENV{TPUTRAIN_TOP}/sgdnn/include)
+include_directories($ENV{TPUTRAIN_TOP}/common/include)
 
-link_directories($ENV{TRAIN_TOP}/libtorch/lib)
+link_directories($ENV{TPUTRAIN_TOP}/libtorch/lib)
 link_directories(/opt/sophon/libsophon-current/lib)
-link_directories($ENV{TRAIN_TOP}/third_party)
-link_directories($ENV{TRAIN_TOP}/build/sgdnn)
+link_directories($ENV{TPUTRAIN_TOP}/third_party)
+link_directories($ENV{TPUTRAIN_TOP}/build/sgdnn)
 
 file(GLOB_RECURSE SRCS
   tpu/TPUGuardImpl.cpp
@@ -33,11 +31,8 @@ add_library(libtorch_plugin SHARED ${SRCS})
 target_link_libraries(libtorch_plugin c10 torch_cpu)
 target_link_libraries(libtorch_plugin sgdnn)
 
-#if(USING_CMODEL)
-#  target_link_libraries(libtorch_plugin bmlib_cmodel)
-#else()
-  target_link_libraries(libtorch_plugin bmlib)
-#endif()
+target_link_libraries(libtorch_plugin bmlib)
+#target_link_libraries(libtorch_plugin bmlib_cmodel)
 
 add_executable(test test.cpp)
 

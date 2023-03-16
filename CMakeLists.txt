@@ -1,13 +1,7 @@
 cmake_minimum_required(VERSION 2.8)
 project(tpu-train)
 
-#find_program(CCACHE ccache)
-#if(CCACHE)
-#    set_property(GLOBAL PROPERTY RULE_LAUNCH_COMPILE ${CCACHE})
-#    set_property(GLOBAL PROPERTY RULE_LAUNCH_LINK ${CCACHE})
-#endif()
-
-if(NOT DEFINED ENV{TRAIN_TOP})
+if(NOT DEFINED ENV{TPUTRAIN_TOP})
   message(FATAL_ERROR "execute envsetup.sh first")
 endif()
 
@@ -23,3 +17,4 @@ set(PROJECT_ROOT ${PROJECT_SOURCE_DIR})
 
 add_subdirectory(firmware_core)
 add_subdirectory(sgdnn)
+add_dependencies(sgdnn firmware_core)
