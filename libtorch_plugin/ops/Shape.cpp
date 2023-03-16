@@ -32,6 +32,8 @@
 #include <TPUTorchUtils.h>
 #include <sgdnn_api.h>
 
+#define TPU_OP_TIMING
+
 namespace at
 {
 //
@@ -89,16 +91,34 @@ TORCH_LIBRARY_IMPL ( aten, PrivateUse1, m )
   m.impl ( "_reshape_alias", _reshape_alias_tpu );
 }
 
-Tensor as_strided_tpu ( const Tensor         & input,
-                        IntArrayRef            size,
-                        IntArrayRef            stride,
-                        c10::optional<int64_t> storage_offset )
+Tensor as_strided_tpu ( const Tensor & self, IntArrayRef size, IntArrayRef stride, c10::optional<int64_t> storage_offset )
 {
-  CHECK_TENSOR_IN_DEVICE ( input );
-  auto input_cpu = input.to ( torch::Device ( "cpu" ) );
-  auto output_cpu = as_strided ( input_cpu, size, stride, storage_offset );
-  auto output = output_cpu.contiguous().to ( tpu::TPUGetCurrentDevice() );
-  return output;
+  CHECK_TENSOR_IN_DEVICE ( self );
+  Tensor out;
+  if ( self.sizes() == size && self.strides() == stride )
+  {
+    out = self.detach();
+  }
+  else
+  {
+#ifdef TPU_OP_TIMING
+    auto timer = tpu::Timer().Start();
+#endif
+    auto out_cpu = as_strided ( self.cpu(), size, stride, storage_offset );
+    out = out_cpu.contiguous().to ( tpu::TPUGetCurrentDevice() );
+#ifdef TPU_OP_TIMING
+    tpu::OpTimer::Instance().AddTime ( tpu::PERMUTE, timer.ElapsedUS() );
+#endif
+#if 0
+    std::cout << "self.shape = " << self.sizes() << std::endl;
+    std::cout << "self.stride = " << self.strides() << std::endl;
+    std::cout << "size = " << size << std::endl;
+    std::cout << "stride = " << stride << std::endl;
+    std::cout << "out.shape = " << out.sizes() << std::endl;
+    std::cout << "**********************************************" << std::endl;
+#endif
+  }
+  return out;
 }
 TORCH_LIBRARY_IMPL ( aten, PrivateUse1, m )
 {
