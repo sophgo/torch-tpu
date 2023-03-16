@@ -58,7 +58,7 @@ static inline sg_binary_type_t tpu_binary_type_convert(BinaryOpMode_t binary_typ
 }
 
 #define ASSERT_SAME_DIMS(A, B)            \
-  assert(A.ndims == Bndims         );             \
+  assert(A.ndims == B.ndims);             \
 
 #define ASSERT_SAME_SHAPE(A, B)           \
   assert(A.ndims == B.ndims);             \
@@ -1272,78 +1272,61 @@ bm_status_t sgdnn_binary_cudnn(
 {
     sg_binary_type_t binary_type = tpu_binary_type_convert(opTensorDesc);
 
-    if (aDesc.ndims > 0 && bDesc.ndims > 0 && aDesc.ndims > bDesc.ndims)
-    {
-        TensorDescriptor_t bDescSaved = bDesc;
-        int dimgap = aDesc.ndims - bDesc.ndims;
-        int i = 0;
-        for (; i < dimgap; ++i)
-        {
-            const_cast<TensorDescriptor_t &>(bDesc).shape[i] = 1;
-        }
-        for (; i < aDesc.ndims; ++i)
-        {
-            const_cast<TensorDescriptor_t &>(bDesc).shape[i] = bDescSaved.shape[i - dimgap];
-        }
-        const_cast<TensorDescriptor_t &>(bDesc).ndims = aDesc.ndims;
-    }
-    else if (aDesc.ndims > 0 && bDesc.ndims > 0 && aDesc.ndims < bDesc.ndims)
-    {
-        TensorDescriptor_t aDescSaved = aDesc;
-        int dimgap = bDesc.ndims - aDesc.ndims;
-        int i = 0;
-        for (; i < dimgap; ++i)
-        {
-            const_cast<TensorDescriptor_t &>(aDesc).shape[i] = 1;
-        }
-        for (; i < bDesc.ndims; ++i)
-        {
-            const_cast<TensorDescriptor_t &>(aDesc).shape[i] = aDescSaved.shape[i - dimgap];
-        }
-        const_cast<TensorDescriptor_t &>(aDesc).ndims = bDesc.ndims;
-    }
+    // if (aDesc.ndims > 0 && bDesc.ndims > 0 && aDesc.ndims > bDesc.ndims)
+    // {
+    //     TensorDescriptor_t bDescSaved = bDesc;
+    //     int dimgap = aDesc.ndims - bDesc.ndims;
+    //     int i = 0;
+    //     for (; i < dimgap; ++i)
+    //     {
+    //         const_cast<TensorDescriptor_t &>(bDesc).shape[i] = 1;
+    //     }
+    //     for (; i < aDesc.ndims; ++i)
+    //     {
+    //         const_cast<TensorDescriptor_t &>(bDesc).shape[i] = bDescSaved.shape[i - dimgap];
+    //     }
+    //     const_cast<TensorDescriptor_t &>(bDesc).ndims = aDesc.ndims;
+    // }
+    // else if (aDesc.ndims > 0 && bDesc.ndims > 0 && aDesc.ndims < bDesc.ndims)
+    // {
+    //     TensorDescriptor_t aDescSaved = aDesc;
+    //     int dimgap = bDesc.ndims - aDesc.ndims;
+    //     int i = 0;
+    //     for (; i < dimgap; ++i)
+    //     {
+    //         const_cast<TensorDescriptor_t &>(aDesc).shape[i] = 1;
+    //     }
+    //     for (; i < bDesc.ndims; ++i)
+    //     {
+    //         const_cast<TensorDescriptor_t &>(aDesc).shape[i] = aDescSaved.shape[i - dimgap];
+    //     }
+    //     const_cast<TensorDescriptor_t &>(aDesc).ndims = bDesc.ndims;
+    // }
 
-    if(aDesc.ndims == bDesc.ndims)
+    if(aDesc.ndims && bDesc.ndims && cDesc.ndims)
     {
         sg_data_type_t dtype_A = (sg_data_type_t)(aDesc.dtype);
         sg_data_type_t dtype_B = (sg_data_type_t)(bDesc.dtype);
         sg_data_type_t dtype_C = (sg_data_type_t)(cDesc.dtype);
         assert(dtype_A == dtype_B && dtype_B == dtype_C);
 
-        int A_n, A_c, A_h, A_w;
-        int B_n, B_c, B_h, B_w;
-        assert(aDesc.ndims == bDesc.ndims && bDesc.ndims == cDesc.ndims);
-        if (aDesc.ndims == 4 && bDesc.ndims == 4 && cDesc.ndims == 4)
+        int adims = aDesc.ndims;
+        int bdims = bDesc.ndims;
+        int shape_a[] = {};
+        int shape_b[] = {};
+        for (int i=0; i<(adims>bdims?adims:bdims); ++i)
         {
-            A_n = aDesc.shape[0]; A_c = aDesc.shape[1]; A_h = aDesc.shape[2]; A_w = aDesc.shape[3];
-            B_n = bDesc.shape[0]; B_c = bDesc.shape[1]; B_h = bDesc.shape[2]; B_w = bDesc.shape[3];
-        }
-        else if (aDesc.ndims == 3 && bDesc.ndims == 3 && cDesc.ndims == 3)
-        {
-            A_n = aDesc.shape[0]; A_c = aDesc.shape[1]; A_h = aDesc.shape[2]; A_w = 1;
-            B_n = bDesc.shape[0]; B_c = bDesc.shape[1]; B_h = bDesc.shape[2]; B_w = 1;
-        }
-        else if (aDesc.ndims == 2 && bDesc.ndims == 2 && cDesc.ndims == 2)
-        {
-            A_n = 1; A_c = aDesc.shape[0]; A_h = aDesc.shape[1]; A_w = 1;
-            B_n = 1; B_c = bDesc.shape[0]; B_h = bDesc.shape[1]; B_w = 1;
-        }
-        else if (aDesc.ndims == 1 && bDesc.ndims == 1 && cDesc.ndims == 1)
-        {
-            A_n = 1; A_c = aDesc.shape[0]; A_h = 1; A_w = 1;
-            B_n = 1; B_c = bDesc.shape[0]; B_h = 1; B_w = 1; 
-        }
-        else
-        {
-            assert(false);
+            shape_a[i] = aDesc.shape[i];
+            shape_b[i] = bDesc.shape[i];
         }
         sg_api_bcbinary_float_t api = {
             (unsigned long long)A,
             (unsigned long long)B,
             (unsigned long long)C,
-            {A_n, A_c, A_h, A_w},
-            {B_n, B_c, B_h, B_w},
-            4,
+            *shape_a,
+            *shape_b,
+            adims,
+            bdims,
             dtype_A,
             binary_type};
         tpu_kernel_launch_sync(handle, "tpu_kernel_api_bcbinary_float", &api, sizeof(api));  
@@ -1397,6 +1380,7 @@ bm_status_t sgdnn_binary_cudnn(
         {
             assert(false);
         }
+        bool is_inversed = !aDesc.ndims;
         sg_api_const_binary_float_t api = {
             (unsigned long long)tensor,
             (unsigned long long)C,
@@ -1405,7 +1389,7 @@ bm_status_t sgdnn_binary_cudnn(
             binary_type,
             tensor_dtype,
             const_value,
-            !aDesc.ndims};
+            is_inversed};
         tpu_kernel_launch_sync(handle, "tpu_kernel_api_const_binary", &api, sizeof(api));
     }
     else
@@ -1821,30 +1805,22 @@ bm_status_t sgdnn_activation_forward_cudnn(
         tpu_kernel_launch_sync(handle, "tpu_kernel_api_relu_forward", &api, sizeof(api));
         return BM_SUCCESS;
     }
-    else
+else
     {
         sg_active_type_t active_type =  tpu_active_type_convert(activationDesc.mode) ;
         
         unsigned long long input    = (unsigned long long)x;
         unsigned long long output   = (unsigned long long)y;
 
-        int n, c, h, w;
-        if (xDesc.ndims == 4 && yDesc.ndims == 4 )
+        assert(xDesc.ndims == yDesc.ndims);
+        int shape[] = {};
+        int dims = xDesc.ndims;
+        for (int i=0; i<dims; ++i)
         {
-            n = xDesc.shape[0]; c = xDesc.shape[1]; h = xDesc.shape[2]; w = xDesc.shape[3];
+            assert(xDesc.shape[i] == yDesc.shape[i] );
+            shape[i] = xDesc.shape[i];
         }
-        else if (xDesc.ndims == 3 && yDesc.ndims == 3 )
-        {
-            n = xDesc.shape[0]; c = xDesc.shape[1]; h = 1; w = xDesc.shape[2];
-        }
-        else if (xDesc.ndims == 2 && yDesc.ndims == 2 )
-        {
-            n = 1; c = xDesc.shape[0]; h = 1; w = xDesc.shape[1];
-        }
-        else if (xDesc.ndims == 1 && yDesc.ndims == 1 )
-        {
-            n = 1; c = xDesc.shape[0]; h = 1; w = 1;
-        }
+        
         sg_data_type_t ydtype = (sg_data_type_t)(yDesc.dtype);
         sg_data_type_t xdtype = (sg_data_type_t)(xDesc.dtype);
         assert(xdtype == ydtype);
@@ -1852,8 +1828,8 @@ bm_status_t sgdnn_activation_forward_cudnn(
         sg_api_active_forward_t api = {
             input,
             output,
-            {n, c, h, w},
-            4,
+            *shape,
+            dims,
             xdtype,
             active_type};
 
@@ -2159,6 +2135,50 @@ bm_status_t sgdnn_general_matmul(
         Ldtype};
 
     tpu_kernel_launch_sync(handle, "tpu_kernel_api_general_matmul", &api, sizeof(api));
+    return BM_SUCCESS;
+}
+
+bm_status_t sgdnn_batch_matmul(
+    bm_handle_t                      handle,
+    const TensorDescriptor_t         LDesc,
+    const void                      *L,
+    const TensorDescriptor_t         RDesc,
+    const void                      *R,
+    const TensorDescriptor_t         YDesc,
+    void                            *Y,
+    int                              L_transpose,
+    int                              R_transpose)
+{
+    assert(LDesc.ndims == 3 && RDesc.ndims == 3 && YDesc.ndims == 3);
+    
+    assert(LDesc.shape[0] == RDesc.shape[0]);
+    assert(LDesc.shape[0] == YDesc.shape[0]);
+    assert(LDesc.shape[2] == RDesc.shape[1]);
+
+    int batch_num = LDesc.shape[0];
+    int L_row = LDesc.shape[1];
+    int L_col = LDesc.shape[2];
+    int R_col = RDesc.shape[2];
+
+    sg_data_type_t Ldtype = (sg_data_type_t)(LDesc.dtype);
+    sg_data_type_t Rdtype = (sg_data_type_t)(RDesc.dtype);
+    sg_data_type_t Ydtype = (sg_data_type_t)(YDesc.dtype);
+
+    sg_api_batch_matmul_t api = {
+        (unsigned long long)L,
+        (unsigned long long)R,
+        (unsigned long long)Y,
+        batch_num,
+        L_row,
+        L_col,
+        R_col,
+        L_transpose,
+        R_transpose,
+        Ldtype,
+        Rdtype,
+        Ydtype};
+
+    tpu_kernel_launch_sync(handle, "tpu_kernel_api_batch_matmul", &api, sizeof(api));
     return BM_SUCCESS;
 }
 

@@ -12,7 +12,7 @@
 typedef struct {
     unsigned long long in_global_addr;
     unsigned long long out_global_addr;
-    int shape[4];
+    int shape[FW_MAX_SHAPE_DIMS];
     int shape_dim;
     sg_data_type_t dtype;
     sg_active_type_t active_type;
@@ -338,9 +338,10 @@ typedef struct {
     unsigned long long A_global_addr;
     unsigned long long B_global_addr;
     unsigned long long res_global_addr;
-    int A_shape[4];
-    int B_shape[4];
-    int dims;
+    int A_shape[FW_MAX_SHAPE_DIMS];
+    int B_shape[FW_MAX_SHAPE_DIMS];
+    int A_dims;
+    int B_dims;
     sg_data_type_t dtype;
     sg_binary_type_t binary_type;
 #ifndef WIN32
@@ -352,7 +353,7 @@ typedef struct {
 typedef struct {
     unsigned long long input_addr;
     unsigned long long output_addr;
-    int shape[4];
+    int shape[FW_MAX_SHAPE_DIMS];
     int dims;
     sg_binary_type_t binary_type;
     sg_data_type_t dtype;
@@ -377,6 +378,39 @@ typedef struct {
 } __attribute__((packed)) sg_api_general_matmul_t;
 #else
 } sg_api_general_matmul_t;
+#endif
+
+typedef struct {
+    unsigned long long L_addr;
+    unsigned long long R_addr;
+    unsigned long long Y_addr;
+    int                batch_num;
+    int                L_row_num;
+    int                L_col_num;
+    int                R_col_num;
+    int                L_trans;
+    int                R_trans;
+    sg_data_type_t L_dtype;
+    sg_data_type_t R_dtype;
+    sg_data_type_t Y_dtype;
+#ifndef WIN32
+} __attribute__((packed)) sg_api_batch_matmul_t;
+#else
+} sg_api_batch_matmul_t;
+#endif
+
+typedef struct {
+    unsigned long long input_global_addr;
+    unsigned long long output_global_addr;
+    int                input_n;
+    int                input_c;
+    int                input_inner_dim;
+    float              scale_val;
+    sg_data_type_t     dtype;
+#ifndef WIN32
+} __attribute__((packed)) sg_api_softmax_forward_t;
+#else
+} sg_api_softmax_forward_t;
 #endif
 
 #pragma pack(pop)

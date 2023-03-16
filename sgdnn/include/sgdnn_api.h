@@ -54,8 +54,8 @@ typedef enum {
 } ActivationMode_t;
 
 typedef enum {
-    Not_Propagate_Nan = 0,
-    Propagate_Nan = 1,
+  Not_Propagate_Nan = 0,
+  Propagate_Nan = 1,
 } NanPropagation_t;
 
 typedef enum {
@@ -559,6 +559,17 @@ bm_status_t sgdnn_general_matmul(
     const void                      *R,
     const TensorDescriptor_t         YDesc,
     void                            *Y,
+    int                              R_transpose);
+
+bm_status_t sgdnn_batch_matmul(
+    bm_handle_t                      handle,
+    const TensorDescriptor_t         LDesc,
+    const void                      *L,
+    const TensorDescriptor_t         RDesc,
+    const void                      *R,
+    const TensorDescriptor_t         YDesc,
+    void                            *Y,
+    int                              L_transpose,
     int                              R_transpose);
 
 #if defined(__cplusplus)

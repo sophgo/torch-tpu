@@ -11,8 +11,8 @@ void tpu_kernel_api_bcbinary_float(const void *args)
         api->res_global_addr,
         api->A_shape,
         api->B_shape,
-        api->dims,
-        api->dims,
+        api->A_dims,
+        api->B_dims,
         api->binary_type,
         tpu_type_convert(api->dtype),
         0, 0);
