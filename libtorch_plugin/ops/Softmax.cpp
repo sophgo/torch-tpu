@@ -46,4 +46,22 @@ Tensor       & out )
 //{
 //  m.impl ( "_log_softmax_backward_data.out", _log_softmax_backward_data_out_tpu );
 //}
+
+Tensor & _softmax_out_tpu ( const Tensor & input,
+                            int64_t        dim,
+                            bool           half_to_float,
+                            Tensor       & output )
+{
+  CHECK_TENSOR_IN_DEVICE ( input );
+  CHECK_TENSOR_IN_DEVICE ( output );
+  TORCH_CHECK ( half_to_float == false );
+  auto input_cpu = TENSOR_TO_CPU ( input );
+  auto output_cpu = softmax ( input_cpu, dim, c10::optional<ScalarType> ( input.scalar_type() ) );
+  tpu::TPUCopyHostToDevice ( output.data_ptr(), output_cpu.contiguous().data_ptr(), output.nbytes() );
+  return output;
+}
+TORCH_LIBRARY_IMPL ( aten, PrivateUse1, m )
+{
+  m.impl ( "_softmax.out", _softmax_out_tpu );
+}
 } // namespace at

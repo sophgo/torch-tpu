@@ -9,6 +9,7 @@
 #include <unistd.h>
 
 #define TPU_OP_TIMING
+//#define SHOW_OP_INFO
 
 namespace at
 {
@@ -24,7 +25,10 @@ double                        momentum,
 double                        eps )
 {
   static int count = 0;
-  //std::cout << "Batchnorm " << count << std::endl;
+#ifdef SHOW_OP_INFO
+  std::cout << "Batchnorm " << count << std::endl;
+  ++count;
+#endif
   c10::MaybeOwned<Tensor> weight_maybe_owned = at::borrow_from_optional_tensor ( weight_opt );
   const Tensor & weight = *weight_maybe_owned;
   const Tensor & bias = c10::value_or_else ( bias_opt, [] { return Tensor(); } );
@@ -33,23 +37,10 @@ double                        eps )
   TORCH_CHECK ( training == true, "Batchnorm only supports training mode for now" );
   auto num_features = input.size ( 1 );
   CHECK_TENSOR_IN_DEVICE ( input );
-  TORCH_CHECK ( input.is_contiguous() );
-  if ( weight.defined() )
-  {
-    CHECK_TENSOR_IN_DEVICE ( weight );
-  }
-  if ( bias.defined() )
-  {
-    CHECK_TENSOR_IN_DEVICE ( bias );
-  }
-  if ( running_mean.defined() )
-  {
-    CHECK_TENSOR_IN_DEVICE ( running_mean );
-  }
-  if ( running_var.defined() )
-  {
-    CHECK_TENSOR_IN_DEVICE ( running_var );
-  }
+  if ( weight.defined() )       { CHECK_TENSOR_IN_DEVICE ( weight ); }
+  if ( bias.defined() )         { CHECK_TENSOR_IN_DEVICE ( bias ); }
+  if ( running_mean.defined() ) { CHECK_TENSOR_IN_DEVICE ( running_mean ); }
+  if ( running_var.defined() )  { CHECK_TENSOR_IN_DEVICE ( running_var ); }
 #if 0
   auto running_mean_cpu = running_mean.defined() ? TENSOR_TO_CPU ( running_mean ) : Tensor();
   auto running_var_cpu = running_var.defined() ? TENSOR_TO_CPU ( running_var ) : Tensor();
@@ -70,49 +61,48 @@ double                        eps )
   {
     tpu::TPUCopyHostToDevice ( running_var.data_ptr(), running_var_cpu.contiguous().data_ptr(), running_var.nbytes() );
   }
-  ++count;
   return std::tuple<Tensor, Tensor, Tensor> (
          TENSOR_TO_TPU ( std::get<0> ( outputs_cpu ) ),
          TENSOR_TO_TPU ( std::get<1> ( outputs_cpu ) ),
          TENSOR_TO_TPU ( std::get<2> ( outputs_cpu ) ) );
 #else
-  auto output_options = torch::TensorOptions ( tpu::TPUGetCurrentDevice() ).dtype ( input.dtype() );
-  auto output = torch::empty ( input.sizes(), output_options );
-  auto other_options = torch::TensorOptions ( tpu::TPUGetCurrentDevice() ).dtype ( weight.dtype() );
-  auto save_mean = torch::empty ( c10::IntArrayRef ( { num_features } ), other_options );
-  auto save_invstd = torch::empty ( c10::IntArrayRef ( { num_features } ), other_options );
-  auto handle = tpu::TPUGetDeviceHandle();
-  bm_status_t status = BM_SUCCESS;
+  auto output = torch::empty ( input.sizes(), input.options() );
+  auto save_mean = torch::empty ( { num_features }, input.options() );
+  auto save_invstd = torch::empty ( { num_features }, input.options() );
   float alpha = 1.f;
   float beta = 0.f;
   auto input_desc = tpu::TPUGenerateTensorDesc ( input );
   auto output_desc = tpu::TPUGenerateTensorDesc ( output );
-  auto other_desc = tpu::TPUGenerateTensorDesc ( weight );
+  TensorDescriptor_t other_desc;
+  if      ( weight.defined() )       { other_desc = tpu::TPUGenerateTensorDesc ( weight ); }
+  else if ( bias.defined() )         { other_desc = tpu::TPUGenerateTensorDesc ( bias ); }
+  else if ( running_mean.defined() ) { other_desc = tpu::TPUGenerateTensorDesc ( running_mean ); }
+  else if ( running_var.defined() )  { other_desc = tpu::TPUGenerateTensorDesc ( running_var ); }
 #ifdef TPU_OP_TIMING
   auto timer = tpu::Timer().Start();
 #endif
-  status = sgdnn_batchnorm_forward_cudnn (
-           handle,
-           BatchNorm_Spatial,
-           &alpha,
-           &beta,
-           input_desc,
-           ADDR_IN_DEVICE ( input ),
-           output_desc,
-           ADDR_IN_DEVICE ( output ),
-           other_desc,
-           weight.defined() ? ADDR_IN_DEVICE ( weight ) : nullptr,
-           bias.defined() ? ADDR_IN_DEVICE ( bias ) : nullptr,
-           momentum,
-           running_mean.defined() ? ADDR_IN_DEVICE ( running_mean ) : nullptr,
-           running_var.defined() ? ADDR_IN_DEVICE ( running_var ) : nullptr,
-           eps,
-           ADDR_IN_DEVICE ( save_mean ),
-           ADDR_IN_DEVICE ( save_invstd ) );
+  bm_status_t status = sgdnn_batchnorm_forward_cudnn (
+                       tpu::TPUGetDeviceHandle(),
+                       BatchNorm_Spatial,
+                       &alpha,
+                       &beta,
+                       input_desc,
+                       ADDR_IN_DEVICE ( input ),
+                       output_desc,
+                       ADDR_IN_DEVICE ( output ),
+                       other_desc,
+                       weight.defined() ? ADDR_IN_DEVICE ( weight ) : nullptr,
+                       bias.defined() ? ADDR_IN_DEVICE ( bias ) : nullptr,
+                       momentum,
+                       running_mean.defined() ? ADDR_IN_DEVICE ( running_mean ) : nullptr,
+                       running_var.defined() ? ADDR_IN_DEVICE ( running_var ) : nullptr,
+                       eps,
+                       ADDR_IN_DEVICE ( save_mean ),
+                       ADDR_IN_DEVICE ( save_invstd ) );
+  TORCH_CHECK ( status == BM_SUCCESS );
 #ifdef TPU_OP_TIMING
   tpu::OpTimer::Instance().AddTime ( tpu::BATCHNORM, timer.ElapsedUS() );
 #endif
-  ++count;
   return std::tuple<Tensor, Tensor, Tensor> ( output, save_mean, save_invstd );
 #endif
 }
@@ -134,7 +124,10 @@ double                        eps,
 std::array<bool, 3>           output_mask )
 {
   static int count = 0;
-  //std::cout << "Batchnorm Backward " << count << std::endl;
+#ifdef SHOW_OP_INFO
+  std::cout << "Batchnorm Backward " << count << std::endl;
+  ++count;
+#endif
   c10::MaybeOwned<Tensor> weight_maybe_owned = at::borrow_from_optional_tensor ( weight_opt );
   const Tensor & weight = *weight_maybe_owned;
   const Tensor & save_mean = c10::value_or_else ( save_mean_opt, [] { return Tensor(); } );
@@ -172,7 +165,6 @@ std::array<bool, 3>           output_mask )
                      training,
                      eps,
                      output_mask );
-  ++count;
   return std::tuple<Tensor, Tensor, Tensor> (
          output_mask[0] ? TENSOR_TO_TPU ( std::get<0> ( outputs_cpu ) ) : Tensor(),
          output_mask[1] ? TENSOR_TO_TPU ( std::get<1> ( outputs_cpu ) ) : Tensor(),
@@ -245,7 +237,6 @@ std::array<bool, 3>           output_mask )
 #ifdef TPU_OP_TIMING
   tpu::OpTimer::Instance().AddTime ( tpu::BATCHNORM_BACKWARD, timer.ElapsedUS() );
 #endif
-  ++count;
   return std::tuple<Tensor, Tensor, Tensor> ( grad_input, grad_weight, grad_bias );
 #endif
 }

@@ -88,13 +88,10 @@ std::vector<torch::Tensor> TorchscriptModule::forward ( const std::vector<torch:
   else if ( Outputs_.isTuple() )
   {
     auto OutputsTuple = Outputs_.toTuple()->elements();
-    TORCH_CHECK ( false );
-#if 0
     for ( auto it : OutputsTuple )
     {
       Outputs.push_back ( it.toTensor() );
     }
-#endif
   }
   return Outputs;
 }

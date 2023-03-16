@@ -738,7 +738,11 @@ bm_status_t sgdnn_batchnorm_forward_cudnn(
     assert(beta_ == 0.0f || beta_ == 1.0f);
 
     assert((xDesc.ndims == 4 && yDesc.ndims == 4) || (xDesc.ndims == 3 && yDesc.ndims == 3));
-    assert(bnScaleBiasMeanVarDesc.ndims ==1 );
+    if ( bnScale != nullptr || bnBias != nullptr || resultRunningMean != nullptr || resultRunningVariance != nullptr )
+    {
+      assert(bnScaleBiasMeanVarDesc.ndims == 1 );
+      assert(bnScaleBiasMeanVarDesc.shape[0] == xDesc.shape[1] );
+    }
     int n, c, h, w;
     if (xDesc.ndims == 4)
     {
@@ -760,9 +764,11 @@ bm_status_t sgdnn_batchnorm_forward_cudnn(
     
     sg_data_type_t idtype = (sg_data_type_t)(xDesc.dtype);
     sg_data_type_t odtype = (sg_data_type_t)(yDesc.dtype);
-    sg_data_type_t wdtype = (sg_data_type_t)(bnScaleBiasMeanVarDesc.dtype);
-    assert(idtype == wdtype && wdtype == odtype);
-
+    if ( bnScale != nullptr || bnBias != nullptr || resultRunningMean != nullptr || resultRunningVariance != nullptr )
+    {
+      sg_data_type_t wdtype = (sg_data_type_t)(bnScaleBiasMeanVarDesc.dtype);
+      assert(idtype == wdtype && wdtype == odtype);
+    }
     sg_api_batchnorm_forward_t api = {
         input,
         running_mean,
@@ -1314,13 +1320,13 @@ bm_status_t sgdnn_binary_cudnn(
         }
         else if (aDesc.ndims == 3 && bDesc.ndims == 3 && cDesc.ndims == 3)
         {
-            A_n = aDesc.shape[0]; A_c = aDesc.shape[1]; A_h = 1; A_w = aDesc.shape[2];
-            B_n = bDesc.shape[0]; B_c = bDesc.shape[1]; B_h = 1; B_w = bDesc.shape[2];
+            A_n = aDesc.shape[0]; A_c = aDesc.shape[1]; A_h = aDesc.shape[2]; A_w = 1;
+            B_n = bDesc.shape[0]; B_c = bDesc.shape[1]; B_h = bDesc.shape[2]; B_w = 1;
         }
         else if (aDesc.ndims == 2 && bDesc.ndims == 2 && cDesc.ndims == 2)
         {
-            A_n = 1; A_c = aDesc.shape[0]; A_h = 1; A_w = aDesc.shape[1];
-            B_n = 1; B_c = bDesc.shape[0]; B_h = 1; B_w = bDesc.shape[1];
+            A_n = 1; A_c = aDesc.shape[0]; A_h = aDesc.shape[1]; A_w = 1;
+            B_n = 1; B_c = bDesc.shape[0]; B_h = bDesc.shape[1]; B_w = 1;
         }
         else if (aDesc.ndims == 1 && bDesc.ndims == 1 && cDesc.ndims == 1)
         {
