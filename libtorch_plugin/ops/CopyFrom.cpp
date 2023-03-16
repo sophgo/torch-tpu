@@ -7,62 +7,72 @@
 #include <sgdnn_api.h>
 #include <iostream>
 
+#define TPU_OP_TIMING
+
 namespace at
 {
-Tensor _copy_from_tpu ( const Tensor & src, const Tensor & dst, bool non_blocking )
+Tensor _copy_from_tpu ( const Tensor & self, const Tensor & dst, bool non_blocking )
 {
   TORCH_CHECK ( non_blocking == false );
-  if ( src.is_contiguous() == false || dst.is_contiguous() == false )
+  if ( self.is_contiguous() == false || dst.is_contiguous() == false )
   {
-    LOG ( FATAL ) << "TPU only supports contiguous memory copy for now";
+    TORCH_CHECK ( false, "TPU only supports contiguous memory copy for now" );
   }
-  if ( src.dtype() == dst.dtype() )
+  if ( self.dtype() == dst.dtype() )
   {
-    TORCH_CHECK ( src.nbytes() == dst.nbytes() );
-    if ( src.device().type() == DeviceType::CPU && dst.device().type() == DeviceType::PrivateUse1 )
+    TORCH_CHECK ( self.nbytes() == dst.nbytes(), "SELF and dst number bytes must be the same" );
+    if ( IS_CPU_TENSOR ( self ) && IS_TPU_TENSOR ( dst ) )
     {
-      tpu::TPUCopyHostToDevice ( dst.data_ptr(), src.data_ptr(), dst.nbytes() );
+      tpu::TPUCopyHostToDevice ( dst.data_ptr(), self.data_ptr(), dst.nbytes() );
     }
-    else if ( src.device().type() == DeviceType::PrivateUse1 && dst.device().type() == DeviceType::CPU )
+    else if ( IS_TPU_TENSOR ( self ) && IS_CPU_TENSOR ( dst ) )
     {
-      tpu::TPUCopyDeviceToHost ( dst.data_ptr(), src.data_ptr(), dst.nbytes() );
+      tpu::TPUCopyDeviceToHost ( dst.data_ptr(), self.data_ptr(), dst.nbytes() );
     }
-    else if ( src.device().type() == DeviceType::PrivateUse1 && dst.device().type() == DeviceType::PrivateUse1 )
+    else if ( IS_TPU_TENSOR ( self ) && IS_TPU_TENSOR ( dst ) )
     {
-      tpu::TPUCopyDeviceToDevice ( dst.data_ptr(), src.data_ptr(), dst.nbytes() );
+      tpu::TPUCopyDeviceToDevice ( dst.data_ptr(), self.data_ptr(), dst.nbytes() );
     }
     else
     {
-      LOG ( FATAL ) << "Unsupported copy from device " << src.device()
-                    << " to device " << dst.device();
+      TORCH_CHECK ( false, "Unsupported copy from device ", self.device(), " to device ", dst.device() );
     }
   }
   else
   {
-    if ( src.device().type() == DeviceType::CPU && dst.device().type() == DeviceType::PrivateUse1 )
+    if ( IS_CPU_TENSOR ( self ) && IS_TPU_TENSOR ( dst ) )
     {
-      _copy_from_tpu ( src.to ( dst.device() ), dst, non_blocking );
+      _copy_from_tpu ( self.to ( dst.device() ), dst, non_blocking );
     }
-    else if ( src.device().type() == DeviceType::PrivateUse1 &&  dst.device().type() == DeviceType::CPU )
+    else if ( IS_TPU_TENSOR ( self ) && IS_CPU_TENSOR ( dst ) )
     {
-      _copy_from_tpu ( src.to ( dst.dtype() ), dst, non_blocking );
+      _copy_from_tpu ( self.to ( dst.dtype() ), dst, non_blocking );
     }
-    else if ( src.device().type() == DeviceType::PrivateUse1 && dst.device().type() == DeviceType::PrivateUse1 )
+    else if ( IS_TPU_TENSOR ( self ) && IS_TPU_TENSOR ( dst ) )
     {
-      auto handle = tpu::TPUGetDeviceHandle();
-      auto input_desc = tpu::TPUGenerateTensorDesc ( src );
-      auto output_desc = tpu::TPUGenerateTensorDesc ( dst );
-      auto status = sgdnn_dtype_convert ( handle,
-                                          input_desc,
-                                          ADDR_IN_DEVICE ( src ),
-                                          output_desc,
-                                          ADDR_IN_DEVICE ( dst ),
-                                          SG_ROUND_EVEN );
+#ifdef TPU_OP_TIMING
+      auto timer = tpu::Timer().Start();
+#endif
+#if 1
+      auto dst_cpu = self.cpu().to ( dst.dtype() );
+      tpu::TPUCopyHostToDevice ( dst.data_ptr(), dst_cpu.contiguous().data_ptr(), dst.nbytes() );
+#else
+      auto status = sgdnn_dtype_convert (
+                    tpu::TPUGetDeviceHandle(),
+                    tpu::TPUGenerateTensorDesc ( self ),
+                    ADDR_IN_DEVICE ( self ),
+                    tpu::TPUGenerateTensorDesc ( dst ),
+                    ADDR_IN_DEVICE ( dst ),
+                    SG_ROUND_EVEN );
       TORCH_CHECK ( status == BM_SUCCESS );
+#endif
+#ifdef TPU_OP_TIMING
+      tpu::OpTimer::Instance().AddTime ( tpu::DTYPE_CONVERT, timer.ElapsedUS() );
+#endif
     }
     else
     {
-      TORCH_CHECK ( false, "Unsupported copy from device ", src.device(), " to device ", dst.device() );
+      TORCH_CHECK ( false, "Unsupported copy from device ", self.device(), " to device ", dst.device() );
     }
   }
   return dst;

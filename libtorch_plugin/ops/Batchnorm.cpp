@@ -42,12 +42,12 @@ double                        eps )
   if ( running_mean.defined() ) { CHECK_TENSOR_IN_DEVICE ( running_mean ); }
   if ( running_var.defined() )  { CHECK_TENSOR_IN_DEVICE ( running_var ); }
 #if 0
-  auto running_mean_cpu = running_mean.defined() ? TENSOR_TO_CPU ( running_mean ) : Tensor();
-  auto running_var_cpu = running_var.defined() ? TENSOR_TO_CPU ( running_var ) : Tensor();
+  auto running_mean_cpu = running_mean.defined() ? running_mean.cpu() : Tensor();
+  auto running_var_cpu = running_var.defined() ? running_var.cpu() : Tensor();
   auto outputs_cpu = native_batch_norm (
                      TENSOR_TO_CPU ( input ),
-                     c10::optional<Tensor> ( weight.defined() ? TENSOR_TO_CPU ( weight ) : Tensor() ),
-                     c10::optional<Tensor> ( bias.defined() ? TENSOR_TO_CPU ( bias ) : Tensor() ),
+                     c10::optional<Tensor> ( weight.defined() ? weight.cpu() : Tensor() ),
+                     c10::optional<Tensor> ( bias.defined() ? bias.cpu() : Tensor() ),
                      c10::optional<Tensor> ( running_mean_cpu ),
                      c10::optional<Tensor> ( running_var_cpu ),
                      training,

@@ -29,6 +29,9 @@ while ( 0 )
 
 #define TPU_ERROR_CODE(Err) " ( TPU error code: " << Err << ")"
 
+#define IS_TPU_TENSOR(t)  ( ( t ).device().type() == DeviceType::PrivateUse1 )
+#define IS_CPU_TENSOR(t)  ( ( t ).device().type() == DeviceType::CPU )
+
 namespace tpu
 {
 
@@ -172,6 +175,18 @@ typedef enum
   BATCHNORM_BACKWARD,
   RELU,
   RELU_BACKWARD,
+  GELU,
+  MM,
+  ADDMM,
+  BMM,
+  SOFTMAX,
+  PERMUTE,
+  ADD,
+  SUB,
+  MUL,
+  DIV,
+  INDEX_SELECT,
+  DTYPE_CONVERT,
   OP_NUM
 }
 OpType;
@@ -183,7 +198,19 @@ static const char * OpTypeStr[OP_NUM] =
   "Batchnorm",
   "Batchnorm Backward",
   "ReLU",
-  "ReLU Backward"
+  "ReLU Backward",
+  "GELU",
+  "Matmul",
+  "Add Matmul",
+  "Batch Matmul",
+  "Softmax",
+  "Permute",
+  "Add",
+  "Sub",
+  "Mul",
+  "Div",
+  "Index Select",
+  "DType Convert"
 };
 
 struct OpTimer

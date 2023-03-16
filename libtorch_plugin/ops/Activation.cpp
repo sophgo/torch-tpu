@@ -9,7 +9,7 @@
 #include <limits.h>
 
 #define TPU_OP_TIMING
-#define SHOW_OP_INFO
+//#define SHOW_OP_INFO
 
 namespace at
 {
@@ -116,16 +116,19 @@ TORCH_LIBRARY_IMPL ( aten, PrivateUse1, m )
   m.impl ( "threshold_backward.grad_input", threshold_backward_grad_input_tpu );
 }
 
-Tensor & gelu_out_tpu ( const Tensor    & self,
-                        c10::string_view  approximate,
-                        Tensor          & out )
+Tensor & gelu_out_tpu ( const Tensor & self, c10::string_view approximate, Tensor & out )
 {
   CHECK_TENSOR_IN_DEVICE ( self );
   CHECK_TENSOR_IN_DEVICE ( out );
+#ifdef TPU_OP_TIMING
+  auto timer = tpu::Timer().Start();
+#endif
+#if 1
+  auto out_cpu = gelu ( self.cpu(), approximate );
+  tpu::TPUCopyHostToDevice ( out.data_ptr(), out_cpu.contiguous().data_ptr(), out.nbytes() );
+#else
   float alpha = 1.f;
   float beta = 0.f;
-  auto self_desc = tpu::TPUGenerateTensorDesc ( self );
-  auto out_desc = tpu::TPUGenerateTensorDesc ( out );
   ActivationDescriptor_t activation_desc =
   {
     .mode = Activation_Gelu,
@@ -139,12 +142,16 @@ Tensor & gelu_out_tpu ( const Tensor    & self,
                        tpu::TPUGetDeviceHandle(),
                        activation_desc,
                        &alpha,
-                       self_desc,
+                       tpu::TPUGenerateTensorDesc ( self ),
                        ADDR_IN_DEVICE ( self ),
                        &beta,
-                       out_desc,
+                       tpu::TPUGenerateTensorDesc ( out ),
                        ADDR_IN_DEVICE ( out ) );
   TORCH_CHECK ( status == BM_SUCCESS );
+#endif
+#ifdef TPU_OP_TIMING
+  tpu::OpTimer::Instance().AddTime ( tpu::GELU, timer.ElapsedUS() );
+#endif
   return out;
 }
 TORCH_LIBRARY_IMPL ( aten, PrivateUse1, m )

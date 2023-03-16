@@ -28,7 +28,10 @@ void OpTimer::Dump() const
 {
   for ( auto i = 0; i < OP_NUM; ++i )
   {
-    std::cout << OpTypeStr[i] << ": " << elapsed_time_us_[i] << "us" << std::endl;
+    if ( elapsed_time_us_[i] > 0 )
+    {
+      std::cout << OpTypeStr[i] << ": " << elapsed_time_us_[i] << "us" << std::endl;
+    }
   }
 }
 

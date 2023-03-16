@@ -6,61 +6,81 @@
 #include <TPUTorchUtils.h>
 #include <sgdnn_api.h>
 
+#define TPU_OP_TIMING
+//#define SHOW_OP_INFO
+
 namespace at
 {
-Tensor & addmm_out_tpu ( const Tensor & input,
-                         const Tensor & mat1,
-                         const Tensor & mat2,
-                         const Scalar & beta,
-                         const Scalar & alpha,
-                         Tensor       & output )
+Tensor & addmm_out_tpu ( const Tensor & self, const Tensor & mat1, const Tensor & mat2, const Scalar & beta, const Scalar & alpha, Tensor & out )
 {
-  CHECK_TENSOR_IN_DEVICE ( output );
-  CHECK_TENSOR_IN_DEVICE ( input );
+  static int count = 0;
+#ifdef SHOW_OP_INFO
+  std::cout << "Addmm " << count << std::endl;
+  ++count;
+#endif
+  CHECK_TENSOR_IN_DEVICE ( self );
   CHECK_TENSOR_IN_DEVICE ( mat1 );
   CHECK_TENSOR_IN_DEVICE ( mat2 );
-  auto input_cpu = input.to ( torch::Device ( "cpu" ) );
-  auto mat1_cpu = mat1.to ( torch::Device ( "cpu" ) );
-  auto mat2_cpu = mat2.to ( torch::Device ( "cpu" ) );
-  auto output_cpu = addmm ( input_cpu, mat1_cpu, mat2_cpu, beta, alpha );
-  tpu::TPUCopyHostToDevice ( output.data_ptr(), output_cpu.contiguous().data_ptr(), output.nbytes() );
-  return output;
+  CHECK_TENSOR_IN_DEVICE ( out );
+#ifdef TPU_OP_TIMING
+  auto timer = tpu::Timer().Start();
+#endif
+  auto out_cpu = addmm ( self.cpu(), mat1.cpu(), mat2.cpu(), beta, alpha );
+  tpu::TPUCopyHostToDevice ( out.data_ptr(), out_cpu.contiguous().data_ptr(), out.nbytes() );
+#ifdef TPU_OP_TIMING
+  tpu::OpTimer::Instance().AddTime ( tpu::ADDMM, timer.ElapsedUS() );
+#endif
+  return out;
 }
 TORCH_LIBRARY_IMPL ( aten, PrivateUse1, m )
 {
   m.impl ( "addmm.out", addmm_out_tpu );
 }
 
-Tensor & mm_out_tpu ( const Tensor & mat1,
-                      const Tensor & mat2,
-                      Tensor       & output )
+Tensor & mm_out_tpu ( const Tensor & self, const Tensor & mat2, Tensor & out )
 {
-  CHECK_TENSOR_IN_DEVICE ( output );
-  CHECK_TENSOR_IN_DEVICE ( mat1 );
+  static int count = 0;
+#ifdef SHOW_OP_INFO
+  std::cout << "mm " << count << std::endl;
+  ++count;
+#endif
+  CHECK_TENSOR_IN_DEVICE ( self );
   CHECK_TENSOR_IN_DEVICE ( mat2 );
-  auto mat1_cpu = mat1.to ( torch::Device ( "cpu" ) );
-  auto mat2_cpu = mat2.to ( torch::Device ( "cpu" ) );
-  auto output_cpu = mm ( mat1_cpu, mat2_cpu );
-  tpu::TPUCopyHostToDevice ( output.data_ptr(), output_cpu.contiguous().data_ptr(), output.nbytes() );
-  return output;
+  CHECK_TENSOR_IN_DEVICE ( out );
+#ifdef TPU_OP_TIMING
+  auto timer = tpu::Timer().Start();
+#endif
+  auto out_cpu = mm ( self.cpu(), mat2.cpu() );
+  tpu::TPUCopyHostToDevice ( out.data_ptr(), out_cpu.contiguous().data_ptr(), out.nbytes() );
+#ifdef TPU_OP_TIMING
+  tpu::OpTimer::Instance().AddTime ( tpu::MM, timer.ElapsedUS() );
+#endif
+  return out;
 }
 TORCH_LIBRARY_IMPL ( aten, PrivateUse1, m )
 {
   m.impl ( "mm.out", mm_out_tpu );
 }
 
-Tensor & bmm_out_tpu ( const Tensor & mat1,
-                       const Tensor & mat2,
-                       Tensor       & output )
+Tensor & bmm_out_tpu ( const Tensor & self, const Tensor & mat2, Tensor & out )
 {
-  CHECK_TENSOR_IN_DEVICE ( output );
-  CHECK_TENSOR_IN_DEVICE ( mat1 );
+  static int count = 0;
+#ifdef SHOW_OP_INFO
+  std::cout << "bmm " << count << std::endl;
+  ++count;
+#endif
+  CHECK_TENSOR_IN_DEVICE ( self );
   CHECK_TENSOR_IN_DEVICE ( mat2 );
-  auto mat1_cpu = mat1.to ( torch::Device ( "cpu" ) );
-  auto mat2_cpu = mat2.to ( torch::Device ( "cpu" ) );
-  auto output_cpu = bmm ( mat1_cpu, mat2_cpu );
-  tpu::TPUCopyHostToDevice ( output.data_ptr(), output_cpu.contiguous().data_ptr(), output.nbytes() );
-  return output;
+  CHECK_TENSOR_IN_DEVICE ( out );
+#ifdef TPU_OP_TIMING
+  auto timer = tpu::Timer().Start();
+#endif
+  auto out_cpu = bmm ( self.cpu(), mat2.cpu() );
+  tpu::TPUCopyHostToDevice ( out.data_ptr(), out_cpu.contiguous().data_ptr(), out.nbytes() );
+#ifdef TPU_OP_TIMING
+  tpu::OpTimer::Instance().AddTime ( tpu::BMM, timer.ElapsedUS() );
+#endif
+  return out;
 }
 TORCH_LIBRARY_IMPL ( aten, PrivateUse1, m )
 {

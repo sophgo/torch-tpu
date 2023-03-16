@@ -6,114 +6,125 @@
 #include <TPUTorchUtils.h>
 #include <sgdnn_api.h>
 
+#define TPU_OP_TIMING
+
 namespace at
 {
-Tensor & add_out_tpu ( const Tensor & input1,
-                       const Tensor & input2,
-                       const Scalar & alpha,
-                       Tensor       & out )
+Tensor & add_out_tpu ( const Tensor & self, const Tensor & other, const Scalar & alpha, Tensor & out )
 {
+  if ( self.dim() > 0 )  { CHECK_TENSOR_IN_DEVICE ( self ); }
+  if ( other.dim() > 0 ) { CHECK_TENSOR_IN_DEVICE ( other ); }
+  CHECK_TENSOR_IN_DEVICE ( out );
 #if 0
-  auto out_cpu = torch::mul ( input1.to ( torch::Device ( "cpu" ) ), input2.to ( torch::Device ( "cpu" ) ) );
+  auto out_cpu = add ( self.cpu(), other.cpu(), alpha );
   tpu::TPUCopyHostToDevice ( out.data_ptr(), out_cpu.contiguous().data_ptr(), out.nbytes() );
 #else
-  auto handle = tpu::TPUGetDeviceHandle();
-  if ( input1.device().type() == DeviceType::PrivateUse1 && input2.device().type() == DeviceType::PrivateUse1 )
+  if ( IS_TPU_TENSOR ( self ) && IS_TPU_TENSOR ( other ) )
   {
-    CHECK_TENSOR_IN_DEVICE ( input1 );
-    CHECK_TENSOR_IN_DEVICE ( input2 );
-    CHECK_TENSOR_IN_DEVICE ( out );
-    auto input1_desc = tpu::TPUGenerateTensorDesc ( input1 );
-    auto input2_desc = tpu::TPUGenerateTensorDesc ( input2 );
-    auto output_desc = tpu::TPUGenerateTensorDesc ( out );
     if ( alpha.toDouble() == 1.0 )
     {
+#ifdef TPU_OP_TIMING
+      auto timer = tpu::Timer().Start();
+#endif
       bm_status_t status = sgdnn_binary_cudnn (
-                           handle,
-                           input1_desc,
-                           ADDR_IN_DEVICE ( input1 ),
-                           input2_desc,
-                           ADDR_IN_DEVICE ( input2 ),
-                           output_desc,
+                           tpu::TPUGetDeviceHandle(),
+                           tpu::TPUGenerateTensorDesc ( self ),
+                           ADDR_IN_DEVICE ( self ),
+                           tpu::TPUGenerateTensorDesc ( other ),
+                           ADDR_IN_DEVICE ( other ),
+                           tpu::TPUGenerateTensorDesc ( out ),
                            ADDR_IN_DEVICE ( out ),
                            OP_BINARY_ADD );
       TORCH_CHECK ( status == BM_SUCCESS );
+#ifdef TPU_OP_TIMING
+      tpu::OpTimer::Instance().AddTime ( tpu::ADD, timer.ElapsedUS() );
+#endif
+    }
+    else if ( alpha.toDouble() == -1.0 )
+    {
+#ifdef TPU_OP_TIMING
+      auto timer = tpu::Timer().Start();
+#endif
+      bm_status_t status = sgdnn_binary_cudnn (
+                           tpu::TPUGetDeviceHandle(),
+                           tpu::TPUGenerateTensorDesc ( self ),
+                           ADDR_IN_DEVICE ( self ),
+                           tpu::TPUGenerateTensorDesc ( other ),
+                           ADDR_IN_DEVICE ( other ),
+                           tpu::TPUGenerateTensorDesc ( out ),
+                           ADDR_IN_DEVICE ( out ),
+                           OP_BINARY_SUB );
+      TORCH_CHECK ( status == BM_SUCCESS );
+#ifdef TPU_OP_TIMING
+      tpu::OpTimer::Instance().AddTime ( tpu::SUB, timer.ElapsedUS() );
+#endif
     }
     else
     {
-      auto input2_mul_alpha = input2 * alpha;
-      input2_desc = tpu::TPUGenerateTensorDesc ( input2_mul_alpha );
-      bm_status_t status = sgdnn_binary_cudnn (
-                           handle,
-                           input1_desc,
-                           ADDR_IN_DEVICE ( input1 ),
-                           input2_desc,
-                           ADDR_IN_DEVICE ( input2_mul_alpha ),
-                           output_desc,
-                           ADDR_IN_DEVICE ( out ),
-                           OP_BINARY_ADD );
-      TORCH_CHECK ( status == BM_SUCCESS );
+      add_out_tpu ( self, other * alpha, 1.0, out );
     }
   }
-  else if ( ( input1.device().type() == DeviceType::PrivateUse1 && input2.device().type() == DeviceType::CPU ) ||
-            ( input1.device().type() == DeviceType::CPU && input2.device().type() == DeviceType::PrivateUse1 ) )
+  else if ( ( IS_TPU_TENSOR ( self ) && IS_CPU_TENSOR ( other ) ) ||
+            ( IS_CPU_TENSOR ( self ) && IS_TPU_TENSOR ( other ) ) )
   {
     TORCH_CHECK ( alpha.toDouble() == 1.0 );
-    if ( input2.device().type() == DeviceType::CPU )
+    if ( IS_CPU_TENSOR ( other ) )
     {
-      TORCH_CHECK ( input2.dim() == 0, "Input2 must be a scalar" );
-      CHECK_TENSOR_IN_DEVICE ( input1 );
-      CHECK_TENSOR_IN_DEVICE ( out );
-      Tensor Scalar;
-      if ( input2.dtype() == caffe2::TypeMeta::Make<double>() )
+      TORCH_CHECK ( other.dim() == 0, "OTHER must be a scalar" );
+      Tensor scalar;
+      if ( other.dtype() == caffe2::TypeMeta::Make<double>() )
       {
-        Scalar = input2.to ( torch::kFloat );
+        scalar = other.to ( torch::kFloat );
       }
       else
       {
-        Scalar = input2;
+        scalar = other;
       }
-      auto input1_desc = tpu::TPUGenerateTensorDesc ( input1 );
-      auto Scalar_desc = tpu::TPUGenerateTensorDesc ( Scalar );
-      auto output_desc = tpu::TPUGenerateTensorDesc ( out );
+#ifdef TPU_OP_TIMING
+      auto timer = tpu::Timer().Start();
+#endif
       bm_status_t status = sgdnn_binary_cudnn (
-                           handle,
-                           input1_desc,
-                           ADDR_IN_DEVICE ( input1 ),
-                           Scalar_desc,
-                           Scalar.data_ptr(),
-                           output_desc,
+                           tpu::TPUGetDeviceHandle(),
+                           tpu::TPUGenerateTensorDesc ( self ),
+                           ADDR_IN_DEVICE ( self ),
+                           tpu::TPUGenerateTensorDesc ( scalar ),
+                           scalar.data_ptr(),
+                           tpu::TPUGenerateTensorDesc ( out ),
                            ADDR_IN_DEVICE ( out ),
                            OP_BINARY_ADD );
       TORCH_CHECK ( status == BM_SUCCESS );
+#ifdef TPU_OP_TIMING
+      tpu::OpTimer::Instance().AddTime ( tpu::ADD, timer.ElapsedUS() );
+#endif
     }
     else
     {
-      TORCH_CHECK ( input1.dim() == 0, "Input1 must be a scalar" );
-      CHECK_TENSOR_IN_DEVICE ( input2 );
-      CHECK_TENSOR_IN_DEVICE ( out );
-      Tensor Scalar;
-      if ( input1.dtype() == caffe2::TypeMeta::Make<double>() )
+      TORCH_CHECK ( self.dim() == 0, "SELF must be a scalar" );
+      Tensor scalar;
+      if ( self.dtype() == caffe2::TypeMeta::Make<double>() )
       {
-        Scalar = input1.to ( torch::kFloat );
+        scalar = self.to ( torch::kFloat );
       }
       else
       {
-        Scalar = input1;
+        scalar = self;
       }
-      auto Scalar_desc = tpu::TPUGenerateTensorDesc ( Scalar );
-      auto input2_desc = tpu::TPUGenerateTensorDesc ( input2 );
-      auto output_desc = tpu::TPUGenerateTensorDesc ( out );
+#ifdef TPU_OP_TIMING
+      auto timer = tpu::Timer().Start();
+#endif
       bm_status_t status = sgdnn_binary_cudnn (
-                           handle,
-                           input2_desc,
-                           ADDR_IN_DEVICE ( input2 ),
-                           Scalar_desc,
-                           Scalar.data_ptr(),
-                           output_desc,
+                           tpu::TPUGetDeviceHandle(),
+                           tpu::TPUGenerateTensorDesc ( scalar ),
+                           scalar.data_ptr(),
+                           tpu::TPUGenerateTensorDesc ( other ),
+                           ADDR_IN_DEVICE ( other ),
+                           tpu::TPUGenerateTensorDesc ( out ),
                            ADDR_IN_DEVICE ( out ),
                            OP_BINARY_ADD );
       TORCH_CHECK ( status == BM_SUCCESS );
+#ifdef TPU_OP_TIMING
+      tpu::OpTimer::Instance().AddTime ( tpu::ADD, timer.ElapsedUS() );
+#endif
     }
   }
   else
@@ -128,94 +139,121 @@ TORCH_LIBRARY_IMPL ( aten, PrivateUse1, m )
   m.impl ( "add.out", add_out_tpu );
 }
 
-Tensor & sub_out_tpu ( const Tensor & input1,
-                       const Tensor & input2,
-                       const Scalar & alpha,
-                       Tensor       & out )
+Tensor & sub_out_tpu ( const Tensor & self, const Tensor & other, const Scalar & alpha, Tensor & out )
 {
-  TORCH_CHECK ( alpha.toDouble() == 1.0 );
+  if ( self.dim() > 0 )  { CHECK_TENSOR_IN_DEVICE ( self ); }
+  if ( other.dim() > 0 ) { CHECK_TENSOR_IN_DEVICE ( other ); }
+  CHECK_TENSOR_IN_DEVICE ( out );
 #if 0
-  auto out_cpu = torch::mul ( input1.to ( torch::Device ( "cpu" ) ), input2.to ( torch::Device ( "cpu" ) ) );
+  auto out_cpu = sub ( self.cpu(), other.cpu(), alpha );
   tpu::TPUCopyHostToDevice ( out.data_ptr(), out_cpu.contiguous().data_ptr(), out.nbytes() );
 #else
-  auto handle = tpu::TPUGetDeviceHandle();
-  if ( input1.device().type() == DeviceType::PrivateUse1 && input2.device().type() == DeviceType::PrivateUse1 )
+  if ( IS_TPU_TENSOR ( self ) && IS_TPU_TENSOR ( other ) )
   {
-    CHECK_TENSOR_IN_DEVICE ( input1 );
-    CHECK_TENSOR_IN_DEVICE ( input2 );
-    CHECK_TENSOR_IN_DEVICE ( out );
-    auto input1_desc = tpu::TPUGenerateTensorDesc ( input1 );
-    auto input2_desc = tpu::TPUGenerateTensorDesc ( input2 );
-    auto output_desc = tpu::TPUGenerateTensorDesc ( out );
-    bm_status_t status = sgdnn_binary_cudnn (
-                         handle,
-                         input1_desc,
-                         ADDR_IN_DEVICE ( input1 ),
-                         input2_desc,
-                         ADDR_IN_DEVICE ( input2 ),
-                         output_desc,
-                         ADDR_IN_DEVICE ( out ),
-                         OP_BINARY_SUB );
-    TORCH_CHECK ( status == BM_SUCCESS );
-  }
-  else if ( ( input1.device().type() == DeviceType::PrivateUse1 && input2.device().type() == DeviceType::CPU ) ||
-            ( input1.device().type() == DeviceType::CPU && input2.device().type() == DeviceType::PrivateUse1 ) )
-  {
-    if ( input2.device().type() == DeviceType::CPU )
+    if ( alpha.toDouble() == 1.0 )
     {
-      TORCH_CHECK ( input2.dim() == 0, "Input2 must be a scalar" );
-      CHECK_TENSOR_IN_DEVICE ( input1 );
-      CHECK_TENSOR_IN_DEVICE ( out );
-      Tensor Scalar;
-      if ( input2.dtype() == caffe2::TypeMeta::Make<double>() )
-      {
-        Scalar = input2.to ( torch::kFloat );
-      }
-      else
-      {
-        Scalar = input2;
-      }
-      auto input1_desc = tpu::TPUGenerateTensorDesc ( input1 );
-      auto Scalar_desc = tpu::TPUGenerateTensorDesc ( Scalar );
-      auto output_desc = tpu::TPUGenerateTensorDesc ( out );
+#ifdef TPU_OP_TIMING
+      auto timer = tpu::Timer().Start();
+#endif
       bm_status_t status = sgdnn_binary_cudnn (
-                           handle,
-                           input1_desc,
-                           ADDR_IN_DEVICE ( input1 ),
-                           Scalar_desc,
-                           Scalar.data_ptr(),
-                           output_desc,
+                           tpu::TPUGetDeviceHandle(),
+                           tpu::TPUGenerateTensorDesc ( self ),
+                           ADDR_IN_DEVICE ( self ),
+                           tpu::TPUGenerateTensorDesc ( other ),
+                           ADDR_IN_DEVICE ( other ),
+                           tpu::TPUGenerateTensorDesc ( out ),
                            ADDR_IN_DEVICE ( out ),
                            OP_BINARY_SUB );
       TORCH_CHECK ( status == BM_SUCCESS );
+#ifdef TPU_OP_TIMING
+      tpu::OpTimer::Instance().AddTime ( tpu::SUB, timer.ElapsedUS() );
+#endif
+    }
+    else if ( alpha.toDouble() == -1.0 )
+    {
+#ifdef TPU_OP_TIMING
+      auto timer = tpu::Timer().Start();
+#endif
+      bm_status_t status = sgdnn_binary_cudnn (
+                           tpu::TPUGetDeviceHandle(),
+                           tpu::TPUGenerateTensorDesc ( self ),
+                           ADDR_IN_DEVICE ( self ),
+                           tpu::TPUGenerateTensorDesc ( other ),
+                           ADDR_IN_DEVICE ( other ),
+                           tpu::TPUGenerateTensorDesc ( out ),
+                           ADDR_IN_DEVICE ( out ),
+                           OP_BINARY_ADD );
+      TORCH_CHECK ( status == BM_SUCCESS );
+#ifdef TPU_OP_TIMING
+      tpu::OpTimer::Instance().AddTime ( tpu::ADD, timer.ElapsedUS() );
+#endif
     }
     else
     {
-      TORCH_CHECK ( input1.dim() == 0, "Input1 must be a scalar" );
-      CHECK_TENSOR_IN_DEVICE ( input2 );
-      CHECK_TENSOR_IN_DEVICE ( out );
-      Tensor Scalar;
-      if ( input1.dtype() == caffe2::TypeMeta::Make<double>() )
+      sub_out_tpu ( self, other * alpha, 1.0, out );
+    }
+  }
+  else if ( ( IS_TPU_TENSOR ( self ) && IS_CPU_TENSOR ( other ) ) ||
+            ( IS_CPU_TENSOR ( self ) && IS_TPU_TENSOR ( other ) ) )
+  {
+    TORCH_CHECK ( alpha.toDouble() == 1.0 );
+    if ( IS_CPU_TENSOR ( other ) )
+    {
+      TORCH_CHECK ( other.dim() == 0, "OTHER must be a scalar" );
+      Tensor scalar;
+      if ( other.dtype() == caffe2::TypeMeta::Make<double>() )
       {
-        Scalar = input1.to ( torch::kFloat );
+        scalar = other.to ( torch::kFloat );
       }
       else
       {
-        Scalar = input1;
+        scalar = other;
       }
-      auto Scalar_desc = tpu::TPUGenerateTensorDesc ( Scalar );
-      auto input2_desc = tpu::TPUGenerateTensorDesc ( input2 );
-      auto output_desc = tpu::TPUGenerateTensorDesc ( out );
+#ifdef TPU_OP_TIMING
+      auto timer = tpu::Timer().Start();
+#endif
       bm_status_t status = sgdnn_binary_cudnn (
-                           handle,
-                           input2_desc,
-                           ADDR_IN_DEVICE ( input2 ),
-                           Scalar_desc,
-                           Scalar.data_ptr(),
-                           output_desc,
+                           tpu::TPUGetDeviceHandle(),
+                           tpu::TPUGenerateTensorDesc ( self ),
+                           ADDR_IN_DEVICE ( self ),
+                           tpu::TPUGenerateTensorDesc ( scalar ),
+                           scalar.data_ptr(),
+                           tpu::TPUGenerateTensorDesc ( out ),
                            ADDR_IN_DEVICE ( out ),
                            OP_BINARY_SUB );
       TORCH_CHECK ( status == BM_SUCCESS );
+#ifdef TPU_OP_TIMING
+      tpu::OpTimer::Instance().AddTime ( tpu::SUB, timer.ElapsedUS() );
+#endif
+    }
+    else
+    {
+      TORCH_CHECK ( self.dim() == 0, "SELF must be a scalar" );
+      Tensor scalar;
+      if ( self.dtype() == caffe2::TypeMeta::Make<double>() )
+      {
+        scalar = self.to ( torch::kFloat );
+      }
+      else
+      {
+        scalar = self;
+      }
+#ifdef TPU_OP_TIMING
+      auto timer = tpu::Timer().Start();
+#endif
+      bm_status_t status = sgdnn_binary_cudnn (
+                           tpu::TPUGetDeviceHandle(),
+                           tpu::TPUGenerateTensorDesc ( scalar ),
+                           scalar.data_ptr(),
+                           tpu::TPUGenerateTensorDesc ( other ),
+                           ADDR_IN_DEVICE ( other ),
+                           tpu::TPUGenerateTensorDesc ( out ),
+                           ADDR_IN_DEVICE ( out ),
+                           OP_BINARY_SUB );
+      TORCH_CHECK ( status == BM_SUCCESS );
+#ifdef TPU_OP_TIMING
+      tpu::OpTimer::Instance().AddTime ( tpu::SUB, timer.ElapsedUS() );
+#endif
     }
   }
   else
@@ -230,92 +268,94 @@ TORCH_LIBRARY_IMPL ( aten, PrivateUse1, m )
   m.impl ( "sub.out", sub_out_tpu );
 }
 
-Tensor & mul_out_tpu ( const Tensor & input1,
-                       const Tensor & input2,
-                       Tensor       & out )
+Tensor & mul_out_tpu ( const Tensor & self, const Tensor & other, Tensor & out )
 {
+  if ( self.dim() > 0 )  { CHECK_TENSOR_IN_DEVICE ( self ); }
+  if ( other.dim() > 0 ) { CHECK_TENSOR_IN_DEVICE ( other ); }
+  CHECK_TENSOR_IN_DEVICE ( out );
 #if 0
-  auto out_cpu = torch::mul ( input1.to ( torch::Device ( "cpu" ) ), input2.to ( torch::Device ( "cpu" ) ) );
+  auto out_cpu = mul ( self.cpu(), other.cpu() );
   tpu::TPUCopyHostToDevice ( out.data_ptr(), out_cpu.contiguous().data_ptr(), out.nbytes() );
 #else
-  auto handle = tpu::TPUGetDeviceHandle();
-  if ( input1.device().type() == DeviceType::PrivateUse1 && input2.device().type() == DeviceType::PrivateUse1 )
+  if ( IS_TPU_TENSOR ( self ) && IS_TPU_TENSOR ( other ) )
   {
-    CHECK_TENSOR_IN_DEVICE ( input1 );
-    CHECK_TENSOR_IN_DEVICE ( input2 );
-    CHECK_TENSOR_IN_DEVICE ( out );
-    auto input1_desc = tpu::TPUGenerateTensorDesc ( input1 );
-    auto input2_desc = tpu::TPUGenerateTensorDesc ( input2 );
-    auto output_desc = tpu::TPUGenerateTensorDesc ( out );
+#ifdef TPU_OP_TIMING
+    auto timer = tpu::Timer().Start();
+#endif
     bm_status_t status = sgdnn_binary_cudnn (
-                         handle,
-                         input1_desc,
-                         ADDR_IN_DEVICE ( input1 ),
-                         input2_desc,
-                         ADDR_IN_DEVICE ( input2 ),
-                         output_desc,
+                         tpu::TPUGetDeviceHandle(),
+                         tpu::TPUGenerateTensorDesc ( self ),
+                         ADDR_IN_DEVICE ( self ),
+                         tpu::TPUGenerateTensorDesc ( other ),
+                         ADDR_IN_DEVICE ( other ),
+                         tpu::TPUGenerateTensorDesc ( out ),
                          ADDR_IN_DEVICE ( out ),
                          OP_BINARY_MUL );
     TORCH_CHECK ( status == BM_SUCCESS );
+#ifdef TPU_OP_TIMING
+    tpu::OpTimer::Instance().AddTime ( tpu::MUL, timer.ElapsedUS() );
+#endif
   }
-  else if ( ( input1.device().type() == DeviceType::PrivateUse1 && input2.device().type() == DeviceType::CPU ) ||
-            ( input1.device().type() == DeviceType::CPU && input2.device().type() == DeviceType::PrivateUse1 ) )
+  else if ( ( IS_TPU_TENSOR ( self ) && IS_CPU_TENSOR ( other ) ) ||
+            ( IS_CPU_TENSOR ( self ) && IS_TPU_TENSOR ( other ) ) )
   {
-    if ( input2.device().type() == DeviceType::CPU )
+    if ( IS_CPU_TENSOR ( other ) )
     {
-      TORCH_CHECK ( input2.dim() == 0, "Input2 must be a scalar" );
-      CHECK_TENSOR_IN_DEVICE ( input1 );
-      CHECK_TENSOR_IN_DEVICE ( out );
-      Tensor Scalar;
-      if ( input2.dtype() == caffe2::TypeMeta::Make<double>() )
+      TORCH_CHECK ( other.dim() == 0, "OTHER must be a scalar" );
+      Tensor scalar;
+      if ( other.dtype() == caffe2::TypeMeta::Make<double>() )
       {
-        Scalar = input2.to ( torch::kFloat );
+        scalar = other.to ( torch::kFloat );
       }
       else
       {
-        Scalar = input2;
+        scalar = other;
       }
-      auto input1_desc = tpu::TPUGenerateTensorDesc ( input1 );
-      auto Scalar_desc = tpu::TPUGenerateTensorDesc ( Scalar );
-      auto output_desc = tpu::TPUGenerateTensorDesc ( out );
+#ifdef TPU_OP_TIMING
+      auto timer = tpu::Timer().Start();
+#endif
       bm_status_t status = sgdnn_binary_cudnn (
-                           handle,
-                           input1_desc,
-                           ADDR_IN_DEVICE ( input1 ),
-                           Scalar_desc,
-                           Scalar.data_ptr(),
-                           output_desc,
+                           tpu::TPUGetDeviceHandle(),
+                           tpu::TPUGenerateTensorDesc ( self ),
+                           ADDR_IN_DEVICE ( self ),
+                           tpu::TPUGenerateTensorDesc ( scalar ),
+                           scalar.data_ptr(),
+                           tpu::TPUGenerateTensorDesc ( out ),
                            ADDR_IN_DEVICE ( out ),
                            OP_BINARY_MUL );
       TORCH_CHECK ( status == BM_SUCCESS );
+#ifdef TPU_OP_TIMING
+      tpu::OpTimer::Instance().AddTime ( tpu::MUL, timer.ElapsedUS() );
+#endif
     }
     else
     {
-      TORCH_CHECK ( input1.dim() == 0, "Input1 must be a scalar" );
-      CHECK_TENSOR_IN_DEVICE ( input2 );
-      CHECK_TENSOR_IN_DEVICE ( out );
-      Tensor Scalar;
-      if ( input1.dtype() == caffe2::TypeMeta::Make<double>() )
+      TORCH_CHECK ( self.dim() == 0, "SELF must be a scalar" );
+      Tensor scalar;
+      if ( self.dtype() == caffe2::TypeMeta::Make<double>() )
       {
-        Scalar = input1.to ( torch::kFloat );
+        scalar = self.to ( torch::kFloat );
       }
       else
       {
-        Scalar = input1;
+        scalar = self;
       }
-      auto Scalar_desc = tpu::TPUGenerateTensorDesc ( Scalar );
-      auto input2_desc = tpu::TPUGenerateTensorDesc ( input2 );
-      auto output_desc = tpu::TPUGenerateTensorDesc ( out );
+#ifdef TPU_OP_TIMING
+      auto timer = tpu::Timer().Start();
+#endif
       bm_status_t status = sgdnn_binary_cudnn (
-                           handle,
-                           input2_desc,
-                           ADDR_IN_DEVICE ( input2 ),
-                           Scalar_desc,
-                           Scalar.data_ptr(),
-                           output_desc,
+                           tpu::TPUGetDeviceHandle(),
+                           tpu::TPUGenerateTensorDesc ( scalar ),
+                           scalar.data_ptr(),
+                           tpu::TPUGenerateTensorDesc ( other ),
+                           ADDR_IN_DEVICE ( other ),
+                           tpu::TPUGenerateTensorDesc ( out ),
                            ADDR_IN_DEVICE ( out ),
                            OP_BINARY_MUL );
       TORCH_CHECK ( status == BM_SUCCESS );
+#ifdef TPU_OP_TIMING
+      tpu::OpTimer::Instance().AddTime ( tpu::MUL, timer.ElapsedUS() );
+#endif
     }
   }
   else
@@ -330,93 +370,97 @@ TORCH_LIBRARY_IMPL ( aten, PrivateUse1, m )
   m.impl ( "mul.out", mul_out_tpu );
 }
 
-Tensor & div_out_tpu ( const Tensor & input1,
-                       const Tensor & input2,
-                       Tensor       & out )
+Tensor & div_out_tpu ( const Tensor & self, const Tensor & other, Tensor & out )
 {
+  if ( self.dim() > 0 )  { CHECK_TENSOR_IN_DEVICE ( self ); }
+  if ( other.dim() > 0 ) { CHECK_TENSOR_IN_DEVICE ( other ); }
+  CHECK_TENSOR_IN_DEVICE ( out );
 #if 0
-  auto out_cpu = torch::div ( input1.to ( torch::Device ( "cpu" ) ), input2.to ( torch::Device ( "cpu" ) ) );
+  auto out_cpu = div ( self.cpu(), other.cpu() );
   tpu::TPUCopyHostToDevice ( out.data_ptr(), out_cpu.contiguous().data_ptr(), out.nbytes() );
 #else
-  auto handle = tpu::TPUGetDeviceHandle();
-  if ( input1.device().type() == DeviceType::PrivateUse1 && input2.device().type() == DeviceType::PrivateUse1 )
+  if ( IS_TPU_TENSOR ( self ) && IS_TPU_TENSOR ( other ) )
   {
-    CHECK_TENSOR_IN_DEVICE ( input1 );
-    CHECK_TENSOR_IN_DEVICE ( input2 );
-    CHECK_TENSOR_IN_DEVICE ( out );
-    auto input1_desc = tpu::TPUGenerateTensorDesc ( input1 );
-    auto input2_desc = tpu::TPUGenerateTensorDesc ( input2 );
-    auto output_desc = tpu::TPUGenerateTensorDesc ( out );
+#ifdef TPU_OP_TIMING
+    auto timer = tpu::Timer().Start();
+#endif
     bm_status_t status = sgdnn_binary_cudnn (
-                         handle,
-                         input1_desc,
-                         ADDR_IN_DEVICE ( input1 ),
-                         input2_desc,
-                         ADDR_IN_DEVICE ( input2 ),
-                         output_desc,
+                         tpu::TPUGetDeviceHandle(),
+                         tpu::TPUGenerateTensorDesc ( self ),
+                         ADDR_IN_DEVICE ( self ),
+                         tpu::TPUGenerateTensorDesc ( other ),
+                         ADDR_IN_DEVICE ( other ),
+                         tpu::TPUGenerateTensorDesc ( out ),
                          ADDR_IN_DEVICE ( out ),
                          OP_BINARY_DIV );
     TORCH_CHECK ( status == BM_SUCCESS );
+#ifdef TPU_OP_TIMING
+    tpu::OpTimer::Instance().AddTime ( tpu::DIV, timer.ElapsedUS() );
+#endif
   }
-  else if ( ( input1.device().type() == DeviceType::PrivateUse1 && input2.device().type() == DeviceType::CPU ) ||
-            ( input1.device().type() == DeviceType::CPU && input2.device().type() == DeviceType::PrivateUse1 ) )
+  else if ( ( IS_TPU_TENSOR ( self ) && IS_CPU_TENSOR ( other ) ) ||
+            ( IS_CPU_TENSOR ( self ) && IS_TPU_TENSOR ( other ) ) )
   {
-    if ( input2.device().type() == DeviceType::CPU )
+    if ( IS_CPU_TENSOR ( other ) )
     {
-      TORCH_CHECK ( input2.dim() == 0, "Input2 must be a scalar" );
-      CHECK_TENSOR_IN_DEVICE ( input1 );
-      CHECK_TENSOR_IN_DEVICE ( out );
-      Tensor Scalar;
-      if ( input2.dtype() == caffe2::TypeMeta::Make<double>() ||
-           input2.dtype() == caffe2::TypeMeta::Make<long>() )
+      TORCH_CHECK ( other.dim() == 0, "OTHER must be a scalar" );
+      Tensor scalar;
+      if ( other.dtype() == caffe2::TypeMeta::Make<double>() ||
+           other.dtype() == caffe2::TypeMeta::Make<long>() )
       {
-        Scalar = input2.to ( torch::kFloat );
+        scalar = other.to ( torch::kFloat );
       }
       else
       {
-        Scalar = input2;
+        scalar = other;
       }
-      auto input1_desc = tpu::TPUGenerateTensorDesc ( input1 );
-      auto Scalar_desc = tpu::TPUGenerateTensorDesc ( Scalar );
-      auto output_desc = tpu::TPUGenerateTensorDesc ( out );
+      /* RECIPROCAL */
+      scalar = 1.0 / scalar;
+#ifdef TPU_OP_TIMING
+      auto timer = tpu::Timer().Start();
+#endif
       bm_status_t status = sgdnn_binary_cudnn (
-                           handle,
-                           input1_desc,
-                           ADDR_IN_DEVICE ( input1 ),
-                           Scalar_desc,
-                           Scalar.data_ptr(),
-                           output_desc,
+                           tpu::TPUGetDeviceHandle(),
+                           tpu::TPUGenerateTensorDesc ( self ),
+                           ADDR_IN_DEVICE ( self ),
+                           tpu::TPUGenerateTensorDesc ( scalar ),
+                           scalar.data_ptr(),
+                           tpu::TPUGenerateTensorDesc ( out ),
                            ADDR_IN_DEVICE ( out ),
-                           OP_BINARY_DIV );
+                           OP_BINARY_MUL );
       TORCH_CHECK ( status == BM_SUCCESS );
+#ifdef TPU_OP_TIMING
+      tpu::OpTimer::Instance().AddTime ( tpu::MUL, timer.ElapsedUS() );
+#endif
     }
     else
     {
-      TORCH_CHECK ( input1.dim() == 0, "Input1 must be a scalar" );
-      CHECK_TENSOR_IN_DEVICE ( input2 );
-      CHECK_TENSOR_IN_DEVICE ( out );
-      Tensor Scalar;
-      if ( input1.dtype() == caffe2::TypeMeta::Make<double>() )
+      TORCH_CHECK ( self.dim() == 0, "SELF must be a scalar" );
+      Tensor scalar;
+      if ( self.dtype() == caffe2::TypeMeta::Make<double>() )
       {
-        Scalar = input1.to ( torch::kFloat );
+        scalar = self.to ( torch::kFloat );
       }
       else
       {
-        Scalar = input1;
+        scalar = self;
       }
-      auto Scalar_desc = tpu::TPUGenerateTensorDesc ( Scalar );
-      auto input2_desc = tpu::TPUGenerateTensorDesc ( input2 );
-      auto output_desc = tpu::TPUGenerateTensorDesc ( out );
+#ifdef TPU_OP_TIMING
+      auto timer = tpu::Timer().Start();
+#endif
       bm_status_t status = sgdnn_binary_cudnn (
-                           handle,
-                           input2_desc,
-                           ADDR_IN_DEVICE ( input2 ),
-                           Scalar_desc,
-                           Scalar.data_ptr(),
-                           output_desc,
+                           tpu::TPUGetDeviceHandle(),
+                           tpu::TPUGenerateTensorDesc ( scalar ),
+                           scalar.data_ptr(),
+                           tpu::TPUGenerateTensorDesc ( other ),
+                           ADDR_IN_DEVICE ( other ),
+                           tpu::TPUGenerateTensorDesc ( out ),
                            ADDR_IN_DEVICE ( out ),
                            OP_BINARY_DIV );
       TORCH_CHECK ( status == BM_SUCCESS );
+#ifdef TPU_OP_TIMING
+      tpu::OpTimer::Instance().AddTime ( tpu::DIV, timer.ElapsedUS() );
+#endif
     }
   }
   else

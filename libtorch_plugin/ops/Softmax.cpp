@@ -6,25 +6,23 @@
 #include <TPUTorchUtils.h>
 #include <sgdnn_api.h>
 
+#define TPU_OP_TIMING
+
 namespace at
 {
-Tensor & _log_softmax_out_tpu ( const Tensor & input,
-                                int64_t        dim,
-                                bool           half_to_float,
-                                Tensor       & output )
+Tensor & _log_softmax_out_tpu ( const Tensor & self, int64_t dim, bool half_to_float, Tensor & out )
 {
-  CHECK_TENSOR_IN_DEVICE ( input );
-  CHECK_TENSOR_IN_DEVICE ( output );
+  CHECK_TENSOR_IN_DEVICE ( self );
+  CHECK_TENSOR_IN_DEVICE ( out );
   TORCH_CHECK ( half_to_float == false );
-  auto input_cpu = TENSOR_TO_CPU ( input );
-  auto output_cpu = log_softmax ( input_cpu, dim, c10::optional<ScalarType> ( input.scalar_type() ) );
-  output = TENSOR_TO_TPU ( output_cpu );
-  return output;
+  auto out_cpu = _log_softmax ( self.cpu(), dim, half_to_float );
+  tpu::TPUCopyHostToDevice ( out.data_ptr(), out_cpu.contiguous().data_ptr(), out.nbytes() );
+  return out;
 }
-//TORCH_LIBRARY_IMPL ( aten, PrivateUse1, m )
-//{
-//  m.impl ( "_log_softmax.out", _log_softmax_out_tpu );
-//}
+TORCH_LIBRARY_IMPL ( aten, PrivateUse1, m )
+{
+  m.impl ( "_log_softmax.out", _log_softmax_out_tpu );
+}
 
 Tensor & _log_softmax_backward_data_out_tpu (
 const Tensor & grad_output,
@@ -47,18 +45,20 @@ Tensor       & out )
 //  m.impl ( "_log_softmax_backward_data.out", _log_softmax_backward_data_out_tpu );
 //}
 
-Tensor & _softmax_out_tpu ( const Tensor & input,
-                            int64_t        dim,
-                            bool           half_to_float,
-                            Tensor       & output )
+Tensor & _softmax_out_tpu ( const Tensor & self, int64_t dim, bool half_to_float, Tensor & out )
 {
-  CHECK_TENSOR_IN_DEVICE ( input );
-  CHECK_TENSOR_IN_DEVICE ( output );
+  CHECK_TENSOR_IN_DEVICE ( self );
+  CHECK_TENSOR_IN_DEVICE ( out );
   TORCH_CHECK ( half_to_float == false );
-  auto input_cpu = TENSOR_TO_CPU ( input );
-  auto output_cpu = softmax ( input_cpu, dim, c10::optional<ScalarType> ( input.scalar_type() ) );
-  tpu::TPUCopyHostToDevice ( output.data_ptr(), output_cpu.contiguous().data_ptr(), output.nbytes() );
-  return output;
+#ifdef TPU_OP_TIMING
+  auto timer = tpu::Timer().Start();
+#endif
+  auto out_cpu = _softmax ( self.cpu(), dim, half_to_float );
+  tpu::TPUCopyHostToDevice ( out.data_ptr(), out_cpu.contiguous().data_ptr(), out.nbytes() );
+#ifdef TPU_OP_TIMING
+  tpu::OpTimer::Instance().AddTime ( tpu::SOFTMAX, timer.ElapsedUS() );
+#endif
+  return out;
 }
 TORCH_LIBRARY_IMPL ( aten, PrivateUse1, m )
 {
