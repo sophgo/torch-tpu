@@ -40,10 +40,6 @@ static inline at::Device TPUGetCurrentDevice()
   return at::Device ( at::DeviceType::PrivateUse1, tpu::TPUGetDeviceIndex() );
 }
 
-static inline bool HasInfOrNan()
-{
-}
-
 static inline void SaveTensorToBinaryFile ( const at::Tensor & Tensor, const std::string & Path )
 {
   auto TensorCPU = TENSOR_TO_CPU ( Tensor ).contiguous();

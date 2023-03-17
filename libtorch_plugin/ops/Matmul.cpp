@@ -47,13 +47,26 @@ Tensor & mm_out_tpu ( const Tensor & self, const Tensor & mat2, Tensor & out )
   CHECK_TENSOR_IN_DEVICE ( self );
   CHECK_TENSOR_IN_DEVICE ( mat2 );
   CHECK_TENSOR_IN_DEVICE ( out );
+#if 0
+  auto out_cpu = mm ( self.cpu(), mat2.cpu() );
+  tpu::TPUCopyHostToDevice ( out.data_ptr(), out_cpu.contiguous().data_ptr(), out.nbytes() );
+#else
 #ifdef TPU_OP_TIMING
   auto timer = tpu::Timer().Start();
 #endif
-  auto out_cpu = mm ( self.cpu(), mat2.cpu() );
-  tpu::TPUCopyHostToDevice ( out.data_ptr(), out_cpu.contiguous().data_ptr(), out.nbytes() );
+  auto status = sgdnn_general_matmul (
+                tpu::TPUGetDeviceHandle(),
+                tpu::TPUGenerateTensorDesc ( self ),
+                ADDR_IN_DEVICE ( self ),
+                tpu::TPUGenerateTensorDesc ( mat2 ),
+                ADDR_IN_DEVICE ( mat2 ),
+                tpu::TPUGenerateTensorDesc ( out ),
+                ADDR_IN_DEVICE ( out ),
+                false );
+  TORCH_CHECK ( status == BM_SUCCESS );
 #ifdef TPU_OP_TIMING
   tpu::OpTimer::Instance().AddTime ( tpu::MM, timer.ElapsedUS() );
+#endif
 #endif
   return out;
 }
@@ -72,13 +85,27 @@ Tensor & bmm_out_tpu ( const Tensor & self, const Tensor & mat2, Tensor & out )
   CHECK_TENSOR_IN_DEVICE ( self );
   CHECK_TENSOR_IN_DEVICE ( mat2 );
   CHECK_TENSOR_IN_DEVICE ( out );
+#if 1
+  auto out_cpu = bmm ( self.cpu(), mat2.cpu() );
+  tpu::TPUCopyHostToDevice ( out.data_ptr(), out_cpu.contiguous().data_ptr(), out.nbytes() );
+#else
 #ifdef TPU_OP_TIMING
   auto timer = tpu::Timer().Start();
 #endif
-  auto out_cpu = bmm ( self.cpu(), mat2.cpu() );
-  tpu::TPUCopyHostToDevice ( out.data_ptr(), out_cpu.contiguous().data_ptr(), out.nbytes() );
+  auto status = sgdnn_batch_matmul (
+                tpu::TPUGetDeviceHandle(),
+                tpu::TPUGenerateTensorDesc ( self ),
+                ADDR_IN_DEVICE ( self ),
+                tpu::TPUGenerateTensorDesc ( mat2 ),
+                ADDR_IN_DEVICE ( mat2 ),
+                tpu::TPUGenerateTensorDesc ( out ),
+                ADDR_IN_DEVICE ( out ),
+                false,
+                false );
+  TORCH_CHECK ( status == BM_SUCCESS );
 #ifdef TPU_OP_TIMING
   tpu::OpTimer::Instance().AddTime ( tpu::BMM, timer.ElapsedUS() );
+#endif
 #endif
   return out;
 }
