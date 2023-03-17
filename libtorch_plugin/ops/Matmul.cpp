@@ -85,7 +85,7 @@ Tensor & bmm_out_tpu ( const Tensor & self, const Tensor & mat2, Tensor & out )
   CHECK_TENSOR_IN_DEVICE ( self );
   CHECK_TENSOR_IN_DEVICE ( mat2 );
   CHECK_TENSOR_IN_DEVICE ( out );
-#if 1
+#if 0
   auto out_cpu = bmm ( self.cpu(), mat2.cpu() );
   tpu::TPUCopyHostToDevice ( out.data_ptr(), out_cpu.contiguous().data_ptr(), out.nbytes() );
 #else
