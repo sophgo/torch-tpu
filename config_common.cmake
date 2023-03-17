@@ -30,9 +30,7 @@ if(USING_CMODEL AND DEBUG)
   add_definitions(-rdynamic)
 endif()
 
-if(NOT USING_CMODEL)
-  add_definitions(-Wno-address-of-packed-member)
-endif()
+add_definitions(-Wno-address-of-packed-member)
 
 add_definitions(-fno-builtin-memcpy)
 add_definitions(-fno-builtin-memset)

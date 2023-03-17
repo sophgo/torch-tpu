@@ -14,8 +14,6 @@ include_directories($ENV{TPUTRAIN_TOP}/sgdnn/include)
 include_directories($ENV{TPUTRAIN_TOP}/common/include)
 
 link_directories($ENV{TPUTRAIN_TOP}/libtorch/lib)
-link_directories(/opt/sophon/libsophon-current/lib)
-link_directories($ENV{TPUTRAIN_TOP}/third_party)
 link_directories($ENV{TPUTRAIN_TOP}/build/sgdnn)
 
 file(GLOB_RECURSE SRCS
@@ -30,9 +28,6 @@ file(GLOB_RECURSE SRCS
 add_library(libtorch_plugin SHARED ${SRCS})
 target_link_libraries(libtorch_plugin c10 torch_cpu)
 target_link_libraries(libtorch_plugin sgdnn)
-
-target_link_libraries(libtorch_plugin bmlib)
-#target_link_libraries(libtorch_plugin bmlib_cmodel)
 
 add_executable(test test.cpp)
 
