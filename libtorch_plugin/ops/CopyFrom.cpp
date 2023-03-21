@@ -50,13 +50,13 @@ Tensor _copy_from_tpu ( const Tensor & self, const Tensor & dst, bool non_blocki
     }
     else if ( IS_TPU_TENSOR ( self ) && IS_TPU_TENSOR ( dst ) )
     {
-#ifdef TPU_OP_TIMING
-      auto timer = tpu::Timer().Start();
-#endif
-#if 1
+#if 0
       auto dst_cpu = self.cpu().to ( dst.dtype() );
       tpu::TPUCopyHostToDevice ( dst.data_ptr(), dst_cpu.contiguous().data_ptr(), dst.nbytes() );
 #else
+#ifdef TPU_OP_TIMING
+      auto timer = tpu::Timer().Start();
+#endif
       auto status = sgdnn_dtype_convert (
                     tpu::TPUGetDeviceHandle(),
                     tpu::TPUGenerateTensorDesc ( self ),
@@ -65,9 +65,9 @@ Tensor _copy_from_tpu ( const Tensor & self, const Tensor & dst, bool non_blocki
                     ADDR_IN_DEVICE ( dst ),
                     SG_ROUND_EVEN );
       TORCH_CHECK ( status == BM_SUCCESS );
-#endif
 #ifdef TPU_OP_TIMING
       tpu::OpTimer::Instance().AddTime ( tpu::DTYPE_CONVERT, timer.ElapsedUS() );
+#endif
 #endif
     }
     else
