@@ -5,6 +5,7 @@
 #include <memory>
 #include <string.h>
 #include "kernel_module_data.h"
+#include "bmodel.hpp"
 
 static inline int dtype_size(sg_data_type_t dtype) {
     int size = 1;
@@ -93,6 +94,31 @@ static void sgdnn_tpu_kernel_launch(
     bm_status_t ret = tpu_kernel_launch(handle, func_id, (void*)api, api_size);
     if (ret != BM_SUCCESS) throw("tpu_kernel_launch failed");
 }
+
+#define SP(D, T) (std::shared_ptr<T>((D), std::default_delete<T []>()))
+void get_coeff_data(const std::string& modelpath, u64 addr_offset, int coeff_size, float* coeff) {
+
+    bmodel::ModelCtx model_ctx(modelpath);
+    //just assume resnet50 has one net
+    auto params = model_ctx.model()->net()->Get(0)->parameter();
+    //just assume resnet50 has one netparam
+    const bmodel::CoeffMem* coeff_mem = params->Get(0)->coeff_mem();
+
+#define COEFF_BLK_SIZE 0x1000000
+    u8* data = new u8[COEFF_BLK_SIZE];
+    auto data_sp = SP(data, u8);
+    u64 left_size = coeff_size;
+    u64 offset = 0;
+    while (left_size > 0) {
+      u64 data_size = (left_size >= COEFF_BLK_SIZE ? COEFF_BLK_SIZE : left_size);
+      model_ctx.read_binary(coeff_mem->binary_coeff(), offset, data, data_size);
+      memcpy(coeff + offset * sizeof(float), data, data_size * sizeof(float));
+      offset += data_size;
+      left_size -= data_size;
+    }
+}
+
+void set_coeff_data(const std::string& modelpath, u64 addr_offset, int coeff_size, float* coeff) {}
 
 //use for pybind test, deprecate after
 bm_status_t sgdnn_conv_forward(

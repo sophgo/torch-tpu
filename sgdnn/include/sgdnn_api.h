@@ -5,10 +5,13 @@
 #include "common.h"
 #include "common_def.h"
 #include "sg_api_struct.h"
+#include <string>
 
 #if defined(__cplusplus)
 extern "C" {
 #endif
+
+void get_coeff_data(const std::string& modelpath, u64 addr_offset, int coeff_size, float* coeff);
 
 void tpu_module_init(bm_handle_t handle);
 void tpu_module_deinit(bm_handle_t handle);

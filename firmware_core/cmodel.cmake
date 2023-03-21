@@ -14,7 +14,7 @@ add_custom_command(
     COMMAND echo "const unsigned int kernel_module_data[] = {0}\;" > ${KERNEL_HEADER}
 )
 # Add a custom target that depends on the custom command
-add_custom_target(gen_kernel_module_data_target ALL DEPENDS ${KERNEL_HEADER})
+add_custom_target(kernel_module ALL DEPENDS ${KERNEL_HEADER})
 
 aux_source_directory(src KERNEL_SRC_FILES)
 add_library(firmware SHARED ${KERNEL_SRC_FILES})

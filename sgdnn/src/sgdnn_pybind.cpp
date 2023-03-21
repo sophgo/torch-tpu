@@ -57,6 +57,16 @@ PYBIND11_MODULE(sgdnn_pybind, m)
 {
     m.doc() = "pybind11 sgdnn backward plugin";
 
+    m.def("get_coeff_from_bmodel", [](std::string model_path,
+                                      u64 addr_offset,
+                                      int coeff_size,
+                                      py::array_t<float> coeff_data) {
+
+        py::buffer_info coeff_data_buf = coeff_data.request();
+        float *coeff_data_fp = (float*)coeff_data_buf.ptr;
+        get_coeff_data(model_path, addr_offset, coeff_size, coeff_data_fp);
+    });
+
     m.def("conv_backward", [](py::array_t<float> grad_output,
                               py::array_t<float> input,
                               py::array_t<float> weight,
