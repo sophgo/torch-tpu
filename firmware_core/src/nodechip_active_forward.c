@@ -12,7 +12,7 @@ void tpu_kernel_api_active_forward(const void *args)
         api->out_global_addr,
         api->shape,
         api->shape_dim,
-        api->dtype,
+        tpu_type_convert((sg_data_type_t)api->dtype),
         api->active_type,
         NULL);
     tpu_poll();
