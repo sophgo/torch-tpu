@@ -24,26 +24,21 @@ TORCH_LIBRARY_IMPL ( aten, PrivateUse1, m )
   m.impl ( "_log_softmax.out", _log_softmax_out_tpu );
 }
 
-Tensor & _log_softmax_backward_data_out_tpu (
-const Tensor & grad_output,
-const Tensor & output,
-int64_t        dim,
-ScalarType     input_dtype,
-Tensor       & out )
+#if 0
+Tensor & _log_softmax_backward_data_out_tpu ( const Tensor & grad_output, const Tensor & output, int64_t dim, ScalarType input_dtype, Tensor & out )
 {
   CHECK_TENSOR_IN_DEVICE ( grad_output );
   CHECK_TENSOR_IN_DEVICE ( output );
   CHECK_TENSOR_IN_DEVICE ( out );
-  auto grad_output_cpu = TENSOR_TO_CPU ( grad_output );
-  auto output_cpu = TENSOR_TO_CPU ( output );
-  auto out_cpu = _log_softmax_backward_data ( grad_output_cpu, output_cpu, dim, input_dtype );
-  out = TENSOR_TO_TPU ( out_cpu );
+  auto out_cpu = _log_softmax_backward_data ( grad_output.cpu(), output.cpu(), dim, input_dtype );
+  tpu::TPUCopyHostToDevice ( out.data_ptr(), out_cpu.contiguous().data_ptr(), out.nbytes() );
   return out;
 }
-//TORCH_LIBRARY_IMPL ( aten, PrivateUse1, m )
-//{
-//  m.impl ( "_log_softmax_backward_data.out", _log_softmax_backward_data_out_tpu );
-//}
+TORCH_LIBRARY_IMPL ( aten, PrivateUse1, m )
+{
+  m.impl ( "_log_softmax_backward_data.out", _log_softmax_backward_data_out_tpu );
+}
+#endif
 
 Tensor & _softmax_out_tpu ( const Tensor & self, int64_t dim, bool half_to_float, Tensor & out )
 {

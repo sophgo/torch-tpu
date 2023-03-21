@@ -1861,25 +1861,23 @@ else
         unsigned long long output   = (unsigned long long)y;
 
         assert(xDesc.ndims == yDesc.ndims);
-        int shape[] = {};
-        int dims = xDesc.ndims;
-        for (int i=0; i<dims; ++i)
-        {
-            assert(xDesc.shape[i] == yDesc.shape[i] );
-            shape[i] = xDesc.shape[i];
-        }
         
         sg_data_type_t ydtype = (sg_data_type_t)(yDesc.dtype);
         sg_data_type_t xdtype = (sg_data_type_t)(xDesc.dtype);
         assert(xdtype == ydtype);
 
         sg_api_active_forward_t api = {
-            input,
-            output,
-            *shape,
-            dims,
-            xdtype,
-            active_type};
+            .in_global_addr = input,
+            .out_global_addr = output,
+            .shape_dim = xDesc.ndims,
+            .dtype = xdtype,
+            .active_type = active_type};
+
+        for (int i=0; i<xDesc.ndims; ++i)
+        {
+            assert(xDesc.shape[i] == yDesc.shape[i] );
+            api.shape[i] = xDesc.shape[i];
+        }
 
         sgdnn_tpu_kernel_launch(handle, "tpu_kernel_api_active_forward", &api, sizeof(api));
         return BM_SUCCESS;

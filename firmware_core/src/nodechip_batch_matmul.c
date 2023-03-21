@@ -28,5 +28,6 @@ void tpu_kernel_api_batch_matmul(const void *args)
         0,
         0,
         0);
+    tpu_poll();
 }
 TPUKERNEL_FUNC_REGISTER(tpu_kernel_api_batch_matmul);
