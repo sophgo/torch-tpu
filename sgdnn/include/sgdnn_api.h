@@ -590,6 +590,21 @@ bm_status_t sgdnn_softmax_forward_cudnn(
     const TensorDescriptor_t         yDesc,
     void                            *y);
 
+bm_status_t sgdnn_transpose(
+    bm_handle_t                      handle,
+    const TensorDescriptor_t         xDesc,
+    const void                      *xData,
+    const TensorDescriptor_t         yDesc,
+    void                            *yData);
+
+bm_status_t sgdnn_permute(
+    bm_handle_t                      handle,
+    const TensorDescriptor_t         xDesc,
+    const void                      *xData,
+    const TensorDescriptor_t         yDesc,
+    void                            *yData,
+    const int                       *order);
+
 #if defined(__cplusplus)
 }
 #endif
