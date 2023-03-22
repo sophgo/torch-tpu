@@ -148,4 +148,17 @@ TORCH_LIBRARY_IMPL ( aten, PrivateUse1, m )
   m.impl ( "gelu.out", gelu_out_tpu );
 }
 
+Tensor & gelu_backward_grad_input_tpu ( const Tensor & grad_output, const Tensor & self, c10::string_view approximate, Tensor & grad_input )
+{
+  CHECK_TENSOR_IN_DEVICE ( grad_output );
+  CHECK_TENSOR_IN_DEVICE ( self );
+  CHECK_TENSOR_IN_DEVICE ( grad_input );
+  auto grad_input_cpu = gelu_backward ( grad_output.cpu(), self.cpu(), approximate );
+  tpu::TPUCopyHostToDevice ( grad_input.data_ptr(), grad_input_cpu.contiguous().data_ptr(), grad_input.nbytes() );
+  return grad_input;
+}
+TORCH_LIBRARY_IMPL ( aten, PrivateUse1, m )
+{
+  m.impl ( "gelu_backward.grad_input", gelu_backward_grad_input_tpu );
+}
 } // namespace at

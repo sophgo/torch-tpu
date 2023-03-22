@@ -74,4 +74,18 @@ TORCH_LIBRARY_IMPL ( aten, PrivateUse1, m )
 {
   m.impl ( "_softmax.out", _softmax_out_tpu );
 }
+
+Tensor & _softmax_backward_data_out_tpu ( const Tensor & grad_output, const Tensor & output, int64_t dim, ScalarType input_dtype, Tensor & grad_input )
+{
+  CHECK_TENSOR_IN_DEVICE ( grad_output );
+  CHECK_TENSOR_IN_DEVICE ( output );
+  CHECK_TENSOR_IN_DEVICE ( grad_input );
+  auto grad_input_cpu = _softmax_backward_data ( grad_output.cpu(), output.cpu(), dim, input_dtype );
+  tpu::TPUCopyHostToDevice ( grad_input.data_ptr(), grad_input_cpu.contiguous().data_ptr(), grad_input.nbytes() );
+  return grad_input;
+}
+TORCH_LIBRARY_IMPL ( aten, PrivateUse1, m )
+{
+  m.impl ( "_softmax_backward_data.out", _softmax_backward_data_out_tpu );
+}
 } // namespace at

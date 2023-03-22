@@ -15,14 +15,14 @@ namespace at
 {
 
 std::tuple<Tensor, Tensor, Tensor> native_batch_norm_tpu (
-const Tensor                & input,
+const Tensor & input,
 const c10::optional<Tensor> & weight_opt,
 const c10::optional<Tensor> & bias_opt,
 const c10::optional<Tensor> & running_mean_opt,
 const c10::optional<Tensor> & running_var_opt,
-bool                          training,
-double                        momentum,
-double                        eps )
+bool training,
+double momentum,
+double eps )
 {
   static int count = 0;
 #ifdef SHOW_OP_INFO
@@ -112,16 +112,16 @@ TORCH_LIBRARY_IMPL ( aten, PrivateUse1, m )
 }
 
 std::tuple<Tensor, Tensor, Tensor> native_batch_norm_backward_tpu (
-const Tensor                & grad_output,
-const Tensor                & input,
+const Tensor & grad_out,
+const Tensor & input,
 const c10::optional<Tensor> & weight_opt,
 const c10::optional<Tensor> & running_mean_opt,
 const c10::optional<Tensor> & running_var_opt,
 const c10::optional<Tensor> & save_mean_opt,
 const c10::optional<Tensor> & save_invstd_opt,
-bool                          training,
-double                        eps,
-std::array<bool, 3>           output_mask )
+bool training,
+double eps,
+std::array<bool, 3> output_mask )
 {
   static int count = 0;
 #ifdef SHOW_OP_INFO
@@ -139,29 +139,20 @@ std::array<bool, 3>           output_mask )
   TORCH_CHECK ( save_mean.defined(), "save_mean must be defined" );
   TORCH_CHECK ( save_invstd.defined(), "save_invstd must be defined" );
   auto num_features = input.size ( 1 );
-  CHECK_TENSOR_IN_DEVICE ( grad_output );
+  CHECK_TENSOR_IN_DEVICE ( grad_out );
   CHECK_TENSOR_IN_DEVICE ( input );
-  if ( weight.defined() )
-  {
-    CHECK_TENSOR_IN_DEVICE ( weight );
-  }
-  if ( save_mean.defined() )
-  {
-    CHECK_TENSOR_IN_DEVICE ( save_mean );
-  }
-  if ( save_invstd.defined() )
-  {
-    CHECK_TENSOR_IN_DEVICE ( save_invstd );
-  }
+  if ( weight.defined() ) { CHECK_TENSOR_IN_DEVICE ( weight ); }
+  if ( save_mean.defined() ) { CHECK_TENSOR_IN_DEVICE ( save_mean ); }
+  if ( save_invstd.defined() ) { CHECK_TENSOR_IN_DEVICE ( save_invstd ); }
 #if 0
   auto outputs_cpu = native_batch_norm_backward (
-                     TENSOR_TO_CPU ( grad_output ),
-                     TENSOR_TO_CPU ( input ),
-                     c10::optional<Tensor> ( weight.defined() ? TENSOR_TO_CPU ( weight ) : Tensor() ),
-                     c10::optional<Tensor> ( running_mean.defined() ? TENSOR_TO_CPU ( running_mean ) : Tensor() ),
-                     c10::optional<Tensor> ( running_var.defined() ? TENSOR_TO_CPU ( running_var ) : Tensor() ),
-                     c10::optional<Tensor> ( save_mean.defined() ? TENSOR_TO_CPU ( save_mean ) : Tensor() ),
-                     c10::optional<Tensor> ( save_invstd.defined() ? TENSOR_TO_CPU ( save_invstd ) : Tensor() ),
+                     grad_out.cpu(),
+                     input.cpu(),
+                     c10::optional<Tensor> ( weight.defined() ? weight.cpu() : Tensor() ),
+                     c10::optional<Tensor> ( running_mean.defined() ? running_mean.cpu() : Tensor() ),
+                     c10::optional<Tensor> ( running_var.defined() ? running_var.cpu() : Tensor() ),
+                     c10::optional<Tensor> ( save_mean.defined() ? save_mean.cpu() : Tensor() ),
+                     c10::optional<Tensor> ( save_invstd.defined() ? save_invstd.cpu() : Tensor() ),
                      training,
                      eps,
                      output_mask );
@@ -173,67 +164,47 @@ std::array<bool, 3>           output_mask )
   Tensor grad_input, grad_weight, grad_bias;
   if ( output_mask[0] == true )
   {
-    auto grad_input_options = torch::TensorOptions ( tpu::TPUGetCurrentDevice() ).dtype ( input.dtype() );
-    grad_input = torch::empty ( input.sizes(), grad_input_options );
+    grad_input = torch::empty ( input.sizes(), input.options() );
   }
   if ( output_mask[1] == true )
   {
-    auto grad_weight_options = torch::TensorOptions ( tpu::TPUGetCurrentDevice() ).dtype ( weight.dtype() );
-    grad_weight = empty ( weight.sizes(), grad_weight_options );
+    grad_weight = empty ( weight.sizes(), weight.options() );
   }
   if ( output_mask[2] == true )
   {
     // We assume that weight and bias have the same data type
-    auto grad_bias_options = torch::TensorOptions ( tpu::TPUGetCurrentDevice() ).dtype ( weight.dtype() );
-    grad_bias = empty ( { weight.size ( 0 ) }, grad_bias_options );
+    grad_bias = empty ( { weight.size ( 0 ) }, weight.options() );
   }
-  auto handle = tpu::TPUGetDeviceHandle();
-  bm_status_t status = BM_SUCCESS;
   float alpha_data_diff = 1.f;
   float beta_data_diff = 0.f;
   float alpha_param_diff = 1.f;
   float beta_param_diff = 0.f;
-  auto grad_output_desc = tpu::TPUGenerateTensorDesc ( grad_output );
-  auto input_desc = tpu::TPUGenerateTensorDesc ( input );
-  TensorDescriptor_t grad_input_desc, grad_weight_bias_desc;
-  if ( output_mask[0] == true )
-  {
-    grad_input_desc = tpu::TPUGenerateTensorDesc ( grad_input );
-  }
-  if ( output_mask[1] == true )
-  {
-    grad_weight_bias_desc = tpu::TPUGenerateTensorDesc ( grad_weight );
-  }
-  else if ( output_mask[2] == true )
-  {
-    grad_weight_bias_desc = tpu::TPUGenerateTensorDesc ( grad_bias );
-  }
 #ifdef TPU_OP_TIMING
   auto timer = tpu::Timer().Start();
 #endif
-  status = sgdnn_batchnorm_backward_cudnn (
-           handle,
-           BatchNorm_Spatial,
-           &alpha_data_diff,
-           &beta_data_diff,
-           &alpha_param_diff,
-           &beta_param_diff,
-           input_desc,
-           ADDR_IN_DEVICE ( input ),
-           grad_output_desc,
-           ADDR_IN_DEVICE ( grad_output ),
-           grad_input_desc,
-           output_mask[0] ? ADDR_IN_DEVICE ( grad_input ) : nullptr,
-           grad_weight_bias_desc,
-           weight.defined() ? ADDR_IN_DEVICE ( weight ) : nullptr,
-           output_mask[1] ? ADDR_IN_DEVICE ( grad_weight ) : nullptr,
-           output_mask[2] ? ADDR_IN_DEVICE ( grad_bias ) : nullptr,
-           eps,
-           save_mean.defined() ? ADDR_IN_DEVICE ( save_mean ) : nullptr,
-           save_invstd.defined() ? ADDR_IN_DEVICE ( save_invstd ) : nullptr,
-           output_mask[0],
-           output_mask[1],
-           output_mask[2] );
+  bm_status_t status = sgdnn_batchnorm_backward_cudnn (
+                       tpu::TPUGetDeviceHandle(),
+                       BatchNorm_Spatial,
+                       &alpha_data_diff,
+                       &beta_data_diff,
+                       &alpha_param_diff,
+                       &beta_param_diff,
+                       tpu::TPUGenerateTensorDesc ( input ),
+                       ADDR_IN_DEVICE ( input ),
+                       tpu::TPUGenerateTensorDesc ( grad_out ),
+                       ADDR_IN_DEVICE ( grad_out ),
+                       output_mask[0] == true ? tpu::TPUGenerateTensorDesc ( grad_input ) : TensorDescriptor_t(),
+                       output_mask[0] ? ADDR_IN_DEVICE ( grad_input ) : nullptr,
+                       output_mask[1] == true ? tpu::TPUGenerateTensorDesc ( grad_weight ) : ( output_mask[2] == true ? tpu::TPUGenerateTensorDesc ( grad_bias ) : TensorDescriptor_t() ),
+                       weight.defined() ? ADDR_IN_DEVICE ( weight ) : nullptr,
+                       output_mask[1] ? ADDR_IN_DEVICE ( grad_weight ) : nullptr,
+                       output_mask[2] ? ADDR_IN_DEVICE ( grad_bias ) : nullptr,
+                       eps,
+                       save_mean.defined() ? ADDR_IN_DEVICE ( save_mean ) : nullptr,
+                       save_invstd.defined() ? ADDR_IN_DEVICE ( save_invstd ) : nullptr,
+                       output_mask[0],
+                       output_mask[1],
+                       output_mask[2] );
 #ifdef TPU_OP_TIMING
   tpu::OpTimer::Instance().AddTime ( tpu::BATCHNORM_BACKWARD, timer.ElapsedUS() );
 #endif
@@ -243,5 +214,43 @@ std::array<bool, 3>           output_mask )
 TORCH_LIBRARY_IMPL ( aten, PrivateUse1, m )
 {
   m.impl ( "native_batch_norm_backward", native_batch_norm_backward_tpu );
+}
+
+std::tuple<Tensor, Tensor, Tensor> native_layer_norm_backward_tpu (
+const Tensor & grad_out,
+const Tensor & input,
+IntArrayRef normalized_shape,
+const Tensor & mean,
+const Tensor & rstd,
+const c10::optional<Tensor> & weight_opt,
+const c10::optional<Tensor> & bias_opt,
+std::array<bool, 3> output_mask )
+{
+  c10::MaybeOwned<Tensor> weight_maybe_owned = at::borrow_from_optional_tensor ( weight_opt );
+  const Tensor & weight = *weight_maybe_owned;
+  const Tensor & bias = c10::value_or_else ( bias_opt, [] { return Tensor(); } );
+  CHECK_TENSOR_IN_DEVICE ( grad_out );
+  CHECK_TENSOR_IN_DEVICE ( input );
+  CHECK_TENSOR_IN_DEVICE ( mean );
+  CHECK_TENSOR_IN_DEVICE ( rstd );
+  if ( weight.defined() ) { CHECK_TENSOR_IN_DEVICE ( weight ); }
+  if ( bias.defined() ) { CHECK_TENSOR_IN_DEVICE ( bias ); }
+  auto outputs_cpu = native_layer_norm_backward (
+                     grad_out.cpu(),
+                     input.cpu(),
+                     normalized_shape,
+                     mean.cpu(),
+                     rstd.cpu(),
+                     c10::optional<Tensor> ( weight.defined() ? weight.cpu() : Tensor() ),
+                     c10::optional<Tensor> ( bias.defined() ? bias.cpu() : Tensor() ),
+                     output_mask );
+  return std::tuple<Tensor, Tensor, Tensor> (
+         output_mask[0] ? TENSOR_TO_TPU ( std::get<0> ( outputs_cpu ) ) : Tensor(),
+         output_mask[1] ? TENSOR_TO_TPU ( std::get<1> ( outputs_cpu ) ) : Tensor(),
+         output_mask[2] ? TENSOR_TO_TPU ( std::get<2> ( outputs_cpu ) ) : Tensor() );
+}
+TORCH_LIBRARY_IMPL ( aten, PrivateUse1, m )
+{
+  m.impl ( "native_layer_norm_backward", native_layer_norm_backward_tpu );
 }
 } // namespace at

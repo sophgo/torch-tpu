@@ -32,4 +32,16 @@ TORCH_LIBRARY_IMPL ( aten, PrivateUse1, m )
 {
   m.impl ( "index_select", index_select_tpu );
 }
+
+Tensor embedding_dense_backward_tpu ( const Tensor & grad_output, const Tensor & indices, int64_t num_weights, int64_t padding_idx, bool scale_grad_by_freq )
+{
+  CHECK_TENSOR_IN_DEVICE ( grad_output );
+  auto out_cpu = embedding_dense_backward ( grad_output.cpu(), indices.cpu(), num_weights, padding_idx, scale_grad_by_freq );
+  auto out = TENSOR_TO_TPU ( out_cpu );
+  return out;
+}
+TORCH_LIBRARY_IMPL ( aten, PrivateUse1, m )
+{
+  m.impl ( "embedding_dense_backward", embedding_dense_backward_tpu );
+}
 } // namespace at
