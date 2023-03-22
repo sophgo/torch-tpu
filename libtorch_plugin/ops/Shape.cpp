@@ -95,6 +95,11 @@ Tensor as_strided_tpu ( const Tensor & self, IntArrayRef size, IntArrayRef strid
 {
   CHECK_TENSOR_IN_DEVICE ( self );
   Tensor out;
+  int64_t size_numel = 1;
+  for ( auto s : size )
+  {
+    size_numel *= s;
+  }
   if ( self.sizes() == size && self.strides() == stride )
   {
     out = self.detach();
@@ -103,16 +108,68 @@ Tensor as_strided_tpu ( const Tensor & self, IntArrayRef size, IntArrayRef strid
   {
     out = view_tpu ( self, size );
   }
+  else if ( self.dim() == 2 && self.size ( 0 ) == size[1] && self.size ( 1 ) == size[0] && self.stride ( 0 ) == stride[1] && self.stride ( 1 ) == stride[0] )
+  {
+    out = empty ( size, self.options() );
+#ifdef TPU_OP_TIMING
+    auto timer = tpu::Timer().Start();
+#endif
+    bm_status_t status = sgdnn_transpose (
+                         tpu::TPUGetDeviceHandle(),
+                         tpu::TPUGenerateTensorDesc ( self ),
+                         ADDR_IN_DEVICE ( self ),
+                         tpu::TPUGenerateTensorDesc ( out ),
+                         ADDR_IN_DEVICE ( out ) );
+    TORCH_CHECK ( status == BM_SUCCESS );
+#ifdef TPU_OP_TIMING
+    tpu::OpTimer::Instance().AddTime ( tpu::TRANSPOSE, timer.ElapsedUS() );
+#endif
+  }
+  else if ( self.numel() == size_numel )
+  {
+    out = empty ( size, self.options() );
+    int *order = new int[self.dim()];
+    bool *done = new bool[self.dim()];
+    for ( auto i = 0; i < self.dim(); ++i )
+    {
+      done[i] = false;
+    }
+    for ( auto i = 0; i < self.dim(); ++i )
+    {
+      bool found = false;
+      for ( auto j = 0; j < self.dim(); ++j )
+      {
+        if ( stride[i] == self.stride ( j ) && done[j] == false )
+        {
+          order[i] = j;
+          done[j] = true;
+          found = true;
+          break;
+        }
+      }
+      TORCH_CHECK ( found == true );
+    }
+#ifdef TPU_OP_TIMING
+    auto timer = tpu::Timer().Start();
+#endif
+    bm_status_t status = sgdnn_permute (
+                         tpu::TPUGetDeviceHandle(),
+                         tpu::TPUGenerateTensorDesc ( self ),
+                         ADDR_IN_DEVICE ( self ),
+                         tpu::TPUGenerateTensorDesc ( out ),
+                         ADDR_IN_DEVICE ( out ),
+                         order );
+    TORCH_CHECK ( status == BM_SUCCESS );
+#ifdef TPU_OP_TIMING
+    tpu::OpTimer::Instance().AddTime ( tpu::PERMUTE, timer.ElapsedUS() );
+#endif
+    delete [] order;
+    delete [] done;
+  }
   else
   {
-//#ifdef TPU_OP_TIMING
-//    auto timer = tpu::Timer().Start();
-//#endif
     auto out_cpu = as_strided ( self.cpu(), size, stride, storage_offset );
     out = out_cpu.contiguous().to ( tpu::TPUGetCurrentDevice() );
-//#ifdef TPU_OP_TIMING
-//    tpu::OpTimer::Instance().AddTime ( tpu::PERMUTE, timer.ElapsedUS() );
-//#endif
 #if 0
     std::cout << "self.shape = " << self.sizes() << std::endl;
     std::cout << "self.stride = " << self.strides() << std::endl;
