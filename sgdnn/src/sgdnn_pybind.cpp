@@ -756,8 +756,8 @@ PYBIND11_MODULE(sgdnn_pybind, m)
         bm_status_t status = sgdnn_relu_forward(handle,
                             bm_mem_from_system(input_fp16),
                             bm_mem_from_system(output_fp16),
-                            upper_limit,
                             n, c, h, w,
+                            upper_limit,
                             (sg_data_type_t)1);
         UNUSED(status);
         assert(status == BM_SUCCESS);

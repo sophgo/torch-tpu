@@ -1743,11 +1743,11 @@ bm_status_t sgdnn_relu_forward(
     bm_handle_t        handle,
     bm_device_mem_t    input,
     bm_device_mem_t    output,
-    float              upper_limit,
     int                n,
     int                c,
     int                h,
-    int                w, 
+    int                w,
+    float              upper_limit,
     sg_data_type_t     dtype)
 {
 
@@ -1781,7 +1781,7 @@ bm_status_t sgdnn_relu_backward(
     int                n,
     int                c,
     int                h,
-    int                w, 
+    int                w,
     bool               input_need_grad,
     sg_data_type_t     dtype)
 {
@@ -1829,7 +1829,7 @@ bm_status_t sgdnn_activation_forward_cudnn(
         assert(alpha_ == 1.0f);
         float beta_ = ((float*)beta)[0];
         assert(beta_ == 0.0f || beta_ == 1.0f);
-        
+
         float upper_limit = activationDesc.coef;
         assert(xDesc.ndims == 4);
         assert(yDesc.ndims == 4);
@@ -1837,7 +1837,7 @@ bm_status_t sgdnn_activation_forward_cudnn(
         int c = xDesc.shape[1];
         int h = xDesc.shape[2];
         int w = xDesc.shape[3];
-        
+
         sg_data_type_t ydtype = (sg_data_type_t)(yDesc.dtype);
         sg_data_type_t xdtype = (sg_data_type_t)(xDesc.dtype);
         assert(xdtype == ydtype);
@@ -1856,22 +1856,22 @@ bm_status_t sgdnn_activation_forward_cudnn(
 else
     {
         sg_active_type_t active_type =  tpu_active_type_convert(activationDesc.mode) ;
-        
+
         unsigned long long input    = (unsigned long long)x;
         unsigned long long output   = (unsigned long long)y;
 
         assert(xDesc.ndims == yDesc.ndims);
-        
+
         sg_data_type_t ydtype = (sg_data_type_t)(yDesc.dtype);
         sg_data_type_t xdtype = (sg_data_type_t)(xDesc.dtype);
         assert(xdtype == ydtype);
 
-        sg_api_active_forward_t api = {
-            .in_global_addr = input,
-            .out_global_addr = output,
-            .shape_dim = xDesc.ndims,
-            .dtype = xdtype,
-            .active_type = active_type};
+        sg_api_active_forward_t api;
+        api.in_global_addr = input;
+        api.out_global_addr = output;
+        api.shape_dim = xDesc.ndims;
+        api.dtype = xdtype;
+        api.active_type = active_type;
 
         for (int i=0; i<xDesc.ndims; ++i)
         {
