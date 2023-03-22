@@ -14,13 +14,15 @@ include_directories(${CMAKE_CURRENT_SOURCE_DIR}/include)
 include_directories(${PROJECT_ROOT}/common/include)
 include_directories(/opt/sophon/libsophon-current/include)
 include_directories(${CMAKE_BINARY_DIR}/firmware_core)
-link_directories(/opt/sophon/libsophon-current/lib)
 
 if(USING_CMODEL)
   link_directories(${PROJECT_ROOT}/third_party)
 endif()
 
+link_directories(/opt/sophon/libsophon-current/lib)
+
 add_library(sgdnn SHARED ${CMAKE_CURRENT_SOURCE_DIR}/src/sgdnn.cpp)
+
 if(USING_CMODEL)
   target_link_libraries(sgdnn bmodel bmlib_cmodel)
 else()
