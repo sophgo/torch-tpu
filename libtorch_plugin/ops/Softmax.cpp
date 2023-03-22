@@ -49,11 +49,11 @@ Tensor & _softmax_out_tpu ( const Tensor & self, int64_t dim, bool half_to_float
   auto out_cpu = _softmax ( self.cpu(), dim, half_to_float );
   tpu::TPUCopyHostToDevice ( out.data_ptr(), out_cpu.contiguous().data_ptr(), out.nbytes() );
 #else
+  float alpha = 1.f;
+  float beta = 0.f;
 #ifdef TPU_OP_TIMING
   auto timer = tpu::Timer().Start();
 #endif
-  float alpha = 1.f;
-  float beta = 0.f;
   bm_status_t status = sgdnn_softmax_forward_cudnn (
                        tpu::TPUGetDeviceHandle(),
                        dim < 0 ? dim + self.dim() : dim,

@@ -26,13 +26,16 @@ OpTimer & OpTimer::AddTime ( OpType type, unsigned long time_us )
 
 void OpTimer::Dump() const
 {
+  unsigned long long ElapsedAll = 0;
   for ( auto i = 0; i < OP_NUM; ++i )
   {
     if ( elapsed_time_us_[i] > 0 )
     {
       std::cout << OpTypeStr[i] << ": " << elapsed_time_us_[i] << "us" << std::endl;
+      ElapsedAll += elapsed_time_us_[i];
     }
   }
+  std::cout << "TPU Elapsed All: " << ElapsedAll << "us" << std::endl;
 }
 
 OpTimer & OpTimer::Instance()

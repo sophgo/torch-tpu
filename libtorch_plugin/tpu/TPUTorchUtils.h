@@ -165,7 +165,11 @@ private:
 
 typedef enum
 {
-  CONVOLUTION = 0,
+  CDMA_D2S = 0,
+  CDMA_S2D,
+  CDMA_D2D,
+  CDMA_C2C,
+  CONVOLUTION,
   CONVOLUTION_BACKWARD,
   BATCHNORM,
   BATCHNORM_BACKWARD,
@@ -189,6 +193,10 @@ OpType;
 
 static const char * OpTypeStr[OP_NUM] =
 {
+  "CDMA D2S",
+  "CDMA S2D",
+  "CDMA D2D",
+  "CDMA C2C",
   "Convolution",
   "Convolution Backward",
   "Batchnorm",
