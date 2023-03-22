@@ -99,16 +99,20 @@ Tensor as_strided_tpu ( const Tensor & self, IntArrayRef size, IntArrayRef strid
   {
     out = self.detach();
   }
+  else if ( self.dim() != size.size() )
+  {
+    out = view_tpu ( self, size );
+  }
   else
   {
-#ifdef TPU_OP_TIMING
-    auto timer = tpu::Timer().Start();
-#endif
+//#ifdef TPU_OP_TIMING
+//    auto timer = tpu::Timer().Start();
+//#endif
     auto out_cpu = as_strided ( self.cpu(), size, stride, storage_offset );
     out = out_cpu.contiguous().to ( tpu::TPUGetCurrentDevice() );
-#ifdef TPU_OP_TIMING
-    tpu::OpTimer::Instance().AddTime ( tpu::PERMUTE, timer.ElapsedUS() );
-#endif
+//#ifdef TPU_OP_TIMING
+//    tpu::OpTimer::Instance().AddTime ( tpu::PERMUTE, timer.ElapsedUS() );
+//#endif
 #if 0
     std::cout << "self.shape = " << self.sizes() << std::endl;
     std::cout << "self.stride = " << self.strides() << std::endl;
