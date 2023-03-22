@@ -14,9 +14,7 @@ message(STATUS "CMAKE PREFIX: " ${CMAKE_INSTALL_PREFIX})
 include(${PROJECT_SOURCE_DIR}/config_common.cmake)
 
 set(PROJECT_ROOT ${PROJECT_SOURCE_DIR})
-set(FLATBUFFERS_PATH ${PROJECT_SOURCE_DIR}/third_party/flatbuffers)
 
-add_subdirectory(bmodel)
 add_subdirectory(firmware_core)
 add_subdirectory(sgdnn)
-add_dependencies(sgdnn bmodel firmware_core)
+add_dependencies(sgdnn firmware_core)
