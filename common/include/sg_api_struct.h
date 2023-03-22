@@ -413,5 +413,19 @@ typedef struct {
 } sg_api_softmax_forward_t;
 #endif
 
+typedef struct {
+  unsigned long long input_global_mem_addr;
+  unsigned long long output_global_mem_addr;
+  int input_shape[FW_MAX_SHAPE_DIMS];
+  int order[FW_MAX_SHAPE_DIMS];
+  int dims;
+  unsigned long long buffer_global_mem_addr;
+  sg_data_type_t     sgdtype;
+#ifndef WIN32
+} __attribute__((packed)) sg_api_transpose_t;
+#else
+} sg_api_transpose_t;
+#endif
+
 #pragma pack(pop)
 #endif  // SG_API_STRUCT_H

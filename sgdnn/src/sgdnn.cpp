@@ -2271,3 +2271,82 @@ bm_status_t sgdnn_softmax_forward_cudnn(
     sgdnn_tpu_kernel_launch(handle, "tpu_kernel_api_softmax_forward", &api, sizeof(api));
     return BM_SUCCESS;
 }
+
+bm_status_t sgdnn_transpose(
+    bm_handle_t                      handle,
+    const TensorDescriptor_t         xDesc,
+    const void                      *xData,
+    const TensorDescriptor_t         yDesc,
+    void                            *yData)
+{
+    assert(xDesc.ndims == yDesc.ndims && xDesc.ndims == 2);
+    assert(xDesc.shape[0] == yDesc.shape[1]);
+    assert(xDesc.shape[1] == yDesc.shape[0]);
+
+    sg_data_type_t xdtype = (sg_data_type_t)(xDesc.dtype);
+    sg_data_type_t ydtype = (sg_data_type_t)(yDesc.dtype);
+    assert(xdtype == ydtype);
+
+    sg_api_transpose_t api;
+    api.input_global_mem_addr = (unsigned long long)xData;
+    api.output_global_mem_addr = (unsigned long long)yData;
+    api.buffer_global_mem_addr = 0;
+    api.dims = 2;
+    api.sgdtype = xdtype;
+    api.input_shape[0] = xDesc.shape[0];
+    api.input_shape[1] = xDesc.shape[1];
+    api.order[0] = 1;
+    api.order[1] = 0;
+
+    sgdnn_tpu_kernel_launch(handle, "tpu_kernel_api_transpose", &api, sizeof(api));
+    return BM_SUCCESS;
+}
+
+bm_status_t sgdnn_permute(
+    bm_handle_t                      handle,
+    const TensorDescriptor_t         xDesc,
+    const void                      *xData,
+    const TensorDescriptor_t         yDesc,
+    void                            *yData,
+    const int                       *order)
+{
+    assert(xDesc.ndims == yDesc.ndims);
+    int dims = xDesc.ndims;
+
+    sg_api_transpose_t api;
+    int x_size = 1, y_size = 1;
+    int change_num = 0;
+    for(int i=0; i<dims; ++i)
+    {
+        x_size *= xDesc.shape[i];
+        y_size *= yDesc.shape[i];
+        api.input_shape[i] = xDesc.shape[i];
+        api.order[i] = order[i];
+        change_num += order[i]!=i;
+    }
+    assert(x_size == y_size);
+
+    sg_data_type_t xdtype = (sg_data_type_t)(xDesc.dtype);
+    sg_data_type_t ydtype = (sg_data_type_t)(yDesc.dtype);
+    assert(xdtype == ydtype);
+
+    int step_num = (change_num-1)/2+1;
+    u64 buffer_size = (step_num>1) * x_size * dtype_size(xdtype);
+    bm_device_mem_t buffer_mem;
+    if (buffer_size > 0) {
+        DEVICE_MEM_NEW_BUFFER(handle, buffer_mem, buffer_size);
+    }
+
+    api.input_global_mem_addr = (unsigned long long)xData;
+    api.output_global_mem_addr = (unsigned long long)yData;
+    api.buffer_global_mem_addr = bm_mem_get_device_addr(buffer_mem);
+    api.dims = dims;
+    api.sgdtype = xdtype;
+
+    sgdnn_tpu_kernel_launch(handle, "tpu_kernel_api_transpose", &api, sizeof(api));
+    
+    if (buffer_size > 0) {
+        bm_free_device(handle, buffer_mem);
+    }
+    return BM_SUCCESS;
+}
