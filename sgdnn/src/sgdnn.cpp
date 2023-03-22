@@ -2229,3 +2229,45 @@ bm_status_t sgdnn_batch_matmul(
     sgdnn_tpu_kernel_launch(handle, "tpu_kernel_api_batch_matmul", &api, sizeof(api));
     return BM_SUCCESS;
 }
+
+bm_status_t sgdnn_softmax_forward_cudnn(
+    bm_handle_t                      handle,
+    //SoftmaxMode_t                    softmax_mode,
+    int                              dim,
+    const void                      *alpha,
+    const TensorDescriptor_t         xDesc,
+    const void                      *x,
+    const void                      *beta,
+    const TensorDescriptor_t         yDesc,
+    void                            *y)
+{
+    assert ( *( ( float * ) alpha ) == 1.f );
+    assert ( *( ( float * ) beta ) == 0.f );
+    sg_data_type_t ydtype = (sg_data_type_t)(yDesc.dtype);
+    sg_data_type_t xdtype = (sg_data_type_t)(xDesc.dtype);
+    assert(xdtype == ydtype && xdtype == 0);
+    assert(xDesc.ndims == yDesc.ndims);
+    for (int i = 0; i < xDesc.ndims; ++i)
+    {
+        assert(xDesc.shape[i] == yDesc.shape[i]);
+    }
+    sg_api_softmax_forward_t api;
+    api.input_global_addr = (unsigned long long)x;
+    api.output_global_addr = (unsigned long long)y;
+    api.input_n = 1;
+    for (int i = 0; i < dim; ++i)
+    {
+        api.input_n *= xDesc.shape[i];
+    }
+    api.input_c = xDesc.shape[dim];
+    api.input_inner_dim = 1;
+    for (int i = dim + 1; i < xDesc.ndims; ++i)
+    {
+        api.input_inner_dim *= xDesc.shape[i];
+    }
+
+    api.scale_val = 1.f;
+    api.dtype = xdtype;
+    sgdnn_tpu_kernel_launch(handle, "tpu_kernel_api_softmax_forward", &api, sizeof(api));
+    return BM_SUCCESS;
+}

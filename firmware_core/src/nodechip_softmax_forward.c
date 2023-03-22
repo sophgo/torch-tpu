@@ -17,5 +17,6 @@ void tpu_kernel_api_softmax_forward(const void *args)
         0,
         api->scale_val,
         tpu_type_convert(api->dtype));
+    tpu_poll();
 }
 TPUKERNEL_FUNC_REGISTER(tpu_kernel_api_softmax_forward);

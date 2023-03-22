@@ -579,6 +579,17 @@ bm_status_t sgdnn_batch_matmul(
     int                              L_transpose,
     int                              R_transpose);
 
+bm_status_t sgdnn_softmax_forward_cudnn(
+    bm_handle_t                      handle,
+    //SoftmaxMode_t                    softmax_mode,
+    int                              dim,
+    const void                      *alpha,
+    const TensorDescriptor_t         xDesc,
+    const void                      *x,
+    const void                      *beta,
+    const TensorDescriptor_t         yDesc,
+    void                            *y);
+
 #if defined(__cplusplus)
 }
 #endif

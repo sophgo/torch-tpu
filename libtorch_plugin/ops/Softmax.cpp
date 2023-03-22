@@ -45,13 +45,28 @@ Tensor & _softmax_out_tpu ( const Tensor & self, int64_t dim, bool half_to_float
   CHECK_TENSOR_IN_DEVICE ( self );
   CHECK_TENSOR_IN_DEVICE ( out );
   TORCH_CHECK ( half_to_float == false );
+#if 0
+  auto out_cpu = _softmax ( self.cpu(), dim, half_to_float );
+  tpu::TPUCopyHostToDevice ( out.data_ptr(), out_cpu.contiguous().data_ptr(), out.nbytes() );
+#else
 #ifdef TPU_OP_TIMING
   auto timer = tpu::Timer().Start();
 #endif
-  auto out_cpu = _softmax ( self.cpu(), dim, half_to_float );
-  tpu::TPUCopyHostToDevice ( out.data_ptr(), out_cpu.contiguous().data_ptr(), out.nbytes() );
+  float alpha = 1.f;
+  float beta = 0.f;
+  bm_status_t status = sgdnn_softmax_forward_cudnn (
+                       tpu::TPUGetDeviceHandle(),
+                       dim < 0 ? dim + self.dim() : dim,
+                       &alpha,
+                       tpu::TPUGenerateTensorDesc ( self ),
+                       ADDR_IN_DEVICE ( self ),
+                       &beta,
+                       tpu::TPUGenerateTensorDesc ( out ),
+                       ADDR_IN_DEVICE ( out ) );
+  TORCH_CHECK ( status == BM_SUCCESS );
 #ifdef TPU_OP_TIMING
   tpu::OpTimer::Instance().AddTime ( tpu::SOFTMAX, timer.ElapsedUS() );
+#endif
 #endif
   return out;
 }
