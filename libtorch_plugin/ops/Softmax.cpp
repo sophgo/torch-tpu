@@ -19,7 +19,7 @@ Tensor & _log_softmax_out_tpu ( const Tensor & self, int64_t dim, bool half_to_f
   tpu::TPUCopyHostToDevice ( out.data_ptr(), out_cpu.contiguous().data_ptr(), out.nbytes() );
   return out;
 }
-TORCH_LIBRARY_IMPL ( aten, PrivateUse1, m )
+TORCH_LIBRARY_IMPL ( aten, TPU, m )
 {
   m.impl ( "_log_softmax.out", _log_softmax_out_tpu );
 }
@@ -34,7 +34,7 @@ Tensor & _log_softmax_backward_data_out_tpu ( const Tensor & grad_output, const 
   tpu::TPUCopyHostToDevice ( out.data_ptr(), out_cpu.contiguous().data_ptr(), out.nbytes() );
   return out;
 }
-TORCH_LIBRARY_IMPL ( aten, PrivateUse1, m )
+TORCH_LIBRARY_IMPL ( aten, TPU, m )
 {
   m.impl ( "_log_softmax_backward_data.out", _log_softmax_backward_data_out_tpu );
 }
@@ -70,7 +70,7 @@ Tensor & _softmax_out_tpu ( const Tensor & self, int64_t dim, bool half_to_float
 #endif
   return out;
 }
-TORCH_LIBRARY_IMPL ( aten, PrivateUse1, m )
+TORCH_LIBRARY_IMPL ( aten, TPU, m )
 {
   m.impl ( "_softmax.out", _softmax_out_tpu );
 }
@@ -84,7 +84,7 @@ Tensor & _softmax_backward_data_out_tpu ( const Tensor & grad_output, const Tens
   tpu::TPUCopyHostToDevice ( grad_input.data_ptr(), grad_input_cpu.contiguous().data_ptr(), grad_input.nbytes() );
   return grad_input;
 }
-TORCH_LIBRARY_IMPL ( aten, PrivateUse1, m )
+TORCH_LIBRARY_IMPL ( aten, TPU, m )
 {
   m.impl ( "_softmax_backward_data.out", _softmax_backward_data_out_tpu );
 }

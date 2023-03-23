@@ -23,7 +23,7 @@ Tensor & addcmul_out_tpu ( const Tensor & self, const Tensor & tensor1, const Te
 #endif
   return out;
 }
-TORCH_LIBRARY_IMPL ( aten, PrivateUse1, m )
+TORCH_LIBRARY_IMPL ( aten, TPU, m )
 {
   m.impl ( "addcmul.out", addcmul_out_tpu );
 }

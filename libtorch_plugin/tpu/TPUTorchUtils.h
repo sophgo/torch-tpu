@@ -15,7 +15,7 @@
 #define CHECK_TENSOR_IN_DEVICE(t)                                                                                \
 do                                                                                                               \
 {                                                                                                                \
-TORCH_CHECK ( t.device().type() == DeviceType::PrivateUse1, #t, " is not in TPU device" );                       \
+TORCH_CHECK ( t.device().type() == DeviceType::TPU, #t, " is not in TPU device" );                       \
 TORCH_CHECK ( tpu::TPUPtrIsInCurrentDevice ( t.data_ptr() ) == true, #t, " is not in current TPU device"  );     \
 TORCH_CHECK ( t.is_contiguous() == true, #t, " is not contiguous" );                                             \
 }                                                                                                                \
@@ -29,7 +29,7 @@ while ( 0 )
 
 #define TPU_ERROR_CODE(Err) " ( TPU error code: " << Err << ")"
 
-#define IS_TPU_TENSOR(t)  ( ( t ).device().type() == DeviceType::PrivateUse1 )
+#define IS_TPU_TENSOR(t)  ( ( t ).device().type() == DeviceType::TPU )
 #define IS_CPU_TENSOR(t)  ( ( t ).device().type() == DeviceType::CPU )
 
 namespace tpu
@@ -37,7 +37,7 @@ namespace tpu
 
 static inline at::Device TPUGetCurrentDevice()
 {
-  return at::Device ( at::DeviceType::PrivateUse1, tpu::TPUGetDeviceIndex() );
+  return at::Device ( at::DeviceType::TPU, tpu::TPUGetDeviceIndex() );
 }
 
 static inline void SaveTensorToBinaryFile ( const at::Tensor & Tensor, const std::string & Path )

@@ -17,7 +17,7 @@ Tensor & fill__Scalar_tpu ( Tensor & self, const Scalar & value )
   tpu::TPUCopyHostToDevice ( self.data_ptr(), self_cpu.contiguous().data_ptr(), self.nbytes() );
   return self;
 }
-//TORCH_LIBRARY_IMPL ( aten, PrivateUse1, m )
+//TORCH_LIBRARY_IMPL ( aten, TPU, m )
 //{
 //  m.impl ( "fill_.Scalar", fill__Scalar_tpu );
 //}
@@ -31,7 +31,7 @@ Tensor & zero__tpu ( Tensor & self )
   delete [] buffer;
   return self;
 }
-TORCH_LIBRARY_IMPL ( aten, PrivateUse1, m )
+TORCH_LIBRARY_IMPL ( aten, TPU, m )
 {
   m.impl ( "zero_", zero__tpu );
 }

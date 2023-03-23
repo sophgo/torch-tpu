@@ -39,7 +39,7 @@ Tensor                      & total_weight )
   total_weight = TENSOR_TO_TPU ( std::get<1> ( outputs_cpu ) );
   return std::tuple<Tensor &, Tensor &> ( output, total_weight );
 }
-//TORCH_LIBRARY_IMPL ( aten, PrivateUse1, m )
+//TORCH_LIBRARY_IMPL ( aten, TPU, m )
 //{
 //  m.impl ( "nll_loss_forward.output", nll_loss_forward_output_tpu );
 //}
@@ -78,7 +78,7 @@ Tensor                      & grad_input )
   grad_input = TENSOR_TO_TPU ( grad_input_cpu );
   return grad_input;
 }
-//TORCH_LIBRARY_IMPL ( aten, PrivateUse1, m )
+//TORCH_LIBRARY_IMPL ( aten, TPU, m )
 //{
 //  m.impl ( "nll_loss_backward.grad_input", nll_loss_backward_grad_input_tpu );
 //}

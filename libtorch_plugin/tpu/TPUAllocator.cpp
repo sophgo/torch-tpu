@@ -43,12 +43,12 @@ ProfiledTPUMemoryReporter & profiledTPUMemoryReporter()
 
 at::Allocator * GetTPUAllocator()
 {
-  return GetAllocator ( DeviceType::PrivateUse1 );
+  return GetAllocator ( DeviceType::TPU );
 }
 
 void SetTPUAllocator ( at::Allocator * alloc, uint8_t priority )
 {
-  SetAllocator ( DeviceType::PrivateUse1, alloc, priority );
+  SetAllocator ( DeviceType::TPU, alloc, priority );
 }
 
 // Global default TPU Allocator
@@ -59,7 +59,7 @@ at::Allocator * GetDefaultTPUAllocator()
   return &g_tpu_alloc;
 }
 
-REGISTER_ALLOCATOR ( DeviceType::PrivateUse1, &g_tpu_alloc );
+REGISTER_ALLOCATOR ( DeviceType::TPU, &g_tpu_alloc );
 
 void ProfiledTPUMemoryReporter::New ( void * ptr, size_t nbytes )
 {
@@ -78,7 +78,7 @@ void ProfiledTPUMemoryReporter::New ( void * ptr, size_t nbytes )
   }
   if ( profile_memory )
   {
-    auto Device = at::Device ( at::DeviceType::PrivateUse1 );
+    auto Device = at::Device ( at::DeviceType::TPU );
     Device.set_index ( tpu::TPUGetDeviceIndex() );
     reportMemoryUsageToProfiler ( ptr, nbytes, allocated, 0, Device );
   }
@@ -118,7 +118,7 @@ void ProfiledTPUMemoryReporter::Delete ( void * ptr )
   }
   if ( profile_memory )
   {
-    auto Device = at::Device ( at::DeviceType::PrivateUse1 );
+    auto Device = at::Device ( at::DeviceType::TPU );
     Device.set_index ( tpu::TPUGetDeviceIndex() );
     reportMemoryUsageToProfiler ( ptr, -nbytes, allocated, 0, Device );
   }
@@ -139,7 +139,7 @@ void ProfiledTPUMemoryReporter::OutOfMemory ( size_t nbytes )
   }
   if ( profile_memory )
   {
-    auto Device = at::Device ( at::DeviceType::PrivateUse1 );
+    auto Device = at::Device ( at::DeviceType::TPU );
     Device.set_index ( tpu::TPUGetDeviceIndex() );
     reportOutOfMemoryToProfiler (
     static_cast<int64_t> ( nbytes ),

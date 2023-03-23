@@ -2,6 +2,8 @@
 
 #include <bmlib_runtime.h>
 
+#define TPU PrivateUse1
+
 namespace tpu
 {
 /**

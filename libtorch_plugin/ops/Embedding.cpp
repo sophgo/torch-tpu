@@ -28,7 +28,7 @@ Tensor index_select_tpu ( const Tensor & self, int64_t dim, const Tensor & index
 #endif
   return out;
 }
-TORCH_LIBRARY_IMPL ( aten, PrivateUse1, m )
+TORCH_LIBRARY_IMPL ( aten, TPU, m )
 {
   m.impl ( "index_select", index_select_tpu );
 }
@@ -40,7 +40,7 @@ Tensor embedding_dense_backward_tpu ( const Tensor & grad_output, const Tensor &
   auto out = TENSOR_TO_TPU ( out_cpu );
   return out;
 }
-TORCH_LIBRARY_IMPL ( aten, PrivateUse1, m )
+TORCH_LIBRARY_IMPL ( aten, TPU, m )
 {
   m.impl ( "embedding_dense_backward", embedding_dense_backward_tpu );
 }

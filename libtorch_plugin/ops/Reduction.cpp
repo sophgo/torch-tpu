@@ -17,7 +17,7 @@ Tensor & mean_out_tpu ( const Tensor & self, OptionalIntArrayRef dim_opt, bool k
   tpu::TPUCopyHostToDevice ( out.data_ptr(), out_cpu.contiguous().data_ptr(), out.nbytes() );
   return out;
 }
-TORCH_LIBRARY_IMPL ( aten, PrivateUse1, m )
+TORCH_LIBRARY_IMPL ( aten, TPU, m )
 {
   m.impl ( "mean.out", mean_out_tpu );
 }
@@ -30,7 +30,7 @@ Tensor & sum_IntList_out_tpu ( const Tensor & self, OptionalIntArrayRef dim_opt,
   tpu::TPUCopyHostToDevice ( out.data_ptr(), out_cpu.contiguous().data_ptr(), out.nbytes() );
   return out;
 }
-TORCH_LIBRARY_IMPL ( aten, PrivateUse1, m )
+TORCH_LIBRARY_IMPL ( aten, TPU, m )
 {
   m.impl ( "sum.IntList_out", sum_IntList_out_tpu );
 }

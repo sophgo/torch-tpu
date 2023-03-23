@@ -24,13 +24,13 @@ Tensor empty_strided_tpu ( IntArrayRef                size,
                       size_bytes,
                       allocator,
                       /*resizeable=*/true );
-  constexpr c10::DispatchKeySet ks ( c10::DispatchKey::PrivateUse1 );
+  constexpr c10::DispatchKeySet ks ( c10::DispatchKey::TPU );
   auto tensor = detail::make_tensor_base<TensorImpl> ( std::move ( storage_impl ), ks, dtype );
   tensor.unsafeGetTensorImpl()->set_sizes_and_strides ( size, stride );
   TORCH_CHECK ( tensor.is_contiguous() );
   return tensor;
 }
-TORCH_LIBRARY_IMPL ( aten, PrivateUse1, m )
+TORCH_LIBRARY_IMPL ( aten, TPU, m )
 {
   m.impl ( "empty_strided", empty_strided_tpu );
 }
@@ -45,7 +45,7 @@ c10::optional<c10::MemoryFormat>  memory_format_opt )
 {
   auto scalar_type = dtype_or_default ( dtype_opt );
   auto pin_memory = pinned_memory_or_default ( pin_memory_opt );
-  constexpr c10::DispatchKeySet ks ( c10::DispatchKey::PrivateUse1 );
+  constexpr c10::DispatchKeySet ks ( c10::DispatchKey::TPU );
   auto allocator = c10::GetTPUAllocator();
   at::detail::check_size_nonnegative ( size );
   caffe2::TypeMeta dtype = scalarTypeToTypeMeta ( scalar_type );
@@ -74,7 +74,7 @@ c10::optional<c10::MemoryFormat>  memory_format_opt )
   TORCH_CHECK ( tensor.is_contiguous() );
   return tensor;
 }
-TORCH_LIBRARY_IMPL ( aten, PrivateUse1, m )
+TORCH_LIBRARY_IMPL ( aten, TPU, m )
 {
   m.impl ( "empty.memory_format", empty_memory_format_tpu );
 }

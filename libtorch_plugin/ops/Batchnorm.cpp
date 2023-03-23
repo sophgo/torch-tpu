@@ -106,7 +106,7 @@ double eps )
   return std::tuple<Tensor, Tensor, Tensor> ( output, save_mean, save_invstd );
 #endif
 }
-TORCH_LIBRARY_IMPL ( aten, PrivateUse1, m )
+TORCH_LIBRARY_IMPL ( aten, TPU, m )
 {
   m.impl ( "native_batch_norm", native_batch_norm_tpu );
 }
@@ -212,7 +212,7 @@ std::array<bool, 3> output_mask )
   return std::tuple<Tensor, Tensor, Tensor> ( grad_input, grad_weight, grad_bias );
 #endif
 }
-TORCH_LIBRARY_IMPL ( aten, PrivateUse1, m )
+TORCH_LIBRARY_IMPL ( aten, TPU, m )
 {
   m.impl ( "native_batch_norm_backward", native_batch_norm_backward_tpu );
 }
@@ -250,7 +250,7 @@ std::array<bool, 3> output_mask )
          output_mask[1] ? TENSOR_TO_TPU ( std::get<1> ( outputs_cpu ) ) : Tensor(),
          output_mask[2] ? TENSOR_TO_TPU ( std::get<2> ( outputs_cpu ) ) : Tensor() );
 }
-TORCH_LIBRARY_IMPL ( aten, PrivateUse1, m )
+TORCH_LIBRARY_IMPL ( aten, TPU, m )
 {
   m.impl ( "native_layer_norm_backward", native_layer_norm_backward_tpu );
 }

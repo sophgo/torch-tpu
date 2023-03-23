@@ -55,7 +55,7 @@ Tensor & relu__tpu ( Tensor & self )
   return self;
 #endif
 }
-TORCH_LIBRARY_IMPL ( aten, PrivateUse1, m )
+TORCH_LIBRARY_IMPL ( aten, TPU, m )
 {
   m.impl ( "relu_", relu__tpu );
 }
@@ -103,7 +103,7 @@ Tensor       & grad_input )
 #endif
   return grad_input;
 }
-TORCH_LIBRARY_IMPL ( aten, PrivateUse1, m )
+TORCH_LIBRARY_IMPL ( aten, TPU, m )
 {
   m.impl ( "threshold_backward.grad_input", threshold_backward_grad_input_tpu );
 }
@@ -143,7 +143,7 @@ Tensor & gelu_out_tpu ( const Tensor & self, c10::string_view approximate, Tenso
 #endif
   return out;
 }
-TORCH_LIBRARY_IMPL ( aten, PrivateUse1, m )
+TORCH_LIBRARY_IMPL ( aten, TPU, m )
 {
   m.impl ( "gelu.out", gelu_out_tpu );
 }
@@ -157,7 +157,7 @@ Tensor & gelu_backward_grad_input_tpu ( const Tensor & grad_output, const Tensor
   tpu::TPUCopyHostToDevice ( grad_input.data_ptr(), grad_input_cpu.contiguous().data_ptr(), grad_input.nbytes() );
   return grad_input;
 }
-TORCH_LIBRARY_IMPL ( aten, PrivateUse1, m )
+TORCH_LIBRARY_IMPL ( aten, TPU, m )
 {
   m.impl ( "gelu_backward.grad_input", gelu_backward_grad_input_tpu );
 }

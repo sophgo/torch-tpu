@@ -77,7 +77,7 @@ Tensor _copy_from_tpu ( const Tensor & self, const Tensor & dst, bool non_blocki
   }
   return dst;
 }
-TORCH_LIBRARY_IMPL ( aten, PrivateUse1, m )
+TORCH_LIBRARY_IMPL ( aten, TPU, m )
 {
   m.impl ( "_copy_from", _copy_from_tpu );
 }

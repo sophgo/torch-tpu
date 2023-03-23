@@ -134,7 +134,7 @@ Tensor & add_out_tpu ( const Tensor & self, const Tensor & other, const Scalar &
 #endif
   return out;
 }
-TORCH_LIBRARY_IMPL ( aten, PrivateUse1, m )
+TORCH_LIBRARY_IMPL ( aten, TPU, m )
 {
   m.impl ( "add.out", add_out_tpu );
 }
@@ -263,7 +263,7 @@ Tensor & sub_out_tpu ( const Tensor & self, const Tensor & other, const Scalar &
 #endif
   return out;
 }
-TORCH_LIBRARY_IMPL ( aten, PrivateUse1, m )
+TORCH_LIBRARY_IMPL ( aten, TPU, m )
 {
   m.impl ( "sub.out", sub_out_tpu );
 }
@@ -365,7 +365,7 @@ Tensor & mul_out_tpu ( const Tensor & self, const Tensor & other, Tensor & out )
 #endif
   return out;
 }
-TORCH_LIBRARY_IMPL ( aten, PrivateUse1, m )
+TORCH_LIBRARY_IMPL ( aten, TPU, m )
 {
   m.impl ( "mul.out", mul_out_tpu );
 }
@@ -470,7 +470,7 @@ Tensor & div_out_tpu ( const Tensor & self, const Tensor & other, Tensor & out )
 #endif
   return out;
 }
-TORCH_LIBRARY_IMPL ( aten, PrivateUse1, m )
+TORCH_LIBRARY_IMPL ( aten, TPU, m )
 {
   m.impl ( "div.out", div_out_tpu );
 }

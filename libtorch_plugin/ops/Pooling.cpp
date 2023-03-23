@@ -57,7 +57,7 @@ bool ceil_mode )
 #endif
   return outputs;
 }
-TORCH_LIBRARY_IMPL ( aten, PrivateUse1, m )
+TORCH_LIBRARY_IMPL ( aten, TPU, m )
 {
   m.impl ( "max_pool2d_with_indices", max_pool2d_with_indices_tpu );
 }
@@ -125,7 +125,7 @@ const Tensor & indices )
 #endif
   return grad_input;
 }
-TORCH_LIBRARY_IMPL ( aten, PrivateUse1, m )
+TORCH_LIBRARY_IMPL ( aten, TPU, m )
 {
   m.impl ( "max_pool2d_with_indices_backward", max_pool2d_with_indices_backward_tpu );
 }

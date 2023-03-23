@@ -15,7 +15,7 @@ Tensor & binary_Tensor_tpu ( const Tensor          & input1,
                              Tensor                & out,
                              const EltwiseOpMode_t & op )
 {
-  if ( input1.device().type() == DeviceType::PrivateUse1 && input2.device().type() == DeviceType::PrivateUse1 )
+  if ( input1.device().type() == DeviceType::TPU && input2.device().type() == DeviceType::TPU )
   {
     CHECK_TENSOR_IN_DEVICE ( input1 );
     CHECK_TENSOR_IN_DEVICE ( input2 );
@@ -66,7 +66,7 @@ Tensor & add_out_tpu ( const Tensor & input1,
   return out;
 #endif
 }
-TORCH_LIBRARY_IMPL ( aten, PrivateUse1, m )
+TORCH_LIBRARY_IMPL ( aten, TPU, m )
 {
   m.impl ( "add.out", add_out_tpu );
 }
@@ -78,7 +78,7 @@ Tensor & sub_out_tpu ( const Tensor & input1,
 {
   return add_out_tpu ( input1, input2, -alpha, out );
 }
-TORCH_LIBRARY_IMPL ( aten, PrivateUse1, m )
+TORCH_LIBRARY_IMPL ( aten, TPU, m )
 {
   m.impl ( "sub.out", sub_out_tpu );
 }

@@ -130,7 +130,7 @@ int64_t groups )
   return is_batched ? output : output.squeeze ( 0 );
 #endif
 }
-TORCH_LIBRARY_IMPL ( aten, PrivateUse1, m )
+TORCH_LIBRARY_IMPL ( aten, TPU, m )
 {
   m.impl ( "convolution_overrideable", convolution_tpu );
 }
@@ -257,7 +257,7 @@ std::array<bool, 3> output_mask )
   return std::tuple<Tensor, Tensor, Tensor> ( grad_input, grad_weight, grad_bias );
 #endif
 }
-TORCH_LIBRARY_IMPL ( aten, PrivateUse1, m )
+TORCH_LIBRARY_IMPL ( aten, TPU, m )
 {
   m.impl ( "convolution_backward_overrideable", convolution_backward_overrideable_tpu );
 }

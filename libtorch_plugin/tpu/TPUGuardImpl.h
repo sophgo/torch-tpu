@@ -14,23 +14,23 @@ namespace impl
 struct TPUGuardImpl final : public c10::impl::DeviceGuardImplInterface
 {
 
-  static constexpr DeviceType static_type = DeviceType::PrivateUse1;
+  static constexpr DeviceType static_type = DeviceType::TPU;
 
   TPUGuardImpl() {}
 
   explicit TPUGuardImpl ( DeviceType t )
   {
-    TORCH_INTERNAL_ASSERT ( t == DeviceType::PrivateUse1 );
+    TORCH_INTERNAL_ASSERT ( t == DeviceType::TPU );
   }
 
   DeviceType type() const override
   {
-    return DeviceType::PrivateUse1;
+    return DeviceType::TPU;
   }
 
   Device exchangeDevice ( Device d ) const override
   {
-    TORCH_INTERNAL_ASSERT ( d.type() == DeviceType::PrivateUse1 );
+    TORCH_INTERNAL_ASSERT ( d.type() == DeviceType::TPU );
     Device old_device = getDevice();
     if ( old_device.index() != d.index() )
     {
@@ -42,12 +42,12 @@ struct TPUGuardImpl final : public c10::impl::DeviceGuardImplInterface
   Device getDevice() const override
   {
     int device = ::tpu::TPUGetDeviceIndex ();
-    return Device ( DeviceType::PrivateUse1, device );
+    return Device ( DeviceType::TPU, device );
   }
 
   void setDevice ( Device d ) const override
   {
-    TORCH_INTERNAL_ASSERT ( d.type() == DeviceType::PrivateUse1 );
+    TORCH_INTERNAL_ASSERT ( d.type() == DeviceType::TPU );
     Device current_device = getDevice();
     if ( current_device != d )
     {
@@ -63,14 +63,14 @@ struct TPUGuardImpl final : public c10::impl::DeviceGuardImplInterface
   Stream getStream ( Device ) const noexcept override
   {
     // no-op
-    return Stream ( Stream::DEFAULT, Device ( DeviceType::PrivateUse1, -1 ) );
+    return Stream ( Stream::DEFAULT, Device ( DeviceType::TPU, -1 ) );
   }
 
   // NB: These do NOT set the current device
   Stream exchangeStream ( Stream ) const noexcept override
   {
     // no-op
-    return Stream ( Stream::DEFAULT, Device ( DeviceType::PrivateUse1, -1 ) );
+    return Stream ( Stream::DEFAULT, Device ( DeviceType::TPU, -1 ) );
   }
 
   DeviceIndex deviceCount() const noexcept override
@@ -84,25 +84,26 @@ struct TPUGuardImpl final : public c10::impl::DeviceGuardImplInterface
                 const DeviceIndex /*device_index*/,
                 const EventFlag /*flag*/ ) const override
   {
-    TORCH_CHECK ( false, DeviceType::PrivateUse1,
+    TORCH_CHECK ( false, DeviceType::TPU,
                   " backend doesn't support events." );
   }
 
   void block ( void * /*event*/, const Stream & /*stream*/ ) const override
   {
-    TORCH_CHECK ( false, DeviceType::PrivateUse1,
+    TORCH_CHECK ( false, DeviceType::TPU,
                   " backend doesn't support events." )
   }
 
   bool queryEvent ( void * /*event*/ ) const override
   {
-    TORCH_CHECK ( false, DeviceType::PrivateUse1,
+    TORCH_CHECK ( false, DeviceType::TPU,
                   " backend doesn't support events." )
   }
 
   void destroyEvent ( void * /*event*/, const DeviceIndex /*device_index*/ )
   const noexcept override {}
 
+#if 0
   // Stream-related functions
   bool queryStream ( const Stream & /*stream*/ ) const override
   {
@@ -113,6 +114,7 @@ struct TPUGuardImpl final : public c10::impl::DeviceGuardImplInterface
   {
     // Don't wait for anything.
   }
+#endif
 };
 } // namespace impl
 } // namespace tpu

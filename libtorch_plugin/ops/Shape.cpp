@@ -13,14 +13,11 @@
 #include <ATen/SparseTensorUtils.h>
 #include <ATen/WrapDimUtils.h>
 #include <ATen/core/DimVector.h>
-#include <ATen/core/IListRef.h>
 #include <ATen/native/Copy.h>
 #include <ATen/native/Resize.h>
 #include <ATen/native/TensorIterator.h>
-#include <ATen/native/TensorShape.h>
 #include <ATen/native/TypeProperties.h>
 #include <ATen/native/cpu/CatKernel.h>
-#include <ATen/native/cpu/SerialStackImpl.h>
 #include <ATen/native/cpu/StackKernel.h>
 #include <ATen/quantized/QTensorImpl.h>
 #include <c10/util/Exception.h>
@@ -75,7 +72,7 @@ Tensor view_tpu ( const Tensor & self, c10::IntArrayRef size )
                 " spans across two contiguous subspaces). Use .reshape(...) instead." );
   return alias_with_sizes_and_strides ( self, inferred_size, *stride );
 }
-TORCH_LIBRARY_IMPL ( aten, PrivateUse1, m )
+TORCH_LIBRARY_IMPL ( aten, TPU, m )
 {
   m.impl ( "view", view_tpu );
 }
@@ -86,7 +83,7 @@ Tensor _reshape_alias_tpu ( const Tensor & input,
 {
   return view_tpu ( input, sizes );
 }
-TORCH_LIBRARY_IMPL ( aten, PrivateUse1, m )
+TORCH_LIBRARY_IMPL ( aten, TPU, m )
 {
   m.impl ( "_reshape_alias", _reshape_alias_tpu );
 }
@@ -181,7 +178,7 @@ Tensor as_strided_tpu ( const Tensor & self, IntArrayRef size, IntArrayRef strid
   }
   return out;
 }
-TORCH_LIBRARY_IMPL ( aten, PrivateUse1, m )
+TORCH_LIBRARY_IMPL ( aten, TPU, m )
 {
   m.impl ( "as_strided", as_strided_tpu );
 }
