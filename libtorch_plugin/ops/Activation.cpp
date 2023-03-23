@@ -153,8 +153,20 @@ Tensor & gelu_backward_grad_input_tpu ( const Tensor & grad_output, const Tensor
   CHECK_TENSOR_IN_DEVICE ( grad_output );
   CHECK_TENSOR_IN_DEVICE ( self );
   CHECK_TENSOR_IN_DEVICE ( grad_input );
+#if 0
   auto grad_input_cpu = gelu_backward ( grad_output.cpu(), self.cpu(), approximate );
   tpu::TPUCopyHostToDevice ( grad_input.data_ptr(), grad_input_cpu.contiguous().data_ptr(), grad_input.nbytes() );
+#else
+  bm_status_t status = sgdnn_gelu_backward_cudnn (
+                       tpu::TPUGetDeviceHandle(),
+                       tpu::TPUGenerateTensorDesc ( self ),
+                       ADDR_IN_DEVICE ( self ),
+                       tpu::TPUGenerateTensorDesc ( grad_output ),
+                       ADDR_IN_DEVICE ( grad_output ),
+                       tpu::TPUGenerateTensorDesc ( grad_input ),
+                       ADDR_IN_DEVICE ( grad_input ) );
+  TORCH_CHECK ( status == BM_SUCCESS );
+#endif
   return grad_input;
 }
 TORCH_LIBRARY_IMPL ( aten, TPU, m )

@@ -2352,3 +2352,36 @@ bm_status_t sgdnn_permute(
     }
     return BM_SUCCESS;
 }
+
+bm_status_t sgdnn_gelu_backward_cudnn(
+    bm_handle_t                     handle,
+    const TensorDescriptor_t        xDesc,
+    const void                     *x,
+    const TensorDescriptor_t        dyDesc,
+    const void                     *dy,
+    const TensorDescriptor_t        dxDesc,
+    void                           *dx)
+{
+    assert(xDesc.ndims == dxDesc.ndims && xDesc.ndims == dyDesc.ndims);
+    sg_data_type_t dxdtype = (sg_data_type_t)(dxDesc.dtype);
+    sg_data_type_t xdtype = (sg_data_type_t)(xDesc.dtype);
+    sg_data_type_t dydtype = (sg_data_type_t)(dyDesc.dtype);
+    assert(dxdtype == xdtype && xdtype == dydtype);
+
+    sg_api_gelu_backward_t api;
+    api.dx_global_addr = (unsigned long long)dx;
+    api.dy_global_addr = (unsigned long long)dy;
+    api.x_global_addr = (unsigned long long)x;
+    api.dim = xDesc.ndims;
+    api.dtype = xdtype;
+
+    for (int i=0; i<xDesc.ndims; ++i)
+    {
+        assert(xDesc.shape[i] == dyDesc.shape[i] );
+        assert(xDesc.shape[i] == dxDesc.shape[i] );
+        api.shape[i] = xDesc.shape[i];
+    }
+
+    sgdnn_tpu_kernel_launch(handle, "tpu_kernel_api_gelu_backward", &api, sizeof(api));
+    return BM_SUCCESS;
+}

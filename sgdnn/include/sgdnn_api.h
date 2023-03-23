@@ -629,6 +629,15 @@ bm_status_t sgdnn_pooling_backward_cudnn(
     const TensorDescriptor_t    dxDesc,
     void                       *dx );
 
+bm_status_t sgdnn_gelu_backward_cudnn(
+    bm_handle_t                     handle,
+    const TensorDescriptor_t        xDesc,
+    const void                     *x,
+    const TensorDescriptor_t        dyDesc,
+    const void                     *dy,
+    const TensorDescriptor_t        dxDesc,
+    void                           *dx);
+
 #if defined(__cplusplus)
 }
 #endif
