@@ -1080,7 +1080,8 @@ bm_status_t sgdnn_pooling_forward_cudnn(
     const TensorDescriptor_t    yDesc,
     void                       *y
  ) {
-
+    assert(*(float *)alpha == 1.f);
+    assert(*(float *)beta == 0.f);
     assert(xDesc.ndims == 4 && yDesc.ndims == 4);
     int n = xDesc.shape[0];
     int c = xDesc.shape[1];
@@ -1237,17 +1238,18 @@ bm_status_t sgdnn_pooling_backward_cudnn(
     bm_handle_t                 handle,
     const PoolingDescriptor_t   poolingDesc,
     const void                 *alpha,
-    const void                 *beta,
     const TensorDescriptor_t    yDesc,
     const void                 *y,
     const TensorDescriptor_t    dyDesc,
     const void                 *dy,
     const TensorDescriptor_t    xDesc,
     const void                 *x,
+    const void                 *beta,
     const TensorDescriptor_t    dxDesc,
     void                       *dx
  ) {
-
+    assert(*(float *)alpha == 1.f);
+    assert(*(float *)beta == 0.f);
     ASSERT_SAME_SHAPE(xDesc, dxDesc);
     ASSERT_SAME_SHAPE(yDesc, dyDesc);
     assert(xDesc.ndims == 4 && yDesc.ndims == 4);

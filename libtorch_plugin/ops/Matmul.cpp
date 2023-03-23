@@ -22,13 +22,14 @@ Tensor & addmm_out_tpu ( const Tensor & self, const Tensor & mat1, const Tensor 
   CHECK_TENSOR_IN_DEVICE ( mat1 );
   CHECK_TENSOR_IN_DEVICE ( mat2 );
   CHECK_TENSOR_IN_DEVICE ( out );
-#ifdef TPU_OP_TIMING
-  auto timer = tpu::Timer().Start();
-#endif
+#if 0
   auto out_cpu = addmm ( self.cpu(), mat1.cpu(), mat2.cpu(), beta, alpha );
   tpu::TPUCopyHostToDevice ( out.data_ptr(), out_cpu.contiguous().data_ptr(), out.nbytes() );
-#ifdef TPU_OP_TIMING
-  tpu::OpTimer::Instance().AddTime ( tpu::ADDMM, timer.ElapsedUS() );
+#else
+  TORCH_CHECK ( alpha.toDouble() == 1. );
+  TORCH_CHECK ( beta.toDouble() == 1. );
+  auto mat1_mat2 = mm ( mat1, mat2 );
+  add_out ( out, self, mat1_mat2, 1. );
 #endif
   return out;
 }

@@ -605,6 +605,30 @@ bm_status_t sgdnn_permute(
     void                            *yData,
     const int                       *order);
 
+bm_status_t sgdnn_pooling_forward_cudnn(
+    bm_handle_t                 handle,
+    const PoolingDescriptor_t   poolingDesc,
+    const void                 *alpha,
+    const TensorDescriptor_t    xDesc,
+    const void                 *x,
+    const void                 *beta,
+    const TensorDescriptor_t    yDesc,
+    void                       *y);
+
+bm_status_t sgdnn_pooling_backward_cudnn(
+    bm_handle_t                 handle,
+    const PoolingDescriptor_t   poolingDesc,
+    const void                 *alpha,
+    const TensorDescriptor_t    yDesc,
+    const void                 *y,
+    const TensorDescriptor_t    dyDesc,
+    const void                 *dy,
+    const TensorDescriptor_t    xDesc,
+    const void                 *x,
+    const void                 *beta,
+    const TensorDescriptor_t    dxDesc,
+    void                       *dx );
+
 #if defined(__cplusplus)
 }
 #endif

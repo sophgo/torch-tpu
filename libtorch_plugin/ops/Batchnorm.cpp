@@ -205,6 +205,7 @@ std::array<bool, 3> output_mask )
                        output_mask[0],
                        output_mask[1],
                        output_mask[2] );
+  TORCH_CHECK ( status == BM_SUCCESS );
 #ifdef TPU_OP_TIMING
   tpu::OpTimer::Instance().AddTime ( tpu::BATCHNORM_BACKWARD, timer.ElapsedUS() );
 #endif
