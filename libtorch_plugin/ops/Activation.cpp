@@ -157,6 +157,9 @@ Tensor & gelu_backward_grad_input_tpu ( const Tensor & grad_output, const Tensor
   auto grad_input_cpu = gelu_backward ( grad_output.cpu(), self.cpu(), approximate );
   tpu::TPUCopyHostToDevice ( grad_input.data_ptr(), grad_input_cpu.contiguous().data_ptr(), grad_input.nbytes() );
 #else
+#ifdef TPU_OP_TIMING
+  auto timer = tpu::Timer().Start();
+#endif
   bm_status_t status = sgdnn_gelu_backward_cudnn (
                        tpu::TPUGetDeviceHandle(),
                        tpu::TPUGenerateTensorDesc ( self ),
@@ -166,6 +169,9 @@ Tensor & gelu_backward_grad_input_tpu ( const Tensor & grad_output, const Tensor
                        tpu::TPUGenerateTensorDesc ( grad_input ),
                        ADDR_IN_DEVICE ( grad_input ) );
   TORCH_CHECK ( status == BM_SUCCESS );
+#ifdef TPU_OP_TIMING
+  tpu::OpTimer::Instance().AddTime ( tpu::GELU_BACKWARD, timer.ElapsedUS() );
+#endif
 #endif
   return grad_input;
 }
