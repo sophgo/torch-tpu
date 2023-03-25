@@ -45,9 +45,11 @@ int main()
   timer.Start();
   OutputsTPU[0].backward ( BackwardInput0TPU );
   std::cout << "BertBase(Batch = " << Batch << ") Backward TPU Elapsed time = " << timer.ElapsedUS() << "us" << std::endl;
-  //auto GradInputGot = InputTPU.grad().to ( CPU );
-  //auto GradInputExp = InputCPU.grad();
-//  tpu::TPUCompareResult ( GradInputGot, GradInputExp );
+  std::vector<at::Tensor> ParamCPU = tpu::GetNamedParameters ( *BertCPU );
+  std::vector<at::Tensor> ParamTPU = tpu::GetNamedParameters ( *BertTPU );
+  TORCH_CHECK ( ParamCPU.size() == ParamTPU.size() );
+  std::cout << ParamCPU.size() << std::endl;
+  tpu::TPUCompareResult ( ParamTPU[0].grad().cpu(), ParamCPU[0].grad() );
   tpu::OpTimer::Instance().Dump();
   return 0;
 }

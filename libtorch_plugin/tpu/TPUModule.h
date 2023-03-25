@@ -43,4 +43,6 @@ private:
   torch::jit::Module Module_;
 };
 
+std::vector<at::Tensor> GetNamedParameters ( const torch::nn::Module & Module );
+
 } // namespace tpu

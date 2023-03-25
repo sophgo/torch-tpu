@@ -136,4 +136,24 @@ void SetConvolutionForwardAccuracy ( AlgorithmAccuracy_t Accuracy )
   kConvolutionForwardAccuracy = Accuracy;
 }
 
+static inline void GetNamedParameters_ (
+const torch::nn::Module & Module, std::vector<at::Tensor> & Params )
+{
+  for ( auto & Par : Module.named_parameters ( false ) )
+  {
+    Params.push_back ( Par.value() );
+  }
+  for ( auto & Mod : Module.named_children() )
+  {
+    GetNamedParameters_ ( *Mod.value(), Params );
+  }
+}
+
+std::vector<at::Tensor> GetNamedParameters ( const torch::nn::Module & Module )
+{
+  std::vector<at::Tensor> Params;
+  GetNamedParameters_ ( Module, Params );
+  return Params;
+}
+
 } // namespace tpu
