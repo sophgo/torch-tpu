@@ -2274,6 +2274,44 @@ bm_status_t sgdnn_softmax_forward_cudnn(
     return BM_SUCCESS;
 }
 
+bm_status_t sgdnn_softmax_backward_cudnn(
+    bm_handle_t                      handle,
+    int                              dim,    
+    const TensorDescriptor_t         yDesc,
+    const void                      *y,
+    const TensorDescriptor_t         dyDesc,
+    const void                      *dy,
+    const TensorDescriptor_t         dxDesc,
+    void                            *dx)
+{
+    sg_data_type_t ydtype  = (sg_data_type_t)( yDesc.dtype);
+    sg_data_type_t dydtype = (sg_data_type_t)(dyDesc.dtype);
+    sg_data_type_t dxdtype = (sg_data_type_t)(dxDesc.dtype);
+    assert(ydtype == dydtype && dydtype == dxdtype && dxdtype == 0);
+    
+    assert(yDesc.ndims == dyDesc.ndims && dyDesc.ndims == dxDesc.ndims && yDesc.ndims == 4);
+    assert(dim == 3);
+    for (int i = 0; i < yDesc.ndims; ++i)
+    {
+        assert(yDesc.shape[i] == dyDesc.shape[i]);
+        assert(yDesc.shape[i] == dxDesc.shape[i]);
+    }
+    
+    sg_api_softmax_backward_t api;
+    api.output_global_addr      = (unsigned long long)y;
+    api.grad_output_global_addr = (unsigned long long)dy;
+    api.grad_input_global_addr  = (unsigned long long)dx;
+    api.input_n = yDesc.shape[0];
+    api.input_c = yDesc.shape[1];
+    api.input_h = yDesc.shape[2];
+    api.input_w = yDesc.shape[3];
+    api.dim = dim;
+    api.dtype = ydtype;
+    
+    sgdnn_tpu_kernel_launch(handle, "tpu_kernel_api_softmax_backward", &api, sizeof(api));
+    return BM_SUCCESS;
+}
+
 bm_status_t sgdnn_transpose(
     bm_handle_t                      handle,
     const TensorDescriptor_t         xDesc,

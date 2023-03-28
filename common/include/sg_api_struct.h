@@ -414,6 +414,22 @@ typedef struct {
 #endif
 
 typedef struct {
+    unsigned long long output_global_addr;
+    unsigned long long grad_output_global_addr;
+    unsigned long long grad_input_global_addr;
+    int                input_n;
+    int                input_c;
+    int                input_h;
+    int                input_w;
+    int                dim;
+    sg_data_type_t     dtype;
+#ifndef WIN32
+} __attribute__((packed)) sg_api_softmax_backward_t;
+#else
+} sg_api_softmax_backward_t;
+#endif
+
+typedef struct {
   unsigned long long input_global_mem_addr;
   unsigned long long output_global_mem_addr;
   int input_shape[FW_MAX_SHAPE_DIMS];

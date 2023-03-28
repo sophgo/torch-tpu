@@ -52,6 +52,8 @@ add_executable(test_gelu test/gelu.cpp)
 target_link_libraries(test_gelu libtorch_plugin)
 add_executable(test_softmax test/softmax.cpp)
 target_link_libraries(test_softmax libtorch_plugin)
+add_executable(test_softmax_backward test/softmax_backward.cpp)
+target_link_libraries(test_softmax_backward libtorch_plugin)
 
 # Benchmark
 add_executable(benchmark_conv2d benchmark/conv2d.cpp)

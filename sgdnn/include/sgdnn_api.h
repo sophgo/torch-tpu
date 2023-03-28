@@ -590,6 +590,16 @@ bm_status_t sgdnn_softmax_forward_cudnn(
     const TensorDescriptor_t         yDesc,
     void                            *y);
 
+bm_status_t sgdnn_softmax_backward_cudnn(
+    bm_handle_t                      handle,
+    int                              dim,    
+    const TensorDescriptor_t         yDesc,
+    const void                      *y,
+    const TensorDescriptor_t         dyDesc,
+    const void                      *dy,
+    const TensorDescriptor_t         dxDesc,
+    void                            *dx);
+
 bm_status_t sgdnn_transpose(
     bm_handle_t                      handle,
     const TensorDescriptor_t         xDesc,
