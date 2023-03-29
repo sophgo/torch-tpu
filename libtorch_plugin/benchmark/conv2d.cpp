@@ -8,8 +8,8 @@ static inline void benchmark ( at::IntArrayRef input_shape,
                                at::IntArrayRef stride,
                                at::IntArrayRef padding,
                                at::IntArrayRef dilation,
-                               int64_t         groups,
-                               bool            has_bias )
+                               int64_t groups,
+                               bool has_bias )
 {
   auto input_cpu = torch::randn ( input_shape ) - 0.5;
   auto weight_cpu = torch::randn ( weight_shape ) - 0.5;

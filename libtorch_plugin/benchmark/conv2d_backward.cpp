@@ -3,13 +3,13 @@
 
 static int loops = 0;
 
-static inline void test ( at::IntArrayRef     grad_output_shape,
-                          at::IntArrayRef     input_shape,
-                          at::IntArrayRef     weight_shape,
-                          at::IntArrayRef     stride,
-                          at::IntArrayRef     padding,
-                          at::IntArrayRef     dilation,
-                          int64_t             groups,
+static inline void test ( at::IntArrayRef grad_output_shape,
+                          at::IntArrayRef input_shape,
+                          at::IntArrayRef weight_shape,
+                          at::IntArrayRef stride,
+                          at::IntArrayRef padding,
+                          at::IntArrayRef dilation,
+                          int64_t groups,
                           std::array<bool, 3> output_mask )
 {
   auto grad_output_cpu = torch::randn ( grad_output_shape ) - 0.5;
