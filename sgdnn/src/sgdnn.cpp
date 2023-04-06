@@ -251,11 +251,18 @@ bm_status_t sgdnn_conv_forward_cudnn(
     bool result_add = beta_ == 1.0f;
 
     sg_data_type_t idtype = (sg_data_type_t)(xDesc.dtype);
+    sg_data_type_t wdtype = (sg_data_type_t)(wDesc.dtype);
+    sg_data_type_t bdtype = (sg_data_type_t)(bDesc.dtype);
     sg_data_type_t odtype = (sg_data_type_t)(yDesc.dtype);
+    assert(bdtype == SG_DTYPE_FP32);
 
     sg_data_type_t compute_type = (sg_data_type_t)(convDesc.computeType);
 
     if (compute_type == SG_DTYPE_FP32) {
+
+        assert(idtype == SG_DTYPE_FP32 &&
+               wdtype == SG_DTYPE_FP32 &&
+               odtype == SG_DTYPE_FP32);
 
         sg_api_conv_forward_t api = {
             (unsigned long long)x,
@@ -280,72 +287,117 @@ bm_status_t sgdnn_conv_forward_cudnn(
 
     } else if (compute_type == SG_DTYPE_FP16) {
 
-        int dtype_size = 2;
+        if (idtype == SG_DTYPE_FP32) {
 
-        bm_device_mem_t x_fp16, w_fp16, w_32ic_fp16;
-        u64 x_fp16_size = (u64)n * ic * ih * iw * dtype_size;
-        u64 w_fp16_size = (u64)oc * ic * kh * kw * dtype_size;
-        u64 w_32ic_fp16_size = (u64)oc * ALIGN(ic, 32) * kh * kw * dtype_size;
+            assert(wdtype == SG_DTYPE_FP32 && odtype == SG_DTYPE_FP32);
 
-        DEVICE_MEM_NEW_BUFFER(handle, x_fp16, x_fp16_size);
-        DEVICE_MEM_NEW_BUFFER(handle, w_fp16, w_fp16_size);
-        DEVICE_MEM_NEW_BUFFER(handle, w_32ic_fp16, w_32ic_fp16_size);
+            int dtype_size = 2;
 
-        sg_api_dtype_convert_t cast_x_api;
-        cast_x_api.input_global_addr = (unsigned long long)x;
-        cast_x_api.output_global_addr = bm_mem_get_device_addr(x_fp16);
-        memcpy(cast_x_api.shape, xDesc.shape, xDesc.ndims * sizeof(int));
-        cast_x_api.dims = xDesc.ndims;
-        cast_x_api.idtype = SG_DTYPE_FP32;
-        cast_x_api.odtype = SG_DTYPE_FP16;
-        cast_x_api.round_mode = SG_ROUND_EVEN;
+            bm_device_mem_t x_fp16, w_fp16, w_32ic_fp16;
+            u64 x_fp16_size = (u64)n * ic * ih * iw * dtype_size;
+            u64 w_fp16_size = (u64)oc * ic * kh * kw * dtype_size;
+            u64 w_32ic_fp16_size = (u64)oc * ALIGN(ic, 32) * kh * kw * dtype_size;
 
-        sgdnn_tpu_kernel_launch(handle, "tpu_kernel_api_dtype_convert", &cast_x_api, sizeof(cast_x_api));
+            DEVICE_MEM_NEW_BUFFER(handle, x_fp16, x_fp16_size);
+            DEVICE_MEM_NEW_BUFFER(handle, w_fp16, w_fp16_size);
+            DEVICE_MEM_NEW_BUFFER(handle, w_32ic_fp16, w_32ic_fp16_size);
 
-        sg_api_dtype_convert_t cast_w_api;
-        cast_w_api.input_global_addr = (unsigned long long)w;
-        cast_w_api.output_global_addr = bm_mem_get_device_addr(w_fp16);
-        int w_shape[4] = {oc, ic, kh, kw};
-        memcpy(cast_w_api.shape, w_shape, 4 * sizeof(int));
-        cast_w_api.dims = 4;
-        cast_w_api.idtype = SG_DTYPE_FP32;
-        cast_w_api.odtype = SG_DTYPE_FP16;
-        cast_w_api.round_mode = SG_ROUND_EVEN;
+            sg_api_dtype_convert_t cast_x_api;
+            cast_x_api.input_global_addr = (unsigned long long)x;
+            cast_x_api.output_global_addr = bm_mem_get_device_addr(x_fp16);
+            memcpy(cast_x_api.shape, xDesc.shape, xDesc.ndims * sizeof(int));
+            cast_x_api.dims = xDesc.ndims;
+            cast_x_api.idtype = SG_DTYPE_FP32;
+            cast_x_api.odtype = SG_DTYPE_FP16;
+            cast_x_api.round_mode = SG_ROUND_EVEN;
 
-        sgdnn_tpu_kernel_launch(handle, "tpu_kernel_api_dtype_convert", &cast_w_api, sizeof(cast_w_api));
+            sgdnn_tpu_kernel_launch(handle, "tpu_kernel_api_dtype_convert", &cast_x_api, sizeof(cast_x_api));
 
-        sg_api_conv_weight_reorder_t conv_weight_reorder_api = {
-            bm_mem_get_device_addr(w_fp16),
-            bm_mem_get_device_addr(w_32ic_fp16),
-            {oc, ic, kh, kw},
-            Reorder_To_32ic};
+            sg_api_dtype_convert_t cast_w_api;
+            cast_w_api.input_global_addr = (unsigned long long)w;
+            cast_w_api.output_global_addr = bm_mem_get_device_addr(w_fp16);
+            int w_shape[4] = {oc, ic, kh, kw};
+            memcpy(cast_w_api.shape, w_shape, 4 * sizeof(int));
+            cast_w_api.dims = 4;
+            cast_w_api.idtype = SG_DTYPE_FP32;
+            cast_w_api.odtype = SG_DTYPE_FP16;
+            cast_w_api.round_mode = SG_ROUND_EVEN;
 
-        sgdnn_tpu_kernel_launch(handle, "tpu_kernel_api_conv_weight_reorder", &conv_weight_reorder_api, sizeof(conv_weight_reorder_api));
+            sgdnn_tpu_kernel_launch(handle, "tpu_kernel_api_dtype_convert", &cast_w_api, sizeof(cast_w_api));
 
-        sg_api_conv_forward_t api = {
-            bm_mem_get_device_addr(x_fp16),
-            bm_mem_get_device_addr(w_32ic_fp16),
-            (unsigned long long)b,
-            (unsigned long long)y,
-            {n, ic, ih, iw},
-            groups,
-            oc,
-            {kh, kw},
-            {stride_h, stride_w},
-            {dh, dw},
-            {pad_h, pad_h, pad_w, pad_w},//pad
-            b != NULL ? 1 : 0,//has_bias?
-            0,//if_relu
-            0,//upper_limit
-            result_add ? 1 : 0,
-            SG_DTYPE_FP16,
-            SG_DTYPE_FP32};
+            sg_api_conv_weight_reorder_t conv_weight_reorder_api = {
+                bm_mem_get_device_addr(w_fp16),
+                bm_mem_get_device_addr(w_32ic_fp16),
+                {oc, ic, kh, kw},
+                Reorder_To_32ic};
 
-        sgdnn_tpu_kernel_launch(handle, "tpu_kernel_api_conv_forward", &api, sizeof(api));
+            sgdnn_tpu_kernel_launch(handle, "tpu_kernel_api_conv_weight_reorder", &conv_weight_reorder_api, sizeof(conv_weight_reorder_api));
 
-        bm_free_device(handle, x_fp16);
-        bm_free_device(handle, w_fp16);
-        bm_free_device(handle, w_32ic_fp16);
+            sg_api_conv_forward_t api = {
+                bm_mem_get_device_addr(x_fp16),
+                bm_mem_get_device_addr(w_32ic_fp16),
+                (unsigned long long)b,
+                (unsigned long long)y,
+                {n, ic, ih, iw},
+                groups,
+                oc,
+                {kh, kw},
+                {stride_h, stride_w},
+                {dh, dw},
+                {pad_h, pad_h, pad_w, pad_w},//pad
+                b != NULL ? 1 : 0,//has_bias?
+                0,//if_relu
+                0,//upper_limit
+                result_add ? 1 : 0,
+                SG_DTYPE_FP16,
+                odtype};
+
+            sgdnn_tpu_kernel_launch(handle, "tpu_kernel_api_conv_forward", &api, sizeof(api));
+
+            bm_free_device(handle, x_fp16);
+            bm_free_device(handle, w_fp16);
+            bm_free_device(handle, w_32ic_fp16);
+
+        } else if (idtype == SG_DTYPE_FP16) {
+
+            assert(wdtype == SG_DTYPE_FP16);
+
+            int dtype_size = 2;
+            bm_device_mem_t w_32ic_fp16;
+            u64 w_32ic_fp16_size = (u64)oc * ALIGN(ic, 32) * kh * kw * dtype_size;
+
+            DEVICE_MEM_NEW_BUFFER(handle, w_32ic_fp16, w_32ic_fp16_size);
+
+            sg_api_conv_weight_reorder_t conv_weight_reorder_api = {
+                (unsigned long long)w,
+                bm_mem_get_device_addr(w_32ic_fp16),
+                {oc, ic, kh, kw},
+                Reorder_To_32ic};
+
+            sgdnn_tpu_kernel_launch(handle, "tpu_kernel_api_conv_weight_reorder", &conv_weight_reorder_api, sizeof(conv_weight_reorder_api));
+
+            sg_api_conv_forward_t api = {
+                (unsigned long long)x,
+                bm_mem_get_device_addr(w_32ic_fp16),
+                (unsigned long long)b,
+                (unsigned long long)y,
+                {n, ic, ih, iw},
+                groups,
+                oc,
+                {kh, kw},
+                {stride_h, stride_w},
+                {dh, dw},
+                {pad_h, pad_h, pad_w, pad_w},//pad
+                b != NULL ? 1 : 0,//has_bias?
+                0,//if_relu
+                0,//upper_limit
+                result_add ? 1 : 0,
+                idtype,
+                odtype};
+
+            sgdnn_tpu_kernel_launch(handle, "tpu_kernel_api_conv_forward", &api, sizeof(api));
+            bm_free_device(handle, w_32ic_fp16);
+        }
     }
 
     return BM_SUCCESS;
@@ -674,6 +726,9 @@ bm_status_t sgdnn_conv_backward_cudnn(
             bm_free_device(handle, w_fp16);
             bm_free_device(handle, dy_fp16);
         }
+    } else {
+        //not support input is FP16 but compute type is FP32
+        assert(0);
     }
 
     return BM_SUCCESS;
