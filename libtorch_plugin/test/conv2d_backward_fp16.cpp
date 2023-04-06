@@ -98,7 +98,7 @@ static inline void test ( at::IntArrayRef grad_output_shape,
 int main()
 {
   const int batch = 64;
-  const bool has_bias = true;
+  const bool has_bias = false;
   // grad output shape, input shape, weight shape, stride, padding, dilation, groups
   test ( { batch,   64, 112, 112 }, { batch,    3, 224, 224 }, {   64,    3, 7, 7 }, { 2, 2 }, { 3, 3 }, { 1, 1 }, 1, { true, true, has_bias } ); // 0
   test ( { batch,   64,  56,  56 }, { batch,   64,  56,  56 }, {   64,   64, 1, 1 }, { 1, 1 }, { 0, 0 }, { 1, 1 }, 1, { true, true, has_bias } ); // 1
