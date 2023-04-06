@@ -94,17 +94,24 @@ int64_t groups )
       .groups = ( int ) groups,
     };
     auto accuracy = tpu::GetConvolutionForwardAccuracy();
-    if ( accuracy == tpu::ALGORITHM_ACCURACY_FP32 )
+    if ( input.dtype() == caffe2::TypeMeta::Make<float>() )
     {
-      conv_desc.computeType = SG_DTYPE_FP32;
+      if ( accuracy == tpu::ALGORITHM_ACCURACY_FP32 )
+      {
+        conv_desc.computeType = SG_DTYPE_FP32;
+      }
+      else if ( accuracy == tpu::ALGORITHM_ACCURACY_FP16 )
+      {
+        conv_desc.computeType = SG_DTYPE_FP16;
+      }
+      else
+      {
+        TORCH_CHECK ( false, "Unsupported convolution forward accuracy" );
+      }
     }
-    else if ( accuracy == tpu::ALGORITHM_ACCURACY_FP16 )
+    else if ( input.dtype() == caffe2::TypeMeta::Make<at::Half>() )
     {
       conv_desc.computeType = SG_DTYPE_FP16;
-    }
-    else
-    {
-      TORCH_CHECK ( false, "Unsupported convolution forward accuracy" );
     }
 #ifdef TPU_OP_TIMING
     auto timer = tpu::Timer().Start();
@@ -215,18 +222,25 @@ std::array<bool, 3> output_mask )
       .dilation_w = ( int ) dilation[1],
       .groups = ( int ) groups,
     };
-    auto accuracy = tpu::GetConvolutionBackwardAccuracy();
-    if ( accuracy == tpu::ALGORITHM_ACCURACY_FP32 )
+    if ( input.dtype() == caffe2::TypeMeta::Make<float>() )
     {
-      conv_desc.computeType = SG_DTYPE_FP32;
+      auto accuracy = tpu::GetConvolutionBackwardAccuracy();
+      if ( accuracy == tpu::ALGORITHM_ACCURACY_FP32 )
+      {
+        conv_desc.computeType = SG_DTYPE_FP32;
+      }
+      else if ( accuracy == tpu::ALGORITHM_ACCURACY_FP16 )
+      {
+        conv_desc.computeType = SG_DTYPE_FP16;
+      }
+      else
+      {
+        TORCH_CHECK ( false, "Unsupported convolution backward accuracy" );
+      }
     }
-    else if ( accuracy == tpu::ALGORITHM_ACCURACY_FP16 )
+    else if ( input.dtype() == caffe2::TypeMeta::Make<at::Half>() )
     {
       conv_desc.computeType = SG_DTYPE_FP16;
-    }
-    else
-    {
-      TORCH_CHECK ( false, "Unsupported convolution backward accuracy" );
     }
 #ifdef TPU_OP_TIMING
     auto timer = tpu::Timer().Start();
