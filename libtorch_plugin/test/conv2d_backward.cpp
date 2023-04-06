@@ -98,29 +98,30 @@ static inline void test ( at::IntArrayRef grad_output_shape,
 int main()
 {
   const int batch = 64;
+  const bool has_bias = true;
   // grad output shape, input shape, weight shape, stride, padding, dilation, groups
-  test ( { batch,   64, 112, 112 }, { batch,    3, 224, 224 }, {   64,    3, 7, 7 }, { 2, 2 }, { 3, 3 }, { 1, 1 }, 1, { true, true, false } ); // 0
-  test ( { batch,   64,  56,  56 }, { batch,   64,  56,  56 }, {   64,   64, 1, 1 }, { 1, 1 }, { 0, 0 }, { 1, 1 }, 1, { true, true, false } ); // 1
-  test ( { batch,   64,  56,  56 }, { batch,   64,  56,  56 }, {   64,   64, 3, 3 }, { 1, 1 }, { 1, 1 }, { 1, 1 }, 1, { true, true, false } ); // 2
-  test ( { batch,  256,  56,  56 }, { batch,   64,  56,  56 }, {  256,   64, 1, 1 }, { 1, 1 }, { 0, 0 }, { 1, 1 }, 1, { true, true, false } ); // 3
-  test ( { batch,   64,  56,  56 }, { batch,  256,  56,  56 }, {   64,  256, 1, 1 }, { 1, 1 }, { 0, 0 }, { 1, 1 }, 1, { true, true, false } ); // 4
-  test ( { batch,  128,  56,  56 }, { batch,  256,  56,  56 }, {  128,  256, 1, 1 }, { 1, 1 }, { 0, 0 }, { 1, 1 }, 1, { true, true, false } ); // 5
-  test ( { batch,  128,  28,  28 }, { batch,  128,  56,  56 }, {  128,  128, 3, 3 }, { 2, 2 }, { 1, 1 }, { 1, 1 }, 1, { true, true, false } ); // 6
-  test ( { batch,  512,  28,  28 }, { batch,  128,  28,  28 }, {  512,  128, 1, 1 }, { 1, 1 }, { 0, 0 }, { 1, 1 }, 1, { true, true, false } ); // 7
-  test ( { batch,  512,  28,  28 }, { batch,  256,  56,  56 }, {  512,  256, 1, 1 }, { 2, 2 }, { 0, 0 }, { 1, 1 }, 1, { true, true, false } ); // 8
-  test ( { batch,  128,  28,  28 }, { batch,  512,  28,  28 }, {  128,  512, 1, 1 }, { 1, 1 }, { 0, 0 }, { 1, 1 }, 1, { true, true, false } ); // 9
-  test ( { batch,  128,  28,  28 }, { batch,  128,  28,  28 }, {  128,  128, 3, 3 }, { 1, 1 }, { 1, 1 }, { 1, 1 }, 1, { true, true, false } ); // 10
-  test ( { batch,  256,  28,  28 }, { batch,  512,  28,  28 }, {  256,  512, 1, 1 }, { 1, 1 }, { 0, 0 }, { 1, 1 }, 1, { true, true, false } ); // 11
-  test ( { batch,  256,  14,  14 }, { batch,  256,  28,  28 }, {  256,  256, 3, 3 }, { 2, 2 }, { 1, 1 }, { 1, 1 }, 1, { true, true, false } ); // 12
-  test ( { batch, 1024,  14,  14 }, { batch,  256,  14,  14 }, { 1024,  256, 1, 1 }, { 1, 1 }, { 0, 0 }, { 1, 1 }, 1, { true, true, false } ); // 13
-  test ( { batch, 1024,  14,  14 }, { batch,  512,  28,  28 }, { 1024,  512, 1, 1 }, { 2, 2 }, { 0, 0 }, { 1, 1 }, 1, { true, true, false } ); // 14
-  test ( { batch,  256,  14,  14 }, { batch, 1024,  14,  14 }, {  256, 1024, 1, 1 }, { 1, 1 }, { 0, 0 }, { 1, 1 }, 1, { true, true, false } ); // 15
-  test ( { batch,  256,  14,  14 }, { batch,  256,  14,  14 }, {  256,  256, 3, 3 }, { 1, 1 }, { 1, 1 }, { 1, 1 }, 1, { true, true, false } ); // 16
-  test ( { batch,  512,  14,  14 }, { batch, 1024,  14,  14 }, {  512, 1024, 1, 1 }, { 1, 1 }, { 0, 0 }, { 1, 1 }, 1, { true, true, false } ); // 17
-  test ( { batch,  512,   7,   7 }, { batch,  512,  14,  14 }, {  512,  512, 3, 3 }, { 2, 2 }, { 1, 1 }, { 1, 1 }, 1, { true, true, false } ); // 18
-  test ( { batch, 2048,   7,   7 }, { batch,  512,   7,   7 }, { 2048,  512, 1, 1 }, { 1, 1 }, { 0, 0 }, { 1, 1 }, 1, { true, true, false } ); // 19
-  test ( { batch, 2048,   7,   7 }, { batch, 1024,  14,  14 }, { 2048, 1024, 1, 1 }, { 2, 2 }, { 0, 0 }, { 1, 1 }, 1, { true, true, false } ); // 20
-  test ( { batch,  512,   7,   7 }, { batch, 2048,   7,   7 }, {  512, 2048, 1, 1 }, { 1, 1 }, { 0, 0 }, { 1, 1 }, 1, { true, true, false } ); // 21
-  test ( { batch,  512,   7,   7 }, { batch,  512,   7,   7 }, {  512,  512, 3, 3 }, { 1, 1 }, { 1, 1 }, { 1, 1 }, 1, { true, true, false } ); // 22
+  test ( { batch,   64, 112, 112 }, { batch,    3, 224, 224 }, {   64,    3, 7, 7 }, { 2, 2 }, { 3, 3 }, { 1, 1 }, 1, { true, true, has_bias } ); // 0
+  test ( { batch,   64,  56,  56 }, { batch,   64,  56,  56 }, {   64,   64, 1, 1 }, { 1, 1 }, { 0, 0 }, { 1, 1 }, 1, { true, true, has_bias } ); // 1
+  test ( { batch,   64,  56,  56 }, { batch,   64,  56,  56 }, {   64,   64, 3, 3 }, { 1, 1 }, { 1, 1 }, { 1, 1 }, 1, { true, true, has_bias } ); // 2
+  test ( { batch,  256,  56,  56 }, { batch,   64,  56,  56 }, {  256,   64, 1, 1 }, { 1, 1 }, { 0, 0 }, { 1, 1 }, 1, { true, true, has_bias } ); // 3
+  test ( { batch,   64,  56,  56 }, { batch,  256,  56,  56 }, {   64,  256, 1, 1 }, { 1, 1 }, { 0, 0 }, { 1, 1 }, 1, { true, true, has_bias } ); // 4
+  test ( { batch,  128,  56,  56 }, { batch,  256,  56,  56 }, {  128,  256, 1, 1 }, { 1, 1 }, { 0, 0 }, { 1, 1 }, 1, { true, true, has_bias } ); // 5
+  test ( { batch,  128,  28,  28 }, { batch,  128,  56,  56 }, {  128,  128, 3, 3 }, { 2, 2 }, { 1, 1 }, { 1, 1 }, 1, { true, true, has_bias } ); // 6
+  test ( { batch,  512,  28,  28 }, { batch,  128,  28,  28 }, {  512,  128, 1, 1 }, { 1, 1 }, { 0, 0 }, { 1, 1 }, 1, { true, true, has_bias } ); // 7
+  test ( { batch,  512,  28,  28 }, { batch,  256,  56,  56 }, {  512,  256, 1, 1 }, { 2, 2 }, { 0, 0 }, { 1, 1 }, 1, { true, true, has_bias } ); // 8
+  test ( { batch,  128,  28,  28 }, { batch,  512,  28,  28 }, {  128,  512, 1, 1 }, { 1, 1 }, { 0, 0 }, { 1, 1 }, 1, { true, true, has_bias } ); // 9
+  test ( { batch,  128,  28,  28 }, { batch,  128,  28,  28 }, {  128,  128, 3, 3 }, { 1, 1 }, { 1, 1 }, { 1, 1 }, 1, { true, true, has_bias } ); // 10
+  test ( { batch,  256,  28,  28 }, { batch,  512,  28,  28 }, {  256,  512, 1, 1 }, { 1, 1 }, { 0, 0 }, { 1, 1 }, 1, { true, true, has_bias } ); // 11
+  test ( { batch,  256,  14,  14 }, { batch,  256,  28,  28 }, {  256,  256, 3, 3 }, { 2, 2 }, { 1, 1 }, { 1, 1 }, 1, { true, true, has_bias } ); // 12
+  test ( { batch, 1024,  14,  14 }, { batch,  256,  14,  14 }, { 1024,  256, 1, 1 }, { 1, 1 }, { 0, 0 }, { 1, 1 }, 1, { true, true, has_bias } ); // 13
+  test ( { batch, 1024,  14,  14 }, { batch,  512,  28,  28 }, { 1024,  512, 1, 1 }, { 2, 2 }, { 0, 0 }, { 1, 1 }, 1, { true, true, has_bias } ); // 14
+  test ( { batch,  256,  14,  14 }, { batch, 1024,  14,  14 }, {  256, 1024, 1, 1 }, { 1, 1 }, { 0, 0 }, { 1, 1 }, 1, { true, true, has_bias } ); // 15
+  test ( { batch,  256,  14,  14 }, { batch,  256,  14,  14 }, {  256,  256, 3, 3 }, { 1, 1 }, { 1, 1 }, { 1, 1 }, 1, { true, true, has_bias } ); // 16
+  test ( { batch,  512,  14,  14 }, { batch, 1024,  14,  14 }, {  512, 1024, 1, 1 }, { 1, 1 }, { 0, 0 }, { 1, 1 }, 1, { true, true, has_bias } ); // 17
+  test ( { batch,  512,   7,   7 }, { batch,  512,  14,  14 }, {  512,  512, 3, 3 }, { 2, 2 }, { 1, 1 }, { 1, 1 }, 1, { true, true, has_bias } ); // 18
+  test ( { batch, 2048,   7,   7 }, { batch,  512,   7,   7 }, { 2048,  512, 1, 1 }, { 1, 1 }, { 0, 0 }, { 1, 1 }, 1, { true, true, has_bias } ); // 19
+  test ( { batch, 2048,   7,   7 }, { batch, 1024,  14,  14 }, { 2048, 1024, 1, 1 }, { 2, 2 }, { 0, 0 }, { 1, 1 }, 1, { true, true, has_bias } ); // 20
+  test ( { batch,  512,   7,   7 }, { batch, 2048,   7,   7 }, {  512, 2048, 1, 1 }, { 1, 1 }, { 0, 0 }, { 1, 1 }, 1, { true, true, has_bias } ); // 21
+  test ( { batch,  512,   7,   7 }, { batch,  512,   7,   7 }, {  512,  512, 3, 3 }, { 1, 1 }, { 1, 1 }, { 1, 1 }, 1, { true, true, has_bias } ); // 22
   return 0;
 }

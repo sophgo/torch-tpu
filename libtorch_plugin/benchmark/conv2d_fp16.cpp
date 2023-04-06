@@ -11,8 +11,8 @@ static inline void benchmark ( at::IntArrayRef input_shape,
                                int64_t groups,
                                bool has_bias )
 {
-  auto input_cpu = torch::randn ( input_shape ) - 0.5;
-  auto weight_cpu = torch::randn ( weight_shape ) - 0.5;
+  auto input_cpu = torch::randn ( input_shape, c10::kHalf ) - 0.5;
+  auto weight_cpu = torch::randn ( weight_shape, c10::kHalf ) - 0.5;
   at::Tensor bias_cpu;
   if ( has_bias )
   {
