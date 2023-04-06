@@ -10,16 +10,19 @@ static inline void test ( at::IntArrayRef grad_output_shape,
                           int64_t groups,
                           std::array<bool, 3> output_mask )
 {
-  auto grad_output_cpu = torch::randn ( grad_output_shape ) - 0.5;
-  auto input_cpu = torch::randn ( input_shape ) - 0.5;
-  auto weight_cpu = torch::randn ( weight_shape ) - 0.5;
+  auto grad_output_cpu = torch::randn ( grad_output_shape, c10::kHalf ) - 0.5;
+  auto input_cpu = torch::randn ( input_shape, c10::kHalf ) - 0.5;
+  auto weight_cpu = torch::randn ( weight_shape, c10::kHalf ) - 0.5;
   auto grad_output_tpu = grad_output_cpu.to ( tpu::TPUGetCurrentDevice() );
   auto input_tpu = input_cpu.to ( tpu::TPUGetCurrentDevice() );
   auto weight_tpu = weight_cpu.to ( tpu::TPUGetCurrentDevice() );
+  grad_output_cpu = grad_output_cpu.to ( c10::Float );
+  input_cpu = input_cpu.to ( c10::Float );
+  weight_cpu = weight_cpu.to ( c10::Float );
   auto outputs_cpu = torch::convolution_backward (
-                     grad_output_cpu.to ( torch::kDouble ),
-                     input_cpu.to ( torch::kDouble ),
-                     weight_cpu.to ( torch::kDouble ),
+                     grad_output_cpu,
+                     input_cpu,
+                     weight_cpu,
                      at::OptionalIntArrayRef ( { weight_shape[0] } ),
                      stride,
                      padding,

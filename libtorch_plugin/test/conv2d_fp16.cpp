@@ -9,12 +9,12 @@ static inline void test ( at::IntArrayRef input_shape,
                           int64_t groups,
                           bool has_bias )
 {
-  auto input_cpu = torch::randn ( input_shape ) - 0.5;
-  auto weight_cpu = torch::randn ( weight_shape ) - 0.5;
+  auto input_cpu = torch::randn ( input_shape, c10::kHalf ) - 0.5;
+  auto weight_cpu = torch::randn ( weight_shape, c10::kHalf ) - 0.5;
   at::Tensor bias_cpu;
   if ( has_bias )
   {
-    bias_cpu = torch::randn ( { weight_shape[0] } ) - 0.5;
+    bias_cpu = torch::randn ( { weight_shape[0] }, c10::kHalf ) - 0.5;
   }
   auto input_tpu = input_cpu.to ( tpu::TPUGetCurrentDevice() );
   auto weight_tpu = weight_cpu.to ( tpu::TPUGetCurrentDevice() );
@@ -23,11 +23,11 @@ static inline void test ( at::IntArrayRef input_shape,
   {
     bias_tpu = bias_cpu.to ( tpu::TPUGetCurrentDevice() );
   }
-  input_cpu = input_cpu.to ( c10::kDouble );
-  weight_cpu = weight_cpu.to ( c10::kDouble );
+  input_cpu = input_cpu.to ( c10::kFloat );
+  weight_cpu = weight_cpu.to ( c10::kFloat );
   if ( has_bias )
   {
-    bias_cpu = bias_cpu.to ( c10::kDouble );
+    bias_cpu = bias_cpu.to ( c10::kFloat );
   }
   auto output_cpu = torch::convolution (
                     input_cpu,
