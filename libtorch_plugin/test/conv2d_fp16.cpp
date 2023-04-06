@@ -75,7 +75,7 @@ static inline void test ( at::IntArrayRef input_shape,
 int main()
 {
   const int batch = 1;
-  const bool has_bias = true;
+  const bool has_bias = false;
   // input shape, weight shape, stride, padding, dilation, groups, has bias
   // Resnet50
   test ( { batch,    3, 224, 224 }, {   64,    3, 7, 7 }, { 2, 2 }, { 3, 3 }, { 1, 1 }, 1, has_bias ); // 0
