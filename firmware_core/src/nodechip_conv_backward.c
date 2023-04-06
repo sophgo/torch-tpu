@@ -3253,48 +3253,94 @@ void nodechip_conv_backward(
                                     input_shape->h, input_shape->w,
                                     grad_out_shape->h, grad_out_shape->w,
                                     kernel->h, kernel->w, dtype);
-            if (kernel->h == 1 && kernel->w == 1 &&
+            if (dtype ==DT_FP32) {
+                if (kernel->h == 1 && kernel->w == 1 &&
+                           dilation->h == 1 && dilation->w == 1 &&
+                           pad->top == 0 && pad->bottom == 0 && pad->left == 0 && pad->right == 0) {
+                    nodechip_conv_backward_weight_1x1(
+                        input_global_addr,
+                        grad_out_global_addr,
+                        grad_weight_global_addr,
+                        groups,
+                        input_shape,
+                        grad_out_shape,
+                        kernel,
+                        stride,
+                        dilation,
+                        pad,
+                        dtype);
+                } else if (can_use_conv) {
+                    nodechip_conv_backward_weight_use_conv(
+                        input_global_addr,
+                        grad_out_global_addr,
+                        buffer_global_addr,
+                        grad_weight_global_addr,
+                        groups,
+                        input_shape,
+                        grad_out_shape,
+                        kernel,
+                        stride,
+                        dilation,
+                        pad,
+                        dtype);
+                } else {
+                    nodechip_conv_backward_weight_depthwise(
+                        input_global_addr,
+                        grad_out_global_addr,
+                        grad_weight_global_addr,
+                        groups,
+                        input_shape,
+                        grad_out_shape,
+                        kernel,
+                        stride,
+                        dilation,
+                        pad,
+                        dtype);
+                }
+            } else if (dtype ==DT_FP16) {
+                if (can_use_conv) {
+                    nodechip_conv_backward_weight_use_conv(
+                        input_global_addr,
+                        grad_out_global_addr,
+                        buffer_global_addr,
+                        grad_weight_global_addr,
+                        groups,
+                        input_shape,
+                        grad_out_shape,
+                        kernel,
+                        stride,
+                        dilation,
+                        pad,
+                        dtype);
+                } else if (kernel->h == 1 && kernel->w == 1 &&
                        dilation->h == 1 && dilation->w == 1 &&
                        pad->top == 0 && pad->bottom == 0 && pad->left == 0 && pad->right == 0) {
-                nodechip_conv_backward_weight_1x1(
-                    input_global_addr,
-                    grad_out_global_addr,
-                    grad_weight_global_addr,
-                    groups,
-                    input_shape,
-                    grad_out_shape,
-                    kernel,
-                    stride,
-                    dilation,
-                    pad,
-                    dtype);
-            } else if (can_use_conv) {
-                nodechip_conv_backward_weight_use_conv(
-                    input_global_addr,
-                    grad_out_global_addr,
-                    buffer_global_addr,
-                    grad_weight_global_addr,
-                    groups,
-                    input_shape,
-                    grad_out_shape,
-                    kernel,
-                    stride,
-                    dilation,
-                    pad,
-                    dtype);
-            } else {
-                nodechip_conv_backward_weight_depthwise(
-                    input_global_addr,
-                    grad_out_global_addr,
-                    grad_weight_global_addr,
-                    groups,
-                    input_shape,
-                    grad_out_shape,
-                    kernel,
-                    stride,
-                    dilation,
-                    pad,
-                    dtype);
+                    nodechip_conv_backward_weight_1x1(
+                        input_global_addr,
+                        grad_out_global_addr,
+                        grad_weight_global_addr,
+                        groups,
+                        input_shape,
+                        grad_out_shape,
+                        kernel,
+                        stride,
+                        dilation,
+                        pad,
+                        dtype);
+                } else {
+                    nodechip_conv_backward_weight_depthwise(
+                        input_global_addr,
+                        grad_out_global_addr,
+                        grad_weight_global_addr,
+                        groups,
+                        input_shape,
+                        grad_out_shape,
+                        kernel,
+                        stride,
+                        dilation,
+                        pad,
+                        dtype);
+                }
             }
         }
     }
