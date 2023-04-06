@@ -16,10 +16,13 @@ static inline void test ( at::IntArrayRef grad_output_shape,
   auto grad_output_tpu = grad_output_cpu.to ( tpu::TPUGetCurrentDevice() );
   auto input_tpu = input_cpu.to ( tpu::TPUGetCurrentDevice() );
   auto weight_tpu = weight_cpu.to ( tpu::TPUGetCurrentDevice() );
+  grad_output_cpu = grad_output_cpu.to ( c10::kDouble );
+  input_cpu = input_cpu.to ( c10::kDouble );
+  weight_cpu = weight_cpu.to ( c10::kDouble );
   auto outputs_cpu = torch::convolution_backward (
-                     grad_output_cpu.to ( torch::kDouble ),
-                     input_cpu.to ( torch::kDouble ),
-                     weight_cpu.to ( torch::kDouble ),
+                     grad_output_cpu,
+                     input_cpu,
+                     weight_cpu,
                      at::OptionalIntArrayRef ( { weight_shape[0] } ),
                      stride,
                      padding,
