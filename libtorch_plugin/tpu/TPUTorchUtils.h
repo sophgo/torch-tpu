@@ -12,13 +12,13 @@
 #include <fstream>
 #include <vector>
 
-#define CHECK_TENSOR_IN_DEVICE(t)                                                                                \
-do                                                                                                               \
-{                                                                                                                \
-TORCH_CHECK ( t.device().type() == DeviceType::TPU, #t, " is not in TPU device" );                       \
-TORCH_CHECK ( tpu::TPUPtrIsInCurrentDevice ( t.data_ptr() ) == true, #t, " is not in current TPU device"  );     \
-TORCH_CHECK ( t.is_contiguous() == true, #t, " is not contiguous" );                                             \
-}                                                                                                                \
+#define CHECK_TENSOR_IN_DEVICE(t) \
+do \
+{ \
+TORCH_CHECK ( t.device().type() == DeviceType::TPU, #t, " is not in TPU device" ); \
+TORCH_CHECK ( tpu::TPUPtrIsInCurrentDevice ( t.data_ptr() ) == true, #t, " is not in current TPU device"  ); \
+TORCH_CHECK ( t.is_contiguous() == true, #t, " is not contiguous" ); \
+} \
 while ( 0 )
 
 #define TENSOR_TO_CPU(t) ( ( t ).to ( torch::Device ( "cpu" ) ) )
@@ -181,7 +181,7 @@ typedef enum
   ADDMM,
   BMM,
   SOFTMAX,
-  Softmax_Backward,
+  SOFTMAX_BACKWARD,
   PERMUTE,
   TRANSPOSE,
   ADD,

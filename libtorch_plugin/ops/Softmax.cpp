@@ -80,8 +80,28 @@ Tensor & _softmax_backward_data_out_tpu ( const Tensor & grad_output, const Tens
   CHECK_TENSOR_IN_DEVICE ( grad_output );
   CHECK_TENSOR_IN_DEVICE ( output );
   CHECK_TENSOR_IN_DEVICE ( grad_input );
+  TORCH_CHECK ( input_dtype == kFloat );
+#if 0
   auto grad_input_cpu = _softmax_backward_data ( grad_output.cpu(), output.cpu(), dim, input_dtype );
   tpu::TPUCopyHostToDevice ( grad_input.data_ptr(), grad_input_cpu.contiguous().data_ptr(), grad_input.nbytes() );
+#else
+#ifdef TPU_OP_TIMING
+  auto timer = tpu::Timer().Start();
+#endif
+  bm_status_t status = sgdnn_softmax_backward_cudnn (
+                       tpu::TPUGetDeviceHandle(),
+                       dim < 0 ? dim + output.dim() : dim,
+                       tpu::TPUGenerateTensorDesc ( output ),
+                       ADDR_IN_DEVICE ( output ),
+                       tpu::TPUGenerateTensorDesc ( grad_output ),
+                       ADDR_IN_DEVICE ( grad_output ),
+                       tpu::TPUGenerateTensorDesc ( grad_input ),
+                       ADDR_IN_DEVICE ( grad_input ) );
+  TORCH_CHECK ( status == BM_SUCCESS );
+#ifdef TPU_OP_TIMING
+  tpu::OpTimer::Instance().AddTime ( tpu::SOFTMAX_BACKWARD, timer.ElapsedUS() );
+#endif
+#endif
   return grad_input;
 }
 TORCH_LIBRARY_IMPL ( aten, TPU, m )

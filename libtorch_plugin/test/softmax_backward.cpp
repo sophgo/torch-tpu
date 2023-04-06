@@ -7,8 +7,8 @@ static inline void test ( at::IntArrayRef input_shape, int64_t dim )
   auto output_tpu = output_cpu.to ( tpu::TPUGetCurrentDevice() );
   auto grad_output_cpu = torch::randn ( input_shape ) - 0.5;
   auto grad_output_tpu = grad_output_cpu.to ( tpu::TPUGetCurrentDevice() );
-  auto grad_input_cpu = torch::_softmax_backward_data ( grad_output_cpu, output_cpu, dim, grad_output_tpu.dtype() );
-  auto grad_input_tpu = torch::_softmax_backward_data ( grad_output_tpu, output_tpu, dim, grad_output_tpu.dtype() );
+  auto grad_input_cpu = torch::_softmax_backward_data ( grad_output_cpu, output_cpu, dim, grad_output_cpu.scalar_type() );
+  auto grad_input_tpu = torch::_softmax_backward_data ( grad_output_tpu, output_tpu, dim, grad_output_tpu.scalar_type() );
   auto grad_input_exp = grad_input_cpu;
   auto grad_input_got = grad_input_tpu.to ( torch::Device ( "cpu" ) );
   std::cout << "Comparing softmax backward:"
