@@ -79,6 +79,7 @@ static inline void nodechip_softmax_backward_dim3(
             {
                 Shape.h = MIN ( HTodo, HMax );
                 int TotalDone = ( NDone * GlobalStride.n + CDone * GlobalStride.c + HDone * GlobalStride.h ) * DataSize;
+                global_addr_t grad_inputGAddr = grad_input_global_addr + TotalDone; 
                 global_addr_t grad_outputGAddr = grad_output_global_addr + TotalDone; 
                 global_addr_t outputGAddr = output_global_addr + TotalDone;
                 tpu_gdma_cpy_S2L ( grad_outputAddr, grad_outputGAddr, &Shape, NULL, &GlobalStride, dtype );
@@ -96,7 +97,7 @@ static inline void nodechip_softmax_backward_dim3(
                 tpu_bdc_fp_mul ( outputAddr, outputAddr, sumprodAddr, &Shape, NULL, NULL, &sumprodStride, dtype );
                 /* compute grad_input */
                 tpu_bdc_fp_sub ( grad_inputAddr, prodAddr, outputAddr, &Shape, NULL, NULL, NULL, dtype );
-
+                tpu_gdma_cpy_L2S ( grad_inputGAddr, grad_inputAddr, &Shape, &GlobalStride, NULL, dtype );
                 HTodo -= Shape.h;
                 HDone += Shape.h;
             }
