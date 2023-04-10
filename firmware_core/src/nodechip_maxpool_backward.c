@@ -31,7 +31,7 @@ typedef struct {
 } maxpool_secs_info_t;
 
 static inline bool is_local_mem_enough(
-        int *size,
+        unsigned int *size,
         int c,
         int ihw,
         int ohw,
@@ -61,7 +61,7 @@ static inline bool split_oh_or_ow(
     data_type_t dtype) {
 
     bool valid;
-    int size[3];
+    unsigned int size[3];
     int slice_new = *slice;
     do {
         if (slice_new == 1) {
@@ -132,17 +132,29 @@ static void maxpool_data_split(
 
     bool stride_less_kernel = stride_h < kh || stride_w < kw;
 
-    int size[3]; // {index, input/grad_in, output/grad_out}
-    int index_size, io_size;
+    unsigned int size[3]; // {index, input/grad_in, output/grad_out}
     bool valid = is_local_mem_enough(size, c,
                                      stride_less_kernel ?
                                        (ih + pt + pb) * (iw + pl + pr) : ih * iw,
                                      oh * ow, stride_less_kernel, dtype);
     if (valid) {
-        index_size = ALIGN(size[0], BANK_SIZE);
-        io_size = ALIGN(size[1], BANK_SIZE) * 2 * 2 + ALIGN(size[2], BANK_SIZE) * 2 * 2 + (stride_less_kernel ? ALIGN(size[2], BANK_SIZE) : 0);
-        nslice = (LOCAL_MEM_SIZE - index_size) / io_size;
-        p_secs->nsecs = DIV_UP(n, nslice);
+        nslice = n;
+        p_secs->nsecs = 1;
+        bool first_time = true;
+        while (true) {
+            if (!first_time) {
+                p_secs->nsecs++;
+                nslice = DIV_UP(n, p_secs->nsecs);
+            }
+            unsigned int size_1 = nslice * size[1];
+            unsigned int size_2 = nslice * size[2];
+            unsigned int total_size = ALIGN(size[0], BANK_SIZE) +
+                                      ALIGN(size_1, BANK_SIZE) * 2 * 2 +
+                                      ALIGN(size_2, BANK_SIZE) * 2 * 2 +
+                                      (stride_less_kernel ? ALIGN(size_2, BANK_SIZE) : 0);
+            if (total_size <= (unsigned int)LOCAL_MEM_SIZE) break;
+            first_time = false;
+        }
         return;
     }
 
@@ -159,12 +171,23 @@ static void maxpool_data_split(
                                            (ih + pt + pb) * (iw + pl + pr) : ih * iw,
                                          oh * ow, stride_less_kernel, dtype);
         if (valid) {
-            index_size = ALIGN(size[0], BANK_SIZE);
-            io_size = ALIGN(size[1], BANK_SIZE) * 2 * 2 +
-                      ALIGN(size[2], BANK_SIZE) * 2 * 2 +
-                      (stride_less_kernel ? ALIGN(size[2], BANK_SIZE) : 0);
-            cslice = (LOCAL_MEM_SIZE - index_size) / io_size * NPU_NUM;
-            p_secs->csecs = DIV_UP(c, cslice);
+            cslice = c;
+            p_secs->csecs = 1;
+            bool first_time = true;
+            while (true) {
+                if (!first_time) {
+                    p_secs->csecs++;
+                    cslice = ALIGN(DIV_UP(c, p_secs->csecs), NPU_NUM);
+                }
+                unsigned int size_1 = DIV_UP(cslice, NPU_NUM) * size[1];
+                unsigned int size_2 = DIV_UP(cslice, NPU_NUM) * size[2];
+                unsigned int total_size = ALIGN(size[0], BANK_SIZE) +
+                                          ALIGN(size_1, BANK_SIZE) * 2 * 2 +
+                                          ALIGN(size_2, BANK_SIZE) * 2 * 2 +
+                                          (stride_less_kernel ? ALIGN(size_2, BANK_SIZE) : 0);
+                if (total_size <= (unsigned int)LOCAL_MEM_SIZE) break;
+                first_time = false;
+            }
             return;
         }
     }
@@ -816,6 +839,8 @@ void nodechip_maxpool_backward_stride_less_kernel(
                         1,
                         index_shape.h * index_shape.w);
 
+                    if (dtype == DT_FP16) TPUKERNEL_ASSERT(index_shape.h * index_shape.w <= 65504);
+
                     tpu_bdc_cast(
                         ping ? grad_in_ping : grad_in_pong,
                         index_addr,
@@ -834,13 +859,16 @@ void nodechip_maxpool_backward_stride_less_kernel(
                         dtype);
 
                     if (slice_pad.left == 0 && slice_pad.right == 0) {
-                        tpu_bdc_cpy(
+                        dim4 index_bcast_shape;
+                        index_bcast_shape.n = 1;
+                        index_bcast_shape.c = NPU_NUM;
+                        index_bcast_shape.h = index_shape.h;
+                        index_bcast_shape.w = index_shape.w;
+                        tpu_bdc_npu_bcast(
                             index_addr +
                                 slice_pad.top * index_shape_withpad.w * tpu_data_type_size(dtype),
                             ping ? grad_in_ping : grad_in_pong,
-                            &index_shape,
-                            NULL,
-                            NULL,
+                            &index_bcast_shape,
                             dtype);
                     } else {
                         dim4 index_stride = {1, 1, index_shape_withpad.w, 1};
@@ -851,6 +879,16 @@ void nodechip_maxpool_backward_stride_less_kernel(
                             &index_shape,
                             &index_stride,
                             NULL,
+                            dtype);
+                        dim4 index_bcast_shape;
+                        index_bcast_shape.n = 1;
+                        index_bcast_shape.c = NPU_NUM;
+                        index_bcast_shape.h = index_shape_withpad.h;
+                        index_bcast_shape.w = index_shape_withpad.w;
+                        tpu_bdc_npu_bcast(
+                            index_addr,
+                            index_addr,
+                            &index_bcast_shape,
                             dtype);
                     }
 
@@ -923,9 +961,10 @@ void nodechip_maxpool_backward_stride_less_kernel(
                         NULL,
                         dtype);
 
-                    if (ihstart < last_ihend || iwstart < last_iwend) {
+                    if ((last_nstart == nstart) &&
+                        (last_cstart == cstart) &&
+                        (ihstart < last_ihend || iwstart < last_iwend)) {
                         dim4 overlap_shape = {nslice, cslice, last_ihend - ihstart, last_iwend - iwstart};
-                        //dim4 last_islice_shape = {nslice, cslice, last_ihslice, last_iwslice};
                         dim4 last_islice_shape_withpad = {nslice, cslice,
                                                           last_ihslice + last_slice_pad_top + last_slice_pad_bottom,
                                                           last_iwslice + last_slice_pad_left + last_slice_pad_right};
@@ -942,13 +981,8 @@ void nodechip_maxpool_backward_stride_less_kernel(
                             dtype);
                     }
 
-                    //dim4 grad_in_stride;
-                    //tpu_compact_stride(&grad_in_stride, 0, &islice_shape);
-                    //grad_in_stride.h = islice_shape.w * stride_h;
-                    //grad_in_stride.w = stride_w;
                     for (int index = 0; index < kh * kw; index++) {
                         local_addr_t index_offset = ((index / kw) * islice_shape_withpad.w + index % kw) * tpu_data_type_size(dtype);
-                        //local_addr_t index_offset_without_pad = ((index / kw) * islice_shape.w + index % kw) * tpu_data_type_size(dtype);
                         tpu_bdc_equal(
                             ping ? forward_out_ping : forward_out_pong,
                             index_addr + index_offset,
