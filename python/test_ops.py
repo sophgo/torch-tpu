@@ -128,8 +128,8 @@ class Test_Backward_Ops(object):
 
     def test_maxpool2d_backward(self):
         torch.manual_seed(0);
-        n = 1
-        c = 1
+        n = 64
+        c = 64
         h = 112
         w = 112
         kernel_size = 3
@@ -152,6 +152,7 @@ class Test_Backward_Ops(object):
         torch_output.backward(grad_output)
         torch_input_grad = torch.ones(torch_input.grad.shape)
         torch_input_grad.copy_(torch_input.grad.detach())
+        grad_compare(input_grad, torch_input_grad, 1e-2)
 
     def test_batchnorm2d_backward(self):
         torch.manual_seed(0)
