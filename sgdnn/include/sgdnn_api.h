@@ -47,7 +47,7 @@ typedef enum {
 
 typedef enum {
   BatchNorm_Spatial = 0,
-  BatchNorm_Spatial_Persistent = 1,
+  BatchNorm_Per_Layer = 1,
   BatchNorm_Per_Activation = 2,
 } BatchNormMode_t;
 
@@ -274,6 +274,7 @@ bm_status_t sgdnn_batchnorm_backward(
     int                c,
     int                h,
     int                w,
+    bool               if_ln,
     bool               input_need_grad,
     bool               weight_need_grad,
     bool               bias_need_grad,

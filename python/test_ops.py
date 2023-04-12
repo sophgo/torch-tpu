@@ -55,6 +55,7 @@ class Test_Backward_Ops(object):
             "Linear": self.test_linear_backward,
             "Relu": self.test_relu_backward,
             "CrossEntropy": self.test_crossentropy_backward,
+            "ln": self.test_layernorm_backward,
         }
 
     def test_conv2d_backward(self):
@@ -242,6 +243,83 @@ class Test_Backward_Ops(object):
             # grad_compare(tpu_input.grad, grad_input_ref, 1e-1)
             # grad_compare(weight.grad, grad_weight_ref, 1e-1)
             # grad_compare(bias.grad, grad_bias_ref, 1e-1)
+
+    def test_layernorm_backward(self):
+        torch.manual_seed(0)
+        eps = 1e-5
+        shapes = [
+            [64, 12, 1, 38],
+            [64, 64, 1, 56],
+            [64, 128, 1, 56],
+            [64, 256, 1, 56],
+            [64, 128, 1, 28],
+            [64, 256, 1, 28],
+            ]
+        for i, [n, c, h, w] in enumerate(shapes):
+            input = torch.randn((n, c, h, w), requires_grad = True)
+            weight = torch.randn(w, requires_grad = True)
+            bias = torch.randn(w, requires_grad = True)
+            grad_output = torch.randn(input.shape)
+            
+            input.data -= 0.5
+            weight.data -= 0.5
+            bias.data -=0.5
+            grad_output.data -= 0.5
+
+            torch_input = input.clone().detach_().requires_grad_(True)
+            torch_weight = weight.clone().detach_().requires_grad_(True)
+            torch_bias = bias.clone().detach_().requires_grad_(True)
+            ln = torch.nn.LayerNorm(w, eps)
+            ln.weight.data = torch_weight
+            ln.bias.data = torch_bias
+
+            output = LayerNorm(input, weight, bias, eps)
+            output.backward(grad_output)
+            torch_output = ln(torch_input)
+            torch_output.backward(grad_output)
+
+            grad_compare(input.grad, torch_input.grad, 1e-3)
+            # grad_compare(weight.grad, torch_weight.grad, 1e-3)
+            # grad_compare(bias.grad, torch_bias.grad, 1e-3)
+
+            r''' verify backward formula
+            param:
+                input = torch.randn((n, c, h, w), requires_grad = True)
+                weight = torch.randn(w, requires_grad = True)
+                bias = torch.randn(w, requires_grad = True)
+                mean = input.mean(dim=3, keepdim = True)
+                var = input.var(dim=3, unbiased = False, keepdims = True)
+                mean.retain_grad()
+                var.retain_grad()
+                invstd = torch.rsqrt(var + eps)
+                normed = (input - mean) * invstd
+                grad_output = torch.randn(input.shape)
+                output = normed * weight + bias
+                output.backward(grad_output)
+            backward:
+                grad_var = -0.5*(invstd**3)*(grad_output*weight*(input-mean)).sum(dim=3,keepdims=True)
+                grad_mean = -1.*invstd*(grad_output*weight).sum(dim=3,keepdims=True)
+                grad_bias = grad_output.sum(dim=(0,1,2), keepdims=True)
+                grad_weight = (grad_output * (input - mean) * invstd).sum(dim=(0,1,2), keepdims=True)
+                grad_input = grad_output * weight * invstd - invstd / w * \
+                (normed * ( grad_output * weight * normed ).sum(dim = 3, keepdims = True) + \
+                (grad_output * weight).sum(dim = 3, keepdims = True))
+            compare:
+                print("output")
+                grad_compare(output, output_test, 1e-1)
+                print("dvar")
+                grad_compare(var.grad, grad_var, 1e-1)
+                print("dmean")
+                grad_compare(mean.grad, grad_mean, 1e-1)
+                print("dbias")
+                grad_compare(bias.grad, grad_bias, 1e-1)
+                print("dweight")
+                grad_compare(weight.grad, grad_weight, 1e-1)
+                print("dinput")
+                grad_compare(input.grad, grad_input, 1e-1)
+            '''
+
+
     def test_eltwise_backward(self):
         torch.manual_seed(0)
         op_code = [1,]#[0,1,2]

@@ -830,7 +830,10 @@ bm_status_t sgdnn_batchnorm_forward_cudnn(
     unsigned long long batch_invstd = (unsigned long long)resultSaveInvVariance;
     unsigned long long output       = (unsigned long long)y;
 
-    assert(mode == BatchNorm_Spatial);
+    if(mode == BatchNorm_Spatial) {assert(xDesc.ndims == 4);}
+    else if(mode == BatchNorm_Per_Layer) {assert(xDesc.ndims == 3);}
+    else {assert(0);}
+
     float alpha_ = ((float*)alpha)[0];
     assert(alpha_ == 1.0f);
     float beta_ = ((float*)beta)[0];
@@ -889,6 +892,7 @@ bm_status_t sgdnn_batchnorm_forward_cudnn(
     return BM_SUCCESS;
 }
 
+//use for pybind test, deprecate after
 bm_status_t sgdnn_batchnorm_backward(
     bm_handle_t        handle,
     bm_device_mem_t    grad_output,
@@ -903,25 +907,26 @@ bm_status_t sgdnn_batchnorm_backward(
     int                c,
     int                h,
     int                w,
+    bool               if_ln,
     bool               input_need_grad,
     bool               weight_need_grad,
     bool               bias_need_grad,
     sg_data_type_t     dtype)
 {
-
     bm_device_mem_t grad_output_mem, input_mem, weight_mem, mean_mem, invstd_mem;
     bm_device_mem_t grad_input_mem, grad_weight_mem, grad_bias_mem;
     u64 param_size = (u64)n * c * h * w * dtype_size(dtype);
-    u64 c_param_size = (u64)c * dtype_size(dtype);
+    u64 mv_size = (u64)( if_ln ? n * c : c) * dtype_size(dtype);
+    u64 wb_size = (u64)( if_ln ? w : c) * dtype_size(dtype);
 
-    DEVICE_MEM_NEW_INPUT(handle, grad_output, param_size, grad_output_mem);
-    DEVICE_MEM_NEW_INPUT(handle, input, param_size, input_mem);
-    DEVICE_MEM_NEW_INPUT(handle, weight, c_param_size, weight_mem);
-    DEVICE_MEM_NEW_INPUT(handle, mean, c_param_size, mean_mem);
-    DEVICE_MEM_NEW_INPUT(handle, invstd, c_param_size, invstd_mem);
-    DEVICE_MEM_NEW_OUTPUT(handle, grad_input, param_size, grad_input_mem);
-    DEVICE_MEM_NEW_OUTPUT(handle, grad_weight, c_param_size, grad_weight_mem);
-    DEVICE_MEM_NEW_OUTPUT(handle, grad_bias, c_param_size, grad_bias_mem);
+    DEVICE_MEM_NEW_INPUT (handle, grad_output, param_size,  grad_output_mem);
+    DEVICE_MEM_NEW_INPUT (handle, input,       param_size,  input_mem);
+    DEVICE_MEM_NEW_INPUT (handle, weight,      wb_size,     weight_mem);
+    DEVICE_MEM_NEW_INPUT (handle, mean,        mv_size,     mean_mem);
+    DEVICE_MEM_NEW_INPUT (handle, invstd,      mv_size,     invstd_mem);
+    DEVICE_MEM_NEW_OUTPUT(handle, grad_input,  param_size,  grad_input_mem);
+    DEVICE_MEM_NEW_OUTPUT(handle, grad_weight, wb_size,     grad_weight_mem);
+    DEVICE_MEM_NEW_OUTPUT(handle, grad_bias,   wb_size,     grad_bias_mem);
 
     sg_api_batchnorm_backward_t api = {
         bm_mem_get_device_addr(grad_output_mem),
@@ -936,7 +941,8 @@ bm_status_t sgdnn_batchnorm_backward(
         1, 1, 1
     };
 
-    sgdnn_tpu_kernel_launch(handle, "tpu_kernel_api_batchnorm_backward", &api, sizeof(api));
+    if(if_ln) sgdnn_tpu_kernel_launch(handle, "tpu_kernel_api_layernorm_backward", &api, sizeof(api));
+    else      sgdnn_tpu_kernel_launch(handle, "tpu_kernel_api_batchnorm_backward", &api, sizeof(api));
 
     DEVICE_MEM_DEL_INPUT(handle, grad_output, grad_output_mem);
     DEVICE_MEM_DEL_INPUT(handle, input, input_mem);
@@ -983,8 +989,6 @@ bm_status_t sgdnn_batchnorm_backward_cudnn(
     unsigned long long grad_weight   = (unsigned long long)resultBnScaleDiff;
     unsigned long long grad_bias     = (unsigned long long)resultBnBiasDiff;
 
-    assert(mode == BatchNorm_Spatial);
-    
     float alpha_data = ((float*)alphaDataDiff)[0];
     assert(alpha_data == 1.0f);
     float alpha_param = ((float*)alphaParamDiff)[0];
@@ -993,15 +997,34 @@ bm_status_t sgdnn_batchnorm_backward_cudnn(
     assert(beta_data == 0.0f);
     float beta_param = ((float*)betaParamDiff)[0];
     assert(beta_param == 0.0f);
-    
-    assert(dyDesc.ndims == 4);
-    assert( xDesc.ndims == 4);
-    assert(dxDesc.ndims == 4);
 
-    int n = xDesc.shape[0];
-    int c = xDesc.shape[1];
-    int h = xDesc.shape[2];
-    int w = xDesc.shape[3];
+    int n, c, h, w;
+    if(mode == BatchNorm_Spatial)
+    {
+        assert(dyDesc.ndims == 4);
+        assert( xDesc.ndims == 4);
+        assert(dxDesc.ndims == 4);
+
+        n = xDesc.shape[0];
+        c = xDesc.shape[1];
+        h = xDesc.shape[2];
+        w = xDesc.shape[3];
+    }
+    else if(mode == BatchNorm_Per_Layer) 
+    {
+        assert(dyDesc.ndims == 3);
+        assert( xDesc.ndims == 3);
+        assert(dxDesc.ndims == 3);
+
+        n = xDesc.shape[0];
+        c = xDesc.shape[1];
+        h = 1;
+        w = xDesc.shape[2];
+    }
+    else 
+    {
+        assert(0);
+    }
 
     assert(bnScaleBiasDiffDesc.ndims == 1);
     
@@ -1029,7 +1052,9 @@ bm_status_t sgdnn_batchnorm_backward_cudnn(
         dw_enable,
         db_enable};
 
-    sgdnn_tpu_kernel_launch(handle, "tpu_kernel_api_batchnorm_backward", &api, sizeof(api));
+    if(mode == BatchNorm_Spatial) sgdnn_tpu_kernel_launch(handle, "tpu_kernel_api_batchnorm_backward", &api, sizeof(api));
+    else if(mode == BatchNorm_Per_Layer) sgdnn_tpu_kernel_launch(handle, "tpu_kernel_api_layernorm_backward", &api, sizeof(api));
+    else {assert(0);}
 
     return BM_SUCCESS;
 }
@@ -1910,7 +1935,7 @@ bm_status_t sgdnn_activation_forward_cudnn(
 
         return BM_SUCCESS;
     }
-else
+    else
     {
         sg_active_type_t active_type =  tpu_active_type_convert(activationDesc.mode) ;
 

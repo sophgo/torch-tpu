@@ -329,63 +329,9 @@ PYBIND11_MODULE(sgdnn_pybind, m)
             assert(status == BM_SUCCESS);
             tpu_module_deinit(handle);
             bm_dev_free(handle);
-        });
-
-    m.def("batchnorm_backward", [](py::array_t<float16> grad_output,
-                                    py::array_t<float16> input,
-                                    py::array_t<float16> weight,
-                                    py::array_t<float16> mean,
-                                    py::array_t<float16> invstd,
-                                    py::array_t<float16> grad_input,
-                                    py::array_t<float16> grad_weight,
-                                    py::array_t<float16> grad_bias,
-                                    int n, int c, int h, int w,
-                                    bool input_grad_enable,
-                                    bool weight_grad_enable,
-                                    bool bias_grad_enable) {
-          py::buffer_info grad_output_buf = grad_output.request();
-          float16 *grad_output_fp16 = (float16 *)grad_output_buf.ptr;
-          py::buffer_info input_buf = input.request();
-          float16 *input_fp16 = (float16 *)input_buf.ptr;
-          py::buffer_info weight_buf = weight.request();
-          float16 *weight_fp16 = (float16 *)weight_buf.ptr;
-          py::buffer_info mean_buf = mean.request();
-          float16 *mean_fp16 = (float16 *)mean_buf.ptr;
-          py::buffer_info invstd_buf = invstd.request();
-          float16 *invstd_fp16 = (float16 *)invstd_buf.ptr;
-          py::buffer_info grad_input_buf = grad_input.request();
-          float16 *grad_input_fp16 = (float16 *)grad_input_buf.ptr;
-          py::buffer_info grad_weight_buf = grad_weight.request();
-          float16 *grad_weight_fp16 = (float16 *)grad_weight_buf.ptr;
-          py::buffer_info grad_bias_buf = grad_bias.request();
-          float16 *grad_bias_fp16 = (float16 *)grad_bias_buf.ptr;
-
-          bm_handle_t handle;
-          bm_dev_request(&handle, 0);
-          tpu_module_init(handle);
-
-          bm_status_t status = sgdnn_batchnorm_backward(handle,
-                              bm_mem_from_system(grad_output_fp16),
-                              bm_mem_from_system(input_fp16),
-                              bm_mem_from_system(weight_fp16),
-                              bm_mem_from_system(mean_fp16),
-                              bm_mem_from_system(invstd_fp16),
-                              bm_mem_from_system(grad_input_fp16),
-                              bm_mem_from_system(grad_weight_fp16),
-                              bm_mem_from_system(grad_bias_fp16),
-                              n, c, h, w,
-                              input_grad_enable,
-                              weight_grad_enable,
-                              bias_grad_enable,
-                              (sg_data_type_t)1);
-
-          UNUSED(status);
-          assert(status == BM_SUCCESS);
-          tpu_module_deinit(handle);
-          bm_dev_free(handle);
     });
 
-    m.def("batchnorm_backward_fp32", [](py::array_t<float> grad_output,
+    m.def("batchnorm_backward", [](py::array_t<float> grad_output,
                                         py::array_t<float> input,
                                         py::array_t<float> weight,
                                         py::array_t<float> mean,
@@ -394,6 +340,7 @@ PYBIND11_MODULE(sgdnn_pybind, m)
                                         py::array_t<float> grad_weight,
                                         py::array_t<float> grad_bias,
                                         int n, int c, int h, int w,
+                                        bool if_ln,
                                         bool input_grad_enable,
                                         bool weight_grad_enable,
                                         bool bias_grad_enable) {
@@ -428,6 +375,7 @@ PYBIND11_MODULE(sgdnn_pybind, m)
                               bm_mem_from_system(grad_weight_fp32),
                               bm_mem_from_system(grad_bias_fp32),
                               n, c, h, w,
+                              if_ln,
                               input_grad_enable,
                               weight_grad_enable,
                               bias_grad_enable,

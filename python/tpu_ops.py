@@ -215,26 +215,6 @@ class BatchNorm2dFunc(Function):
     @staticmethod
     def backward(ctx, grad_output):
         input, weight, mean, invstd = ctx.saved_tensors
-        # test fp16
-        # grad_out_np = np.asarray(grad_output.half().data.flatten())
-        # input_np = np.asarray(input.half().data.flatten())
-        # weight_np = np.asarray(weight.half().data.flatten())
-        # mean_np = np.asarray(mean.half().data.flatten())
-        # invstd_np = np.asarray(invstd.half().data.flatten())
-        # grad_input_np = np.ones(input.shape, dtype = np.float16)
-        # grad_weight_np = np.ones(weight.shape, dtype = np.float16)
-        # grad_bias_np = np.ones(weight.shape, dtype = np.float16)
-        # sgdnn_pybind.batchnorm_backward(grad_out_np,
-        #                                   input_np,
-        #                                   weight_np,
-        #                                   mean_np,
-        #                                   invstd_np,
-        #                                   grad_input_np,
-        #                                   grad_weight_np,
-        #                                   grad_bias_np,
-        #                                   n,c,h,w,
-        #                                   1, 1, 1)
-        # test fp32
         grad_out_np = np.asarray(grad_output.data.flatten())
         input_np = np.asarray(input.data.flatten())
         weight_np = np.asarray(weight.data.flatten())
@@ -243,19 +223,19 @@ class BatchNorm2dFunc(Function):
         grad_input_np = np.ones(input.shape, dtype = np.float32)
         grad_weight_np = np.ones(weight.shape, dtype = np.float32)
         grad_bias_np = np.ones(weight.shape, dtype = np.float32)
-        sgdnn_pybind.batchnorm_backward_fp32(grad_out_np,
-                                            input_np,
-                                            weight_np,
-                                            mean_np,
-                                            invstd_np,
-                                            grad_input_np,
-                                            grad_weight_np,
-                                            grad_bias_np,
-                                            input.shape[0],
-                                            input.shape[1],
-                                            input.shape[2],
-                                            input.shape[3],
-                                            1, 1, 1)
+        sgdnn_pybind.batchnorm_backward(grad_out_np,
+                                        input_np,
+                                        weight_np,
+                                        mean_np,
+                                        invstd_np,
+                                        grad_input_np,
+                                        grad_weight_np,
+                                        grad_bias_np,
+                                        input.shape[0],
+                                        input.shape[1],
+                                        input.shape[2],
+                                        input.shape[3],
+                                        0, 1, 1, 1)
         grad_input = torch.from_numpy(grad_input_np).reshape(input.shape)
         grad_weight = torch.from_numpy(grad_weight_np).reshape(weight.shape)
         grad_bias = torch.from_numpy(grad_bias_np).reshape(weight.shape)
@@ -597,3 +577,44 @@ class CrossEntropyFunc(Function):
 
 def CrossEntropy(input, target, reduction=0):
     return CrossEntropyFunc.apply(input, target, reduction)
+
+class LayerNormDim3Func(Function):
+    @staticmethod
+    def forward(ctx, input, weight, bias, eps=1e-5):
+        mean = input.mean(dim = input.dim()-1, keepdims = True )
+        var = input.var(dim = input.dim()-1, unbiased = False, keepdims = True)
+        invstd = torch.rsqrt(var + eps)
+        ctx.save_for_backward(input, weight, mean, invstd)
+        return F.layer_norm(input, [input.shape[-1]], weight, bias, eps)
+
+    @staticmethod
+    def backward(ctx, grad_output):
+        input, weight, mean, invstd = ctx.saved_tensors
+        grad_out_np = np.asarray(grad_output.data.flatten())
+        input_np = np.asarray(input.data.flatten())
+        weight_np = np.asarray(weight.data.flatten())
+        mean_np = np.asarray(mean.data.flatten())
+        invstd_np = np.asarray(invstd.data.flatten())
+        grad_input_np = np.ones(input.shape, dtype = np.float32)
+        grad_weight_np = np.ones(weight.shape, dtype = np.float32)
+        grad_bias_np = np.ones(weight.shape, dtype = np.float32)
+        sgdnn_pybind.batchnorm_backward(grad_out_np,
+                                        input_np,
+                                        weight_np,
+                                        mean_np,
+                                        invstd_np,
+                                        grad_input_np,
+                                        grad_weight_np,
+                                        grad_bias_np,
+                                        input.shape[0],
+                                        input.shape[1],
+                                        input.shape[2],
+                                        input.shape[3],
+                                        1, 1, 1, 1)
+        grad_input = torch.from_numpy(grad_input_np).reshape(input.shape)
+        grad_weight = torch.from_numpy(grad_weight_np).reshape(weight.shape)
+        grad_bias = torch.from_numpy(grad_bias_np).reshape(weight.shape)
+        return grad_input, grad_weight, grad_bias, None
+
+def LayerNorm(input, weight, bias, eps=1e-5):
+    return LayerNormDim3Func.apply(input, weight, bias, eps)
