@@ -227,6 +227,11 @@ const c10::optional<Tensor> & weight_opt,
 const c10::optional<Tensor> & bias_opt,
 std::array<bool, 3> output_mask )
 {
+  static int count = 0;
+#ifdef SHOW_OP_INFO
+  std::cout << "Layernorm Backward " << count << std::endl;
+  ++count;
+#endif
   c10::MaybeOwned<Tensor> weight_maybe_owned = at::borrow_from_optional_tensor ( weight_opt );
   const Tensor & weight = *weight_maybe_owned;
   const Tensor & bias = c10::value_or_else ( bias_opt, [] { return Tensor(); } );
@@ -236,6 +241,7 @@ std::array<bool, 3> output_mask )
   CHECK_TENSOR_IN_DEVICE ( rstd );
   if ( weight.defined() ) { CHECK_TENSOR_IN_DEVICE ( weight ); }
   if ( bias.defined() ) { CHECK_TENSOR_IN_DEVICE ( bias ); }
+#if 0
   auto outputs_cpu = native_layer_norm_backward (
                      grad_out.cpu(),
                      input.cpu(),
@@ -249,6 +255,57 @@ std::array<bool, 3> output_mask )
          output_mask[0] ? TENSOR_TO_TPU ( std::get<0> ( outputs_cpu ) ) : Tensor(),
          output_mask[1] ? TENSOR_TO_TPU ( std::get<1> ( outputs_cpu ) ) : Tensor(),
          output_mask[2] ? TENSOR_TO_TPU ( std::get<2> ( outputs_cpu ) ) : Tensor() );
+#else
+  Tensor grad_input, grad_weight, grad_bias;
+  if ( output_mask[0] == true )
+  {
+    grad_input = torch::empty ( input.sizes(), input.options() );
+  }
+  if ( output_mask[1] == true )
+  {
+    grad_weight = empty ( weight.sizes(), weight.options() );
+  }
+  if ( output_mask[2] == true )
+  {
+    // We assume that weight and bias have the same data type
+    grad_bias = empty ( { weight.size ( 0 ) }, weight.options() );
+  }
+  float alpha_data_diff = 1.f;
+  float beta_data_diff = 0.f;
+  float alpha_param_diff = 1.f;
+  float beta_param_diff = 0.f;
+#ifdef TPU_OP_TIMING
+  auto timer = tpu::Timer().Start();
+#endif
+  bm_status_t status = sgdnn_batchnorm_backward_cudnn (
+                       tpu::TPUGetDeviceHandle(),
+                       BatchNorm_Per_Layer,
+                       &alpha_data_diff,
+                       &beta_data_diff,
+                       &alpha_param_diff,
+                       &beta_param_diff,
+                       tpu::TPUGenerateTensorDesc ( input ),
+                       ADDR_IN_DEVICE ( input ),
+                       tpu::TPUGenerateTensorDesc ( grad_out ),
+                       ADDR_IN_DEVICE ( grad_out ),
+                       output_mask[0] == true ? tpu::TPUGenerateTensorDesc ( grad_input ) : TensorDescriptor_t(),
+                       output_mask[0] ? ADDR_IN_DEVICE ( grad_input ) : nullptr,
+                       output_mask[1] == true ? tpu::TPUGenerateTensorDesc ( grad_weight ) : ( output_mask[2] == true ? tpu::TPUGenerateTensorDesc ( grad_bias ) : TensorDescriptor_t() ),
+                       weight.defined() ? ADDR_IN_DEVICE ( weight ) : nullptr,
+                       output_mask[1] ? ADDR_IN_DEVICE ( grad_weight ) : nullptr,
+                       output_mask[2] ? ADDR_IN_DEVICE ( grad_bias ) : nullptr,
+                       eps,
+                       ADDR_IN_DEVICE ( mean ),
+                       ADDR_IN_DEVICE ( rvstd ),
+                       output_mask[0],
+                       output_mask[1],
+                       output_mask[2] );
+  TORCH_CHECK ( status == BM_SUCCESS );
+#ifdef TPU_OP_TIMING
+  tpu::OpTimer::Instance().AddTime ( tpu::BATCHNORM_BACKWARD, timer.ElapsedUS() );
+#endif
+  return std::tuple<Tensor, Tensor, Tensor> ( grad_input, grad_weight, grad_bias );
+#endif
 }
 TORCH_LIBRARY_IMPL ( aten, TPU, m )
 {
