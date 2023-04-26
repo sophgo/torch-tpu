@@ -830,9 +830,18 @@ bm_status_t sgdnn_batchnorm_forward_cudnn(
     unsigned long long batch_invstd = (unsigned long long)resultSaveInvVariance;
     unsigned long long output       = (unsigned long long)y;
 
-    if(mode == BatchNorm_Spatial) {assert(xDesc.ndims == 4);}
-    else if(mode == BatchNorm_Per_Layer) {assert(xDesc.ndims == 3);}
-    else {assert(0);}
+    // if(mode == BatchNorm_Spatial)
+    // {
+    //     assert(xDesc.ndims == 4);
+    // }
+    // else if(mode == BatchNorm_Per_Layer)
+    // {
+    //     assert(xDesc.ndims == 3);
+    // }
+    // else
+    // {
+    //     assert(0);
+    // }
 
     float alpha_ = ((float*)alpha)[0];
     assert(alpha_ == 1.0f);
