@@ -294,9 +294,9 @@ std::array<bool, 3> output_mask )
                        weight.defined() ? ADDR_IN_DEVICE ( weight ) : nullptr,
                        output_mask[1] ? ADDR_IN_DEVICE ( grad_weight ) : nullptr,
                        output_mask[2] ? ADDR_IN_DEVICE ( grad_bias ) : nullptr,
-                       eps,
+                       1e-5,
                        ADDR_IN_DEVICE ( mean ),
-                       ADDR_IN_DEVICE ( rvstd ),
+                       ADDR_IN_DEVICE ( rstd ),
                        output_mask[0],
                        output_mask[1],
                        output_mask[2] );

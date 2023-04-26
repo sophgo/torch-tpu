@@ -28,7 +28,7 @@ static inline void test ( at::IntArrayRef     input_shape,
                      c10::optional<at::Tensor> ( weight_cpu ),
                      c10::optional<at::Tensor> ( bias_cpu ),
                      output_mask );
-  auto outputs_tpu = torch::native_batch_norm_backward (
+  auto outputs_tpu = torch::native_layer_norm_backward (
                      grad_output_tpu,
                      input_tpu,
                      input_shape[2],
