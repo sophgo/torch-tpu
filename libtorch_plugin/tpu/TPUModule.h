@@ -20,6 +20,12 @@ void SetConvolutionBackwardAccuracy ( AlgorithmAccuracy_t Accuracy );
 AlgorithmAccuracy_t GetConvolutionForwardAccuracy();
 void SetConvolutionForwardAccuracy ( AlgorithmAccuracy_t Accuracy );
 
+AlgorithmAccuracy_t GetMatrixMultiplyBackwardAccuracy();
+void SetMatrixMultiplyBackwardAccuracy ( AlgorithmAccuracy_t Accuracy );
+
+AlgorithmAccuracy_t GetMatrixMultiplyForwardAccuracy();
+void SetMatrixMultiplyForwardAccuracy ( AlgorithmAccuracy_t Accuracy );
+
 void MoveModuleToTPUDevice ( torch::nn::Module & Module );
 
 void MoveModuleToCPUDevice ( torch::nn::Module & Module );

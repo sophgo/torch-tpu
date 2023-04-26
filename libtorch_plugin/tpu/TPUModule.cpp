@@ -136,6 +136,30 @@ void SetConvolutionForwardAccuracy ( AlgorithmAccuracy_t Accuracy )
   kConvolutionForwardAccuracy = Accuracy;
 }
 
+static AlgorithmAccuracy_t kMatrixMultiplyBackwardAccuracy = ALGORITHM_ACCURACY_FP32;
+
+AlgorithmAccuracy_t GetMatrixMultiplyBackwardAccuracy()
+{
+  return kMatrixMultiplyBackwardAccuracy;
+}
+
+void SetMatrixMultiplyBackwardAccuracy ( AlgorithmAccuracy_t Accuracy )
+{
+  kMatrixMultiplyBackwardAccuracy = Accuracy;
+}
+
+static AlgorithmAccuracy_t kMatrixMultiplyForwardAccuracy = ALGORITHM_ACCURACY_FP32;
+
+AlgorithmAccuracy_t GetMatrixMultiplyForwardAccuracy()
+{
+  return kMatrixMultiplyForwardAccuracy;
+}
+
+void SetMatrixMultiplyForwardAccuracy ( AlgorithmAccuracy_t Accuracy )
+{
+  kMatrixMultiplyForwardAccuracy = Accuracy;
+}
+
 static inline void GetNamedParameters_ (
 const torch::nn::Module & Module, std::vector<at::Tensor> & Params )
 {
