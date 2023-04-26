@@ -567,7 +567,8 @@ bm_status_t sgdnn_general_matmul(
     const void                      *R,
     const TensorDescriptor_t         YDesc,
     void                            *Y,
-    int                              R_transpose);
+    int                              R_transpose,
+    sg_data_type_t                   compute_type);
 
 bm_status_t sgdnn_batch_matmul(
     bm_handle_t                      handle,
@@ -578,7 +579,8 @@ bm_status_t sgdnn_batch_matmul(
     const TensorDescriptor_t         YDesc,
     void                            *Y,
     int                              L_transpose,
-    int                              R_transpose);
+    int                              R_transpose,
+    sg_data_type_t                   compute_type);
 
 bm_status_t sgdnn_softmax_forward_cudnn(
     bm_handle_t                      handle,

@@ -63,7 +63,8 @@ Tensor & mm_out_tpu ( const Tensor & self, const Tensor & mat2, Tensor & out )
                 ADDR_IN_DEVICE ( mat2 ),
                 tpu::TPUGenerateTensorDesc ( out ),
                 ADDR_IN_DEVICE ( out ),
-                false );
+                false,
+                SG_DTYPE_FP16 );
   TORCH_CHECK ( status == BM_SUCCESS );
 #ifdef TPU_OP_TIMING
   tpu::OpTimer::Instance().AddTime ( tpu::MM, timer.ElapsedUS() );
@@ -102,7 +103,8 @@ Tensor & bmm_out_tpu ( const Tensor & self, const Tensor & mat2, Tensor & out )
                 tpu::TPUGenerateTensorDesc ( out ),
                 ADDR_IN_DEVICE ( out ),
                 false,
-                false );
+                false,
+                SG_DTYPE_FP16 );
   TORCH_CHECK ( status == BM_SUCCESS );
 #ifdef TPU_OP_TIMING
   tpu::OpTimer::Instance().AddTime ( tpu::BMM, timer.ElapsedUS() );
