@@ -224,7 +224,7 @@ static inline void nodechip_layernorm_backward_dim3(
     const int H = shape.h;
     const int W = shape.w;
     TPUKERNEL_ASSERT ( H == 1 );
-    TPUKERNEL_ASSERT ( grad_input_enable );
+    // TPUKERNEL_ASSERT ( grad_input_enable );
     const dim4 TotalShape = { .n = N, .c = C, .h = H, .w = W };
     dim4 WeightShape = { .n = 1, .c = 1, .h = 1, .w = W };
     dim4 GlobalStride;
@@ -394,7 +394,7 @@ static inline void nodechip_layernorm_backward_dim3(
             /* compute and move grad input */
             tpu_bdc_fp_sub( grad_inputAddr, grad_outputAddr, inputAddr, &Shape, NULL, NULL, NULL, dtype );
             tpu_bdc_fp_mul( grad_inputAddr, grad_inputAddr, invstdAddr, &Shape, NULL, NULL, &WBcastStride, dtype );
-            tpu_gdma_cpy_L2S ( grad_inputGAddr, grad_inputAddr, &Shape, &GlobalStride, NULL, dtype );
+            if(grad_input_enable) tpu_gdma_cpy_L2S ( grad_inputGAddr, grad_inputAddr, &Shape, &GlobalStride, NULL, dtype );
             CTodo -= Shape.c;
             CDone += Shape.c;
         }

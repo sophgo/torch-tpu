@@ -1023,7 +1023,7 @@ bm_status_t sgdnn_batchnorm_backward_cudnn(
     {
         assert(dyDesc.ndims == 3);
         assert( xDesc.ndims == 3);
-        assert(dxDesc.ndims == 3);
+        if(dx_enable) assert(dxDesc.ndims == 3);
 
         n = xDesc.shape[0];
         c = xDesc.shape[1];
