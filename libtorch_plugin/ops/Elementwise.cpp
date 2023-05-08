@@ -8,6 +8,17 @@
 
 namespace at
 {
+Tensor & sqrt_out_tpu ( Tensor & self )
+{
+  CHECK_TENSOR_IN_DEVICE ( self );
+  auto self_cpu = sqrt( self.cpu() );
+  tpu::TPUCopyHostToDevice ( self.data_ptr(), self_cpu.contiguous().data_ptr(), self.nbytes() );
+  return self;
+}
+TORCH_LIBRARY_IMPL ( aten, TPU, m )
+{
+  m.impl ( "sqrt.out", sqrt_out_tpu );
+}
 #if 0
 Tensor & binary_Tensor_tpu ( const Tensor          & input1,
                              const Tensor          & input2,
