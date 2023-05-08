@@ -8,12 +8,12 @@
 
 namespace at
 {
-Tensor & sqrt_out_tpu ( Tensor & self )
+Tensor & sqrt_out_tpu ( const Tensor & self, Tensor & out  )
 {
   CHECK_TENSOR_IN_DEVICE ( self );
-  auto self_cpu = sqrt( self.cpu() );
-  tpu::TPUCopyHostToDevice ( self.data_ptr(), self_cpu.contiguous().data_ptr(), self.nbytes() );
-  return self;
+  auto out_cpu = sqrt( self.cpu() );
+  tpu::TPUCopyHostToDevice ( out.data_ptr(), out_cpu.contiguous().data_ptr(), out.nbytes() );
+  return out;
 }
 TORCH_LIBRARY_IMPL ( aten, TPU, m )
 {
