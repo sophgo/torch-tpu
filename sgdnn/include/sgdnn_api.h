@@ -424,22 +424,6 @@ bm_status_t sgdnn_eltwise_backward_cudnn(
     bool                       grad_input_b_enable,
     const EltwiseOpMode_t      opTensorDesc);
 
-bm_status_t sgdnn_linear_backward(
-    bm_handle_t        handle,
-    bm_device_mem_t    input,
-    bm_device_mem_t    weight,
-    bm_device_mem_t    grad_output,
-    bm_device_mem_t    grad_input,
-    bm_device_mem_t    grad_weight,
-    bm_device_mem_t    grad_bias,
-    int                batch,  
-    int                in_features,  
-    int                out_features,  
-    bool               input_need_grad,
-    bool               weight_need_grad,
-    bool               bias_need_grad,
-    sg_data_type_t     dtype);
-
 bm_status_t sgdnn_relu_forward(
     bm_handle_t        handle,
     bm_device_mem_t    input,
@@ -579,6 +563,19 @@ bm_status_t sgdnn_batch_matmul(
     const TensorDescriptor_t         YDesc,
     void                            *Y,
     int                              L_transpose,
+    int                              R_transpose,
+    sg_data_type_t                   compute_type);
+
+bm_status_t sgdnn_linear(
+    bm_handle_t                      handle,
+    const TensorDescriptor_t         LDesc,
+    const void                      *L,
+    const TensorDescriptor_t         RDesc,
+    const void                      *R,
+    const TensorDescriptor_t         BDesc,
+    void                            *B,
+    const TensorDescriptor_t         YDesc,
+    void                            *Y,
     int                              R_transpose,
     sg_data_type_t                   compute_type);
 

@@ -125,24 +125,6 @@ typedef struct{
 
 typedef struct {
     unsigned long long input_global_addr;
-    unsigned long long weight_global_addr;
-    unsigned long long grad_output_global_addr;
-    unsigned long long grad_input_global_addr;
-    unsigned long long grad_weight_global_addr;
-    unsigned long long grad_bias_global_addr;
-    int                batch;
-    int                features[2];
-    int                grad_input_enable;
-    int                grad_weight_enable;
-    int                grad_bias_enable;
-#ifndef WIN32
-} __attribute__((packed)) sg_api_linear_backward_t;
-#else
-} sg_api_linear_backward_t;
-#endif
-
-typedef struct {
-    unsigned long long input_global_addr;
     unsigned long long grad_output_global_addr;
     unsigned long long grad_input_global_addr;
     int                shape[4];
@@ -283,20 +265,6 @@ typedef struct {
 
 typedef struct {
     unsigned long long input_global_addr;
-    unsigned long long weight_global_addr;
-    unsigned long long bias_global_addr;
-    unsigned long long output_global_addr;
-    int                batch;
-    int                in_features;
-    int                out_features;
-#ifndef WIN32
-} __attribute__((packed)) sg_api_linear_forward_t;
-#else
-} sg_api_linear_forward_t;
-#endif
-
-typedef struct {
-    unsigned long long input_global_addr;
     unsigned long long target_global_addr;
     unsigned long long loss_global_addr;
     int                batch;
@@ -368,11 +336,13 @@ typedef struct {
 typedef struct {
     unsigned long long L_global_addr;
     unsigned long long R_global_addr;
+    unsigned long long bias_global_addr;
     unsigned long long Y_global_addr;
     int                L_row_num;
     int                L_col_num;
     int                R_col_num;
     int                R_transpose;
+    int                have_bias;
     sg_data_type_t     dtype;
 #ifndef WIN32
 } __attribute__((packed)) sg_api_general_matmul_t;

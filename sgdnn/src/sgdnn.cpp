@@ -1776,60 +1776,6 @@ bm_status_t sgdnn_eltwise_backward_cudnn(
     return BM_SUCCESS;
 }
 
-bm_status_t sgdnn_linear_backward(
-    bm_handle_t        handle,
-    bm_device_mem_t    input,
-    bm_device_mem_t    weight,
-    bm_device_mem_t    grad_output,
-    bm_device_mem_t    grad_input,
-    bm_device_mem_t    grad_weight,
-    bm_device_mem_t    grad_bias,
-    int                batch,  
-    int                in_features,  
-    int                out_features,  
-    bool               input_need_grad,
-    bool               weight_need_grad,
-    bool               bias_need_grad,
-    sg_data_type_t     dtype)
-{
-
-    bm_device_mem_t grad_output_mem, input_mem, weight_mem;
-    bm_device_mem_t grad_input_mem, grad_weight_mem, grad_bias_mem;
-    u64 input_size = (u64)batch * in_features * dtype_size(dtype);
-    u64 weight_size = (u64)in_features * out_features * dtype_size(dtype);
-    u64 grad_output_size = (u64)batch * out_features * dtype_size(dtype);
-    u64 bias_size = (u64)out_features * dtype_size(dtype);
-
-    DEVICE_MEM_NEW_INPUT(handle, input, input_size, input_mem);
-    DEVICE_MEM_NEW_INPUT(handle, weight, weight_size, weight_mem);
-    DEVICE_MEM_NEW_INPUT(handle, grad_output, grad_output_size, grad_output_mem);
-    DEVICE_MEM_NEW_OUTPUT(handle, grad_input, input_size, grad_input_mem);
-    DEVICE_MEM_NEW_OUTPUT(handle, grad_weight, weight_size, grad_weight_mem);
-    DEVICE_MEM_NEW_OUTPUT(handle, grad_bias, bias_size, grad_bias_mem);
-
-    sg_api_linear_backward_t api = {
-        bm_mem_get_device_addr(input_mem),
-        bm_mem_get_device_addr(weight_mem),
-        bm_mem_get_device_addr(grad_output_mem),
-        bm_mem_get_device_addr(grad_input_mem),
-        bm_mem_get_device_addr(grad_weight_mem),
-        bm_mem_get_device_addr(grad_bias_mem),
-        batch,
-        {in_features, out_features},
-        1, 1, 1};
-
-    sgdnn_tpu_kernel_launch(handle, "tpu_kernel_api_linear_backward", &api, sizeof(api));
-
-    DEVICE_MEM_DEL_INPUT(handle, input, input_mem);
-    DEVICE_MEM_DEL_INPUT(handle, weight, weight_mem);
-    DEVICE_MEM_DEL_INPUT(handle, grad_output, grad_output_mem);
-    DEVICE_MEM_DEL_OUTPUT(handle, grad_input, grad_input_mem);
-    DEVICE_MEM_DEL_OUTPUT(handle, grad_weight, grad_weight_mem);
-    DEVICE_MEM_DEL_OUTPUT(handle, grad_bias, grad_bias_mem);
-
-    return BM_SUCCESS;
-}
-
 bm_status_t sgdnn_relu_forward(
     bm_handle_t        handle,
     bm_device_mem_t    input,
@@ -2303,10 +2249,12 @@ bm_status_t sgdnn_general_matmul(
             bm_mem_get_device_addr(L_cast),
             bm_mem_get_device_addr(R_cast),
             bm_mem_get_device_addr(Y_cast),
+            bm_mem_get_device_addr(Y_cast),
             L_row,
             L_col,
             R_col,
             R_transpose,
+            0,
             compute_type};
         sgdnn_tpu_kernel_launch(handle, "tpu_kernel_api_general_matmul", &api, sizeof(api));
 
@@ -2331,10 +2279,12 @@ bm_status_t sgdnn_general_matmul(
             (unsigned long long)L,
             (unsigned long long)R,
             (unsigned long long)Y,
+            (unsigned long long)Y,
             L_row,
             L_col,
             R_col,
             R_transpose,
+            0,
             Ldtype};
         sgdnn_tpu_kernel_launch(handle, "tpu_kernel_api_general_matmul", &api, sizeof(api));
     }
@@ -2453,6 +2403,126 @@ bm_status_t sgdnn_batch_matmul(
 
         sgdnn_tpu_kernel_launch(handle, "tpu_kernel_api_batch_matmul", &api, sizeof(api));
     }
+    return BM_SUCCESS;
+}
+
+bm_status_t sgdnn_linear(
+    bm_handle_t                      handle,
+    const TensorDescriptor_t         LDesc,
+    const void                      *L,
+    const TensorDescriptor_t         RDesc,
+    const void                      *R,
+    const TensorDescriptor_t         BDesc,
+    void                            *B,
+    const TensorDescriptor_t         YDesc,
+    void                            *Y,
+    int                              R_transpose,
+    sg_data_type_t                   compute_type)
+{
+    assert(LDesc.ndims == 2 && RDesc.ndims == 2 && YDesc.ndims == 2);
+    assert(BDesc.ndims == 1);
+
+    int L_row = LDesc.shape[0];
+    int L_col = LDesc.shape[1];
+    int R_col = RDesc.shape[1];
+    assert(BDesc.shape[0] == R_col);
+
+    sg_data_type_t Ldtype = (sg_data_type_t)(LDesc.dtype);
+    sg_data_type_t Rdtype = (sg_data_type_t)(RDesc.dtype);
+    sg_data_type_t Bdtype = (sg_data_type_t)(BDesc.dtype);
+    sg_data_type_t Ydtype = (sg_data_type_t)(YDesc.dtype);
+    assert(Ldtype == Rdtype && Ldtype == Bdtype && Ldtype == Ydtype);
+
+    if( Ldtype != compute_type )
+    {
+        int datasize = dtype_size(compute_type);
+
+        bm_device_mem_t L_cast, R_cast, B_cast, Y_cast;
+        u64 L_cast_size = (u64)L_row * L_col * datasize;
+        u64 R_cast_size = (u64)L_col * R_col * datasize;
+        u64 B_cast_size = (u64)R_col * datasize;
+        u64 Y_cast_size = (u64)L_row * R_col * datasize;
+
+        DEVICE_MEM_NEW_BUFFER(handle, L_cast, L_cast_size);
+        DEVICE_MEM_NEW_BUFFER(handle, R_cast, R_cast_size);
+        DEVICE_MEM_NEW_BUFFER(handle, B_cast, B_cast_size);
+        DEVICE_MEM_NEW_BUFFER(handle, Y_cast, Y_cast_size);
+
+        sg_api_dtype_convert_t cast_L_api;
+        cast_L_api.input_global_addr = (unsigned long long)L;
+        cast_L_api.output_global_addr = bm_mem_get_device_addr(L_cast);
+        cast_L_api.dims = LDesc.ndims;
+        cast_L_api.idtype = Ldtype;
+        cast_L_api.odtype = compute_type;
+        cast_L_api.round_mode = SG_ROUND_EVEN;
+        memcpy(cast_L_api.shape, LDesc.shape, LDesc.ndims * sizeof(int));
+        sgdnn_tpu_kernel_launch(handle, "tpu_kernel_api_dtype_convert", &cast_L_api, sizeof(cast_L_api));
+
+        sg_api_dtype_convert_t cast_R_api;
+        cast_R_api.input_global_addr = (unsigned long long)R;
+        cast_R_api.output_global_addr = bm_mem_get_device_addr(R_cast);
+        cast_R_api.dims = RDesc.ndims;
+        cast_R_api.idtype = Rdtype;
+        cast_R_api.odtype = compute_type;
+        cast_R_api.round_mode = SG_ROUND_EVEN;
+        memcpy(cast_R_api.shape, RDesc.shape, RDesc.ndims * sizeof(int));
+        sgdnn_tpu_kernel_launch(handle, "tpu_kernel_api_dtype_convert", &cast_R_api, sizeof(cast_R_api));
+
+        sg_api_dtype_convert_t cast_B_api;
+        cast_B_api.input_global_addr = (unsigned long long)B;
+        cast_B_api.output_global_addr = bm_mem_get_device_addr(B_cast);
+        cast_B_api.dims = BDesc.ndims;
+        cast_B_api.idtype = Bdtype;
+        cast_B_api.odtype = compute_type;
+        cast_B_api.round_mode = SG_ROUND_EVEN;
+        memcpy(cast_B_api.shape, BDesc.shape, BDesc.ndims * sizeof(int));
+        sgdnn_tpu_kernel_launch(handle, "tpu_kernel_api_dtype_convert", &cast_B_api, sizeof(cast_B_api));
+
+        sg_api_general_matmul_t api = {
+            bm_mem_get_device_addr(L_cast),
+            bm_mem_get_device_addr(R_cast),
+            bm_mem_get_device_addr(B_cast),
+            bm_mem_get_device_addr(Y_cast),
+            L_row,
+            L_col,
+            R_col,
+            R_transpose,
+            1,
+            compute_type};
+        sgdnn_tpu_kernel_launch(handle, "tpu_kernel_api_general_matmul", &api, sizeof(api));
+
+        sg_api_dtype_convert_t cast_Y_api;
+        cast_Y_api.input_global_addr = bm_mem_get_device_addr(Y_cast);
+        cast_Y_api.output_global_addr = (unsigned long long)Y;
+        cast_Y_api.dims = YDesc.ndims;
+        cast_Y_api.idtype = compute_type;
+        cast_Y_api.odtype = Ydtype;
+        cast_Y_api.round_mode = SG_ROUND_EVEN;
+        memcpy(cast_Y_api.shape, YDesc.shape, YDesc.ndims * sizeof(int));
+        
+        sgdnn_tpu_kernel_launch(handle, "tpu_kernel_api_dtype_convert", &cast_Y_api, sizeof(cast_Y_api));
+        
+        bm_free_device(handle, L_cast);
+        bm_free_device(handle, R_cast);
+        bm_free_device(handle, B_cast);
+        bm_free_device(handle, Y_cast);
+    }
+    else
+    {
+        sg_api_general_matmul_t api = {
+            (unsigned long long)L,
+            (unsigned long long)R,
+            (unsigned long long)B,
+            (unsigned long long)Y,
+            L_row,
+            L_col,
+            R_col,
+            R_transpose,
+            1,
+            Ldtype};
+        sgdnn_tpu_kernel_launch(handle, "tpu_kernel_api_general_matmul", &api, sizeof(api));
+    }
+
     return BM_SUCCESS;
 }
 

@@ -117,4 +117,45 @@ TORCH_LIBRARY_IMPL ( aten, TPU, m )
   m.impl ( "bmm.out", bmm_out_tpu );
 }
 
+Tensor & linear_out_tpu ( const Tensor & self, const Tensor & mat2, const Tensor & bias, Tensor & out)
+{
+  static int count = 0;
+#ifdef SHOW_OP_INFO
+  std::cout << "linear " << count << std::endl;
+  ++count;
+#endif
+  CHECK_TENSOR_IN_DEVICE ( self );
+  CHECK_TENSOR_IN_DEVICE ( mat2 );
+  CHECK_TENSOR_IN_DEVICE ( bias );
+  CHECK_TENSOR_IN_DEVICE ( out );
+#if 0
+  auto out_cpu = linear ( self.cpu(), mat2.cpu(), bias.cpu() );
+  tpu::TPUCopyHostToDevice ( out.data_ptr(), out_cpu.contiguous().data_ptr(), out.nbytes() );
+#else
+#ifdef TPU_OP_TIMING
+  auto timer = tpu::Timer().Start();
+#endif
+  auto status = sgdnn_linear (
+                tpu::TPUGetDeviceHandle(),
+                tpu::TPUGenerateTensorDesc ( self ),
+                ADDR_IN_DEVICE ( self ),
+                tpu::TPUGenerateTensorDesc ( mat2 ),
+                ADDR_IN_DEVICE ( mat2 ),
+                tpu::TPUGenerateTensorDesc ( bias ),
+                ADDR_IN_DEVICE ( bias ),
+                tpu::TPUGenerateTensorDesc ( out ),
+                ADDR_IN_DEVICE ( out ),
+                false,
+                SG_DTYPE_FP16 );
+  TORCH_CHECK ( status == BM_SUCCESS );
+#ifdef TPU_OP_TIMING
+  tpu::OpTimer::Instance().AddTime ( tpu::LINEAR, timer.ElapsedUS() );
+#endif
+#endif
+  return out;
+}
+TORCH_LIBRARY_IMPL ( aten, TPU, m )
+{
+  m.impl ( "linear.out", linear_out_tpu );
+}
 } // namespace at
