@@ -26,10 +26,14 @@ Tensor & addmm_out_tpu ( const Tensor & self, const Tensor & mat1, const Tensor 
   auto out_cpu = addmm ( self.cpu(), mat1.cpu(), mat2.cpu(), beta, alpha );
   tpu::TPUCopyHostToDevice ( out.data_ptr(), out_cpu.contiguous().data_ptr(), out.nbytes() );
 #else
-  TORCH_CHECK ( alpha.toDouble() == 1. );
-  TORCH_CHECK ( beta.toDouble() == 1. );
-  auto mat1_mat2 = mm ( mat1, mat2 );
-  add_out ( out, self, mat1_mat2, 1. );
+  if (( alpha.toDouble() == 1. ) && ( beta.toDouble() == 1. ))
+  {
+    linear_out( out, mat1, mat2, self);
+  }
+  else
+  {
+    TORCH_CHECK( false );
+  }
 #endif
   return out;
 }

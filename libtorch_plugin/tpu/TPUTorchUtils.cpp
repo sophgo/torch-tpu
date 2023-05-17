@@ -38,7 +38,7 @@ void OpTimer::Dump() const
   {
     if ( elapsed_time_us_[i] > 0 )
     {
-      std::cout << std::setw(20)<< OpTypeStr[i] << ": " << std::setw(20) << elapsed_time_us_[i] << "us, ";
+      std::cout << std::setw(20)<< OpTypeStr[i] << ": " << std::setw(12) << elapsed_time_us_[i] << "us, ";
       std::cout << std::setw(8) << std::setprecision(3) << elapsed_time_us_[i]*100. / ElapsedAll << "%" << std::endl;
     }
 
