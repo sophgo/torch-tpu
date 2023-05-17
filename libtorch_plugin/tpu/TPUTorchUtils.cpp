@@ -31,8 +31,15 @@ void OpTimer::Dump() const
   {
     if ( elapsed_time_us_[i] > 0 )
     {
-      std::cout << OpTypeStr[i] << ": " << elapsed_time_us_[i] << "us" << std::endl;
       ElapsedAll += elapsed_time_us_[i];
+    }
+  }
+  for ( auto i = 0; i < OP_NUM; ++i )
+  {
+    if ( elapsed_time_us_[i] > 0 )
+    {
+      std::cout << OpTypeStr[i] << ": " << elapsed_time_us_[i] << "us, ";
+      std::cout << std::setprecision(1) << elapsed_time_us_[i] / ElapsedAll << "%" << std::endl;
     }
   }
   std::cout << "TPU Elapsed All: " << ElapsedAll << "us" << std::endl;

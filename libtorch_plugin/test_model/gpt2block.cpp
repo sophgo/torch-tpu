@@ -5,8 +5,8 @@
 
 int main()
 {
-  int Batch = 16;
-  int Seq_len = 32;
+  int Batch = 32;
+  int Seq_len = 256;
   const int Hidden_size = 768;
   tpu::SetMatrixMultiplyForwardAccuracy ( tpu::ALGORITHM_ACCURACY_FP32 );
   tpu::SetMatrixMultiplyBackwardAccuracy ( tpu::ALGORITHM_ACCURACY_FP32 );
@@ -42,7 +42,7 @@ int main()
   auto GOT = TENSOR_TO_CPU ( OutputsTPU[0] );
   tpu::TPUCompareResult ( GOT, EXP );
   // Backward
-  auto BackwardInput0CPU = torch::ones ( OutputsTPU[0].sizes() );
+  auto BackwardInput0CPU = torch::ones ( OutputsCPU[0].sizes() );
   auto BackwardInput0TPU = torch::ones ( OutputsTPU[0].sizes() ).to ( TPU );
   tpu::OpTimer::Instance().Clear();
   timer.Start();
@@ -52,19 +52,18 @@ int main()
   OutputsTPU[0].backward ( BackwardInput0TPU );
   std::cout << "Gpt2Block Backward TPU Elapsed time = " << timer.ElapsedUS() << "us" << std::endl;
   tpu::OpTimer::Instance().Dump();
-  // Optimizer Step
-  tpu::OpTimer::Instance().Clear();
-  timer.Start();
-  OptimizerCPU.step();
-  std::cout << "Gpt2Block Optimizer Step CPU Elapsed time = " << timer.ElapsedUS() << "us" << std::endl;
-  timer.Start();
-  optimizerTPU.step();
-  std::cout << "Gpt2Block Optimizer Step TPU Elapsed time = " << timer.ElapsedUS() << "us" << std::endl;
+  // // Optimizer Step
+  // tpu::OpTimer::Instance().Clear();
+  // timer.Start();
+  // OptimizerCPU.step();
+  // std::cout << "Gpt2Block Optimizer Step CPU Elapsed time = " << timer.ElapsedUS() << "us" << std::endl;
+  // timer.Start();
+  // optimizerTPU.step();
+  // std::cout << "Gpt2Block Optimizer Step TPU Elapsed time = " << timer.ElapsedUS() << "us" << std::endl;
   std::vector<at::Tensor> ParamCPU = tpu::GetNamedParameters ( *GptCPU );
   std::vector<at::Tensor> ParamTPU = tpu::GetNamedParameters ( *GptTPU );
   TORCH_CHECK ( ParamCPU.size() == ParamTPU.size() );
   std::cout << "Gpt2Block (Batch = " << Batch << ", Seq_len = "<< Seq_len << ", Param_size = " << ParamCPU.size() << ")" << std::endl;
   tpu::TPUCompareResult ( ParamTPU[0].grad().cpu(), ParamCPU[0].grad() );
-  tpu::OpTimer::Instance().Dump();
   return 0;
 }
