@@ -18,11 +18,11 @@ int main()
   GptCPU->train();
   GptTPU->train();
   tpu::MoveModuleToTPUDevice ( *GptTPU );
-  // https://pytorch.org/cppdocs/api/structtorch_1_1optim_1_1_adam_options.html#exhale-struct-structtorch-1-1optim-1-1-adam-options
-  torch::optim::Adam OptimizerCPU { GptCPU->parameters(), torch::optim::AdamOptions () };
-  torch::optim::Adam optimizerTPU { GptTPU->parameters(), torch::optim::AdamOptions () };
-  OptimizerCPU.zero_grad();
-  optimizerTPU.zero_grad();
+  // // https://pytorch.org/cppdocs/api/structtorch_1_1optim_1_1_adam_options.html#exhale-struct-structtorch-1-1optim-1-1-adam-options
+  // torch::optim::Adam OptimizerCPU { GptCPU->parameters(), torch::optim::AdamOptions () };
+  // torch::optim::Adam optimizerTPU { GptTPU->parameters(), torch::optim::AdamOptions () };
+  // OptimizerCPU.zero_grad();
+  // optimizerTPU.zero_grad();
   torch::manual_seed ( 0 );
   tpu::Timer timer;
   // Forward

@@ -117,16 +117,18 @@ TORCH_LIBRARY_IMPL ( aten, TPU, m )
   m.impl ( "bmm.out", bmm_out_tpu );
 }
 
-Tensor & linear_out_tpu ( const Tensor & self, const Tensor & mat2, const Tensor & bias, Tensor & out)
+Tensor & linear_out_tpu ( const Tensor & self, const Tensor & mat2, const c10::optional<Tensor> & bias_opt, Tensor & out)
 {
   static int count = 0;
 #ifdef SHOW_OP_INFO
   std::cout << "linear " << count << std::endl;
   ++count;
 #endif
+  c10::MaybeOwned<Tensor> bias_maybe_owned = at::borrow_from_optional_tensor ( bias_opt );
+  const Tensor & bias = *bias_maybe_owned;
+  if ( bias.defined() ) { CHECK_TENSOR_IN_DEVICE ( bias ); }
   CHECK_TENSOR_IN_DEVICE ( self );
   CHECK_TENSOR_IN_DEVICE ( mat2 );
-  CHECK_TENSOR_IN_DEVICE ( bias );
   CHECK_TENSOR_IN_DEVICE ( out );
 #if 0
   auto out_cpu = linear ( self.cpu(), mat2.cpu(), bias.cpu() );
@@ -142,7 +144,7 @@ Tensor & linear_out_tpu ( const Tensor & self, const Tensor & mat2, const Tensor
                 tpu::TPUGenerateTensorDesc ( mat2 ),
                 ADDR_IN_DEVICE ( mat2 ),
                 tpu::TPUGenerateTensorDesc ( bias ),
-                ADDR_IN_DEVICE ( bias ),
+                bias.defined() ? ADDR_IN_DEVICE ( bias ) : nullptr,
                 tpu::TPUGenerateTensorDesc ( out ),
                 ADDR_IN_DEVICE ( out ),
                 false,
