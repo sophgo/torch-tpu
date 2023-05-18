@@ -136,28 +136,16 @@ void SetConvolutionForwardAccuracy ( AlgorithmAccuracy_t Accuracy )
   kConvolutionForwardAccuracy = Accuracy;
 }
 
-static AlgorithmAccuracy_t kMatrixMultiplyBackwardAccuracy = ALGORITHM_ACCURACY_FP32;
+static AlgorithmAccuracy_t kMatrixMultiplyAccuracy = ALGORITHM_ACCURACY_FP32;
 
-AlgorithmAccuracy_t GetMatrixMultiplyBackwardAccuracy()
+AlgorithmAccuracy_t GetMatrixMultiplyAccuracy()
 {
-  return kMatrixMultiplyBackwardAccuracy;
+  return kMatrixMultiplyAccuracy;
 }
 
-void SetMatrixMultiplyBackwardAccuracy ( AlgorithmAccuracy_t Accuracy )
+void SetMatrixMultiplyAccuracy ( AlgorithmAccuracy_t Accuracy )
 {
-  kMatrixMultiplyBackwardAccuracy = Accuracy;
-}
-
-static AlgorithmAccuracy_t kMatrixMultiplyForwardAccuracy = ALGORITHM_ACCURACY_FP32;
-
-AlgorithmAccuracy_t GetMatrixMultiplyForwardAccuracy()
-{
-  return kMatrixMultiplyForwardAccuracy;
-}
-
-void SetMatrixMultiplyForwardAccuracy ( AlgorithmAccuracy_t Accuracy )
-{
-  kMatrixMultiplyForwardAccuracy = Accuracy;
+  kMatrixMultiplyAccuracy = Accuracy;
 }
 
 static inline void GetNamedParameters_ (

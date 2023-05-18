@@ -6,8 +6,7 @@
 int main()
 {
   int Batch = 16;
-  tpu::SetMatrixMultiplyForwardAccuracy ( tpu::ALGORITHM_ACCURACY_FP32 );
-  tpu::SetMatrixMultiplyBackwardAccuracy ( tpu::ALGORITHM_ACCURACY_FP32 );
+  tpu::SetMatrixMultiplyAccuracy ( tpu::ALGORITHM_ACCURACY_FP16 );
   auto TPU = tpu::TPUGetCurrentDevice();
   auto CPU = torch::Device ( "cpu" );
   std::string ModelPath = "../bert_base_traced-2.11.0.pt";

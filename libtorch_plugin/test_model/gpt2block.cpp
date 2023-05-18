@@ -8,8 +8,7 @@ int main()
   int Batch = 32;
   int Seq_len = 256;
   const int Hidden_size = 768;
-  tpu::SetMatrixMultiplyForwardAccuracy ( tpu::ALGORITHM_ACCURACY_FP32 );
-  tpu::SetMatrixMultiplyBackwardAccuracy ( tpu::ALGORITHM_ACCURACY_FP32 );
+  tpu::SetMatrixMultiplyAccuracy ( tpu::ALGORITHM_ACCURACY_FP16 );
   auto TPU = tpu::TPUGetCurrentDevice();
   auto CPU = torch::Device ( "cpu" );
   std::string ModelPath = "../mygpt2block.pt";

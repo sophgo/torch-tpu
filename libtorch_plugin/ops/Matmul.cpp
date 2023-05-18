@@ -4,6 +4,7 @@
 #include <ATen/EmptyTensor.h>
 #include <TPUDeviceManager.h>
 #include <TPUTorchUtils.h>
+#include <TPUModule.h>
 #include <sgdnn_api.h>
 
 #define TPU_OP_TIMING
@@ -59,6 +60,27 @@ Tensor & mm_out_tpu ( const Tensor & self, const Tensor & mat2, Tensor & out )
 #ifdef TPU_OP_TIMING
   auto timer = tpu::Timer().Start();
 #endif
+  auto computeType = SG_DTYPE_FP32;
+  auto accuracy = tpu::GetMatrixMultiplyAccuracy();
+  if ( self.dtype() == caffe2::TypeMeta::Make<float>() )
+  {
+    if ( accuracy == tpu::ALGORITHM_ACCURACY_FP32 )
+    {
+      computeType = SG_DTYPE_FP32;
+    }
+    else if ( accuracy == tpu::ALGORITHM_ACCURACY_FP16 )
+    {
+      computeType = SG_DTYPE_FP16;
+    }
+    else
+    {
+      TORCH_CHECK ( false, "Unsupported Matmul Accuracy" );
+    }
+  }
+  else if ( self.dtype() == caffe2::TypeMeta::Make<at::Half>() )
+  {
+    computeType = SG_DTYPE_FP16;
+  }
   auto status = sgdnn_general_matmul (
                 tpu::TPUGetDeviceHandle(),
                 tpu::TPUGenerateTensorDesc ( self ),
@@ -68,7 +90,7 @@ Tensor & mm_out_tpu ( const Tensor & self, const Tensor & mat2, Tensor & out )
                 tpu::TPUGenerateTensorDesc ( out ),
                 ADDR_IN_DEVICE ( out ),
                 false,
-                SG_DTYPE_FP16 );
+                computeType );
   TORCH_CHECK ( status == BM_SUCCESS );
 #ifdef TPU_OP_TIMING
   tpu::OpTimer::Instance().AddTime ( tpu::MM, timer.ElapsedUS() );
@@ -98,6 +120,27 @@ Tensor & bmm_out_tpu ( const Tensor & self, const Tensor & mat2, Tensor & out )
 #ifdef TPU_OP_TIMING
   auto timer = tpu::Timer().Start();
 #endif
+  auto computeType = SG_DTYPE_FP32;
+  auto accuracy = tpu::GetMatrixMultiplyAccuracy();
+  if ( self.dtype() == caffe2::TypeMeta::Make<float>() )
+  {
+    if ( accuracy == tpu::ALGORITHM_ACCURACY_FP32 )
+    {
+      computeType = SG_DTYPE_FP32;
+    }
+    else if ( accuracy == tpu::ALGORITHM_ACCURACY_FP16 )
+    {
+      computeType = SG_DTYPE_FP16;
+    }
+    else
+    {
+      TORCH_CHECK ( false, "Unsupported Matmul Accuracy" );
+    }
+  }
+  else if ( self.dtype() == caffe2::TypeMeta::Make<at::Half>() )
+  {
+    computeType = SG_DTYPE_FP16;
+  }
   auto status = sgdnn_batch_matmul (
                 tpu::TPUGetDeviceHandle(),
                 tpu::TPUGenerateTensorDesc ( self ),
@@ -108,7 +151,7 @@ Tensor & bmm_out_tpu ( const Tensor & self, const Tensor & mat2, Tensor & out )
                 ADDR_IN_DEVICE ( out ),
                 false,
                 false,
-                SG_DTYPE_FP16 );
+                computeType );
   TORCH_CHECK ( status == BM_SUCCESS );
 #ifdef TPU_OP_TIMING
   tpu::OpTimer::Instance().AddTime ( tpu::BMM, timer.ElapsedUS() );
@@ -141,6 +184,27 @@ Tensor & linear_out_tpu ( const Tensor & self, const Tensor & mat2, const c10::o
 #ifdef TPU_OP_TIMING
   auto timer = tpu::Timer().Start();
 #endif
+  auto computeType = SG_DTYPE_FP32;
+  auto accuracy = tpu::GetMatrixMultiplyAccuracy();
+  if ( self.dtype() == caffe2::TypeMeta::Make<float>() )
+  {
+    if ( accuracy == tpu::ALGORITHM_ACCURACY_FP32 )
+    {
+      computeType = SG_DTYPE_FP32;
+    }
+    else if ( accuracy == tpu::ALGORITHM_ACCURACY_FP16 )
+    {
+      computeType = SG_DTYPE_FP16;
+    }
+    else
+    {
+      TORCH_CHECK ( false, "Unsupported Matmul Accuracy" );
+    }
+  }
+  else if ( self.dtype() == caffe2::TypeMeta::Make<at::Half>() )
+  {
+    computeType = SG_DTYPE_FP16;
+  }
   auto status = sgdnn_linear (
                 tpu::TPUGetDeviceHandle(),
                 tpu::TPUGenerateTensorDesc ( self ),
@@ -152,7 +216,7 @@ Tensor & linear_out_tpu ( const Tensor & self, const Tensor & mat2, const c10::o
                 tpu::TPUGenerateTensorDesc ( out ),
                 ADDR_IN_DEVICE ( out ),
                 false,
-                SG_DTYPE_FP16 );
+                computeType );
   TORCH_CHECK ( status == BM_SUCCESS );
 #ifdef TPU_OP_TIMING
   tpu::OpTimer::Instance().AddTime ( tpu::LINEAR, timer.ElapsedUS() );
