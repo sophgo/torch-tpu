@@ -201,7 +201,7 @@ static inline void nodechip_gelu_backward_parallel ( global_addr_t DXGlobalAddr,
     Index = 1 - Index;
     ++Count;
   }
-  if ( Count > 1 )
+  if ( Count > 0 )
   {
     tpu_parallel_end();
   }
