@@ -63,6 +63,10 @@ static inline int TPUConvertDType ( caffe2::TypeMeta dtype )
   {
     return 6;
   }
+  else if ( dtype == caffe2::TypeMeta::Make<bool>() ||
+      dtype == caffe2::TypeMeta::Make<unsigned char>()){
+    return 3;
+  }
   else
   {
     TORCH_CHECK ( false, "Unsupported data type ", dtype );
