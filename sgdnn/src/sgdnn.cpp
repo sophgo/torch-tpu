@@ -1890,6 +1890,28 @@ bm_status_t sgdnn_activation_forward_cudnn(
 
         return BM_SUCCESS;
     }
+    else if ( activationDesc.mode == Activation_Gelu && xDesc.dtype == SG_DTYPE_FP16)
+    {
+        assert(xDesc.ndims == yDesc.ndims);
+        sg_data_type_t ydtype = (sg_data_type_t)(yDesc.dtype);
+        sg_data_type_t xdtype = (sg_data_type_t)(xDesc.dtype);
+        assert(xdtype == ydtype);
+
+        sg_api_gelu_forward_t api;
+        api.x_global_addr =  (unsigned long long)x;
+        api.y_global_addr =  (unsigned long long)y;
+        api.dim = xDesc.ndims;
+        api.dtype = xdtype;
+
+        for (int i=0; i<xDesc.ndims; ++i)
+        {
+            assert(xDesc.shape[i] == yDesc.shape[i] );
+            api.shape[i] = xDesc.shape[i];
+        }
+
+        sgdnn_tpu_kernel_launch(handle, "tpu_kernel_api_gelu_forward", &api, sizeof(api));
+        return BM_SUCCESS;      
+    }
     // else if ( activationDesc.mode == Activation_Gelu && xDesc.dtype == SG_DTYPE_FP16)
     // {
     //     sg_active_type_t active_type =  tpu_active_type_convert(activationDesc.mode) ;
