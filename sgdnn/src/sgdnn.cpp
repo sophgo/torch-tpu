@@ -2595,8 +2595,8 @@ bm_status_t sgdnn_softmax_forward_cudnn(
         sgdnn_tpu_kernel_launch(handle, "tpu_kernel_api_dtype_convert", &cast_input_api, sizeof(cast_input_api));
 
         sg_api_softmax_forward_t api;
-        api.input_global_addr = (unsigned long long)x;
-        api.output_global_addr = (unsigned long long)y;
+        api.input_global_addr = bm_mem_get_device_addr(input_cast);
+        api.output_global_addr = bm_mem_get_device_addr(output_cast);
         for (int i=0; i<xDesc.ndims; ++i)
         {
             api.shape[i] = xDesc.shape[i];
@@ -2604,7 +2604,7 @@ bm_status_t sgdnn_softmax_forward_cudnn(
         api.dims = xDesc.ndims;
         api.compute_dim = dim;
         api.scale_val = 1.f;
-        api.dtype = xdtype;
+        api.dtype = SG_DTYPE_FP32;
         sgdnn_tpu_kernel_launch(handle, "tpu_kernel_api_softmax_forward", &api, sizeof(api));
 
         sg_api_dtype_convert_t cast_output_api;
