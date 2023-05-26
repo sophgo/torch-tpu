@@ -414,6 +414,18 @@ typedef struct {
 #endif
 
 typedef struct {
+    unsigned long long x_global_addr;
+    unsigned long long y_global_addr;
+    int shape[FW_MAX_SHAPE_DIMS];
+    int dim;
+    sg_data_type_t dtype;
+#ifndef WIN32
+} __attribute__((packed)) sg_api_gelu_forward_t;
+#else
+} sg_api_active_forward_t;
+#endif
+
+typedef struct {
     unsigned long long dx_global_addr;
     unsigned long long dy_global_addr;
     unsigned long long x_global_addr;
