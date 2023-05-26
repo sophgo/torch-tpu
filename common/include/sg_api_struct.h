@@ -372,9 +372,9 @@ typedef struct {
 typedef struct {
     unsigned long long input_global_addr;
     unsigned long long output_global_addr;
-    int                input_n;
-    int                input_c;
-    int                input_inner_dim;
+    int                shape[FW_MAX_SHAPE_DIMS];
+    int                dims;
+    int                compute_dim;
     float              scale_val;
     sg_data_type_t     dtype;
 #ifndef WIN32

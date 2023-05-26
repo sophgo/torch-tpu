@@ -1912,66 +1912,6 @@ bm_status_t sgdnn_activation_forward_cudnn(
         sgdnn_tpu_kernel_launch(handle, "tpu_kernel_api_gelu_forward", &api, sizeof(api));
         return BM_SUCCESS;      
     }
-    // else if ( activationDesc.mode == Activation_Gelu && xDesc.dtype == SG_DTYPE_FP16)
-    // {
-    //     sg_active_type_t active_type =  tpu_active_type_convert(activationDesc.mode) ;
-
-    //     int numel = 1;
-    //     assert(xDesc.ndims == yDesc.ndims);
-    //     for (int i = 0; i < xDesc.ndims; ++i)
-    //     {
-    //         assert(xDesc.shape[i] == yDesc.shape[i] );
-    //         numel *= xDesc.shape[i];
-    //     }
-    //     u64 input_cast_size = (u64) numel * 4;
-    //     u64 output_cast_size = (u64) numel * 4;
-
-    //     bm_device_mem_t input_cast, output_cast;
-    //     DEVICE_MEM_NEW_BUFFER(handle, input_cast, input_cast_size);
-    //     DEVICE_MEM_NEW_BUFFER(handle, output_cast, output_cast_size);
-
-    //     sg_api_dtype_convert_t cast_input_api;
-    //     cast_input_api.input_global_addr = (unsigned long long)x;
-    //     cast_input_api.output_global_addr = bm_mem_get_device_addr(input_cast);
-    //     cast_input_api.dims = xDesc.ndims;
-    //     cast_input_api.idtype = (sg_data_type_t)(xDesc.dtype);
-    //     cast_input_api.odtype = SG_DTYPE_FP32;
-    //     cast_input_api.round_mode = SG_ROUND_EVEN;
-    //     memcpy(cast_input_api.shape, xDesc.shape, xDesc.ndims * sizeof(int));
-    //     sgdnn_tpu_kernel_launch(handle, "tpu_kernel_api_dtype_convert", &cast_input_api, sizeof(cast_input_api));
-
-    //     sg_data_type_t ydtype = (sg_data_type_t)(yDesc.dtype);
-    //     sg_data_type_t xdtype = (sg_data_type_t)(xDesc.dtype);
-    //     assert(xdtype == ydtype);
-
-    //     sg_api_active_forward_t api;
-    //     api.in_global_addr = bm_mem_get_device_addr(input_cast);
-    //     api.out_global_addr = bm_mem_get_device_addr(output_cast);
-    //     api.shape_dim = xDesc.ndims;
-    //     api.dtype = SG_DTYPE_FP32;
-    //     api.active_type = active_type;
-    //     for (int i=0; i<xDesc.ndims; ++i)
-    //     {
-    //         assert(xDesc.shape[i] == yDesc.shape[i] );
-    //         api.shape[i] = xDesc.shape[i];
-    //     }
-    //     sgdnn_tpu_kernel_launch(handle, "tpu_kernel_api_active_forward", &api, sizeof(api));
-
-    //     sg_api_dtype_convert_t cast_output_api;
-    //     cast_output_api.input_global_addr = bm_mem_get_device_addr(output_cast);
-    //     cast_output_api.output_global_addr = (unsigned long long)y;
-    //     cast_output_api.dims = yDesc.ndims;
-    //     cast_output_api.idtype = SG_DTYPE_FP32;
-    //     cast_output_api.odtype = ydtype;
-    //     cast_output_api.round_mode = SG_ROUND_EVEN;
-    //     memcpy(cast_output_api.shape, yDesc.shape, yDesc.ndims * sizeof(int));
-    //     sgdnn_tpu_kernel_launch(handle, "tpu_kernel_api_dtype_convert", &cast_output_api, sizeof(cast_output_api));
-
-    //     bm_free_device(handle, input_cast);
-    //     bm_free_device(handle, output_cast);
-
-    //     return BM_SUCCESS;
-    // }
     else
     {
         sg_active_type_t active_type =  tpu_active_type_convert(activationDesc.mode) ;
@@ -2610,7 +2550,6 @@ bm_status_t sgdnn_linear(
 
 bm_status_t sgdnn_softmax_forward_cudnn(
     bm_handle_t                      handle,
-    //SoftmaxMode_t                    softmax_mode,
     int                              dim,
     const void                      *alpha,
     const TensorDescriptor_t         xDesc,
@@ -2623,30 +2562,84 @@ bm_status_t sgdnn_softmax_forward_cudnn(
     assert ( *( ( float * ) beta ) == 0.f );
     sg_data_type_t ydtype = (sg_data_type_t)(yDesc.dtype);
     sg_data_type_t xdtype = (sg_data_type_t)(xDesc.dtype);
-    assert(xdtype == ydtype && xdtype == 0);
+    assert(xdtype == ydtype);
     assert(xDesc.ndims == yDesc.ndims);
     for (int i = 0; i < xDesc.ndims; ++i)
     {
         assert(xDesc.shape[i] == yDesc.shape[i]);
     }
-    sg_api_softmax_forward_t api;
-    api.input_global_addr = (unsigned long long)x;
-    api.output_global_addr = (unsigned long long)y;
-    api.input_n = 1;
-    for (int i = 0; i < dim; ++i)
-    {
-        api.input_n *= xDesc.shape[i];
-    }
-    api.input_c = xDesc.shape[dim];
-    api.input_inner_dim = 1;
-    for (int i = dim + 1; i < xDesc.ndims; ++i)
-    {
-        api.input_inner_dim *= xDesc.shape[i];
-    }
 
-    api.scale_val = 1.f;
-    api.dtype = xdtype;
-    sgdnn_tpu_kernel_launch(handle, "tpu_kernel_api_softmax_forward", &api, sizeof(api));
+    if ( xdtype == SG_DTYPE_FP16)
+    {
+        int numel = 1;
+        for (int i = 0; i < xDesc.ndims; ++i)
+        {
+            assert(xDesc.shape[i] == yDesc.shape[i] );
+            numel *= xDesc.shape[i];
+        }
+        u64 input_cast_size = (u64) numel * 4;
+        u64 output_cast_size = (u64) numel * 4;
+
+        bm_device_mem_t input_cast, output_cast;
+        DEVICE_MEM_NEW_BUFFER(handle, input_cast, input_cast_size);
+        DEVICE_MEM_NEW_BUFFER(handle, output_cast, output_cast_size);
+
+        sg_api_dtype_convert_t cast_input_api;
+        cast_input_api.input_global_addr = (unsigned long long)x;
+        cast_input_api.output_global_addr = bm_mem_get_device_addr(input_cast);
+        cast_input_api.dims = xDesc.ndims;
+        cast_input_api.idtype = (sg_data_type_t)(xDesc.dtype);
+        cast_input_api.odtype = SG_DTYPE_FP32;
+        cast_input_api.round_mode = SG_ROUND_EVEN;
+        memcpy(cast_input_api.shape, xDesc.shape, xDesc.ndims * sizeof(int));
+        sgdnn_tpu_kernel_launch(handle, "tpu_kernel_api_dtype_convert", &cast_input_api, sizeof(cast_input_api));
+
+        sg_api_softmax_forward_t api;
+        api.input_global_addr = (unsigned long long)x;
+        api.output_global_addr = (unsigned long long)y;
+        for (int i=0; i<xDesc.ndims; ++i)
+        {
+            api.shape[i] = xDesc.shape[i];
+        }
+        api.dims = xDesc.ndims;
+        api.compute_dim = dim;
+        api.scale_val = 1.f;
+        api.dtype = xdtype;
+        sgdnn_tpu_kernel_launch(handle, "tpu_kernel_api_softmax_forward", &api, sizeof(api));
+
+        sg_api_dtype_convert_t cast_output_api;
+        cast_output_api.input_global_addr = bm_mem_get_device_addr(output_cast);
+        cast_output_api.output_global_addr = (unsigned long long)y;
+        cast_output_api.dims = yDesc.ndims;
+        cast_output_api.idtype = SG_DTYPE_FP32;
+        cast_output_api.odtype = ydtype;
+        cast_output_api.round_mode = SG_ROUND_EVEN;
+        memcpy(cast_output_api.shape, yDesc.shape, yDesc.ndims * sizeof(int));
+        sgdnn_tpu_kernel_launch(handle, "tpu_kernel_api_dtype_convert", &cast_output_api, sizeof(cast_output_api));
+
+        bm_free_device(handle, input_cast);
+        bm_free_device(handle, output_cast);
+    }
+    else if ( xdtype == SG_DTYPE_FP32 )
+    {
+        sg_api_softmax_forward_t api;
+        api.input_global_addr = (unsigned long long)x;
+        api.output_global_addr = (unsigned long long)y;
+        for (int i=0; i<xDesc.ndims; ++i)
+        {
+            api.shape[i] = xDesc.shape[i];
+        }
+        api.dims = xDesc.ndims;
+        api.compute_dim = dim;
+        api.scale_val = 1.f;
+        api.dtype = xdtype;
+        
+        sgdnn_tpu_kernel_launch(handle, "tpu_kernel_api_softmax_forward", &api, sizeof(api));
+    }
+    else
+    {
+        assert(false);
+    }
     return BM_SUCCESS;
 }
 

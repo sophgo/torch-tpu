@@ -72,7 +72,7 @@ static inline void nodechip_gelu_forward_parallel ( global_addr_t XGlobalAddr, g
       Shape.c = 1;
       Shape.w = Todo;
     }
-    tpu_gdma_cpy_S2L ( XAddrs[Index], XGlobalAddr + Done * DSize, &Shape, NULL, NULL, DT_FP32 );
+    tpu_gdma_cpy_S2L ( XAddrs[Index], XGlobalAddr + Done * DSize, &Shape, NULL, NULL, DT_FP16 );
     if ( Count > 0 && tpu_is_parallel_state())
     {
       tpu_parallel_end();
