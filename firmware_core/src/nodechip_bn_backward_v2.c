@@ -262,7 +262,8 @@ void tpu_kernel_api_batchnorm_backward_v2(const void *args)
 {
     sg_api_batchnorm_backward_t *api = (sg_api_batchnorm_backward_t *)args;
     dim4 shape = {api->shape[0], api->shape[1], api->shape[2], api->shape[3]};
-    data_type_t dtype = DT_FP32;
+    // TODO:fp16 to fp32 local type convert
+    TPUKERNEL_ASSERT(api->dtype == SG_DTYPE_FP32);
 
     tpu_initialize();
     nodechip_batchnorm2d_backward(
@@ -275,7 +276,7 @@ void tpu_kernel_api_batchnorm_backward_v2(const void *args)
             api->grad_weight_global_addr,
             api->grad_bias_global_addr,
             shape,
-            dtype,
+            DT_FP32,
             api->grad_input_enable,
             api->grad_weight_enable,
             api->grad_bias_enable);

@@ -60,6 +60,7 @@ typedef struct{
     int                grad_input_enable;
     int                grad_weight_enable;
     int                grad_bias_enable;
+    sg_data_type_t     dtype;
 #ifndef WIN32
 } __attribute__((packed)) sg_api_batchnorm_backward_t;
 #else

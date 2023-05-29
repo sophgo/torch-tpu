@@ -947,8 +947,8 @@ bm_status_t sgdnn_batchnorm_backward(
         bm_mem_get_device_addr(grad_weight_mem),
         bm_mem_get_device_addr(grad_bias_mem),
         {n, c, h, w},
-        1, 1, 1
-    };
+        1, 1, 1,
+        dtype};
 
     if(if_ln) sgdnn_tpu_kernel_launch(handle, "tpu_kernel_api_layernorm_backward", &api, sizeof(api));
     else      sgdnn_tpu_kernel_launch(handle, "tpu_kernel_api_batchnorm_backward", &api, sizeof(api));
@@ -1042,10 +1042,12 @@ bm_status_t sgdnn_batchnorm_backward_cudnn(
     sg_data_type_t dxdtype = (sg_data_type_t)(dxDesc.dtype);
     sg_data_type_t wdtype = (sg_data_type_t)(bnScaleBiasDiffDesc.dtype);
     
-    assert(dydtype == 0);
-    assert(xdtype == 0);
-    assert(dxdtype == 0);
-    assert(wdtype == 0);
+    // if dtype is fp16, it will convert to fp32 in local
+    assert(xdtype == dxdtype && xdtype == dydtype && xdtype == wdtype);  
+    // assert(dydtype == 0);
+    // assert(xdtype == 0);
+    // assert(dxdtype == 0);
+    // assert(wdtype == 0);
 
     sg_api_batchnorm_backward_t api = {
         grad_output,
@@ -1059,7 +1061,8 @@ bm_status_t sgdnn_batchnorm_backward_cudnn(
         {n, c, h, w},
         dx_enable,
         dw_enable,
-        db_enable};
+        db_enable,
+        xdtype};
 
     if(mode == BatchNorm_Spatial) sgdnn_tpu_kernel_launch(handle, "tpu_kernel_api_batchnorm_backward", &api, sizeof(api));
     else if(mode == BatchNorm_Per_Layer) sgdnn_tpu_kernel_launch(handle, "tpu_kernel_api_layernorm_backward", &api, sizeof(api));
