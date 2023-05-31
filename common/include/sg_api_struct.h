@@ -520,5 +520,17 @@ typedef struct {
 } sg_api_concat_t;
 #endif
 
+typedef struct {
+    unsigned long long input_global_addr;
+    unsigned long long output_global_addr;
+    int shape[4];
+    int reduce_dim;
+    sg_data_type_t dtype;
+#ifndef WIN32
+} __attribute__((packed)) sg_api_reduce_sum_t;
+#else
+} sg_api_reduce_sum_t;
+#endif
+
 #pragma pack(pop)
 #endif  // SG_API_STRUCT_H

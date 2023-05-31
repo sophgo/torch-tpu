@@ -2836,6 +2836,60 @@ bm_status_t sgdnn_gelu_backward_cudnn(
     return BM_SUCCESS;
 }
 
+bm_status_t sgdnn_reduce_sum_cudnn(
+    bm_handle_t                     handle,
+    const TensorDescriptor_t        xDesc,
+    const void                     *x,
+    const TensorDescriptor_t        yDesc,
+    void                           *y,
+    int                             reduce_dim)
+{
+    assert (xDesc.ndims == yDesc.ndims);
+    sg_data_type_t xdtype = (sg_data_type_t)(xDesc.dtype);
+    sg_data_type_t ydtype = (sg_data_type_t)(yDesc.dtype);
+    assert (xdtype == ydtype);
+
+    int n, c, h, w;
+    if (xDesc.ndims == 4)
+    {
+      n = xDesc.shape[0];
+      c = xDesc.shape[1];
+      h = xDesc.shape[2];
+      w = xDesc.shape[3];
+    }
+    else if (xDesc.ndims == 3)
+    {
+      n = xDesc.shape[0];
+      c = xDesc.shape[1];
+      h = 1;
+      w = xDesc.shape[2];
+      if( reduce_dim == 3 ) reduce_dim = 4;
+    }
+    else if (xDesc.ndims == 2)
+    {
+      n = 1;
+      c = xDesc.shape[0];
+      h = 1;
+      w = xDesc.shape[1];
+      if( reduce_dim == 0 ) reduce_dim = 1;
+      else if( reduce_dim == 1 ) reduce_dim = 3;
+    }
+    else
+    {
+        assert (false);
+    }
+    int input_shape[4] = {n, c, h, w};
+
+    sg_api_reduce_sum_t api;
+    api.input_global_addr = (unsigned long long)x;
+    api.output_global_addr = (unsigned long long)y;
+    memcpy(api.shape, input_shape, 4 * sizeof(int));
+    api.reduce_dim = reduce_dim;
+    api.dtype = xdtype;
+
+    sgdnn_tpu_kernel_launch(handle, "tpu_kernel_api_reduce_sum", &api, sizeof(api));
+    return BM_SUCCESS;
+}
 bm_status_t sgdnn_strided_copy_cudnn(
     bm_handle_t                     handle,
     const TensorDescriptor_t        srcDesc,

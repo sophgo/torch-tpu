@@ -675,6 +675,13 @@ bm_status_t sgdnn_concat (
     void                           *output,
     int                             concat_dim);
 
+bm_status_t sgdnn_reduce_sum_cudnn(
+    bm_handle_t                     handle,
+    const TensorDescriptor_t        xDesc,
+    const void                     *x,
+    const TensorDescriptor_t        yDesc,
+    void                           *y,
+    int                             reduce_dim);
 
 #if defined(__cplusplus)
 }

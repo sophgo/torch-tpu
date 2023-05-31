@@ -25,7 +25,6 @@ int main ()
   for (int i = 0; i < loop; i++)
   {
     srand(time(NULL));
-    sleep(1.0);
     std::cout << "\ntest gelu backward case: " << i << std::endl;
     int len = rand() % max_len + 1;
     test ( { len } );
