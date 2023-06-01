@@ -648,6 +648,14 @@ bm_status_t sgdnn_gelu_backward_cudnn(
     const TensorDescriptor_t        dxDesc,
     void                           *dx);
 
+bm_status_t sgdnn_strided_copy_cudnn(
+    bm_handle_t                     handle,
+    const TensorDescriptor_t        srcDesc,
+    const void                      *src,
+    const TensorDescriptor_t        dstDesc,
+    const void                      *dst);
+
+
 #if defined(__cplusplus)
 }
 #endif

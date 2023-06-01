@@ -439,5 +439,32 @@ typedef struct {
 } sg_api_gelu_backward_t;
 #endif
 
+typedef struct {
+    unsigned long long in_global_addr;
+    unsigned long long out_global_addr;
+    int shape[FW_MAX_SHAPE_DIMS];
+    int stride[FW_MAX_SHAPE_DIMS];
+    int shape_dim;
+    sg_data_type_t dtype;
+#ifndef WIN32
+} __attribute__((packed)) sg_api_contiguous_forward_t;
+#else
+} sg_api_contiguous_forward_t;
+#endif
+
+typedef struct {
+    unsigned long long in_global_addr;
+    unsigned long long out_global_addr;
+    int shape[FW_MAX_SHAPE_DIMS];
+    int in_stride[FW_MAX_SHAPE_DIMS];
+    int out_stride[FW_MAX_SHAPE_DIMS];
+    int shape_dim;
+    sg_data_type_t dtype;
+#ifndef WIN32
+} __attribute__((packed)) sg_api_strided_copy_t;
+#else
+} sg_api_strided_copy_t;
+#endif
+
 #pragma pack(pop)
 #endif  // SG_API_STRUCT_H

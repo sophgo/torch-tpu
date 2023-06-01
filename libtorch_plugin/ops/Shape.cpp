@@ -90,7 +90,7 @@ TORCH_LIBRARY_IMPL ( aten, TPU, m )
 
 Tensor as_strided_tpu ( const Tensor & self, IntArrayRef size, IntArrayRef stride, c10::optional<int64_t> storage_offset )
 {
-  CHECK_TENSOR_IN_DEVICE ( self );
+  // CHECK_TENSOR_IN_DEVICE ( self );
   Tensor out;
   int64_t size_numel = 1;
   for ( auto s : size )
@@ -162,6 +162,16 @@ Tensor as_strided_tpu ( const Tensor & self, IntArrayRef size, IntArrayRef strid
 #endif
     delete [] order;
     delete [] done;
+  }
+  else if ( self.numel() != size_numel && self.dim() == size.size() && self.strides() == stride)
+  {
+    out = at::detail::make_tensor<TensorImpl> (
+            c10::TensorImpl::VIEW, Storage ( self.storage() ), self.key_set(), self.dtype() );
+    auto* self_tmp_ = out.unsafeGetTensorImpl();
+    self_tmp_->set_storage_offset ( self.storage_offset() + 
+                                    storage_offset.has_value() ? storage_offset.value() : 0);
+    self_tmp_->set_sizes_and_strides ( size, stride );
+    namedinference::propagate_names ( out, self );
   }
   else
   {

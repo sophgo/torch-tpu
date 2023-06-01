@@ -2795,3 +2795,32 @@ bm_status_t sgdnn_gelu_backward_cudnn(
     sgdnn_tpu_kernel_launch(handle, "tpu_kernel_api_gelu_backward", &api, sizeof(api));
     return BM_SUCCESS;
 }
+
+bm_status_t sgdnn_strided_copy_cudnn(
+    bm_handle_t                     handle,
+    const TensorDescriptor_t        srcDesc,
+    const void                      *src,
+    const TensorDescriptor_t        dstDesc,
+    const void                      *dst)
+{
+    sg_data_type_t srcDtype = (sg_data_type_t)(srcDesc.dtype);
+    sg_data_type_t dstDtype = (sg_data_type_t)(srcDesc.dtype);
+    assert(srcDtype == dstDtype);
+    assert(srcDesc.ndims == dstDesc.ndims);
+
+    sg_api_strided_copy_t api;
+    api.dtype = srcDtype;
+    api.shape_dim = srcDesc.ndims;
+    api.in_global_addr = (unsigned long long) src;
+    api.out_global_addr = (unsigned long long) dst;
+    
+    for (int i = 0; i < srcDesc.ndims; i++){
+        assert(srcDesc.shape[i] == dstDesc.shape[i]);
+        api.shape[i]      = srcDesc.shape[i];
+        api.in_stride[i]  = srcDesc.stride[i];
+        api.out_stride[i] = dstDesc.stride[i];
+     }
+    sgdnn_tpu_kernel_launch(handle, "tpu_kernel_api_strided_copy", &api, sizeof(api));
+    
+    return BM_SUCCESS;
+}

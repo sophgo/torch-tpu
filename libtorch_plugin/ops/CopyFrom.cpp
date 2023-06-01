@@ -14,24 +14,42 @@ namespace at
 Tensor _copy_from_tpu ( const Tensor & self, const Tensor & dst, bool non_blocking )
 {
   TORCH_CHECK ( non_blocking == false );
-  if ( self.is_contiguous() == false || dst.is_contiguous() == false )
-  {
-    TORCH_CHECK ( false, "TPU only supports contiguous memory copy for now" );
-  }
   if ( self.dtype() == dst.dtype() )
   {
     TORCH_CHECK ( self.nbytes() == dst.nbytes(), "SELF and dst number bytes must be the same" );
     if ( IS_CPU_TENSOR ( self ) && IS_TPU_TENSOR ( dst ) )
     {
-      tpu::TPUCopyHostToDevice ( dst.data_ptr(), self.data_ptr(), dst.nbytes() );
+      TORCH_CHECK ( self.is_contiguous() == true ,
+        "TPU only supports contiguous memory copy for now" );
+      if (dst.is_contiguous()){
+        tpu::TPUCopyHostToDevice ( dst.data_ptr(), self.data_ptr(), dst.nbytes() );
+      }else{
+        _copy_from_tpu(self.to ( dst.device() ), dst, non_blocking);
+      }
     }
     else if ( IS_TPU_TENSOR ( self ) && IS_CPU_TENSOR ( dst ) )
     {
-      tpu::TPUCopyDeviceToHost ( dst.data_ptr(), self.data_ptr(), dst.nbytes() );
+      TORCH_CHECK ( dst.is_contiguous() == true ,
+        "TPU only supports contiguous memory copy for now" );
+      if (self.is_contiguous()){
+        tpu::TPUCopyDeviceToHost ( dst.data_ptr(), self.data_ptr(), dst.nbytes() );
+      }else{
+        _copy_from_tpu(self.contiguous(), dst, non_blocking);
+      }
     }
     else if ( IS_TPU_TENSOR ( self ) && IS_TPU_TENSOR ( dst ) )
     {
-      tpu::TPUCopyDeviceToDevice ( dst.data_ptr(), self.data_ptr(), dst.nbytes() );
+      if(self.is_contiguous() && dst.is_contiguous()){
+        tpu::TPUCopyDeviceToDevice ( dst.data_ptr(), self.data_ptr(), dst.nbytes() );
+      }else{
+        bm_status_t status = sgdnn_strided_copy_cudnn(
+                            tpu::TPUGetDeviceHandle(),
+                            tpu::TPUGenerateTensorDesc(self),
+                            ADDR_IN_DEVICE(self),
+                            tpu::TPUGenerateTensorDesc(dst),
+                            ADDR_IN_DEVICE(dst));
+        TORCH_CHECK( status == BM_SUCCESS);
+      }
     }
     else
     {
