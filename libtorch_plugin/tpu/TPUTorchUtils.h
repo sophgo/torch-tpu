@@ -21,6 +21,14 @@ TORCH_CHECK ( t.is_contiguous() == true, #t, " is not contiguous" ); \
 } \
 while ( 0 )
 
+#define CHECK_TENSOR_IN_DEVICE_NO_CONTIGUOUS(t) \
+do \
+{ \
+TORCH_CHECK ( t.device().type() == DeviceType::TPU, #t, " is not in TPU device" ); \
+TORCH_CHECK ( tpu::TPUPtrIsInCurrentDevice ( t.data_ptr() ) == true, #t, " is not in current TPU device"  ); \
+} \
+while ( 0 )
+
 #define TENSOR_TO_CPU(t) ( ( t ).to ( torch::Device ( "cpu" ) ) )
 
 #define TENSOR_TO_TPU(t) ( ( t ).to ( tpu::TPUGetCurrentDevice() ) )

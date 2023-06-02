@@ -21,7 +21,7 @@ Tensor & addmm_out_tpu ( const Tensor & self, const Tensor & mat1, const Tensor 
 #endif
   CHECK_TENSOR_IN_DEVICE ( self );
   CHECK_TENSOR_IN_DEVICE ( mat1 );
-  CHECK_TENSOR_IN_DEVICE ( mat2 );
+  CHECK_TENSOR_IN_DEVICE_NO_CONTIGUOUS ( mat2 );
   CHECK_TENSOR_IN_DEVICE ( out );
 #if 0
   auto out_cpu = addmm ( self.cpu(), mat1.cpu(), mat2.cpu(), beta, alpha );
@@ -29,7 +29,7 @@ Tensor & addmm_out_tpu ( const Tensor & self, const Tensor & mat1, const Tensor 
 #else
   if (( alpha.toDouble() == 1. ) && ( beta.toDouble() == 1. ))
   {
-    linear_out( out, mat1, mat2, self);
+    linear_out( out, mat1, mat2.is_contiguous() ? mat2 : mat2.contiguous(), self);
   }
   else
   {

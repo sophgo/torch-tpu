@@ -34,15 +34,43 @@ void nodechip_strided_copy(
         copy_in_stride.w = in_stride[3];
         copy_out_stride.w = out_stride[3];
     }
-    TPUKERNEL_ASSERT(copy_in_stride.w <= 128 / tpu_data_type_size(dtype) &&
-                        copy_out_stride.w <= 128 / tpu_data_type_size(dtype));
-    tpu_gdma_cpy_S2S(
-        out_global_addr,
-        in_global_addr,
-        &copy_shape,
-        &copy_out_stride,
-        &copy_in_stride,
-        dtype);
+    if (copy_in_stride.w <= 128 / tpu_data_type_size(dtype) &&
+                        copy_out_stride.w <= 128 / tpu_data_type_size(dtype)){
+        tpu_gdma_cpy_S2S(
+            out_global_addr,
+            in_global_addr,
+            &copy_shape,
+            &copy_out_stride,
+            &copy_in_stride,
+            dtype);
+    }else{
+        copy_shape.n = copy_shape.c;
+        copy_shape.c = copy_shape.h;
+        copy_shape.h = copy_shape.w;
+        copy_shape.w = 1;
+        
+        int copy_in_stride_n = copy_in_stride.n;
+        copy_in_stride.n = copy_in_stride.c;
+        copy_in_stride.c = copy_in_stride.h;
+        copy_in_stride.h = copy_in_stride.w;
+        copy_in_stride.w = 1;
+
+        int copy_out_stride_n = copy_out_stride.n;
+        copy_out_stride.n = copy_out_stride.c;
+        copy_out_stride.c = copy_out_stride.h;
+        copy_out_stride.h = copy_out_stride.w;
+        copy_out_stride.w = 1;
+        for (int i = 0; i < copy_shape.n; i++){
+            tpu_gdma_cpy_S2S(
+                out_global_addr + i * copy_out_stride_n * tpu_data_type_size(dtype),
+                in_global_addr + i * copy_in_stride_n * tpu_data_type_size(dtype),
+                &copy_shape,
+                &copy_out_stride,
+                &copy_in_stride,
+                dtype);
+        }
+    }
+   
 
 }
 

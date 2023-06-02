@@ -40,7 +40,6 @@ public:
   {
     int DeviceCount = 0;
     bm_status_t Status = bm_dev_getcount ( &DeviceCount );
-    DeviceCount = 1;
     TORCH_CHECK ( Status == BM_SUCCESS, "Failed to get TPU device count" );
     if ( DeviceCount > 0 )
     {

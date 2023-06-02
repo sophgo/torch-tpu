@@ -653,7 +653,7 @@ bm_status_t sgdnn_strided_copy_cudnn(
     const TensorDescriptor_t        srcDesc,
     const void                      *src,
     const TensorDescriptor_t        dstDesc,
-    const void                      *dst);
+    void                      *dst);
 
 
 #if defined(__cplusplus)
