@@ -44,6 +44,7 @@ void nodechip_strided_copy(
             &copy_in_stride,
             dtype);
     }else{
+        int copy_shape_n = copy_shape.n;
         copy_shape.n = copy_shape.c;
         copy_shape.c = copy_shape.h;
         copy_shape.h = copy_shape.w;
@@ -60,7 +61,7 @@ void nodechip_strided_copy(
         copy_out_stride.c = copy_out_stride.h;
         copy_out_stride.h = copy_out_stride.w;
         copy_out_stride.w = 1;
-        for (int i = 0; i < copy_shape.n; i++){
+        for (int i = 0; i < copy_shape_n; i++){
             tpu_gdma_cpy_S2S(
                 out_global_addr + i * copy_out_stride_n * tpu_data_type_size(dtype),
                 in_global_addr + i * copy_in_stride_n * tpu_data_type_size(dtype),
