@@ -197,6 +197,26 @@ typedef struct{
 
 typedef struct {
     unsigned long long input_global_addr;
+    unsigned long long weight_global_addr;
+    unsigned long long bias_global_addr;
+    unsigned long long output_global_addr;
+    unsigned long long mean_global_addr;
+    unsigned long long rstd_global_addr;
+    const int*         shape;
+    int                dims;
+    int                axis;
+    float              eps;
+    int                affine;
+    int                save_stat;
+    sg_data_type_t     dtype;
+#ifndef WIN32
+} __attribute__((packed)) sg_api_layernorm_forward_t;
+#else
+} sg_api_layernorm_forward_t;
+#endif
+
+typedef struct {
+    unsigned long long input_global_addr;
     unsigned long long output_global_addr;
     unsigned long long max_mask_global_addr;
     int input_n;

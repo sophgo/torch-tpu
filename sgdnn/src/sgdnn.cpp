@@ -821,84 +821,113 @@ bm_status_t sgdnn_batchnorm_forward_cudnn(
     void                            *resultSaveMean,
     void                            *resultSaveInvVariance)
 {
-    unsigned long long input        = (unsigned long long)x;
-    unsigned long long weight       = (unsigned long long)bnScale;
-    unsigned long long bias         = (unsigned long long)bnBias;
-    unsigned long long running_mean = (unsigned long long)resultRunningMean;
-    unsigned long long running_var  = (unsigned long long)resultRunningVariance;
-    unsigned long long batch_mean   = (unsigned long long)resultSaveMean;
-    unsigned long long batch_invstd = (unsigned long long)resultSaveInvVariance;
-    unsigned long long output       = (unsigned long long)y;
-
-    // if(mode == BatchNorm_Spatial)
-    // {
-    //     assert(xDesc.ndims == 4);
-    // }
-    // else if(mode == BatchNorm_Per_Layer)
-    // {
-    //     assert(xDesc.ndims == 3);
-    // }
-    // else
-    // {
-    //     assert(0);
-    // }
-
     float alpha_ = ((float*)alpha)[0];
     assert(alpha_ == 1.0f);
     float beta_ = ((float*)beta)[0];
     assert(beta_ == 0.0f || beta_ == 1.0f);
 
-    assert((xDesc.ndims == 4 && yDesc.ndims == 4) || (xDesc.ndims == 3 && yDesc.ndims == 3));
-    if ( bnScale != nullptr || bnBias != nullptr || resultRunningMean != nullptr || resultRunningVariance != nullptr )
-    {
-      assert(bnScaleBiasMeanVarDesc.ndims == 1 );
-      assert(bnScaleBiasMeanVarDesc.shape[0] == xDesc.shape[1] );
-    }
     int n, c, h, w;
     if (xDesc.ndims == 4)
     {
-      n = xDesc.shape[0];
-      c = xDesc.shape[1];
-      h = xDesc.shape[2];
-      w = xDesc.shape[3];
+        n = xDesc.shape[0];
+        c = xDesc.shape[1];
+        h = xDesc.shape[2];
+        w = xDesc.shape[3];
     }
-    else if (xDesc.ndims == 3)
-    {
-      n = xDesc.shape[0];
-      c = xDesc.shape[1];
-      h = 1;
-      w = xDesc.shape[2];
-    }
-    
-    float momentum = exponentialAverageFactor;
+
     float eps = epsilon;
-    
     sg_data_type_t idtype = (sg_data_type_t)(xDesc.dtype);
     sg_data_type_t odtype = (sg_data_type_t)(yDesc.dtype);
-    if ( bnScale != nullptr || bnBias != nullptr || resultRunningMean != nullptr || resultRunningVariance != nullptr )
+
+    if( mode == BatchNorm_Spatial )
     {
-      sg_data_type_t wdtype = (sg_data_type_t)(bnScaleBiasMeanVarDesc.dtype);
-      assert(idtype == wdtype && wdtype == odtype);
+        unsigned long long input        = (unsigned long long)x;
+        unsigned long long weight       = (unsigned long long)bnScale;
+        unsigned long long bias         = (unsigned long long)bnBias;
+        unsigned long long running_mean = (unsigned long long)resultRunningMean;
+        unsigned long long running_var  = (unsigned long long)resultRunningVariance;
+        unsigned long long batch_mean   = (unsigned long long)resultSaveMean;
+        unsigned long long batch_invstd = (unsigned long long)resultSaveInvVariance;
+        unsigned long long output       = (unsigned long long)y;
+
+        assert((xDesc.ndims == 4 && yDesc.ndims == 4) );        
+        float momentum = exponentialAverageFactor;
+        
+        if ( bnScale != nullptr || bnBias != nullptr || resultRunningMean != nullptr || resultRunningVariance != nullptr )
+        {
+            sg_data_type_t wdtype = (sg_data_type_t)(bnScaleBiasMeanVarDesc.dtype);
+            assert(idtype == wdtype && wdtype == odtype);
+            assert(bnScaleBiasMeanVarDesc.ndims == 1 );
+            assert(bnScaleBiasMeanVarDesc.shape[0] == xDesc.shape[1] );
+        }
+
+        sg_api_batchnorm_forward_t api = {
+            input,
+            running_mean,
+            running_var,
+            weight,
+            bias,
+            running_mean,
+            running_var,
+            batch_mean,
+            batch_invstd,
+            output,
+            {n, c, h, w},
+            momentum,
+            eps,
+            idtype};
+
+        sgdnn_tpu_kernel_launch(handle, "tpu_kernel_api_batchnorm_forward_v2", &api, sizeof(api));
+        return BM_SUCCESS;
     }
-    sg_api_batchnorm_forward_t api = {
-        input,
-        running_mean,
-        running_var,
-        weight,
-        bias,
-        running_mean,
-        running_var,
-        batch_mean,
-        batch_invstd,
-        output,
-        {n, c, h, w},
-        momentum,
-        eps,
-        idtype};
+    else if ( mode == BatchNorm_Per_Layer )
+    {
+        unsigned long long input   = (unsigned long long)x;
+        unsigned long long weight  = (unsigned long long)bnScale;
+        unsigned long long bias    = (unsigned long long)bnBias;
+        unsigned long long mean    = (unsigned long long)resultSaveMean;
+        unsigned long long rstd    = (unsigned long long)resultSaveInvVariance;
+        unsigned long long output  = (unsigned long long)y;
 
-    sgdnn_tpu_kernel_launch(handle, "tpu_kernel_api_batchnorm_forward_v2", &api, sizeof(api));
+        assert( resultRunningMean == nullptr && resultRunningVariance == nullptr );
+        
+        int affine = 0, save_stat = 0;
+        if ( resultSaveMean != nullptr && resultSaveInvVariance != nullptr )
+        {
+            save_stat = 1;
+        }
+        if ( bnScale != nullptr && bnBias != nullptr )
+        {
+            affine = 1;
+            sg_data_type_t wdtype = (sg_data_type_t)(bnScaleBiasMeanVarDesc.dtype);
+            assert(idtype == wdtype && wdtype == odtype);
+        }
 
-    return BM_SUCCESS;
+        int normalized_ndim = bnScaleBiasMeanVarDesc.ndims;
+        int input_ndim = xDesc.ndims;
+        const int* input_shape = xDesc.shape;
+        int axis = input_ndim - normalized_ndim;
+
+        sg_api_layernorm_forward_t api = {
+            input,
+            weight,
+            bias,
+            output,
+            mean,
+            rstd,
+            input_shape,
+            input_ndim,
+            axis,
+            eps,
+            affine,
+            save_stat,
+            idtype};
+
+        sgdnn_tpu_kernel_launch(handle, "tpu_kernel_api_layernorm_forward", &api, sizeof(api));
+        return BM_SUCCESS;
+    }
+
+    return BM_ERR_NOFEATURE;
 }
 
 //use for pybind test, deprecate after
