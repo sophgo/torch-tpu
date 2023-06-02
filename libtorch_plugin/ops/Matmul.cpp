@@ -19,8 +19,8 @@ Tensor & addmm_out_tpu ( const Tensor & self, const Tensor & mat1, const Tensor 
   std::cout << "Addmm " << count << std::endl;
   ++count;
 #endif
-  CHECK_TENSOR_IN_DEVICE ( self );
-  CHECK_TENSOR_IN_DEVICE ( mat1 );
+  CHECK_TENSOR_IN_DEVICE_NO_CONTIGUOUS ( self );
+  CHECK_TENSOR_IN_DEVICE_NO_CONTIGUOUS ( mat1 );
   CHECK_TENSOR_IN_DEVICE_NO_CONTIGUOUS ( mat2 );
   CHECK_TENSOR_IN_DEVICE ( out );
 #if 0
@@ -29,7 +29,7 @@ Tensor & addmm_out_tpu ( const Tensor & self, const Tensor & mat1, const Tensor 
 #else
   if (( alpha.toDouble() == 1. ) && ( beta.toDouble() == 1. ))
   {
-    linear_out( out, mat1, mat2.is_contiguous() ? mat2 : mat2.contiguous(), self);
+    linear_out( out, mat1.contiguous(), mat2.contiguous(), self.contiguous());
   }
   else
   {
@@ -50,8 +50,8 @@ Tensor & mm_out_tpu ( const Tensor & self, const Tensor & mat2, Tensor & out )
   std::cout << "mm " << count << std::endl;
   ++count;
 #endif
-  CHECK_TENSOR_IN_DEVICE ( self );
-  CHECK_TENSOR_IN_DEVICE ( mat2 );
+  CHECK_TENSOR_IN_DEVICE_NO_CONTIGUOUS ( self );
+  CHECK_TENSOR_IN_DEVICE_NO_CONTIGUOUS ( mat2 );
   CHECK_TENSOR_IN_DEVICE ( out );
 #if 0
   auto out_cpu = mm ( self.cpu(), mat2.cpu() );
@@ -81,12 +81,14 @@ Tensor & mm_out_tpu ( const Tensor & self, const Tensor & mat2, Tensor & out )
   {
     computeType = SG_DTYPE_FP16;
   }
+  auto self_ = self.contiguous();
+  auto mat2_ = mat2.contiguous();
   auto status = sgdnn_general_matmul (
                 tpu::TPUGetDeviceHandle(),
-                tpu::TPUGenerateTensorDesc ( self ),
-                ADDR_IN_DEVICE ( self ),
-                tpu::TPUGenerateTensorDesc ( mat2 ),
-                ADDR_IN_DEVICE ( mat2 ),
+                tpu::TPUGenerateTensorDesc ( self_ ),
+                ADDR_IN_DEVICE ( self_ ),
+                tpu::TPUGenerateTensorDesc ( mat2_ ),
+                ADDR_IN_DEVICE ( mat2_ ),
                 tpu::TPUGenerateTensorDesc ( out ),
                 ADDR_IN_DEVICE ( out ),
                 false,
@@ -110,8 +112,8 @@ Tensor & bmm_out_tpu ( const Tensor & self, const Tensor & mat2, Tensor & out )
   std::cout << "bmm " << count << std::endl;
   ++count;
 #endif
-  CHECK_TENSOR_IN_DEVICE ( self );
-  CHECK_TENSOR_IN_DEVICE ( mat2 );
+  CHECK_TENSOR_IN_DEVICE_NO_CONTIGUOUS ( self );
+  CHECK_TENSOR_IN_DEVICE_NO_CONTIGUOUS ( mat2 );
   CHECK_TENSOR_IN_DEVICE ( out );
 #if 0
   auto out_cpu = bmm ( self.cpu(), mat2.cpu() );
@@ -141,12 +143,14 @@ Tensor & bmm_out_tpu ( const Tensor & self, const Tensor & mat2, Tensor & out )
   {
     computeType = SG_DTYPE_FP16;
   }
+  auto self_ = self.contiguous();
+  auto mat2_ = mat2.contiguous();
   auto status = sgdnn_batch_matmul (
                 tpu::TPUGetDeviceHandle(),
-                tpu::TPUGenerateTensorDesc ( self ),
-                ADDR_IN_DEVICE ( self ),
-                tpu::TPUGenerateTensorDesc ( mat2 ),
-                ADDR_IN_DEVICE ( mat2 ),
+                tpu::TPUGenerateTensorDesc ( self_ ),
+                ADDR_IN_DEVICE ( self_ ),
+                tpu::TPUGenerateTensorDesc ( mat2_ ),
+                ADDR_IN_DEVICE ( mat2_ ),
                 tpu::TPUGenerateTensorDesc ( out ),
                 ADDR_IN_DEVICE ( out ),
                 false,
