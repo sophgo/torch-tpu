@@ -5,25 +5,32 @@ torch.manual_seed(1000)
 
 if __name__ == "__main__":
     device = "privateuseone"
-    batch = 32
-    sequence = 1024
-    head_size = 12
-    max_position = 1024
-    dtype_list = ["float32", "float16"]
+    batch = 1
+    sequence = 8
+    head_size = 3
+    max_position = 8
 
-    for t in dtype_list:
-        if t == "float32":
-            attn_weights = torch.rand(batch, head_size, sequence, sequence).to("privateuseone")
-            mask_value   = torch.tensor(-1e4).to("privateuseone")
-        elif t == "float16":
-            attn_weights = torch.rand(batch, head_size, sequence, sequence).to("privateuseone").half()
-            mask_value   = torch.tensor(-1e4).to("privateuseone").half()
-        else:
-            continue
+    attn_weights = torch.rand(batch, head_size, sequence, sequence)
+    mask_value   = torch.tensor(-1e4)
+    casual_mask = torch.tril(torch.ones((max_position, max_position),dtype=torch.uint8)) \
+                        .view(1,1,max_position, max_position)
 
-        casual_mask = torch.tril(torch.ones((max_position, max_position),dtype=torch.uint8)) \
-                        .view(1,1,max_position, max_position).to("privateuseone")
+    attn_weights_tpu =  attn_weights.to(device)
+    mask_value_tpu = mask_value.to(device)
+    casual_mask_tpu = casual_mask.to(device)
 
-        attn_weight_ = torch.where(casual_mask.bool(), attn_weights, mask_value)
-        attn_weight_ = attn_weight_.float().to("cpu")
-        print(attn_weight_)
+
+    res_cpu = torch.where(casual_mask.bool(), attn_weights, mask_value)
+    res_tpu = torch.where(casual_mask_tpu.bool(), attn_weights_tpu, mask_value_tpu)
+    print("cpu ======")
+    print(res_cpu)
+    print("tpu ======")
+    print(res_tpu.cpu())
+
+    diff = abs(res_cpu - res_tpu.cpu())
+    idx = diff.argmax()
+
+    print("max_diff: ", torch.max(diff))
+    print("idx: ", idx)
+    print("cpu:", res_cpu.flatten()[idx])
+    print("tpu:", res_tpu.cpu().flatten()[idx])

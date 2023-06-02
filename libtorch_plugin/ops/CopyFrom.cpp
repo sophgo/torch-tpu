@@ -22,7 +22,7 @@ Tensor _copy_from_tpu ( const Tensor & self, const Tensor & dst, bool non_blocki
       if (dst.is_contiguous()){
         tpu::TPUCopyHostToDevice ( dst.data_ptr(), self.contiguous().data_ptr(), dst.nbytes() );
       }else{
-        _copy_from(self.contiguous().to ( dst.device() ), dst, non_blocking);
+        dst.copy_(self.contiguous().to ( dst.device() ), non_blocking);
       }
     }
     else if ( IS_TPU_TENSOR ( self ) && IS_CPU_TENSOR ( dst ) )
@@ -30,7 +30,7 @@ Tensor _copy_from_tpu ( const Tensor & self, const Tensor & dst, bool non_blocki
       if (dst.is_contiguous()){
         tpu::TPUCopyDeviceToHost ( dst.data_ptr(), self.contiguous().data_ptr(), dst.nbytes() );
       }else {
-        _copy_from(self.contiguous().to( dst.device() ), dst, non_blocking);
+        dst.copy_(self.contiguous().to( dst.device() ), non_blocking);
       }
     }
     else if ( IS_TPU_TENSOR ( self ) && IS_TPU_TENSOR ( dst ) )
@@ -55,12 +55,12 @@ Tensor _copy_from_tpu ( const Tensor & self, const Tensor & dst, bool non_blocki
   else
   {
     if ( IS_CPU_TENSOR ( self ) && IS_TPU_TENSOR ( dst ) )
-    {       
-      _copy_from ( self.to ( dst.device() ), dst, non_blocking );
+    { 
+      dst.copy_(self.to ( dst.device() ), non_blocking);      
     }
     else if ( IS_TPU_TENSOR ( self ) && IS_CPU_TENSOR ( dst ) )
     {
-      _copy_from ( self.to ( dst.dtype() ), dst, non_blocking );
+      dst.copy_(self.to ( dst.dtype() ), non_blocking);
     }
     else if ( IS_TPU_TENSOR ( self ) && IS_TPU_TENSOR ( dst ) )
     {
@@ -82,7 +82,7 @@ Tensor _copy_from_tpu ( const Tensor & self, const Tensor & dst, bool non_blocki
                       SG_ROUND_EVEN );
         TORCH_CHECK ( status == BM_SUCCESS );
       }else{
-        _copy_from(self_.to( dst.dtype() ), dst, non_blocking);
+        dst.copy_(self_.to( dst.dtype() ), non_blocking);
       }
 #ifdef TPU_OP_TIMING
       tpu::OpTimer::Instance().AddTime ( tpu::DTYPE_CONVERT, timer.ElapsedUS() );
