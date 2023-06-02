@@ -655,6 +655,17 @@ bm_status_t sgdnn_strided_copy_cudnn(
     const TensorDescriptor_t        dstDesc,
     void                      *dst);
 
+bm_status_t sgdnn_where (
+    bm_handle_t                     handle,
+    const TensorDescriptor_t        condDesc,
+    const void                     *cond,
+    const TensorDescriptor_t        selfDesc,
+    const void                     *self,
+    const TensorDescriptor_t        otherDesc,
+    const void                     *other,
+    const TensorDescriptor_t        outDesc,
+    void                           *out);
+
 
 #if defined(__cplusplus)
 }

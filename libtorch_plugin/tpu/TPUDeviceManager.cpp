@@ -40,6 +40,16 @@ public:
   {
     int DeviceCount = 0;
     bm_status_t Status = bm_dev_getcount ( &DeviceCount );
+    char * MaxDeviceCountStr = nullptr;
+    if ( ( MaxDeviceCountStr = getenv ( "SG_MAX_DEVICE_COUNT" ) ) )
+    {
+      int MaxDeviceCount = atoi ( MaxDeviceCountStr );
+      TORCH_CHECK ( MaxDeviceCount > 0 );
+      if ( DeviceCount > MaxDeviceCount )
+      {
+        DeviceCount = MaxDeviceCount;
+      }
+    }
     TORCH_CHECK ( Status == BM_SUCCESS, "Failed to get TPU device count" );
     if ( DeviceCount > 0 )
     {

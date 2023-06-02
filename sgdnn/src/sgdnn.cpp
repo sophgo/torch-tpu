@@ -21,12 +21,12 @@ static inline int dtype_size(sg_data_type_t dtype) {
 static inline sg_active_type_t tpu_active_type_convert(ActivationMode_t active_type) {
     sg_active_type_t atype = ACTIVE_RELU;
     switch (active_type) {
-        case Activation_Sigmoid:    atype = ACTIVE_SIGMOID;     break; 
-        case Activation_Relu:       atype = ACTIVE_RELU;        break;    
-        case Activation_Tanh:       atype = ACTIVE_TANH;        break;    
-        case Activation_Elu:        atype = ACTIVE_ELU;         break;     
-        case Activation_Gelu:       atype = ACTIVE_GELU;        break;    
-        case Activation_Swish:      atype = ACTIVE_SWISH;       break;   
+        case Activation_Sigmoid:    atype = ACTIVE_SIGMOID;     break;
+        case Activation_Relu:       atype = ACTIVE_RELU;        break;
+        case Activation_Tanh:       atype = ACTIVE_TANH;        break;
+        case Activation_Elu:        atype = ACTIVE_ELU;         break;
+        case Activation_Gelu:       atype = ACTIVE_GELU;        break;
+        case Activation_Swish:      atype = ACTIVE_SWISH;       break;
     default:
         assert(0);
         break;
@@ -798,7 +798,7 @@ bm_status_t sgdnn_batchnorm_forward(
     DEVICE_MEM_DEL_OUTPUT(handle, updated_var, updated_var_mem);
     DEVICE_MEM_DEL_OUTPUT(handle, batch_mean, batch_mean_mem);
     DEVICE_MEM_DEL_OUTPUT(handle, batch_invstd, batch_invstd_mem);
-    DEVICE_MEM_DEL_OUTPUT(handle, output, output_mem); 
+    DEVICE_MEM_DEL_OUTPUT(handle, output, output_mem);
     return BM_SUCCESS;
 }
 
@@ -901,7 +901,7 @@ bm_status_t sgdnn_batchnorm_forward_cudnn(
         unsigned long long output  = (unsigned long long)y;
 
         assert( resultRunningMean == nullptr && resultRunningVariance == nullptr );
-        
+
         int affine = 0, save_stat = 0;
         if ( resultSaveMean != nullptr && resultSaveInvVariance != nullptr )
         {
@@ -1059,7 +1059,7 @@ bm_status_t sgdnn_batchnorm_backward_cudnn(
         h = xDesc.shape[2];
         w = xDesc.shape[3];
     }
-    else if(mode == BatchNorm_Per_Layer) 
+    else if(mode == BatchNorm_Per_Layer)
     {
         assert(dyDesc.ndims == 3);
         assert( xDesc.ndims == 3);
@@ -1070,20 +1070,20 @@ bm_status_t sgdnn_batchnorm_backward_cudnn(
         h = 1;
         w = xDesc.shape[2];
     }
-    else 
+    else
     {
         assert(0);
     }
 
     assert(bnScaleBiasDiffDesc.ndims == 1);
-    
+
     sg_data_type_t dydtype = (sg_data_type_t)(dyDesc.dtype);
     sg_data_type_t xdtype = (sg_data_type_t)(xDesc.dtype);
     sg_data_type_t dxdtype = (sg_data_type_t)(dxDesc.dtype);
     sg_data_type_t wdtype = (sg_data_type_t)(bnScaleBiasDiffDesc.dtype);
-    
+
     // if dtype is fp16, it will convert to fp32 in local
-    assert(xdtype == dxdtype && xdtype == dydtype && xdtype == wdtype);  
+    assert(xdtype == dxdtype && xdtype == dydtype && xdtype == wdtype);
     // assert(dydtype == 0);
     // assert(xdtype == 0);
     // assert(dxdtype == 0);
@@ -1451,7 +1451,7 @@ bm_status_t sgdnn_binary_cudnn(
     const void*                 B,
     const TensorDescriptor_t    cDesc,
     void*                       C,
-    BinaryOpMode_t              opTensorDesc) 
+    BinaryOpMode_t              opTensorDesc)
 {
     sg_binary_type_t binary_type = tpu_binary_type_convert(opTensorDesc);
 
@@ -1538,23 +1538,23 @@ bm_status_t sgdnn_binary_cudnn(
         int n, c, h, w;
         if (tensorDesc.ndims == 4)
         {
-            n = tensorDesc.shape[0]; 
-            c = tensorDesc.shape[1]; 
-            h = tensorDesc.shape[2]; 
+            n = tensorDesc.shape[0];
+            c = tensorDesc.shape[1];
+            h = tensorDesc.shape[2];
             w = tensorDesc.shape[3];
         }
         else if (tensorDesc.ndims == 2)
         {
-            n = 1; 
-            c = tensorDesc.shape[0]; 
-            h = 1; 
+            n = 1;
+            c = tensorDesc.shape[0];
+            h = 1;
             w = tensorDesc.shape[1];
         }
         else if (tensorDesc.ndims == 1)
         {
-            n = 1; 
-            c = tensorDesc.shape[0]; 
-            h = 1; 
+            n = 1;
+            c = tensorDesc.shape[0];
+            h = 1;
             w = 1;
         }
         else
@@ -1953,7 +1953,7 @@ bm_status_t sgdnn_activation_forward_cudnn(
         }
 
         sgdnn_tpu_kernel_launch(handle, "tpu_kernel_api_gelu_forward", &api, sizeof(api));
-        return BM_SUCCESS;      
+        return BM_SUCCESS;
     }
     else
     {
@@ -2014,7 +2014,7 @@ bm_status_t sgdnn_activation_backward_cudnn(
         assert(alpha_ == 1.0f);
         float beta_ = ((float*)beta)[0];
         assert(beta_ == 0.0f || beta_ == 1.0f);
-        
+
         float upper_limit = activationDesc.coef;
         //TODO: clipped_relu_backward
         assert(upper_limit==0);
@@ -2296,7 +2296,7 @@ bm_status_t sgdnn_general_matmul(
         cast_L_api.odtype = compute_type;//SG_DTYPE_FP16;
         cast_L_api.round_mode = SG_ROUND_EVEN;
         memcpy(cast_L_api.shape, LDesc.shape, LDesc.ndims * sizeof(int));
-        
+
         sgdnn_tpu_kernel_launch(handle, "tpu_kernel_api_dtype_convert", &cast_L_api, sizeof(cast_L_api));
 
         sg_api_dtype_convert_t cast_R_api;
@@ -2307,7 +2307,7 @@ bm_status_t sgdnn_general_matmul(
         cast_R_api.odtype = compute_type;//SG_DTYPE_FP16;
         cast_R_api.round_mode = SG_ROUND_EVEN;
         memcpy(cast_R_api.shape, RDesc.shape, RDesc.ndims * sizeof(int));
-        
+
         sgdnn_tpu_kernel_launch(handle, "tpu_kernel_api_dtype_convert", &cast_R_api, sizeof(cast_R_api));
 
         sg_api_general_matmul_t api = {
@@ -2331,9 +2331,9 @@ bm_status_t sgdnn_general_matmul(
         cast_Y_api.odtype = Ydtype;//SG_DTYPE_FP32;
         cast_Y_api.round_mode = SG_ROUND_EVEN;
         memcpy(cast_Y_api.shape, YDesc.shape, YDesc.ndims * sizeof(int));
-        
+
         sgdnn_tpu_kernel_launch(handle, "tpu_kernel_api_dtype_convert", &cast_Y_api, sizeof(cast_Y_api));
-        
+
         bm_free_device(handle, L_cast);
         bm_free_device(handle, R_cast);
         bm_free_device(handle, Y_cast);
@@ -2370,7 +2370,7 @@ bm_status_t sgdnn_batch_matmul(
     sg_data_type_t                   compute_type)
 {
     assert(LDesc.ndims == 3 && RDesc.ndims == 3 && YDesc.ndims == 3);
-    
+
     assert(LDesc.shape[0] == RDesc.shape[0]);
     assert(LDesc.shape[0] == YDesc.shape[0]);
     assert(LDesc.shape[2] == RDesc.shape[1]);
@@ -2405,7 +2405,7 @@ bm_status_t sgdnn_batch_matmul(
         cast_L_api.odtype = compute_type;//SG_DTYPE_FP16;
         cast_L_api.round_mode = SG_ROUND_EVEN;
         memcpy(cast_L_api.shape, LDesc.shape, LDesc.ndims * sizeof(int));
-        
+
         sgdnn_tpu_kernel_launch(handle, "tpu_kernel_api_dtype_convert", &cast_L_api, sizeof(cast_L_api));
 
         sg_api_dtype_convert_t cast_R_api;
@@ -2416,7 +2416,7 @@ bm_status_t sgdnn_batch_matmul(
         cast_R_api.odtype = compute_type;//SG_DTYPE_FP16;
         cast_R_api.round_mode = SG_ROUND_EVEN;
         memcpy(cast_R_api.shape, RDesc.shape, RDesc.ndims * sizeof(int));
-        
+
         sgdnn_tpu_kernel_launch(handle, "tpu_kernel_api_dtype_convert", &cast_R_api, sizeof(cast_R_api));
 
         sg_api_batch_matmul_t api = {
@@ -2443,9 +2443,9 @@ bm_status_t sgdnn_batch_matmul(
         cast_Y_api.odtype = Ydtype;//SG_DTYPE_FP32;
         cast_Y_api.round_mode = SG_ROUND_EVEN;
         memcpy(cast_Y_api.shape, YDesc.shape, YDesc.ndims * sizeof(int));
-        
+
         sgdnn_tpu_kernel_launch(handle, "tpu_kernel_api_dtype_convert", &cast_Y_api, sizeof(cast_Y_api));
-        
+
         bm_free_device(handle, L_cast);
         bm_free_device(handle, R_cast);
         bm_free_device(handle, Y_cast);
@@ -2564,9 +2564,9 @@ bm_status_t sgdnn_linear(
         cast_Y_api.odtype = Ydtype;
         cast_Y_api.round_mode = SG_ROUND_EVEN;
         memcpy(cast_Y_api.shape, YDesc.shape, YDesc.ndims * sizeof(int));
-        
+
         sgdnn_tpu_kernel_launch(handle, "tpu_kernel_api_dtype_convert", &cast_Y_api, sizeof(cast_Y_api));
-        
+
         bm_free_device(handle, L_cast);
         bm_free_device(handle, R_cast);
         bm_free_device(handle, B_cast);
@@ -2676,7 +2676,7 @@ bm_status_t sgdnn_softmax_forward_cudnn(
         api.compute_dim = dim;
         api.scale_val = 1.f;
         api.dtype = xdtype;
-        
+
         sgdnn_tpu_kernel_launch(handle, "tpu_kernel_api_softmax_forward", &api, sizeof(api));
     }
     else
@@ -2688,7 +2688,7 @@ bm_status_t sgdnn_softmax_forward_cudnn(
 
 bm_status_t sgdnn_softmax_backward_cudnn(
     bm_handle_t                      handle,
-    int                              dim,    
+    int                              dim,
     const TensorDescriptor_t         yDesc,
     const void                      *y,
     const TensorDescriptor_t         dyDesc,
@@ -2700,7 +2700,7 @@ bm_status_t sgdnn_softmax_backward_cudnn(
     sg_data_type_t dydtype = (sg_data_type_t)(dyDesc.dtype);
     sg_data_type_t dxdtype = (sg_data_type_t)(dxDesc.dtype);
     assert(ydtype == dydtype && dydtype == dxdtype && dxdtype == 0);
-    
+
     assert(yDesc.ndims == dyDesc.ndims && dyDesc.ndims == dxDesc.ndims && yDesc.ndims == 4);
     assert(dim == 3);
     for (int i = 0; i < yDesc.ndims; ++i)
@@ -2708,7 +2708,7 @@ bm_status_t sgdnn_softmax_backward_cudnn(
         assert(yDesc.shape[i] == dyDesc.shape[i]);
         assert(yDesc.shape[i] == dxDesc.shape[i]);
     }
-    
+
     sg_api_softmax_backward_t api;
     api.output_global_addr      = (unsigned long long)y;
     api.grad_output_global_addr = (unsigned long long)dy;
@@ -2719,7 +2719,7 @@ bm_status_t sgdnn_softmax_backward_cudnn(
     api.input_w = yDesc.shape[3];
     api.dim = dim;
     api.dtype = ydtype;
-    
+
     sgdnn_tpu_kernel_launch(handle, "tpu_kernel_api_softmax_backward", &api, sizeof(api));
     return BM_SUCCESS;
 }
@@ -2796,7 +2796,7 @@ bm_status_t sgdnn_permute(
     api.sgdtype = xdtype;
 
     sgdnn_tpu_kernel_launch(handle, "tpu_kernel_api_transpose", &api, sizeof(api));
-    
+
     if (buffer_size > 0) {
         bm_free_device(handle, buffer_mem);
     }
@@ -2853,7 +2853,7 @@ bm_status_t sgdnn_strided_copy_cudnn(
     api.shape_dim = srcDesc.ndims;
     api.in_global_addr = (unsigned long long) src;
     api.out_global_addr = (unsigned long long) dst;
-    
+
     for (int i = 0; i < srcDesc.ndims; i++){
         assert(srcDesc.shape[i] == dstDesc.shape[i]);
         api.shape[i]      = srcDesc.shape[i];
@@ -2861,6 +2861,75 @@ bm_status_t sgdnn_strided_copy_cudnn(
         api.out_stride[i] = dstDesc.stride[i];
      }
     sgdnn_tpu_kernel_launch(handle, "tpu_kernel_api_strided_copy", &api, sizeof(api));
-    
+
+    return BM_SUCCESS;
+}
+
+bm_status_t sgdnn_where (
+    bm_handle_t                     handle,
+    const TensorDescriptor_t        condDesc,
+    const void                     *cond,
+    const TensorDescriptor_t        selfDesc,
+    const void                     *self,
+    const TensorDescriptor_t        otherDesc,
+    const void                     *other,
+    const TensorDescriptor_t        outDesc,
+    void                           *out)
+{
+    sg_data_type_t condDtype = (sg_data_type_t)(condDesc.dtype);
+    sg_data_type_t selfDtype = (sg_data_type_t)(selfDesc.dtype);
+    sg_data_type_t otherDtype = (sg_data_type_t)(otherDesc.dtype);
+    sg_data_type_t outDtype = (sg_data_type_t)(outDesc.dtype);
+    assert(selfDtype == otherDtype);
+    assert(selfDtype == outDtype);
+    assert(condDesc.ndims > 0);
+    assert(condDesc.ndims == outDesc.ndims);
+    if (selfDesc.ndims > 0)
+    {
+        assert(selfDesc.ndims == outDesc.ndims);
+    }
+    if (otherDesc.ndims > 0)
+    {
+        assert(otherDesc.ndims == outDesc.ndims);
+    }
+    sg_api_where_t api;
+    api.cond_global_addr = (unsigned long long)cond;
+    if (selfDesc.ndims > 0)
+    {
+        api.self_is_scalar = false;
+        api.self_global_addr = (unsigned long long)self;
+    }
+    else
+    {
+        api.self_is_scalar = true;
+        memcpy ( &api.self_global_addr, self, dtype_size(selfDtype) );
+    }
+    if (otherDesc.ndims > 0)
+    {
+        api.other_is_scalar = false;
+        api.other_global_addr = (unsigned long long)other;
+    }
+    else
+    {
+        api.other_is_scalar = true;
+        memcpy ( &api.other_global_addr, other, dtype_size(otherDtype) );
+    }
+    api.out_global_addr = (unsigned long long)out;
+    api.cond_dtype = condDtype;
+    api.dtype = selfDtype;
+    api.shape_dim = selfDesc.ndims;
+    for (int i = 0; i < outDesc.ndims; i++) {
+        api.cond_shape[i] = condDesc.shape[i];
+        api.out_shape[i] = outDesc.shape[i];
+        if (selfDesc.ndims > 0)
+        {
+           api.self_shape[i] = selfDesc.shape[i];
+        }
+        if (otherDesc.ndims > 0)
+        {
+            api.other_shape[i] = otherDesc.shape[i];
+        }
+     }
+    sgdnn_tpu_kernel_launch(handle, "tpu_kernel_api_where", &api, sizeof(api));
     return BM_SUCCESS;
 }
