@@ -239,7 +239,7 @@ data_type_t   dtype )
         ndone * out_global_stride.n +
         cdone * out_global_stride.c +
         hdone * out_global_stride.h ) * tpu_data_type_size ( dtype );
-        tpu_gdma_cpy_L2S ( out_global_addr_gdma, out_addr, &shape, NULL, NULL, dtype );
+        tpu_gdma_cpy_L2S ( out_global_addr_gdma, out_addr, &shape, &out_global_stride, NULL, dtype );
         htodo -= shape.h;
         hdone += shape.h;
       }
