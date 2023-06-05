@@ -202,7 +202,7 @@ typedef struct {
     unsigned long long output_global_addr;
     unsigned long long mean_global_addr;
     unsigned long long rstd_global_addr;
-    const int*         shape;
+    int                shape[FW_MAX_SHAPE_DIMS];
     int                dims;
     int                axis;
     float              eps;

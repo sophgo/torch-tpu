@@ -827,13 +827,6 @@ bm_status_t sgdnn_batchnorm_forward_cudnn(
     assert(beta_ == 0.0f || beta_ == 1.0f);
 
     int n, c, h, w;
-    if (xDesc.ndims == 4)
-    {
-        n = xDesc.shape[0];
-        c = xDesc.shape[1];
-        h = xDesc.shape[2];
-        w = xDesc.shape[3];
-    }
 
     float eps = epsilon;
     sg_data_type_t idtype = (sg_data_type_t)(xDesc.dtype);
@@ -850,9 +843,24 @@ bm_status_t sgdnn_batchnorm_forward_cudnn(
         unsigned long long batch_invstd = (unsigned long long)resultSaveInvVariance;
         unsigned long long output       = (unsigned long long)y;
 
-        assert((xDesc.ndims == 4 && yDesc.ndims == 4) );        
+        assert((xDesc.ndims == 4 && yDesc.ndims == 4) || (xDesc.ndims == 3 && yDesc.ndims == 3) );
+        if (xDesc.ndims == 4)
+        {
+            n = xDesc.shape[0];
+            c = xDesc.shape[1];
+            h = xDesc.shape[2];
+            w = xDesc.shape[3];
+        }
+        else if (xDesc.ndims == 3)
+        {
+            n = xDesc.shape[0];
+            c = xDesc.shape[1];
+            h = 1;
+            w = xDesc.shape[2];
+        }
+
         float momentum = exponentialAverageFactor;
-        
+
         if ( bnScale != nullptr || bnBias != nullptr || resultRunningMean != nullptr || resultRunningVariance != nullptr )
         {
             sg_data_type_t wdtype = (sg_data_type_t)(bnScaleBiasMeanVarDesc.dtype);
@@ -861,21 +869,24 @@ bm_status_t sgdnn_batchnorm_forward_cudnn(
             assert(bnScaleBiasMeanVarDesc.shape[0] == xDesc.shape[1] );
         }
 
-        sg_api_batchnorm_forward_t api = {
-            input,
-            running_mean,
-            running_var,
-            weight,
-            bias,
-            running_mean,
-            running_var,
-            batch_mean,
-            batch_invstd,
-            output,
-            {n, c, h, w},
-            momentum,
-            eps,
-            idtype};
+        sg_api_batchnorm_forward_t api;
+        api.input_global_addr           = input;
+        api.running_mean_global_addr    = running_mean;
+        api.running_var_global_addr     = running_var;
+        api.weight_global_addr          = weight;
+        api.bias_global_addr            = bias;
+        api.updated_mean_global_addr    = running_mean;
+        api.updated_var_global_addr     = running_var;
+        api.batch_mean_global_addr      = batch_mean;
+        api.batch_invstd_global_addr    = batch_invstd;
+        api.output_global_addr          = output;
+        api.momentum                    = momentum;
+        api.eps                         = eps;
+        api.dtype                       = idtype;
+        api.shape[0]                    = n;
+        api.shape[1]                    = c;
+        api.shape[2]                    = h;
+        api.shape[3]                    = w;
 
         sgdnn_tpu_kernel_launch(handle, "tpu_kernel_api_batchnorm_forward_v2", &api, sizeof(api));
         return BM_SUCCESS;
@@ -905,23 +916,23 @@ bm_status_t sgdnn_batchnorm_forward_cudnn(
 
         int normalized_ndim = bnScaleBiasMeanVarDesc.ndims;
         int input_ndim = xDesc.ndims;
-        const int* input_shape = xDesc.shape;
         int axis = input_ndim - normalized_ndim;
-
-        sg_api_layernorm_forward_t api = {
-            input,
-            weight,
-            bias,
-            output,
-            mean,
-            rstd,
-            input_shape,
-            input_ndim,
-            axis,
-            eps,
-            affine,
-            save_stat,
-            idtype};
+        sg_api_layernorm_forward_t api;
+        api.input_global_addr   = input;
+        api.weight_global_addr  = weight;
+        api.bias_global_addr    = bias;
+        api.output_global_addr  = output;
+        api.mean_global_addr    = mean;
+        api.rstd_global_addr    = rstd;
+        api.dims                = input_ndim;
+        api.axis                = axis;
+        api.eps                 = eps;
+        api.affine              = affine;
+        api.save_stat           = save_stat;
+        api.dtype               = idtype;
+        for (int i =0; i < input_ndim; i++){
+            api.shape[i] = xDesc.shape[i];
+        }
 
         sgdnn_tpu_kernel_launch(handle, "tpu_kernel_api_layernorm_forward", &api, sizeof(api));
         return BM_SUCCESS;
