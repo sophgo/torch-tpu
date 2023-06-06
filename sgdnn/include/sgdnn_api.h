@@ -666,6 +666,15 @@ bm_status_t sgdnn_where (
     const TensorDescriptor_t        outDesc,
     void                           *out);
 
+bm_status_t sgdnn_concat (
+    bm_handle_t                     handle,
+    const TensorDescriptor_t       *inputDescs,
+    const void * const *            inputs,
+    int                             input_num,
+    const TensorDescriptor_t        outputDesc,
+    void                           *output,
+    int                             concat_dim);
+
 
 #if defined(__cplusplus)
 }

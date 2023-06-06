@@ -10,13 +10,22 @@ namespace at
 {
 Tensor & cat_out_tpu ( const ITensorListRef & tensors, int64_t dim, Tensor & out )
 {
-  std::vector<Tensor> tensors_cpu;
+  std::vector<TensorDescriptor_t> inputDescs;
+  std::vector<const void *> inputs;
   for ( auto tensor : tensors )
   {
-    tensors_cpu.push_back ( tensor.cpu() );
+    CHECK_TENSOR_IN_DEVICE ( tensor );
+    inputDescs.push_back ( tpu::TPUGenerateTensorDesc ( tensor ) );
+    inputs.push_back ( ADDR_IN_DEVICE ( tensor ) );
   }
-  auto out_cpu = cat ( tensors_cpu, dim );
-  tpu::TPUCopyHostToDevice ( out.data_ptr(), out_cpu.contiguous().data_ptr(), out.nbytes() );
+  auto status = sgdnn_concat (
+                tpu::TPUGetDeviceHandle(),
+                inputDescs.data(),
+                inputs.data(),
+                inputs.size(),
+                tpu::TPUGenerateTensorDesc ( out ),
+                ADDR_IN_DEVICE ( out ),
+                dim );
   return out;
 }
 TORCH_LIBRARY_IMPL ( aten, TPU, m )

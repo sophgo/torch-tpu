@@ -2933,3 +2933,54 @@ bm_status_t sgdnn_where (
     sgdnn_tpu_kernel_launch(handle, "tpu_kernel_api_where", &api, sizeof(api));
     return BM_SUCCESS;
 }
+
+bm_status_t sgdnn_concat (
+    bm_handle_t                     handle,
+    const TensorDescriptor_t       *inputDescs,
+    const void * const *            inputs,
+    int                             input_num,
+    const TensorDescriptor_t        outputDesc,
+    void                           *output,
+    int                             concat_dim)
+{
+    sg_data_type_t outDtype = (sg_data_type_t)(outputDesc.dtype);
+    if (concat_dim < 0)
+    {
+        concat_dim += outputDesc.ndims;
+    }
+    int concat_dim_shape = 0;
+    for (int i = 0; i < input_num; ++i)
+    {
+        sg_data_type_t inDtype = (sg_data_type_t)(inputDescs[i].dtype);
+        assert(inDtype == outDtype);
+        assert(inputDescs[i].ndims == outputDesc.ndims);
+        for (int j = 0; j < outputDesc.ndims; ++j)
+        {
+            if (j != concat_dim)
+            {
+                assert(inputDescs[i].shape[j] == outputDesc.shape[j]);
+            }
+            else
+            {
+                concat_dim_shape += inputDescs[i].shape[j];
+            }
+        }
+    }
+    assert(concat_dim_shape == outputDesc.shape[concat_dim]);
+    sg_api_concat_t api;
+    for (int i = 0; i < input_num; ++i)
+    {
+        api.input_global_addrs[i] = (unsigned long long)inputs[i];
+        for (int j = 0; j < inputDescs[i].ndims; ++j)
+        {
+            api.input_shapes[i][j] = inputDescs[i].shape[j];
+        }
+    }
+    api.output_global_addr = (unsigned long long)output;
+    api.input_num = input_num;
+    api.shape_dim = outputDesc.ndims;
+    api.concat_dim = concat_dim;
+    api.dtype = outDtype;
+    sgdnn_tpu_kernel_launch(handle, "tpu_kernel_api_concat", &api, sizeof(api));
+    return BM_SUCCESS;
+}

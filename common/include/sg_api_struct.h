@@ -506,5 +506,19 @@ typedef struct {
 } sg_api_where_t;
 #endif
 
+typedef struct {
+    unsigned long long input_global_addrs[MAX_CONCATLAYER_INPUT_NUM];
+    unsigned long long output_global_addr;
+    int input_shapes[MAX_CONCATLAYER_INPUT_NUM][FW_MAX_SHAPE_DIMS];
+    int input_num;
+    int shape_dim;
+    int concat_dim;
+    sg_data_type_t dtype;
+#ifndef WIN32
+} __attribute__((packed)) sg_api_concat_t;
+#else
+} sg_api_concat_t;
+#endif
+
 #pragma pack(pop)
 #endif  // SG_API_STRUCT_H
