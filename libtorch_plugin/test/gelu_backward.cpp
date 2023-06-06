@@ -20,19 +20,15 @@ static inline void test ( at::IntArrayRef grad_output_shape )
 
 int main ()
 {
-  const int batch = 4;
-  test ( { batch,   64, 112, 112 } ); // 0
-  test ( { batch,   64,  56,  56 } ); // 1
-  test ( { batch,  256,  56,  56 } ); // 2
-  test ( { batch,  128,  56,  56 } ); // 3
-  test ( { batch,  128,  28,  28 } ); // 4
-  test ( { batch,  512,  28,  28 } ); // 5
-  test ( { batch,  256,  28,  28 } ); // 6
-  test ( { batch,  256,  14,  14 } ); // 7
-  test ( { batch, 1024,  14,  14 } ); // 8
-  test ( { batch,  512,  14,  14 } ); // 9
-  test ( { batch,  512,   7,   7 } ); // 10
-  test ( { batch, 2048,   7,   7 } ); // 11
-  test ( {     1,   32,   1,3072 } ); // 12
+  int max_len = 1000000;
+  int loop = 10;
+  for (int i = 0; i < loop; i++)
+  {
+    srand(time(NULL));
+    sleep(1.0);
+    std::cout << "\ntest gelu backward case: " << i << std::endl;
+    int len = rand() % max_len + 1;
+    test ( { len } );
+  }
   return 0;
 }

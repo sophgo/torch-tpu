@@ -97,6 +97,7 @@ static inline TensorDescriptor_t TPUGenerateTensorDesc ( const at::Tensor & Tens
 
 static inline void TPUCompareResult ( const at::Tensor & Got,
                                       const at::Tensor & Exp,
+                                      double Threshold = 1e-4,
                                       double ErrScale = 1.0 )
 {
   if ( Got.dtype() != Exp.dtype() )
@@ -128,7 +129,7 @@ static inline void TPUCompareResult ( const at::Tensor & Got,
       {
         continue;
       }
-      if ( AbsErrPtr[i] < 1e-4 || RltAbsErrPtr[i] <= 1e-5 )
+      if ( AbsErrPtr[i] < Threshold || RltAbsErrPtr[i] <= 1e-5 )
       {
         continue;
       }
