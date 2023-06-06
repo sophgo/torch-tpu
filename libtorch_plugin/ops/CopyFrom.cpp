@@ -38,6 +38,9 @@ Tensor _copy_from_tpu ( const Tensor & self, const Tensor & dst, bool non_blocki
       if(self.is_contiguous() && dst.is_contiguous()){
         tpu::TPUCopyDeviceToDevice ( dst.data_ptr(), self.data_ptr(), dst.nbytes() );
       }else{
+#ifdef TPU_OP_TIMING
+  auto timer = tpu::Timer().Start();
+#endif
         bm_status_t status = sgdnn_strided_copy_cudnn(
                             tpu::TPUGetDeviceHandle(),
                             tpu::TPUGenerateTensorDesc(self),
@@ -45,6 +48,9 @@ Tensor _copy_from_tpu ( const Tensor & self, const Tensor & dst, bool non_blocki
                             tpu::TPUGenerateTensorDesc(dst),
                             ADDR_IN_DEVICE(dst));
         TORCH_CHECK( status == BM_SUCCESS);
+#ifdef TPU_OP_TIMING
+  tpu::OpTimer::Instance().AddTime ( tpu::STRIDED_COPY, timer.ElapsedUS() );
+#endif
       }
     }
     else

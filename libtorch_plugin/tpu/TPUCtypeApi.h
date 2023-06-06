@@ -1,0 +1,10 @@
+#pragma once
+
+#ifdef __cplusplus
+extern "C"{
+#endif
+    void tpu_op_timer_reset();
+    void tpu_op_timer_dump();
+#ifdef __cplusplus
+}
+#endif

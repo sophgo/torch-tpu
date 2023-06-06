@@ -18,13 +18,17 @@ static inline void nodechip_reduce_c(
   TPUKERNEL_ASSERT( reduce_dim == 1 );
   TPUKERNEL_ASSERT( N == 1 );
   TPUKERNEL_ASSERT( H == 1 );
-  const dim4 TotalShape = { .n = N, .c = C, .h = H, .w = W };    
+  const dim4 TotalShape = { .n = N, .c = C, .h = H, .w = W };
+  const dim4 OutputShape = { .n = N, .c = 1, .h = H, .w = W };    
+
   const padding_t ZeroPadding = { .top = 0, .bottom = 0, .left = 0, .right = 0 };
   const dim2 OneStride = { .h = 1, .w = 1 };
   const dim2 OneDilation = { .h = 1, .w = 1 };
   const scalar_t OneFP = { .f32 = 1.f };
-  dim4 GlobalStride;
+  dim4 GlobalStride, GlobalOutStride;
   tpu_continuous_stride ( &GlobalStride, &TotalShape );
+  tpu_continuous_stride ( &GlobalOutStride, &OutputShape );
+
   const int DSize = tpu_data_type_size( dtype );
   /*
   *  input  : [ 1,    C,  1, WMax ]
@@ -68,7 +72,7 @@ static inline void nodechip_reduce_c(
   local_addr_t YAddrs[2] = { Y0Addr, Y1Addr };
   dim4 Shape = { .n = 1, .c = C, .h = 1 };
   dim4 LastShape;
-  int Todo = WMax, Done = 0;
+  int Todo = W, Done = 0;
   int Index = 0;
   int LastDone = 0;
   int Count = 0;
@@ -85,16 +89,16 @@ static inline void nodechip_reduce_c(
     tpu_parallel_start();
     if ( Count > 0 )
     {
-      tpu_gdma_cpy_L2S ( output_global_addr + LastDone * DSize, YAddrs[1 - Index], &LastShape, NULL, NULL, dtype );
+      tpu_gdma_cpy_L2S ( output_global_addr + LastDone * DSize, YAddrs[1 - Index], &LastShape, &GlobalOutStride, NULL, dtype );
     }
     tpu_bdc_cw_trans ( Tmp1Addr, XAddrs[Index], &Trans_Shape, dtype);
     dim2 KernelSize = { .h = 1, .w = C };
     tpu_bdc_fp_avg_pool2d ( Tmp2Addr, Tmp1Addr, &Trans_Shape, &KernelSize, &ZeroPadding, &OneStride, &OneDilation, dtype, OneFP );
     tpu_bdc_cw_trans ( YAddrs[Index], Tmp2Addr, &Output_Shape, dtype);
     LastDone = Done;
-    LastShape = Shape;
-    Todo -= Shape.c * Shape.w;
-    Done += Shape.c * Shape.w;
+    LastShape = Output_Shape;
+    Todo -= Shape.w;
+    Done += Shape.w;
     Index = 1 - Index;
     ++Count;
   }
@@ -102,7 +106,7 @@ static inline void nodechip_reduce_c(
   {
     tpu_parallel_end();
   }
-  tpu_gdma_cpy_L2S ( output_global_addr + LastDone * DSize, YAddrs[1 - Index], &LastShape, NULL, NULL, dtype );
+  tpu_gdma_cpy_L2S ( output_global_addr + LastDone * DSize, YAddrs[1 - Index], &LastShape, &GlobalOutStride, NULL, dtype );
 }
 
 void tpu_kernel_api_reduce_sum(const void *args)

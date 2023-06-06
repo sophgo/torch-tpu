@@ -207,6 +207,9 @@ typedef enum
   INDEX_SELECT,
   DTYPE_CONVERT,
   REDUCE_SUM,
+  WHERE,
+  STRIDED_COPY,
+  CONCAT,
   OP_NUM
 }
 OpType;
@@ -241,7 +244,10 @@ static const char * OpTypeStr[OP_NUM] =
   "Div",
   "Index Select",
   "DType Convert",
-  "Reduce Sum"
+  "Reduce Sum",
+  "Where",
+  "Strided Copy",
+  "Concat"
 };
 
 struct OpTimer

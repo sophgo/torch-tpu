@@ -28,3 +28,4 @@ void tpu_kernel_api_concat ( const void * args )
                        tpu_type_convert ( ( sg_data_type_t ) api->dtype ) );
   tpu_poll();
 }
+TPUKERNEL_FUNC_REGISTER(tpu_kernel_api_concat);

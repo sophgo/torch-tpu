@@ -57,9 +57,7 @@ Tensor & mm_out_tpu ( const Tensor & self, const Tensor & mat2, Tensor & out )
   auto out_cpu = mm ( self.cpu(), mat2.cpu() );
   tpu::TPUCopyHostToDevice ( out.data_ptr(), out_cpu.contiguous().data_ptr(), out.nbytes() );
 #else
-#ifdef TPU_OP_TIMING
-  auto timer = tpu::Timer().Start();
-#endif
+
   auto computeType = SG_DTYPE_FP32;
   auto accuracy = tpu::GetMatrixMultiplyAccuracy();
   if ( self.dtype() == caffe2::TypeMeta::Make<float>() )
@@ -83,6 +81,9 @@ Tensor & mm_out_tpu ( const Tensor & self, const Tensor & mat2, Tensor & out )
   }
   auto self_ = self.contiguous();
   auto mat2_ = mat2.contiguous();
+#ifdef TPU_OP_TIMING
+  auto timer = tpu::Timer().Start();
+#endif
   auto status = sgdnn_general_matmul (
                 tpu::TPUGetDeviceHandle(),
                 tpu::TPUGenerateTensorDesc ( self_ ),
@@ -119,9 +120,6 @@ Tensor & bmm_out_tpu ( const Tensor & self, const Tensor & mat2, Tensor & out )
   auto out_cpu = bmm ( self.cpu(), mat2.cpu() );
   tpu::TPUCopyHostToDevice ( out.data_ptr(), out_cpu.contiguous().data_ptr(), out.nbytes() );
 #else
-#ifdef TPU_OP_TIMING
-  auto timer = tpu::Timer().Start();
-#endif
   auto computeType = SG_DTYPE_FP32;
   auto accuracy = tpu::GetMatrixMultiplyAccuracy();
   if ( self.dtype() == caffe2::TypeMeta::Make<float>() )
@@ -145,6 +143,9 @@ Tensor & bmm_out_tpu ( const Tensor & self, const Tensor & mat2, Tensor & out )
   }
   auto self_ = self.contiguous();
   auto mat2_ = mat2.contiguous();
+#ifdef TPU_OP_TIMING
+  auto timer = tpu::Timer().Start();
+#endif
   auto status = sgdnn_batch_matmul (
                 tpu::TPUGetDeviceHandle(),
                 tpu::TPUGenerateTensorDesc ( self_ ),
@@ -185,9 +186,7 @@ Tensor & linear_out_tpu ( const Tensor & self, const Tensor & mat2, const c10::o
   auto out_cpu = linear ( self.cpu(), mat2.cpu(), bias.cpu() );
   tpu::TPUCopyHostToDevice ( out.data_ptr(), out_cpu.contiguous().data_ptr(), out.nbytes() );
 #else
-#ifdef TPU_OP_TIMING
-  auto timer = tpu::Timer().Start();
-#endif
+
   auto computeType = SG_DTYPE_FP32;
   auto accuracy = tpu::GetMatrixMultiplyAccuracy();
   if ( self.dtype() == caffe2::TypeMeta::Make<float>() )
@@ -209,6 +208,9 @@ Tensor & linear_out_tpu ( const Tensor & self, const Tensor & mat2, const c10::o
   {
     computeType = SG_DTYPE_FP16;
   }
+#ifdef TPU_OP_TIMING
+  auto timer = tpu::Timer().Start();
+#endif
   auto status = sgdnn_linear (
                 tpu::TPUGetDeviceHandle(),
                 tpu::TPUGenerateTensorDesc ( self ),
