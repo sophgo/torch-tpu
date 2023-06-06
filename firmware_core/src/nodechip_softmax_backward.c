@@ -29,16 +29,24 @@ static inline void nodechip_softmax_backward_dim3(
     *  sumprod     : [ NMax, CMax, HMax,     1 ]
     */
     int NMax = N, CMax = C, HMax = H;
+    local_addr_t outputCast, grad_outputCast;
     local_addr_t outputAddr, grad_outputAddr, sumprodAddr;
     local_addr_t grad_inputAddr, prodAddr;
     while(true)
     {
         grad_outputAddr = 0;
-        int grad_outputSize = NMax * DIV_UP ( CMax, NPU_NUM ) * tpu_aligned_feature_size ( HMax, W, dtype );
+        if ( dtype == DT_FP16 )
+        {
+            outputCast = 0;
+            int InSize = NMax * DIV_UP ( CMax, NPU_NUM ) * tpu_aligned_feature_size ( HMax, W, DT_FP16 );
+            grad_outputCast = outputCast + InSize;
+            grad_outputAddr = grad_outputCast + InSize;
+        }
+        int grad_outputSize = NMax * DIV_UP ( CMax, NPU_NUM ) * tpu_aligned_feature_size ( HMax, W, DT_FP32 );
         outputAddr = grad_outputAddr + grad_outputSize;
-        int outputSize = NMax * DIV_UP ( CMax, NPU_NUM ) * tpu_aligned_feature_size ( HMax, W, dtype );
+        int outputSize = NMax * DIV_UP ( CMax, NPU_NUM ) * tpu_aligned_feature_size ( HMax, W, DT_FP32 );
         sumprodAddr = outputAddr + outputSize;
-        int sumprodSize = DIV_UP ( CMax, NPU_NUM ) * tpu_aligned_feature_size ( 1, 1, dtype );
+        int sumprodSize = NMax * DIV_UP ( CMax, NPU_NUM ) * tpu_aligned_feature_size ( HMax, 1, DT_FP32 );
         grad_inputAddr = grad_outputAddr;
         prodAddr = grad_outputAddr;
         if ( ( int ) sumprodAddr + sumprodSize <= LOCAL_MEM_SIZE ) { break; }
@@ -82,21 +90,35 @@ static inline void nodechip_softmax_backward_dim3(
                 global_addr_t grad_inputGAddr = grad_input_global_addr + TotalDone; 
                 global_addr_t grad_outputGAddr = grad_output_global_addr + TotalDone; 
                 global_addr_t outputGAddr = output_global_addr + TotalDone;
-                tpu_gdma_cpy_S2L ( grad_outputAddr, grad_outputGAddr, &Shape, NULL, &GlobalStride, dtype );
-                tpu_gdma_cpy_S2L ( outputAddr, outputGAddr, &Shape, NULL, &GlobalStride, dtype );
+                if ( dtype == DT_FP16)
+                {
+                    tpu_gdma_cpy_S2L ( grad_outputCast, grad_outputGAddr, &Shape, NULL, &GlobalStride, dtype );
+                    tpu_gdma_cpy_S2L ( outputCast, outputGAddr, &Shape, NULL, &GlobalStride, dtype );
+                    tpu_bdc_cast ( outputAddr, outputCast, &Shape, NULL, NULL, DT_FP32, DT_FP16, RM_HALF_TO_EVEN );
+                    tpu_bdc_cast ( grad_outputAddr, grad_outputCast, &Shape, NULL, NULL, DT_FP32, DT_FP16, RM_HALF_TO_EVEN );
+                }
+                else
+                {
+                    tpu_gdma_cpy_S2L ( grad_outputAddr, grad_outputGAddr, &Shape, NULL, &GlobalStride, dtype );
+                    tpu_gdma_cpy_S2L ( outputAddr, outputGAddr, &Shape, NULL, &GlobalStride, dtype );
+                }
                 /* compute product of grad_output & output */
-                tpu_bdc_fp_mul ( prodAddr, outputAddr, grad_outputAddr, &Shape, NULL, NULL, NULL, dtype );
+                tpu_bdc_fp_mul ( prodAddr, outputAddr, grad_outputAddr, &Shape, NULL, NULL, NULL, DT_FP32 );
                 /* compute sum of product */
                 dim2 KernelSize = { .h = 1, .w = Shape.w };
-                tpu_bdc_fp_avg_pool2d ( sumprodAddr, prodAddr, &Shape, &KernelSize, &ZeroPadding, &OneStride, &OneDilation, dtype, OneFP );
+                tpu_bdc_fp_avg_pool2d ( sumprodAddr, prodAddr, &Shape, &KernelSize, &ZeroPadding, &OneStride, &OneDilation, DT_FP32, OneFP );
                 /* compute output mul sum of product */
                 dim4 sumprodStride;
                 dim4 sumprodShape = { .n = Shape.n, .c = Shape.c, .h = Shape.h, .w = 1 };
-                tpu_aligned_stride ( &sumprodStride, 0, &sumprodShape, dtype );
+                tpu_aligned_stride ( &sumprodStride, 0, &sumprodShape, DT_FP32 );
                 sumprodStride.w = 0;
-                tpu_bdc_fp_mul ( outputAddr, outputAddr, sumprodAddr, &Shape, NULL, NULL, &sumprodStride, dtype );
+                tpu_bdc_fp_mul ( outputAddr, outputAddr, sumprodAddr, &Shape, NULL, NULL, &sumprodStride, DT_FP32 );
                 /* compute grad_input */
-                tpu_bdc_fp_sub ( grad_inputAddr, prodAddr, outputAddr, &Shape, NULL, NULL, NULL, dtype );
+                tpu_bdc_fp_sub ( grad_inputAddr, prodAddr, outputAddr, &Shape, NULL, NULL, NULL, DT_FP32 );
+                if ( dtype == DT_FP16 )
+                {
+                    tpu_bdc_cast ( grad_inputAddr, grad_inputAddr, &Shape, NULL, NULL, DT_FP16, DT_FP32, RM_HALF_TO_EVEN );
+                }
                 tpu_gdma_cpy_L2S ( grad_inputGAddr, grad_inputAddr, &Shape, &GlobalStride, NULL, dtype );
                 HTodo -= Shape.h;
                 HDone += Shape.h;
@@ -115,10 +137,9 @@ void tpu_kernel_api_softmax_backward(const void *args)
     sg_api_softmax_backward_t *api = (sg_api_softmax_backward_t *)args;
     tpu_initialize();
     
-    TPUKERNEL_ASSERT ( api->dtype == SG_DTYPE_FP32);
     TPUKERNEL_ASSERT ( api->dim   == 3);
     dim4 shape = {api->input_n, api->input_c, api->input_h, api->input_w};
-    
+
     nodechip_softmax_backward_dim3(
         api->output_global_addr,
         api->grad_output_global_addr,

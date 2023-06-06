@@ -2699,7 +2699,7 @@ bm_status_t sgdnn_softmax_backward_cudnn(
     sg_data_type_t ydtype  = (sg_data_type_t)( yDesc.dtype);
     sg_data_type_t dydtype = (sg_data_type_t)(dyDesc.dtype);
     sg_data_type_t dxdtype = (sg_data_type_t)(dxDesc.dtype);
-    assert(ydtype == dydtype && dydtype == dxdtype && dxdtype == 0);
+    assert(ydtype == dydtype && dydtype == dxdtype);
 
     assert(yDesc.ndims == dyDesc.ndims && dyDesc.ndims == dxDesc.ndims && yDesc.ndims == 4);
     assert(dim == 3);

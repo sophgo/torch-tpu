@@ -80,7 +80,7 @@ Tensor & _softmax_backward_data_out_tpu ( const Tensor & grad_output, const Tens
   CHECK_TENSOR_IN_DEVICE ( grad_output );
   CHECK_TENSOR_IN_DEVICE ( output );
   CHECK_TENSOR_IN_DEVICE ( grad_input );
-  TORCH_CHECK ( input_dtype == kFloat );
+  // TORCH_CHECK ( input_dtype == kFloat );
 #if 0
   auto grad_input_cpu = _softmax_backward_data ( grad_output.cpu(), output.cpu(), dim, input_dtype );
   tpu::TPUCopyHostToDevice ( grad_input.data_ptr(), grad_input_cpu.contiguous().data_ptr(), grad_input.nbytes() );
