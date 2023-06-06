@@ -56,6 +56,7 @@ static inline void nodechip_gelu_forward_parallel ( global_addr_t XGlobalAddr, g
   local_addr_t XCastAddrs[2] = { X0CastAddr, X1CastAddr };
   local_addr_t YCastAddrs[2] = { Y0CastAddr, Y1CastAddr };
   dim4 Shape = { .n = 1, .h = 1 };
+  dim4 LastShape;
   int Todo = Len, Done = 0;
   int Index = 0;
   int LastDone = 0;
@@ -69,8 +70,8 @@ static inline void nodechip_gelu_forward_parallel ( global_addr_t XGlobalAddr, g
     }
     else
     {
-      Shape.c = 1;
-      Shape.w = Todo;
+      Shape.c = Todo;
+      Shape.w = 1;
     }
     tpu_gdma_cpy_S2L ( XAddrs[Index], XGlobalAddr + Done * DSize, &Shape, NULL, NULL, DT_FP16 );
     if ( Count > 0 && tpu_is_parallel_state())
@@ -80,12 +81,13 @@ static inline void nodechip_gelu_forward_parallel ( global_addr_t XGlobalAddr, g
     tpu_parallel_start();
     if ( Count > 0 )
     {
-      tpu_gdma_cpy_L2S ( YGlobalAddr + LastDone * DSize, YAddrs[1 - Index], &Shape, NULL, NULL, DT_FP16 );
+      tpu_gdma_cpy_L2S ( YGlobalAddr + LastDone * DSize, YAddrs[1 - Index], &LastShape, NULL, NULL, DT_FP16 );
     }
     tpu_bdc_cast ( XCastAddrs[Index], XAddrs[Index], &Shape, NULL, NULL, DT_FP32, DT_FP16, RM_HALF_TO_EVEN );
     tpu_bdc_fp32_gelu ( YCastAddrs[Index], XCastAddrs[Index], W0Addr, W1Addr, W2Addr, W3Addr, EXPCoeffAddr, ERFCoeffAddr, EXPTableAddr, &Shape);
     tpu_bdc_cast ( YAddrs[Index], YCastAddrs[Index], &Shape, NULL, NULL, DT_FP16, DT_FP32, RM_HALF_TO_EVEN );
     LastDone = Done;
+    LastShape = Shape;
     Todo -= Shape.c * Shape.w;
     Done += Shape.c * Shape.w;
     Index = 1 - Index;
@@ -95,7 +97,7 @@ static inline void nodechip_gelu_forward_parallel ( global_addr_t XGlobalAddr, g
   {
     tpu_parallel_end();
   }
-  tpu_gdma_cpy_L2S ( YGlobalAddr + LastDone * DSize, YAddrs[1 - Index], &Shape, NULL, NULL, DT_FP16 );
+  tpu_gdma_cpy_L2S ( YGlobalAddr + LastDone * DSize, YAddrs[1 - Index], &LastShape, NULL, NULL, DT_FP16 );
 }
 
 void tpu_kernel_api_gelu_forward ( const void * args )

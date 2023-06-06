@@ -140,6 +140,7 @@ static inline void nodechip_gelu_backward_parallel ( global_addr_t DXGlobalAddr,
   local_addr_t DXAddrs[2] = { DX0Addr, DX1Addr };
   local_addr_t DYAddrs[2] = { DY0Addr, DY1Addr };
   dim4 Shape = { .n = 1, .h = 1 };
+  dim4 LastShape;
   int Todo = Len, Done = 0;
   scalar_t C;
   int Index = 0;
@@ -154,8 +155,8 @@ static inline void nodechip_gelu_backward_parallel ( global_addr_t DXGlobalAddr,
     }
     else
     {
-      Shape.c = 1;
-      Shape.w = Todo;
+      Shape.c = Todo;
+      Shape.w = 1;
     }
     tpu_gdma_cpy_S2L ( XAddrs[Index], XGlobalAddr + Done * sizeof ( float ), &Shape, NULL, NULL, DT_FP32 );
     tpu_gdma_cpy_S2L ( DYAddrs[Index], DYGlobalAddr + Done * sizeof ( float ), &Shape, NULL, NULL, DT_FP32 );
@@ -166,7 +167,7 @@ static inline void nodechip_gelu_backward_parallel ( global_addr_t DXGlobalAddr,
     tpu_parallel_start();
     if ( Count > 0 )
     {
-      tpu_gdma_cpy_L2S ( DXGlobalAddr + LastDone * sizeof ( float ), DXAddrs[1 - Index], &Shape, NULL, NULL, DT_FP32 );
+      tpu_gdma_cpy_L2S ( DXGlobalAddr + LastDone * sizeof ( float ), DXAddrs[1 - Index], &LastShape, NULL, NULL, DT_FP32 );
     }
     // W3 = X / SQRT(2)
     C.f32 = 1 / sqrt ( 2. );
@@ -196,6 +197,7 @@ static inline void nodechip_gelu_backward_parallel ( global_addr_t DXGlobalAddr,
     // DX = DX * DY
     tpu_bdc_fp_mul ( DXAddrs[Index], DXAddrs[Index], DYAddrs[Index], &Shape, NULL, NULL, NULL, DT_FP32 );
     LastDone = Done;
+    LastShape = Shape;
     Todo -= Shape.c * Shape.w;
     Done += Shape.c * Shape.w;
     Index = 1 - Index;
@@ -205,7 +207,7 @@ static inline void nodechip_gelu_backward_parallel ( global_addr_t DXGlobalAddr,
   {
     tpu_parallel_end();
   }
-  tpu_gdma_cpy_L2S ( DXGlobalAddr + LastDone * sizeof ( float ), DXAddrs[1 - Index], &Shape, NULL, NULL, DT_FP32 );
+  tpu_gdma_cpy_L2S ( DXGlobalAddr + LastDone * sizeof ( float ), DXAddrs[1 - Index], &LastShape, NULL, NULL, DT_FP32 );
 }
 
 void tpu_kernel_api_gelu_backward ( const void * args )
