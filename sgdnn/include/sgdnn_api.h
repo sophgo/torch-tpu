@@ -682,6 +682,15 @@ bm_status_t sgdnn_reduce_sum_cudnn(
     const TensorDescriptor_t        yDesc,
     void                           *y,
     int                             reduce_dim);
+bm_status_t sgdnn_index_select_cudnn(
+    bm_handle_t                     handle,
+    const TensorDescriptor_t        tableDesc,
+    const void                      *table,
+    const TensorDescriptor_t        indexDesc,
+    const void                      *index,
+    const TensorDescriptor_t        outDesc,
+    void                            *out,
+    int                             dim);
 
 #if defined(__cplusplus)
 }

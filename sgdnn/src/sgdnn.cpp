@@ -3038,3 +3038,31 @@ bm_status_t sgdnn_concat (
     sgdnn_tpu_kernel_launch(handle, "tpu_kernel_api_concat", &api, sizeof(api));
     return BM_SUCCESS;
 }
+
+bm_status_t sgdnn_index_select_cudnn(
+    bm_handle_t                     handle,
+    const TensorDescriptor_t        tableDesc,
+    const void                      *table,
+    const TensorDescriptor_t        indexDesc,
+    const void                      *index,
+    const TensorDescriptor_t        outDesc,
+    void                            *out,
+    int                             dim){
+    sg_api_index_select_t api;
+    api.input_global_addr     = (unsigned long long) table;
+    api.index_global_addr     = (unsigned long long) index;
+    api.output_global_addr    = (unsigned long long) out;
+    api.shape_dims            = tableDesc.ndims;
+    api.index_num             = 1;
+    api.axis                  = dim;
+    api.const_val             = 0;
+    api.dtype                 = (sg_data_type_t)tableDesc.dtype;
+    for(int i = 0; i < tableDesc.ndims; i++ ){
+        api.input_shape[i] = tableDesc.shape[i];
+    }
+    for (int i = 0; i < indexDesc.ndims; i++){
+        api.index_num *= indexDesc.shape[i];
+    }
+    sgdnn_tpu_kernel_launch(handle, "tpu_kernel_api_index_select", &api, sizeof(api));
+    return BM_SUCCESS;
+}
