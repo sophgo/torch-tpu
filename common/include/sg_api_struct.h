@@ -548,5 +548,17 @@ typedef struct {
 } sg_api_index_select_t;
 #endif
 
+typedef struct {
+    unsigned long long  out_global_addr;
+    int                 shape[FW_MAX_SHAPE_DIMS];
+    int                 shape_dim;
+    unsigned int        filled_value;
+    sg_data_type_t      filled_sgdtype;
+#ifndef WIN32
+} __attribute__((packed)) sg_api_constant_fill_t;
+#else
+} sg_api_constant_fill_t;
+#endif
+
 #pragma pack(pop)
 #endif  // SG_API_STRUCT_H

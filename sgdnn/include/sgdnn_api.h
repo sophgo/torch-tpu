@@ -692,6 +692,12 @@ bm_status_t sgdnn_index_select_cudnn(
     void                            *out,
     int                             dim);
 
+bm_status_t sgdnn_const_fill_cudnn(
+    bm_handle_t                     handle,
+    const TensorDescriptor_t        srcDesc,
+    const void                      *src,
+    const void*                     fill_value);    
+
 #if defined(__cplusplus)
 }
 #endif

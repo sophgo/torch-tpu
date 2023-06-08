@@ -36,7 +36,7 @@ static inline void nodechip_reduce_c(
   */
   local_addr_t X0Addr = 0;
   local_addr_t X1Addr, Y0Addr, Y1Addr;
-  local_addr_t X0Cast, X1Cast;
+  local_addr_t X0Cast = 0, X1Cast = 0;
   local_addr_t Tmp1Addr, Tmp2Addr;
   int WMax = W;
   while ( true )

@@ -210,6 +210,7 @@ typedef enum
   WHERE,
   STRIDED_COPY,
   CONCAT,
+  CONST_FILL,
   OP_NUM
 }
 OpType;
@@ -247,7 +248,8 @@ static const char * OpTypeStr[OP_NUM] =
   "Reduce Sum",
   "Where",
   "Strided Copy",
-  "Concat"
+  "Concat",
+  "Const Fill"
 };
 
 struct OpTimer
