@@ -2612,58 +2612,7 @@ bm_status_t sgdnn_softmax_forward_cudnn(
         assert(xDesc.shape[i] == yDesc.shape[i]);
     }
 
-    if ( xdtype == SG_DTYPE_FP16)
-    {
-        int numel = 1;
-        for (int i = 0; i < xDesc.ndims; ++i)
-        {
-            assert(xDesc.shape[i] == yDesc.shape[i] );
-            numel *= xDesc.shape[i];
-        }
-        u64 input_cast_size = (u64) numel * 4;
-        u64 output_cast_size = (u64) numel * 4;
-
-        bm_device_mem_t input_cast, output_cast;
-        DEVICE_MEM_NEW_BUFFER(handle, input_cast, input_cast_size);
-        DEVICE_MEM_NEW_BUFFER(handle, output_cast, output_cast_size);
-
-        sg_api_dtype_convert_t cast_input_api;
-        cast_input_api.input_global_addr = (unsigned long long)x;
-        cast_input_api.output_global_addr = bm_mem_get_device_addr(input_cast);
-        cast_input_api.dims = xDesc.ndims;
-        cast_input_api.idtype = (sg_data_type_t)(xDesc.dtype);
-        cast_input_api.odtype = SG_DTYPE_FP32;
-        cast_input_api.round_mode = SG_ROUND_EVEN;
-        memcpy(cast_input_api.shape, xDesc.shape, xDesc.ndims * sizeof(int));
-        sgdnn_tpu_kernel_launch(handle, "tpu_kernel_api_dtype_convert", &cast_input_api, sizeof(cast_input_api));
-
-        sg_api_softmax_forward_t api;
-        api.input_global_addr = bm_mem_get_device_addr(input_cast);
-        api.output_global_addr = bm_mem_get_device_addr(output_cast);
-        for (int i=0; i<xDesc.ndims; ++i)
-        {
-            api.shape[i] = xDesc.shape[i];
-        }
-        api.dims = xDesc.ndims;
-        api.compute_dim = dim;
-        api.scale_val = 1.f;
-        api.dtype = SG_DTYPE_FP32;
-        sgdnn_tpu_kernel_launch(handle, "tpu_kernel_api_softmax_forward", &api, sizeof(api));
-
-        sg_api_dtype_convert_t cast_output_api;
-        cast_output_api.input_global_addr = bm_mem_get_device_addr(output_cast);
-        cast_output_api.output_global_addr = (unsigned long long)y;
-        cast_output_api.dims = yDesc.ndims;
-        cast_output_api.idtype = SG_DTYPE_FP32;
-        cast_output_api.odtype = ydtype;
-        cast_output_api.round_mode = SG_ROUND_EVEN;
-        memcpy(cast_output_api.shape, yDesc.shape, yDesc.ndims * sizeof(int));
-        sgdnn_tpu_kernel_launch(handle, "tpu_kernel_api_dtype_convert", &cast_output_api, sizeof(cast_output_api));
-
-        bm_free_device(handle, input_cast);
-        bm_free_device(handle, output_cast);
-    }
-    else if ( xdtype == SG_DTYPE_FP32 )
+    if ( xdtype == SG_DTYPE_FP32 || xdtype == SG_DTYPE_FP16)
     {
         sg_api_softmax_forward_t api;
         api.input_global_addr = (unsigned long long)x;
