@@ -2,9 +2,10 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 import numpy as np
-from utils import get_model_grad
-
+from utils import get_model_grad, Optimer, compare_model_grad
+torch.manual_seed(1000)
 torch.ops.load_library("../../libtorch_plugin/build/liblibtorch_plugin.so")
+optimer = Optimer("../../libtorch_plugin/build/liblibtorch_plugin.so")
 
 class Conv1D(nn.Module):
     """
@@ -311,22 +312,26 @@ if __name__ == "__main__":
     configure.n_layer= 2
     configure.activation_function= "gelu"
 
-    batch = 2
-    sequence = 8
+    batch = 32
+    sequence = 256
     ########################################
 
     inp = torch.rand(batch, sequence, configure.hidden_size)
     ref = torch.rand(batch, sequence, configure.hidden_size)
-    inp_tpu = inp.to("privateuseone:1") #.half()
-    ref_tpu = ref.to("privateuseone:1")
+    #inp = torch.ones(batch, sequence, configure.hidden_size)
+    #ref = torch.ones(batch, sequence, configure.hidden_size)
+    inp_tpu = inp.to("privateuseone:1").half()
+    ref_tpu = ref.to("privateuseone:1").half()
 
     net = GPT2Block(configure)
     net_tpu = copy.deepcopy(net)
-    net_tpu.to("privateuseone:1") #.half()
+    net_tpu.to("privateuseone:1").half()
 
     print("===== forward =========")
     t1 = time.time()
+    optimer.reset()
     out_tpu = net_tpu(inp_tpu)
+    optimer.dump()
     t2 = time.time()
     print("tpu time :", t2 - t1)
 
@@ -337,7 +342,9 @@ if __name__ == "__main__":
 
     print("===== backward =========")
     t1 = time.time()
+    optimer.reset()
     out_tpu[0].backward(ref_tpu)
+    optimer.dump()
     t2 = time.time()
     print("tpu time :", t2 - t1)
 
@@ -346,28 +353,20 @@ if __name__ == "__main__":
     t2 = time.time()
     print("cpu time :", t2 - t1)
 
-    cpu_grad = get_model_grad(net, "gpt_cpu.npz", False)
-    tpu_grad = get_model_grad(net_tpu,"gpt_tpu.npz", False)
     print(" ======== compare model's parameter grad =======")
-    assert(len(cpu_grad.keys()) == len(tpu_grad.keys()))
-    for k in cpu_grad.keys():
-        c_g = cpu_grad[k]
-        t_g = tpu_grad[k]
-        diff = c_g - t_g
-        print(k,np.max(abs(diff)))
+    compare_model_grad(net, net_tpu)
 
     print(" ======== compare model's out  =======")
-
     def my_print(out_cpu, out_tpu):
         for i in range(len(out_cpu)):
             o_c = out_cpu[i]
             if isinstance(o_c, torch.Tensor):
                 o_t = out_tpu[i].to("cpu")
-                print("cpu:")
+                #print("cpu:")
                 #print(o_c)
-                print("tpu:")
+                #print("tpu:")
                 #print(o_t)
-                print(torch.max(abs(o_c - o_t)))
+                print("max diff:", torch.max(abs(o_c - o_t)))
             elif isinstance(o_c, tuple):
                 my_print(out_cpu[i], out_tpu[i])
             else:

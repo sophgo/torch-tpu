@@ -74,11 +74,11 @@ Tensor _copy_from_tpu ( const Tensor & self, const Tensor & dst, bool non_blocki
       auto dst_cpu = self.cpu().to ( dst.dtype() );
       tpu::TPUCopyHostToDevice ( dst.data_ptr(), dst_cpu.contiguous().data_ptr(), dst.nbytes() );
 #else
+      auto self_ = self.contiguous();
+      if ( dst.is_contiguous() ) {
 #ifdef TPU_OP_TIMING
       auto timer = tpu::Timer().Start();
 #endif
-      auto self_ = self.contiguous();
-      if ( dst.is_contiguous() ) {
         auto status = sgdnn_dtype_convert (
                       tpu::TPUGetDeviceHandle(),
                       tpu::TPUGenerateTensorDesc ( self_ ),
@@ -87,12 +87,12 @@ Tensor _copy_from_tpu ( const Tensor & self, const Tensor & dst, bool non_blocki
                       ADDR_IN_DEVICE ( dst ),
                       SG_ROUND_EVEN );
         TORCH_CHECK ( status == BM_SUCCESS );
-      } else {
-        dst.copy_ ( self_.to ( dst.dtype() ), non_blocking );
-      }
 #ifdef TPU_OP_TIMING
       tpu::OpTimer::Instance().AddTime ( tpu::DTYPE_CONVERT, timer.ElapsedUS() );
 #endif
+      } else {
+        dst.copy_ ( self_.to ( dst.dtype() ), non_blocking );
+      }
 #endif
     }
     else

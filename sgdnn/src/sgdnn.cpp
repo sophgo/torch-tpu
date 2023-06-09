@@ -1083,11 +1083,9 @@ bm_status_t sgdnn_batchnorm_backward_cudnn(
     sg_data_type_t wdtype = (sg_data_type_t)(bnScaleBiasDiffDesc.dtype);
 
     // if dtype is fp16, it will convert to fp32 in local
-    assert(xdtype == dxdtype && xdtype == dydtype && xdtype == wdtype);
-    // assert(dydtype == 0);
-    // assert(xdtype == 0);
-    // assert(dxdtype == 0);
-    // assert(wdtype == 0);
+    assert(xdtype == dydtype);
+    if (dx_enable)              { assert(xdtype == dxdtype);}
+    if (dw_enable || db_enable) { assert(xdtype == wdtype);}
 
     sg_api_batchnorm_backward_t api = {
         grad_output,

@@ -15,10 +15,10 @@ Tensor & sqrt_out_tpu ( const Tensor & self, Tensor & out  )
   tpu::TPUCopyHostToDevice ( out.data_ptr(), out_cpu.contiguous().data_ptr(), out.nbytes() );
   return out;
 }
-TORCH_LIBRARY_IMPL ( aten, TPU, m )
-{
-  m.impl ( "sqrt.out", sqrt_out_tpu );
-}
+// TORCH_LIBRARY_IMPL ( aten, TPU, m )
+// {
+//   m.impl ( "sqrt.out", sqrt_out_tpu );
+// }
 #if 0
 Tensor & binary_Tensor_tpu ( const Tensor          & input1,
                              const Tensor          & input2,

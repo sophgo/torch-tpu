@@ -35,8 +35,14 @@ def compare_model_grad(model1, model2):
     for k in cpu_grad.keys():
         c_g = cpu_grad[k]
         t_g = tpu_grad[k]
-        diff = c_g - t_g
-        print(k, ",max abs diff: ", np.max(abs(diff)), ", max related diff: ")
+        diff = abs(c_g - t_g)
+        index_abs = diff.argmax()
+        related_diff = abs(diff/c_g)
+        index_related = related_diff.argmax()
+        print(k, 
+                ",max abs diff: ", np.max(diff), " exp:", c_g.flatten()[index_abs], ", got:", t_g.flatten()[index_abs],
+                ",max rel diff: ", np.max(related_diff), ", exp: ", c_g.flatten()[index_related], ", got:", t_g.flatten()[index_related]
+            )
 
 class Optimer:
     def __init__(self, libpath = "/home/huyu/workspace/tpu-train/libtorch_plugin/build/liblibtorch_plugin.so"):

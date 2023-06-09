@@ -1,20 +1,14 @@
+from re import A
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from transformers.models.gpt2.modeling_gpt2 import GPT2LMHeadModel
 
 torch.ops.load_library("../../libtorch_plugin/build/liblibtorch_plugin.so")
+torch.manual_seed(1000)
 
-
-# a = torch.ones(32, 32)
-
-# #import pdb;pdb.set_trace()
-
-# b = a.to("privateuseone:0").half()
-# c = F.gelu(b)
-# print(b.device)
-# #c = b[0] + torch.matmul(b, b)
-# print(c.to("cpu"))
+tmp1 = None
+tmp2 = None
 
 class Conv1D(nn.Module):
     """
@@ -136,6 +130,21 @@ class GPT2Attention(nn.Module):
         attn_output = torch.matmul(attn_weights, value)
         t2 = time.time()
         print("====inner_attn batch-mm time ", t2 - t1)
+        
+        # global tmp1, tmp2
+        # if tmp1 == None:
+        #     tmp1 = value.cpu()
+        #     tmp2 = attn_output.cpu()
+        # else:
+        #     #diff = torch.max(abs(tmp1 - value))
+        #     #print(diff)
+        #     diff = abs(tmp2 - attn_output) #/abs(attn_output)
+        #     idx = diff.argmax()
+        #     print("max_diff: ", torch.max(diff))
+        #     print("idx: ", idx)
+        #     print("cpu:", attn_output.flatten()[idx])
+        #     print("tpu:", tmp2.flatten()[idx])
+        # import pdb;pdb.set_trace()
 
         return attn_output, attn_weights
 
@@ -144,6 +153,7 @@ class GPT2Attention(nn.Module):
         Splits hidden_size dim into attn_head_size and num_heads
         """
         new_shape = tensor.size()[:-1] + (num_heads, attn_head_size)
+        #import pdb;pdb.set_trace()
         tensor = tensor.view(*new_shape)
         return tensor.permute(0, 2, 1, 3)  # (batch, head, seq_length, head_features)
 
@@ -177,12 +187,15 @@ class GPT2Attention(nn.Module):
             key, value = self.c_attn(encoder_hidden_states).split(self.split_size, dim=2)
             attention_mask = encoder_attention_mask
         else:
-            query, key, value = self.c_attn(hidden_states).split(self.split_size, dim=2)
-        
+            x = self.c_attn(hidden_states)
+            query, key, value = x.split(self.split_size, dim=2)
+
         t1 = time.time()
         query = self._split_heads(query, self.num_heads, self.head_dim)
         key = self._split_heads(key, self.num_heads, self.head_dim)
         value = self._split_heads(value, self.num_heads, self.head_dim)
+        
+
         t2 = time.time()
         print("split time", t2 - t1)
 
@@ -202,12 +215,16 @@ class GPT2Attention(nn.Module):
         attn_output, attn_weights = self._attn(query, key, value, attention_mask, head_mask)
         t2 = time.time()
         print("inner_att time", t2 - t1)
+ 
 
         t1 = time.time()
         attn_output = self._merge_heads(attn_output, self.num_heads, self.head_dim)
         t2 = time.time()
         print("permute time", t2 - t1)
+
         attn_output = self.c_proj(attn_output)
+
+
         attn_output = self.resid_dropout(attn_output)
 
         outputs = (attn_output, present)
@@ -304,7 +321,7 @@ class GPT2Block(nn.Module):
 
         t1 = time.time()
         residual = hidden_states
-        hidden_states = self.ln_2(hidden_states)
+        #hidden_states = self.ln_2(hidden_states)
         t2 = time.time()
         print("layernorm time", t2 - t1)
 
@@ -324,48 +341,47 @@ class GPT2Block(nn.Module):
         return outputs  # hidden_states, present, (attentions, cross_attentions)
 
 if __name__ == "__main__":
-    from transformers import GPT2Config, GPT2Model
-    from transformers import GPT2Tokenizer
+    from transformers import GPT2Config
     import copy
     import time
-
-    tokenizer = GPT2Tokenizer.from_pretrained("gpt2")
-    word_txt = "Hello world , hello hello"
-    inps =tokenizer(word_txt)
-
+    from utils import Optimer
+    
+    optimer = Optimer("/home/huyu/workspace/tpu-train/libtorch_plugin/build/liblibtorch_plugin.so")
+    ############# configure ###############
     configure = GPT2Config()
     configure.attn_pdrop = 0
     configure.embd_pdrop = 0
     configure.resid_pdrop = 0
-    configure.n_layer= 2
     configure.activation_function= "gelu"
 
     batch = 32
     sequence = 256
+    ########################################
 
     inp = torch.rand(batch, sequence, configure.hidden_size)
     inp_tpu = inp.clone().to("privateuseone:0").half()
 
+    #net = GPT2MLP(4 * configure.hidden_size, configure)
+    #net = GPT2Attention(configure)
     net = GPT2Block(configure)
-    #net = GPT2Model(configure).train()
+
     net_tpu = copy.deepcopy(net)
     net_tpu.to("privateuseone:0").half()
+    #net.double()
 
     print(inp.device)
     print("start run")
     t1 = time.time()
+    optimer.reset()
     out_tpu = net_tpu(inp_tpu)
     t2 = time.time()
-    print("tpu time :", t2 - t1)
+    print("tpu time :", (t2 - t1))
+    optimer.dump()
 
     t1 = time.time()
     out_cpu = net(inp)
     t2 = time.time()
     print("cpu time :", t2 - t1)
-    import pdb;pdb.set_trace()
-
-    # out_cpu["loss"].backward()
-    # out_tpu["loss"].backward()
     # import pdb;pdb.set_trace()
 
     def my_print(out_cpu, out_tpu):
@@ -373,16 +389,23 @@ if __name__ == "__main__":
             o_c = out_cpu[i]
             if isinstance(o_c, torch.Tensor):
                 o_t = out_tpu[i].to("cpu")
-                print("cpu:")
+                #print("cpu:")
                 #print(o_c)
-                print("tpu:")
-                #print(o_t)
-                print(torch.max(abs(o_c - o_t)))
+                # print("tpu:")
+                # print(o_t)
+                diff = abs(o_c - o_t) #/abs(o_c)
+                idx = diff.argmax()
+
+                print("max_diff: ", torch.max(diff))
+                print("idx: ", idx)
+                print("cpu:", o_c.flatten()[idx])
+                print("tpu:", o_t.flatten()[idx])
+                #print("cos sim: ", cos_sim(o_c.flatten().numpy(), o_t.flatten().numpy()))
             elif isinstance(o_c, tuple):
                 my_print(out_cpu[i], out_tpu[i])
             else:
                 return
-    my_print(out_cpu, out_tpu)
+    my_print((out_cpu), (out_tpu))
 
 
 

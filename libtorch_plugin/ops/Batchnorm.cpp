@@ -365,14 +365,6 @@ std::array<bool, 3> output_mask )
 #ifdef TPU_OP_TIMING
   auto timer = tpu::Timer().Start();
 #endif
-  TensorDescriptor_t grad_i;
-  if( output_mask[0] )
-  {
-    grad_i = tpu::TPUGenerateTensorDesc ( grad_input );
-  }
-  else{
-    grad_i.dtype = tpu::TPUConvertDType ( input.dtype() );
-  }
   bm_status_t status = sgdnn_batchnorm_backward_cudnn (
                        tpu::TPUGetDeviceHandle(),
                        BatchNorm_Per_Layer,
@@ -384,7 +376,7 @@ std::array<bool, 3> output_mask )
                        ADDR_IN_DEVICE ( input ),
                        tpu::TPUGenerateTensorDesc ( grad_out ),
                        ADDR_IN_DEVICE ( grad_out ),
-                       grad_i,
+                       output_mask[0] ? tpu::TPUGenerateTensorDesc ( grad_input ) : TensorDescriptor_t(),
                        output_mask[0] ? ADDR_IN_DEVICE ( grad_input ) : nullptr,
                        output_mask[1] == true ? tpu::TPUGenerateTensorDesc ( grad_weight ) : ( output_mask[2] == true ? tpu::TPUGenerateTensorDesc ( grad_bias ) : TensorDescriptor_t() ),
                        weight.defined() ? ADDR_IN_DEVICE ( weight ) : nullptr,
