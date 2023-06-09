@@ -1,7 +1,7 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-
+import copy
 torch.ops.load_library("../../libtorch_plugin/build/liblibtorch_plugin.so")
 torch.manual_seed(1000)
 
@@ -37,6 +37,54 @@ def case_4d():
     # print(o_tran_tpu.cpu())
     print("max diff : ", torch.max(abs(diff)))
 
+def case_3d():
+    """
+    """
+    ############## config ###################
+    device = "privateuseone"
+    N = 128
+    C = 512
+    H = 512
+    #########################################
+    a = torch.ones(N,C,H)
+    a_tpu = a.to(device).half()
+    print("before stride", a_tpu.stride())
+
+    a_trans_tpu = torch.transpose(a_tpu, 1, 2)
+    print("a_trans_tpu's stride: ", a_trans_tpu.stride())
+    print("a_trans_tpu.storage", a_trans_tpu.storage().data_ptr())
+
+    a_t2 = a_trans_tpu.contiguous()
+    print("a_t2 stride" ,a_t2.stride())
+    print("a_t2.storage", a_t2.storage().data_ptr())
+
+    # a_tpu2 = torch.transpose(a_t2, 1, 2)
+    # print("a_tpu2" ,a_tpu2.stride(), a_tpu2.is_contiguous())
+
+    # a_cont_tpu = a_tpu2.contiguous()
+
+def case_2d():
+    """
+    """
+    ############## config ###################
+    device = "privateuseone"
+    N = 128
+    C = 512
+    H = 512
+    #########################################
+    a = torch.ones(N, C * H)
+    a_tpu = a.to(device).half()
+    print("before stride", a_tpu.stride())
+
+    a_trans_tpu = torch.transpose(a_tpu, -1, -2)
+    print("a_trans_tpu's stride: ", a_trans_tpu.stride())
+    print("a_trans_tpu.storage", a_trans_tpu.storage().data_ptr())
+
+    a_t2 = a_trans_tpu.contiguous()
+    print("a_t2 stride" ,a_t2.stride())
+    print("a_t2.storage", a_t2.storage().data_ptr())
+
+
 
 if __name__ == "__main__":
-    case_4d()
+    case_3d()
