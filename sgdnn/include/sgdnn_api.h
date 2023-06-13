@@ -707,6 +707,18 @@ bm_status_t sgdnn_sqrt(
     const TensorDescriptor_t        outputDesc,
     void                           *output );
 
+bm_status_t sgdnn_addcdiv(
+    bm_handle_t                     handle,
+    const TensorDescriptor_t        inputDesc,
+    const void                     *input,
+    const TensorDescriptor_t        tensor1Desc,
+    const void                     *tensor1,
+    const TensorDescriptor_t        tensor2Desc,
+    const void                     *tensor2,
+    const TensorDescriptor_t        outputDesc,
+    void                           *output,
+    double                          value);
+
 #if defined(__cplusplus)
 }
 #endif
