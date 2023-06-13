@@ -17,11 +17,23 @@ Tensor & addcmul_out_tpu ( const Tensor & self, const Tensor & tensor1, const Te
   CHECK_TENSOR_IN_DEVICE ( tensor1 );
   CHECK_TENSOR_IN_DEVICE ( tensor2 );
   CHECK_TENSOR_IN_DEVICE ( out );
-#if 0
-  auto out_cpu = addcmul ( self.cpu(), tensor1.cpu(), tensor2.cpu(), value );
-  tpu::TPUCopyHostToDevice ( out.data_ptr(), out_cpu.contiguous().data_ptr(), out.nbytes() );
-#else
-  add_out ( out, self, tensor1 * tensor2, value );
+#ifdef TPU_OP_TIMING
+  auto timer = tpu::Timer().Start();
+#endif
+  bm_status_t status = sgdnn_addcmul (
+                       tpu::TPUGetDeviceHandle(),
+                       tpu::TPUGenerateTensorDesc ( self ),
+                       ADDR_IN_DEVICE ( self ),
+                       tpu::TPUGenerateTensorDesc ( tensor1 ),
+                       ADDR_IN_DEVICE ( tensor1 ),
+                       tpu::TPUGenerateTensorDesc ( tensor2 ),
+                       ADDR_IN_DEVICE ( tensor2 ),
+                       tpu::TPUGenerateTensorDesc ( out ),
+                       ADDR_IN_DEVICE ( out ),
+                       value.toDouble() );
+  TORCH_CHECK ( status == BM_SUCCESS );
+#ifdef TPU_OP_TIMING
+  tpu::OpTimer::Instance().AddTime ( tpu::ADDCMUL, timer.ElapsedUS() );
 #endif
   return out;
 }

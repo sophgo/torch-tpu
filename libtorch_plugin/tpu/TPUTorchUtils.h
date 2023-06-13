@@ -213,6 +213,7 @@ typedef enum
   CONST_FILL,
   SQRT,
   ADDCDIV,
+  ADDCMUL,
   OP_NUM
 }
 OpType;
@@ -253,7 +254,8 @@ static const char * OpTypeStr[OP_NUM] =
   "Concat",
   "Const Fill",
   "Sqrt",
-  "Addcdiv"
+  "Addcdiv",
+  "Addcmul",
 };
 
 struct OpTimer
