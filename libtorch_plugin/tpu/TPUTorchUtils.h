@@ -214,6 +214,8 @@ typedef enum
   SQRT,
   ADDCDIV,
   ADDCMUL,
+  MALLOC,
+  FREE,
   OP_NUM
 }
 OpType;
@@ -256,6 +258,8 @@ static const char * OpTypeStr[OP_NUM] =
   "Sqrt",
   "Addcdiv",
   "Addcmul",
+  "Malloc",
+  "Free"
 };
 
 struct OpTimer

@@ -120,7 +120,13 @@ public:
     bm_handle_t Handle = GetDeviceHandle();
     TORCH_CHECK ( Handle != nullptr, "TPU handle of device #", GetDeviceIndex(), " is null" );
     bm_device_mem_t Mem;
+#ifdef TPU_OP_TIMING
+    auto timer = tpu::Timer().Start();
+#endif
     bm_status_t Status = bm_malloc_device_byte ( Handle, &Mem, ( unsigned int ) Size );
+#ifdef TPU_OP_TIMING
+    tpu::OpTimer::Instance().AddTime ( tpu::MALLOC, timer.ElapsedUS() );
+#endif
     TORCH_CHECK ( Status == BM_SUCCESS, "Failed to allocate memory on TPU device #", GetDeviceIndex(), " size = ", Size, "bytes" );
     unsigned long long Addr = UnifiedAddr ( bm_mem_get_device_addr ( Mem ), GetDeviceIndex() );
     AddrMemMap_.emplace ( Addr, Mem );
@@ -144,7 +150,13 @@ public:
     TORCH_CHECK ( Handle != nullptr, "TPU handle of device #", GetDeviceIndex(), " is null" );
     auto Iter = AddrMemMap_.find ( ( unsigned long long ) Ptr );
     TORCH_CHECK ( Iter != AddrMemMap_.end(), "Memory of address = ", Ptr, " is not found" );
+#ifdef TPU_OP_TIMING
+    auto timer = tpu::Timer().Start();
+#endif
     bm_free_device ( Handle, Iter->second );
+#ifdef TPU_OP_TIMING
+    tpu::OpTimer::Instance().AddTime ( tpu::FREE, timer.ElapsedUS() );
+#endif
     AddrMemMap_.erase ( Iter );
 #ifdef SHOW_INFO
     std::cout << "Free addr = " << Ptr << std::endl;
