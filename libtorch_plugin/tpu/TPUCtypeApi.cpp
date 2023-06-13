@@ -14,7 +14,7 @@ extern "C" {
     tpu::GlobalTimer::Instance().Reset();
   }
 
-  void tpu_op_timer_dump() {
+  void tpu_timer_dump() {
     tpu::GlobalTimer::Instance().Dump();
   }
 } // extern "C"

@@ -162,13 +162,13 @@ struct Timer
     gettimeofday ( &timer, NULL );
     return *this;
   }
-  unsigned long ElapsedUS()
+  unsigned long ElapsedUS() const
   {
     struct timeval end;
     gettimeofday ( &end, NULL );
     return ( end.tv_sec - timer.tv_sec ) * 1000000UL + ( end.tv_usec - timer.tv_usec );
   }
-  unsigned long ElapsedMS()
+  unsigned long ElapsedMS() const
   {
     return ElapsedUS() / 1000;
   }
