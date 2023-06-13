@@ -6,7 +6,7 @@ torch.ops.load_library("../../libtorch_plugin/build/liblibtorch_plugin.so")
 torch.manual_seed(1000)
 torch.set_printoptions(precision=6)
 
-def case1(use_f16=False):
+def case_2d_sum(use_f16=False):
     """
     reduce sum
     """
@@ -27,5 +27,25 @@ def case1(use_f16=False):
     print(o[0,:10])
     print(o_tpu.cpu()[0,:10])
 
+def case_3d_sum(use_f16=False):
+    ############## config ###################
+    device = "privateuseone"
+    batch = 32
+    sequence = 256
+    hidden_size = 768
+    #########################################
+    inp = torch.rand(batch, sequence, hidden_size)
+    inp_tpu = inp.to(device)
+    if use_f16: inp_tpu.half()
+
+    o = torch.sum(inp, dim=0, keepdim=False)
+    o_tpu = torch.sum(inp_tpu, dim =0, keepdim=False)
+
+    diff = abs(o - o_tpu.cpu()) #/abs(o_c)
+    print("max_diff: ", torch.max(diff))
+    print(o[0,:10])
+    print(o_tpu.cpu()[0,:10])
+
+
 if __name__ == "__main__":
-    case1(True)
+    case_3d_sum(True)

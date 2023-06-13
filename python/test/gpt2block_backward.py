@@ -3,6 +3,9 @@ import torch.nn as nn
 import torch.nn.functional as F
 import numpy as np
 from utils import get_model_grad, Optimer, compare_model_grad
+from transformers import GPT2Config
+import copy
+import time
 torch.manual_seed(1000)
 torch.ops.load_library("../../libtorch_plugin/build/liblibtorch_plugin.so")
 optimer = Optimer("../../libtorch_plugin/build/liblibtorch_plugin.so")
@@ -299,7 +302,79 @@ class GPT2Block(nn.Module):
         #import pdb;pdb.set_trace()
         return outputs  # hidden_states, present, (attentions, cross_attentions)
 
-if __name__ == "__main__":
+def case_gptblock_backward():
+
+
+    ############# configure ###############
+    configure = GPT2Config()
+    configure.attn_pdrop = 0
+    configure.embd_pdrop = 0
+    configure.resid_pdrop = 0
+    configure.n_layer= 2
+    configure.activation_function= "gelu"
+
+    batch = 32
+    sequence = 256
+    ########################################
+
+    inp = torch.rand(batch, sequence, configure.hidden_size)
+    ref = torch.rand(batch, sequence, configure.hidden_size)
+    #inp = torch.ones(batch, sequence, configure.hidden_size)
+    #ref = torch.ones(batch, sequence, configure.hidden_size)
+    inp_tpu = inp.to("privateuseone:1").half()
+    ref_tpu = ref.to("privateuseone:1").half()
+
+    net = GPT2Block(configure)
+    net_tpu = copy.deepcopy(net)
+    net_tpu.to("privateuseone:1").half()
+
+    print("===== forward =========")
+    t1 = time.time()
+    optimer.reset()
+    out_tpu = net_tpu(inp_tpu)
+    optimer.dump()
+    t2 = time.time()
+    print("tpu time :", t2 - t1)
+
+    t1 = time.time()
+    out_cpu = net(inp)
+    t2 = time.time()
+    print("cpu time :", t2 - t1)
+
+    print("===== backward =========")
+    t1 = time.time()
+    optimer.reset()
+    out_tpu[0].backward(ref_tpu)
+    optimer.dump()
+    t2 = time.time()
+    print("tpu time :", t2 - t1)
+
+    t1 = time.time()
+    out_cpu[0].backward(ref)
+    t2 = time.time()
+    print("cpu time :", t2 - t1)
+
+    print(" ======== compare model's parameter grad =======")
+    compare_model_grad(net, net_tpu)
+
+    print(" ======== compare model's out  =======")
+    def my_print(out_cpu, out_tpu):
+        for i in range(len(out_cpu)):
+            o_c = out_cpu[i]
+            if isinstance(o_c, torch.Tensor):
+                o_t = out_tpu[i].to("cpu")
+                #print("cpu:")
+                #print(o_c)
+                #print("tpu:")
+                #print(o_t)
+                print("max diff:", torch.max(abs(o_c - o_t)))
+            elif isinstance(o_c, tuple):
+                my_print(out_cpu[i], out_tpu[i])
+            else:
+                return
+    my_print(out_cpu, out_tpu)    
+
+def case_gptmlp_backward():
     from transformers import GPT2Config
     import copy
     import time
@@ -371,7 +446,8 @@ if __name__ == "__main__":
                 my_print(out_cpu[i], out_tpu[i])
             else:
                 return
-    my_print(out_cpu, out_tpu)
+    my_print(out_cpu, out_tpu)    
 
 
-
+if __name__ == "__main__":
+    case_gptblock_backward()

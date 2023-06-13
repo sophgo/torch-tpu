@@ -8,11 +8,11 @@ torch.manual_seed(1000)
 
 def case_CrossEntropyLoss():
     device = "privateuseone"
-    batch = 8
+    batch = 32
     sequence = 8
-    vtable_size = 10
+    vtable_size = 4
 
-    inp_cpu = torch.rand(batch, sequence, vtable_size)
+    inp_cpu = torch.ones(batch, sequence, vtable_size)
     inp_tpu = copy.deepcopy(inp_cpu).to(device)
     inp_cpu.requires_grad = True
     inp_tpu.requires_grad = True
@@ -21,10 +21,11 @@ def case_CrossEntropyLoss():
     label_tpu = copy.deepcopy(label_cpu).to(device)
 
     loss_fct = nn.CrossEntropyLoss()
-
+    print("=======forward============")
     loss_cpu = loss_fct(inp_cpu.view(-1, vtable_size), label_cpu.view(-1))
     loss_tpu = loss_fct(inp_tpu.view(-1, vtable_size), label_tpu.view(-1))
-
+    print("loss_cpu: ", loss_cpu, "loss_tpu: ", loss_tpu.cpu())
+    print("=======backward============")
     loss_cpu.backward()
     loss_tpu.backward()
     print("=======compare grad=======")

@@ -20,7 +20,6 @@ Tensor & fill__Scalar_tpu ( Tensor & self, const Scalar & value )
   tpu::TPUCopyHostToDevice ( self.data_ptr(), self_cpu.contiguous().data_ptr(), self.nbytes() );
 #else
 #ifdef TPU_OP_TIMING
-  std::cout << "start const fill" << std::endl;
   auto timer = tpu::Timer().Start();
 #endif
   bm_status_t status = sgdnn_const_fill_cudnn(
@@ -30,7 +29,6 @@ Tensor & fill__Scalar_tpu ( Tensor & self, const Scalar & value )
     value.data_ptr());
 #ifdef TPU_OP_TIMING
   tpu::OpTimer::Instance().AddTime ( tpu::CONST_FILL, timer.ElapsedUS() );
-  std::cout << "end const fill" << std::endl;
 #endif
 #endif
   return self;
