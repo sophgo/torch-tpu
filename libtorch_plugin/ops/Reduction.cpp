@@ -43,7 +43,8 @@ Tensor & sum_IntList_out_tpu ( const Tensor & self, OptionalIntArrayRef dim_opt,
                        ADDR_IN_DEVICE ( self ),
                        tpu::TPUGenerateTensorDesc ( out ),
                        ADDR_IN_DEVICE ( out ),
-                       reduce_dim[0] );
+                       reduce_dim[0],
+                       keepdim);
   TORCH_CHECK ( status == BM_SUCCESS );
 #ifdef TPU_OP_TIMING
   tpu::OpTimer::Instance().AddTime ( tpu::REDUCE_SUM, timer.ElapsedUS() );

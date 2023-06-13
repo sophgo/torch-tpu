@@ -2789,48 +2789,61 @@ bm_status_t sgdnn_reduce_sum_cudnn(
     const void                     *x,
     const TensorDescriptor_t        yDesc,
     void                           *y,
-    int                             reduce_dim)
+    int                             reduce_dim,
+    int                             keep_dim)
 {
-    assert (xDesc.ndims == yDesc.ndims);
-    sg_data_type_t xdtype = (sg_data_type_t)(xDesc.dtype);
-    sg_data_type_t ydtype = (sg_data_type_t)(yDesc.dtype);
-    assert (xdtype == ydtype);
-
-    int n, c, h, w;
-    if (xDesc.ndims == 4)
+    if (keep_dim)
     {
-      n = xDesc.shape[0];
-      c = xDesc.shape[1];
-      h = xDesc.shape[2];
-      w = xDesc.shape[3];
-    }
-    else if (xDesc.ndims == 3)
-    {
-      n = xDesc.shape[0];
-      c = xDesc.shape[1];
-      h = 1;
-      w = xDesc.shape[2];
-      if( reduce_dim == 3 ) reduce_dim = 4;
-    }
-    else if (xDesc.ndims == 2)
-    {
-      n = 1;
-      c = xDesc.shape[0];
-      h = 1;
-      w = xDesc.shape[1];
-      if( reduce_dim == 0 ) reduce_dim = 1;
-      else if( reduce_dim == 1 ) reduce_dim = 3;
+        assert (xDesc.ndims == yDesc.ndims);
     }
     else
     {
-        assert (false);
+        assert (xDesc.ndims == yDesc.ndims + 1);
     }
-    int input_shape[4] = {n, c, h, w};
+    sg_data_type_t xdtype = (sg_data_type_t)(xDesc.dtype);
+    sg_data_type_t ydtype = (sg_data_type_t)(yDesc.dtype);
+    assert (xdtype == ydtype);
+    if (reduce_dim < 0)
+    {
+        reduce_dim += xDesc.ndims;
+    }
+     sg_api_reduce_sum_t api;
+    int y_shape[FW_MAX_SHAPE_DIMS];
+    if (keep_dim)
+    {
+         for (int i = 0; i < yDesc.ndims; ++i)
+         {
+             y_shape[i] = yDesc.shape[i];
+         }
+    }
+    else
+    {
+        for (int i = 0; i < reduce_dim; ++i)
+        {
+            y_shape[i] = yDesc.shape[i];
+        }
+        y_shape[reduce_dim] = 1;
+        for (int i = reduce_dim + 1; i < yDesc.ndims; ++i)
+        {
+            y_shape[i] = yDesc.shape[i];
+        }
+    }
+    for (int i = 0; i < xDesc.ndims; ++i)
+    {
+        if (i != reduce_dim)
+        {
+            assert(xDesc.shape[i] == y_shape[i]);
+        }
+        else
+        {
+            assert(y_shape[i] == 1);
+        }
+        api.shape[i] = xDesc.shape[i];
+    }
 
-    sg_api_reduce_sum_t api;
+    api.shape_dim = xDesc.ndims;
     api.input_global_addr = (unsigned long long)x;
     api.output_global_addr = (unsigned long long)y;
-    memcpy(api.shape, input_shape, 4 * sizeof(int));
     api.reduce_dim = reduce_dim;
     api.dtype = xdtype;
 

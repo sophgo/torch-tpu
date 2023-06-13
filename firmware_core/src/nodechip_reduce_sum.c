@@ -19,7 +19,7 @@ static inline void nodechip_reduce_c(
   TPUKERNEL_ASSERT( N == 1 );
   TPUKERNEL_ASSERT( H == 1 );
   const dim4 TotalShape = { .n = N, .c = C, .h = H, .w = W };
-  const dim4 OutputShape = { .n = N, .c = 1, .h = H, .w = W };    
+  const dim4 OutputShape = { .n = N, .c = 1, .h = H, .w = W };
   const padding_t ZeroPadding = { .top = 0, .bottom = 0, .left = 0, .right = 0 };
   const dim2 OneStride = { .h = 1, .w = 1 };
   const dim2 OneDilation = { .h = 1, .w = 1 };
@@ -45,7 +45,7 @@ static inline void nodechip_reduce_c(
     {
       int XCastSize = DIV_UP ( C, NPU_NUM ) * tpu_aligned_feature_size ( 1, WMax, DT_FP16 );
       X0Cast = 0;
-      X1Cast = X0Cast + XCastSize; 
+      X1Cast = X0Cast + XCastSize;
       X0Addr = X1Cast + XCastSize;
     }
     int XSize = DIV_UP ( C, NPU_NUM ) * tpu_aligned_feature_size ( 1, WMax, DT_FP32 );
@@ -94,7 +94,7 @@ static inline void nodechip_reduce_c(
     }
     else
     {
-      tpu_gdma_cpy_S2L ( XAddrs[Index], input_global_addr + Done * DSize, &Shape, NULL, &GlobalStride, dtype );      
+      tpu_gdma_cpy_S2L ( XAddrs[Index], input_global_addr + Done * DSize, &Shape, NULL, &GlobalStride, dtype );
     }
     if ( Count > 0 && tpu_is_parallel_state())
     {
@@ -131,6 +131,7 @@ static inline void nodechip_reduce_c(
   tpu_gdma_cpy_L2S ( output_global_addr + LastDone * DSize, YAddrs[1 - Index], &LastShape, &GlobalOutStride, NULL, dtype );
 }
 
+#if 0
 void tpu_kernel_api_reduce_sum(const void *args)
 {
     sg_api_reduce_sum_t *api = (sg_api_reduce_sum_t *)args;
@@ -145,3 +146,4 @@ void tpu_kernel_api_reduce_sum(const void *args)
     tpu_poll();
 }
 TPUKERNEL_FUNC_REGISTER(tpu_kernel_api_reduce_sum);
+#endif
