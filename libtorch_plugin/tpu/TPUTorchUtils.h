@@ -275,6 +275,17 @@ private:
   static OpTimer * instance_;
 };
 
+struct GlobalTimer
+{
+  GlobalTimer & Reset();
+  void Dump() const;
+  static GlobalTimer & Instance();
+private:
+  GlobalTimer() {}
+  Timer timer_;
+  static GlobalTimer * instance_;
+};
+
 struct TensorWatcher
 {
   void AddTensor ( const at::Tensor & Tensor );

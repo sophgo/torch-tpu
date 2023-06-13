@@ -38,10 +38,9 @@ void OpTimer::Dump() const
   {
     if ( elapsed_time_us_[i] > 0 )
     {
-      std::cout << std::setw(20)<< OpTypeStr[i] << ": " << std::setw(12) << elapsed_time_us_[i] << "us, ";
-      std::cout << std::setw(8) << std::setprecision(3) << elapsed_time_us_[i]*100. / ElapsedAll << "%" << std::endl;
+      std::cout << std::setw ( 20 ) << OpTypeStr[i] << ": " << std::setw ( 12 ) << elapsed_time_us_[i] << "us, ";
+      std::cout << std::setw ( 8 ) << std::setprecision ( 3 ) << elapsed_time_us_[i] * 100. / ElapsedAll << "%" << std::endl;
     }
-
   }
   std::cout << "TPU Elapsed All: " << ElapsedAll << "us" << std::endl;
 }
@@ -54,6 +53,29 @@ OpTimer & OpTimer::Instance()
   }
   return *instance_;
 }
+
+GlobalTimer * GlobalTimer::instance_ = nullptr;
+
+GlobalTimer & GlobalTimer::Reset()
+{
+  timer_.Start();
+  return *this;
+}
+
+void GlobalTimer::Dump() const
+{
+  std::cout << "TPU Elpased: " << timer_.ElapsedUS() << "us" << std::endl;
+}
+
+GlobalTimer & GlobalTimer::Instance()
+{
+  if ( instance_ == nullptr )
+  {
+    instance_ = new GlobalTimer;
+  }
+  return *instance_;
+}
+
 
 TensorWatcher * TensorWatcher::instance_ = nullptr;
 
