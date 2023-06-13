@@ -6,19 +6,33 @@
 #include <TPUTorchUtils.h>
 #include <sgdnn_api.h>
 
+#define TPU_OP_TIMING
+
 namespace at
 {
 Tensor & sqrt_out_tpu ( const Tensor & self, Tensor & out  )
 {
   CHECK_TENSOR_IN_DEVICE ( self );
-  auto out_cpu = sqrt( self.cpu() );
-  tpu::TPUCopyHostToDevice ( out.data_ptr(), out_cpu.contiguous().data_ptr(), out.nbytes() );
+  CHECK_TENSOR_IN_DEVICE ( out );
+#ifdef TPU_OP_TIMING
+  auto timer = tpu::Timer().Start();
+#endif
+  bm_status_t status = sgdnn_sqrt (
+                       tpu::TPUGetDeviceHandle(),
+                       tpu::TPUGenerateTensorDesc ( self ),
+                       ADDR_IN_DEVICE ( self ),
+                       tpu::TPUGenerateTensorDesc ( out ),
+                       ADDR_IN_DEVICE ( out ) );
+  TORCH_CHECK ( status == BM_SUCCESS );
+#ifdef TPU_OP_TIMING
+  tpu::OpTimer::Instance().AddTime ( tpu::SQRT, timer.ElapsedUS() );
+#endif
   return out;
 }
-// TORCH_LIBRARY_IMPL ( aten, TPU, m )
-// {
-//   m.impl ( "sqrt.out", sqrt_out_tpu );
-// }
+TORCH_LIBRARY_IMPL ( aten, TPU, m )
+{
+  m.impl ( "sqrt.out", sqrt_out_tpu );
+}
 #if 0
 Tensor & binary_Tensor_tpu ( const Tensor          & input1,
                              const Tensor          & input2,

@@ -3017,7 +3017,7 @@ bm_status_t sgdnn_index_select_cudnn(
 bm_status_t sgdnn_const_fill_cudnn(
     bm_handle_t                     handle,
     const TensorDescriptor_t        srcDesc,
-    const void                      *src,
+    void                           *src,
     const void*                     fill_value){
     sg_api_constant_fill_t api;
     api.out_global_addr       = (unsigned long long) src;
@@ -3032,3 +3032,26 @@ bm_status_t sgdnn_const_fill_cudnn(
     sgdnn_tpu_kernel_launch(handle, "tpu_kernel_api_const_fill", &api, sizeof(api));
     return BM_SUCCESS;
 } 
+
+bm_status_t sgdnn_sqrt(
+    bm_handle_t                     handle,
+    const TensorDescriptor_t        inputDesc,
+    const void                     *input,
+    const TensorDescriptor_t        outputDesc,
+    void                           *output )
+{
+    sg_api_sqrt_t api;
+    api.input_global_addr = (unsigned long long) input;
+    api.output_global_addr = (unsigned long long) output;
+    api.dim = inputDesc.ndims;
+    api.dtype = (sg_data_type_t)inputDesc.dtype;
+    assert(inputDesc.ndims == outputDesc.ndims);
+    assert(inputDesc.dtype == outputDesc.dtype);
+
+    for(int i = 0; i < inputDesc.ndims; i++ ){
+        assert(inputDesc.shape[i] == outputDesc.shape[i]);
+        api.shape[i] = inputDesc.shape[i];
+    }
+    sgdnn_tpu_kernel_launch(handle, "tpu_kernel_api_sqrt", &api, sizeof(api));
+    return BM_SUCCESS;
+}
