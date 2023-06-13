@@ -2823,9 +2823,9 @@ bm_status_t sgdnn_reduce_sum_cudnn(
             y_shape[i] = yDesc.shape[i];
         }
         y_shape[reduce_dim] = 1;
-        for (int i = reduce_dim + 1; i < yDesc.ndims; ++i)
+        for (int i = reduce_dim; i < yDesc.ndims; ++i)
         {
-            y_shape[i] = yDesc.shape[i];
+            y_shape[i + 1] = yDesc.shape[i];
         }
     }
     for (int i = 0; i < xDesc.ndims; ++i)
