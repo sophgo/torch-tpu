@@ -250,8 +250,8 @@ static const char * OpTypeStr[OP_NUM] =
   "Where",
   "Strided Copy",
   "Concat",
+  "Const Fill",
   "Sqrt",
-  "Const Fill"
 };
 
 struct OpTimer
