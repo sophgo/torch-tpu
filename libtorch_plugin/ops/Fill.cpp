@@ -27,6 +27,7 @@ Tensor & fill__Scalar_tpu ( Tensor & self, const Scalar & value )
     tpu::TPUGenerateTensorDesc( self ),
     ADDR_IN_DEVICE( self ),
     value.data_ptr());
+  TORCH_CHECK ( status == BM_SUCCESS );
 #ifdef TPU_OP_TIMING
   tpu::OpTimer::Instance().AddTime ( tpu::CONST_FILL, timer.ElapsedUS() );
 #endif
@@ -41,10 +42,14 @@ TORCH_LIBRARY_IMPL ( aten, TPU, m )
 Tensor & zero__tpu ( Tensor & self )
 {
   CHECK_TENSOR_IN_DEVICE ( self );
+#if 0
   char * buffer = new char [self.nbytes()];
   memset ( buffer, 0x0, self.nbytes() );
   tpu::TPUCopyHostToDevice ( self.data_ptr(), buffer, self.nbytes() );
   delete [] buffer;
+#else
+  fill__Scalar_tpu(self, 0);
+#endif
   return self;
 }
 TORCH_LIBRARY_IMPL ( aten, TPU, m )

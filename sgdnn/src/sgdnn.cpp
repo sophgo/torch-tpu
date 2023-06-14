@@ -2044,158 +2044,6 @@ bm_status_t sgdnn_activation_backward_cudnn(
     return BM_ERR_NOFEATURE;
 }
 
-bm_status_t sgdnn_cross_entropy_forward(
-    bm_handle_t        handle,
-    bm_device_mem_t    input,
-    bm_device_mem_t    target,
-    bm_device_mem_t    loss,
-    int                batch,
-    int                cls_num,
-    int                reduction,
-    sg_data_type_t     dtype)
-{
-
-    bm_device_mem_t input_mem, target_mem;
-    bm_device_mem_t loss_mem;
-    u64 size = (u64)batch * cls_num * dtype_size(dtype);
-
-    DEVICE_MEM_NEW_INPUT(handle, input, size, input_mem);
-    DEVICE_MEM_NEW_INPUT(handle, target, size, target_mem);
-    DEVICE_MEM_NEW_OUTPUT(handle, loss, dtype_size(dtype), loss_mem);
-
-    sg_api_crossentropy_forward_t api = {
-        bm_mem_get_device_addr(input_mem),
-        bm_mem_get_device_addr(target_mem),
-        bm_mem_get_device_addr(loss_mem),
-        batch, cls_num, reduction, dtype};
-
-    sgdnn_tpu_kernel_launch(handle, "tpu_kernel_api_cross_entropy_forward", &api, sizeof(api));
-
-    DEVICE_MEM_DEL_INPUT(handle, input, input_mem);
-    DEVICE_MEM_DEL_INPUT(handle, target, target_mem);
-    DEVICE_MEM_DEL_OUTPUT(handle, loss, loss_mem);
-
-    return BM_SUCCESS;
-}
-
-bm_status_t sgdnn_cross_entropy_forward_cudnn(
-    bm_handle_t                      handle,
-    SoftmaxMode_t                    softmax_mode,
-    CrossEntropyMode_t               crossentropy_mode,
-    const void                      *alpha,
-    const TensorDescriptor_t         xDesc,
-    const void                      *x,
-    const void                      *beta,
-    const TensorDescriptor_t         yDesc,
-    void                            *y,
-    const TensorDescriptor_t         labelDesc,
-    void                            *label)
-{
-    unsigned long long input  = (unsigned long long)x;
-    unsigned long long target = (unsigned long long)label;
-    unsigned long long loss   = (unsigned long long)y;
-
-    float alpha_ = ((float*)alpha)[0];
-    assert(alpha_ == 1.0f);
-    float beta_ = ((float*)beta)[0];
-    assert(beta_ == 0.0f);
-
-    assert( yDesc.ndims == 1 && yDesc.shape[0] == 1);
-    assert( xDesc.ndims == 2);
-    assert( labelDesc.ndims == 2);
-    int batch = xDesc.shape[0];
-    int cls_num = xDesc.shape[1];
-    int reduction = (int)crossentropy_mode;
-
-    sg_data_type_t ydtype = (sg_data_type_t)(yDesc.dtype);
-    sg_data_type_t xdtype = (sg_data_type_t)(xDesc.dtype);
-    assert(xdtype == ydtype && xdtype == 0);
-
-    sg_api_crossentropy_forward_t api = {
-        input, target, loss,
-        batch, cls_num, reduction, xdtype};
-
-    sgdnn_tpu_kernel_launch(handle, "tpu_kernel_api_cross_entropy_forward", &api, sizeof(api));
-
-    return BM_SUCCESS;
-}
-
-bm_status_t sgdnn_cross_entropy_backward(
-    bm_handle_t        handle,
-    bm_device_mem_t    input,
-    bm_device_mem_t    target,
-    bm_device_mem_t    grad_input,
-    int                batch,
-    int                cls_num,
-    int                reduction,
-    sg_data_type_t     dtype)
-{
-    bm_device_mem_t input_mem, target_mem;
-    bm_device_mem_t grad_input_mem;
-    u64 size = (u64)batch * cls_num * dtype_size(dtype);
-
-    DEVICE_MEM_NEW_INPUT(handle, input, size, input_mem);
-    DEVICE_MEM_NEW_INPUT(handle, target, size, target_mem);
-    DEVICE_MEM_NEW_OUTPUT(handle, grad_input, size, grad_input_mem);
-
-    sg_api_crossentropy_backward_t api = {
-        bm_mem_get_device_addr(input_mem),
-        bm_mem_get_device_addr(target_mem),
-        bm_mem_get_device_addr(grad_input_mem),
-        batch, cls_num, reduction, dtype};
-
-    sgdnn_tpu_kernel_launch(handle, "tpu_kernel_api_cross_entropy_backward", &api, sizeof(api));
-
-    DEVICE_MEM_DEL_INPUT(handle, input, input_mem);
-    DEVICE_MEM_DEL_INPUT(handle, target, target_mem);
-    DEVICE_MEM_DEL_OUTPUT(handle, grad_input, grad_input_mem);
-
-    return BM_SUCCESS;
-}
-
-bm_status_t sgdnn_cross_entropy_backward_cudnn(
-    bm_handle_t                      handle,
-    SoftmaxMode_t                    softmax_mode,
-    CrossEntropyMode_t               crossentropy_mode,
-    const void                      *alpha,
-    const TensorDescriptor_t         xDesc,
-    const void                      *xData,
-    const TensorDescriptor_t         labelDesc,
-    void                            *label,
-    const void                      *beta,
-    const TensorDescriptor_t         dxDesc,
-    void                            *dx)
-{
-    float alpha_ = ((float*)alpha)[0];
-    assert(alpha_ == 1.0f);
-    float beta_ = ((float*)beta)[0];
-    assert(beta_ == 0.0f);
-
-    unsigned long long input        = (unsigned long long)xData;
-    unsigned long long target       = (unsigned long long)label;
-    unsigned long long grad_input   = (unsigned long long)dx;
-
-    assert(    xDesc.ndims == 2);
-    assert(   dxDesc.ndims == 2);
-    assert(labelDesc.ndims == 2);
-    int batch = xDesc.shape[0];
-    int cls_num = xDesc.shape[1];
-    int reduction = (int)crossentropy_mode;
-    assert(reduction == 0 || reduction == 1);
-
-    sg_data_type_t dxdtype = (sg_data_type_t)(dxDesc.dtype);
-    sg_data_type_t  xdtype = (sg_data_type_t)( xDesc.dtype);
-    assert(xdtype == dxdtype && xdtype == 0);
-
-    sg_api_crossentropy_backward_t api = {
-        input, target, grad_input,
-        batch, cls_num, reduction, xdtype};
-
-    sgdnn_tpu_kernel_launch(handle, "tpu_kernel_api_cross_entropy_backward", &api, sizeof(api));
-
-    return BM_SUCCESS;
-}
-
 //y = cast(x)
 bm_status_t sgdnn_dtype_convert(
     bm_handle_t                      handle,
@@ -3039,7 +2887,7 @@ bm_status_t sgdnn_const_fill_cudnn(
     api.filled_value          = 0;
 
     memcpy( &api.filled_value, fill_value, dtype_size(api.filled_sgdtype) );
-        for(int i = 0; i < srcDesc.ndims; i++ ){
+    for(int i = 0; i < srcDesc.ndims; i++ ){
         api.shape[i] = srcDesc.shape[i];
     }
     sgdnn_tpu_kernel_launch(handle, "tpu_kernel_api_const_fill", &api, sizeof(api));
@@ -3142,3 +2990,41 @@ bm_status_t sgdnn_addcmul(
     sgdnn_tpu_kernel_launch(handle, "tpu_kernel_api_addcmul", &api, sizeof(api));
     return BM_SUCCESS;
 }
+
+bm_status_t sgdnn_cross_entropy_forward(
+    bm_handle_t                      handle,
+    const TensorDescriptor_t         inDesc,
+    const void                      *in,
+    const TensorDescriptor_t         targetDesc,
+    const void                      *target,
+    const TensorDescriptor_t         weightDesc,
+    const void                      *weight,
+    const TensorDescriptor_t         outDesc,
+    void                            *out,
+    const TensorDescriptor_t         softmaxOutDesc,
+    void                            *softmax,
+    bool                             has_weight,
+    CrossEntropyMode_t               reduction,
+    int                              ignore_index,
+    double                           label_smoothing){
+    assert(0);
+    return BM_SUCCESS;
+    }
+
+bm_status_t sgdnn_cross_entropy_backward(
+    bm_handle_t                      handle,
+    const TensorDescriptor_t         targetDesc,
+    const void                      *target,
+    const TensorDescriptor_t         softmaxOutDesc,
+    const void                      *softmax,
+    const TensorDescriptor_t         weightDesc,
+    const void                      *weight,
+    const TensorDescriptor_t         gradinDesc,
+    void                            *gradin,
+    CrossEntropyMode_t               reduction,
+    int                              ignore_index,
+    double                           label_smoothing,
+    bool                             has_weight){
+    assert(0);
+    return BM_SUCCESS;
+    }

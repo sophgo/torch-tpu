@@ -71,9 +71,9 @@ typedef enum {
 } SoftmaxMode_t;
 
 typedef enum {
-  Mean_Reduction = 0,
-  Sum_Reduction = 1,
-  None_Reduction = 2,
+  None_Reduction = 0,
+  Mean_Reduction = 1,
+  Sum_Reduction = 2,
 } CrossEntropyMode_t;
 
 typedef enum {
@@ -471,51 +471,6 @@ bm_status_t sgdnn_activation_backward_cudnn(
     const TensorDescriptor_t         dxDesc,
     void                            *dx);
 
-bm_status_t sgdnn_cross_entropy_forward(
-    bm_handle_t        handle,
-    bm_device_mem_t    input,
-    bm_device_mem_t    target,
-    bm_device_mem_t    loss,
-    int                batch,
-    int                cls,
-    int                reduction,
-    sg_data_type_t     dtype);
-
-bm_status_t sgdnn_cross_entropy_forward_cudnn(
-    bm_handle_t                      handle,
-    SoftmaxMode_t                    softmax_mode,
-    CrossEntropyMode_t               crossentropy_mode,
-    const void                      *alpha,
-    const TensorDescriptor_t         xDesc,
-    const void                      *x,
-    const void                      *beta,
-    const TensorDescriptor_t         yDesc,
-    void                            *y,
-    const TensorDescriptor_t         labelDesc,
-    void                            *label);
-
-bm_status_t sgdnn_cross_entropy_backward(
-    bm_handle_t        handle,
-    bm_device_mem_t    input,
-    bm_device_mem_t    target,
-    bm_device_mem_t    grad_input,
-    int                batch,
-    int                cls,
-    int                reduction,
-    sg_data_type_t     dtype);
-
-bm_status_t sgdnn_cross_entropy_backward_cudnn(
-    bm_handle_t                      handle,
-    SoftmaxMode_t                    softmax_mode,
-    CrossEntropyMode_t               crossentropy_mode,
-    const void                      *alpha,
-    const TensorDescriptor_t         xDesc,
-    const void                      *xData,
-    const TensorDescriptor_t         labelDesc,
-    void                            *label,
-    const void                      *beta,
-    const TensorDescriptor_t         dxDesc,
-    void                            *dx);
 
 bm_status_t sgdnn_dtype_convert(
     bm_handle_t                      handle,
@@ -731,6 +686,61 @@ bm_status_t sgdnn_addcmul(
     void                           *output,
     double                          value);
 
+/* 
+reference:
+https://pytorch.org/docs/1.13/generated/torch.nn.CrossEntropyLoss.html?highlight=crossentropy#torch.nn.CrossEntropyLoss
+- in:
+        shape = [N, C]
+-target:
+        shape = [N]
+- weight: default have no value
+        shape = in.shape[-1] = [C]
+        weight * log(softmax(in))
+- reduction: default= Mean
+        None : shape = target.shape = [N]
+        Mean : shape = [1]
+        Sum  : shape = [1]
+- label_smoothing: [0, 1], default = 0
+        target = one_hot(target_index)
+        target[i == target_index] = 1 - label_smoothing, others = label_smothing/(len(in)-1)
+ examples:
+    target_index                            : 3
+    label_smothing                          : 0.3
+    target  = one_hot(target_index)         : [0, 0, 0, 1]
+    target <- label smoothing               : [0.1, 0.1, 0.1, 0.7]
+**/ 
+bm_status_t sgdnn_cross_entropy_forward(
+    bm_handle_t                      handle,
+    const TensorDescriptor_t         inDesc,
+    const void                      *in,
+    const TensorDescriptor_t         targetDesc,
+    const void                      *target,
+    const TensorDescriptor_t         weightDesc,
+    const void                      *weight,
+    const TensorDescriptor_t         outDesc,
+    void                            *out,
+    const TensorDescriptor_t         softmaxOutDesc,
+    void                            *softmax,
+    bool                             has_weight,
+    CrossEntropyMode_t               reduction,
+    int                              ignore_index,
+    double                           label_smoothing
+    );
+
+bm_status_t sgdnn_cross_entropy_backward(
+    bm_handle_t                      handle,
+    const TensorDescriptor_t         targetDesc,
+    const void                      *target,
+    const TensorDescriptor_t         softmaxOutDesc,
+    const void                      *softmax,
+    const TensorDescriptor_t         weightDesc,
+    const void                      *weight,
+    const TensorDescriptor_t         gradinDesc,
+    void                            *gradin,
+    CrossEntropyMode_t               reduction,
+    int                              ignore_index,
+    double                           label_smoothing,
+    bool                             has_weight);
 #if defined(__cplusplus)
 }
 #endif
