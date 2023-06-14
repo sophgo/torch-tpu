@@ -16,7 +16,6 @@
 do \
 { \
 TORCH_CHECK ( t.device().type() == DeviceType::TPU, #t, " is not in TPU device" ); \
-TORCH_CHECK ( tpu::TPUPtrIsInCurrentDevice ( t.data_ptr() ) == true, #t, " is not in current TPU device"  ); \
 TORCH_CHECK ( t.is_contiguous() == true, #t, " is not contiguous" ); \
 } \
 while ( 0 )
@@ -25,7 +24,6 @@ while ( 0 )
 do \
 { \
 TORCH_CHECK ( t.device().type() == DeviceType::TPU, #t, " is not in TPU device" ); \
-TORCH_CHECK ( tpu::TPUPtrIsInCurrentDevice ( t.data_ptr() ) == true, #t, " is not in current TPU device"  ); \
 } \
 while ( 0 )
 
@@ -33,7 +31,7 @@ while ( 0 )
 
 #define TENSOR_TO_TPU(t) ( ( t ).to ( tpu::TPUGetCurrentDevice() ) )
 
-#define ADDR_IN_DEVICE(t) tpu::TPUGetAddrInDevice( t.data_ptr() )
+#define ADDR_IN_DEVICE(t) (t).data_ptr()
 
 #define TPU_ERROR_CODE(Err) " ( TPU error code: " << Err << ")"
 
@@ -180,8 +178,8 @@ typedef enum
 {
   CDMA_D2S = 0,
   CDMA_S2D,
-  CDMA_D2D,
   CDMA_C2C,
+  COPY,
   CONVOLUTION,
   CONVOLUTION_BACKWARD,
   BATCHNORM,
@@ -224,8 +222,8 @@ static const char * OpTypeStr[OP_NUM] =
 {
   "CDMA D2S",
   "CDMA S2D",
-  "CDMA D2D",
   "CDMA C2C",
+  "Copy",
   "Convolution",
   "Convolution Backward",
   "BatchNorm",
