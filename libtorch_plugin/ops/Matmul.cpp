@@ -4,7 +4,6 @@
 #include <ATen/EmptyTensor.h>
 #include <TPUDeviceManager.h>
 #include <TPUTorchUtils.h>
-#include <TPUModule.h>
 #include <sgdnn_api.h>
 
 #define TPU_OP_TIMING
@@ -27,13 +26,13 @@ Tensor & addmm_out_tpu ( const Tensor & self, const Tensor & mat1, const Tensor 
   auto out_cpu = addmm ( self.cpu(), mat1.cpu(), mat2.cpu(), beta, alpha );
   tpu::TPUCopyHostToDevice ( out.data_ptr(), out_cpu.contiguous().data_ptr(), out.nbytes() );
 #else
-  if (( alpha.toDouble() == 1. ) && ( beta.toDouble() == 1. ))
+  if ( ( alpha.toDouble() == 1. ) && ( beta.toDouble() == 1. ) )
   {
-    linear_out( out, mat1.contiguous(), mat2.contiguous(), self.contiguous());
+    linear_out ( out, mat1.contiguous(), mat2.contiguous(), self.contiguous() );
   }
   else
   {
-    TORCH_CHECK( false );
+    TORCH_CHECK ( false );
   }
 #endif
   return out;
@@ -57,23 +56,10 @@ Tensor & mm_out_tpu ( const Tensor & self, const Tensor & mat2, Tensor & out )
   auto out_cpu = mm ( self.cpu(), mat2.cpu() );
   tpu::TPUCopyHostToDevice ( out.data_ptr(), out_cpu.contiguous().data_ptr(), out.nbytes() );
 #else
-
   auto computeType = SG_DTYPE_FP32;
-  auto accuracy = tpu::GetMatrixMultiplyAccuracy();
   if ( self.dtype() == caffe2::TypeMeta::Make<float>() )
   {
-    if ( accuracy == tpu::ALGORITHM_ACCURACY_FP32 )
-    {
-      computeType = SG_DTYPE_FP32;
-    }
-    else if ( accuracy == tpu::ALGORITHM_ACCURACY_FP16 )
-    {
-      computeType = SG_DTYPE_FP16;
-    }
-    else
-    {
-      TORCH_CHECK ( false, "Unsupported Matmul Accuracy" );
-    }
+    computeType = SG_DTYPE_FP32;
   }
   else if ( self.dtype() == caffe2::TypeMeta::Make<at::Half>() )
   {
@@ -121,21 +107,9 @@ Tensor & bmm_out_tpu ( const Tensor & self, const Tensor & mat2, Tensor & out )
   tpu::TPUCopyHostToDevice ( out.data_ptr(), out_cpu.contiguous().data_ptr(), out.nbytes() );
 #else
   auto computeType = SG_DTYPE_FP32;
-  auto accuracy = tpu::GetMatrixMultiplyAccuracy();
   if ( self.dtype() == caffe2::TypeMeta::Make<float>() )
   {
-    if ( accuracy == tpu::ALGORITHM_ACCURACY_FP32 )
-    {
-      computeType = SG_DTYPE_FP32;
-    }
-    else if ( accuracy == tpu::ALGORITHM_ACCURACY_FP16 )
-    {
-      computeType = SG_DTYPE_FP16;
-    }
-    else
-    {
-      TORCH_CHECK ( false, "Unsupported Matmul Accuracy" );
-    }
+    computeType = SG_DTYPE_FP32;
   }
   else if ( self.dtype() == caffe2::TypeMeta::Make<at::Half>() )
   {
@@ -169,7 +143,7 @@ TORCH_LIBRARY_IMPL ( aten, TPU, m )
   m.impl ( "bmm.out", bmm_out_tpu );
 }
 
-Tensor & linear_out_tpu ( const Tensor & self, const Tensor & mat2, const c10::optional<Tensor> & bias_opt, Tensor & out)
+Tensor & linear_out_tpu ( const Tensor & self, const Tensor & mat2, const c10::optional<Tensor> & bias_opt, Tensor & out )
 {
   static int count = 0;
 #ifdef SHOW_OP_INFO
@@ -186,23 +160,10 @@ Tensor & linear_out_tpu ( const Tensor & self, const Tensor & mat2, const c10::o
   auto out_cpu = linear ( self.cpu(), mat2.cpu(), bias.cpu() );
   tpu::TPUCopyHostToDevice ( out.data_ptr(), out_cpu.contiguous().data_ptr(), out.nbytes() );
 #else
-
   auto computeType = SG_DTYPE_FP32;
-  auto accuracy = tpu::GetMatrixMultiplyAccuracy();
   if ( self.dtype() == caffe2::TypeMeta::Make<float>() )
   {
-    if ( accuracy == tpu::ALGORITHM_ACCURACY_FP32 )
-    {
-      computeType = SG_DTYPE_FP32;
-    }
-    else if ( accuracy == tpu::ALGORITHM_ACCURACY_FP16 )
-    {
-      computeType = SG_DTYPE_FP16;
-    }
-    else
-    {
-      TORCH_CHECK ( false, "Unsupported Matmul Accuracy" );
-    }
+    computeType = SG_DTYPE_FP32;
   }
   else if ( self.dtype() == caffe2::TypeMeta::Make<at::Half>() )
   {

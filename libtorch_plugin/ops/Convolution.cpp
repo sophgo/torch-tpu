@@ -5,7 +5,6 @@
 #include <ATen/native/ConvUtils.h>
 #include <TPUDeviceManager.h>
 #include <TPUTorchUtils.h>
-#include <TPUModule.h>
 #include <sgdnn_api.h>
 
 #define TPU_OP_TIMING
@@ -93,21 +92,10 @@ int64_t groups )
       .dilation_w = ( int ) dilation[1],
       .groups = ( int ) groups,
     };
-    auto accuracy = tpu::GetConvolutionForwardAccuracy();
+    auto accuracy = SG_DTYPE_FP32;
     if ( input.dtype() == caffe2::TypeMeta::Make<float>() )
     {
-      if ( accuracy == tpu::ALGORITHM_ACCURACY_FP32 )
-      {
-        conv_desc.computeType = SG_DTYPE_FP32;
-      }
-      else if ( accuracy == tpu::ALGORITHM_ACCURACY_FP16 )
-      {
-        conv_desc.computeType = SG_DTYPE_FP16;
-      }
-      else
-      {
-        TORCH_CHECK ( false, "Unsupported convolution forward accuracy" );
-      }
+      conv_desc.computeType = SG_DTYPE_FP32;
     }
     else if ( input.dtype() == caffe2::TypeMeta::Make<at::Half>() )
     {
@@ -224,19 +212,7 @@ std::array<bool, 3> output_mask )
     };
     if ( input.dtype() == caffe2::TypeMeta::Make<float>() )
     {
-      auto accuracy = tpu::GetConvolutionBackwardAccuracy();
-      if ( accuracy == tpu::ALGORITHM_ACCURACY_FP32 )
-      {
-        conv_desc.computeType = SG_DTYPE_FP32;
-      }
-      else if ( accuracy == tpu::ALGORITHM_ACCURACY_FP16 )
-      {
-        conv_desc.computeType = SG_DTYPE_FP16;
-      }
-      else
-      {
-        TORCH_CHECK ( false, "Unsupported convolution backward accuracy" );
-      }
+      conv_desc.computeType = SG_DTYPE_FP32;
     }
     else if ( input.dtype() == caffe2::TypeMeta::Make<at::Half>() )
     {

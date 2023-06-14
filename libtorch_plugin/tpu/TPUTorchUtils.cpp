@@ -16,10 +16,29 @@ OpTimer & OpTimer::Clear()
   return *this;
 }
 
+OpTimer & OpTimer::Start()
+{
+  mutex_.lock();
+  is_paused_ = false;
+  mutex_.unlock();
+  return *this;
+}
+
+OpTimer & OpTimer::Pause()
+{
+  mutex_.lock();
+  is_paused_ = true;
+  mutex_.unlock();
+  return *this;
+}
+
 OpTimer & OpTimer::AddTime ( OpType type, unsigned long time_us )
 {
   mutex_.lock();
-  elapsed_time_us_[type] += time_us;
+  if ( is_paused_ == false )
+  {
+    elapsed_time_us_[type] += time_us;
+  }
   mutex_.unlock();
   return *this;
 }

@@ -265,12 +265,15 @@ static const char * OpTypeStr[OP_NUM] =
 struct OpTimer
 {
   OpTimer & Clear();
+  OpTimer & Start();
+  OpTimer & Pause();
   OpTimer & AddTime ( OpType type, unsigned long time_us );
   void Dump() const;
   static OpTimer & Instance();
 private:
   OpTimer() {}
   unsigned long long elapsed_time_us_[OP_NUM];
+  bool is_paused_ = false;
   std::mutex mutex_;
   static OpTimer * instance_;
 };
@@ -297,17 +300,5 @@ private:
   std::vector<at::Tensor> tensors_cpu_;
   static TensorWatcher * instance_;
 };
-
-template<typename T>
-static inline void DumpTensor ( const at::Tensor & Tensor )
-{
-  auto TensorCPU = TENSOR_TO_CPU ( Tensor );
-  auto Ptr = TensorCPU.data_ptr<T>();
-  for ( auto i = 0; i < Tensor.numel(); ++i )
-  {
-    std::cout << Ptr[i] << " ";
-  }
-  std::cout << std::endl;
-}
 
 } // namespace tpu

@@ -2,10 +2,8 @@
 #include <torch/torch.h>
 #include <ATen/core/TensorBase.h>
 #include <ATen/EmptyTensor.h>
-#include <ATen/native/ConvUtils.h>
 #include <TPUDeviceManager.h>
 #include <TPUTorchUtils.h>
-#include <TPUModule.h>
 #include <sgdnn_api.h>
 
 #define TPU_OP_TIMING
