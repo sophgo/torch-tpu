@@ -13,6 +13,10 @@ Tensor empty_strided_tpu ( IntArrayRef                size,
                            c10::optional<Device>      device_opt,
                            c10::optional<bool>        pin_memory_opt )
 {
+  if ( device_opt.has_value() )
+  {
+    tpu::TPUSetDeviceIndex ( device_opt.value().index() );
+  }
   auto scalar_type = dtype_or_default ( dtype_opt );
   auto pin_memory = pinned_memory_or_default ( pin_memory_opt );
   at::detail::check_size_nonnegative ( size );
@@ -43,6 +47,10 @@ c10::optional<Device>             device_opt,
 c10::optional<bool>               pin_memory_opt,
 c10::optional<c10::MemoryFormat>  memory_format_opt )
 {
+  if ( device_opt.has_value() )
+  {
+    tpu::TPUSetDeviceIndex ( device_opt.value().index() );
+  }
   auto scalar_type = dtype_or_default ( dtype_opt );
   auto pin_memory = pinned_memory_or_default ( pin_memory_opt );
   constexpr c10::DispatchKeySet ks ( c10::DispatchKey::TPU );

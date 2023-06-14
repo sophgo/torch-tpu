@@ -41,14 +41,9 @@ private:
         TORCH_CHECK ( Status == BM_SUCCESS, "Failed to request tpu device #", i );
         tpu_module_init ( Handles_[i] );
       }
-      Index_ = 0;
+      Mutexes_ = std::vector<std::mutex> ( DeviceCount );
+      AddrMemMaps_ = std::vector<std::unordered_map<unsigned long long, bm_device_mem_t>> ( DeviceCount );
     }
-    else
-    {
-      Index_ = -1;
-    }
-    Mutexes_ = std::vector<std::mutex> ( DeviceCount );
-    AddrMemMaps_ = std::vector<std::unordered_map<unsigned long long, bm_device_mem_t>> ( DeviceCount );
   }
 
   ~TPUDeviceManager()
@@ -72,16 +67,6 @@ public:
     return *instance_;
   }
 
-  int GetDeviceIndex() const
-  {
-    return Index_;
-  }
-
-  void SetDeviceIndex ( int Index )
-  {
-    Index_ = Index;
-  }
-
   int GetDeviceCount() const
   {
     return ( int ) Handles_.size();
@@ -99,22 +84,17 @@ public:
     }
   }
 
-  bm_handle_t GetDeviceHandle() const
+  void * Alloc ( size_t Size, int Index )
   {
-    return GetDeviceHandle ( Index_ );
-  }
-
-  void * Alloc ( size_t Size )
-  {
-    Mutexes_[Index_].lock();
+    Mutexes_[Index].lock();
     if ( Size == 0 )
     {
-      Mutexes_[Index_].unlock();
+      Mutexes_[Index].unlock();
       return nullptr;
     }
     TORCH_CHECK ( Size < ( 1UL << 32 ), "TPU only allows to allocate memory with size smaller than (2^32) bytes" );
-    bm_handle_t Handle = GetDeviceHandle();
-    TORCH_CHECK ( Handle != nullptr, "TPU handle of device #", GetDeviceIndex(), " is null" );
+    bm_handle_t Handle = GetDeviceHandle ( Index );
+    TORCH_CHECK ( Handle != nullptr, "TPU handle of device #", Index, " is null" );
     bm_device_mem_t Mem;
 #ifdef TPU_OP_TIMING
     auto timer = tpu::Timer().Start();
@@ -123,35 +103,35 @@ public:
 #ifdef TPU_OP_TIMING
     tpu::OpTimer::Instance().AddTime ( tpu::MALLOC, timer.ElapsedUS() );
 #endif
-    TORCH_CHECK ( Status == BM_SUCCESS, "Failed to allocate memory on TPU device #", GetDeviceIndex(), " size = ", Size, "bytes" );
+    TORCH_CHECK ( Status == BM_SUCCESS, "Failed to allocate memory on TPU device #", Index, " size = ", Size, "bytes" );
     unsigned long long Addr = bm_mem_get_device_addr ( Mem );
-    AddrMemMaps_[Index_].emplace ( Addr, Mem );
+    AddrMemMaps_[Index].emplace ( Addr, Mem );
 #ifdef SHOW_INFO
     std::cout << "Alloc addr = " << ( void * ) Addr << " size = " << Size << std::endl;
     std::cout << "====================================" << std::endl;
-    for ( auto iter : AddrMemMaps_[Index_] )
+    for ( auto iter : AddrMemMaps_[Index] )
     {
       std::cout << ( void * ) iter.first << " ";
     }
     std::cout << std::endl;
     std::cout << "====================================" << std::endl;
 #endif
-    Mutexes_[Index_].unlock();
+    Mutexes_[Index].unlock();
     return ( void * ) Addr;
   }
 
-  void Free ( void * Ptr )
+  void Free ( void * Ptr, int Index )
   {
-    Mutexes_[Index_].lock();
+    Mutexes_[Index].lock();
     if ( Ptr == nullptr )
     {
-      Mutexes_[Index_].unlock();
+      Mutexes_[Index].unlock();
       return;
     }
-    bm_handle_t Handle = GetDeviceHandle();
-    TORCH_CHECK ( Handle != nullptr, "TPU handle of device #", GetDeviceIndex(), " is null" );
-    auto Iter = AddrMemMaps_[Index_].find ( ( unsigned long long ) Ptr );
-    TORCH_CHECK ( Iter != AddrMemMaps_[Index_].end(), "Memory of address = ", Ptr, " is not found" );
+    bm_handle_t Handle = GetDeviceHandle ( Index );
+    TORCH_CHECK ( Handle != nullptr, "TPU handle of device #", Index, " is null" );
+    auto Iter = AddrMemMaps_[Index].find ( ( unsigned long long ) Ptr );
+    TORCH_CHECK ( Iter != AddrMemMaps_[Index].end(), "Memory of address = ", Ptr, " is not found" );
 #ifdef TPU_OP_TIMING
     auto timer = tpu::Timer().Start();
 #endif
@@ -159,63 +139,63 @@ public:
 #ifdef TPU_OP_TIMING
     tpu::OpTimer::Instance().AddTime ( tpu::FREE, timer.ElapsedUS() );
 #endif
-    AddrMemMaps_[Index_].erase ( Iter );
+    AddrMemMaps_[Index].erase ( Iter );
 #ifdef SHOW_INFO
     std::cout << "Free addr = " << Ptr << std::endl;
     std::cout << "====================================" << std::endl;
-    for ( auto iter : AddrMemMaps_[Index_] )
+    for ( auto iter : AddrMemMaps_[Index] )
     {
       std::cout << ( void * ) iter.first << " ";
     }
     std::cout << std::endl;
     std::cout << "====================================" << std::endl;
 #endif
-    Mutexes_[Index_].unlock();
+    Mutexes_[Index].unlock();
   }
 
-  void CopyHostToDevice ( void * Dst, const void * Src, size_t Size )
+  void CopyHostToDevice ( void * Dst, const void * Src, size_t Size, int Index )
   {
 #ifdef SHOW_INFO
     std::cout << "Copy Host = " << Src << " to Device = " << Dst << " Size = " << Size << std::endl;
 #endif
-    bm_handle_t Handle = GetDeviceHandle();
-    TORCH_CHECK ( Handle != nullptr, "TPU handle of device #", GetDeviceIndex(), " is null" );
+    bm_handle_t Handle = GetDeviceHandle ( Index );
+    TORCH_CHECK ( Handle != nullptr, "TPU handle of device #", Index, " is null" );
     bm_device_mem_t DstMem = bm_mem_from_device ( ( unsigned long long ) Dst, Size );
 #ifdef TPU_OP_TIMING
     auto timer = tpu::Timer().Start();
 #endif
     bm_status_t Status = bm_memcpy_s2d ( Handle, DstMem, ( void * ) Src );
-    TORCH_CHECK ( Status == BM_SUCCESS, "Failed to copy memory from host to TPU device #", Index_, " size = ", Size, "bytes" );
+    TORCH_CHECK ( Status == BM_SUCCESS, "Failed to copy memory from host to TPU device #", Index, " size = ", Size, "bytes" );
 #ifdef TPU_OP_TIMING
     tpu::OpTimer::Instance().AddTime ( tpu::CDMA_S2D, timer.ElapsedUS() );
 #endif
   }
 
-  void CopyDeviceToHost ( void * Dst, const void * Src, size_t Size )
+  void CopyDeviceToHost ( void * Dst, const void * Src, size_t Size, int Index )
   {
 #ifdef SHOW_INFO
     std::cout << "Copy Device = " << Src << " to Host = " << Dst << " Size = " << Size << std::endl;
 #endif
-    bm_handle_t Handle = GetDeviceHandle();
-    TORCH_CHECK ( Handle != nullptr, "TPU handle of device #", GetDeviceIndex(), " is null" );
+    bm_handle_t Handle = GetDeviceHandle ( Index );
+    TORCH_CHECK ( Handle != nullptr, "TPU handle of device #", Index, " is null" );
     bm_device_mem_t SrcMem = bm_mem_from_device ( ( unsigned long long ) Src, Size );
 #ifdef TPU_OP_TIMING
     auto timer = tpu::Timer().Start();
 #endif
     bm_status_t Status = bm_memcpy_d2s ( Handle, Dst, SrcMem );
-    TORCH_CHECK ( Status == BM_SUCCESS, "Failed to copy memory from TPU device #", Index_, " to host size = ", Size, "bytes" );
+    TORCH_CHECK ( Status == BM_SUCCESS, "Failed to copy memory from TPU device #", Index, " to host size = ", Size, "bytes" );
 #ifdef TPU_OP_TIMING
     tpu::OpTimer::Instance().AddTime ( tpu::CDMA_D2S, timer.ElapsedUS() );
 #endif
   }
 
-  void CopyDeviceToDevice ( void * Dst, const void * Src, size_t Size )
+  void CopyDeviceToDevice ( void * Dst, const void * Src, size_t Size, int Index )
   {
 #ifdef SHOW_INFO
     std::cout << "Copy Device = " << Src << " to Device = " << Dst << " Size = " << Size << std::endl;
 #endif
-    bm_handle_t Handle = GetDeviceHandle();
-    TORCH_CHECK ( Handle != nullptr, "TPU handle of device #", GetDeviceIndex(), " is null" );
+    bm_handle_t Handle = GetDeviceHandle ( Index );
+    TORCH_CHECK ( Handle != nullptr, "TPU handle of device #", Index, " is null" );
     auto DstMem = bm_mem_from_device ( ( unsigned long long ) Dst, Size );
     auto SrcMem = bm_mem_from_device ( ( unsigned long long ) Src, Size );
     bm_status_t Status = BM_SUCCESS;
@@ -230,12 +210,13 @@ public:
 
 private:
   std::vector<bm_handle_t> Handles_;
-  int Index_;
   std::vector<std::mutex> Mutexes_;
   std::vector<std::unordered_map<unsigned long long, bm_device_mem_t>> AddrMemMaps_;
 };
 
 TPUDeviceManager * TPUDeviceManager::instance_ = nullptr;
+
+static thread_local int kIndex = 0;
 
 int TPUGetDeviceCount ( void )
 {
@@ -244,42 +225,52 @@ int TPUGetDeviceCount ( void )
 
 int TPUGetDeviceIndex ( void )
 {
-  return TPUDeviceManager::GetInstance().GetDeviceIndex();
+  return kIndex;
 }
 
 void TPUSetDeviceIndex ( int Index )
 {
-  TPUDeviceManager::GetInstance().SetDeviceIndex ( Index );
+  kIndex = Index;
 }
 
 bm_handle_t TPUGetDeviceHandle()
 {
-  return TPUDeviceManager::GetInstance().GetDeviceHandle();
+  return TPUDeviceManager::GetInstance().GetDeviceHandle ( kIndex );
 }
 
 void * TPUAlloc ( size_t Size )
 {
-  return TPUDeviceManager::GetInstance().Alloc ( Size );
+  return TPUDeviceManager::GetInstance().Alloc ( Size, kIndex );
+}
+
+void * TPUAlloc ( size_t Size, int Index )
+{
+  return TPUDeviceManager::GetInstance().Alloc ( Size, Index );
 }
 
 void TPUFree ( void * Ptr )
 {
-  TPUDeviceManager::GetInstance().Free ( Ptr );
+  TPUDeviceManager::GetInstance().Free ( Ptr, kIndex );
+}
+
+void TPUFree ( void * Ptr, int Index )
+{
+  TPUDeviceManager::GetInstance().Free ( Ptr, Index );
 }
 
 void TPUCopyHostToDevice ( void * Dst, const void * Src, size_t Size )
 {
-  TPUDeviceManager::GetInstance().CopyHostToDevice ( Dst, Src, Size );
+  TPUDeviceManager::GetInstance().CopyHostToDevice ( Dst, Src, Size, kIndex );
 }
 
 void TPUCopyDeviceToHost ( void * Dst, const void * Src, size_t Size )
 {
-  TPUDeviceManager::GetInstance().CopyDeviceToHost ( Dst, Src, Size );
+  TPUDeviceManager::GetInstance().CopyDeviceToHost ( Dst, Src, Size, kIndex );
 }
 
 void TPUCopyDeviceToDevice ( void * Dst, const void * Src, size_t Size )
 {
-  TPUDeviceManager::GetInstance().CopyDeviceToDevice ( Dst, Src, Size );
+  TPUDeviceManager::GetInstance().CopyDeviceToDevice ( Dst, Src, Size, kIndex );
 }
 
 } // namespace tpu

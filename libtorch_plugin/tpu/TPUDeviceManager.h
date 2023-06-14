@@ -30,11 +30,13 @@ bm_handle_t TPUGetDeviceHandle ( void );
  * Alloc memory on the TPU current device.
  */
 void * TPUAlloc ( size_t Size );
+void * TPUAlloc ( size_t Size, int Index );
 
 /**
  * Free memory allocted on arbitrary TPU device.
  */
 void TPUFree ( void * Ptr );
+void TPUFree ( void * Ptr, int Index );
 
 /**
  * Copy data from host to TPU device.
