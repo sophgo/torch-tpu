@@ -49,6 +49,7 @@ const int   * in_stride_org,
 const int   * out_stride_org,
 data_type_t   dtype )
 {
+  const int dsize = tpu_data_type_size ( dtype );
   int shape[FW_MAX_SHAPE_DIMS];
   int in_stride[FW_MAX_SHAPE_DIMS];
   int out_stride[FW_MAX_SHAPE_DIMS];
@@ -62,17 +63,62 @@ data_type_t   dtype )
   simplify ( shape, in_stride, out_stride, &dim );
   if ( dim == 2 && in_stride[0] == 1 && out_stride[1] == 1 )
   {
-    dim4 copy_shape = { .n = 1, .c = shape[0], .h = 1, .w = shape[1] };
     dim4 copy_in_stride = { .n = 1, .c = in_stride[1], .h = 1, .w = in_stride[0] };
     dim4 copy_out_stride = { .n = 1, .c = out_stride[0], .h = 1, .w = out_stride[1] };
-    tpu_gdma_cpy_cw_trans_S2S ( out_global_addr, in_global_addr, &copy_shape, &copy_out_stride, &copy_in_stride, dtype );
+    int cmax = 32768;
+    int wmax = 32768;
+    dim4 copy_shape = { .n = 1, .h = 1 };
+    int ctodo = shape[0];
+    int cdone = 0;
+    while ( ctodo != 0 )
+    {
+      copy_shape.c = MIN ( ctodo, cmax );
+      int wtodo = shape[1];
+      int wdone = 0;
+      while ( wtodo != 0 )
+      {
+        copy_shape.w = MIN ( wtodo, wmax );
+        tpu_gdma_cpy_cw_trans_S2S ( out_global_addr + ( 1UL * cdone * copy_out_stride.c + 1UL * wdone * copy_out_stride.w ) * dsize, in_global_addr + ( 1UL * cdone * copy_in_stride.w + 1UL * wdone * copy_in_stride.c ) * dsize, &copy_shape, &copy_out_stride, &copy_in_stride, dtype );
+        wtodo -= copy_shape.w;
+        wdone += copy_shape.w;
+      }
+      ctodo -= copy_shape.c;
+      cdone += copy_shape.c;
+    }
   }
   else if ( dim == 3 && in_stride[1] == 1 && out_stride[2] == 1 )
   {
-    dim4 copy_shape = { .n = shape[0], .c = shape[1], .h = 1, .w = shape[2] };
     dim4 copy_in_stride = { .n = in_stride[0], .c = in_stride[2], .h = 1, .w = in_stride[1] };
     dim4 copy_out_stride = { .n = out_stride[0], .c = out_stride[1], .h = 1, .w = out_stride[2] };
-    tpu_gdma_cpy_cw_trans_S2S ( out_global_addr, in_global_addr, &copy_shape, &copy_out_stride, &copy_in_stride, dtype );
+    int nmax = 32768;
+    int cmax = 32768;
+    int wmax = 32768;
+    dim4 copy_shape = { .h = 1 };
+    int ntodo = shape[0];
+    int ndone = 0;
+    while ( ntodo != 0 )
+    {
+      copy_shape.n = MIN ( ntodo, nmax );
+      int ctodo = shape[1];
+      int cdone = 0;
+      while ( ctodo != 0 )
+      {
+        copy_shape.c = MIN ( ctodo, cmax );
+        int wtodo = shape[2];
+        int wdone = 0;
+        while ( wtodo != 0 )
+        {
+          copy_shape.w = MIN ( wtodo, wmax );
+          tpu_gdma_cpy_cw_trans_S2S ( out_global_addr + ( 1UL * ndone * copy_out_stride.n + 1UL * cdone * copy_out_stride.c + 1UL * wdone * copy_out_stride.w ) * dsize, in_global_addr + ( 1UL * ndone * copy_in_stride.n + 1UL * cdone * copy_in_stride.w + 1UL * wdone * copy_in_stride.c ) * dsize, &copy_shape, &copy_out_stride, &copy_in_stride, dtype );
+          wtodo -= copy_shape.w;
+          wdone += copy_shape.w;
+        }
+        ctodo -= copy_shape.c;
+        cdone += copy_shape.c;
+      }
+      ntodo -= copy_shape.n;
+      ndone += copy_shape.n;
+    }
   }
   else if ( dim == 3 && in_stride[2] == 1 && out_stride[2] == 1 /* && in_stride[0] == shape[2] && out_stride[1] == shape[2] */ )
   {
