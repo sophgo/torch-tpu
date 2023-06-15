@@ -33,7 +33,7 @@ public:
       c10::MaybeOwned<Tensor> weight_maybe_owned = at::borrow_from_optional_tensor ( weight_opt );
       const Tensor & weight = *weight_maybe_owned;
       if(weight.defined()) {CHECK_TENSOR_IN_DEVICE(weight);};
-#if 1
+#if 0
       auto out_cpu = cross_entropy_loss(self.cpu(), target.cpu(),
                                 c10::optional<at::Tensor> (weight.defined() ? weight.cpu() : Tensor()),
                                 reduction, ignore_index, label_smoothing);
@@ -53,7 +53,7 @@ public:
                 tpu::TPUGenerateTensorDesc( out ),
                 ADDR_IN_DEVICE( out ),
                 weight.defined(),
-                reduction,
+                (CrossEntropyMode_t)reduction,
                 ignore_index,
                 label_smoothing);
       TORCH_CHECK ( status == BM_SUCCESS );

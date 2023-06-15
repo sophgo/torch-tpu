@@ -78,7 +78,7 @@ data_type_t DType ) // DT_FP32 or DT_FP16
         CMax -= NPU_NUM;
         continue;
       }
-      else if ( HMax > 1 )
+      else if ( HMax > Tile )
       {
         HMax -= Tile;
         continue;
@@ -347,7 +347,7 @@ data_type_t DType ) // DT_FP32 or DT_FP16
         CMax -= NPU_NUM;
         continue;
       }
-      else if ( HMax > 1 )
+      else if ( HMax > Tile )
       {
         HMax -= Tile;
         continue;

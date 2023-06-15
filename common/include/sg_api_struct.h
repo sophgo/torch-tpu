@@ -603,5 +603,22 @@ typedef struct {
 } sg_api_addcmul_t;
 #endif
 
+typedef struct {
+    unsigned long long input_global_addr;
+    unsigned long long target_global_addr;
+    unsigned long long weight_global_addr;
+    unsigned long long output_global_addr;
+    int batch_num;
+    int class_num;
+    int reduction;
+    float label_smoothing;
+    sg_data_type_t dtype;
+    int target_is_int64;
+#ifndef WIN32
+} __attribute__((packed)) sg_api_cross_entropy_loss_forward_t;
+#else
+} sg_api_cross_entropy_loss_forward_t;
+#endif
+
 #pragma pack(pop)
 #endif  // SG_API_STRUCT_H
