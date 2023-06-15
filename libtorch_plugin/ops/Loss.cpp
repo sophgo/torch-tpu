@@ -6,6 +6,8 @@
 #include <TPUTorchUtils.h>
 #include <sgdnn_api.h>
 
+#include "common/config.h"
+
 namespace torch{
 namespace autograd{
 class CrossEntropyLossFunction : public torch::autograd::Function<CrossEntropyLossFunction> {
@@ -19,6 +21,11 @@ public:
       ctx->saved_data["label_smoothing"] = label_smoothing;
       bool weight_has_value = weight_opt.has_value();
       ctx->saved_data["weight_has_value"] = weight_has_value;
+      if (!weight_has_value) {
+          ctx->save_for_backward({self, target});
+      } else {
+          ctx->save_for_backward({self, target, weight_opt.value()});
+      }
 
       // do the compute and get result
       CHECK_TENSOR_IN_DEVICE(self);
@@ -31,17 +38,10 @@ public:
                                 c10::optional<at::Tensor> (weight.defined() ? weight.cpu() : Tensor()),
                                 reduction, ignore_index, label_smoothing);
       auto out = out_cpu.to(self.device());
-      if (!weight_has_value) {
-          ctx->save_for_backward({self, target});
-      } else {
-          ctx->save_for_backward({self, target, weight_opt.value()});
-      }
 #else
       TensorOptions out_option = TensorOptions(self.device()).dtype(self.dtype());
       Tensor out = torch::empty({ (int)reduction == None_Reduction ? target.sizes() : 1 },
                                 out_option);
-      TensorOptions softmax_out_option = TensorOptions(self.device()).dtype(self.dtype());
-      Tensor softmax_out = torch::empty(self.sizes(), softmax_out_option);
       bm_status_t status = sgdnn_cross_entropy_forward(
                 tpu::TPUGetDeviceHandle(),
                 tpu::TPUGenerateTensorDesc( self ),
@@ -52,18 +52,11 @@ public:
                 weight.defined() ? ADDR_IN_DEVICE( weight ) : nullptr,
                 tpu::TPUGenerateTensorDesc( out ),
                 ADDR_IN_DEVICE( out ),
-                tpu::TPUGenerateTensorDesc(softmax_out),
-                ADDR_IN_DEVICE( softmax_out ),
                 weight.defined(),
                 reduction,
                 ignore_index,
                 label_smoothing);
       TORCH_CHECK ( status == BM_SUCCESS );
-      if (!weight_has_value) {
-          ctx->save_for_backward({self, target, softmax_out});
-      } else {
-          ctx->save_for_backward({self, target, softmax_out, weight_opt.value()});
-      }
 #endif
         return out;
     }
@@ -75,7 +68,6 @@ public:
       auto label_smoothing = ctx->saved_data["label_smoothing"].toDouble();
       auto weight_has_value = ctx->saved_data["weight_has_value"].toBool();
       auto saved = ctx->get_saved_variables();
-#if 1
       auto input = saved[0];
       auto target = saved[1];
       CHECK_TENSOR_IN_DEVICE(input);
@@ -85,30 +77,20 @@ public:
         weight.emplace(saved[2]);
         CHECK_TENSOR_IN_DEVICE(weight.value());
       }
+#if 1
       auto target_onehot_cpu = one_hot(target.cpu(), input.sizes()[input.dim() -1 ]);
       auto softmax_out_cpu = softmax(input.cpu(), -1);
       at::Tensor grad_input_cpu = (softmax_out_cpu - target_onehot_cpu)/ target.size(0);
       auto grad_input = grad_input_cpu.to(input.device());
 #else
-      auto input = saved[0];
-      auto target = saved[1];
-      auto softmax_out = saved[2];
-      CHECK_TENSOR_IN_DEVICE(input);
-      CHECK_TENSOR_IN_DEVICE(target);
-      CHECK_TENSOR_IN_DEVICE(softmax_out);
-      c10::optional<at::Tensor> weight = c10::nullopt;
-      if (weight_has_value) {
-        weight.emplace(saved[3]);
-        CHECK_TENSOR_IN_DEVICE(weight.value());
-      }
       TensorOptions grad_in_option = TensorOptions(self.device()).dtype(self.dtype());
       at::Tensor grad_input(input.sizes(), grad_in_option);
       bm_status_t status = sgdnn_cross_entropy_backward(
                 tpu::TPUGetDeviceHandle(),
                 tpu::TPUGenerateTensorDesc(target),
                 ADDR_IN_DEVICE(target),
-                tpu::TPUGenerateTensorDesc(softmax_out),
-                ADDR_IN_DEVICE(softmax_out),
+                tpu::TPUGenerateTensorDesc(input),
+                ADDR_IN_DEVICE(input),
                 weight_has_value ? tpu::TPUGenerateTensorDesc(weight.value()) : TensorDescriptor_t(),
                 weight_has_value ? ADDR_IN_DEVICE(weight.value()) : nullptr,
                 tpu::TPUGenerateTensorDesc(grad_input),
@@ -157,10 +139,10 @@ Tensor                      & total_weight )
   total_weight = TENSOR_TO_TPU ( std::get<1> ( outputs_cpu ) );
   return std::tuple<Tensor &, Tensor &> ( output, total_weight );
 }
-TORCH_LIBRARY_IMPL ( aten, TPU, m )
-{
- m.impl ( "nll_loss_forward.output", nll_loss_forward_output_tpu );
-}
+// TORCH_LIBRARY_IMPL ( aten, TPU, m )
+// {
+//  m.impl ( "nll_loss_forward.output", nll_loss_forward_output_tpu );
+// }
 
 Tensor & nll_loss_backward_grad_input_tpu (
 const Tensor                & grad_output,
@@ -196,10 +178,10 @@ Tensor                      & grad_input )
   grad_input = TENSOR_TO_TPU ( grad_input_cpu );
   return grad_input;
 }
-TORCH_LIBRARY_IMPL ( aten, TPU, m )
-{
- m.impl ( "nll_loss_backward.grad_input", nll_loss_backward_grad_input_tpu );
-}
+// TORCH_LIBRARY_IMPL ( aten, TPU, m )
+// {
+//  m.impl ( "nll_loss_backward.grad_input", nll_loss_backward_grad_input_tpu );
+// }
 
 at::Tensor cross_entropy_loss_tpu(const at::Tensor& self, const at::Tensor& target, const c10::optional<at::Tensor>& weight_opt, int64_t reduction, int64_t ignore_index, double label_smoothing) {
     c10::optional<at::Tensor> weight = c10::nullopt;

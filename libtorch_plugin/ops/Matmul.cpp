@@ -6,8 +6,7 @@
 #include <TPUTorchUtils.h>
 #include <sgdnn_api.h>
 
-#define TPU_OP_TIMING
-//#define SHOW_OP_INFO
+#include "common/config.h"
 
 namespace at
 {

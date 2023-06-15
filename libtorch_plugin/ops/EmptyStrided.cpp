@@ -4,6 +4,8 @@
 #include <TPUAllocator.h>
 #include <TPUDeviceManager.h>
 
+#include "common/config.h"
+
 namespace at
 {
 Tensor empty_strided_tpu ( IntArrayRef                size,

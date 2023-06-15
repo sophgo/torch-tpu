@@ -8,8 +8,7 @@
 
 #include <unistd.h>
 
-#define TPU_OP_TIMING
-//#define SHOW_OP_INFO
+#include "common/config.h"
 
 namespace at
 {

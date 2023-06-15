@@ -1,8 +1,7 @@
 #pragma once
 
 #include <bmlib_runtime.h>
-
-#define TPU PrivateUse1
+#include "common/config.h"
 
 namespace tpu
 {

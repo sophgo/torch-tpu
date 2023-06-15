@@ -3001,8 +3001,6 @@ bm_status_t sgdnn_cross_entropy_forward(
     const void                      *weight,
     const TensorDescriptor_t         outDesc,
     void                            *out,
-    const TensorDescriptor_t         softmaxOutDesc,
-    void                            *softmax,
     bool                             has_weight,
     CrossEntropyMode_t               reduction,
     int                              ignore_index,

@@ -6,6 +6,8 @@
 #include <TPUTorchUtils.h>
 #include <sgdnn_api.h>
 
+#include "common/config.h"
+
 namespace at
 {
 Scalar _local_scalar_dense_tpu ( const Tensor & self )

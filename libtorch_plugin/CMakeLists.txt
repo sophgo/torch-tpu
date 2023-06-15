@@ -6,12 +6,20 @@ add_definitions("-D_GLIBCXX_USE_CXX11_ABI=0")
 set(CMAKE_BUILD_TYPE "Debug")
 add_definitions(-DDEBUG)
 
+set(TPU_OP_TIMING 1)
+#set(SHOW_OP_INFO 1)
+
+configure_file( 
+    "${PROJECT_SOURCE_DIR}/common/config.h.in"
+    "${PROJECT_SOURCE_DIR}/common/config.h" )
+
 include_directories(/opt/sophon/libsophon-current/include)
 include_directories($ENV{TPUTRAIN_TOP}/libtorch/include/torch/csrc/api/include)
 include_directories($ENV{TPUTRAIN_TOP}/libtorch/include)
 include_directories(${CMAKE_CURRENT_SOURCE_DIR}/tpu)
 include_directories($ENV{TPUTRAIN_TOP}/sgdnn/include)
 include_directories($ENV{TPUTRAIN_TOP}/common/include)
+include_directories(${CMAKE_CURRENT_SOURCE_DIR})
 
 link_directories($ENV{TPUTRAIN_TOP}/libtorch/lib)
 link_directories($ENV{TPUTRAIN_TOP}/build/sgdnn)

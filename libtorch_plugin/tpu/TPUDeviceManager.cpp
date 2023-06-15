@@ -8,9 +8,6 @@
 
 #include <iostream>
 
-//#define SHOW_INFO
-#define TPU_OP_TIMING
-
 namespace tpu
 {
 

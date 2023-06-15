@@ -7,6 +7,8 @@
 #include <TPUTorchUtils.h>
 #include <sgdnn_api.h>
 
+#include "common/config.h"
+
 namespace at
 {
 

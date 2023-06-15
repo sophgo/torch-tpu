@@ -7,7 +7,7 @@
 #include <sgdnn_api.h>
 #include <iostream>
 
-#define TPU_OP_TIMING
+#include "common/config.h"
 
 namespace at
 {
