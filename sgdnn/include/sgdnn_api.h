@@ -518,8 +518,7 @@ bm_status_t sgdnn_batch_matmul(
     const TensorDescriptor_t         YDesc,
     void                            *Y,
     int                              L_transpose,
-    int                              R_transpose,
-    sg_data_type_t                   compute_type);
+    int                              R_transpose);
 
 bm_status_t sgdnn_linear(
     bm_handle_t                      handle,
@@ -739,6 +738,20 @@ bm_status_t sgdnn_cross_entropy_backward(
     int                              ignore_index,
     double                           label_smoothing,
     bool                             has_weight);
+
+bm_status_t sgdnn_matmul(
+    bm_handle_t                      handle,
+    const TensorDescriptor_t         LDesc,
+    const void                      *L,
+    const TensorDescriptor_t         RDesc,
+    const void                      *R,
+    const TensorDescriptor_t         BDesc,
+    const void                      *B,
+    const TensorDescriptor_t         YDesc,
+    void                            *Y,
+    int                              L_transpose,
+    int                              R_transpose);
+
 #if defined(__cplusplus)
 }
 #endif

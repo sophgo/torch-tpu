@@ -375,15 +375,14 @@ typedef struct {
     unsigned long long L_addr;
     unsigned long long R_addr;
     unsigned long long Y_addr;
+    unsigned long long B_addr;
     int                batch_num;
     int                L_row_num;
     int                L_col_num;
     int                R_col_num;
     int                L_trans;
     int                R_trans;
-    sg_data_type_t L_dtype;
-    sg_data_type_t R_dtype;
-    sg_data_type_t Y_dtype;
+    sg_data_type_t     dtype;
 #ifndef WIN32
 } __attribute__((packed)) sg_api_batch_matmul_t;
 #else
