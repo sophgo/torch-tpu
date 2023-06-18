@@ -313,11 +313,25 @@ data_type_t DType ) // DT_FP32 or DT_FP16
     int TSizeFP32 = DIV_UP ( CMax, NPU_NUM ) * tpu_aligned_feature_size ( 1, Tile, DT_FP32 );
     int SSizeFP32 = DIV_UP ( CMax, NPU_NUM ) * tpu_aligned_feature_size ( 1, 1, DT_FP32 );
     int Next = IAddrs[0] + Size;
-    IAddrs[1] = Next; Next = IAddrs[1] + Size;
+    if ( HMax != Column || CMax != Row )
+    {
+      IAddrs[1] = Next; Next = IAddrs[1] + Size;
+    }
+    else
+    {
+      IAddrs[1] =  IAddrs[0];
+    }
     if ( DType == DT_FP16 )
     {
       IFP32Addrs[0] = Next; Next = IFP32Addrs[0] + SizeFP32;
-      IFP32Addrs[1] = Next; Next = IFP32Addrs[1] + SizeFP32;
+      if ( HMax != Column || CMax != Row )
+      {
+        IFP32Addrs[1] = Next; Next = IFP32Addrs[1] + SizeFP32;
+      }
+      else
+      {
+        IFP32Addrs[1] = IFP32Addrs[0];
+      }
     }
     else
     {
