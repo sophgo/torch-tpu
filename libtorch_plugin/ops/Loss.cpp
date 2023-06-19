@@ -93,6 +93,8 @@ public:
                 ADDR_IN_DEVICE(input),
                 weight_has_value ? tpu::TPUGenerateTensorDesc(weight.value()) : TensorDescriptor_t(),
                 weight_has_value ? ADDR_IN_DEVICE(weight.value()) : nullptr,
+                tpu::TPUGenerateTensorDesc(grad_outputs[0]),
+                ADDR_IN_DEVICE(grad_outputs[0]),
                 tpu::TPUGenerateTensorDesc(grad_input),
                 ADDR_IN_DEVICE(grad_input),
                 reduction,

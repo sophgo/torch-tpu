@@ -732,6 +732,8 @@ bm_status_t sgdnn_cross_entropy_backward(
     const void                      *input,
     const TensorDescriptor_t         weightDesc,
     const void                      *weight,
+    const TensorDescriptor_t         gradoutDesc,
+    const void                      *gradout,
     const TensorDescriptor_t         gradinDesc,
     void                            *gradin,
     CrossEntropyMode_t               reduction,
