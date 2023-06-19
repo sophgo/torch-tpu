@@ -2964,6 +2964,7 @@ bm_status_t sgdnn_cross_entropy_forward(
     assert(reduction == Mean_Reduction || reduction == Sum_Reduction);
     if (reduction == Mean_Reduction)
     {
+        assert(weight == nullptr);
         api.reduction = 0;
     }
     else if (reduction == Sum_Reduction)

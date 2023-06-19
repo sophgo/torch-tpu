@@ -16,6 +16,10 @@ float label_smoothing,
 data_type_t dtype,
 bool target_is_int64 )
 {
+  if ( reduction == 0 )
+  {
+    TPUKERNEL_ASSERT ( weight_global_addr == 0 );
+  }
   const int dsize = tpu_data_type_size ( dtype );
   const int tile = tpu_eu_num ( dtype );
   const scalar_t zero = { .u32 = 0 };
@@ -23,8 +27,8 @@ bool target_is_int64 )
   const scalar_t one_fp = tpu_fp_cast ( one_fp32, dtype, DT_FP32, RM_HALF_TO_EVEN );
   const scalar_t batch_num_inv_fp32 = { .f32 = 1.f / batch_num };
   const scalar_t batch_num_inv_fp = tpu_fp_cast ( batch_num_inv_fp32, dtype, DT_FP32, RM_HALF_TO_EVEN );
-  const scalar_t onehot_hit_fp32 = { .f32 = 1.f - label_smoothing };
-  const scalar_t onehot_miss_fp32 = { .f32 = label_smoothing / ( class_num - 1 ) };
+  const scalar_t onehot_hit_fp32 = { .f32 = ( 1.f - label_smoothing ) + label_smoothing / class_num };
+  const scalar_t onehot_miss_fp32 = { .f32 = label_smoothing / class_num };
 #if 0
   const scalar_t onehot_hit = tpu_fp_cast ( onehot_hit_fp32, dtype, DT_FP32, RM_HALF_TO_EVEN );
   const scalar_t onehot_miss = tpu_fp_cast ( onehot_miss_fp32, dtype, DT_FP32, RM_HALF_TO_EVEN );
