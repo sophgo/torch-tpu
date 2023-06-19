@@ -6,7 +6,6 @@
 #include <TPUDeviceManager.h>
 #include <TPUTorchUtils.h>
 #include <sgdnn_api.h>
-
 #include "common/config.h"
 
 namespace at
@@ -22,11 +21,12 @@ Tensor & fill__Scalar_tpu ( Tensor & self, const Scalar & value )
 #ifdef TPU_OP_TIMING
   auto timer = tpu::Timer().Start();
 #endif
-  bm_status_t status = sgdnn_const_fill_cudnn(
-    tpu::TPUGetDeviceHandle(),
-    tpu::TPUGenerateTensorDesc( self ),
-    ADDR_IN_DEVICE( self ),
-    value.data_ptr());
+  auto self_ = self.dim() == 0 ? self.unsqueeze ( 0 ) : self;
+  bm_status_t status = sgdnn_const_fill_cudnn (
+                       tpu::TPUGetDeviceHandle(),
+                       tpu::TPUGenerateTensorDesc ( self_ ),
+                       ADDR_IN_DEVICE ( self_ ),
+                       value.data_ptr() );
   TORCH_CHECK ( status == BM_SUCCESS );
 #ifdef TPU_OP_TIMING
   tpu::OpTimer::Instance().AddTime ( tpu::CONST_FILL, timer.ElapsedUS() );
@@ -36,7 +36,7 @@ Tensor & fill__Scalar_tpu ( Tensor & self, const Scalar & value )
 }
 TORCH_LIBRARY_IMPL ( aten, TPU, m )
 {
- m.impl ( "fill_.Scalar", fill__Scalar_tpu );
+  m.impl ( "fill_.Scalar", fill__Scalar_tpu );
 }
 
 Tensor & zero__tpu ( Tensor & self )
@@ -48,7 +48,7 @@ Tensor & zero__tpu ( Tensor & self )
   tpu::TPUCopyHostToDevice ( self.data_ptr(), buffer, self.nbytes() );
   delete [] buffer;
 #else
-  fill__Scalar_tpu(self, 0);
+  fill__Scalar_tpu ( self, 0 );
 #endif
   return self;
 }

@@ -2987,8 +2987,8 @@ bm_status_t sgdnn_cross_entropy_backward(
     bm_handle_t                      handle,
     const TensorDescriptor_t         targetDesc,
     const void                      *target,
-    const TensorDescriptor_t         softmaxOutDesc,
-    const void                      *softmax,
+    const TensorDescriptor_t         inDesc,
+    const void                      *in,
     const TensorDescriptor_t         weightDesc,
     const void                      *weight,
     const TensorDescriptor_t         gradoutDesc,
@@ -2999,7 +2999,61 @@ bm_status_t sgdnn_cross_entropy_backward(
     int                              ignore_index,
     double                           label_smoothing,
     bool                             has_weight){
-    assert(0);
+    sg_api_cross_entropy_loss_backward_t api;
+    assert(ignore_index < 0);
+    assert(inDesc.ndims == 2);
+    api.batch_num = inDesc.shape[0];
+    api.class_num = inDesc.shape[1];
+    api.dtype = (sg_data_type_t)inDesc.dtype;
+    assert(api.dtype == SG_DTYPE_FP32 || api.dtype == SG_DTYPE_FP16);
+    assert(targetDesc.dtype == 31 || targetDesc.dtype == SG_DTYPE_INT32);
+    if (targetDesc.dtype == 31)
+    {
+        api.target_is_int64 = 1;
+    }
+    else
+    {
+        api.target_is_int64 = 0;
+    }
+    assert(targetDesc.ndims == 1);
+    assert(targetDesc.shape[0] == api.batch_num);
+    if (has_weight)
+    {
+        assert(weightDesc.ndims == 1);
+        assert(weightDesc.shape[0] == api.class_num);
+        assert(weightDesc.dtype == inDesc.dtype);
+        api.weight_global_addr = (unsigned long long)weight;
+    }
+    else
+    {
+        api.weight_global_addr = 0;
+    }
+    assert(reduction == Mean_Reduction || reduction == Sum_Reduction);
+    if (reduction == Mean_Reduction)
+    {
+        assert(weight == nullptr);
+        api.reduction = 0;
+    }
+    else if (reduction == Sum_Reduction)
+    {
+        api.reduction = 1;
+    }
+    assert(gradinDesc.dtype == inDesc.dtype);
+    assert(gradinDesc.ndims == inDesc.ndims);
+    for (int i = 0; i < inDesc.ndims; ++i)
+    {
+        assert(gradinDesc.shape[i] == inDesc.shape[i]);
+    }
+
+#if 0
+    assert(gradoutDesc.ndims == 0);
+#endif
+    api.label_smoothing = label_smoothing;
+    api.input_global_addr = (unsigned long long)in;
+    api.target_global_addr = (unsigned long long)target;
+    api.grad_output_global_addr = (unsigned long long)gradout;
+    api.grad_input_global_addr = (unsigned long long)gradin;
+    sgdnn_tpu_kernel_launch(handle, "tpu_kernel_api_cross_entropy_loss_backward", &api, sizeof(api));
     return BM_SUCCESS;
     }
 

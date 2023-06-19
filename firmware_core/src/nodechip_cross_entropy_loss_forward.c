@@ -16,10 +16,6 @@ float label_smoothing,
 data_type_t dtype,
 bool target_is_int64 )
 {
-  if ( reduction == 0 )
-  {
-    TPUKERNEL_ASSERT ( weight_global_addr == 0 );
-  }
   const int dsize = tpu_data_type_size ( dtype );
   const int tile = tpu_eu_num ( dtype );
   const scalar_t zero = { .u32 = 0 };
@@ -29,10 +25,6 @@ bool target_is_int64 )
   const scalar_t batch_num_inv_fp = tpu_fp_cast ( batch_num_inv_fp32, dtype, DT_FP32, RM_HALF_TO_EVEN );
   const scalar_t onehot_hit_fp32 = { .f32 = ( 1.f - label_smoothing ) + label_smoothing / class_num };
   const scalar_t onehot_miss_fp32 = { .f32 = label_smoothing / class_num };
-#if 0
-  const scalar_t onehot_hit = tpu_fp_cast ( onehot_hit_fp32, dtype, DT_FP32, RM_HALF_TO_EVEN );
-  const scalar_t onehot_miss = tpu_fp_cast ( onehot_miss_fp32, dtype, DT_FP32, RM_HALF_TO_EVEN );
-#endif
   const dim2 stride_one = { .h = 1, .w = 1 };
   const dim2 dilation_one = { .h = 1, .w = 1 };
   const padding_t zero_pad = { .top = 0, .left = 0, .bottom = 0, .right = 0 };
@@ -60,46 +52,26 @@ bool target_is_int64 )
     int reduce_size_fp32 = DIV_UP ( cmax, NPU_NUM ) * tpu_aligned_feature_size ( 1, 1, DT_FP32 );
     int reduce_size = DIV_UP ( cmax, NPU_NUM ) * tpu_aligned_feature_size ( 1, 1, dtype );
     int target_size = DIV_UP ( cmax, NPU_NUM ) * tpu_aligned_feature_size ( 1, target_is_int64 ? 2 : 1, DT_INT32 );
-    // int size_sequence = tpu_aligned_feature_size ( 1, wmax, DT_INT32 );
-    // int onehot_size = tpu_aligned_feature_size ( 1, wmax, DT_FP32 );
     int weight_size = tpu_aligned_feature_size ( 1, wmax, dtype );
     int size_cw_trans = tpu_aligned_feature_size ( 1, MIN ( cmax, NPU_NUM ), dtype );
     next = next_base;
     output_local_addrs[0] = next; next += MAX ( reduce_size, size_cw_trans );
     output_local_addrs[1] = next; next += reduce_size;
     input_local_addrs[0] = next; next += size;
-    if ( wmax != class_num || cmax != batch_num )
-    {
-      input_local_addrs[1] = next; next += size;
-    }
-    else
-    {
-      input_local_addrs[1] = input_local_addrs[0];
-    }
+    input_local_addrs[1] = next; next += size;
     input_exp_local_addr = next; next += size_fp32;
     reduce_tile_local_addr = next; next += reduce_tile_size_fp32;
     reduce_sum_local_addrs[0] = next; next += reduce_size_fp32;
-    if ( wmax != class_num || cmax != batch_num )
-    {
-      reduce_sum_local_addrs[1] = next; next += reduce_size_fp32;
-    }
-    else
-    {
-      reduce_sum_local_addrs[1] = reduce_sum_local_addrs[0];
-    }
+    reduce_sum_local_addrs[1] = next; next += reduce_size_fp32;
     target_local_addr = next; next += target_size;
     work0_local_addr = next; next += size_fp32;
     work1_local_addr = next; next += size_fp32;
     sequence_local_addr = work0_local_addr; // reuse
     onehot_local_addr = work1_local_addr; // reuse
-    weight_local_addrs[0] = next; next += weight_size;
-    if ( wmax != class_num || cmax != batch_num )
+    if ( weight_global_addr != 0 )
     {
+      weight_local_addrs[0] = next; next += weight_size;
       weight_local_addrs[1] = next; next += weight_size;
-    }
-    else
-    {
-      weight_local_addrs[1] = weight_local_addrs[0];
     }
     if ( ( int ) next <= LOCAL_MEM_SIZE )
     {
@@ -153,7 +125,7 @@ bool target_is_int64 )
       // input FP16 -> FP32
       if ( dtype == DT_FP16 )
       {
-        tpu_bdc_cast ( input_exp_local_addr, input_local_addrs[index], &tile_shape, NULL, NULL, DT_FP32, DT_FP16, RM_HALF_TO_EVEN );
+        tpu_bdc_cast ( input_exp_local_addr, input_local_addrs[index], &tile_shape, NULL, NULL, DT_FP32, dtype, RM_HALF_TO_EVEN );
         // input = exp ( input )
         tpu_bdc_fp32_exp ( input_exp_local_addr, input_exp_local_addr, work0_local_addr, work1_local_addr, exp_coeff_addr, exp_table_addr, &tile_shape );
       }
@@ -189,7 +161,7 @@ bool target_is_int64 )
     // input_sum FP32 -> FP16 ( inplace )
     if ( dtype == DT_FP16 )
     {
-      tpu_bdc_cast ( reduce_sum_local_addr, reduce_sum_local_addr, &reduce_shape, NULL, NULL, DT_FP16, DT_FP32, RM_HALF_TO_EVEN );
+      tpu_bdc_cast ( reduce_sum_local_addr, reduce_sum_local_addr, &reduce_shape, NULL, NULL, dtype, DT_FP32, RM_HALF_TO_EVEN );
     }
     // Move target from global memory to local memory
     dim4 target_s2l_shape = { .n = 1, .c = shape.c, .h = 1, .w = target_is_int64 ? 2 : 1 };
@@ -235,7 +207,7 @@ bool target_is_int64 )
       if ( weight_global_addr != 0 )
       {
         dim4 weight_bcast_shape = { .n = 1, .c = MIN ( shape.c, NPU_NUM ), .h = 1, .w = shape.w };
-        tpu_bdc_cpy_cross_npu ( weight_local_addrs[index], weight_local_addrs[index], &weight_bcast_shape, dtype );
+        tpu_bdc_npu_bcast ( weight_local_addrs[index], weight_local_addrs[index], &weight_bcast_shape, dtype );
         // input = input * weight
         dim4 weight_bcast_stride; tpu_aligned_stride ( &weight_bcast_stride, 0, &weight_bcast_shape, dtype );
         weight_bcast_stride.c = 0; // broadcast c
@@ -302,6 +274,10 @@ void tpu_kernel_api_cross_entropy_loss_forward ( const void * args )
   data_type_t dtype = tpu_type_convert ( api->dtype );
   TPUKERNEL_ASSERT ( dtype == DT_FP32 || dtype == DT_FP16 );
   TPUKERNEL_ASSERT ( api->reduction == 0 || api->reduction == 1 );
+  if ( api->reduction == 0 )
+  {
+    TPUKERNEL_ASSERT ( api->weight_global_addr == 0 );
+  }
   tpu_initialize();
   nodechip_cross_entropy_loss_forward ( api->input_global_addr, api->target_global_addr, api->weight_global_addr, api->output_global_addr, api->batch_num, api->class_num, api->reduction, api->label_smoothing, dtype, api->target_is_int64 );
   tpu_poll();
