@@ -303,30 +303,28 @@ class GPT2Block(nn.Module):
         return outputs  # hidden_states, present, (attentions, cross_attentions)
 
 def case_gptblock_backward():
-
-
     ############# configure ###############
+    device = torch.device("privateuseone:0")
     configure = GPT2Config()
     configure.attn_pdrop = 0
     configure.embd_pdrop = 0
     configure.resid_pdrop = 0
-    configure.n_layer= 2
     configure.activation_function= "gelu"
 
     batch = 32
-    sequence = 256
+    sequence = 256 
     ########################################
 
     inp = torch.rand(batch, sequence, configure.hidden_size)
     ref = torch.rand(batch, sequence, configure.hidden_size)
     #inp = torch.ones(batch, sequence, configure.hidden_size)
     #ref = torch.ones(batch, sequence, configure.hidden_size)
-    inp_tpu = inp.to("privateuseone:1").half()
-    ref_tpu = ref.to("privateuseone:1").half()
+    inp_tpu = inp.to(device).half()
+    ref_tpu = ref.to(device).half()
 
     net = GPT2Block(configure)
     net_tpu = copy.deepcopy(net)
-    net_tpu.to("privateuseone:1").half()
+    net_tpu.to(device).half()
 
     print("===== forward =========")
     t1 = time.time()
@@ -334,7 +332,7 @@ def case_gptblock_backward():
     out_tpu = net_tpu(inp_tpu)
     optimer.dump()
     t2 = time.time()
-    print("tpu time :", t2 - t1)
+    print("tpu time :", (t2 - t1) * 1e6)
 
     t1 = time.time()
     out_cpu = net(inp)
@@ -347,17 +345,15 @@ def case_gptblock_backward():
     out_tpu[0].backward(ref_tpu)
     optimer.dump()
     t2 = time.time()
-    print("tpu time :", t2 - t1)
+    print("tpu time :", (t2 - t1) * 1e6)
 
     t1 = time.time()
     out_cpu[0].backward(ref)
     t2 = time.time()
     print("cpu time :", t2 - t1)
 
-    print(" ======== compare model's parameter grad =======")
     compare_model_grad(net, net_tpu)
 
-    print(" ======== compare model's out  =======")
     def my_print(out_cpu, out_tpu):
         for i in range(len(out_cpu)):
             o_c = out_cpu[i]
@@ -375,11 +371,8 @@ def case_gptblock_backward():
     my_print(out_cpu, out_tpu)    
 
 def case_gptmlp_backward():
-    from transformers import GPT2Config
-    import copy
-    import time
-
     ############# configure ###############
+    device = torch.device("privateuseone:0")
     configure = GPT2Config()
     configure.attn_pdrop = 0
     configure.embd_pdrop = 0
@@ -395,12 +388,12 @@ def case_gptmlp_backward():
     ref = torch.rand(batch, sequence, configure.hidden_size)
     #inp = torch.ones(batch, sequence, configure.hidden_size)
     #ref = torch.ones(batch, sequence, configure.hidden_size)
-    inp_tpu = inp.to("privateuseone:1").half()
-    ref_tpu = ref.to("privateuseone:1").half()
+    inp_tpu = inp.to(device).half()
+    ref_tpu = ref.to(device).half()
 
-    net = GPT2Block(configure)
+    net = GPT2MLP(configure.hidden_size * 3, configure)
     net_tpu = copy.deepcopy(net)
-    net_tpu.to("privateuseone:1").half()
+    net_tpu.to(device).half()
 
     print("===== forward =========")
     t1 = time.time()
@@ -418,17 +411,16 @@ def case_gptmlp_backward():
     print("===== backward =========")
     t1 = time.time()
     optimer.reset()
-    out_tpu[0].backward(ref_tpu)
+    out_tpu.backward(ref_tpu)
     optimer.dump()
     t2 = time.time()
     print("tpu time :", t2 - t1)
 
     t1 = time.time()
-    out_cpu[0].backward(ref)
+    out_cpu.backward(ref)
     t2 = time.time()
     print("cpu time :", t2 - t1)
 
-    print(" ======== compare model's parameter grad =======")
     compare_model_grad(net, net_tpu)
 
     print(" ======== compare model's out  =======")

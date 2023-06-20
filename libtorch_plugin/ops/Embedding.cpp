@@ -55,13 +55,34 @@ TORCH_LIBRARY_IMPL ( aten, TPU, m )
   m.impl ( "index_select", index_select_tpu );
 }
 
-
-
 Tensor embedding_dense_backward_tpu ( const Tensor & grad_output, const Tensor & indices, int64_t num_weights, int64_t padding_idx, bool scale_grad_by_freq )
 {
   CHECK_TENSOR_IN_DEVICE ( grad_output );
+  CHECK_TENSOR_IN_DEVICE ( indices );
+#if 0
   auto out_cpu = embedding_dense_backward ( grad_output.cpu(), indices.cpu(), num_weights, padding_idx, scale_grad_by_freq );
   auto out = TENSOR_TO_TPU ( out_cpu );
+#else
+  TensorOptions out_option = TensorOptions(grad_output.device()).dtype(grad_output.dtype());
+  torch::Tensor out = torch::empty({num_weights, grad_output.size(grad_output.dim()-1)}, out_option);
+#ifdef TPU_OP_TIMING
+  auto timer = tpu::Timer().Start();
+#endif
+  bm_status_t status = sgdnn_embedding_dense_backward(
+                       tpu::TPUGetDeviceHandle(),
+                       tpu::TPUGenerateTensorDesc(grad_output),
+                       ADDR_IN_DEVICE(grad_output),
+                       tpu::TPUGenerateTensorDesc(indices),
+                       ADDR_IN_DEVICE(indices),
+                       tpu::TPUGenerateTensorDesc(out),
+                       ADDR_IN_DEVICE(out),
+                       padding_idx,
+                       scale_grad_by_freq);
+  TORCH_CHECK(status == BM_SUCCESS);
+#ifdef TPU_OP_TIMING
+  tpu::OpTimer::Instance().AddTime ( tpu::EMBEDDING_BACKWARD, timer.ElapsedUS() );
+#endif
+#endif
   return out;
 }
 TORCH_LIBRARY_IMPL ( aten, TPU, m )

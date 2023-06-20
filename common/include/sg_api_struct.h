@@ -637,5 +637,30 @@ typedef struct {
 } sg_api_cross_entropy_loss_backward_t;
 #endif
 
+typedef struct {
+    unsigned long long gradout_global_addr;
+    unsigned long long index_global_addr;
+    unsigned long long output_global_addr;
+    unsigned long long sorted_index_global_addr;
+    unsigned long long sorted_index_index_global_addr;
+    unsigned long long from_index_global_addr;
+    unsigned long long to_index_global_addr;
+    unsigned long long from_buffer_global_addr;
+    unsigned long long to_buffer_global_addr;
+    int gradout_shape[FW_MAX_SHAPE_DIMS];
+    int gradout_dim;
+    int idx_shape[FW_MAX_SHAPE_DIMS];
+    int idx_dim;
+    int out_shape[FW_MAX_SHAPE_DIMS];
+    int out_dim;
+    int window_size;
+    sg_data_type_t grad_dtype;
+    sg_data_type_t idx_dtype;
+#ifndef WIN32
+} __attribute__((packed)) sg_api_emb_backward_t;
+#else
+} sg_api_emb_backward_t;
+#endif
+
 #pragma pack(pop)
 #endif  // SG_API_STRUCT_H

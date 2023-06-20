@@ -88,48 +88,48 @@ class GPT2Attention(nn.Module):
     #     self.pruned_heads = self.pruned_heads.union(heads)
 
     def _attn(self, query, key, value, attention_mask=None, head_mask=None):
-        t1 = time.time()
+        #t1 = time.time()
         attn_weights = torch.matmul(query, key.transpose(-1, -2))
-        t2 = time.time()
-        print("====inner_attn matmul-qk time ", t2 - t1)
+        #t2 = time.time()
+        #print("====inner_attn matmul-qk time ", t2 - t1)
         if self.scale_attn_weights:
             attn_weights = attn_weights / (float(value.size(-1)) ** 0.5)
 
         if not self.is_cross_attention:
             # if only "normal" attention layer implements causal mask
-            t1 = time.time()
+            #t1 = time.time()
             query_length, key_length = query.size(-2), key.size(-2)
             causal_mask = self.bias[:, :, key_length - query_length : key_length, :key_length].bool()
             attn_weights = torch.where(causal_mask, attn_weights, self.masked_bias.to(attn_weights.dtype))
-            t2 = time.time()
-            print("====inner_attn where time ", t2 - t1)            
+            #t2 = time.time()
+            #print("====inner_attn where time ", t2 - t1)            
 
         if attention_mask is not None:
             # Apply the attention mask
             attn_weights = attn_weights + attention_mask
 
         #import pdb;pdb.set_trace()
-        t1 = time.time()
+        #t1 = time.time()
         attn_weights = nn.Softmax(dim=-1)(attn_weights)
-        t2 = time.time()
-        print("====inner_attn softmax time ", t2 - t1)
+        #t2 = time.time()
+        #print("====inner_attn softmax time ", t2 - t1)
         
-        t1 = time.time()
+        #t1 = time.time()
         attn_weights = self.attn_dropout(attn_weights)
-        t2 = time.time()
-        print("====inner_attn attn_dropout time ", t2 - t1)
+        #t2 = time.time()
+        #print("====inner_attn attn_dropout time ", t2 - t1)
 
         # Mask heads if we want to
         if head_mask is not None:
-            t1 = time.time()
+            #t1 = time.time()
             attn_weights = attn_weights * head_mask
-            t2 = time.time()
-            print("====inner_attn binary-mul attn time ", t2 - t1)
+            #t2 = time.time()
+            #print("====inner_attn binary-mul attn time ", t2 - t1)
 
-        t1 = time.time()
+        #t1 = time.time()
         attn_output = torch.matmul(attn_weights, value)
-        t2 = time.time()
-        print("====inner_attn batch-mm time ", t2 - t1)
+        #t2 = time.time()
+        #print("====inner_attn batch-mm time ", t2 - t1)
         
         # global tmp1, tmp2
         # if tmp1 == None:
@@ -190,40 +190,39 @@ class GPT2Attention(nn.Module):
             x = self.c_attn(hidden_states)
             query, key, value = x.split(self.split_size, dim=2)
 
-        t1 = time.time()
+        #t1 = time.time()
         query = self._split_heads(query, self.num_heads, self.head_dim)
         key = self._split_heads(key, self.num_heads, self.head_dim)
         value = self._split_heads(value, self.num_heads, self.head_dim)
         
 
-        t2 = time.time()
-        print("split time", t2 - t1)
+        #t2 = time.time()
+        #print("split time", t2 - t1)
 
-        t1 = time.time()
+        #t1 = time.time()
         if layer_past is not None:
             past_key, past_value = layer_past
             key = torch.cat((past_key, key), dim=-2)
             value = torch.cat((past_value, value), dim=-2)
-        t2 = time.time()
-        print("cat time", t2 - t1)
+        #t2 = time.time()
+        #print("cat time", t2 - t1)
 
         if use_cache is True:
             present = (key, value)
         else:
             present = None
-        t1 = time.time()
+        #t1 = time.time()
         attn_output, attn_weights = self._attn(query, key, value, attention_mask, head_mask)
-        t2 = time.time()
-        print("inner_att time", t2 - t1)
+        #t2 = time.time()
+        #print("inner_att time", t2 - t1)
  
 
-        t1 = time.time()
+        #t1 = time.time()
         attn_output = self._merge_heads(attn_output, self.num_heads, self.head_dim)
-        t2 = time.time()
-        print("permute time", t2 - t1)
+        #t2 = time.time()
+        #print("permute time", t2 - t1)
 
         attn_output = self.c_proj(attn_output)
-
 
         attn_output = self.resid_dropout(attn_output)
 
@@ -277,11 +276,11 @@ class GPT2Block(nn.Module):
         output_attentions=False,
     ):
         residual = hidden_states
-        t1 = time.time()
+        #t1 = time.time()
         hidden_states = self.ln_1(hidden_states)
-        t2 = time.time()
-        print("layernorm1 time ", t2 - t1)
-        t3 = time.time()
+        #t2 = time.time()
+        #print("layernorm1 time ", t2 - t1)
+        #t3 = time.time()
         attn_outputs = self.attn(
             hidden_states,
             layer_past=layer_past,
@@ -290,8 +289,8 @@ class GPT2Block(nn.Module):
             use_cache=use_cache,
             output_attentions=output_attentions,
         )
-        t4 = time.time()
-        print("attetion time", t4 - t3)
+        #t4 = time.time()
+        #print("attetion time", t4 - t3)
         attn_output = attn_outputs[0]  # output_attn: a, present, (attentions)
         outputs = attn_outputs[1:]
         # residual connection
@@ -319,16 +318,16 @@ class GPT2Block(nn.Module):
             hidden_states = residual + attn_output
             outputs = outputs + cross_attn_outputs[2:]  # add cross attentions if we output attention weights
 
-        t1 = time.time()
+        #t1 = time.time()
         residual = hidden_states
-        #hidden_states = self.ln_2(hidden_states)
-        t2 = time.time()
-        print("layernorm time", t2 - t1)
+        hidden_states = self.ln_2(hidden_states)
+        #t2 = time.time()
+        #print("layernorm time", t2 - t1)
 
-        t1 = time.time()
+        #t1 = time.time()
         feed_forward_hidden_states = self.mlp(hidden_states)
-        t2 = time.time()
-        print("mlp time", t2 - t1)
+        #t2 = time.time()
+        #print("mlp time", t2 - t1)
 
         # residual connection
         hidden_states = residual + feed_forward_hidden_states
@@ -354,7 +353,7 @@ if __name__ == "__main__":
     configure.resid_pdrop = 0
     configure.activation_function= "gelu"
 
-    batch = 32
+    batch = 64
     sequence = 256
     ########################################
 
@@ -369,19 +368,19 @@ if __name__ == "__main__":
     net_tpu.to("privateuseone:0").half()
     #net.double()
 
-    print(inp.device)
     print("start run")
     t1 = time.time()
     optimer.reset()
-    out_tpu = net_tpu(inp_tpu)
-    t2 = time.time()
-    print("tpu time :", (t2 - t1))
+    for i in range(12):
+        out_tpu = net_tpu(inp_tpu)
     optimer.dump()
+    t2 = time.time()
+    print(" tpu time :", (t2 - t1) * 1e6)
 
     t1 = time.time()
     out_cpu = net(inp)
     t2 = time.time()
-    print("cpu time :", t2 - t1)
+    #print("cpu time :", t2 - t1)
     # import pdb;pdb.set_trace()
 
     def my_print(out_cpu, out_tpu):
@@ -405,7 +404,7 @@ if __name__ == "__main__":
                 my_print(out_cpu[i], out_tpu[i])
             else:
                 return
-    my_print((out_cpu), (out_tpu))
+    #my_print((out_cpu), (out_tpu))
 
 
 

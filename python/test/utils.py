@@ -72,7 +72,7 @@ def compare_model_weight(model1, model2):
 
 
 class Optimer:
-    def __init__(self, libpath = "/home/huyu/workspace/tpu-train/libtorch_plugin/build/liblibtorch_plugin.so"):
+    def __init__(self, libpath = "../../libtorch_plugin/build/liblibtorch_plugin.so"):
         self.lib_path = libpath
         self._lib = ct.cdll.LoadLibrary(libpath)
 

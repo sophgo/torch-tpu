@@ -753,6 +753,23 @@ bm_status_t sgdnn_matmul(
     void                            *Y,
     int                              L_transpose,
     int                              R_transpose);
+/**
+ * refrence：
+ * https://pytorch.org/docs/1.13/generated/torch.nn.Embedding.html?highlight=embedding#torch.nn.Embedding
+ * - padding_idx: 
+ *  #TODO
+ * - scale_grad_by_freq: default False
+ * */
+bm_status_t sgdnn_embedding_dense_backward(
+    bm_handle_t                       handle,
+    const TensorDescriptor_t          gradoutDesc,
+    const void                       *gradout,
+    const TensorDescriptor_t          indicesDesc,
+    const void                       *indices,
+    const TensorDescriptor_t          outDesc,
+    void                             *out,
+    int                               padding_idx,
+    bool                              scale_grad_by_freq);
 
 #if defined(__cplusplus)
 }

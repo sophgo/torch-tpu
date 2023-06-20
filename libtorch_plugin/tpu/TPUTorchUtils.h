@@ -216,6 +216,7 @@ typedef enum
   SQRT,
   ADDCDIV,
   ADDCMUL,
+  EMBEDDING_BACKWARD,
   MALLOC,
   FREE,
   OP_NUM
@@ -260,6 +261,7 @@ static const char * OpTypeStr[OP_NUM] =
   "Sqrt",
   "Addcdiv",
   "Addcmul",
+  "Embedding Backward",
   "Malloc",
   "Free"
 };
