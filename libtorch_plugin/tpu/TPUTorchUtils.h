@@ -266,8 +266,8 @@ static const char * OpTypeStr[OP_NUM] =
   "Embedding Backward",
   "Malloc",
   "Free",
-  "CrossEntropyLoss",
-  "CrossEntropyLossBackward"
+  "Cross Entropy Loss",
+  "Cross Entropy Loss Backward"
 };
 
 struct OpTimer
