@@ -1,7 +1,7 @@
 #include "nodechip_softmax.h"
 #include "sg_api_struct.h"
 
-extern void nodechip_softmax_forward_2DR1_parallel (
+extern void nodechip_softmax_forward_2DR1_no_max_pivot_parallel (
 global_addr_t IGAddr,
 global_addr_t OGAddr,
 int Row, // row number
@@ -20,7 +20,7 @@ void tpu_kernel_api_softmax_forward ( const void *args )
       Row *= api->shape[i];
     }
     int Column = api->shape[api->dims - 1];
-    nodechip_softmax_forward_2DR1_parallel (
+    nodechip_softmax_forward_2DR1_no_max_pivot_parallel (
     api->input_global_addr,
     api->output_global_addr,
     Row,

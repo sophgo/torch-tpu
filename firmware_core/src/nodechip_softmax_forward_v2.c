@@ -3,7 +3,7 @@
 #include "common_def.h"
 #include "tpu_kernel.h"
 
-void nodechip_softmax_forward_2DR1_parallel (
+void nodechip_softmax_forward_2DR1_no_max_pivot_parallel (
 global_addr_t input_global_addr,
 global_addr_t output_global_addr,
 int batch_num, // row number
