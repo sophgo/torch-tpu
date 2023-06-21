@@ -117,7 +117,7 @@ public:
                          weight_has_value );
     TORCH_CHECK ( status == BM_SUCCESS );
 #ifdef TPU_OP_TIMING
-    tpu::OpTimer::Instance().AddTime ( tpu::CROSS_ENTROPY_LOSS, timer.ElapsedUS() );
+    tpu::OpTimer::Instance().AddTime ( tpu::CROSS_ENTROPY_LOSS_BACKWARD, timer.ElapsedUS() );
 #endif
 #endif
     return {grad_input, at::Tensor(), at::Tensor(), at::Tensor(), at::Tensor(), at::Tensor() };
