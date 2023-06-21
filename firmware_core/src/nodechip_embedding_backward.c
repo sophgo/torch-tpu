@@ -1,7 +1,6 @@
 #include "sg_api_struct.h"
 #include "tpu_utils.h"
 #include "tpu_kernel.h"
-#include <string.h>
 #include <stdlib.h>
 
 typedef struct List_Node{
@@ -52,6 +51,9 @@ void nodechip_embedding_backward(
     TPUKERNEL_ASSERT(index_dtype == DT_INT32);
     // 1. fill out_global with zero
     scalar_t zero_ = {.u32 = 0};
+    scalar_t one_ = {.f32 = 1.0};
+    if (grad_dtype == DT_FP16) one_ = tpu_fp_cast(one_, DT_FP32, DT_FP16, RM_HALF_TO_EVEN);
+
     dim4 o_shape = {.n = 1, .c = 1, .h = 1, .w = out_shape[out_dim -1]};
     for (int i = 0; i < out_dim - 1; i++){
         o_shape.h *= out_shape[i];
@@ -81,24 +83,38 @@ void nodechip_embedding_backward(
                                index_global_addr,
                                NUM_index,NUM_index, false, DT_INT32);
     tpu_hau_poll();
-#if 1
+
     tpu_invalidate_cache(sorted_index_global_addr, ALIGN( NUM_index * sizeof(int), 64));
     tpu_invalidate_cache(sorted_index_index_global_addr, ALIGN(NUM_index * sizeof(int), 64));
 
+    int* sorted_index      = (int*)malloc(NUM_index * sizeof(int));
+    int* sorted_index_indx = (int*)malloc(NUM_index * sizeof(int));
+    int* tmp1 = NULL, *tmp2 = NULL;
+    tmp1 = (int*)tpu_global_mem_addr(sorted_index_global_addr);
+    tmp2 = (int*)tpu_global_mem_addr(sorted_index_index_global_addr);
+    for(int i = 0; i < NUM_index; i++){
+        sorted_index[i] = tmp1[i];
+        sorted_index_indx[i] = tmp2[i];
+    }
+    local_addr_t from_local_addr = 0;
+    local_addr_t to_local_addr = from_local_addr + DIV_UP(window_size , NPU_NUM) * tpu_aligned_feature_size(1, o_shape.w, grad_dtype);
+    local_addr_t res_local_addr = to_local_addr +  DIV_UP(window_size , NPU_NUM) * tpu_aligned_feature_size(1, o_shape.w, grad_dtype);
+    TPUKERNEL_ASSERT(( 3 * DIV_UP(window_size, NPU_NUM) * tpu_aligned_feature_size(1, o_shape.w, grad_dtype))
+                        < LOCAL_MEM_SIZE);
     int window_cur = 0;
     int *in_idx_window =  (int*)malloc( window_size * sizeof(int) );
     int *out_idx_window = (int*)malloc( window_size * sizeof(int) );
     List reserved_list;
     reserved_list.head.next = &reserved_list.tail; reserved_list.tail.prv = &reserved_list.head;
-    ListNode* ptr_reserved_idx = reserved_list.head.next;
+    reserved_list.head.prv = NULL; reserved_list.tail.next = NULL;
+    ListNode* ptr_reserved_idx = reserved_list.head.next; 
     int start_idx = 0;
-    //printf("===NUM_idx : %d \n", NUM_index);
     while ( start_idx < NUM_index )
     {
         //printf("start_idx: %d \n", start_idx);
         if (ptr_reserved_idx == &reserved_list.tail){
-            int idx_out = ((int*)tpu_global_mem_addr(sorted_index_global_addr))[start_idx];
-            int idx_in  = ((int*)tpu_global_mem_addr(sorted_index_index_global_addr))[start_idx];
+            int idx_out = sorted_index[start_idx];
+            int idx_in  = sorted_index_indx[start_idx];
             if ( idx_in_window( idx_out, out_idx_window, window_cur) ){
                 ListNode *node = (ListNode*) malloc(sizeof(ListNode));
                 node->prv = reserved_list.tail.prv;
@@ -110,7 +126,7 @@ void nodechip_embedding_backward(
                     start_idx++;
                     //printf("----start_idx: %d \n", start_idx);
                 }while (start_idx < NUM_index && 
-                        ((int*)tpu_global_mem_addr(sorted_index_global_addr))[start_idx] == idx_out);
+                        sorted_index[start_idx] == idx_out);
             }else{
                 in_idx_window[window_cur] = idx_in;
                 out_idx_window[window_cur] = idx_out;
@@ -118,8 +134,8 @@ void nodechip_embedding_backward(
                 start_idx++;
             }
         }else{
-            int idx_out = ((int*)tpu_global_mem_addr(sorted_index_global_addr))[ptr_reserved_idx->index];
-            int idx_in  = ((int*)tpu_global_mem_addr(sorted_index_index_global_addr))[ptr_reserved_idx->index];
+            int idx_out = sorted_index[ptr_reserved_idx->index];
+            int idx_in  = sorted_index_indx[ptr_reserved_idx->index];
             if (idx_in_window(idx_out, out_idx_window, window_cur)){
                 ptr_reserved_idx = ptr_reserved_idx->next;
             }else{ // find useful idx in list
@@ -128,7 +144,7 @@ void nodechip_embedding_backward(
                 window_cur++;
                 // delete node in list
                 if (ptr_reserved_idx->index + 1 < NUM_index){
-                    int next_idx_out = ((int*)tpu_global_mem_addr(sorted_index_global_addr))[ptr_reserved_idx->index + 1];
+                    int next_idx_out = sorted_index[ptr_reserved_idx->index + 1];
                     if (next_idx_out == idx_out) // have another value in list
                     {
                         ptr_reserved_idx->index++;
@@ -143,94 +159,88 @@ void nodechip_embedding_backward(
                 }
             }
         }
-        if (window_cur == window_size || start_idx == NUM_index) { // enough to caculate
+        if ((window_cur == window_size || start_idx == NUM_index) && window_cur > 0 && window_cur <= window_size) { // enough to caculate
             ptr_reserved_idx = reserved_list.head.next;
             //do caculate here
             tpu_poll(); // necessary, but harm for performance 
-            memcpy(tpu_global_mem_addr(from_index_global_addr), in_idx_window, sizeof(int) * window_cur);
-            memcpy(tpu_global_mem_addr(to_index_global_addr), out_idx_window, sizeof(int) * window_cur);
+            tmp1 = (int*)tpu_global_mem_addr(from_index_global_addr);
+            tmp2 = (int*)tpu_global_mem_addr(to_index_global_addr);
+            for (int i = 0; i < window_cur; i++){
+                tmp1[i] = in_idx_window[i];
+                tmp2[i] = out_idx_window[i];
+            }
             tpu_flush_cache(from_index_global_addr, ALIGN(sizeof(int) * window_cur, 64));
             tpu_flush_cache(to_index_global_addr, ALIGN(sizeof(int) * window_cur, 64));
-
             dim4 add_shape = {.n = 1, .c = window_cur, .h = 1, .w=o_shape.w};
-            local_addr_t from_local_addr = 0;
-            local_addr_t to_local_addr = from_local_addr + add_shape.n * DIV_UP(add_shape.c , NPU_NUM) * tpu_aligned_feature_size(add_shape.h, add_shape.w, grad_dtype);
-            local_addr_t res_local_addr = to_local_addr + add_shape.n * DIV_UP(add_shape.c , NPU_NUM) * tpu_aligned_feature_size(add_shape.h, add_shape.w, grad_dtype);
-            TPUKERNEL_ASSERT(( 3 * add_shape.n * DIV_UP(add_shape.c , NPU_NUM) * tpu_aligned_feature_size(add_shape.h, add_shape.w, grad_dtype))
-                              < LOCAL_MEM_SIZE);
             dim4 from_stride = {.n = 0, .c = 0, .h = add_shape.w, .w = 1};
             tpu_gdma_h_gather_S2L(from_local_addr, gradout_global_addr, from_index_global_addr, false, zero_, &add_shape, go_shape.h, NULL, &from_stride, NULL, grad_dtype);
             dim4 to_stride = {.n = 0, .c = 0, .h = add_shape.w, .w = 1};
             tpu_gdma_h_gather_S2L(to_local_addr, out_global_addr, to_index_global_addr, false, zero_, &add_shape, o_shape.h, NULL, &to_stride, NULL, grad_dtype);
-            
+
             tpu_bdc_fp_add(res_local_addr, from_local_addr, to_local_addr, &add_shape, NULL, NULL, NULL, grad_dtype);
 
             dim4 scatter_out_stride = {.n = 0 , .c = 0, .h = add_shape.w, .w = 1};
             dim4 scatter_oshape = {.n = o_shape.n, .c = window_cur, .h = o_shape.h, .w = o_shape.w};
             tpu_gdma_h_scatter_L2S(out_global_addr, res_local_addr, to_index_global_addr, false, &scatter_oshape, 1, &scatter_out_stride, NULL, NULL, grad_dtype);
-            memset(in_idx_window, 0, sizeof(int) * window_size);
-            memset(out_idx_window, 0, sizeof(int) * window_size);
             window_cur = 0;
         }
     }
-
-    int max_len = window_size;
-    local_addr_t res_local_addr = 0;
-    local_addr_t in_local_addr = res_local_addr + tpu_aligned_feature_size(1, out_shape[out_dim-1], grad_dtype);
-    TPUKERNEL_ASSERT( (1 + DIV_UP(window_size, NPU_NUM)) * tpu_aligned_feature_size(1, out_shape[out_dim-1], grad_dtype) < LOCAL_MEM_SIZE );
-    int * in_idx = (int *)malloc(NUM_index * sizeof(int));
+#if 1
     // list have reserved data
-    ptr_reserved_idx = reserved_list.head.next;
-    while(ptr_reserved_idx != &reserved_list.tail){
-        // do calculate
-        int idx_out = ((int*)tpu_global_mem_addr(sorted_index_global_addr))[ptr_reserved_idx->index];
-        int len = 0;
-        for (int tmp = ptr_reserved_idx->index;
-            tmp < NUM_index && (((int*)tpu_global_mem_addr(sorted_index_global_addr))[tmp] == idx_out);
-            tmp++
-        ){
-            in_idx[len] = ((int*)tpu_global_mem_addr(sorted_index_index_global_addr))[tmp];
-            len++;
+    while(reserved_list.head.next != &reserved_list.tail){
+        // 1. all 
+        window_cur = 0;
+        ptr_reserved_idx = reserved_list.head.next;
+        while(ptr_reserved_idx != &reserved_list.tail){
+            // do calculate
+            int idx_out = sorted_index[ptr_reserved_idx->index];
+            int idx_in  = sorted_index_indx[ptr_reserved_idx->index];
+            in_idx_window[window_cur] = idx_in;
+            out_idx_window[window_cur] = idx_out;
+            window_cur++;
+            if (ptr_reserved_idx->index + 1 < NUM_index){
+                int next_idx_out = sorted_index[ptr_reserved_idx->index + 1];
+                if (next_idx_out == idx_out) // have another value in list
+                {
+                    ptr_reserved_idx->index++;
+                    ptr_reserved_idx = ptr_reserved_idx->next;
+                }
+                else // delete node
+                {
+                    ptr_reserved_idx = delete_nodel(ptr_reserved_idx);
+                }
+            } else{
+                ptr_reserved_idx = delete_nodel(ptr_reserved_idx);
+            }
         }
-        // local is enough
-        int start_idx = 0;
-        int res_len = len;
-        while (start_idx < len){
-            int cur_len = MIN(res_len, max_len);
-            tpu_poll(); // necessary, but harm for performance 
-            memcpy(tpu_global_mem_addr(from_index_global_addr), in_idx + start_idx, sizeof(int) * cur_len);
-            tpu_flush_cache(from_index_global_addr, ALIGN(sizeof(int) * cur_len, 64));
-
-            dim4 one_out_shape = {.n = 1, .c = 1, .h = 1, .w = out_shape[out_dim-1]};
-            dim4 one_in_shape = {.n = 1, .c = cur_len, .h = 1, .w = one_out_shape.w};
-
-            dim4 param_stride = {.n = 0, .c = 0, .h = one_in_shape.w, .w = 1};
-            tpu_gdma_h_gather_S2L(in_local_addr, gradout_global_addr, from_index_global_addr, false, zero_, &one_in_shape, go_shape.h, NULL, &param_stride, NULL, grad_dtype);
-            // cpy out -> local mem
-            if (start_idx == 0)
-                tpu_gdma_cpy_S2L(res_local_addr, out_global_addr + idx_out * one_out_shape.w * tpu_data_type_size(grad_dtype),
-                                &one_out_shape, NULL, NULL, grad_dtype);
-
-            scalar_t one_ = {.f32 = 1.0};
-            if (grad_dtype == DT_FP16) one_ = tpu_fp_cast(one_, DT_FP32, DT_FP16, RM_HALF_TO_EVEN);
-            padding_t conv_pad = {.bottom=0, .top = 0, .left = 0, .right = 0};
-            dim2 conv_kernel = {.h = 1, .w = 1};
-            dim2 conv_stride = {.h = 1, .w = 1};
-            dim2 conv_dilation = {.h = 1, .w = 1};
-            tpu_bdc_fp_conv2d_kernel_const(res_local_addr, in_local_addr, 0, one_, &one_in_shape, NULL, 1,  &conv_kernel,
-                                        &conv_pad, &conv_stride, &conv_dilation, grad_dtype,grad_dtype, false, true);
-            start_idx += cur_len;
-            res_len -= cur_len;
-            if (start_idx >= len)
-                tpu_gdma_general_cpy_L2S(out_global_addr + idx_out * one_out_shape.w * tpu_data_type_size(grad_dtype),res_local_addr,
-                                        &one_out_shape, &one_out_shape, NULL, NULL, grad_dtype);
+        // 2. do
+        tpu_poll(); // necessary, but harm for performance 
+        tmp1 = (int*) tpu_global_mem_addr(from_index_global_addr);
+        tmp2 = (int*) tpu_global_mem_addr(to_index_global_addr);
+        for(int i = 0; i < window_cur; i++){
+            tmp1[i] = in_idx_window[i];
+            tmp2[i] = out_idx_window[i];
         }
-        ptr_reserved_idx = delete_nodel(ptr_reserved_idx);
+        tpu_flush_cache(from_index_global_addr, ALIGN(sizeof(int) * window_cur, 64));
+        tpu_flush_cache(to_index_global_addr, ALIGN(sizeof(int) * window_cur, 64));
+
+        dim4 add_shape = {.n = 1, .c = window_cur, .h = 1, .w=o_shape.w};
+        dim4 from_stride = {.n = 0, .c = 0, .h = add_shape.w, .w = 1};
+        tpu_gdma_h_gather_S2L(from_local_addr, gradout_global_addr, from_index_global_addr, false, zero_, &add_shape, go_shape.h, NULL, &from_stride, NULL, grad_dtype);
+        dim4 to_stride = {.n = 0, .c = 0, .h = add_shape.w, .w = 1};
+        tpu_gdma_h_gather_S2L(to_local_addr, out_global_addr, to_index_global_addr, false, zero_, &add_shape, o_shape.h, NULL, &to_stride, NULL, grad_dtype);
+
+        tpu_bdc_fp_add(res_local_addr, from_local_addr, to_local_addr, &add_shape, NULL, NULL, NULL, grad_dtype);
+
+        dim4 scatter_out_stride = {.n = 0 , .c = 0, .h = add_shape.w, .w = 1};
+        dim4 scatter_oshape = {.n = o_shape.n, .c = window_cur, .h = o_shape.h, .w = o_shape.w};
+        tpu_gdma_h_scatter_L2S(out_global_addr, res_local_addr, to_index_global_addr, false, &scatter_oshape, 1, &scatter_out_stride, NULL, NULL, grad_dtype);
     }
+#endif
     free(in_idx_window);
     free(out_idx_window);
-    free(in_idx);
-#endif
+    free(sorted_index);
+    free(sorted_index_indx);
 }
 
 void tpu_kernel_api_emb_backward(const void* args) {
