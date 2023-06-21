@@ -52,9 +52,9 @@ Tensor where_self_tpu ( const Tensor & condition, const Tensor & self, const Ten
                        tpu::TPUGenerateTensorDesc ( condition ),
                        ADDR_IN_DEVICE ( condition ),
                        tpu::TPUGenerateTensorDesc ( self ),
-                       self.dim() == 0 ? self.cpu().data_ptr() : ADDR_IN_DEVICE ( self ),
+                       ADDR_IN_DEVICE ( self ),
                        tpu::TPUGenerateTensorDesc ( other ),
-                       other.dim() == 0 ? other.cpu().data_ptr() : ADDR_IN_DEVICE ( other ),
+                       ADDR_IN_DEVICE ( other ),
                        tpu::TPUGenerateTensorDesc ( out ),
                        ADDR_IN_DEVICE ( out ) );
   TORCH_CHECK ( status == BM_SUCCESS );

@@ -219,6 +219,8 @@ typedef enum
   EMBEDDING_BACKWARD,
   MALLOC,
   FREE,
+  CROSS_ENTROPY_LOSS,
+  CROSS_ENTROPY_LOSS_BACKWARD,
   OP_NUM
 }
 OpType;
@@ -263,7 +265,9 @@ static const char * OpTypeStr[OP_NUM] =
   "Addcmul",
   "Embedding Backward",
   "Malloc",
-  "Free"
+  "Free",
+  "CrossEntropyLoss",
+  "CrossEntropyLossBackward"
 };
 
 struct OpTimer

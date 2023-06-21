@@ -2682,27 +2682,11 @@ bm_status_t sgdnn_where (
     }
     sg_api_where_t api;
     api.cond_global_addr = (unsigned long long)cond;
-    if (selfDesc.ndims > 0)
-    {
-        api.self_is_scalar = false;
-        api.self_global_addr = (unsigned long long)self;
-    }
-    else
-    {
-        api.self_is_scalar = true;
-        memcpy ( &api.self_global_addr, self, dtype_size(selfDtype) );
-    }
-    if (otherDesc.ndims > 0)
-    {
-        api.other_is_scalar = false;
-        api.other_global_addr = (unsigned long long)other;
-    }
-    else
-    {
-        api.other_is_scalar = true;
-        memcpy ( &api.other_global_addr, other, dtype_size(otherDtype) );
-    }
+    api.self_global_addr = (unsigned long long)self;
+    api.other_global_addr = (unsigned long long)other;
     api.out_global_addr = (unsigned long long)out;
+    api.self_is_scalar = selfDesc.ndims == 0;
+    api.other_is_scalar = otherDesc.ndims == 0;
     api.cond_dtype = condDtype;
     api.dtype = selfDtype;
     api.shape_dim = selfDesc.ndims;
@@ -3151,7 +3135,6 @@ bm_status_t sgdnn_embedding_dense_backward(
     for(int i = 0; i < api.idx_dim; i++){ NUM_Index *= api.idx_shape[i]; }
     bm_device_mem_t sorted_index, sorted_index_index;
     bm_device_mem_t from_index, to_index;
-    bm_device_mem_t from_buffer, to_buffer;
     bm_status_t status;
     status = bm_malloc_device_byte(handle, &sorted_index, NUM_Index * sizeof(int));
     assert(status == BM_SUCCESS);
@@ -3161,21 +3144,13 @@ bm_status_t sgdnn_embedding_dense_backward(
     assert(status == BM_SUCCESS);
     status = bm_malloc_device_byte(handle, &to_index, window_size * sizeof(int));
     assert(status == BM_SUCCESS);
-    status = bm_malloc_device_byte(handle, &from_buffer,
-                            window_size * api.out_shape[1] * sg_dtype_len(api.grad_dtype));
-    assert(status == BM_SUCCESS);
-    status = bm_malloc_device_byte(handle, &to_buffer,
-                            window_size * api.out_shape[1] * sg_dtype_len(api.grad_dtype));
-    assert(status == BM_SUCCESS);
 
     api.sorted_index_global_addr = bm_mem_get_device_addr(sorted_index);
     api.sorted_index_index_global_addr = bm_mem_get_device_addr(sorted_index_index);
     api.from_index_global_addr = bm_mem_get_device_addr(from_index);
     api.to_index_global_addr = bm_mem_get_device_addr(to_index);
-    api.from_buffer_global_addr = bm_mem_get_device_addr(from_buffer);
-    api.to_buffer_global_addr = bm_mem_get_device_addr(to_buffer);
     api.window_size = window_size;
-    
+
 
     sgdnn_tpu_kernel_launch(handle, "tpu_kernel_api_emb_backward", &api, sizeof(api));
     bm_free_device(handle, sorted_index);

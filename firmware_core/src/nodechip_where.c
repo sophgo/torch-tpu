@@ -8,10 +8,8 @@ global_addr_t out_global_addr,
 global_addr_t cond_global_addr,
 global_addr_t self_global_addr,
 global_addr_t other_global_addr,
-bool          self_is_const,
-scalar_t      self_const_val,
-bool          other_is_const,
-scalar_t      other_const_val,
+bool          self_is_scalar,
+bool          other_is_scalar,
 const dim4  * out_shape,
 const dim4  * cond_shape,
 const dim4  * self_shape,
@@ -22,11 +20,11 @@ data_type_t   dtype )
   dim4 out_global_stride, cond_global_stride, self_global_stride, other_global_stride;
   tpu_continuous_stride ( &out_global_stride, out_shape );
   tpu_continuous_stride ( &cond_global_stride, cond_shape );
-  if ( self_is_const == false )
+  if ( self_is_scalar == false )
   {
     tpu_continuous_stride ( &self_global_stride, self_shape );
   }
-  if ( other_is_const == false )
+  if ( other_is_scalar == false )
   {
     tpu_continuous_stride ( &other_global_stride, other_shape );
   }
@@ -39,17 +37,17 @@ data_type_t   dtype )
   };
   const bool self_bcast[4] =
   {
-    self_is_const ? false : self_shape->n != out_shape->n,
-    self_is_const ? false : self_shape->c != out_shape->c,
-    self_is_const ? false : self_shape->h != out_shape->h,
-    self_is_const ? false : self_shape->w != out_shape->w
+    self_is_scalar ? false : self_shape->n != out_shape->n,
+    self_is_scalar ? false : self_shape->c != out_shape->c,
+    self_is_scalar ? false : self_shape->h != out_shape->h,
+    self_is_scalar ? false : self_shape->w != out_shape->w
   };
   const bool other_bcast[4] =
   {
-    other_is_const ? false : other_shape->n != out_shape->n,
-    other_is_const ? false : other_shape->c != out_shape->c,
-    other_is_const ? false : other_shape->h != out_shape->h,
-    other_is_const ? false : other_shape->w != out_shape->w
+    other_is_scalar ? false : other_shape->n != out_shape->n,
+    other_is_scalar ? false : other_shape->c != out_shape->c,
+    other_is_scalar ? false : other_shape->h != out_shape->h,
+    other_is_scalar ? false : other_shape->w != out_shape->w
   };
   bool cond_bcast_all = false, self_bcast_all = false, other_bcast_all = false;
   for ( int i = 0; i < 4; ++i )
@@ -68,9 +66,9 @@ data_type_t   dtype )
     cond_addr = out_addr + out_size;
     int cond_size = tpu_aligned_feature_size ( hmax, out_shape->w, cond_dtype ) * DIV_UP ( cmax, NPU_NUM ) * nmax;
     self_addr = cond_addr + cond_size;
-    int self_size = self_is_const ? 0 : out_size;
+    int self_size = self_is_scalar ? 0 : out_size;
     other_addr = self_addr + self_size;
-    int other_size = other_is_const ? 0 : out_size;
+    int other_size = other_is_scalar ? 0 : out_size;
     int total_size = other_addr + other_size;
     if ( total_size <= LOCAL_MEM_SIZE )
     {
@@ -102,10 +100,12 @@ data_type_t   dtype )
   variable_t cond_var = { .type = TENSOR, .context = { .addr = cond_addr } };
   variable_t zero_var = { .type = SCALAR, .context = { .scalar = { .u32 = 0 } } };
   variable_t self_var;
-  if ( self_is_const )
+  if ( self_is_scalar )
   {
     self_var.type = SCALAR;
-    self_var.context.scalar = self_const_val;
+    tpu_invalidate_cache ( self_global_addr, 64 );
+    scalar_t val = { .u32 = * ( unsigned int * ) tpu_global_mem_addr ( self_global_addr ) };
+    self_var.context.scalar = val;
   }
   else
   {
@@ -113,10 +113,12 @@ data_type_t   dtype )
     self_var.context.addr = self_addr;
   }
   variable_t other_var;
-  if ( other_is_const )
+  if ( other_is_scalar )
   {
     other_var.type = SCALAR;
-    other_var.context.scalar = other_const_val;
+    tpu_invalidate_cache ( other_global_addr, 64 );
+    scalar_t val = { .u32 = * ( unsigned int * ) tpu_global_mem_addr ( other_global_addr ) };
+    other_var.context.scalar = val;
   }
   else
   {
@@ -151,7 +153,7 @@ data_type_t   dtype )
         ( cond_bcast[2] ? 0 : hdone ) * cond_global_stride.h ) * tpu_data_type_size ( cond_dtype );
         tpu_gdma_cpy_S2L ( cond_addr, cond_global_addr_gdma, &cond_local_shape, &cond_local_stride, &cond_global_stride, cond_dtype );
         // Move self from global memory to local memory
-        if ( self_is_const == false )
+        if ( self_is_scalar == false )
         {
           tpu_aligned_stride ( &self_local_stride, 0, &shape, dtype );
           self_local_shape.n = self_bcast[0] ? 1 : shape.n;
@@ -166,7 +168,7 @@ data_type_t   dtype )
           tpu_gdma_cpy_S2L ( self_addr, self_global_addr_gdma, &self_local_shape, &self_local_stride, &self_global_stride, dtype );
         }
         // Move other from global memory to local memory
-        if ( other_is_const == false )
+        if ( other_is_scalar == false )
         {
           tpu_aligned_stride ( &other_local_stride, 0, &shape, dtype );
           other_local_shape.n = other_bcast[0] ? 1 : shape.n;
@@ -196,7 +198,7 @@ data_type_t   dtype )
           tpu_bdc_cpy ( cond_addr, cond_addr, &shape, NULL, &cond_bcast_stride, cond_dtype );
         }
         // Broadcast self if needed
-        if ( self_is_const == false )
+        if ( self_is_scalar == false )
         {
           if ( self_bcast[1] )
           {
@@ -214,7 +216,7 @@ data_type_t   dtype )
           }
         }
         // Broadcast other if needed
-        if ( other_is_const == false )
+        if ( other_is_scalar == false )
         {
           if ( other_bcast[1] )
           {
@@ -254,8 +256,6 @@ void tpu_kernel_api_where ( const void * args )
 {
   sg_api_where_t * api = ( sg_api_where_t * ) args;
   TPUKERNEL_ASSERT ( api->shape_dim > 0 && api->shape_dim <= 4 );
-  scalar_t self_scalar = { .u32 = api->self_is_scalar ? ( u32 ) api->self_global_addr : 0 };
-  scalar_t other_scalar = { .u32 = api->other_is_scalar ? ( u32 ) api->other_global_addr : 0 };
   dim4 out_shape = { .n = 1, .c = 1, .h = 1, .w = 1 };
   dim4 cond_shape = { .n = 1, .c = 1, .h = 1, .w = 1 };
   dim4 self_shape = { .n = 1, .c = 1, .h = 1, .w = 1 };
@@ -295,9 +295,7 @@ void tpu_kernel_api_where ( const void * args )
   api->self_global_addr,
   api->other_global_addr,
   api->self_is_scalar,
-  self_scalar,
   api->other_is_scalar,
-  other_scalar,
   &out_shape,
   &cond_shape,
   api->self_is_scalar ? NULL : &self_shape,
