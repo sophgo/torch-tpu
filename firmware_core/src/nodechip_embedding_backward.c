@@ -104,6 +104,7 @@ void nodechip_embedding_backward(
                 node->prv = reserved_list.tail.prv;
                 node->next = &reserved_list.tail;
                 node->index = start_idx;
+                reserved_list.tail.prv->next = node;
                 reserved_list.tail.prv = node;
                 do{
                     start_idx++;
@@ -145,6 +146,7 @@ void nodechip_embedding_backward(
         if (window_cur == window_size || start_idx == NUM_index) { // enough to caculate
             ptr_reserved_idx = reserved_list.head.next;
             //do caculate here
+            tpu_poll(); // necessary, but harm for performance 
             memcpy(tpu_global_mem_addr(from_index_global_addr), in_idx_window, sizeof(int) * window_cur);
             memcpy(tpu_global_mem_addr(to_index_global_addr), out_idx_window, sizeof(int) * window_cur);
             tpu_flush_cache(from_index_global_addr, ALIGN(sizeof(int) * window_cur, 64));
@@ -161,54 +163,49 @@ void nodechip_embedding_backward(
             dim4 to_stride = {.n = 0, .c = 0, .h = add_shape.w, .w = 1};
             tpu_gdma_h_gather_S2L(to_local_addr, out_global_addr, to_index_global_addr, false, zero_, &add_shape, o_shape.h, NULL, &to_stride, NULL, grad_dtype);
             
-            tpu_poll();
             tpu_bdc_fp_add(res_local_addr, from_local_addr, to_local_addr, &add_shape, NULL, NULL, NULL, grad_dtype);
-            tpu_poll();
 
-            // tpu_gdma_general_cpy_L2S(to_buffer_global_addr,res_local_addr, &add_shape, &add_shape, NULL, NULL, grad_dtype);
-            // tpu_gdma_h_scatter_S2S(out_global_addr, to_buffer_global_addr, to_index_global_addr, false, &o_shape, window_cur, NULL, NULL, NULL, grad_dtype);
-            //dim4 scatter_out_stride = {.n = 0 , .c = add_shape.w, .h = 0, .w = 1};
             dim4 scatter_out_stride = {.n = 0 , .c = 0, .h = add_shape.w, .w = 1};
             dim4 scatter_oshape = {.n = o_shape.n, .c = window_cur, .h = o_shape.h, .w = o_shape.w};
             tpu_gdma_h_scatter_L2S(out_global_addr, res_local_addr, to_index_global_addr, false, &scatter_oshape, 1, &scatter_out_stride, NULL, NULL, grad_dtype);
-            tpu_poll();
             memset(in_idx_window, 0, sizeof(int) * window_size);
             memset(out_idx_window, 0, sizeof(int) * window_size);
             window_cur = 0;
         }
     }
 
+    int max_len = window_size;
+    local_addr_t res_local_addr = 0;
+    local_addr_t in_local_addr = res_local_addr + tpu_aligned_feature_size(1, out_shape[out_dim-1], grad_dtype);
+    TPUKERNEL_ASSERT( (1 + DIV_UP(window_size, NPU_NUM)) * tpu_aligned_feature_size(1, out_shape[out_dim-1], grad_dtype) < LOCAL_MEM_SIZE );
+    int * in_idx = (int *)malloc(NUM_index * sizeof(int));
     // list have reserved data
     ptr_reserved_idx = reserved_list.head.next;
     while(ptr_reserved_idx != &reserved_list.tail){
         // do calculate
         int idx_out = ((int*)tpu_global_mem_addr(sorted_index_global_addr))[ptr_reserved_idx->index];
         int len = 0;
-        for (int tmp = ptr_reserved_idx->index;tmp < NUM_index; tmp++){
-            in_idx_window[len] = ((int*)tpu_global_mem_addr(sorted_index_index_global_addr))[tmp];
+        for (int tmp = ptr_reserved_idx->index;
+            tmp < NUM_index && (((int*)tpu_global_mem_addr(sorted_index_global_addr))[tmp] == idx_out);
+            tmp++
+        ){
+            in_idx[len] = ((int*)tpu_global_mem_addr(sorted_index_index_global_addr))[tmp];
             len++;
-            if(((int*)tpu_global_mem_addr(sorted_index_global_addr))[tmp] != idx_out){
-                break;
-            }
         }
         // local is enough
         int start_idx = 0;
+        int res_len = len;
         while (start_idx < len){
-            int cur_len = MIN(len, window_size);
-            local_addr_t res_local_addr = 0;
-            local_addr_t in_local_addr = res_local_addr + tpu_aligned_feature_size(1, out_shape[out_dim-1], grad_dtype);
-            TPUKERNEL_ASSERT(( tpu_aligned_feature_size(1, out_shape[out_dim-1], grad_dtype) +
-                               DIV_UP(cur_len, NPU_NUM) * tpu_aligned_feature_size(1, out_shape[out_dim-1], grad_dtype))
-                               < LOCAL_MEM_SIZE);
+            int cur_len = MIN(res_len, max_len);
+            tpu_poll(); // necessary, but harm for performance 
+            memcpy(tpu_global_mem_addr(from_index_global_addr), in_idx + start_idx, sizeof(int) * cur_len);
+            tpu_flush_cache(from_index_global_addr, ALIGN(sizeof(int) * cur_len, 64));
 
             dim4 one_out_shape = {.n = 1, .c = 1, .h = 1, .w = out_shape[out_dim-1]};
             dim4 one_in_shape = {.n = 1, .c = cur_len, .h = 1, .w = one_out_shape.w};
-            memcpy(tpu_global_mem_addr(from_index_global_addr), in_idx_window + start_idx, sizeof(int) * cur_len);
-            tpu_flush_cache(from_index_global_addr, ALIGN(sizeof(int) * cur_len, 64));
-            dim4 global_buffer_shape= {.n = 1, .c = 1, .h = cur_len, .w = out_shape[out_dim-1]};
-            tpu_gdma_h_gather_S2S(from_buffer_global_addr, gradout_global_addr, from_index_global_addr,
-                                false, zero_, &global_buffer_shape, go_shape.h, NULL, NULL, NULL, grad_dtype);
-            tpu_gdma_cpy_S2L(in_local_addr, from_buffer_global_addr, &one_in_shape,NULL, NULL, grad_dtype);
+
+            dim4 param_stride = {.n = 0, .c = 0, .h = one_in_shape.w, .w = 1};
+            tpu_gdma_h_gather_S2L(in_local_addr, gradout_global_addr, from_index_global_addr, false, zero_, &one_in_shape, go_shape.h, NULL, &param_stride, NULL, grad_dtype);
             // cpy out -> local mem
             if (start_idx == 0)
                 tpu_gdma_cpy_S2L(res_local_addr, out_global_addr + idx_out * one_out_shape.w * tpu_data_type_size(grad_dtype),
@@ -221,17 +218,18 @@ void nodechip_embedding_backward(
             dim2 conv_stride = {.h = 1, .w = 1};
             dim2 conv_dilation = {.h = 1, .w = 1};
             tpu_bdc_fp_conv2d_kernel_const(res_local_addr, in_local_addr, 0, one_, &one_in_shape, NULL, 1,  &conv_kernel,
-                                        &conv_pad, &conv_stride, &conv_dilation, grad_dtype,grad_dtype, false, false);
+                                        &conv_pad, &conv_stride, &conv_dilation, grad_dtype,grad_dtype, false, true);
             start_idx += cur_len;
+            res_len -= cur_len;
             if (start_idx >= len)
                 tpu_gdma_general_cpy_L2S(out_global_addr + idx_out * one_out_shape.w * tpu_data_type_size(grad_dtype),res_local_addr,
                                         &one_out_shape, &one_out_shape, NULL, NULL, grad_dtype);
         }
         ptr_reserved_idx = delete_nodel(ptr_reserved_idx);
     }
-    
     free(in_idx_window);
     free(out_idx_window);
+    free(in_idx);
 #endif
 }
 
