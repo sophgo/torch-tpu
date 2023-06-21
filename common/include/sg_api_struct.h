@@ -645,8 +645,6 @@ typedef struct {
     unsigned long long sorted_index_index_global_addr;
     unsigned long long from_index_global_addr;
     unsigned long long to_index_global_addr;
-    unsigned long long from_buffer_global_addr;
-    unsigned long long to_buffer_global_addr;
     int gradout_shape[FW_MAX_SHAPE_DIMS];
     int gradout_dim;
     int idx_shape[FW_MAX_SHAPE_DIMS];
