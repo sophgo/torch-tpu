@@ -19,3 +19,4 @@ function format_code {
 export BMLIB_CMODEL_PATH=$TPUTRAIN_TOP/third_party/libcmodel_firmware.so
 
 source ${TPUTRAIN_TOP}/scripts/build_helper.sh
+source ${TPUTRAIN_TOP}/scripts/release.sh
