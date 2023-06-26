@@ -1355,17 +1355,39 @@ ReductionMode_t                 mode )
   sg_data_type_t ydtype = ( sg_data_type_t ) ( yDesc.dtype );
   assert ( xdtype == ydtype );
   sg_api_reduce_t api;
-  for ( int i = 0; i < xDesc.ndims; ++i )
+  if ( keep_dim )
   {
-    if ( i < reduce_dim_start )
+    for ( int i = 0; i < xDesc.ndims; ++i )
     {
-      assert ( xDesc.shape[i] == yDesc.shape[i] );
+      if ( i < reduce_dim_start )
+      {
+        assert ( xDesc.shape[i] == yDesc.shape[i] );
+      }
+      else if ( i >= reduce_dim_start && i < reduce_dim_end )
+      {
+        assert ( yDesc.shape[i] == 1 );
+      }
+      else if ( i >= reduce_dim_end )
+      {
+        assert ( xDesc.shape[i] == yDesc.shape[i] );
+      }
+      api.shape[i] = xDesc.shape[i];
     }
-    else if ( i >= reduce_dim_end )
+  }
+  else
+  {
+    for ( int i = 0; i < xDesc.ndims; ++i )
     {
-      assert ( xDesc.shape[i] == yDesc.shape[i - ( reduce_dim_end - reduce_dim_start )] );
+      if ( i < reduce_dim_start )
+      {
+        assert ( xDesc.shape[i] == yDesc.shape[i] );
+      }
+      else if ( i >= reduce_dim_end )
+      {
+        assert ( xDesc.shape[i] == yDesc.shape[i - ( reduce_dim_end - reduce_dim_start )] );
+      }
+      api.shape[i] = xDesc.shape[i];
     }
-    api.shape[i] = xDesc.shape[i];
   }
   api.shape_dim = xDesc.ndims;
   api.input_global_addr = ( unsigned long long ) x;
