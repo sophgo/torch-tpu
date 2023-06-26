@@ -54,7 +54,7 @@ Tensor & _softmax_out_tpu ( const Tensor & self, int64_t dim, bool half_to_float
 #ifdef TPU_OP_TIMING
   auto timer = tpu::Timer().Start();
 #endif
-  bm_status_t status = sgdnn_softmax_forward_cudnn (
+  bm_status_t status = sgdnn_softmax_forward (
                        tpu::TPUGetDeviceHandle(),
                        dim < 0 ? dim + self.dim() : dim,
                        &alpha,
@@ -88,7 +88,7 @@ Tensor & _softmax_backward_data_out_tpu ( const Tensor & grad_output, const Tens
 #ifdef TPU_OP_TIMING
   auto timer = tpu::Timer().Start();
 #endif
-  bm_status_t status = sgdnn_softmax_backward_cudnn (
+  bm_status_t status = sgdnn_softmax_backward (
                        tpu::TPUGetDeviceHandle(),
                        dim < 0 ? dim + output.dim() : dim,
                        tpu::TPUGenerateTensorDesc ( output ),

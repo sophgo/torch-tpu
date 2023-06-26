@@ -80,7 +80,7 @@ double eps )
 #ifdef TPU_OP_TIMING
   auto timer = tpu::Timer().Start();
 #endif
-  bm_status_t status = sgdnn_batchnorm_forward_cudnn (
+  bm_status_t status = sgdnn_batchnorm_forward (
                        tpu::TPUGetDeviceHandle(),
                        BatchNorm_Spatial,
                        &alpha,
@@ -181,7 +181,7 @@ std::array<bool, 3> output_mask )
 #ifdef TPU_OP_TIMING
   auto timer = tpu::Timer().Start();
 #endif
-  bm_status_t status = sgdnn_batchnorm_backward_cudnn (
+  bm_status_t status = sgdnn_batchnorm_backward (
                        tpu::TPUGetDeviceHandle(),
                        BatchNorm_Spatial,
                        &alpha_data_diff,
@@ -274,7 +274,7 @@ double eps)
 #ifdef TPU_OP_TIMING
   auto timer = tpu::Timer().Start();
 #endif
-  bm_status_t status = sgdnn_batchnorm_forward_cudnn (
+  bm_status_t status = sgdnn_batchnorm_forward (
                        tpu::TPUGetDeviceHandle(),
                        BatchNorm_Per_Layer,
                        &alpha,
@@ -364,7 +364,7 @@ std::array<bool, 3> output_mask )
 #ifdef TPU_OP_TIMING
   auto timer = tpu::Timer().Start();
 #endif
-  bm_status_t status = sgdnn_batchnorm_backward_cudnn (
+  bm_status_t status = sgdnn_batchnorm_backward (
                        tpu::TPUGetDeviceHandle(),
                        BatchNorm_Per_Layer,
                        &alpha_data_diff,

@@ -524,12 +524,14 @@ typedef struct {
     unsigned long long output_global_addr;
     int shape[FW_MAX_SHAPE_DIMS];
     int shape_dim;
-    int reduce_dim;
+    int reduce_dim_start;
+    int reduce_dim_end;
     sg_data_type_t dtype;
+    int reduction_mode;
 #ifndef WIN32
-} __attribute__((packed)) sg_api_reduce_sum_t;
+} __attribute__((packed)) sg_api_reduce_t;
 #else
-} sg_api_reduce_sum_t;
+} sg_api_reduce_t;
 #endif
 
 typedef struct {

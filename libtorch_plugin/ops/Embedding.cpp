@@ -34,7 +34,7 @@ Tensor index_select_tpu ( const Tensor & self, int64_t dim, const Tensor & index
   }
   IntArrayRef sizes ( sizes_vec.data(), sizes_vec.size() );
   auto out = torch::empty ( sizes, options );
-  bm_status_t status = sgdnn_index_select_cudnn (
+  bm_status_t status = sgdnn_index_select (
                        tpu::TPUGetDeviceHandle(),
                        tpu::TPUGenerateTensorDesc ( self ),
                        ADDR_IN_DEVICE ( self ),

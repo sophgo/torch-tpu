@@ -10,7 +10,8 @@ global_addr_t output_global_addr,
 int row,
 int column,
 int axis,
-data_type_t dtype )
+data_type_t dtype,
+int reduction )
 {
   const bool cw_trans = axis == 0;
   const int dsize = tpu_data_type_size ( dtype );
@@ -130,6 +131,12 @@ data_type_t dtype )
       wdone += shape.w;
       index = 1 - index;
     }
+    if ( reduction == 0 )
+    {
+      scalar_t C_fp32 = { .f32 = 1.f / ( cw_trans ? row : column ) };
+      scalar_t C = tpu_fp_cast ( C_fp32, dtype, DT_FP32, RM_HALF_TO_EVEN );
+      tpu_bdc_fp_mul_C ( output_local_addrs[1 - index], output_local_addrs[1 - index], C, &reduce_shape, NULL, NULL, dtype );
+    }
     l2s = true;
     l2s_global_addr = output_global_addr + cdone * ( cw_trans ? output_global_stride.w : output_global_stride.c ) * dsize;
     l2s_local_addr = output_local_addrs[1 - index];
@@ -158,43 +165,54 @@ data_type_t dtype )
   }
 }
 
-void tpu_kernel_api_reduce_sum ( const void *args )
+void tpu_kernel_api_reduce ( const void *args )
 {
-  sg_api_reduce_sum_t * api = ( sg_api_reduce_sum_t * ) args;
+  sg_api_reduce_t * api = ( sg_api_reduce_t * ) args;
   data_type_t dtype = tpu_type_convert ( api->dtype );
   TPUKERNEL_ASSERT ( dtype == DT_FP32 || dtype == DT_FP16 );
+  TPUKERNEL_ASSERT ( api->reduction_mode == 0 || api->reduction_mode == 1 );
   tpu_initialize();
-  if ( api->reduce_dim == api->shape_dim - 1 )
+  if ( api->reduce_dim_end == api->shape_dim )
   {
     int row = 1;
-    for ( int i = 0; i < api->shape_dim - 1; ++i )
+    int column = 1;
+    for ( int i = 0; i < api->reduce_dim_start; ++i )
     {
       row *= api->shape[i];
     }
-    int column = api->shape[api->shape_dim - 1];
+    for ( int i = api->reduce_dim_start; i < api->shape_dim; ++i )
+    {
+      column *= api->shape[i];
+    }
     nodechip_reduce_sum_2d (
     api->input_global_addr,
     api->output_global_addr,
     row,
     column,
     1,
-    dtype );
+    dtype,
+    api->reduction_mode );
   }
-  else if ( api->reduce_dim == 0 )
+  else if ( api->reduce_dim_start == 0 )
   {
+    int row = 1;
     int column = 1;
-    for ( int i = 1; i < api->shape_dim; ++i )
+    for ( int i = 0; i < api->reduce_dim_end; ++i )
+    {
+      row *= api->shape[i];
+    }
+    for ( int i = api->reduce_dim_end; i < api->shape_dim; ++i )
     {
       column *= api->shape[i];
     }
-    int row = api->shape[0];
     nodechip_reduce_sum_2d (
     api->input_global_addr,
     api->output_global_addr,
     row,
     column,
     0,
-    dtype );
+    dtype,
+    api->reduction_mode );
   }
   else
   {
@@ -202,4 +220,4 @@ void tpu_kernel_api_reduce_sum ( const void *args )
   }
   tpu_poll();
 }
-TPUKERNEL_FUNC_REGISTER ( tpu_kernel_api_reduce_sum );
+TPUKERNEL_FUNC_REGISTER ( tpu_kernel_api_reduce );

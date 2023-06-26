@@ -31,7 +31,7 @@ Tensor & fill__Scalar_tpu ( Tensor & self, const Scalar & value )
     TORCH_CHECK ( false );
   }
 
-  bm_status_t status = sgdnn_const_fill_cudnn (
+  bm_status_t status = sgdnn_const_fill (
                        tpu::TPUGetDeviceHandle(),
                        tpu::TPUGenerateTensorDesc ( self_ ),
                        ADDR_IN_DEVICE ( self_ ),

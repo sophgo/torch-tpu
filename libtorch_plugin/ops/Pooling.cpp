@@ -45,7 +45,7 @@ bool ceil_mode )
   int output_h = at::native::pooling_output_shape ( self.size ( 2 ), kernel_size[0], padding[0], stride[0], dilation[0], ceil_mode );
   int output_w = at::native::pooling_output_shape ( self.size ( 3 ), kernel_size[1], padding[1], stride[1], dilation[1], ceil_mode );
   auto output = empty ( { self.size ( 0 ), self.size ( 1 ), output_h, output_w }, self.options() );
-  bm_status_t status = sgdnn_pooling_forward_cudnn (
+  bm_status_t status = sgdnn_pooling_forward (
                        tpu::TPUGetDeviceHandle(),
                        pooling_desc,
                        &alpha,
@@ -99,7 +99,7 @@ const Tensor & indices )
   int output_h = at::native::pooling_output_shape ( self.size ( 2 ), kernel_size[0], padding[0], stride[0], dilation[0], ceil_mode );
   int output_w = at::native::pooling_output_shape ( self.size ( 3 ), kernel_size[1], padding[1], stride[1], dilation[1], ceil_mode );
   auto output = empty ( { self.size ( 0 ), self.size ( 1 ), output_h, output_w }, self.options() );
-  bm_status_t status = sgdnn_pooling_forward_cudnn (
+  bm_status_t status = sgdnn_pooling_forward (
                        tpu::TPUGetDeviceHandle(),
                        pooling_desc,
                        &alpha,
@@ -110,7 +110,7 @@ const Tensor & indices )
                        ADDR_IN_DEVICE ( output ) );
   TORCH_CHECK ( status == BM_SUCCESS );
   grad_input = empty ( self.sizes(), self.options() );
-  status = sgdnn_pooling_backward_cudnn (
+  status = sgdnn_pooling_backward (
            tpu::TPUGetDeviceHandle(),
            pooling_desc,
            &alpha,

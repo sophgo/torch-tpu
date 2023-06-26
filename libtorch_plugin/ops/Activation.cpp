@@ -38,7 +38,7 @@ Tensor & relu__tpu ( Tensor & self )
 #ifdef TPU_OP_TIMING
   auto timer = tpu::Timer().Start();
 #endif
-  bm_status_t status = sgdnn_activation_forward_cudnn (
+  bm_status_t status = sgdnn_activation_forward (
                        tpu::TPUGetDeviceHandle(),
                        activation_desc,
                        &alpha,
@@ -83,7 +83,7 @@ Tensor       & grad_input )
 #ifdef TPU_OP_TIMING
   auto timer = tpu::Timer().Start();
 #endif
-  bm_status_t status = sgdnn_activation_backward_cudnn (
+  bm_status_t status = sgdnn_activation_backward (
                        tpu::TPUGetDeviceHandle(),
                        activation_desc,
                        &alpha,
@@ -126,7 +126,7 @@ Tensor & gelu_out_tpu ( const Tensor & self, c10::string_view approximate, Tenso
 #ifdef TPU_OP_TIMING
   auto timer = tpu::Timer().Start();
 #endif
-  bm_status_t status = sgdnn_activation_forward_cudnn (
+  bm_status_t status = sgdnn_activation_forward (
                        tpu::TPUGetDeviceHandle(),
                        activation_desc,
                        &alpha,
@@ -159,7 +159,7 @@ Tensor & gelu_backward_grad_input_tpu ( const Tensor & grad_output, const Tensor
 #ifdef TPU_OP_TIMING
   auto timer = tpu::Timer().Start();
 #endif
-  bm_status_t status = sgdnn_gelu_backward_cudnn (
+  bm_status_t status = sgdnn_gelu_backward (
                        tpu::TPUGetDeviceHandle(),
                        tpu::TPUGenerateTensorDesc ( self ),
                        ADDR_IN_DEVICE ( self ),

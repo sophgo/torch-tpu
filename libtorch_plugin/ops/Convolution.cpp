@@ -104,7 +104,7 @@ int64_t groups )
 #ifdef TPU_OP_TIMING
     auto timer = tpu::Timer().Start();
 #endif
-    bm_status_t status = sgdnn_conv_forward_cudnn (
+    bm_status_t status = sgdnn_conv_forward (
                          tpu::TPUGetDeviceHandle(),
                          &alpha,
                          tpu::TPUGenerateTensorDesc ( input ),
@@ -221,7 +221,7 @@ std::array<bool, 3> output_mask )
 #ifdef TPU_OP_TIMING
     auto timer = tpu::Timer().Start();
 #endif
-    bm_status_t status = sgdnn_conv_backward_cudnn (
+    bm_status_t status = sgdnn_conv_backward (
                          tpu::TPUGetDeviceHandle(),
                          &alpha,
                          &beta,

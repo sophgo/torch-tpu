@@ -41,7 +41,7 @@ Tensor _copy_from_tpu ( const Tensor & self, const Tensor & dst, bool non_blocki
 #ifdef TPU_OP_TIMING
         auto timer = tpu::Timer().Start();
 #endif
-        bm_status_t status = sgdnn_strided_copy_cudnn (
+        bm_status_t status = sgdnn_strided_copy (
                              tpu::TPUGetDeviceHandle(),
                              tpu::TPUGenerateTensorDesc ( self ),
                              ADDR_IN_DEVICE ( self ),

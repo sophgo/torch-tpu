@@ -52,7 +52,7 @@ Tensor & binary_Tensor_tpu ( const Tensor          & input1,
     float alpha1 = 1.f;
     float alpha2 = alpha.toDouble();
     float beta = 0.f;
-    bm_status_t status = sgdnn_eltwise_forward_cudnn (
+    bm_status_t status = sgdnn_eltwise_forward (
                          handle,
                          &alpha1,
                          input1_desc,

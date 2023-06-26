@@ -26,7 +26,7 @@ Tensor & add_out_tpu ( const Tensor & self, const Tensor & other, const Scalar &
 #ifdef TPU_OP_TIMING
       auto timer = tpu::Timer().Start();
 #endif
-      bm_status_t status = sgdnn_binary_cudnn (
+      bm_status_t status = sgdnn_binary (
                            tpu::TPUGetDeviceHandle(),
                            tpu::TPUGenerateTensorDesc ( self ),
                            ADDR_IN_DEVICE ( self ),
@@ -45,7 +45,7 @@ Tensor & add_out_tpu ( const Tensor & self, const Tensor & other, const Scalar &
 #ifdef TPU_OP_TIMING
       auto timer = tpu::Timer().Start();
 #endif
-      bm_status_t status = sgdnn_binary_cudnn (
+      bm_status_t status = sgdnn_binary (
                            tpu::TPUGetDeviceHandle(),
                            tpu::TPUGenerateTensorDesc ( self ),
                            ADDR_IN_DEVICE ( self ),
@@ -83,7 +83,7 @@ Tensor & add_out_tpu ( const Tensor & self, const Tensor & other, const Scalar &
 #ifdef TPU_OP_TIMING
       auto timer = tpu::Timer().Start();
 #endif
-      bm_status_t status = sgdnn_binary_cudnn (
+      bm_status_t status = sgdnn_binary (
                            tpu::TPUGetDeviceHandle(),
                            tpu::TPUGenerateTensorDesc ( self ),
                            ADDR_IN_DEVICE ( self ),
@@ -112,7 +112,7 @@ Tensor & add_out_tpu ( const Tensor & self, const Tensor & other, const Scalar &
 #ifdef TPU_OP_TIMING
       auto timer = tpu::Timer().Start();
 #endif
-      bm_status_t status = sgdnn_binary_cudnn (
+      bm_status_t status = sgdnn_binary (
                            tpu::TPUGetDeviceHandle(),
                            tpu::TPUGenerateTensorDesc ( scalar ),
                            scalar.data_ptr(),
@@ -155,7 +155,7 @@ Tensor & sub_out_tpu ( const Tensor & self, const Tensor & other, const Scalar &
 #ifdef TPU_OP_TIMING
       auto timer = tpu::Timer().Start();
 #endif
-      bm_status_t status = sgdnn_binary_cudnn (
+      bm_status_t status = sgdnn_binary (
                            tpu::TPUGetDeviceHandle(),
                            tpu::TPUGenerateTensorDesc ( self ),
                            ADDR_IN_DEVICE ( self ),
@@ -174,7 +174,7 @@ Tensor & sub_out_tpu ( const Tensor & self, const Tensor & other, const Scalar &
 #ifdef TPU_OP_TIMING
       auto timer = tpu::Timer().Start();
 #endif
-      bm_status_t status = sgdnn_binary_cudnn (
+      bm_status_t status = sgdnn_binary (
                            tpu::TPUGetDeviceHandle(),
                            tpu::TPUGenerateTensorDesc ( self ),
                            ADDR_IN_DEVICE ( self ),
@@ -212,7 +212,7 @@ Tensor & sub_out_tpu ( const Tensor & self, const Tensor & other, const Scalar &
 #ifdef TPU_OP_TIMING
       auto timer = tpu::Timer().Start();
 #endif
-      bm_status_t status = sgdnn_binary_cudnn (
+      bm_status_t status = sgdnn_binary (
                            tpu::TPUGetDeviceHandle(),
                            tpu::TPUGenerateTensorDesc ( self ),
                            ADDR_IN_DEVICE ( self ),
@@ -241,7 +241,7 @@ Tensor & sub_out_tpu ( const Tensor & self, const Tensor & other, const Scalar &
 #ifdef TPU_OP_TIMING
       auto timer = tpu::Timer().Start();
 #endif
-      bm_status_t status = sgdnn_binary_cudnn (
+      bm_status_t status = sgdnn_binary (
                            tpu::TPUGetDeviceHandle(),
                            tpu::TPUGenerateTensorDesc ( scalar ),
                            scalar.data_ptr(),
@@ -282,7 +282,7 @@ Tensor & mul_out_tpu ( const Tensor & self, const Tensor & other, Tensor & out )
 #ifdef TPU_OP_TIMING
     auto timer = tpu::Timer().Start();
 #endif
-    bm_status_t status = sgdnn_binary_cudnn (
+    bm_status_t status = sgdnn_binary (
                          tpu::TPUGetDeviceHandle(),
                          tpu::TPUGenerateTensorDesc ( self ),
                          ADDR_IN_DEVICE ( self ),
@@ -314,7 +314,7 @@ Tensor & mul_out_tpu ( const Tensor & self, const Tensor & other, Tensor & out )
 #ifdef TPU_OP_TIMING
       auto timer = tpu::Timer().Start();
 #endif
-      bm_status_t status = sgdnn_binary_cudnn (
+      bm_status_t status = sgdnn_binary (
                            tpu::TPUGetDeviceHandle(),
                            tpu::TPUGenerateTensorDesc ( self ),
                            ADDR_IN_DEVICE ( self ),
@@ -343,7 +343,7 @@ Tensor & mul_out_tpu ( const Tensor & self, const Tensor & other, Tensor & out )
 #ifdef TPU_OP_TIMING
       auto timer = tpu::Timer().Start();
 #endif
-      bm_status_t status = sgdnn_binary_cudnn (
+      bm_status_t status = sgdnn_binary (
                            tpu::TPUGetDeviceHandle(),
                            tpu::TPUGenerateTensorDesc ( scalar ),
                            scalar.data_ptr(),
@@ -384,7 +384,7 @@ Tensor & div_out_tpu ( const Tensor & self, const Tensor & other, Tensor & out )
 #ifdef TPU_OP_TIMING
     auto timer = tpu::Timer().Start();
 #endif
-    bm_status_t status = sgdnn_binary_cudnn (
+    bm_status_t status = sgdnn_binary (
                          tpu::TPUGetDeviceHandle(),
                          tpu::TPUGenerateTensorDesc ( self ),
                          ADDR_IN_DEVICE ( self ),
@@ -419,7 +419,7 @@ Tensor & div_out_tpu ( const Tensor & self, const Tensor & other, Tensor & out )
 #ifdef TPU_OP_TIMING
       auto timer = tpu::Timer().Start();
 #endif
-      bm_status_t status = sgdnn_binary_cudnn (
+      bm_status_t status = sgdnn_binary (
                            tpu::TPUGetDeviceHandle(),
                            tpu::TPUGenerateTensorDesc ( self ),
                            ADDR_IN_DEVICE ( self ),
@@ -448,7 +448,7 @@ Tensor & div_out_tpu ( const Tensor & self, const Tensor & other, Tensor & out )
 #ifdef TPU_OP_TIMING
       auto timer = tpu::Timer().Start();
 #endif
-      bm_status_t status = sgdnn_binary_cudnn (
+      bm_status_t status = sgdnn_binary (
                            tpu::TPUGetDeviceHandle(),
                            tpu::TPUGenerateTensorDesc ( scalar ),
                            scalar.data_ptr(),
