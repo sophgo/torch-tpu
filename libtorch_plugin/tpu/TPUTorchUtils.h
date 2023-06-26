@@ -16,7 +16,7 @@
 do \
 { \
 TORCH_CHECK ( t.device().type() == DeviceType::TPU, #t, " is not in TPU device" ); \
-TORCH_CHECK ( t.is_contiguous() == true, #t, " is not contiguous" ); \
+TORCH_CHECK ( t.is_contiguous() == true, __FILE__ ,":" ,__func__, ": ", #t, " is not contiguous" ); \
 } \
 while ( 0 )
 

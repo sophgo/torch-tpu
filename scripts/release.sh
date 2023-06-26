@@ -40,7 +40,7 @@ function python_pack(){
     pushd $src_dir
     rm -rf build
     rm -f dist/*.whl
-    python3 setup.py bdist_wheel
+    python3 setup.py bdist_wheel --plat-name linux_x86_64
     ret=$?; if [ $ret -ne 0 ]; then return $ret; fi
     if [ -n "$dst_dir" ]; then
         mkdir -p "$dst_dir"

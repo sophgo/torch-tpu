@@ -3,6 +3,8 @@ import torch.nn as nn
 import copy
 
 from tpu_plugin import TPU
+device = TPU(0)
+
 def case_forward(use_fp16=False):
     batch = 8
     sequence = 1024
@@ -10,11 +12,11 @@ def case_forward(use_fp16=False):
     out_size = 3
 
     inp_cpu = torch.rand(batch, sequence, hidden_size)
-    inp_tpu = inp_cpu.to(TPU).half()
+    inp_tpu = inp_cpu.to(device).half()
 
     ln_cpu = nn.Linear(hidden_size, out_size)
     ln_tpu = copy.deepcopy(ln_cpu)
-    ln_tpu = ln_tpu.to(TPU).half()
+    ln_tpu = ln_tpu.to(device).half()
 
     out_cpu = ln_cpu(inp_cpu)
     out_tpu = ln_tpu(inp_tpu)
