@@ -1700,6 +1700,30 @@ double                          value )
   return BM_SUCCESS;
 }
 
+bm_status_t sgdnn_mulc (
+bm_handle_t                     handle,
+const TensorDescriptor_t        inputDesc,
+const void                     *input,
+const TensorDescriptor_t        outputDesc,
+void                           *output,
+double                          value )
+{
+  sg_api_mulc_t api;
+  api.input_global_addr = ( unsigned long long ) input;
+  api.output_global_addr = ( unsigned long long ) output;
+  api.dim = inputDesc.ndims;
+  api.dtype = ( sg_data_type_t ) inputDesc.dtype;
+  api.value = ( float ) value;
+  assert ( inputDesc.ndims == outputDesc.ndims );
+  assert ( inputDesc.dtype == outputDesc.dtype );
+  for ( int i = 0; i < inputDesc.ndims; i++ ) {
+    assert ( inputDesc.shape[i] == outputDesc.shape[i] );
+    api.shape[i] = inputDesc.shape[i];
+  }
+  sgdnn_tpu_kernel_launch ( handle, "tpu_kernel_api_mulc", &api, sizeof ( api ) );
+  return BM_SUCCESS;
+}
+
 bm_status_t sgdnn_cross_entropy_forward (
 bm_handle_t                      handle,
 const TensorDescriptor_t         inDesc,
