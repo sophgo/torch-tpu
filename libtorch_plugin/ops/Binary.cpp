@@ -168,7 +168,12 @@ Tensor & sub_out_tpu ( const Tensor & self, const Tensor & other, const Scalar &
   auto out_cpu = sub ( self.cpu(), other.cpu(), alpha );
   tpu::TPUCopyHostToDevice ( out.data_ptr(), out_cpu.contiguous().data_ptr(), out.nbytes() );
 #else
-  if ( IS_TPU_TENSOR ( self ) && IS_TPU_TENSOR ( other ) )
+  if ( self.dim() == 0 && other.dim() == 0 )
+  {
+    auto out_cpu = sub ( self.cpu(), other.cpu(), alpha );
+    tpu::TPUCopyHostToDevice ( out.data_ptr(), out_cpu.contiguous().data_ptr(), out.nbytes() );
+  }
+  else if ( IS_TPU_TENSOR ( self ) && IS_TPU_TENSOR ( other ) )
   {
     if ( alpha.toDouble() == 1.0 )
     {
@@ -297,7 +302,12 @@ Tensor & mul_out_tpu ( const Tensor & self, const Tensor & other, Tensor & out )
   auto out_cpu = mul ( self.cpu(), other.cpu() );
   tpu::TPUCopyHostToDevice ( out.data_ptr(), out_cpu.contiguous().data_ptr(), out.nbytes() );
 #else
-  if ( IS_TPU_TENSOR ( self ) && IS_TPU_TENSOR ( other ) )
+  if ( self.dim() == 0 && other.dim() == 0 )
+  {
+    auto out_cpu = mul ( self.cpu(), other.cpu() );
+    tpu::TPUCopyHostToDevice ( out.data_ptr(), out_cpu.contiguous().data_ptr(), out.nbytes() );
+  }
+  else if ( IS_TPU_TENSOR ( self ) && IS_TPU_TENSOR ( other ) )
   {
 #ifdef TPU_OP_TIMING
     auto timer = tpu::Timer().Start();
@@ -390,7 +400,12 @@ Tensor & div_out_tpu ( const Tensor & self, const Tensor & other, Tensor & out )
   auto out_cpu = div ( self.cpu(), other.cpu() );
   tpu::TPUCopyHostToDevice ( out.data_ptr(), out_cpu.contiguous().data_ptr(), out.nbytes() );
 #else
-  if ( IS_TPU_TENSOR ( self_ ) && IS_TPU_TENSOR ( other ) )
+  if ( self.dim() == 0 && other.dim() == 0 )
+  {
+    auto out_cpu = div ( self.cpu(), other.cpu() );
+    tpu::TPUCopyHostToDevice ( out.data_ptr(), out_cpu.contiguous().data_ptr(), out.nbytes() );
+  }
+  else if ( IS_TPU_TENSOR ( self_ ) && IS_TPU_TENSOR ( other ) )
   {
     if ( other.dim() == 0 )
     {
