@@ -662,5 +662,19 @@ typedef struct {
 } sg_api_emb_backward_t;
 #endif
 
+typedef struct {
+    unsigned long long input_global_addr;
+    unsigned long long other_global_addr;
+    unsigned long long output_global_addr;
+    int shape[FW_MAX_SHAPE_DIMS];
+    int dim;
+    float value;
+    sg_data_type_t dtype;
+#ifndef WIN32
+} __attribute__((packed)) sg_api_scale_add_t;
+#else
+} sg_api_scale_add_t;
+#endif
+
 #pragma pack(pop)
 #endif  // SG_API_STRUCT_H

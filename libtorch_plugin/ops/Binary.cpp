@@ -61,7 +61,22 @@ Tensor & add_out_tpu ( const Tensor & self, const Tensor & other, const Scalar &
     }
     else
     {
-      add_out_tpu ( self, other * alpha, 1.0, out );
+#ifdef TPU_OP_TIMING
+      auto timer = tpu::Timer().Start();
+#endif
+      bm_status_t status = sgdnn_scale_add (
+                           tpu::TPUGetDeviceHandle(),
+                           tpu::TPUGenerateTensorDesc ( self ),
+                           ADDR_IN_DEVICE ( self ),
+                           tpu::TPUGenerateTensorDesc ( other ),
+                           ADDR_IN_DEVICE ( other ),
+                           tpu::TPUGenerateTensorDesc ( out ),
+                           ADDR_IN_DEVICE ( out ),
+                           alpha.toDouble() );
+      TORCH_CHECK ( status == BM_SUCCESS );
+#ifdef TPU_OP_TIMING
+      tpu::OpTimer::Instance().AddTime ( tpu::SCALE_ADD, timer.ElapsedUS() );
+#endif
     }
   }
   else if ( ( IS_TPU_TENSOR ( self ) && IS_CPU_TENSOR ( other ) ) ||

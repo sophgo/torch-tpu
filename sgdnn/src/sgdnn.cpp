@@ -1670,6 +1670,36 @@ double                          value )
   return BM_SUCCESS;
 }
 
+bm_status_t sgdnn_scale_add (
+bm_handle_t                     handle,
+const TensorDescriptor_t        inputDesc,
+const void                     *input,
+const TensorDescriptor_t        otherDesc,
+const void                     *other,
+const TensorDescriptor_t        outputDesc,
+void                           *output,
+double                          value )
+{
+  sg_api_scale_add_t api;
+  api.input_global_addr = ( unsigned long long ) input;
+  api.other_global_addr = ( unsigned long long ) other;
+  api.output_global_addr = ( unsigned long long ) output;
+  api.dim = inputDesc.ndims;
+  api.dtype = ( sg_data_type_t ) inputDesc.dtype;
+  api.value = ( float ) value;
+  assert ( inputDesc.ndims == outputDesc.ndims );
+  assert ( inputDesc.ndims == otherDesc.ndims );
+  assert ( inputDesc.dtype == outputDesc.dtype );
+  assert ( inputDesc.dtype == otherDesc.dtype );
+  for ( int i = 0; i < inputDesc.ndims; i++ ) {
+    assert ( inputDesc.shape[i] == outputDesc.shape[i] );
+    assert ( inputDesc.shape[i] == otherDesc.shape[i] );
+    api.shape[i] = inputDesc.shape[i];
+  }
+  sgdnn_tpu_kernel_launch ( handle, "tpu_kernel_api_scale_add", &api, sizeof ( api ) );
+  return BM_SUCCESS;
+}
+
 bm_status_t sgdnn_cross_entropy_forward (
 bm_handle_t                      handle,
 const TensorDescriptor_t         inDesc,
