@@ -501,6 +501,16 @@ void                             *out,
 int                               padding_idx,
 bool                              scale_grad_by_freq );
 
+bm_status_t sgdnn_scale_add (
+bm_handle_t                     handle,
+const TensorDescriptor_t        inputDesc,
+const void                     *input,
+const TensorDescriptor_t        otherDesc,
+const void                     *other,
+const TensorDescriptor_t        outputDesc,
+void                           *output,
+double                          value );
+
 #if defined(__cplusplus)
 }
 #endif
