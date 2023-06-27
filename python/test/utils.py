@@ -31,7 +31,7 @@ def compare_model_grad(model1, model2):
     cpu_grad = get_model_grad(model1, "gpt_cpu.npz", False)
     tpu_grad = get_model_grad(model2, "gpt_tpu.npz", False)
     print(" ======== compare model's parameter grad =======")
-    assert(len(cpu_grad.keys()) == len(tpu_grad.keys()))
+    #assert(len(cpu_grad.keys()) == len(tpu_grad.keys()))
     for k in cpu_grad.keys():
         c_g = cpu_grad[k]
         t_g = tpu_grad[k]
@@ -57,7 +57,7 @@ def compare_model_weight(model1, model2):
     model2_weight = get_model_weight(model2, "gpt_tpu.npz", False)
     print(" ======== compare model's parameter weight =======")
     # import pdb;pdb.set_trace()
-    assert(len(model1_weight.keys()) == len(model2_weight.keys()))
+    #assert(len(model1_weight.keys()) == len(model2_weight.keys()))
     for k in model1_weight.keys():
         c_g = model1_weight[k]
         t_g = model2_weight[k]

@@ -18,11 +18,11 @@ if __name__ == "__main__":
     configure.attn_pdrop = 0
     configure.embd_pdrop = 0
     configure.resid_pdrop = 0
-    configure.n_layer= 1
+    configure.n_layer= 12
     configure.activation_function= "gelu"
 
-    batch = 32
-    sequence = 256
+    batch = 8
+    sequence = 1024
 
     inp = torch.randint(0,configure.vocab_size,(batch, sequence))
     inp_tpu = inp.clone().int().to("privateuseone:0")
@@ -30,7 +30,7 @@ if __name__ == "__main__":
     net = GPT2LMHeadModel(configure).train()
     net_tpu = copy.deepcopy(net)
     net_tpu.to("privateuseone:0").half()
-    net_tpu.lm_head.weight = net_tpu.transformer.wte.weight
+    #net_tpu.lm_head.weight = net_tpu.transformer.wte.weight
 
     print("start forward")
     t1 = time.time()

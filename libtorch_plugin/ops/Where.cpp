@@ -10,7 +10,8 @@
 
 namespace at {
 Tensor where_self_tpu ( const Tensor & condition, const Tensor & self, const Tensor & other ) {
-  CHECK_TENSOR_IN_DEVICE ( condition );
+  CHECK_TENSOR_IN_DEVICE_NO_CONTIGUOUS ( condition );
+  auto condition_ = condition.contiguous();
   if ( self.dim() > 0 )
   {
     CHECK_TENSOR_IN_DEVICE ( self );
@@ -19,15 +20,15 @@ Tensor where_self_tpu ( const Tensor & condition, const Tensor & self, const Ten
   {
     CHECK_TENSOR_IN_DEVICE ( other );
   }
-  TORCH_CHECK ( condition.dim() > 0 );
-  std::vector<int64_t> sizes_vec ( condition.dim() );
-  for ( auto i = 0; i < condition.dim(); ++i )
+  TORCH_CHECK ( condition_.dim() > 0 );
+  std::vector<int64_t> sizes_vec ( condition_.dim() );
+  for ( auto i = 0; i < condition_.dim(); ++i )
   {
-    sizes_vec[i] = condition.size ( i );
+    sizes_vec[i] = condition_.size ( i );
   }
   if ( self.dim() > 0 )
   {
-    TORCH_CHECK ( condition.dim() == self.dim() );
+    TORCH_CHECK ( condition_.dim() == self.dim() );
     for ( auto i = 0; i < self.dim(); ++i )
     {
       sizes_vec [i] = std::max ( sizes_vec[i], self.size ( i ) );
@@ -35,13 +36,13 @@ Tensor where_self_tpu ( const Tensor & condition, const Tensor & self, const Ten
   }
   if ( other.dim() > 0 )
   {
-    TORCH_CHECK ( condition.dim() == other.dim() );
+    TORCH_CHECK ( condition_.dim() == other.dim() );
     for ( auto i = 0; i < other.dim(); ++i )
     {
       sizes_vec [i] = std::max ( sizes_vec[i], other.size ( i ) );
     }
   }
-  TensorOptions options = TensorOptions ( condition.device() ).dtype ( self.dtype() );
+  TensorOptions options = TensorOptions ( condition_.device() ).dtype ( self.dtype() );
   IntArrayRef sizes ( sizes_vec.data(), sizes_vec.size() );
   auto out = torch::empty ( sizes, options );
 #ifdef TPU_OP_TIMING
@@ -49,8 +50,8 @@ Tensor where_self_tpu ( const Tensor & condition, const Tensor & self, const Ten
 #endif
   bm_status_t status = sgdnn_where (
                        tpu::TPUGetDeviceHandle(),
-                       tpu::TPUGenerateTensorDesc ( condition ),
-                       ADDR_IN_DEVICE ( condition ),
+                       tpu::TPUGenerateTensorDesc ( condition_ ),
+                       ADDR_IN_DEVICE ( condition_ ),
                        tpu::TPUGenerateTensorDesc ( self ),
                        ADDR_IN_DEVICE ( self ),
                        tpu::TPUGenerateTensorDesc ( other ),

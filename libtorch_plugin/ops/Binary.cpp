@@ -387,6 +387,27 @@ Tensor & div_out_tpu ( const Tensor & self, const Tensor & other, Tensor & out )
 #else
   if ( IS_TPU_TENSOR ( self_ ) && IS_TPU_TENSOR ( other ) )
   {
+    if (other.dim() == 0 ){
+      /* RECIPROCAL */
+      Tensor scalar = (1.0 / other.cpu()).to(torch::kFloat32);
+#ifdef TPU_OP_TIMING
+      auto timer = tpu::Timer().Start();
+#endif
+      bm_status_t status = sgdnn_binary (
+                           tpu::TPUGetDeviceHandle(),
+                           tpu::TPUGenerateTensorDesc ( self_ ),
+                           ADDR_IN_DEVICE ( self_ ),
+                           tpu::TPUGenerateTensorDesc ( scalar ),
+                           scalar.data_ptr(),
+                           tpu::TPUGenerateTensorDesc ( out ),
+                           ADDR_IN_DEVICE ( out ),
+                           OP_BINARY_MUL );
+      TORCH_CHECK ( status == BM_SUCCESS );
+#ifdef TPU_OP_TIMING
+      tpu::OpTimer::Instance().AddTime ( tpu::MUL, timer.ElapsedUS() );
+#endif
+    }
+    else{
 #ifdef TPU_OP_TIMING
     auto timer = tpu::Timer().Start();
 #endif
@@ -403,6 +424,7 @@ Tensor & div_out_tpu ( const Tensor & self, const Tensor & other, Tensor & out )
 #ifdef TPU_OP_TIMING
     tpu::OpTimer::Instance().AddTime ( tpu::DIV, timer.ElapsedUS() );
 #endif
+    }
   }
   else if ( ( IS_TPU_TENSOR ( self_ ) && IS_CPU_TENSOR ( other ) ) ||
             ( IS_CPU_TENSOR ( self_ ) && IS_TPU_TENSOR ( other ) ) )
@@ -410,18 +432,8 @@ Tensor & div_out_tpu ( const Tensor & self, const Tensor & other, Tensor & out )
     if ( IS_CPU_TENSOR ( other ) )
     {
       TORCH_CHECK ( other.dim() == 0, "OTHER must be a scalar" );
-      Tensor scalar;
-      if ( other.dtype() == caffe2::TypeMeta::Make<double>() ||
-           other.dtype() == caffe2::TypeMeta::Make<long>() )
-      {
-        scalar = other.to ( torch::kFloat );
-      }
-      else
-      {
-        scalar = other;
-      }
       /* RECIPROCAL */
-      scalar = 1.0 / scalar;
+      Tensor scalar = (1.0 / other).to( torch::kFloat );
 #ifdef TPU_OP_TIMING
       auto timer = tpu::Timer().Start();
 #endif
