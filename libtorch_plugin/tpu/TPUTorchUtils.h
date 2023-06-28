@@ -224,6 +224,7 @@ typedef enum
   CROSS_ENTROPY_LOSS_BACKWARD,
   SCALE_ADD,
   MUL_C,
+  NORM2,
   OP_NUM
 }
 OpType;
@@ -273,7 +274,8 @@ static const char * OpTypeStr[OP_NUM] =
   "Cross Entropy Loss",
   "Cross Entropy Loss Backward",
   "Scale Add",
-  "MulC"
+  "MulC",
+  "Norm2"
 };
 
 struct OpTimer

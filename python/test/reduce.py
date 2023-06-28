@@ -5,6 +5,7 @@ import torch.nn.functional as F
 torch.ops.load_library("../../libtorch_plugin/build/liblibtorch_plugin.so")
 torch.manual_seed(1000)
 torch.set_printoptions(precision=6)
+device = "privateuseone:0"
 
 def case_2d_sum(use_f16=False):
     """
@@ -45,6 +46,12 @@ def case_3d_sum(use_f16=False):
     print("max_diff: ", torch.max(diff))
     print(o[0,:10])
     print(o_tpu.cpu()[0,:10])
+
+def case_FP16_override():
+    inp = torch.Tensor([30000] * 10 + [-30000] * 10).to(device).half()
+    print(inp.cpu())
+    o1 = torch.sum(inp)
+    print(o1.float().cpu())
 
 
 if __name__ == "__main__":

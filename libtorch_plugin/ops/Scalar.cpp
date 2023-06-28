@@ -15,8 +15,8 @@ Scalar _local_scalar_dense_tpu ( const Tensor & self )
   CHECK_TENSOR_IN_DEVICE ( self );
   return _local_scalar_dense ( TENSOR_TO_CPU ( self ) );
 }
-//TORCH_LIBRARY_IMPL ( aten, TPU, m )
-//{
-//  m.impl ( "_local_scalar_dense", _local_scalar_dense_tpu );
-//}
+TORCH_LIBRARY_IMPL ( aten, TPU, m )
+{
+ m.impl ( "_local_scalar_dense", _local_scalar_dense_tpu );
+}
 } // namespace at
