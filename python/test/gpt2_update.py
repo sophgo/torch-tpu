@@ -20,8 +20,8 @@ if __name__ == "__main__":
     configure.resid_pdrop = 0
     configure.n_layer= 12
     configure.activation_function= "gelu"
-    batch = 32
-    sequence = 256
+    batch = 8
+    sequence = 1024
     # ====== configure ======
 
     ## 1.input

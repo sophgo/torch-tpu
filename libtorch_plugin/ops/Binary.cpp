@@ -430,7 +430,7 @@ Tensor & div_out_tpu ( const Tensor & self, const Tensor & other, Tensor & out )
     if ( other.dim() == 0 )
     {
       /* RECIPROCAL */
-      Tensor scalar = ( 1.0 / other.cpu() ).to ( torch::kDouble );
+      Tensor scalar = ( 1.0 / other.cpu().to ( torch::kDouble ) );
 #ifdef TPU_OP_TIMING
       auto timer = tpu::Timer().Start();
 #endif
@@ -473,7 +473,7 @@ Tensor & div_out_tpu ( const Tensor & self, const Tensor & other, Tensor & out )
     {
       TORCH_CHECK ( other.dim() == 0, "OTHER must be a scalar" );
       /* RECIPROCAL */
-      Tensor scalar = ( 1.0 / other ).to ( torch::kDouble );
+      Tensor scalar = ( 1.0 / other.to ( torch::kDouble ) );
 #ifdef TPU_OP_TIMING
       auto timer = tpu::Timer().Start();
 #endif

@@ -1,4 +1,6 @@
 #cmakedefine TPU_OP_TIMING
 #cmakedefine SHOW_OP_INFO
 
+#cmakedefine SHOW_MALLOC_INFO
+
 #define TPU PrivateUse1

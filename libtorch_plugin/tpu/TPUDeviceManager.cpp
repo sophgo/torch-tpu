@@ -10,6 +10,9 @@
 
 namespace tpu
 {
+#ifdef SHOW_MALLOC_INFO
+static unsigned long long mem_in_use = 0;
+#endif
 
 class TPUDeviceManager
 {
@@ -103,6 +106,15 @@ public:
     TORCH_CHECK ( Status == BM_SUCCESS, "Failed to allocate memory on TPU device #", Index, " size = ", Size, "bytes" );
     unsigned long long Addr = bm_mem_get_device_addr ( Mem );
     AddrMemMaps_[Index].emplace ( Addr, Mem );
+
+#ifdef SHOW_MALLOC_INFO
+    static int malloc_num = 0;
+    malloc_num++;
+    mem_in_use += (unsigned int )Size;
+    std::cout << "[Malloc] id = " << malloc_num << ", size = " << Size  << " bytes"
+              << ", Current Mem = " << (mem_in_use >> 20) << "MB" << std::endl;
+#endif
+
 #ifdef SHOW_INFO
     std::cout << "Alloc addr = " << ( void * ) Addr << " size = " << Size << std::endl;
     std::cout << "====================================" << std::endl;
@@ -136,7 +148,17 @@ public:
 #ifdef TPU_OP_TIMING
     tpu::OpTimer::Instance().AddTime ( tpu::FREE, timer.ElapsedUS() );
 #endif
+
+#ifdef SHOW_MALLOC_INFO
+    static int free_num = 0;
+    free_num++;
+    mem_in_use -= Iter->second.size;
+    std::cout << "[Free] id = " << free_num << ", size = " << Iter->second.size << " bytes"
+              << ", Current Mem = " << (mem_in_use >> 20) << "MB" << std::endl;
+#endif
+
     AddrMemMaps_[Index].erase ( Iter );
+
 #ifdef SHOW_INFO
     std::cout << "Free addr = " << Ptr << std::endl;
     std::cout << "====================================" << std::endl;
