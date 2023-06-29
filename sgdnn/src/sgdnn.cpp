@@ -1969,3 +1969,32 @@ bool                              scale_grad_by_freq ) {
   bm_free_device ( handle, to_index );
   return BM_SUCCESS;
 }
+
+bm_status_t sgdnn_norm2 (
+bm_handle_t                     handle,
+const TensorDescriptor_t        inputDesc,
+const void                     *input,
+const TensorDescriptor_t        outputDesc,
+void                           *output )
+{
+  sg_api_norm2_t api;
+  api.dim = inputDesc.ndims;
+  if ( outputDesc.ndims != 0 )
+  {
+    assert ( outputDesc.ndims == inputDesc.ndims );
+    for ( int i = 0; i < outputDesc.ndims; ++i )
+    {
+      assert ( outputDesc.shape[i] == 1 );
+    }
+  }
+  for ( int i = 0; i < inputDesc.ndims; ++i )
+  {
+    api.shape[i] = inputDesc.shape[i];
+  }
+  assert ( inputDesc.dtype == outputDesc.dtype );
+  api.input_global_addr = ( unsigned long long ) input;
+  api.output_global_addr = ( unsigned long long ) output;
+  api.dtype = ( sg_data_type_t ) ( inputDesc.dtype );
+  sgdnn_tpu_kernel_launch ( handle, "tpu_kernel_api_norm2", &api, sizeof ( api ) );
+  return BM_SUCCESS;
+}

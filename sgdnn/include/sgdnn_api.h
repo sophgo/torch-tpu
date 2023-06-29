@@ -519,6 +519,13 @@ const TensorDescriptor_t        outputDesc,
 void                           *output,
 double                          value );
 
+bm_status_t sgdnn_norm2 (
+bm_handle_t                     handle,
+const TensorDescriptor_t        inputDesc,
+const void                     *input,
+const TensorDescriptor_t        outputDesc,
+void                           *output );
+
 #if defined(__cplusplus)
 }
 #endif
