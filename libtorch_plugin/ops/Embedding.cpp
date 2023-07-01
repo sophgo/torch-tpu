@@ -34,15 +34,12 @@ Tensor index_select_tpu ( const Tensor & self, int64_t dim, const Tensor & index
   }
   IntArrayRef sizes ( sizes_vec.data(), sizes_vec.size() );
   auto out = torch::empty ( sizes, options );
-  bm_status_t status = sgdnn_index_select (
+  bm_status_t status = sgdnnIndexSelect (
                        tpu::TPUGetDeviceHandle(),
-                       tpu::TPUGenerateTensorDesc ( self ),
-                       ADDR_IN_DEVICE ( self ),
-                       tpu::TPUGenerateTensorDesc ( index ),
-                       ADDR_IN_DEVICE ( index ),
-                       tpu::TPUGenerateTensorDesc ( out ),
-                       ADDR_IN_DEVICE ( out ),
-                       dim );
+                       tpu::TPUGenerateSgdnnTensor ( self ),
+                       tpu::TPUGenerateSgdnnTensor ( index ),
+                       dim,
+                       tpu::TPUGenerateSgdnnTensor ( out ) );
   TORCH_CHECK ( status == BM_SUCCESS );
 #ifdef TPU_OP_TIMING
   tpu::OpTimer::Instance().AddTime ( tpu::INDEX_SELECT, timer.ElapsedUS() );
@@ -63,22 +60,17 @@ Tensor embedding_dense_backward_tpu ( const Tensor & grad_output, const Tensor &
   auto out_cpu = embedding_dense_backward ( grad_output.cpu(), indices.cpu(), num_weights, padding_idx, scale_grad_by_freq );
   auto out = TENSOR_TO_TPU ( out_cpu );
 #else
-  TensorOptions out_option = TensorOptions(grad_output.device()).dtype(grad_output.dtype());
-  torch::Tensor out = torch::empty({num_weights, grad_output.size(grad_output.dim()-1)}, out_option);
+  TensorOptions out_option = TensorOptions ( grad_output.device() ).dtype ( grad_output.dtype() );
+  torch::Tensor out = torch::empty ( {num_weights, grad_output.size ( grad_output.dim() - 1 ) }, out_option );
 #ifdef TPU_OP_TIMING
   auto timer = tpu::Timer().Start();
 #endif
-  bm_status_t status = sgdnn_embedding_dense_backward(
+  bm_status_t status = sgdnnEmbeddingBackward (
                        tpu::TPUGetDeviceHandle(),
-                       tpu::TPUGenerateTensorDesc(grad_output),
-                       ADDR_IN_DEVICE(grad_output),
-                       tpu::TPUGenerateTensorDesc(indices),
-                       ADDR_IN_DEVICE(indices),
-                       tpu::TPUGenerateTensorDesc(out),
-                       ADDR_IN_DEVICE(out),
-                       padding_idx,
-                       scale_grad_by_freq);
-  TORCH_CHECK(status == BM_SUCCESS);
+                       tpu::TPUGenerateSgdnnTensor ( grad_output ),
+                       tpu::TPUGenerateSgdnnTensor ( indices ),
+                       tpu::TPUGenerateSgdnnTensor ( out ) );
+  TORCH_CHECK ( status == BM_SUCCESS );
 #ifdef TPU_OP_TIMING
   tpu::OpTimer::Instance().AddTime ( tpu::EMBEDDING_BACKWARD, timer.ElapsedUS() );
 #endif

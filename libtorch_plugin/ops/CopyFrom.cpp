@@ -41,12 +41,10 @@ Tensor _copy_from_tpu ( const Tensor & self, const Tensor & dst, bool non_blocki
 #ifdef TPU_OP_TIMING
         auto timer = tpu::Timer().Start();
 #endif
-        bm_status_t status = sgdnn_strided_copy (
+        bm_status_t status = sgdnnStridedCopy (
                              tpu::TPUGetDeviceHandle(),
-                             tpu::TPUGenerateTensorDesc ( self ),
-                             ADDR_IN_DEVICE ( self ),
-                             tpu::TPUGenerateTensorDesc ( dst ),
-                             ADDR_IN_DEVICE ( dst ) );
+                             tpu::TPUGenerateSgdnnTensor ( self ),
+                             tpu::TPUGenerateSgdnnTensor ( dst ) );
         TORCH_CHECK ( status == BM_SUCCESS );
 #ifdef TPU_OP_TIMING
         tpu::OpTimer::Instance().AddTime ( tpu::STRIDED_COPY, timer.ElapsedUS() );
@@ -77,18 +75,15 @@ Tensor _copy_from_tpu ( const Tensor & self, const Tensor & dst, bool non_blocki
       auto self_ = self.contiguous();
       if ( dst.is_contiguous() ) {
 #ifdef TPU_OP_TIMING
-      auto timer = tpu::Timer().Start();
+        auto timer = tpu::Timer().Start();
 #endif
-        auto status = sgdnn_dtype_convert (
+        auto status = sgdnnConvert (
                       tpu::TPUGetDeviceHandle(),
-                      tpu::TPUGenerateTensorDesc ( self_ ),
-                      ADDR_IN_DEVICE ( self_ ),
-                      tpu::TPUGenerateTensorDesc ( dst ),
-                      ADDR_IN_DEVICE ( dst ),
-                      SG_ROUND_EVEN );
+                      tpu::TPUGenerateSgdnnTensor ( self_ ),
+                      tpu::TPUGenerateSgdnnTensor ( dst ) );
         TORCH_CHECK ( status == BM_SUCCESS );
 #ifdef TPU_OP_TIMING
-      tpu::OpTimer::Instance().AddTime ( tpu::DTYPE_CONVERT, timer.ElapsedUS() );
+        tpu::OpTimer::Instance().AddTime ( tpu::DTYPE_CONVERT, timer.ElapsedUS() );
 #endif
       } else {
         dst.copy_ ( self_.to ( dst.dtype() ), non_blocking );

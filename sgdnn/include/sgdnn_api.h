@@ -2,529 +2,572 @@
 #define SGDNN_API_H
 
 #include "bmlib_runtime.h"
-#include "common.h"
-#include "common_def.h"
-#include "sg_api_struct.h"
-#include <string>
 
 #if defined(__cplusplus)
 extern "C" {
 #endif
 
-void get_coeff_data ( const std::string& modelpath, u64 addr_offset, int coeff_size, float* coeff );
+typedef struct
+{
+  int kernel_h;
+  int kernel_w;
+  int pad_h;
+  int pad_w;
+  int stride_h;
+  int stride_w;
+  int dilation_h;
+  int dilation_w;
+  int groups;
+}
+SgdnnConv2dParam_t;
 
-void tpu_module_init ( bm_handle_t handle );
-void tpu_module_deinit ( bm_handle_t handle );
+typedef enum
+{
+  SGDNN_DTYPE_UNKNOWN = 0,
+  SGDNN_DTYPE_INT8,
+  SGDNN_DTYPE_UINT8,
+  SGDNN_DTYPE_INT16,
+  SGDNN_DTYPE_UINT16,
+  SGDNN_DTYPE_FP16,
+  SGDNN_DTYPE_BF16,
+  SGDNN_DTYPE_INT32,
+  SGDNN_DTYPE_UINT32,
+  SGDNN_DTYPE_FP32,
+  SGDNN_DTYPE_INT64
+}
+SgdnnDataType_t;
 
-typedef enum {
-  OP_ELTWISE_PRODUCT     = 0,
-  OP_ELTWISE_COEF_ADD    = 1,
-  OP_ELTWISE_MAX         = 2,
-} EltwiseOpMode_t;
+typedef struct
+{
+  unsigned long long addr;
+  int dim;
+  int shape[8];
+  int stride[8];
+  SgdnnDataType_t dtype;
+}
+SgdnnTensor_t;
 
-typedef enum {
-  OP_BINARY_ADD          = 0,
-  OP_BINARY_SUB          = 1,
-  OP_BINARY_MUL          = 2,
-  OP_BINARY_DIV          = 3,
-  OP_BINARY_MAX          = 4,
-  OP_BINARY_MIN          = 10000,
-  OP_BINARY_GT           = 10001,
-  OP_BINARY_GE           = 10002,
-  OP_BINARY_LT           = 10003,
-  OP_BINARY_LE           = 10004,
-  OP_BINARY_EQ           = 10005,
-  OP_BINARY_NE           = 10006,
-  OP_BINARY_SQUARED_DIFF = 10007,
-  OP_BINARY_FLOOR_MOD    = 10008,
-  OP_BINARY_FLOOR_DIV    = 10009
-} BinaryOpMode_t;
+static inline SgdnnTensor_t sgdnnUndefinedTensor()
+{
+  SgdnnTensor_t tensor = { .addr = 0 };
+  return tensor;
+}
 
-typedef enum {
-  Pooling_MAX = 0,
-  Pooling_AVERAGE = 1,
-} PoolingMode_t;
+bm_status_t sgdnnInitialize ( bm_handle_t handle );
 
-typedef enum {
-  BatchNorm_Spatial = 0,
-  BatchNorm_Per_Layer = 1,
-  BatchNorm_Per_Activation = 2,
-} BatchNormMode_t;
+bm_status_t sgdnnDeinitialize ( bm_handle_t handle );
 
-typedef enum {
-  Activation_Sigmoid        = 0,
-  Activation_Relu           = 1,
-  Activation_Tanh           = 2,
-  Activation_Elu            = 3,
-  Activation_Gelu           = 4,
-  Activation_Swish          = 5,
-} ActivationMode_t;
-
-typedef enum {
-  Not_Propagate_Nan = 0,
-  Propagate_Nan = 1,
-} NanPropagation_t;
-
-typedef enum {
-  Softmax_Per_Instance = 0,
-  Softmax_Per_Chanel = 1,
-} SoftmaxMode_t;
-
-typedef enum {
-  None_Reduction = 0,
-  Mean_Reduction = 1,
-  Sum_Reduction = 2,
-} CrossEntropyMode_t;
-
-typedef enum {
-  Reduction_Mean = 0,
-  Reduction_Sum = 1,
-} ReductionMode_t;
-
-typedef enum {
-  Reorder_To_32ic = 0,
-  Reorder_To_32oc = 1,
-} ConvWeightReorderMode_t;
-
-typedef struct {
-  int         dtype;
-  int         ndims;
-  int         shape[FW_MAX_SHAPE_DIMS];
-  int         stride[FW_MAX_SHAPE_DIMS];
-  int         format;
-} TensorDescriptor_t;
-
-typedef struct {
-  int     oc;
-  int     ic;
-  int     kh;
-  int     kw;
-  sg_data_type_t  dtype;
-} FilterDescriptor_t;
-
-typedef struct {
-  int     pad_h;
-  int     pad_w;
-  int     stride_h;//u
-  int     stride_w;//v
-  int     dilation_h;
-  int     dilation_w;
-  int     groups;
-  sg_data_type_t  computeType;
-} ConvolutionDescriptor_t;
-
-typedef struct {
-  ActivationMode_t    mode;
-  NanPropagation_t    NanOpt;
-  double              coef;//upper_limit when clipped
-} ActivationDescriptor_t;
-
-typedef struct {
-  int             kh;
-  int             kw;
-  int             pad_h;
-  int             pad_w;
-  int             stride_h;
-  int             stride_w;
-  PoolingMode_t   mode;
-} PoolingDescriptor_t;
-
-bm_status_t sgdnn_conv_forward (
-bm_handle_t                     handle,
-const void                     *alpha,
-const TensorDescriptor_t        xDesc,
-const void                     *x,
-const FilterDescriptor_t        wDesc,
-const void                     *w,
-const TensorDescriptor_t        bDesc,
-const void                     *b,
-const ConvolutionDescriptor_t   convDesc,
-//ConvlutionFwdAlgo_t             algo,
-//void                           *workspace,
-//size_t                          workSpaceSizeInBytes,
-const void                     *beta,
-const TensorDescriptor_t        yDesc,
-void                           *y );
-
-bm_status_t sgdnn_conv_backward (
-bm_handle_t                     handle,
-const void                     *alpha,
-const void                     *beta,
-const TensorDescriptor_t        xDesc,
-const void                     *x,
-void                           *dx,
-const FilterDescriptor_t        wDesc,
-const void                     *w,
-void                           *dw,
-const TensorDescriptor_t        dbDesc,
-void                           *db,
-const TensorDescriptor_t        dyDesc,
-const void                     *dy,
-const ConvolutionDescriptor_t   convDesc,
-bool                            dx_enable,
-bool                            dw_enable,
-bool                            db_enable );
-
-bm_status_t sgdnn_batchnorm_forward (
-bm_handle_t                      handle,
-BatchNormMode_t                  mode,
-const void                      *alpha,
-const void                      *beta,
-const TensorDescriptor_t         xDesc,
-const void                      *x,
-const TensorDescriptor_t         yDesc,
-void                            *y,
-const TensorDescriptor_t         bnScaleBiasMeanVarDesc,
-const void                      *bnScale,
-const void                      *bnBias,
-double                           exponentialAverageFactor,
-void                            *resultRunningMean,
-void                            *resultRunningVariance,
-double                           epsilon,
-void                            *resultSaveMean,
-void                            *resultSaveInvVariance );
-
-bm_status_t sgdnn_batchnorm_backward (
-bm_handle_t                      handle,
-BatchNormMode_t                  mode,
-const void                      *alphaDataDiff,
-const void                      *betaDataDiff,
-const void                      *alphaParamDiff,
-const void                      *betaParamDiff,
-const TensorDescriptor_t         xDesc,
-const void                      *x,
-const TensorDescriptor_t         dyDesc,
-const void                      *dy,
-const TensorDescriptor_t         dxDesc,
-void                            *dx,
-const TensorDescriptor_t         bnScaleBiasDiffDesc,
-const void                      *bnScale,
-void                            *resultBnScaleDiff,
-void                            *resultBnBiasDiff,
-double                           epsilon,
-const void                      *savedMean,
-const void                      *savedInvVariance,
-bool                             dx_enable,
-bool                             dw_enable,
-bool                             db_enable );
-
-bm_status_t sgdnn_activation_forward (
-bm_handle_t                     handle,
-ActivationDescriptor_t          activationDesc,
-const void                     *alpha,
-const TensorDescriptor_t        xDesc,
-const void                     *x,
-const void                     *beta,
-const TensorDescriptor_t        yDesc,
-void                           *y );
-
-bm_status_t sgdnn_activation_backward (
-bm_handle_t                      handle,
-ActivationDescriptor_t           activationDesc,
-const void                      *alpha,
-const TensorDescriptor_t         yDesc,
-const void                      *y,
-const TensorDescriptor_t         dyDesc,
-const void                      *dy,
-const TensorDescriptor_t         xDesc,
-const void                      *x,
-const void                      *beta,
-const TensorDescriptor_t         dxDesc,
-void                            *dx );
-
-bm_status_t sgdnn_dtype_convert (
-bm_handle_t                      handle,
-const TensorDescriptor_t         xDesc,
-const void                      *xData,
-const TensorDescriptor_t         yDesc,
-const void                      *yData,
-sg_round_mode_t                  round_mode );
-
-bm_status_t sgdnn_conv_weight_reorder (
-bm_handle_t                      handle,
-const TensorDescriptor_t         xDesc,
-const void                      *xData,
-const TensorDescriptor_t         yDesc,
-const void                      *yData,
-ConvWeightReorderMode_t          reorder_mode );
-
-bm_status_t sgdnn_binary (
-bm_handle_t                 handle,
-const TensorDescriptor_t    aDesc,
-const void*                 A,
-const TensorDescriptor_t    bDesc,
-const void*                 B,
-const TensorDescriptor_t    cDesc,
-void*                       C,
-BinaryOpMode_t              opTensorDesc );
-
-bm_status_t sgdnn_batch_matmul (
-bm_handle_t                      handle,
-const TensorDescriptor_t         LDesc,
-const void                      *L,
-const TensorDescriptor_t         RDesc,
-const void                      *R,
-const TensorDescriptor_t         YDesc,
-void                            *Y,
-int                              L_transpose,
-int                              R_transpose );
-
-bm_status_t sgdnn_softmax_forward (
-bm_handle_t                      handle,
-//SoftmaxMode_t                    softmax_mode,
-int                              dim,
-const void                      *alpha,
-const TensorDescriptor_t         xDesc,
-const void                      *x,
-const void                      *beta,
-const TensorDescriptor_t         yDesc,
-void                            *y );
-
-bm_status_t sgdnn_softmax_backward (
-bm_handle_t                      handle,
-int                              dim,
-const TensorDescriptor_t         yDesc,
-const void                      *y,
-const TensorDescriptor_t         dyDesc,
-const void                      *dy,
-const TensorDescriptor_t         dxDesc,
-void                            *dx );
-
-bm_status_t sgdnn_transpose (
-bm_handle_t                      handle,
-const TensorDescriptor_t         xDesc,
-const void                      *xData,
-const TensorDescriptor_t         yDesc,
-void                            *yData );
-
-bm_status_t sgdnn_pooling_forward (
-bm_handle_t                 handle,
-const PoolingDescriptor_t   poolingDesc,
-const void                 *alpha,
-const TensorDescriptor_t    xDesc,
-const void                 *x,
-const void                 *beta,
-const TensorDescriptor_t    yDesc,
-void                       *y );
-
-bm_status_t sgdnn_pooling_backward (
-bm_handle_t                 handle,
-const PoolingDescriptor_t   poolingDesc,
-const void                 *alpha,
-const TensorDescriptor_t    yDesc,
-const void                 *y,
-const TensorDescriptor_t    dyDesc,
-const void                 *dy,
-const TensorDescriptor_t    xDesc,
-const void                 *x,
-const void                 *beta,
-const TensorDescriptor_t    dxDesc,
-void                       *dx );
-
-bm_status_t sgdnn_gelu_backward (
-bm_handle_t                     handle,
-const TensorDescriptor_t        xDesc,
-const void                     *x,
-const TensorDescriptor_t        dyDesc,
-const void                     *dy,
-const TensorDescriptor_t        dxDesc,
-void                           *dx );
-
-bm_status_t sgdnn_strided_copy (
-bm_handle_t                     handle,
-const TensorDescriptor_t        srcDesc,
-const void                      *src,
-const TensorDescriptor_t        dstDesc,
-void                      *dst );
-
-bm_status_t sgdnn_where (
-bm_handle_t                     handle,
-const TensorDescriptor_t        condDesc,
-const void                     *cond,
-const TensorDescriptor_t        selfDesc,
-const void                     *self,
-const TensorDescriptor_t        otherDesc,
-const void                     *other,
-const TensorDescriptor_t        outDesc,
-void                           *out );
-
-bm_status_t sgdnn_concat (
-bm_handle_t                     handle,
-const TensorDescriptor_t       *inputDescs,
-const void * const *            inputs,
-int                             input_num,
-const TensorDescriptor_t        outputDesc,
-void                           *output,
-int                             concat_dim );
-
-bm_status_t sgdnn_reduce (
-bm_handle_t                     handle,
-const TensorDescriptor_t        xDesc,
-const void                     *x,
-const TensorDescriptor_t        yDesc,
-void                           *y,
-int                             reduce_dim_start,
-int                             reduce_dim_end,
-int                             keep_dim,
-ReductionMode_t                 mode );
-
-bm_status_t sgdnn_index_select (
-bm_handle_t                     handle,
-const TensorDescriptor_t        tableDesc,
-const void                      *table,
-const TensorDescriptor_t        indexDesc,
-const void                      *index,
-const TensorDescriptor_t        outDesc,
-void                            *out,
-int                             dim );
-
-bm_status_t sgdnn_const_fill (
-bm_handle_t                     handle,
-const TensorDescriptor_t        srcDesc,
-void                           *src,
-const void*                     fill_value );
-
-bm_status_t sgdnn_sqrt (
-bm_handle_t                     handle,
-const TensorDescriptor_t        inputDesc,
-const void                     *input,
-const TensorDescriptor_t        outputDesc,
-void                           *output );
-
-bm_status_t sgdnn_addcdiv (
-bm_handle_t                     handle,
-const TensorDescriptor_t        inputDesc,
-const void                     *input,
-const TensorDescriptor_t        tensor1Desc,
-const void                     *tensor1,
-const TensorDescriptor_t        tensor2Desc,
-const void                     *tensor2,
-const TensorDescriptor_t        outputDesc,
-void                           *output,
-double                          value );
-
-bm_status_t sgdnn_addcmul (
-bm_handle_t                     handle,
-const TensorDescriptor_t        inputDesc,
-const void                     *input,
-const TensorDescriptor_t        tensor1Desc,
-const void                     *tensor1,
-const TensorDescriptor_t        tensor2Desc,
-const void                     *tensor2,
-const TensorDescriptor_t        outputDesc,
-void                           *output,
-double                          value );
+bm_status_t sgdnnReorderConv2dWeight ( bm_handle_t handle,
+                                       SgdnnTensor_t input,
+                                       int mode,
+                                       SgdnnTensor_t output );
 
 /*
-reference:
-https://pytorch.org/docs/1.13/generated/torch.nn.CrossEntropyLoss.html?highlight=crossentropy#torch.nn.CrossEntropyLoss
-- in:
-        shape = [N, C]
--target:
-        shape = [N]
-- weight: default have no value
-        shape = in.shape[-1] = [C]
-        weight * log(softmax(in))
-- reduction: default= Mean
-        None : shape = target.shape = [N]
-        Mean : shape = [1]
-        Sum  : shape = [1]
-- label_smoothing: [0, 1], default = 0
-        target = one_hot(target_index)
-        target[i == target_index] = 1 - label_smoothing, others = label_smothing/(len(in)-1)
- examples:
-    target_index                            : 3
-    label_smothing                          : 0.3
-    target  = one_hot(target_index)         : [0, 0, 0, 1]
-    target <- label smoothing               : [0.1, 0.1, 0.1, 0.7]
-**/
-bm_status_t sgdnn_cross_entropy_forward (
-bm_handle_t                      handle,
-const TensorDescriptor_t         inDesc,
-const void                      *in,
-const TensorDescriptor_t         targetDesc,
-const void                      *target,
-const TensorDescriptor_t         weightDesc,
-const void                      *weight,
-const TensorDescriptor_t         outDesc,
-void                            *out,
-bool                             has_weight,
-CrossEntropyMode_t               reduction,
-int                              ignore_index,
-double                           label_smoothing
-);
+ * OUTPUT = CONV2D ( INPUT, WEIGHT, BIAS )
+ * Note:
+ * 1. The data types of INPUT, WEIGHT, BIAS and OUTPUT must be the same and one of FP32, FP16 and BF16
+ * 2. The dimensions of INPUT, WEIGHT and OUTPUT must be 4, BIAS must be 1
+ * 3. The shape of INPUT is ( N, IC, IH, IW ), WEIGHT is ( OC, IC, KH, KW ), BIAS is ( OC ), OUTPUT is ( N, OC, OH, OW )
+ * 4. INPUT, WEIGHT, BIAS and OUTPUT must be contiguous
+ * 5. BIAS is optional
+ */
+bm_status_t sgdnnConv2d ( bm_handle_t handle,
+                          SgdnnTensor_t input,
+                          SgdnnTensor_t weight,
+                          SgdnnTensor_t bias,
+                          SgdnnConv2dParam_t param,
+                          SgdnnTensor_t output );
 
-bm_status_t sgdnn_cross_entropy_backward (
-bm_handle_t                      handle,
-const TensorDescriptor_t         targetDesc,
-const void                      *target,
-const TensorDescriptor_t         inputDesc,
-const void                      *input,
-const TensorDescriptor_t         weightDesc,
-const void                      *weight,
-const TensorDescriptor_t         gradoutDesc,
-const void                      *gradout,
-const TensorDescriptor_t         gradinDesc,
-void                            *gradin,
-CrossEntropyMode_t               reduction,
-int                              ignore_index,
-double                           label_smoothing,
-bool                             has_weight );
+/*
+ * [ GRAD_INPUT, GRAD_WEIGHT, GRAD_BIAS ] = CONV2D BACKWARD ( GRAD_OUTPUT, INPUT, WEIGHT )
+ * Note:
+ * 1. The data types of all the tensors must be the same and one of FP32, FP16 and BF16
+ * 2. The dimensions of INPUT, GRAD_OUTPUT, WEIGHT, GRAD_WEIGHT, OUTPUT and GRAD_OUTPUT must be 4, GRAD_BIAS must be 1
+ * 3. The shape of INPUT and GRAD_INPUT is ( N, IC, IH, IW ), WEIGHT and GRAD_WEIGHT is ( OC, IC, KH, KW ), GRAD_BIAS is ( OC ), GRAD_OUTPUT is ( N, OC, OH, OW )
+ * 4. All the tensors must be contiguous
+ * 5. GRAD_INPUT, GRAD_WEIGHT, GRAD_BIAS are optional
+ */
+bm_status_t sgdnnConv2dBackward ( bm_handle_t handle,
+                                  SgdnnTensor_t grad_output,
+                                  SgdnnTensor_t input,
+                                  SgdnnTensor_t weight,
+                                  SgdnnConv2dParam_t param,
+                                  SgdnnTensor_t grad_input,
+                                  SgdnnTensor_t grad_weight,
+                                  SgdnnTensor_t grad_bias );
 
-bm_status_t sgdnn_matmul (
-bm_handle_t                      handle,
-const TensorDescriptor_t         LDesc,
-const void                      *L,
-const TensorDescriptor_t         RDesc,
-const void                      *R,
-const TensorDescriptor_t         BDesc,
-const void                      *B,
-const TensorDescriptor_t         YDesc,
-void                            *Y,
-int                              L_transpose,
-int                              R_transpose );
-/**
- * refrence：
- * https://pytorch.org/docs/1.13/generated/torch.nn.Embedding.html?highlight=embedding#torch.nn.Embedding
- * - padding_idx:
- *  #TODO
- * - scale_grad_by_freq: default False
- * */
-bm_status_t sgdnn_embedding_dense_backward (
-bm_handle_t                       handle,
-const TensorDescriptor_t          gradoutDesc,
-const void                       *gradout,
-const TensorDescriptor_t          indicesDesc,
-const void                       *indices,
-const TensorDescriptor_t          outDesc,
-void                             *out,
-int                               padding_idx,
-bool                              scale_grad_by_freq );
+/*
+ * [ OUTPUT, SAVED_MEAN, SAVED_INVSTD, RUNNING_MEAN, RUNNING_VAR ] = BATCHNORM2D ( INPUT, WEIGHT, BIAS, EPS, RUNNING_MEAN, RUNNING_VAR, MOMENTUM )
+ * Note:
+ * 1. The data types of all the tensors must be the same and one of FP32, FP16 and BF16
+ * 2. The dimensions of INPUT and OUTPUT must be the same and be 3 or 4
+ * 3. The dimensions of WEIGHT, BIAS, RUNNING_MEAN, RUNNING_VAR, SAVED_MEAN and SAVED_INVSTD must be 1
+ * 4. The shape of INPUT is ( N, C, H, W ) or ( N, C, H ), OUTPUT is ( N, C, H, W ) or ( N, C, H ) and the other tensor, such as WEIGHT, is ( C )
+ * 5. All the tensors must be contiguous
+ * 6. WEIGHT, BIAS, RUNNING_MEAN, RUNNING_VAR, SAVED_MEAN and SAVED_INVSTD are optional
+ */
+bm_status_t sgdnnBatchnorm2d ( bm_handle_t handle,
+                               SgdnnTensor_t input,
+                               SgdnnTensor_t weight,
+                               SgdnnTensor_t bias,
+                               float eps,
+                               SgdnnTensor_t running_mean,
+                               SgdnnTensor_t running_var,
+                               float momentum,
+                               SgdnnTensor_t output,
+                               SgdnnTensor_t saved_mean,
+                               SgdnnTensor_t saved_invstd );
 
-bm_status_t sgdnn_scale_add (
-bm_handle_t                     handle,
-const TensorDescriptor_t        inputDesc,
-const void                     *input,
-const TensorDescriptor_t        otherDesc,
-const void                     *other,
-const TensorDescriptor_t        outputDesc,
-void                           *output,
-double                          value );
+/*
+ * [ GRAD_INPUT, GRAD_WEIGHT, GRAD_BIAS ] = BATCHNORM2D BACKWARD ( GRAD_OUTPUT, INPUT, WEIGHT, SAVED_MEAN, SAVED_INVSTD )
+ * Note:
+ * 1. The data types of all the tensors must be the same and one of FP32, FP16 and BF16
+ * 2. The dimensions of GRAD_OUTPUT and INTPUT must be the same and be 3 or 4
+ * 3. The dimensions of WEIGHT, SAVED_MEAN and SAVED_INVSTD must be 1
+ * 4. The shape of INPUT is ( N, C, H, W ) or ( N, C, H ), GRAD_OUTPUT is ( N, C, H, W ) or ( N, C, H ) and the other tensor, such as WEIGHT, is ( C )
+ * 5. All the tensors must be contiguous
+ * 6. WEIGHT, GRAD_INPUT, GRAD_WEIGHT and GRAD_BIAS are optional
+ */
+bm_status_t sgdnnBatchnorm2dBackward ( bm_handle_t handle,
+                                       SgdnnTensor_t grad_output,
+                                       SgdnnTensor_t input,
+                                       SgdnnTensor_t weight,
+                                       SgdnnTensor_t saved_mean,
+                                       SgdnnTensor_t saved_invstd,
+                                       SgdnnTensor_t grad_input,
+                                       SgdnnTensor_t grad_weight,
+                                       SgdnnTensor_t grad_bias );
 
-bm_status_t sgdnn_mulc (
-bm_handle_t                     handle,
-const TensorDescriptor_t        inputDesc,
-const void                     *input,
-const TensorDescriptor_t        outputDesc,
-void                           *output,
-double                          value );
+/*
+ * [ OUTPUT, MEAN, RSTD ] = LAYERNORM ( INPUT, WEIGHT, BIAS, START_DIM, EPS )
+ * Note:
+ * 1. The data types of all the tensors must be the same and one of FP32, FP16 and BF16
+ * 2. The shapes of INPUT and OUTPUT must be the same
+ * 4. The shape of INPUT is ( D0, D1, ..., D(A-1), DA, D(A+1), ... ), where DA is the START_DIM, then WEIGHT and BIAS are ( D(A), D(A+1), ... ), MEAN and RSTD are ( D0, D1, ..., D(A-1), 1, 1, ... )
+ * 5. All the tensors must be contiguous
+ * 6. WEIGHT and BIAS are optional
+ */
+bm_status_t sgdnnLayernorm ( bm_handle_t handle,
+                             SgdnnTensor_t input,
+                             SgdnnTensor_t weight,
+                             SgdnnTensor_t bias,
+                             int start_dim,
+                             float eps,
+                             SgdnnTensor_t output,
+                             SgdnnTensor_t mean,
+                             SgdnnTensor_t rstd );
 
-bm_status_t sgdnn_norm2 (
-bm_handle_t                     handle,
-const TensorDescriptor_t        inputDesc,
-const void                     *input,
-const TensorDescriptor_t        outputDesc,
-void                           *output );
+/*
+ * [ GRAD_INPUT, GRAD_WEIGHT, GRAD_BIAS ] = LAYERNORM BACKWARD ( GRAD_OUTPUT, INPUT, WEIGHT, MEAN, RSTD, START_DIM )
+ * Note:
+ * 1. The data types of all the tensors must be the same and one of FP32, FP16 and BF16
+ * 2. The shapes of INPUT, GRAD_OUTPUT and GRAD_INPUT must be the same
+ * 4. The shape of INPUT is ( D0, D1, ..., D(A-1), DA, D(A+1), ... ), where DA is the START_DIM, then WEIGHT, GRAD_WEIGHT and GRAD_BIAS are ( D(A), D(A+1), ... ), MEAN and RSTD are ( D0, D1, ..., D(A-1), 1, 1, ... )
+ * 5. All the tensors must be contiguous
+ * 6. WEIGHT, GRAD_INPUT, GRAD_WEIGHT and GRAD_BIAS are optional
+ */
+bm_status_t sgdnnLayernormBackward ( bm_handle_t handle,
+                                     SgdnnTensor_t grad_output,
+                                     SgdnnTensor_t input,
+                                     SgdnnTensor_t weight,
+                                     SgdnnTensor_t mean,
+                                     SgdnnTensor_t rstd,
+                                     int start_dim,
+                                     SgdnnTensor_t grad_input,
+                                     SgdnnTensor_t grad_weight,
+                                     SgdnnTensor_t grad_bias );
+
+/*
+ * OUTPUT = LEFT * RIGHT + BIAS, where " * " is matrix multiplication
+ * Note:
+ * 1. The data types of LEFT, RIGHT, BIAS and OUTPUT must be the same and one of FP32, FP16 and BF16
+ * 2. The dimensions of LEFT, RIGHT, BIAS and OUTPUT must be 2
+ * 3. The shape of LEFT is ( M, K ), RIGHT is ( K, N ), BIAS is ( N ), OUTPUT is ( M, N )
+ * 4. LEFT is allowed to be contiguous or transposed, meaning that the stride is ( K, 1 ) or ( 1, M )
+ *    RIGHT is allowed to be contiguous or transposed, meaning that the stride is ( N, 1 ) or ( 1, K )
+ *    OUTPUT is only allowed to be contiguous, meaning that the stride is ( N, 1 )
+ *    BIAS must be contiguous
+ * 5. BIAS is optional
+ */
+bm_status_t sgdnnMatmul ( bm_handle_t handle,
+                          SgdnnTensor_t left,
+                          SgdnnTensor_t right,
+                          SgdnnTensor_t bias,
+                          SgdnnTensor_t output );
+
+/*
+ * OUTPUT ( batch ) = LEFT ( batch ) * RIGHT ( batch ), where " * " is matrix multiplication
+ * Note:
+ * 1. The data types of LEFT, RIGHT and OUTPUT must be the same and one of FP32, FP16 and BF16
+ * 2. The dimensions of LEFT, RIGHT and OUTPUT must be 3
+ * 3. The shape of LEFT is ( B, M, K ), RIGHT is ( B, K, N ), OUTPUT is ( B, M, N )
+ * 4. LEFT is allowed to be contiguous or transposed, meaning that the stride is ( M * K, K, 1 ) or ( M * K, 1, M )
+ *    RIGHT is allowed to be contiguous or transposed, meaning that the stride is ( N * K, N, 1 ) or ( N * K, 1, K )
+ *    OUTPUT is only allowed to be contiguous, meaning that the stride is ( M * N, N, 1 )
+ */
+bm_status_t sgdnnBatchMatmul ( bm_handle_t handle,
+                               SgdnnTensor_t left,
+                               SgdnnTensor_t right,
+                               SgdnnTensor_t output );
+
+/*
+ * OUTPUT = INPUT + SCALAR * OTHER
+ * Note:
+ * 1. The data types of INPUT, OTHER and OUTPUT must be the same and one of FP32, FP16 and BF16
+ * 2. The shapes of INPUT, OTHER and OUTPUT must be the same, broadcasting is not allowed
+ * 3. INPUT, OTHER and OUTPUT must be contiguous
+ */
+bm_status_t sgdnnAdd ( bm_handle_t handle,
+                       SgdnnTensor_t input,
+                       SgdnnTensor_t other,
+                       float scalar,
+                       SgdnnTensor_t output );
+
+/*
+ * OUTPUT = INPUT - SCALAR * OTHER
+ * Note:
+ * 1. The data types of INPUT, OTHER and OUTPUT must be the same and one of FP32, FP16 and BF16
+ * 2. The shapes of INPUT, OTHER and OUTPUT must be the same, broadcasting is not allowed
+ * 3. INPUT, OTHER and OUTPUT must be contiguous
+ */
+bm_status_t sgdnnSub ( bm_handle_t handle,
+                       SgdnnTensor_t input,
+                       SgdnnTensor_t other,
+                       float scalar,
+                       SgdnnTensor_t output );
+
+/*
+ * OUTPUT = INPUT * OTHER
+ * Note:
+ * 1. The data types of INPUT, OTHER and OUTPUT must be the same and one of FP32, FP16 and BF16
+ * 2. The shapes of INPUT, OTHER and OUTPUT must be the same, broadcasting is not allowed
+ * 3. INPUT, OTHER and OUTPUT must be contiguous
+ */
+bm_status_t sgdnnMul ( bm_handle_t handle,
+                       SgdnnTensor_t input,
+                       SgdnnTensor_t other,
+                       SgdnnTensor_t output );
+
+/*
+ * OUTPUT = INPUT / OTHER
+ * Note:
+ * 1. The data types of INPUT, OTHER and OUTPUT must be the same and one of FP32, FP16 and BF16
+ * 2. The shapes of INPUT, OTHER and OUTPUT must be the same, broadcasting is not allowed
+ * 3. INPUT, OTHER and OUTPUT must be contiguous
+ */
+bm_status_t sgdnnDiv ( bm_handle_t handle,
+                       SgdnnTensor_t input,
+                       SgdnnTensor_t other,
+                       SgdnnTensor_t output );
+
+/*
+ * OUTPUT = INPUT + SCALAR * OTHER
+ * Note:
+ * 1. The data types of INPUT, OTHER and OUTPUT must be the same and one of FP32, FP16 and BF16
+ * 2. The dimentions of INPUT, OTHER and OUTPUT must be the same
+ * 3. INPUT and OTHER are allowed broadcasting
+ * 3. INPUT, OTHER and OUTPUT must be contiguous
+ */
+bm_status_t sgdnnAddBcast ( bm_handle_t handle,
+                            SgdnnTensor_t input,
+                            SgdnnTensor_t other,
+                            float scalar,
+                            SgdnnTensor_t output );
+
+/*
+ * OUTPUT = INPUT + SCALAR
+ * Note:
+ * 1. The data types of INPUT and OUTPUT must be the same and one of FP32, FP16 and BF16
+ * 2. The shapes of INPUT and OUTPUT must be the same
+ * 3. INPUT and OUTPUT must be contiguous
+ */
+bm_status_t sgdnnAddC ( bm_handle_t handle,
+                        SgdnnTensor_t input,
+                        float scalar,
+                        SgdnnTensor_t output );
+
+/*
+ * OUTPUT = SCALAR - INPUT
+ * Note:
+ * 1. The data types of INPUT and OUTPUT must be the same and one of FP32, FP16 and BF16
+ * 2. The shapes of INPUT and OUTPUT must be the same
+ * 3. INPUT and OUTPUT must be contiguous
+ */
+bm_status_t sgdnnCSub ( bm_handle_t handle,
+                        SgdnnTensor_t input,
+                        float scalar,
+                        SgdnnTensor_t output );
+
+/*
+ * OUTPUT = INPUT * SCALAR
+ * Note:
+ * 1. The data types of INPUT and OUTPUT must be the same and one of FP32, FP16 and BF16
+ * 2. The shapes of INPUT and OUTPUT must be the same
+ * 3. INPUT and OUTPUT must be contiguous
+ */
+bm_status_t sgdnnMulC ( bm_handle_t handle,
+                        SgdnnTensor_t input,
+                        float scalar,
+                        SgdnnTensor_t output );
+
+/*
+ * OUTPUT = SCALAR / INPUT
+ * Note:
+ * 1. The data types of INPUT and OUTPUT must be the same and one of FP32, FP16 and BF16
+ * 2. The shapes of INPUT and OUTPUT must be the same
+ * 3. INPUT and OUTPUT must be contiguous
+ */
+bm_status_t sgdnnCDiv ( bm_handle_t handle,
+                        SgdnnTensor_t input,
+                        float scalar,
+                        SgdnnTensor_t output );
+
+/*
+ * OUTPUT = INPUT + SCALAR * ( TENSOR1 * TENSOR2 )
+ * Note:
+ * 1. The data types of INPUT, TENSOR1, TENSOR2 and OUTPUT must be the same and one of FP32, FP16 and BF16
+ * 2. The shapes of INPUT, TENSOR1, TENSOR2 and OUTPUT must be the same, broadcasting is not allowed
+ * 3. INPUT, TENSOR1, TENSOR2 and OUTPUT must be contiguous
+ */
+bm_status_t sgdnnAddCMul ( bm_handle_t handle,
+                           SgdnnTensor_t input,
+                           SgdnnTensor_t tensor1,
+                           SgdnnTensor_t tensor2,
+                           float scalar,
+                           SgdnnTensor_t output );
+
+/*
+ * OUTPUT = INPUT + SCALAR * ( TENSOR1 / TENSOR2 )
+ * Note:
+ * 1. The data types of INPUT, TENSOR1, TENSOR2 and OUTPUT must be the same and one of FP32, FP16 and BF16
+ * 2. The shapes of INPUT, TENSOR1, TENSOR2 and OUTPUT must be the same, broadcasting is not allowed
+ * 3. INPUT, TENSOR1, TENSOR2 and OUTPUT must be contiguous
+ */
+bm_status_t sgdnnAddCDiv ( bm_handle_t handle,
+                           SgdnnTensor_t input,
+                           SgdnnTensor_t tensor1,
+                           SgdnnTensor_t tensor2,
+                           float scalar,
+                           SgdnnTensor_t output );
+
+/*
+ * OUTPUT = ReLU ( INPUT )
+ * Note:
+ * 1. The data types of INPUT and OUTPUT must be the same and one of FP32, FP16 and BF16
+ * 2. The shapes of INPUT and OUTPUT must be the same
+ * 3. INPUT and OUTPUT must be contiguous
+ */
+bm_status_t sgdnnReLU ( bm_handle_t handle,
+                        SgdnnTensor_t input,
+                        SgdnnTensor_t output );
+
+/*
+ * GRAD_INPUT = ReLU Backward ( GRAD_OUTPUT, INPUT )
+ * Note:
+ * 1. The data types of GRAD_OUTPUT, INPUT and GRAD_INPUT must be the same and one of FP32, FP16 and BF16
+ * 2. The shapes of GRAD_OUTPUT, INPUT and GRAD_INPUT must be the same
+ * 3. GRAD_OUTPUT, INPUT and GRAD_INPUT must be contiguous
+ */
+bm_status_t sgdnnReLUBackward ( bm_handle_t handle,
+                                SgdnnTensor_t grad_output,
+                                SgdnnTensor_t input,
+                                SgdnnTensor_t grad_input );
+
+/*
+ * OUTPUT = GELU ( INPUT )
+ * Note:
+ * 1. The data types of INPUT and OUTPUT must be the same and one of FP32, FP16 and BF16
+ * 2. The shapes of INPUT and OUTPUT must be the same
+ * 3. INPUT and OUTPUT must be contiguous
+ */
+bm_status_t sgdnnGELU ( bm_handle_t handle,
+                        SgdnnTensor_t input,
+                        SgdnnTensor_t output );
+
+/*
+ * GRAD_INPUT = GELU BACKWARD ( GRAD_OUTPUT, INPUT )
+ * Note:
+ * 1. The data types of GRAD_OUTPUT, INPUT and GRAD_INPUT must be the same and one of FP32, FP16 and BF16
+ * 2. The shapes of GRAD_OUTPUT, INPUT and GRAD_INPUT must be the same
+ * 3. GRAD_OUTPUT, INPUT and GRAD_INPUT must be contiguous
+ */
+bm_status_t sgdnnGELUBackward ( bm_handle_t handle,
+                                SgdnnTensor_t grad_output,
+                                SgdnnTensor_t input,
+                                SgdnnTensor_t grad_input );
+
+/*
+ * OUTPUT = COPY ( INPUT )
+ * Note:
+ * 1. The data types of INPUT and OUTPUT must be the same
+ * 2. The shapes of INPUT and OUTPUT must be the same
+ * 3. INPUT and OUTPUT are allowed to be NOT contiguous
+ */
+bm_status_t sgdnnStridedCopy ( bm_handle_t handle,
+                               SgdnnTensor_t input,
+                               SgdnnTensor_t output );
+
+/*
+ * OUTPUT = CONVERT ( INPUT )
+ * Note:
+ * 1. The shapes of INPUT and OUTPUT must be the same
+ * 2. INPUT and OUTPUT must be contiguous
+ */
+bm_status_t sgdnnConvert ( bm_handle_t handle,
+                           SgdnnTensor_t input,
+                           SgdnnTensor_t output );
+
+/*
+ * OUTPUT = SQRT ( INPUT )
+ * Note:
+ * 1. The data types of INPUT and OUTPUT must be the same and one of FP32, FP16 and BF16
+ * 2. The shapes of INPUT and OUTPUT must be the same
+ * 3. INPUT and OUTPUT must be contiguous
+ */
+bm_status_t sgdnnSqrt ( bm_handle_t handle,
+                        SgdnnTensor_t input,
+                        SgdnnTensor_t output );
+
+/*
+ * OUTPUT = SOFTMAX ( INPUT, DIM )
+ * Note:
+ * 1. The data types of INPUT and OUTPUT must be the same and one of FP32, FP16 and BF16
+ * 2. The shapes of INPUT and OUTPUT must be the same
+ * 3. INPUT and OUTPUT must be contiguous
+ */
+bm_status_t sgdnnSoftmax ( bm_handle_t handle,
+                           SgdnnTensor_t input,
+                           int dim,
+                           SgdnnTensor_t output );
+
+/*
+ * GRAD_INPUT = SOFTMAX BACKWARD ( GRAD_OUTPUT, OUTPUT, DIM )
+ * Note:
+ * 1. The data types of GRAD_OUTPUT, OUTPUT and GRAD_INPUT must be the same and one of FP32, FP16 and BF16
+ * 2. The shapes of GRAD_OUTPUT, OUTPUT and GRAD_INPUT must be the same
+ * 3. GRAD_OUTPUT, OUTPUT and GRAD_INPUT must be contiguous
+ */
+bm_status_t sgdnnSoftmaxBackward ( bm_handle_t handle,
+                                   SgdnnTensor_t grad_output,
+                                   SgdnnTensor_t output,
+                                   int dim,
+                                   SgdnnTensor_t grad_input );
+
+/*
+ * OUTPUT = NORM2 ( INPUT, KEEPDIM )
+ * Note:
+ * 1. The data types of INPUT and OUTPUT must be the same and one of FP32, FP16 and BF16
+ * 2. If keepdim is TRUE, the dimensions of INPUT and OUTPUT must be the same, the shape of OUTPUT must be ( 1, 1, ... )
+ * 3. If keepdim is FALSE, the dimension of OUTPUT must be zero
+ * 4. INPUT and OUTPUT must be contiguous
+ */
+bm_status_t sgdnnNorm2 ( bm_handle_t handle,
+                         SgdnnTensor_t input,
+                         int keepdim,
+                         SgdnnTensor_t output );
+
+/*
+ * OUTPUT = CROSS ENTROPY LOSS ( INPUT, TARGET, REDUCTION, LABEL_SMOOTHING )
+ * Note:
+ * 1. The data types of INPUT and OUTPUT must be the same and one of FP32, FP16 and BF16
+ * 2. The data type of TARGET must be INT32 or INT64, and will be used as INT32
+ * 3. The dimension of INPUT must be 2, TARGET must be 1 and OUTPUT must be 0
+ * 4. The shape of INPUT is ( B, C ), TARGET is ( B )
+ * 5. INPUT, TARGET and OUTPUT must be contiguous
+ * 6. REDUCTION must be 0 ( mean ) or 1 ( sum )
+ */
+bm_status_t sgdnnCrossEntropyLoss ( bm_handle_t handle,
+                                    SgdnnTensor_t input,
+                                    SgdnnTensor_t target,
+                                    int reduction,
+                                    float label_smoothing,
+                                    SgdnnTensor_t output );
+
+/*
+ * GRAD_INPUT = CROSS ENTROPY LOSS BACKWARD ( INPUT, TARGET, GRAD_OUTPUT, REDUCTION, LABEL_SMOOTHING )
+ * Note:
+ * 1. The data types of INPUT, GRAD_OUTPUT and GRAD_INPUT must be the same and one of FP32, FP16 and BF16
+ * 2. The data type of TARGET must be INT32 or INT64, and will be used as INT32
+ * 3. The dimensions of INPUT and GRAD_INPUT must be 2, TARGET must be 1 and GRAD_OUTPUT must be 0
+ * 4. The shape of INPUT is ( B, C ), GRAD_INPUT is ( B, C ), TARGET is ( B )
+ * 5. INPUT, TARGET, GRAD_OUTPUT and GRAD_INPUT must be contiguous
+ * 6. REDUCTION must be 0 ( mean ) or 1 ( sum )
+ */
+bm_status_t sgdnnCrossEntropyLossBackward (
+bm_handle_t handle,
+SgdnnTensor_t input,
+SgdnnTensor_t target,
+SgdnnTensor_t grad_output,
+int reduction,
+float label_smoothing,
+SgdnnTensor_t grad_input );
+
+/*
+ * OUTPUT = FILL ( SCALAR ), the elements of OUTPUT are all set SCALAR
+ * Note:
+ * 1. The data types of SCALAR and OUTPUT must be the same
+ * 2. SCALAR_PTR is a host pointer
+ * 3. OUTPUT must be contiguous
+ */
+bm_status_t sgdnnFill ( bm_handle_t handle,
+                        const void * scalar_ptr,
+                        SgdnnTensor_t output );
+
+/*
+ * OUTPUT = REDUCE ( INPUT, START_DIM, END_DIM, KEEPDIM, MODE )
+ * Note:
+ * 1. The data types of INPUT and OUTPUT must be the same and one of FP32, FP16 and BF16
+ * 2. The shape of INPUT is ( D0, D1, ..., D(S-1), DS, ..., D(E-1), DE, D(E+1), ... ), where DS is START_DIM and DE is END_DIM,
+ *    if keepdim is TRUE, OUTPUT is ( D0, D1, ..., D(S-1), 1, ..., 1, DE, D(E+1), ... ), otherwise, ( D0, D1, ..., D(S-1), DE, D(E+1), ... )
+ * 3. INPUT and OUTPUT must be contiguous
+ * 4. MODE must be 0 ( mean ) or 1 ( sum )
+ */
+bm_status_t sgdnnReduce ( bm_handle_t handle,
+                          SgdnnTensor_t input,
+                          int start_dim,
+                          int end_dim,
+                          int keepdim,
+                          int mode,
+                          SgdnnTensor_t output );
+
+bm_status_t sgdnnConcat ( bm_handle_t handle,
+                          const SgdnnTensor_t * inputs,
+                          int input_num,
+                          int dim,
+                          SgdnnTensor_t output );
+
+/*
+ * OUTPUT = WHERE ( COND, SELF, OTHER ) = COND ? SELF : OTHER
+ * Note:
+ * 1. The data types of SELF, OTHER and OUTPUT must be the same
+ * 2. The dimension of COND and OUTPUT must be the same
+ * 3. COND, SELF, OTHER and OUTPUT must be contiguous
+ * 4. COND, SELF and OTHER are allowed broadcastable, SELF and OTHER are allowed scalar
+ */
+bm_status_t sgdnnWhere ( bm_handle_t handle,
+                         SgdnnTensor_t cond,
+                         SgdnnTensor_t self,
+                         SgdnnTensor_t other,
+                         SgdnnTensor_t output );
+
+/*
+ * OUTPUT = INDEX SELECT ( INPUT, INDICES, DIM )
+ * Note:
+ * 1. The data types of INPUT and OUTPUT must be the same, INDICES must be INT32 or INT64, but used as INT32
+ * 2. The shape of INPUT is ( D0, ..., D(D-1), DD, D(D+1), ... ), where DD is the DIM, INDICES is ( I0, ..., IX ),
+ *    then OUTPUT is ( D0, ..., D(D-1), I0, ..., IX, D(D+1), ...  )
+ * 3. INPUT, INDICES and OUTPUT must be contiguous
+ */
+bm_status_t sgdnnIndexSelect ( bm_handle_t handle,
+                               SgdnnTensor_t input,
+                               SgdnnTensor_t indices,
+                               int dim,
+                               SgdnnTensor_t output );
+
+bm_status_t sgdnnEmbeddingBackward ( bm_handle_t handle,
+                                     SgdnnTensor_t grad_output,
+                                     SgdnnTensor_t indices,
+                                     SgdnnTensor_t grad_input );
 
 #if defined(__cplusplus)
 }

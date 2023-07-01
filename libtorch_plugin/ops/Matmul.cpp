@@ -50,18 +50,12 @@ Tensor & addmm_out_tpu ( const Tensor & self, const Tensor & mat1, const Tensor 
 #ifdef TPU_OP_TIMING
     auto timer = tpu::Timer().Start();
 #endif
-    auto status = sgdnn_matmul (
+    auto status = sgdnnMatmul (
                   tpu::TPUGetDeviceHandle(),
-                  tpu::TPUGenerateTensorDesc ( mat1_ ),
-                  ADDR_IN_DEVICE ( mat1_ ),
-                  tpu::TPUGenerateTensorDesc ( mat2_ ),
-                  ADDR_IN_DEVICE ( mat2_ ),
-                  tpu::TPUGenerateTensorDesc ( self ),
-                  ADDR_IN_DEVICE ( self ),
-                  tpu::TPUGenerateTensorDesc ( out ),
-                  ADDR_IN_DEVICE ( out ),
-                  false,
-                  is_transposed ( mat2 ) );
+                  tpu::TPUGenerateSgdnnTensor ( mat1_ ),
+                  tpu::TPUGenerateSgdnnTensor ( mat2_ ),
+                  tpu::TPUGenerateSgdnnTensor ( self ),
+                  tpu::TPUGenerateSgdnnTensor ( out ) );
     TORCH_CHECK ( status == BM_SUCCESS );
 #ifdef TPU_OP_TIMING
     tpu::OpTimer::Instance().AddTime ( tpu::MM, timer.ElapsedUS() );
@@ -99,18 +93,12 @@ Tensor & mm_out_tpu ( const Tensor & self, const Tensor & mat2, Tensor & out )
 #ifdef TPU_OP_TIMING
   auto timer = tpu::Timer().Start();
 #endif
-  auto status = sgdnn_matmul (
+  auto status = sgdnnMatmul (
                 tpu::TPUGetDeviceHandle(),
-                tpu::TPUGenerateTensorDesc ( self_ ),
-                ADDR_IN_DEVICE ( self_ ),
-                tpu::TPUGenerateTensorDesc ( mat2_ ),
-                ADDR_IN_DEVICE ( mat2_ ),
-                TensorDescriptor_t(),
-                nullptr,
-                tpu::TPUGenerateTensorDesc ( out ),
-                ADDR_IN_DEVICE ( out ),
-                false,
-                is_transposed ( mat2 ) );
+                tpu::TPUGenerateSgdnnTensor ( self_ ),
+                tpu::TPUGenerateSgdnnTensor ( mat2_ ),
+                sgdnnUndefinedTensor(),
+                tpu::TPUGenerateSgdnnTensor ( out ) );
   TORCH_CHECK ( status == BM_SUCCESS );
 #ifdef TPU_OP_TIMING
   tpu::OpTimer::Instance().AddTime ( tpu::MM, timer.ElapsedUS() );
@@ -143,16 +131,11 @@ Tensor & bmm_out_tpu ( const Tensor & self, const Tensor & mat2, Tensor & out )
 #ifdef TPU_OP_TIMING
   auto timer = tpu::Timer().Start();
 #endif
-  auto status = sgdnn_batch_matmul (
+  auto status = sgdnnBatchMatmul (
                 tpu::TPUGetDeviceHandle(),
-                tpu::TPUGenerateTensorDesc ( self_ ),
-                ADDR_IN_DEVICE ( self_ ),
-                tpu::TPUGenerateTensorDesc ( mat2_ ),
-                ADDR_IN_DEVICE ( mat2_ ),
-                tpu::TPUGenerateTensorDesc ( out ),
-                ADDR_IN_DEVICE ( out ),
-                false,
-                is_transposed ( mat2 ) );
+                tpu::TPUGenerateSgdnnTensor ( self_ ),
+                tpu::TPUGenerateSgdnnTensor ( mat2_ ),
+                tpu::TPUGenerateSgdnnTensor ( out ) );
   TORCH_CHECK ( status == BM_SUCCESS );
 #ifdef TPU_OP_TIMING
   tpu::OpTimer::Instance().AddTime ( tpu::BMM, timer.ElapsedUS() );

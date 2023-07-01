@@ -1,32 +1,27 @@
-#include "common.h"
 #include "sg_api_struct.h"
-#include "common_def.h"
 #include "tpu_kernel.h"
-#include "tpu_utils.h"
 
 static inline void nodechip_layernorm_forward (
-  global_addr_t input_global_addr,
-  global_addr_t weight_global_addr,
-  global_addr_t bias_global_addr,
-  global_addr_t output_global_addr,
-  global_addr_t mean_global_addr,
-  global_addr_t rstd_global_addr,
-  const int*    shape,
-  int           dims,
-  int           axis,
-  float         eps,
-  bool          affine,
-  bool          save_stat,
-  data_type_t   dtype )
+global_addr_t input_global_addr,
+global_addr_t weight_global_addr,
+global_addr_t bias_global_addr,
+global_addr_t output_global_addr,
+global_addr_t mean_global_addr,
+global_addr_t rstd_global_addr,
+const int*    shape,
+int           dims,
+int           axis,
+float         eps,
+data_type_t   dtype )
 {
-  const bool weight_defined = (weight_global_addr != 0 && affine);
-  const bool bias_defined = (bias_global_addr != 0 && affine);
+  const bool weight_defined = ( weight_global_addr != 0 );
+  const bool bias_defined = ( bias_global_addr != 0 );
   int inner_num = 1, outer_num = 1;
-  for (int i = 0; i < axis; ++i)
+  for ( int i = 0; i < axis; ++i )
   {
     outer_num *= shape[i];
   }
-  for (int i = axis; i < dims; ++i)
+  for ( int i = axis; i < dims; ++i )
   {
     inner_num *= shape[i];
   }
@@ -44,7 +39,7 @@ static inline void nodechip_layernorm_forward (
   const scalar_t InvInner = { .f32 = 1.0 / ( ( double ) inner_num ) };
   const scalar_t EPS = { .f32 = eps };
   const int DataSize = tpu_data_type_size ( DT_FP32 );
-  const int HalfSize = tpu_data_type_size ( DT_FP16 );
+  const int HalfSize = tpu_data_type_size ( dtype );
   /*
    *  In    : [ 1,  CMax,   1,  WMax ]
    *  Out   : [ 1,  CMax,   1,  WMax ]
@@ -63,11 +58,11 @@ static inline void nodechip_layernorm_forward (
   {
     Split = CMax != C || WMax != W ;
     IAddr = 0;
-    if( dtype == DT_FP16 )
+    if ( dtype != DT_FP32 )
     {
-      CastSize = tpu_aligned_feature_size ( 1, WMax, DT_FP16 ) * DIV_UP ( CMax, NPU_NUM );
-      MVCastSize = tpu_aligned_feature_size ( 1, 1, DT_FP16 ) * DIV_UP ( CMax, NPU_NUM );
-      WBCastSize = tpu_aligned_feature_size ( 1, WMax, DT_FP16 );
+      CastSize = tpu_aligned_feature_size ( 1, WMax, dtype ) * DIV_UP ( CMax, NPU_NUM );
+      MVCastSize = tpu_aligned_feature_size ( 1, 1, dtype ) * DIV_UP ( CMax, NPU_NUM );
+      WBCastSize = tpu_aligned_feature_size ( 1, WMax, dtype );
       ICast = 0;
       OCast = ICast + CastSize;
       MVCast = OCast + CastSize;
@@ -109,7 +104,7 @@ static inline void nodechip_layernorm_forward (
       }
     }
   }
-  TPUKERNEL_DBG("Split:%d\n", Split);
+  TPUKERNEL_DBG ( "Split:%d\n", Split );
   dim4 Shape = { .n = 1, .h = 1 };
   int CTodo = C, CDone = 0;
   while ( CTodo > 0 )
@@ -119,7 +114,6 @@ static inline void nodechip_layernorm_forward (
     dim4 CStride;
     tpu_aligned_stride ( &CStride, 0, &CShape, DT_FP32 );
     dim4 CBcastStride = { .n = 0, .c = CStride.c, .h = 0, .w = 0 };
-
     //////////////////////////////////////////////////////////////////////////////
     //////////////////////////////////////////////////////////////////////////////
     /* Compute Mean */
@@ -129,11 +123,11 @@ static inline void nodechip_layernorm_forward (
       Shape.w = MIN ( WTodo, WMax );
       dim2 KernelSize = { .h = 1, .w = Shape.w };
       /* Move input from global to local */
-      if ( dtype == DT_FP16 )
+      if ( dtype != DT_FP32 )
       {
         global_addr_t IGAddr = input_global_addr + ( WDone * GlobalStride.w + CDone * GlobalStride.c ) * HalfSize;
-        tpu_gdma_cpy_S2L ( ICast, IGAddr, &Shape, NULL, &GlobalStride, DT_FP16 );
-        tpu_bdc_cast ( IAddr, ICast, &Shape, NULL, NULL, DT_FP32, DT_FP16, RM_HALF_TO_EVEN );
+        tpu_gdma_cpy_S2L ( ICast, IGAddr, &Shape, NULL, &GlobalStride, dtype );
+        tpu_bdc_cast ( IAddr, ICast, &Shape, NULL, NULL, DT_FP32, dtype, RM_HALF_TO_EVEN );
       }
       else
       {
@@ -153,10 +147,10 @@ static inline void nodechip_layernorm_forward (
       WDone += Shape.w;
     }
     /* Move MEAN from local to global memory */
-    if ( dtype == DT_FP16 )
+    if ( dtype != DT_FP32 )
     {
-      tpu_bdc_cast ( MVCast, MAddr, &CShape, NULL, NULL, DT_FP16, DT_FP32, RM_HALF_TO_EVEN );
-      tpu_gdma_cpy_L2S ( mean_global_addr + CDone * HalfSize, MVCast, &CShape, NULL, NULL, DT_FP16 );
+      tpu_bdc_cast ( MVCast, MAddr, &CShape, NULL, NULL, dtype, DT_FP32, RM_HALF_TO_EVEN );
+      tpu_gdma_cpy_L2S ( mean_global_addr + CDone * HalfSize, MVCast, &CShape, NULL, NULL, dtype );
     }
     else
     {
@@ -172,11 +166,11 @@ static inline void nodechip_layernorm_forward (
       dim2 KernelSize = { .h = 1, .w = Shape.w };
       if ( Split == true )
       {
-        if ( dtype == DT_FP16 )
+        if ( dtype != DT_FP32 )
         {
           global_addr_t IGAddr = input_global_addr + ( WDone * GlobalStride.w + CDone * GlobalStride.c ) * HalfSize;
-          tpu_gdma_cpy_S2L ( ICast, IGAddr, &Shape, NULL, &GlobalStride, DT_FP16 );
-          tpu_bdc_cast ( IAddr, ICast, &Shape, NULL, NULL, DT_FP32, DT_FP16, RM_HALF_TO_EVEN );
+          tpu_gdma_cpy_S2L ( ICast, IGAddr, &Shape, NULL, &GlobalStride, dtype );
+          tpu_bdc_cast ( IAddr, ICast, &Shape, NULL, NULL, DT_FP32, dtype, RM_HALF_TO_EVEN );
         }
         else
         {
@@ -201,10 +195,10 @@ static inline void nodechip_layernorm_forward (
     tpu_bdc_fp_add_C ( TAddr, VAddr, EPS, &CShape, NULL, NULL, DT_FP32 );
     tpu_bdc_fp32_rsqrt ( VAddr, TAddr, &CShape );
     /* Move RSTD from local to global memory */
-    if ( dtype == DT_FP16 )
+    if ( dtype != DT_FP32 )
     {
-      tpu_bdc_cast ( MVCast, VAddr, &CShape, NULL, NULL, DT_FP16, DT_FP32, RM_HALF_TO_EVEN );
-      tpu_gdma_cpy_L2S ( rstd_global_addr + CDone * HalfSize, MVCast, &CShape, NULL, NULL, DT_FP16 );
+      tpu_bdc_cast ( MVCast, VAddr, &CShape, NULL, NULL, dtype, DT_FP32, RM_HALF_TO_EVEN );
+      tpu_gdma_cpy_L2S ( rstd_global_addr + CDone * HalfSize, MVCast, &CShape, NULL, NULL, dtype );
     }
     else
     {
@@ -224,11 +218,11 @@ static inline void nodechip_layernorm_forward (
       WBcastStride.c = 0;
       if ( Split == true )
       {
-        if ( dtype == DT_FP16 )
+        if ( dtype != DT_FP32 )
         {
           global_addr_t IGAddr = input_global_addr + ( WDone * GlobalStride.w + CDone * GlobalStride.c ) * HalfSize;
-          tpu_gdma_cpy_S2L ( ICast, IGAddr, &Shape, NULL, &GlobalStride, DT_FP16 );
-          tpu_bdc_cast ( IAddr, ICast, &Shape, NULL, NULL, DT_FP32, DT_FP16, RM_HALF_TO_EVEN );
+          tpu_gdma_cpy_S2L ( ICast, IGAddr, &Shape, NULL, &GlobalStride, dtype );
+          tpu_bdc_cast ( IAddr, ICast, &Shape, NULL, NULL, DT_FP32, dtype, RM_HALF_TO_EVEN );
         }
         else
         {
@@ -240,10 +234,10 @@ static inline void nodechip_layernorm_forward (
       tpu_bdc_fp_mul ( OAddr, OAddr, VAddr, &Shape, NULL, NULL, &CBcastStride, DT_FP32 );
       if ( weight_defined )
       {
-        if ( dtype == DT_FP16 )
+        if ( dtype != DT_FP32 )
         {
-          tpu_gdma_cpy_S2L ( WBCast, weight_global_addr + WDone * HalfSize, &WShape, NULL, NULL, DT_FP16 );
-          tpu_bdc_cast ( WAddr, WBCast, &WShape, NULL, NULL, DT_FP32, DT_FP16, RM_HALF_TO_EVEN );
+          tpu_gdma_cpy_S2L ( WBCast, weight_global_addr + WDone * HalfSize, &WShape, NULL, NULL, dtype );
+          tpu_bdc_cast ( WAddr, WBCast, &WShape, NULL, NULL, DT_FP32, dtype, RM_HALF_TO_EVEN );
           tpu_bdc_npu_bcast ( WAddr, WAddr, &WBCastShape, DT_FP32 );
         }
         else
@@ -255,10 +249,10 @@ static inline void nodechip_layernorm_forward (
       }
       if ( bias_defined )
       {
-        if ( dtype == DT_FP16 )
+        if ( dtype != DT_FP32 )
         {
-          tpu_gdma_cpy_S2L ( WBCast, bias_global_addr + WDone * HalfSize, &WShape, NULL, NULL, DT_FP16 );
-          tpu_bdc_cast ( BAddr, WBCast, &WShape, NULL, NULL, DT_FP32, DT_FP16, RM_HALF_TO_EVEN );
+          tpu_gdma_cpy_S2L ( WBCast, bias_global_addr + WDone * HalfSize, &WShape, NULL, NULL, dtype );
+          tpu_bdc_cast ( BAddr, WBCast, &WShape, NULL, NULL, DT_FP32, dtype, RM_HALF_TO_EVEN );
           tpu_bdc_npu_bcast ( BAddr, BAddr, &WBCastShape, DT_FP32 );
         }
         else
@@ -269,11 +263,11 @@ static inline void nodechip_layernorm_forward (
         tpu_bdc_fp_add ( OAddr, OAddr, BAddr, &Shape, NULL, NULL, &WBcastStride, DT_FP32 );
       }
       /* Move output from local to global */
-      if ( dtype == DT_FP16 )
+      if ( dtype != DT_FP32 )
       {
         global_addr_t OGAddr = output_global_addr + ( WDone * GlobalStride.w + CDone * GlobalStride.c ) * HalfSize;
-        tpu_bdc_cast ( OCast, OAddr, &Shape, NULL, NULL, DT_FP16, DT_FP32, RM_HALF_TO_EVEN );
-        tpu_gdma_cpy_L2S ( OGAddr, OCast, &Shape, &GlobalStride, NULL, DT_FP16 );
+        tpu_bdc_cast ( OCast, OAddr, &Shape, NULL, NULL, dtype, DT_FP32, RM_HALF_TO_EVEN );
+        tpu_gdma_cpy_L2S ( OGAddr, OCast, &Shape, &GlobalStride, NULL, dtype );
       }
       else
       {
@@ -288,25 +282,23 @@ static inline void nodechip_layernorm_forward (
   }
 }
 
-void tpu_kernel_api_layernorm_forward(const void *args)
+void tpu_kernel_api_layernorm ( const void *args )
 {
-    sg_api_layernorm_forward_t *api = (sg_api_layernorm_forward_t *)args;
-
-    tpu_initialize();
-    nodechip_layernorm_forward(
-      api->input_global_addr,
-      api->weight_global_addr,
-      api->bias_global_addr,
-      api->output_global_addr,
-      api->mean_global_addr,
-      api->rstd_global_addr,
-      api->shape,
-      api->dims,
-      api->axis,
-      api->eps,
-      api->affine,
-      api->save_stat,
-      tpu_type_convert(api->dtype));
-    tpu_poll();
+  sg_api_layernorm_t *api = ( sg_api_layernorm_t * ) args;
+  TPUKERNEL_ASSERT ( api->dtype == DT_FP32 || api->dtype == DT_FP16 || api->dtype == DT_BFP16 );
+  tpu_initialize();
+  nodechip_layernorm_forward (
+  api->input_global_addr,
+  api->weight_global_addr,
+  api->bias_global_addr,
+  api->output_global_addr,
+  api->mean_global_addr,
+  api->rstd_global_addr,
+  api->shape,
+  api->dim,
+  api->axis,
+  api->eps,
+  ( data_type_t ) api->dtype );
+  tpu_poll();
 }
-TPUKERNEL_FUNC_REGISTER(tpu_kernel_api_layernorm_forward);
+TPUKERNEL_FUNC_REGISTER ( tpu_kernel_api_layernorm );

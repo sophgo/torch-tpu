@@ -49,20 +49,14 @@ Tensor & _softmax_out_tpu ( const Tensor & self, int64_t dim, bool half_to_float
   auto out_cpu = _softmax ( self.cpu(), dim, half_to_float );
   tpu::TPUCopyHostToDevice ( out.data_ptr(), out_cpu.contiguous().data_ptr(), out.nbytes() );
 #else
-  float alpha = 1.f;
-  float beta = 0.f;
 #ifdef TPU_OP_TIMING
   auto timer = tpu::Timer().Start();
 #endif
-  bm_status_t status = sgdnn_softmax_forward (
+  bm_status_t status = sgdnnSoftmax (
                        tpu::TPUGetDeviceHandle(),
-                       dim < 0 ? dim + self.dim() : dim,
-                       &alpha,
-                       tpu::TPUGenerateTensorDesc ( self ),
-                       ADDR_IN_DEVICE ( self ),
-                       &beta,
-                       tpu::TPUGenerateTensorDesc ( out ),
-                       ADDR_IN_DEVICE ( out ) );
+                       tpu::TPUGenerateSgdnnTensor ( self ),
+                       dim,
+                       tpu::TPUGenerateSgdnnTensor ( out ) );
   TORCH_CHECK ( status == BM_SUCCESS );
 #ifdef TPU_OP_TIMING
   tpu::OpTimer::Instance().AddTime ( tpu::SOFTMAX, timer.ElapsedUS() );
@@ -88,15 +82,12 @@ Tensor & _softmax_backward_data_out_tpu ( const Tensor & grad_output, const Tens
 #ifdef TPU_OP_TIMING
   auto timer = tpu::Timer().Start();
 #endif
-  bm_status_t status = sgdnn_softmax_backward (
+  bm_status_t status = sgdnnSoftmaxBackward (
                        tpu::TPUGetDeviceHandle(),
-                       dim < 0 ? dim + output.dim() : dim,
-                       tpu::TPUGenerateTensorDesc ( output ),
-                       ADDR_IN_DEVICE ( output ),
-                       tpu::TPUGenerateTensorDesc ( grad_output ),
-                       ADDR_IN_DEVICE ( grad_output ),
-                       tpu::TPUGenerateTensorDesc ( grad_input ),
-                       ADDR_IN_DEVICE ( grad_input ) );
+                       tpu::TPUGenerateSgdnnTensor ( grad_output ),
+                       tpu::TPUGenerateSgdnnTensor ( output ),
+                       dim,
+                       tpu::TPUGenerateSgdnnTensor ( grad_input ) );
   TORCH_CHECK ( status == BM_SUCCESS );
 #ifdef TPU_OP_TIMING
   tpu::OpTimer::Instance().AddTime ( tpu::SOFTMAX_BACKWARD, timer.ElapsedUS() );

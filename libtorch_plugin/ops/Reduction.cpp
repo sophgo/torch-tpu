@@ -43,16 +43,13 @@ Tensor & mean_out_tpu ( const Tensor & self, OptionalIntArrayRef dim_opt, bool k
   {
     TORCH_CHECK ( reduction_dim_vec[i] + 1 == reduction_dim_vec[i + 1], "Reduction only supports contiguous reduction dimension now" );
   }
-  bm_status_t status = sgdnn_reduce (
-                       tpu::TPUGetDeviceHandle(),
-                       tpu::TPUGenerateTensorDesc ( self ),
-                       ADDR_IN_DEVICE ( self ),
-                       tpu::TPUGenerateTensorDesc ( out ),
-                       ADDR_IN_DEVICE ( out ),
-                       reduction_dim_vec[0],
-                       reduction_dim_vec.back() + 1,
-                       keepdim,
-                       Reduction_Mean );
+  bm_status_t status = sgdnnReduce ( tpu::TPUGetDeviceHandle(),
+                                     tpu::TPUGenerateSgdnnTensor ( self ),
+                                     reduction_dim_vec[0],
+                                     reduction_dim_vec.back() + 1,
+                                     keepdim,
+                                     0,
+                                     tpu::TPUGenerateSgdnnTensor ( out ) );
   TORCH_CHECK ( status == BM_SUCCESS );
 #ifdef TPU_OP_TIMING
   tpu::OpTimer::Instance().AddTime ( tpu::REDUCE_MEAN, timer.ElapsedUS() );
@@ -97,16 +94,13 @@ Tensor & sum_IntList_out_tpu ( const Tensor & self, OptionalIntArrayRef dim_opt,
   {
     TORCH_CHECK ( reduction_dim_vec[i] + 1 == reduction_dim_vec[i + 1], "Reduction only supports contiguous reduction dimension now" );
   }
-  bm_status_t status = sgdnn_reduce (
-                       tpu::TPUGetDeviceHandle(),
-                       tpu::TPUGenerateTensorDesc ( self ),
-                       ADDR_IN_DEVICE ( self ),
-                       tpu::TPUGenerateTensorDesc ( out ),
-                       ADDR_IN_DEVICE ( out ),
-                       reduction_dim_vec[0],
-                       reduction_dim_vec.back() + 1,
-                       keepdim,
-                       Reduction_Sum );
+  bm_status_t status = sgdnnReduce ( tpu::TPUGetDeviceHandle(),
+                                     tpu::TPUGenerateSgdnnTensor ( self ),
+                                     reduction_dim_vec[0],
+                                     reduction_dim_vec.back() + 1,
+                                     keepdim,
+                                     1,
+                                     tpu::TPUGenerateSgdnnTensor ( out ) );
   TORCH_CHECK ( status == BM_SUCCESS );
 #ifdef TPU_OP_TIMING
   tpu::OpTimer::Instance().AddTime ( tpu::REDUCE_SUM, timer.ElapsedUS() );

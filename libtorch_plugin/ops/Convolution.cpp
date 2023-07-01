@@ -70,20 +70,12 @@ int64_t groups )
   else
   {
     TORCH_CHECK ( num_spatial_dims == 2, "TPU ", num_spatial_dims, "D convolution is not implemented" );
-    float alpha = 1.f;
-    float beta = 0.f;
     auto output_shape = at::native::conv_output_size ( input.sizes(), weight.sizes(), padding, stride, dilation );
     output = torch::empty ( output_shape, input.options() );
-    FilterDescriptor_t weight_desc =
+    SgdnnConv2dParam_t conv_param =
     {
-      .oc = ( int ) weight.size ( 0 ),
-      .ic = ( int ) weight.size ( 1 ),
-      .kh = ( int ) weight.size ( 2 ),
-      .kw = ( int ) weight.size ( 3 ),
-      .dtype = ( sg_data_type_t ) tpu::TPUConvertDType ( weight.dtype() )
-    };
-    ConvolutionDescriptor_t conv_desc =
-    {
+      .kernel_h = ( int ) weight.size ( 2 ),
+      .kernel_w = ( int ) weight.size ( 3 ),
       .pad_h = ( int ) padding[0],
       .pad_w = ( int ) padding[1],
       .stride_h = ( int ) stride[0],
@@ -92,31 +84,16 @@ int64_t groups )
       .dilation_w = ( int ) dilation[1],
       .groups = ( int ) groups,
     };
-    auto accuracy = SG_DTYPE_FP32;
-    if ( input.dtype() == caffe2::TypeMeta::Make<float>() )
-    {
-      conv_desc.computeType = SG_DTYPE_FP32;
-    }
-    else if ( input.dtype() == caffe2::TypeMeta::Make<at::Half>() )
-    {
-      conv_desc.computeType = SG_DTYPE_FP16;
-    }
 #ifdef TPU_OP_TIMING
     auto timer = tpu::Timer().Start();
 #endif
-    bm_status_t status = sgdnn_conv_forward (
+    bm_status_t status = sgdnnConv2d (
                          tpu::TPUGetDeviceHandle(),
-                         &alpha,
-                         tpu::TPUGenerateTensorDesc ( input ),
-                         ADDR_IN_DEVICE ( input ),
-                         weight_desc,
-                         ADDR_IN_DEVICE ( weight ),
-                         bias.defined() ? tpu::TPUGenerateTensorDesc ( bias ) : TensorDescriptor_t(),
-                         bias.defined() ? ADDR_IN_DEVICE ( bias ) : nullptr,
-                         conv_desc,
-                         &beta,
-                         tpu::TPUGenerateTensorDesc ( output ),
-                         ADDR_IN_DEVICE ( output ) );
+                         tpu::TPUGenerateSgdnnTensor ( input ),
+                         tpu::TPUGenerateSgdnnTensor ( weight ),
+                         bias.defined() ? tpu::TPUGenerateSgdnnTensor ( bias ) : sgdnnUndefinedTensor(),
+                         conv_param,
+                         tpu::TPUGenerateSgdnnTensor ( output ) );
     TORCH_CHECK ( status == BM_SUCCESS );
 #ifdef TPU_OP_TIMING
     tpu::OpTimer::Instance().AddTime ( tpu::CONVOLUTION, timer.ElapsedUS() );
@@ -190,18 +167,10 @@ std::array<bool, 3> output_mask )
     {
       TORCH_CHECK ( num_spatial_dims == 2, "TPU ", num_spatial_dims, "D transposed convolution backward is not implemented" );
     }
-    float alpha = 1.f;
-    float beta = 0.f;
-    FilterDescriptor_t weight_desc =
+    SgdnnConv2dParam_t conv_param =
     {
-      .oc = ( int ) weight.size ( 0 ),
-      .ic = ( int ) weight.size ( 1 ),
-      .kh = ( int ) weight.size ( 2 ),
-      .kw = ( int ) weight.size ( 3 ),
-      .dtype = ( sg_data_type_t ) tpu::TPUConvertDType ( weight.dtype() )
-    };
-    ConvolutionDescriptor_t conv_desc =
-    {
+      .kernel_h = ( int ) weight.size ( 2 ),
+      .kernel_w = ( int ) weight.size ( 3 ),
       .pad_h = ( int ) padding[0],
       .pad_w = ( int ) padding[1],
       .stride_h = ( int ) stride[0],
@@ -210,35 +179,18 @@ std::array<bool, 3> output_mask )
       .dilation_w = ( int ) dilation[1],
       .groups = ( int ) groups,
     };
-    if ( input.dtype() == caffe2::TypeMeta::Make<float>() )
-    {
-      conv_desc.computeType = SG_DTYPE_FP32;
-    }
-    else if ( input.dtype() == caffe2::TypeMeta::Make<at::Half>() )
-    {
-      conv_desc.computeType = SG_DTYPE_FP16;
-    }
 #ifdef TPU_OP_TIMING
     auto timer = tpu::Timer().Start();
 #endif
-    bm_status_t status = sgdnn_conv_backward (
+    bm_status_t status = sgdnnConv2dBackward (
                          tpu::TPUGetDeviceHandle(),
-                         &alpha,
-                         &beta,
-                         tpu::TPUGenerateTensorDesc ( input ),
-                         ADDR_IN_DEVICE ( input ),
-                         output_mask[0] ? ADDR_IN_DEVICE ( grad_input ) : nullptr,
-                         weight_desc,
-                         ADDR_IN_DEVICE ( weight ),
-                         output_mask[1] ? ADDR_IN_DEVICE ( grad_weight ) : nullptr,
-                         output_mask[2] ? tpu::TPUGenerateTensorDesc ( grad_bias ) : TensorDescriptor_t(),
-                         output_mask[2] ? ADDR_IN_DEVICE ( grad_bias ) : nullptr,
-                         tpu::TPUGenerateTensorDesc ( grad_output ),
-                         ADDR_IN_DEVICE ( grad_output ),
-                         conv_desc,
-                         output_mask[0],
-                         output_mask[1],
-                         output_mask[2] );
+                         tpu::TPUGenerateSgdnnTensor ( grad_output ),
+                         tpu::TPUGenerateSgdnnTensor ( input ),
+                         tpu::TPUGenerateSgdnnTensor ( weight ),
+                         conv_param,
+                         output_mask[0] ? tpu::TPUGenerateSgdnnTensor ( grad_input ) : sgdnnUndefinedTensor(),
+                         output_mask[1] ? tpu::TPUGenerateSgdnnTensor ( grad_weight ) : sgdnnUndefinedTensor(),
+                         output_mask[2] ? tpu::TPUGenerateSgdnnTensor ( grad_bias ) : sgdnnUndefinedTensor() );
     TORCH_CHECK ( status == BM_SUCCESS );
 #ifdef TPU_OP_TIMING
     tpu::OpTimer::Instance().AddTime ( tpu::CONVOLUTION_BACKWARD, timer.ElapsedUS() );

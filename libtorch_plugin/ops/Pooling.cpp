@@ -23,9 +23,9 @@ bool ceil_mode )
   CHECK_TENSOR_IN_DEVICE ( self );
   std::tuple<Tensor, Tensor> outputs;
 #if 1
-  auto outputs_cpu = max_pool2d_with_indices ( self.to(torch::kFloat32).cpu(), kernel_size, stride, padding, dilation, ceil_mode );
+  auto outputs_cpu = max_pool2d_with_indices ( self.to ( torch::kFloat32 ).cpu(), kernel_size, stride, padding, dilation, ceil_mode );
   outputs = std::tuple<Tensor, Tensor> (
-            TENSOR_TO_TPU ( std::get<0> ( outputs_cpu ) ).to(self.dtype()),
+            TENSOR_TO_TPU ( std::get<0> ( outputs_cpu ) ).to ( self.dtype() ),
             TENSOR_TO_TPU ( std::get<1> ( outputs_cpu ) ) );
 #else
   TORCH_CHECK ( ceil_mode == false );
@@ -49,10 +49,10 @@ bool ceil_mode )
                        tpu::TPUGetDeviceHandle(),
                        pooling_desc,
                        &alpha,
-                       tpu::TPUGenerateTensorDesc ( self ),
+                       tpu::TPUGenerateSgdnnTensor ( self ),
                        ADDR_IN_DEVICE ( self ),
                        &beta,
-                       tpu::TPUGenerateTensorDesc ( output ),
+                       tpu::TPUGenerateSgdnnTensor ( output ),
                        ADDR_IN_DEVICE ( output ) );
   TORCH_CHECK ( status == BM_SUCCESS );
   outputs = std::tuple<Tensor, Tensor> ( output, Tensor() );
@@ -79,8 +79,8 @@ const Tensor & indices )
   CHECK_TENSOR_IN_DEVICE ( indices );
   Tensor grad_input;
 #if 1
-  auto grad_input_cpu = max_pool2d_with_indices_backward (grad_output.to(torch::kFloat32).cpu() , self.to(torch::kFloat32).cpu(), kernel_size, stride, padding, dilation, ceil_mode, indices.cpu() );
-  grad_input = TENSOR_TO_TPU ( grad_input_cpu ).to(self.dtype());
+  auto grad_input_cpu = max_pool2d_with_indices_backward ( grad_output.to ( torch::kFloat32 ).cpu(), self.to ( torch::kFloat32 ).cpu(), kernel_size, stride, padding, dilation, ceil_mode, indices.cpu() );
+  grad_input = TENSOR_TO_TPU ( grad_input_cpu ).to ( self.dtype() );
 #else
   TORCH_CHECK ( ceil_mode == false );
   TORCH_CHECK ( dilation[0] == 1 && dilation[1] == 1, "DILATION must be one" );
@@ -103,10 +103,10 @@ const Tensor & indices )
                        tpu::TPUGetDeviceHandle(),
                        pooling_desc,
                        &alpha,
-                       tpu::TPUGenerateTensorDesc ( self ),
+                       tpu::TPUGenerateSgdnnTensor ( self ),
                        ADDR_IN_DEVICE ( self ),
                        &beta,
-                       tpu::TPUGenerateTensorDesc ( output ),
+                       tpu::TPUGenerateSgdnnTensor ( output ),
                        ADDR_IN_DEVICE ( output ) );
   TORCH_CHECK ( status == BM_SUCCESS );
   grad_input = empty ( self.sizes(), self.options() );
@@ -114,14 +114,14 @@ const Tensor & indices )
            tpu::TPUGetDeviceHandle(),
            pooling_desc,
            &alpha,
-           tpu::TPUGenerateTensorDesc ( output ),
+           tpu::TPUGenerateSgdnnTensor ( output ),
            ADDR_IN_DEVICE ( output ),
-           tpu::TPUGenerateTensorDesc ( grad_output ),
+           tpu::TPUGenerateSgdnnTensor ( grad_output ),
            ADDR_IN_DEVICE ( grad_output ),
-           tpu::TPUGenerateTensorDesc ( self ),
+           tpu::TPUGenerateSgdnnTensor ( self ),
            ADDR_IN_DEVICE ( self ),
            &beta,
-           tpu::TPUGenerateTensorDesc ( grad_input ),
+           tpu::TPUGenerateSgdnnTensor ( grad_input ),
            ADDR_IN_DEVICE ( grad_input ) );
   TORCH_CHECK ( status == BM_SUCCESS );
 #endif

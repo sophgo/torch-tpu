@@ -33,7 +33,7 @@ Tensor empty_strided_tpu ( IntArrayRef                size,
   constexpr c10::DispatchKeySet ks ( c10::DispatchKey::TPU );
   auto tensor = detail::make_tensor_base<TensorImpl> ( std::move ( storage_impl ), ks, dtype );
   tensor.unsafeGetTensorImpl()->set_sizes_and_strides ( size, stride );
-  TORCH_CHECK ( tensor.is_contiguous() );
+  //TORCH_CHECK ( tensor.is_contiguous() );
   return tensor;
 }
 TORCH_LIBRARY_IMPL ( aten, TPU, m )
@@ -77,11 +77,10 @@ c10::optional<c10::MemoryFormat>  memory_format_opt )
     // Restriding a just-created empty contiguous tensor does nothing.
     if ( *memory_format_opt != MemoryFormat::Contiguous )
     {
-      LOG ( FATAL );
       tensor.unsafeGetTensorImpl()->empty_tensor_restride ( *memory_format_opt );
     }
   }
-  TORCH_CHECK ( tensor.is_contiguous() );
+  //TORCH_CHECK ( tensor.is_contiguous() );
   return tensor;
 }
 TORCH_LIBRARY_IMPL ( aten, TPU, m )

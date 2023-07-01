@@ -92,10 +92,10 @@ Tensor as_strided_tpu ( const Tensor & self, IntArrayRef size, IntArrayRef strid
   CHECK_TENSOR_IN_DEVICE_NO_CONTIGUOUS ( self );
   Tensor out;
   out = at::detail::make_tensor<TensorImpl> (
-          c10::TensorImpl::VIEW, Storage ( self.storage() ), self.key_set(), self.dtype() );
+        c10::TensorImpl::VIEW, Storage ( self.storage() ), self.key_set(), self.dtype() );
   auto* self_tmp_ = out.unsafeGetTensorImpl();
   self_tmp_->set_storage_offset (
-          storage_offset.has_value() ? storage_offset.value() : self.storage_offset());
+  storage_offset.has_value() ? storage_offset.value() : self.storage_offset() );
   self_tmp_->set_sizes_and_strides ( size, stride );
   namedinference::propagate_names ( out, self );
   return out;

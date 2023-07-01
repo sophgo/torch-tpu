@@ -1,8 +1,5 @@
-#include "common.h"
 #include "sg_api_struct.h"
-#include "common_def.h"
 #include "tpu_kernel.h"
-#include "tpu_utils.h"
 
 void nodechip_norm2 (
 global_addr_t input_global_addr,
@@ -219,15 +216,14 @@ data_type_t dtype )
 void tpu_kernel_api_norm2 ( const void * args )
 {
   sg_api_norm2_t * api = ( sg_api_norm2_t * ) args;
-  data_type_t dtype = tpu_type_convert ( api->dtype );
-  TPUKERNEL_ASSERT ( dtype == DT_FP32 || dtype == DT_FP16 );
+  TPUKERNEL_ASSERT ( api->dtype == DT_FP32 || api->dtype == DT_FP16 || api->dtype == DT_BFP16 );
   int len = 1;
   for ( int i = 0; i < api->dim; ++i )
   {
     len *= api->shape[i];
   }
   tpu_initialize();
-  nodechip_norm2 ( api->input_global_addr, api->output_global_addr, len, dtype );
+  nodechip_norm2 ( api->input_global_addr, api->output_global_addr, len, ( data_type_t ) api->dtype );
   tpu_poll();
 }
 TPUKERNEL_FUNC_REGISTER ( tpu_kernel_api_norm2 );

@@ -55,46 +55,66 @@ static inline void SaveTensorToBinaryFile ( const at::Tensor & Tensor, const std
   fout.close();
 }
 
-static inline int TPUConvertDType ( caffe2::TypeMeta dtype )
+static inline SgdnnDataType_t TPUConvertDType ( caffe2::TypeMeta dtype )
 {
   if ( dtype == caffe2::TypeMeta::Make<float>() )
   {
-    return 0;
+    return SGDNN_DTYPE_FP32;
   }
   else if ( dtype == caffe2::TypeMeta::Make<at::Half>() )
   {
-    return 1;
+    return SGDNN_DTYPE_FP16;
   }
   else if ( dtype == caffe2::TypeMeta::Make<int>() )
   {
-    return 6;
+    return SGDNN_DTYPE_INT32;
   }
   else if ( dtype == caffe2::TypeMeta::Make<bool>() ||
             dtype == caffe2::TypeMeta::Make<unsigned char>() ) {
-    return 3;
+    return SGDNN_DTYPE_UINT8;
   }
   else if ( dtype == caffe2::TypeMeta::Make<long>() )
   {
-    return 31;
+    return SGDNN_DTYPE_INT64;
   }
   else
   {
     TORCH_CHECK ( false, "Unsupported data type ", dtype );
   }
-  return -1;
+  return SGDNN_DTYPE_UNKNOWN;
 }
 
-static inline TensorDescriptor_t TPUGenerateTensorDesc ( const at::Tensor & Tensor )
+static inline SgdnnTensor_t TPUGenerateSgdnnTensor ( const at::Tensor & Tensor )
 {
-  TensorDescriptor_t Desc = { 0 };
-  Desc.dtype = TPUConvertDType ( Tensor.dtype() );
-  Desc.ndims = Tensor.dim();
+  SgdnnTensor_t t = { 0 };
+  t.addr = ( unsigned long long ) Tensor.data_ptr();
+  t.dtype = TPUConvertDType ( Tensor.dtype() );
+  t.dim = Tensor.dim();
   for ( auto i = 0; i < Tensor.dim(); ++i )
   {
-    Desc.shape[i] = Tensor.size ( i );
-    Desc.stride[i] = Tensor.stride ( i );
+    t.shape[i] = Tensor.size ( i );
+    t.stride[i] = Tensor.stride ( i );
   }
-  return Desc;
+  return t;
+}
+
+static inline bool TPUIsSameShape ( const at::Tensor & Tensor1, const at::Tensor & Tensor2 )
+{
+  if ( Tensor1.dim() == Tensor2.dim() )
+  {
+    for ( auto i = 0; i < Tensor1.dim(); ++i )
+    {
+      if ( Tensor1.size ( i ) != Tensor2.size ( i ) )
+      {
+        return false;
+      }
+    }
+  }
+  else
+  {
+    return false;
+  }
+  return true;
 }
 
 static inline void TPUCompareResult ( const at::Tensor & Got,
@@ -222,9 +242,12 @@ typedef enum
   FREE,
   CROSS_ENTROPY_LOSS,
   CROSS_ENTROPY_LOSS_BACKWARD,
-  SCALE_ADD,
+  ADD_C,
   MUL_C,
+  C_SUB,
+  C_DIV,
   NORM2,
+  BCAST_ADD,
   OP_NUM
 }
 OpType;
@@ -273,9 +296,12 @@ static const char * OpTypeStr[OP_NUM] =
   "Free",
   "Cross Entropy Loss",
   "Cross Entropy Loss Backward",
-  "Scale Add",
+  "AddC",
   "MulC",
-  "Norm2"
+  "CSub",
+  "CDiv",
+  "Norm2",
+  "Bcast Add"
 };
 
 struct OpTimer

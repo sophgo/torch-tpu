@@ -1,8 +1,5 @@
-#include "common.h"
 #include "sg_api_struct.h"
-#include "common_def.h"
 #include "tpu_kernel.h"
-#include "tpu_utils.h"
 
 void nodechip_cross_entropy_loss_forward (
 global_addr_t input_global_addr,
@@ -123,7 +120,7 @@ bool target_is_int64 )
       }
       tpu_parallel_start();
       // input FP16 -> FP32
-      if ( dtype == DT_FP16 )
+      if ( dtype != DT_FP32 )
       {
         tpu_bdc_cast ( input_exp_local_addr, input_local_addrs[index], &tile_shape, NULL, NULL, DT_FP32, dtype, RM_HALF_TO_EVEN );
         // input = exp ( input )
@@ -159,7 +156,7 @@ bool target_is_int64 )
     // input_sum = log ( input_sum )
     tpu_bdc_fp32_log ( reduce_sum_local_addr, reduce_sum_local_addr, work0_local_addr, log_coeff_addr, &reduce_shape );
     // input_sum FP32 -> FP16 ( inplace )
-    if ( dtype == DT_FP16 )
+    if ( dtype != DT_FP32 )
     {
       tpu_bdc_cast ( reduce_sum_local_addr, reduce_sum_local_addr, &reduce_shape, NULL, NULL, dtype, DT_FP32, RM_HALF_TO_EVEN );
     }
@@ -223,9 +220,9 @@ bool target_is_int64 )
         variable_t var_hit = { .type = SCALAR, .context = { .scalar = onehot_hit_fp32 } };
         variable_t var_miss = { .type = SCALAR, .context = { .scalar = onehot_miss_fp32 } };
         tpu_bdc_equal_select ( onehot_local_addr, &var_sequence, &var_target, &var_hit, &var_miss, &onehot_shape, DT_INT32, DT_FP32 );
-        if ( dtype == DT_FP16 )
+        if ( dtype != DT_FP32 )
         {
-          tpu_bdc_cast ( onehot_local_addr, onehot_local_addr, &onehot_shape, NULL, NULL, DT_FP16, DT_FP32, RM_HALF_TO_EVEN );
+          tpu_bdc_cast ( onehot_local_addr, onehot_local_addr, &onehot_shape, NULL, NULL, dtype, DT_FP32, RM_HALF_TO_EVEN );
         }
         // input = input * one-hot
         tpu_bdc_fp_mul ( input_local_addrs[index] + c * tile_stride.c * dsize, input_local_addrs[index] + c * tile_stride.c * dsize, onehot_local_addr, &onehot_shape, NULL, NULL, NULL, dtype );
@@ -268,18 +265,22 @@ bool target_is_int64 )
   tpu_gdma_cpy_L2S ( output_global_addr, output_local_addrs[1], &output_shape, NULL, NULL, dtype );
 }
 
-void tpu_kernel_api_cross_entropy_loss_forward ( const void * args )
+void tpu_kernel_api_cross_entropy_loss ( const void * args )
 {
-  sg_api_cross_entropy_loss_forward_t * api = ( sg_api_cross_entropy_loss_forward_t * ) args;
-  data_type_t dtype = tpu_type_convert ( api->dtype );
-  TPUKERNEL_ASSERT ( dtype == DT_FP32 || dtype == DT_FP16 );
+  sg_api_cross_entropy_loss_t * api = ( sg_api_cross_entropy_loss_t * ) args;
+  TPUKERNEL_ASSERT ( api->dtype == DT_FP32 || api->dtype == DT_FP16 || api->dtype == DT_BFP16 );
   TPUKERNEL_ASSERT ( api->reduction == 0 || api->reduction == 1 );
-  if ( api->reduction == 0 )
-  {
-    TPUKERNEL_ASSERT ( api->weight_global_addr == 0 );
-  }
   tpu_initialize();
-  nodechip_cross_entropy_loss_forward ( api->input_global_addr, api->target_global_addr, api->weight_global_addr, api->output_global_addr, api->batch_num, api->class_num, api->reduction, api->label_smoothing, dtype, api->target_is_int64 );
+  nodechip_cross_entropy_loss_forward ( api->input_global_addr,
+                                        api->target_global_addr,
+                                        0,
+                                        api->output_global_addr,
+                                        api->batch,
+                                        api->class_,
+                                        api->reduction,
+                                        api->label_smoothing,
+                                        ( data_type_t ) api->dtype,
+                                        api->is_target_int64 );
   tpu_poll();
 }
-TPUKERNEL_FUNC_REGISTER ( tpu_kernel_api_cross_entropy_loss_forward );
+TPUKERNEL_FUNC_REGISTER ( tpu_kernel_api_cross_entropy_loss );

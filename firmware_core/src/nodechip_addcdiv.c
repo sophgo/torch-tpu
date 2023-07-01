@@ -1,7 +1,5 @@
 #include "sg_api_struct.h"
-#include "common_def.h"
 #include "tpu_kernel.h"
-#include "tpu_utils.h"
 
 /*
  * output = input + value * ( tensor1 / tensor2 )
@@ -34,7 +32,7 @@ data_type_t dtype )
     tensor2_local_addrs[1] = next; next += size;
     output_local_addrs[0] = next; next += size;
     output_local_addrs[1] = next; next += size;
-    if ( dtype == DT_FP16 )
+    if ( dtype != DT_FP32 )
     {
       tensor1_fp32_local_addrs[0] = next; next += size_fp32;
       tensor1_fp32_local_addrs[1] = tensor1_fp32_local_addrs[0];
@@ -97,15 +95,15 @@ data_type_t dtype )
     {
       tpu_gdma_cpy_L2S ( l2s_global_addr, l2s_local_addr, &l2s_shape, NULL, NULL, dtype );
     }
-    if ( dtype == DT_FP16 )
+    if ( dtype != DT_FP32 )
     {
-      tpu_bdc_cast ( tensor1_fp32_local_addrs[index], tensor1_local_addrs[index], &shape, NULL, NULL, DT_FP32, DT_FP16, RM_HALF_TO_EVEN );
-      tpu_bdc_cast ( tensor2_fp32_local_addrs[index], tensor2_local_addrs[index], &shape, NULL, NULL, DT_FP32, DT_FP16, RM_HALF_TO_EVEN );
+      tpu_bdc_cast ( tensor1_fp32_local_addrs[index], tensor1_local_addrs[index], &shape, NULL, NULL, DT_FP32, dtype, RM_HALF_TO_EVEN );
+      tpu_bdc_cast ( tensor2_fp32_local_addrs[index], tensor2_local_addrs[index], &shape, NULL, NULL, DT_FP32, dtype, RM_HALF_TO_EVEN );
     }
-    if ( dtype == DT_FP16 )
+    if ( dtype != DT_FP32 )
     {
       tpu_bdc_fp32_div ( tensor1_fp32_local_addrs[index], tensor1_fp32_local_addrs[index], tensor2_fp32_local_addrs[index], &shape, NULL, NULL, NULL );
-      tpu_bdc_cast ( output_local_addrs[index], tensor1_fp32_local_addrs[index], &shape, NULL, NULL, DT_FP16, DT_FP32, RM_HALF_TO_EVEN );
+      tpu_bdc_cast ( output_local_addrs[index], tensor1_fp32_local_addrs[index], &shape, NULL, NULL, dtype, DT_FP32, RM_HALF_TO_EVEN );
     }
     else
     {
@@ -134,8 +132,8 @@ data_type_t dtype )
 void tpu_kernel_api_addcdiv ( const void * args )
 {
   sg_api_addcdiv_t * api = ( sg_api_addcdiv_t * ) args;
-  data_type_t dtype = tpu_type_convert ( api->dtype );
-  TPUKERNEL_ASSERT ( dtype == DT_FP32 || dtype == DT_FP16 );
+  data_type_t dtype = ( data_type_t ) api->dtype;
+  TPUKERNEL_ASSERT ( dtype == DT_FP32 || dtype == DT_FP16 || dtype == DT_BFP16 );
   scalar_t value;
   if ( dtype == DT_FP32 )
   {
@@ -144,7 +142,7 @@ void tpu_kernel_api_addcdiv ( const void * args )
   else
   {
     scalar_t value_f32 = { .f32 = api->value };
-    value = tpu_fp_cast ( value_f32, DT_FP16, DT_FP32, RM_HALF_TO_EVEN );
+    value = tpu_fp_cast ( value_f32, dtype, DT_FP32, RM_HALF_TO_EVEN );
   }
   int length = 1;
   for ( int i = 0; i < api->dim; ++i )

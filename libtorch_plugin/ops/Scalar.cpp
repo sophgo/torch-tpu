@@ -17,6 +17,6 @@ Scalar _local_scalar_dense_tpu ( const Tensor & self )
 }
 TORCH_LIBRARY_IMPL ( aten, TPU, m )
 {
- m.impl ( "_local_scalar_dense", _local_scalar_dense_tpu );
+  m.impl ( "_local_scalar_dense", _local_scalar_dense_tpu );
 }
 } // namespace at

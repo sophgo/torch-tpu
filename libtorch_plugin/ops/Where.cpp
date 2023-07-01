@@ -48,16 +48,12 @@ Tensor where_self_tpu ( const Tensor & condition, const Tensor & self, const Ten
 #ifdef TPU_OP_TIMING
   auto timer = tpu::Timer().Start();
 #endif
-  bm_status_t status = sgdnn_where (
+  bm_status_t status = sgdnnWhere (
                        tpu::TPUGetDeviceHandle(),
-                       tpu::TPUGenerateTensorDesc ( condition_ ),
-                       ADDR_IN_DEVICE ( condition_ ),
-                       tpu::TPUGenerateTensorDesc ( self ),
-                       ADDR_IN_DEVICE ( self ),
-                       tpu::TPUGenerateTensorDesc ( other ),
-                       ADDR_IN_DEVICE ( other ),
-                       tpu::TPUGenerateTensorDesc ( out ),
-                       ADDR_IN_DEVICE ( out ) );
+                       tpu::TPUGenerateSgdnnTensor ( condition_ ),
+                       tpu::TPUGenerateSgdnnTensor ( self ),
+                       tpu::TPUGenerateSgdnnTensor ( other ),
+                       tpu::TPUGenerateSgdnnTensor ( out ) );
   TORCH_CHECK ( status == BM_SUCCESS );
 #ifdef TPU_OP_TIMING
   tpu::OpTimer::Instance().AddTime ( tpu::WHERE, timer.ElapsedUS() );

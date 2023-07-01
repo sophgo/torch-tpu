@@ -1,7 +1,5 @@
 #include "sg_api_struct.h"
-#include "common_def.h"
 #include "tpu_kernel.h"
-#include "tpu_utils.h"
 
 /*
  * output = input + value * ( other )
@@ -97,20 +95,19 @@ data_type_t dtype )
   }
 }
 
-void tpu_kernel_api_scale_add ( const void * args )
+void tpu_kernel_api_add ( const void * args )
 {
-  sg_api_scale_add_t * api = ( sg_api_scale_add_t * ) args;
-  data_type_t dtype = tpu_type_convert ( api->dtype );
-  TPUKERNEL_ASSERT ( dtype == DT_FP32 || dtype == DT_FP16 );
+  sg_api_add_t * api = ( sg_api_add_t * ) args;
+  TPUKERNEL_ASSERT ( api->dtype == DT_FP32 || api->dtype == DT_FP16 || api->dtype == DT_BFP16 );
   scalar_t value;
-  if ( dtype == DT_FP32 )
+  if ( api->dtype == DT_FP32 )
   {
     value.f32 = api->value;
   }
   else
   {
     scalar_t value_f32 = { .f32 = api->value };
-    value = tpu_fp_cast ( value_f32, DT_FP16, DT_FP32, RM_HALF_TO_EVEN );
+    value = tpu_fp_cast ( value_f32, ( data_type_t ) api->dtype, DT_FP32, RM_HALF_TO_EVEN );
   }
   int length = 1;
   for ( int i = 0; i < api->dim; ++i )
@@ -118,7 +115,7 @@ void tpu_kernel_api_scale_add ( const void * args )
     length *= api->shape[i];
   }
   tpu_initialize();
-  nodechip_scale_add ( api->input_global_addr, api->other_global_addr, api->output_global_addr, value, length, dtype );
+  nodechip_scale_add ( api->input_global_addr, api->other_global_addr, api->output_global_addr, value, length, ( data_type_t ) api->dtype );
   tpu_poll();
 }
-TPUKERNEL_FUNC_REGISTER ( tpu_kernel_api_scale_add );
+TPUKERNEL_FUNC_REGISTER ( tpu_kernel_api_add );

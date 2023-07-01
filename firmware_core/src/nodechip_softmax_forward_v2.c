@@ -1,6 +1,4 @@
-#include "common.h"
 #include "sg_api_struct.h"
-#include "common_def.h"
 #include "tpu_kernel.h"
 
 void nodechip_softmax_forward_2DR1_no_max_pivot_parallel (
@@ -8,7 +6,7 @@ global_addr_t input_global_addr,
 global_addr_t output_global_addr,
 int batch_num, // row number
 int class_num, // column number
-data_type_t dtype ) // DT_FP32 or DT_FP16
+data_type_t dtype ) // DT_FP32 or DT_FP16 or DT_BFP16
 {
   const int dsize = tpu_data_type_size ( dtype );
   const int tile = tpu_eu_num ( dtype );
@@ -103,7 +101,7 @@ data_type_t dtype ) // DT_FP32 or DT_FP16
         l2s = false;
       }
       // input FP16 -> FP32
-      if ( dtype == DT_FP16 )
+      if ( dtype != DT_FP32 )
       {
         tpu_bdc_cast ( input_exp_local_addr, input_local_addrs[index], &tile_shape, NULL, NULL, DT_FP32, dtype, RM_HALF_TO_EVEN );
         // input = exp ( input )
@@ -162,7 +160,7 @@ data_type_t dtype ) // DT_FP32 or DT_FP16
       if ( wmax != class_num )
       {
         // input FP16 -> FP32
-        if ( dtype == DT_FP16 )
+        if ( dtype != DT_FP32 )
         {
           tpu_bdc_cast ( input_exp_local_addr, input_local_addrs[index], &tile_shape, NULL, NULL, DT_FP32, dtype, RM_HALF_TO_EVEN );
           // input = exp ( input )
@@ -177,7 +175,7 @@ data_type_t dtype ) // DT_FP32 or DT_FP16
       // output = input * input_sum
       dim4 reduce_stride; tpu_aligned_stride ( &reduce_stride, 0, &reduce_shape, DT_FP32 );
       dim4 reduce_bcast_stride = { .n = reduce_stride.n, .c = reduce_stride.c, 0, 0 };
-      if ( dtype == DT_FP16 )
+      if ( dtype != DT_FP32 )
       {
         tpu_bdc_fp_mul ( input_exp_local_addr, input_exp_local_addr, reduce_sum_local_addr, &tile_shape, NULL, NULL, &reduce_bcast_stride, DT_FP32 );
         tpu_bdc_cast ( output_local_addrs[index], input_exp_local_addr, &tile_shape, NULL, NULL, dtype, DT_FP32, RM_HALF_TO_EVEN );
@@ -211,3 +209,51 @@ data_type_t dtype ) // DT_FP32 or DT_FP16
     l2s = false;
   }
 }
+
+extern void nodechip_softmax (
+global_addr_t   bottom_global_offset,
+global_addr_t   top_global_offset,
+const int*      shape,
+int             dims,
+int             beg_axis,
+int             end_axis,
+int             log,
+float           scale_val,
+data_type_t     dtype );
+
+void tpu_kernel_api_softmax ( const void *args )
+{
+  sg_api_softmax_t *api = ( sg_api_softmax_t * ) args;
+  TPUKERNEL_ASSERT ( api->dtype == DT_FP32 || api->dtype == DT_FP16 || api->dtype == DT_BFP16 );
+  tpu_initialize();
+  if ( api->axis == api->dim - 1 )
+  {
+    int Row = 1;
+    for ( int i = 0; i < api->dim - 1; ++i )
+    {
+      Row *= api->shape[i];
+    }
+    int Column = api->shape[api->dim - 1];
+    nodechip_softmax_forward_2DR1_no_max_pivot_parallel (
+    api->input_global_addr,
+    api->output_global_addr,
+    Row,
+    Column,
+    ( data_type_t ) api->dtype );
+  }
+  else
+  {
+    nodechip_softmax (
+    api->input_global_addr,
+    api->output_global_addr,
+    api->shape,
+    api->dim,
+    api->axis,
+    api->axis,
+    0,
+    1.f,
+    ( data_type_t ) api->dtype );
+  }
+  tpu_poll();
+}
+TPUKERNEL_FUNC_REGISTER ( tpu_kernel_api_softmax );

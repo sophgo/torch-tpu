@@ -1,7 +1,4 @@
-#include "common.h"
 #include "sg_api_struct.h"
-#include "common_def.h"
-#include "tpu_utils.h"
 #include "tpu_kernel.h"
 
 static inline bool is_local_mem_enough(
@@ -1061,7 +1058,7 @@ void nodechip_conv_backward_input(
     TPUKERNEL_DBG("out ping local addr = 0x%5x, bank id = %d\n", oaddr_ping, oaddr_ping / BANK_SIZE);
     TPUKERNEL_DBG("out pong local addr = 0x%5x, bank id = %d\n", oaddr_pong, oaddr_pong / BANK_SIZE);
 
-    if (dtype == DT_FP16) {
+    if (dtype == DT_FP16 || dtype == DT_BFP16) {
         //nodechip_weight_reorder(forward_weight_global_addr,
         //                        weight_reordered_global_addr,
         //                        oc,
@@ -1592,7 +1589,7 @@ void nodechip_conv_backward_weight(
     dim4 wstride;
     tpu_compact_stride(&wstride, 0, &wshape);
 
-    if (dtype == DT_FP16) {
+    if (dtype == DT_FP16 || dtype == DT_BFP16) {
         nodechip_grad_output_reorder(grad_out_global_addr,
                                      grad_out_reordered_global_addr,
                                      ic,
@@ -1668,7 +1665,7 @@ void nodechip_conv_backward_weight(
                             if (tpu_data_type_size(idtype) == 2) {
                                 dim4 wslice_stride;
                                 tpu_compact_stride(&wslice_stride, 0, &wslice_shape);
-                                if (idtype == DT_FP16 && ic > 32 && split_kernel) {
+                                if ((idtype == DT_FP16 || idtype == DT_BFP16) && ic > 32 && split_kernel) {
                                     for (int icidx = 0; icidx < DIV_UP(ic, 32); icidx++) {
                                         dim4 per32ic_wslice_shape = {1, ocslice, khslice * kwslice, 32};
                                         tpu_gdma_cpy_S2L(
@@ -3297,7 +3294,7 @@ void nodechip_conv_backward(
                         pad,
                         dtype);
                 }
-            } else if (dtype ==DT_FP16) {
+            } else if (dtype ==DT_FP16 || dtype == DT_BFP16) {
                 if (can_use_conv) {
                     nodechip_conv_backward_weight_use_conv(
                         input_global_addr,
@@ -3346,8 +3343,10 @@ void nodechip_conv_backward(
     }
 }
 
-void tpu_kernel_api_conv_backward(const void* args) {
-    sg_api_conv_backward_t* api = (sg_api_conv_backward_t*)args;
+void tpu_kernel_api_conv2d_backward(const void* args) {
+    sg_api_conv2d_backward_t* api = (sg_api_conv2d_backward_t*)args;
+
+    TPUKERNEL_ASSERT ( api->dtype == DT_FP32 || api->dtype == DT_FP16 || api->dtype == DT_BFP16 );
 
     dim4 input_shape = {api->input_shape[0], api->input_shape[1],
                         api->input_shape[2], api->input_shape[3]};
@@ -3374,11 +3373,11 @@ void tpu_kernel_api_conv_backward(const void* args) {
         &dilation,
         &pad,
         api->groups,
-        api->grad_input_enable == 1 ? true : false,
-        api->grad_weight_enable == 1 ? true : false,
-        api->grad_bias_enable == 1 ? true : false,
-        tpu_type_convert(api->dtype));
+        api->grad_input_global_addr != 0,
+        api->grad_weight_global_addr != 0,
+        api->grad_bias_global_addr != 0,
+        (data_type_t)api->dtype);
     tpu_poll();
 }
 
-TPUKERNEL_FUNC_REGISTER(tpu_kernel_api_conv_backward);
+TPUKERNEL_FUNC_REGISTER(tpu_kernel_api_conv2d_backward);

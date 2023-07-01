@@ -1,5 +1,4 @@
 #include "sg_api_struct.h"
-#include "common_def.h"
 #include "tpu_kernel.h"
 #include <math.h>
 
@@ -120,7 +119,7 @@ static inline void nodechip_gelu_backward_parallel_fp32 ( global_addr_t DXGlobal
   tpu_gdma_cpy_L2S ( DXGlobalAddr + LastDone * sizeof ( float ), DXAddrs[1 - Index], &LastShape, NULL, NULL, DT_FP32 );
 }
 
-static inline void nodechip_gelu_backward_parallel_fp16 ( global_addr_t DXGlobalAddr, global_addr_t XGlobalAddr, global_addr_t DYGlobalAddr, int Len )
+static inline void nodechip_gelu_backward_parallel_fp16 ( global_addr_t DXGlobalAddr, global_addr_t XGlobalAddr, global_addr_t DYGlobalAddr, int Len, data_type_t dtype )
 {
   local_addr_t EXPCoeffAddr = 0;
   int EXPCoeffSize = tpu_aligned_feature_size ( 1, 32, DT_FP32 );
@@ -135,7 +134,7 @@ static inline void nodechip_gelu_backward_parallel_fp16 ( global_addr_t DXGlobal
   while ( true )
   {
     int SizeFP32 = tpu_aligned_feature_size ( 1, WMax, DT_FP32 );
-    int SizeFP16 = tpu_aligned_feature_size ( 1, WMax, DT_FP16 );
+    int SizeFP16 = tpu_aligned_feature_size ( 1, WMax, dtype );
     X1Addr = X0Addr + SizeFP16;
     DX0Addr = X1Addr + SizeFP16;
     DX1Addr = DX0Addr + SizeFP16;
@@ -190,8 +189,8 @@ static inline void nodechip_gelu_backward_parallel_fp16 ( global_addr_t DXGlobal
       Shape.c = Todo;
       Shape.w = 1;
     }
-    tpu_gdma_cpy_S2L ( XAddrs[Index], XGlobalAddr + Done * 2, &Shape, NULL, NULL, DT_FP16 );
-    tpu_gdma_cpy_S2L ( DYAddrs[Index], DYGlobalAddr + Done * 2, &Shape, NULL, NULL, DT_FP16 );
+    tpu_gdma_cpy_S2L ( XAddrs[Index], XGlobalAddr + Done * 2, &Shape, NULL, NULL, dtype );
+    tpu_gdma_cpy_S2L ( DYAddrs[Index], DYGlobalAddr + Done * 2, &Shape, NULL, NULL, dtype );
     if ( Count > 0 )
     {
       tpu_parallel_end();
@@ -199,11 +198,11 @@ static inline void nodechip_gelu_backward_parallel_fp16 ( global_addr_t DXGlobal
     tpu_parallel_start();
     if ( Count > 0 )
     {
-      tpu_gdma_cpy_L2S ( DXGlobalAddr + LastDone * 2, DXAddrs[1 - Index], &LastShape, NULL, NULL, DT_FP16 );
+      tpu_gdma_cpy_L2S ( DXGlobalAddr + LastDone * 2, DXAddrs[1 - Index], &LastShape, NULL, NULL, dtype );
     }
     // FP16 -> FP32
-    tpu_bdc_cast ( XFP32Addr, XAddrs[Index], &Shape, NULL, NULL, DT_FP32, DT_FP16, RM_HALF_TO_EVEN );
-    tpu_bdc_cast ( DYFP32Addr, DYAddrs[Index], &Shape, NULL, NULL, DT_FP32, DT_FP16, RM_HALF_TO_EVEN );
+    tpu_bdc_cast ( XFP32Addr, XAddrs[Index], &Shape, NULL, NULL, DT_FP32, dtype, RM_HALF_TO_EVEN );
+    tpu_bdc_cast ( DYFP32Addr, DYAddrs[Index], &Shape, NULL, NULL, DT_FP32, dtype, RM_HALF_TO_EVEN );
     // W3 = X / SQRT(2)
     C.f32 = 1 / sqrt ( 2. );
     tpu_bdc_fp_mul_C ( W3Addr, XFP32Addr, C, &Shape, NULL, NULL, DT_FP32 );
@@ -232,7 +231,7 @@ static inline void nodechip_gelu_backward_parallel_fp16 ( global_addr_t DXGlobal
     // DX = DX * DY
     tpu_bdc_fp_mul ( DXFP32Addr, DXFP32Addr, DYFP32Addr, &Shape, NULL, NULL, NULL, DT_FP32 );
     // FP32 -> FP16
-    tpu_bdc_cast ( DXAddrs[Index], DXFP32Addr, &Shape, NULL, NULL, DT_FP16, DT_FP32, RM_HALF_TO_EVEN );
+    tpu_bdc_cast ( DXAddrs[Index], DXFP32Addr, &Shape, NULL, NULL, dtype, DT_FP32, RM_HALF_TO_EVEN );
     LastDone = Done;
     LastShape = Shape;
     Todo -= Shape.c * Shape.w;
@@ -244,26 +243,26 @@ static inline void nodechip_gelu_backward_parallel_fp16 ( global_addr_t DXGlobal
   {
     tpu_parallel_end();
   }
-  tpu_gdma_cpy_L2S ( DXGlobalAddr + LastDone * 2, DXAddrs[1 - Index], &LastShape, NULL, NULL, DT_FP16 );
+  tpu_gdma_cpy_L2S ( DXGlobalAddr + LastDone * 2, DXAddrs[1 - Index], &LastShape, NULL, NULL, dtype );
 }
 
 void tpu_kernel_api_gelu_backward ( const void * args )
 {
   sg_api_gelu_backward_t * api = ( sg_api_gelu_backward_t * ) args;
-  TPUKERNEL_ASSERT ( api->dtype == SG_DTYPE_FP32 || api->dtype == SG_DTYPE_FP16 );
+  TPUKERNEL_ASSERT ( api->dtype == DT_FP32 || api->dtype == DT_FP16 || api->dtype == DT_BFP16 );
   int Len = 1;
   for ( int i = 0; i < api->dim; ++i )
   {
     Len *= api->shape[i];
   }
   tpu_initialize();
-  if ( api->dtype == SG_DTYPE_FP32 )
+  if ( api->dtype == DT_FP32 )
   {
-    nodechip_gelu_backward_parallel_fp32 ( api->dx_global_addr, api->x_global_addr, api->dy_global_addr, Len );
+    nodechip_gelu_backward_parallel_fp32 ( api->grad_input_global_addr, api->input_global_addr, api->grad_output_global_addr, Len );
   }
   else
   {
-    nodechip_gelu_backward_parallel_fp16 ( api->dx_global_addr, api->x_global_addr, api->dy_global_addr, Len );
+    nodechip_gelu_backward_parallel_fp16 ( api->grad_input_global_addr, api->input_global_addr, api->grad_output_global_addr, Len, ( data_type_t ) api->dtype );
   }
   tpu_poll();
 }

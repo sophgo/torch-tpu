@@ -29,27 +29,23 @@ Tensor & cat_out_tpu ( const ITensorListRef & tensors, int64_t dim, Tensor & out
   }
   else
   {
-    std::vector<TensorDescriptor_t> inputDescs;
-    std::vector<const void *> inputs;
+    std::vector<SgdnnTensor_t> inputs;
     std::vector<Tensor> contiguous_tensors;
     for ( auto tensor : tensors )
     {
       CHECK_TENSOR_IN_DEVICE_NO_CONTIGUOUS ( tensor );
       contiguous_tensors.push_back ( tensor.contiguous() );
-      inputDescs.push_back ( tpu::TPUGenerateTensorDesc ( contiguous_tensors.back() ) );
-      inputs.push_back ( ADDR_IN_DEVICE ( contiguous_tensors.back() ) );
+      inputs.push_back ( tpu:: TPUGenerateSgdnnTensor ( contiguous_tensors.back() ) );
     }
 #ifdef TPU_OP_TIMING
     auto timer = tpu::Timer().Start();
 #endif
-    auto status = sgdnn_concat (
-                  tpu::TPUGetDeviceHandle(),
-                  inputDescs.data(),
-                  inputs.data(),
-                  inputs.size(),
-                  tpu::TPUGenerateTensorDesc ( out ),
-                  ADDR_IN_DEVICE ( out ),
-                  dim );
+    auto status = sgdnnConcat ( tpu::TPUGetDeviceHandle(),
+                                inputs.data(),
+                                inputs.size(),
+                                dim,
+                                tpu:: TPUGenerateSgdnnTensor ( out ) );
+    TORCH_CHECK ( status == BM_SUCCESS );
 #ifdef TPU_OP_TIMING
     tpu::OpTimer::Instance().AddTime ( tpu::CONCAT, timer.ElapsedUS() );
 #endif

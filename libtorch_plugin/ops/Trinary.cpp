@@ -20,17 +20,13 @@ Tensor & addcmul_out_tpu ( const Tensor & self, const Tensor & tensor1, const Te
 #ifdef TPU_OP_TIMING
   auto timer = tpu::Timer().Start();
 #endif
-  bm_status_t status = sgdnn_addcmul (
+  bm_status_t status = sgdnnAddCMul (
                        tpu::TPUGetDeviceHandle(),
-                       tpu::TPUGenerateTensorDesc ( self ),
-                       ADDR_IN_DEVICE ( self ),
-                       tpu::TPUGenerateTensorDesc ( tensor1 ),
-                       ADDR_IN_DEVICE ( tensor1 ),
-                       tpu::TPUGenerateTensorDesc ( tensor2 ),
-                       ADDR_IN_DEVICE ( tensor2 ),
-                       tpu::TPUGenerateTensorDesc ( out ),
-                       ADDR_IN_DEVICE ( out ),
-                       value.toDouble() );
+                       tpu::TPUGenerateSgdnnTensor ( self ),
+                       tpu::TPUGenerateSgdnnTensor ( tensor1 ),
+                       tpu::TPUGenerateSgdnnTensor ( tensor2 ),
+                       value.toDouble(),
+                       tpu::TPUGenerateSgdnnTensor ( out ) );
   TORCH_CHECK ( status == BM_SUCCESS );
 #ifdef TPU_OP_TIMING
   tpu::OpTimer::Instance().AddTime ( tpu::ADDCMUL, timer.ElapsedUS() );
@@ -51,17 +47,13 @@ Tensor & addcdiv_out_tpu ( const Tensor & self, const Tensor & tensor1, const Te
 #ifdef TPU_OP_TIMING
   auto timer = tpu::Timer().Start();
 #endif
-  bm_status_t status = sgdnn_addcdiv (
+  bm_status_t status = sgdnnAddCDiv (
                        tpu::TPUGetDeviceHandle(),
-                       tpu::TPUGenerateTensorDesc ( self ),
-                       ADDR_IN_DEVICE ( self ),
-                       tpu::TPUGenerateTensorDesc ( tensor1 ),
-                       ADDR_IN_DEVICE ( tensor1 ),
-                       tpu::TPUGenerateTensorDesc ( tensor2 ),
-                       ADDR_IN_DEVICE ( tensor2 ),
-                       tpu::TPUGenerateTensorDesc ( out ),
-                       ADDR_IN_DEVICE ( out ),
-                       value.toDouble() );
+                       tpu::TPUGenerateSgdnnTensor ( self ),
+                       tpu::TPUGenerateSgdnnTensor ( tensor1 ),
+                       tpu::TPUGenerateSgdnnTensor ( tensor2 ),
+                       value.toDouble(),
+                       tpu::TPUGenerateSgdnnTensor ( out ) );
   TORCH_CHECK ( status == BM_SUCCESS );
 #ifdef TPU_OP_TIMING
   tpu::OpTimer::Instance().AddTime ( tpu::ADDCDIV, timer.ElapsedUS() );

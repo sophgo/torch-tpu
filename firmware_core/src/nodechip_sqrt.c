@@ -1,7 +1,5 @@
 #include "sg_api_struct.h"
-#include "common_def.h"
 #include "tpu_kernel.h"
-#include "tpu_utils.h"
 
 void nodechip_sqrt (
 global_addr_t input_global_addr,
@@ -116,13 +114,14 @@ data_type_t dtype )
 void tpu_kernel_api_sqrt ( const void * args )
 {
   sg_api_sqrt_t * api = ( sg_api_sqrt_t * ) args;
+  TPUKERNEL_ASSERT ( api->dtype == DT_FP32 || api->dtype == DT_FP16 || api->dtype == DT_BFP16 );
   int length = 1;
   for ( int i = 0; i < api->dim; ++i )
   {
     length *= api->shape[i];
   }
   tpu_initialize();
-  nodechip_sqrt ( api->input_global_addr, api->output_global_addr, length, tpu_type_convert ( api->dtype ) );
+  nodechip_sqrt ( api->input_global_addr, api->output_global_addr, length, ( data_type_t ) api->dtype );
   tpu_poll();
 }
 TPUKERNEL_FUNC_REGISTER ( tpu_kernel_api_sqrt );

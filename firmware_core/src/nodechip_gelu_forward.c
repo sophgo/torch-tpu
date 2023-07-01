@@ -1,11 +1,10 @@
 #include "sg_api_struct.h"
-#include "common_def.h"
 #include "tpu_kernel.h"
 
 // only support fp16
 static inline void nodechip_gelu_forward_parallel ( global_addr_t XGlobalAddr, global_addr_t YGlobalAddr, int Len )
 {
-  const int DSize = tpu_data_type_size(DT_FP16);
+  const int DSize = tpu_data_type_size ( DT_FP16 );
   local_addr_t EXPCoeffAddr = 0;
   int EXPCoeffSize = tpu_aligned_feature_size ( 1, 32, DT_FP32 );
   local_addr_t EXPTableAddr = EXPCoeffAddr + EXPCoeffSize;
@@ -74,7 +73,7 @@ static inline void nodechip_gelu_forward_parallel ( global_addr_t XGlobalAddr, g
       Shape.w = 1;
     }
     tpu_gdma_cpy_S2L ( XAddrs[Index], XGlobalAddr + Done * DSize, &Shape, NULL, NULL, DT_FP16 );
-    if ( Count > 0 && tpu_is_parallel_state())
+    if ( Count > 0 && tpu_is_parallel_state() )
     {
       tpu_parallel_end();
     }
@@ -84,7 +83,7 @@ static inline void nodechip_gelu_forward_parallel ( global_addr_t XGlobalAddr, g
       tpu_gdma_cpy_L2S ( YGlobalAddr + LastDone * DSize, YAddrs[1 - Index], &LastShape, NULL, NULL, DT_FP16 );
     }
     tpu_bdc_cast ( XCastAddrs[Index], XAddrs[Index], &Shape, NULL, NULL, DT_FP32, DT_FP16, RM_HALF_TO_EVEN );
-    tpu_bdc_fp32_gelu ( YCastAddrs[Index], XCastAddrs[Index], W0Addr, W1Addr, W2Addr, W3Addr, EXPCoeffAddr, ERFCoeffAddr, EXPTableAddr, &Shape);
+    tpu_bdc_fp32_gelu ( YCastAddrs[Index], XCastAddrs[Index], W0Addr, W1Addr, W2Addr, W3Addr, EXPCoeffAddr, ERFCoeffAddr, EXPTableAddr, &Shape );
     tpu_bdc_cast ( YAddrs[Index], YCastAddrs[Index], &Shape, NULL, NULL, DT_FP16, DT_FP32, RM_HALF_TO_EVEN );
     LastDone = Done;
     LastShape = Shape;
@@ -100,16 +99,16 @@ static inline void nodechip_gelu_forward_parallel ( global_addr_t XGlobalAddr, g
   tpu_gdma_cpy_L2S ( YGlobalAddr + LastDone * DSize, YAddrs[1 - Index], &LastShape, NULL, NULL, DT_FP16 );
 }
 
-void tpu_kernel_api_gelu_forward ( const void * args )
+void tpu_kernel_api_gelu ( const void * args )
 {
-  sg_api_gelu_forward_t * api = ( sg_api_gelu_forward_t * ) args;
+  sg_api_gelu_t * api = ( sg_api_gelu_t * ) args;
   int Len = 1;
   for ( int i = 0; i < api->dim; ++i )
   {
     Len *= api->shape[i];
   }
   tpu_initialize();
-  nodechip_gelu_forward_parallel ( api->x_global_addr, api->y_global_addr, Len );
+  nodechip_gelu_forward_parallel ( api->input_global_addr, api->output_global_addr, Len );
   tpu_poll();
 }
-TPUKERNEL_FUNC_REGISTER(tpu_kernel_api_gelu_forward);
+TPUKERNEL_FUNC_REGISTER ( tpu_kernel_api_gelu );

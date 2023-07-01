@@ -23,19 +23,17 @@ Tensor & fill__Scalar_tpu ( Tensor & self, const Scalar & value )
 #endif
   auto self_ = self.dim() == 0 ? self.unsqueeze ( 0 ) : self;
   int64_t value_;
-  if (self.dtype() == caffe2::TypeMeta::Make<float>()){
-    *(float *)(&value_) = value.toFloat();
-  }else if (self.dtype() == caffe2::TypeMeta::Make<at::Half>()){
-    *(at::Half *)(&value_) = value.toHalf();
-  }else{
+  if ( self.dtype() == caffe2::TypeMeta::Make<float>() ) {
+    * ( float * ) ( &value_ ) = value.toFloat();
+  } else if ( self.dtype() == caffe2::TypeMeta::Make<at::Half>() ) {
+    * ( at::Half * ) ( &value_ ) = value.toHalf();
+  } else {
     TORCH_CHECK ( false );
   }
-
-  bm_status_t status = sgdnn_const_fill (
+  bm_status_t status = sgdnnFill (
                        tpu::TPUGetDeviceHandle(),
-                       tpu::TPUGenerateTensorDesc ( self_ ),
-                       ADDR_IN_DEVICE ( self_ ),
-                       &value_ );
+                       &value_,
+                       tpu::TPUGenerateSgdnnTensor ( self_ ) );
   TORCH_CHECK ( status == BM_SUCCESS );
 #ifdef TPU_OP_TIMING
   tpu::OpTimer::Instance().AddTime ( tpu::CONST_FILL, timer.ElapsedUS() );

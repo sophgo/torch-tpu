@@ -1,7 +1,5 @@
 #include "sg_api_struct.h"
-#include "common_def.h"
 #include "tpu_kernel.h"
-#include "tpu_utils.h"
 
 /*
  * output = input + value * ( tensor1 * tensor2 )
@@ -105,8 +103,8 @@ data_type_t dtype )
 void tpu_kernel_api_addcmul ( const void * args )
 {
   sg_api_addcmul_t * api = ( sg_api_addcmul_t * ) args;
-  data_type_t dtype = tpu_type_convert ( api->dtype );
-  TPUKERNEL_ASSERT ( dtype == DT_FP32 || dtype == DT_FP16 );
+  data_type_t dtype = ( data_type_t ) api->dtype;
+  TPUKERNEL_ASSERT ( dtype == DT_FP32 || dtype == DT_FP16 || dtype == DT_BFP16 );
   scalar_t value;
   if ( dtype == DT_FP32 )
   {
@@ -115,7 +113,7 @@ void tpu_kernel_api_addcmul ( const void * args )
   else
   {
     scalar_t value_f32 = { .f32 = api->value };
-    value = tpu_fp_cast ( value_f32, DT_FP16, DT_FP32, RM_HALF_TO_EVEN );
+    value = tpu_fp_cast ( value_f32, dtype, DT_FP32, RM_HALF_TO_EVEN );
   }
   int length = 1;
   for ( int i = 0; i < api->dim; ++i )

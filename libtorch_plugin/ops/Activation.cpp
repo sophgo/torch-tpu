@@ -27,26 +27,12 @@ Tensor & relu__tpu ( Tensor & self )
   tpu::TPUCopyHostToDevice ( self.data_ptr(), self_cpu.contiguous().data_ptr(), self.nbytes() );
   return self;
 #else
-  float alpha = 1.f;
-  float beta = 0.f;
-  ActivationDescriptor_t activation_desc =
-  {
-    .mode = Activation_Relu,
-    .NanOpt = Not_Propagate_Nan,
-    .coef = std::numeric_limits<double>::max()
-  };
 #ifdef TPU_OP_TIMING
   auto timer = tpu::Timer().Start();
 #endif
-  bm_status_t status = sgdnn_activation_forward (
-                       tpu::TPUGetDeviceHandle(),
-                       activation_desc,
-                       &alpha,
-                       tpu::TPUGenerateTensorDesc ( self ),
-                       ADDR_IN_DEVICE ( self ),
-                       &beta,
-                       tpu::TPUGenerateTensorDesc ( self ),
-                       ADDR_IN_DEVICE ( self ) );
+  bm_status_t status = sgdnnReLU ( tpu::TPUGetDeviceHandle(),
+                                   tpu::TPUGenerateSgdnnTensor ( self ),
+                                   tpu::TPUGenerateSgdnnTensor ( self ) );
   TORCH_CHECK ( status == BM_SUCCESS );
 #ifdef TPU_OP_TIMING
   tpu::OpTimer::Instance().AddTime ( tpu::RELU, timer.ElapsedUS() );
@@ -57,6 +43,39 @@ Tensor & relu__tpu ( Tensor & self )
 TORCH_LIBRARY_IMPL ( aten, TPU, m )
 {
   m.impl ( "relu_", relu__tpu );
+}
+
+Tensor relu_tpu ( const Tensor & self )
+{
+  static int count = 0;
+#ifdef SHOW_OP_INFO
+  std::cout << "ReLU " << count << std::endl;
+  ++count;
+#endif
+  CHECK_TENSOR_IN_DEVICE ( self );
+#if 0
+  auto self_cpu = self.cpu();
+  self_cpu = relu_ ( self_cpu );
+  tpu::TPUCopyHostToDevice ( self.data_ptr(), self_cpu.contiguous().data_ptr(), self.nbytes() );
+  return self;
+#else
+  auto out = empty ( self.sizes(), self.options() );
+#ifdef TPU_OP_TIMING
+  auto timer = tpu::Timer().Start();
+#endif
+  bm_status_t status = sgdnnReLU ( tpu::TPUGetDeviceHandle(),
+                                   tpu::TPUGenerateSgdnnTensor ( self ),
+                                   tpu::TPUGenerateSgdnnTensor ( out ) );
+  TORCH_CHECK ( status == BM_SUCCESS );
+#ifdef TPU_OP_TIMING
+  tpu::OpTimer::Instance().AddTime ( tpu::RELU, timer.ElapsedUS() );
+#endif
+  return out;
+#endif
+}
+TORCH_LIBRARY_IMPL ( aten, TPU, m )
+{
+  m.impl ( "relu", relu_tpu );
 }
 
 Tensor & threshold_backward_grad_input_tpu (
@@ -72,30 +91,14 @@ Tensor       & grad_input )
   auto grad_input_cpu = threshold_backward ( grad_output.cpu(), input.cpu(), threshold );
   tpu::TPUCopyHostToDevice ( grad_input.data_ptr(), grad_input_cpu.contiguous().data_ptr(), grad_input.nbytes() );
 #else
-  float alpha = 1.f;
-  float beta = 0.f;
-  ActivationDescriptor_t activation_desc =
-  {
-    .mode = Activation_Relu,
-    .NanOpt = Not_Propagate_Nan,
-    .coef = threshold.toDouble()
-  };
 #ifdef TPU_OP_TIMING
   auto timer = tpu::Timer().Start();
 #endif
-  bm_status_t status = sgdnn_activation_backward (
+  bm_status_t status = sgdnnReLUBackward (
                        tpu::TPUGetDeviceHandle(),
-                       activation_desc,
-                       &alpha,
-                       tpu::TPUGenerateTensorDesc ( grad_output ),
-                       nullptr,
-                       tpu::TPUGenerateTensorDesc ( grad_output ),
-                       ADDR_IN_DEVICE ( grad_output ),
-                       tpu::TPUGenerateTensorDesc ( input ),
-                       ADDR_IN_DEVICE ( input ),
-                       &beta,
-                       tpu::TPUGenerateTensorDesc ( grad_input ),
-                       ADDR_IN_DEVICE ( grad_input ) );
+                       tpu::TPUGenerateSgdnnTensor ( grad_output ),
+                       tpu::TPUGenerateSgdnnTensor ( input ),
+                       tpu::TPUGenerateSgdnnTensor ( grad_input ) );
 #ifdef TPU_OP_TIMING
   tpu::OpTimer::Instance().AddTime ( tpu::RELU_BACKWARD, timer.ElapsedUS() );
 #endif
@@ -115,26 +118,12 @@ Tensor & gelu_out_tpu ( const Tensor & self, c10::string_view approximate, Tenso
   auto out_cpu = gelu ( self.cpu(), approximate );
   tpu::TPUCopyHostToDevice ( out.data_ptr(), out_cpu.contiguous().data_ptr(), out.nbytes() );
 #else
-  float alpha = 1.f;
-  float beta = 0.f;
-  ActivationDescriptor_t activation_desc =
-  {
-    .mode = Activation_Gelu,
-    .NanOpt = Not_Propagate_Nan,
-    .coef = std::numeric_limits<double>::max()
-  };
 #ifdef TPU_OP_TIMING
   auto timer = tpu::Timer().Start();
 #endif
-  bm_status_t status = sgdnn_activation_forward (
-                       tpu::TPUGetDeviceHandle(),
-                       activation_desc,
-                       &alpha,
-                       tpu::TPUGenerateTensorDesc ( self ),
-                       ADDR_IN_DEVICE ( self ),
-                       &beta,
-                       tpu::TPUGenerateTensorDesc ( out ),
-                       ADDR_IN_DEVICE ( out ) );
+  bm_status_t status = sgdnnGELU ( tpu::TPUGetDeviceHandle(),
+                                   tpu::TPUGenerateSgdnnTensor ( self ),
+                                   tpu::TPUGenerateSgdnnTensor ( out ) );
   TORCH_CHECK ( status == BM_SUCCESS );
 #ifdef TPU_OP_TIMING
   tpu::OpTimer::Instance().AddTime ( tpu::GELU, timer.ElapsedUS() );
@@ -159,14 +148,11 @@ Tensor & gelu_backward_grad_input_tpu ( const Tensor & grad_output, const Tensor
 #ifdef TPU_OP_TIMING
   auto timer = tpu::Timer().Start();
 #endif
-  bm_status_t status = sgdnn_gelu_backward (
+  bm_status_t status = sgdnnGELUBackward (
                        tpu::TPUGetDeviceHandle(),
-                       tpu::TPUGenerateTensorDesc ( self ),
-                       ADDR_IN_DEVICE ( self ),
-                       tpu::TPUGenerateTensorDesc ( grad_output ),
-                       ADDR_IN_DEVICE ( grad_output ),
-                       tpu::TPUGenerateTensorDesc ( grad_input ),
-                       ADDR_IN_DEVICE ( grad_input ) );
+                       tpu::TPUGenerateSgdnnTensor ( grad_output ),
+                       tpu::TPUGenerateSgdnnTensor ( self ),
+                       tpu::TPUGenerateSgdnnTensor ( grad_input ) );
   TORCH_CHECK ( status == BM_SUCCESS );
 #ifdef TPU_OP_TIMING
   tpu::OpTimer::Instance().AddTime ( tpu::GELU_BACKWARD, timer.ElapsedUS() );

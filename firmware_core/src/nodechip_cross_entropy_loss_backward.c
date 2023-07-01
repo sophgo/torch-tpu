@@ -1,8 +1,5 @@
-#include "common.h"
 #include "sg_api_struct.h"
-#include "common_def.h"
 #include "tpu_kernel.h"
-#include "tpu_utils.h"
 
 #if 1
 void nodechip_cross_entropy_loss_backward (
@@ -109,7 +106,7 @@ bool target_is_int64 )
   {
     grad_output_scalar.u32 = * ( unsigned int * ) tpu_global_mem_addr ( grad_output_global_addr );
   }
-  else if ( dtype == DT_FP16 )
+  else if ( dtype != DT_FP32 || dtype == DT_BFP16 )
   {
     grad_output_scalar.u16 = * ( unsigned short * ) tpu_global_mem_addr ( grad_output_global_addr );
   }
@@ -148,7 +145,7 @@ bool target_is_int64 )
         l2s = false;
       }
       // input FP16 -> FP32
-      if ( dtype == DT_FP16 )
+      if ( dtype != DT_FP32 )
       {
         tpu_bdc_cast ( input_exp_local_addr, input_local_addrs[index], &tile_shape, NULL, NULL, DT_FP32, dtype, RM_HALF_TO_EVEN );
         // input = exp ( input )
@@ -227,9 +224,9 @@ bool target_is_int64 )
       if ( wmax != class_num )
       {
         // input FP16 -> FP32
-        if ( dtype == DT_FP16 )
+        if ( dtype != DT_FP32 )
         {
-          tpu_bdc_cast ( input_exp_local_addr, input_local_addrs[index], &tile_shape, NULL, NULL, DT_FP32, DT_FP16, RM_HALF_TO_EVEN );
+          tpu_bdc_cast ( input_exp_local_addr, input_local_addrs[index], &tile_shape, NULL, NULL, DT_FP32, dtype, RM_HALF_TO_EVEN );
           // input = exp ( input )
           tpu_bdc_fp32_exp ( input_exp_local_addr, input_exp_local_addr, work0_local_addr, work1_local_addr, exp_coeff_addr, exp_table_addr, &tile_shape );
         }
@@ -242,7 +239,7 @@ bool target_is_int64 )
       // gread_input = input * input_sum
       dim4 reduce_stride; tpu_aligned_stride ( &reduce_stride, 0, &reduce_shape, DT_FP32 );
       dim4 reduce_bcast_stride = { .n = reduce_stride.n, .c = reduce_stride.c, 0, 0 };
-      if ( dtype == DT_FP16 )
+      if ( dtype != DT_FP32 )
       {
         tpu_bdc_fp_mul ( input_exp_local_addr, input_exp_local_addr, reduce_sum_local_addr, &tile_shape, NULL, NULL, &reduce_bcast_stride, DT_FP32 );
         tpu_bdc_cast ( grad_input_local_addrs[index], input_exp_local_addr, &tile_shape, NULL, NULL, dtype, DT_FP32, RM_HALF_TO_EVEN );
@@ -271,9 +268,9 @@ bool target_is_int64 )
         variable_t var_hit = { .type = SCALAR, .context = { .scalar = onehot_hit_fp32 } };
         variable_t var_miss = { .type = SCALAR, .context = { .scalar = onehot_miss_fp32 } };
         tpu_bdc_equal_select ( onehot_local_addr, &var_sequence, &var_target, &var_hit, &var_miss, &onehot_shape, DT_INT32, DT_FP32 );
-        if ( dtype == DT_FP16 )
+        if ( dtype != DT_FP32 )
         {
-          tpu_bdc_cast ( onehot_local_addr, onehot_local_addr, &onehot_shape, NULL, NULL, DT_FP16, DT_FP32, RM_HALF_TO_EVEN );
+          tpu_bdc_cast ( onehot_local_addr, onehot_local_addr, &onehot_shape, NULL, NULL, dtype, DT_FP32, RM_HALF_TO_EVEN );
         }
         // gread_input = gread_input - one-hot
         tpu_bdc_fp_sub ( grad_input_local_addrs[index] + c * tile_stride.c * dsize, grad_input_local_addrs[index] + c * tile_stride.c * dsize, onehot_local_addr, &onehot_shape, NULL, NULL, NULL, dtype );
@@ -314,12 +311,10 @@ bool target_is_int64 )
 void tpu_kernel_api_cross_entropy_loss_backward ( const void * args )
 {
   sg_api_cross_entropy_loss_backward_t * api = ( sg_api_cross_entropy_loss_backward_t * ) args;
-  data_type_t dtype = tpu_type_convert ( api->dtype );
-  TPUKERNEL_ASSERT ( dtype == DT_FP32 || dtype == DT_FP16 );
+  TPUKERNEL_ASSERT ( api->dtype == DT_FP32 || api->dtype == DT_FP16 || api->dtype == DT_BFP16 );
   TPUKERNEL_ASSERT ( api->reduction == 0 || api->reduction == 1 );
-  TPUKERNEL_ASSERT ( api->weight_global_addr == 0 );
   tpu_initialize();
-  nodechip_cross_entropy_loss_backward ( api->input_global_addr, api->target_global_addr, api->weight_global_addr, api->grad_output_global_addr, api->grad_input_global_addr, api->batch_num, api->class_num, api->reduction, api->label_smoothing, dtype, api->target_is_int64 );
+  nodechip_cross_entropy_loss_backward ( api->input_global_addr, api->target_global_addr, 0, api->grad_output_global_addr, api->grad_input_global_addr, api->batch, api->class_, api->reduction, api->label_smoothing, ( data_type_t ) api->dtype, api->is_target_int64 );
   tpu_poll();
 }
 TPUKERNEL_FUNC_REGISTER ( tpu_kernel_api_cross_entropy_loss_backward );

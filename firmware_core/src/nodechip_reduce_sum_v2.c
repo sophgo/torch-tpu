@@ -1,8 +1,5 @@
-#include "common.h"
 #include "sg_api_struct.h"
-#include "common_def.h"
 #include "tpu_kernel.h"
-#include "tpu_utils.h"
 
 void nodechip_reduce_sum_2d (
 global_addr_t input_global_addr,
@@ -19,8 +16,6 @@ int reduction )
   const dim4 output_shape = { .n = 1, .c = axis == 0 ? 1 : row, .h = 1, .w = axis == 1 ? 1 : column };
   const int tile = tpu_eu_num ( dtype );
   const scalar_t one_fp32 = { .f32 = 1.f };
-  const scalar_t one_fp16 = tpu_fp_cast ( one_fp32, DT_FP16, DT_FP32, RM_HALF_TO_EVEN );
-  const scalar_t one_fp = dtype == DT_FP16 ? one_fp16 :  one_fp32;
   const scalar_t zero = { .u32 = 0 };
   const dim2 stride_one = { .h = 1, .w = 1 };
   const dim2 dilation_one = { .h = 1, .w = 1 };
@@ -29,7 +24,7 @@ int reduction )
   tpu_continuous_stride ( &input_global_stride, &input_shape );
   tpu_continuous_stride ( &output_global_stride, &output_shape );
   local_addr_t input_local_addrs[2], output_local_addrs[2];
-  local_addr_t reduce_tile_addr;
+  local_addr_t input_fp32_local_addr, reduce_tile_fp32_addrs[2];
   dim4 shape = { .n = 1, .h = 1 };
   bool l2s = false;
   global_addr_t l2s_global_addr = 0;
@@ -42,13 +37,19 @@ int reduction )
   {
     next = 0;
     int size = DIV_UP ( cmax, NPU_NUM ) * tpu_aligned_feature_size ( DIV_UP ( wmax, tile ), tile, dtype );
-    int tsize = DIV_UP ( cmax, NPU_NUM ) * tpu_aligned_feature_size ( 1, tile, dtype );
+    int size_fp32 = DIV_UP ( cmax, NPU_NUM ) * tpu_aligned_feature_size ( DIV_UP ( wmax, tile ), tile, DT_FP32 );
+    int tsize_fp32 = DIV_UP ( cmax, NPU_NUM ) * tpu_aligned_feature_size ( 1, tile, DT_FP32 );
     int rsize = DIV_UP ( cmax, NPU_NUM ) * tpu_aligned_feature_size ( 1, 1, dtype );
     input_local_addrs[0] = next; next += size;
     input_local_addrs[1] = next; next += size;
     output_local_addrs[0] = next; next += rsize;
     output_local_addrs[1] = next; next += rsize;
-    reduce_tile_addr = next; next += tsize;
+    if ( dtype != DT_FP32 )
+    {
+      input_fp32_local_addr = next; next += size_fp32;
+    }
+    reduce_tile_fp32_addrs[0] = next; next += tsize_fp32;
+    reduce_tile_fp32_addrs[1] = next; next += tsize_fp32;
     if ( ( int ) next <= LOCAL_MEM_SIZE )
     {
       break;
@@ -78,6 +79,7 @@ int reduction )
   {
     shape.c = MIN ( cmax, ctodo );
     dim4 reduce_shape = { .n = shape.n, .c = shape.c, .h = 1, .w = 1 };
+    dim4 reduce_tile_shape = { .n = shape.n, .c = shape.c, .h = 1, .w = tile };
     int wtodo = cw_trans ? row : column;
     int wdone = 0;
     while ( wtodo != 0 )
@@ -118,24 +120,44 @@ int reduction )
         dim4 tail_shape = { .n = shape.n, .c = shape.c, .h = 1, .w = tile - ( shape.w % tile ) };
         tpu_bdc_set_C ( input_local_addrs[index] + shape.w * dsize, zero, &tail_shape, &tile_stride, dtype );
       }
-      // [ 1, shape.c, DIV_UP ( shape.w, tile ), tile ] -> [ 1, shape.c, 1, tile ] -> [ 1, shape.c, 1, 1 ]
+      // [ 1, shape.c, DIV_UP ( shape.w, tile ), tile ] -> [ 1, shape.c, 1, tile ]
       dim2 kernel = { .h = tile_shape.h, .w = 1 };
-      tpu_bdc_fp_avg_pool2d ( reduce_tile_addr, input_local_addrs[index], &tile_shape, &kernel, &zero_pad, &stride_one, &dilation_one, dtype, one_fp );
-      tile_shape.h = 1; kernel.h = 1; kernel.w = tile_shape.w;
-      tpu_bdc_fp_avg_pool2d ( output_local_addrs[index], reduce_tile_addr, &tile_shape, &kernel, &zero_pad, &stride_one, &dilation_one, dtype, one_fp );
+      if ( dtype == DT_FP32 )
+      {
+        tpu_bdc_fp_avg_pool2d ( reduce_tile_fp32_addrs[index], input_local_addrs[index], &tile_shape, &kernel, &zero_pad, &stride_one, &dilation_one, DT_FP32, one_fp32 );
+      }
+      else
+      {
+        tpu_bdc_cast ( input_fp32_local_addr, input_local_addrs[index], &tile_shape, NULL, NULL, DT_FP32, dtype, RM_HALF_TO_EVEN );
+        tpu_bdc_fp_avg_pool2d ( reduce_tile_fp32_addrs[index], input_fp32_local_addr, &tile_shape, &kernel, &zero_pad, &stride_one, &dilation_one, DT_FP32, one_fp32 );
+      }
       if ( wdone > 0 )
       {
-        tpu_bdc_fp_add ( output_local_addrs[index], output_local_addrs[index], output_local_addrs[1 - index], &reduce_shape, NULL, NULL, NULL, dtype );
+        tpu_bdc_fp_add ( reduce_tile_fp32_addrs[index], reduce_tile_fp32_addrs[index], reduce_tile_fp32_addrs[1 - index], &reduce_tile_shape, NULL, NULL, NULL, DT_FP32 );
       }
       wtodo -= shape.w;
       wdone += shape.w;
       index = 1 - index;
     }
+    scalar_t C_fp32;
     if ( reduction == 0 )
     {
-      scalar_t C_fp32 = { .f32 = 1.f / ( cw_trans ? row : column ) };
-      scalar_t C = tpu_fp_cast ( C_fp32, dtype, DT_FP32, RM_HALF_TO_EVEN );
-      tpu_bdc_fp_mul_C ( output_local_addrs[1 - index], output_local_addrs[1 - index], C, &reduce_shape, NULL, NULL, dtype );
+      C_fp32.f32 = 1.f / ( cw_trans ? row : column );
+    }
+    else
+    {
+      C_fp32.f32 = 1.f;
+    }
+    if ( dtype == DT_FP32 )
+    {
+      dim2 kernel = { .h = 1, .w = tile };
+      tpu_bdc_fp_avg_pool2d ( output_local_addrs[1 - index], reduce_tile_fp32_addrs[1 - index], &reduce_tile_shape, &kernel, &zero_pad, &stride_one, &dilation_one, DT_FP32, C_fp32 );
+    }
+    else
+    {
+      dim2 kernel = { .h = 1, .w = tile };
+      tpu_bdc_fp_avg_pool2d ( reduce_tile_fp32_addrs[index], reduce_tile_fp32_addrs[1 - index], &reduce_tile_shape, &kernel, &zero_pad, &stride_one, &dilation_one, DT_FP32, C_fp32 );
+      tpu_bdc_cast ( output_local_addrs[1 - index], reduce_tile_fp32_addrs[index], &reduce_shape, NULL, NULL, dtype, DT_FP32, RM_HALF_TO_EVEN );
     }
     l2s = true;
     l2s_global_addr = output_global_addr + cdone * ( cw_trans ? output_global_stride.w : output_global_stride.c ) * dsize;
@@ -168,19 +190,18 @@ int reduction )
 void tpu_kernel_api_reduce ( const void *args )
 {
   sg_api_reduce_t * api = ( sg_api_reduce_t * ) args;
-  data_type_t dtype = tpu_type_convert ( api->dtype );
-  TPUKERNEL_ASSERT ( dtype == DT_FP32 || dtype == DT_FP16 );
-  TPUKERNEL_ASSERT ( api->reduction_mode == 0 || api->reduction_mode == 1 );
+  TPUKERNEL_ASSERT ( api->dtype == DT_FP32 || api->dtype == DT_FP16 || api->dtype == DT_BFP16 );
+  TPUKERNEL_ASSERT ( api->mode == 0 || api->mode == 1 );
   tpu_initialize();
-  if ( api->reduce_dim_end == api->shape_dim )
+  if ( api->end_dim == api->dim )
   {
     int row = 1;
     int column = 1;
-    for ( int i = 0; i < api->reduce_dim_start; ++i )
+    for ( int i = 0; i < api->start_dim; ++i )
     {
       row *= api->shape[i];
     }
-    for ( int i = api->reduce_dim_start; i < api->shape_dim; ++i )
+    for ( int i = api->start_dim; i < api->dim; ++i )
     {
       column *= api->shape[i];
     }
@@ -190,18 +211,18 @@ void tpu_kernel_api_reduce ( const void *args )
     row,
     column,
     1,
-    dtype,
-    api->reduction_mode );
+    ( data_type_t ) api->dtype,
+    api->mode );
   }
-  else if ( api->reduce_dim_start == 0 )
+  else if ( api->start_dim == 0 )
   {
     int row = 1;
     int column = 1;
-    for ( int i = 0; i < api->reduce_dim_end; ++i )
+    for ( int i = 0; i < api->end_dim; ++i )
     {
       row *= api->shape[i];
     }
-    for ( int i = api->reduce_dim_end; i < api->shape_dim; ++i )
+    for ( int i = api->end_dim; i < api->dim; ++i )
     {
       column *= api->shape[i];
     }
@@ -211,8 +232,8 @@ void tpu_kernel_api_reduce ( const void *args )
     row,
     column,
     0,
-    dtype,
-    api->reduction_mode );
+    ( data_type_t ) api->dtype,
+    api->mode );
   }
   else
   {
