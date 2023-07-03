@@ -67,7 +67,7 @@ data_type_t dtype )
                   NULL,
                   DT_FP32 );
   dim4 shape = { .n = 1, .h = 1 };
-  int index;
+  int index = 0;
   int todo = len, done = 0;
   while ( todo != 0 )
   {
