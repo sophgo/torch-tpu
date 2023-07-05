@@ -45,7 +45,7 @@ Tensor & addmm_out_tpu ( const Tensor & self, const Tensor & mat1, const Tensor 
 #else
   if ( ( alpha.toDouble() == 1. ) && ( beta.toDouble() == 1. ) && self.dim() == 1 )
   {
-    auto mat1_ = mat1.contiguous();
+    auto mat1_ = mat1.is_contiguous() == false && is_transposed ( mat1 ) == false ? mat1.contiguous() : mat1;
     auto mat2_ = mat2.is_contiguous() == false && is_transposed ( mat2 ) == false ? mat2.contiguous() : mat2;
 #ifdef TPU_OP_TIMING
     auto timer = tpu::Timer().Start();
@@ -88,7 +88,7 @@ Tensor & mm_out_tpu ( const Tensor & self, const Tensor & mat2, Tensor & out )
   auto out_cpu = mm ( self.cpu(), mat2.cpu() );
   tpu::TPUCopyHostToDevice ( out.data_ptr(), out_cpu.contiguous().data_ptr(), out.nbytes() );
 #else
-  auto self_ = self.contiguous();
+  auto self_ = self.is_contiguous() == false && is_transposed ( self ) == false ? self.contiguous() : self;
   auto mat2_ = mat2.is_contiguous() == false && is_transposed ( mat2 ) == false ? mat2.contiguous() : mat2;
 #ifdef TPU_OP_TIMING
   auto timer = tpu::Timer().Start();
@@ -126,7 +126,7 @@ Tensor & bmm_out_tpu ( const Tensor & self, const Tensor & mat2, Tensor & out )
   auto out_cpu = bmm ( self.cpu(), mat2.cpu() );
   tpu::TPUCopyHostToDevice ( out.data_ptr(), out_cpu.contiguous().data_ptr(), out.nbytes() );
 #else
-  auto self_ = self.contiguous();
+  auto self_ = self.is_contiguous() == false && is_transposed ( self ) == false ? self.contiguous() : self;
   auto mat2_ = mat2.is_contiguous() == false && is_transposed ( mat2 ) == false ? mat2.contiguous() : mat2;
 #ifdef TPU_OP_TIMING
   auto timer = tpu::Timer().Start();

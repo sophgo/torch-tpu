@@ -1812,8 +1812,22 @@ bm_status_t sgdnnMatmul ( bm_handle_t handle,
     SGDNN_CHECK ( sgdnnIsTensorContiguous ( &bias ) );
   }
 #if defined SGDNN_BACKEND_1684X
+  bm_device_mem_t left_contiguous_mem;
+  if ( sgdnnIsTensorTransposed ( &left ) )
+  {
+    SgdnnTensor_t left_contiguous;
+    left_contiguous.dim = 2;
+    left_contiguous.shape[0] = left.shape[0];
+    left_contiguous.shape[1] = left.shape[1];
+    left_contiguous.stride[0] = left.shape[1];
+    left_contiguous.stride[1] = 1;
+    left_contiguous.dtype = left.dtype;
+    SAFE_CALL ( bm_malloc_device_byte ( handle, &left_contiguous_mem, sgdnnTensorBytes ( &left_contiguous ) ) );
+    left_contiguous.addr = bm_mem_get_device_addr ( left_contiguous_mem );
+    SAFE_CALL ( sgdnnStridedCopy ( handle, left, left_contiguous ) );
+  }
   sg_api_batch_matmul_t api;
-  api.left_global_addr = left.addr;
+  api.left_global_addr = sgdnnIsTensorTransposed ( &left ) ? bm_mem_get_device_addr ( left_contiguous_mem ) : left.addr;
   api.right_global_addr = right.addr;
   api.bias_global_addr = bias.addr;
   api.output_global_addr = output.addr;
@@ -1821,10 +1835,14 @@ bm_status_t sgdnnMatmul ( bm_handle_t handle,
   api.left_row = left.shape[0];
   api.left_column = left.shape[1];
   api.right_column = right.shape[1];
-  api.is_left_transposed = sgdnnIsTensorTransposed ( &left );
+  api.is_left_transposed = 0; // sgdnnIsTensorTransposed ( &left ); // bm1684x does not support TN Matmul
   api.is_right_transposed = sgdnnIsTensorTransposed ( &right );
   api.dtype = sgdnnTPUKernelDType ( left.dtype );
   SAFE_CALL ( sgdnnTPUKernelLaunch ( handle, "tpu_kernel_api_batch_matmul", &api, sizeof ( api ) ) );
+  if ( sgdnnIsTensorTransposed ( &left ) )
+  {
+    bm_free_device ( handle, left_contiguous_mem );
+  }
 #elif defined SGDNN_BACKEND_2260
   SGDNN_CHECK ( false );
 #else
@@ -1855,8 +1873,24 @@ bm_status_t sgdnnBatchMatmul ( bm_handle_t handle,
   SGDNN_CHECK ( sgdnnIsTensorContiguous ( &right ) || sgdnnIsTensorTransposed ( &right ) );
   SGDNN_CHECK ( sgdnnIsTensorContiguous ( &output ) );
 #if defined SGDNN_BACKEND_1684X
+  bm_device_mem_t left_contiguous_mem;
+  if ( sgdnnIsTensorTransposed ( &left ) )
+  {
+    SgdnnTensor_t left_contiguous;
+    left_contiguous.dim = 3;
+    left_contiguous.shape[0] = left.shape[0];
+    left_contiguous.shape[1] = left.shape[1];
+    left_contiguous.shape[2] = left.shape[2];
+    left_contiguous.stride[0] = left.shape[0];
+    left_contiguous.stride[1] = left.shape[2];
+    left_contiguous.stride[2] = 1;
+    left_contiguous.dtype = left.dtype;
+    SAFE_CALL ( bm_malloc_device_byte ( handle, &left_contiguous_mem, sgdnnTensorBytes ( &left_contiguous ) ) );
+    left_contiguous.addr = bm_mem_get_device_addr ( left_contiguous_mem );
+    SAFE_CALL ( sgdnnStridedCopy ( handle, left, left_contiguous ) );
+  }
   sg_api_batch_matmul_t api;
-  api.left_global_addr = left.addr;
+  api.left_global_addr = sgdnnIsTensorTransposed ( &left ) ? bm_mem_get_device_addr ( left_contiguous_mem ) : left.addr;
   api.right_global_addr = right.addr;
   api.bias_global_addr = 0;
   api.output_global_addr = output.addr;
@@ -1864,10 +1898,14 @@ bm_status_t sgdnnBatchMatmul ( bm_handle_t handle,
   api.left_row = left.shape[1];
   api.left_column = left.shape[2];
   api.right_column = right.shape[2];
-  api.is_left_transposed = sgdnnIsTensorTransposed ( &left );
+  api.is_left_transposed = 0; // sgdnnIsTensorTransposed ( &left ); // bm1684x does not support TN Matmul
   api.is_right_transposed = sgdnnIsTensorTransposed ( &right );
   api.dtype = sgdnnTPUKernelDType ( left.dtype );
   SAFE_CALL ( sgdnnTPUKernelLaunch ( handle, "tpu_kernel_api_batch_matmul", &api, sizeof ( api ) ) );
+  if ( sgdnnIsTensorTransposed ( &left ) )
+  {
+    bm_free_device ( handle, left_contiguous_mem );
+  }
 #elif defined SGDNN_BACKEND_2260
   SGDNN_CHECK ( false );
 #else
