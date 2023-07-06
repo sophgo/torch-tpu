@@ -4,8 +4,7 @@
 #include <map>
 #include <memory>
 #include <stdio.h>
-
-#define SGDNN_BACKEND_1684X
+#include "config_sgdnn_backend.h"
 
 #define SGDNN_CHECK(expression) \
 do \

@@ -10,13 +10,17 @@ function copy_file(){
 }
 function copy_build_binary(){
     dst_dir=$TPUTRAIN_TOP/python/tpu_plugin/lib
-    if [ ! -d $dst_dir ] ; then
-        mkdir -p $dst_dir
+    if [ "${CHIP_ARCH}" = "sg2260" ]; then
+        echo "chip 2260 tpu-lplugin is 'invalid'"
+    else
+        if [ ! -d $dst_dir ] ; then
+            mkdir -p $dst_dir
+        fi
+        copy_file $TPUTRAIN_TOP/libtorch_plugin/build/liblibtorch_plugin.so              $dst_dir
+        copy_file $TPUTRAIN_TOP/build/sgdnn/libsgdnn.so                                  $dst_dir
+        copy_file $TPUTRAIN_TOP/build/firmware_core/lib${CHIP_ARCH}_kernel_module.so     $dst_dir
+        copy_file $TPUTRAIN_TOP/third_party/$CHIP_ARCH/lib$CHIP_ARCH.a                   $dst_dir
     fi
-    copy_file $TPUTRAIN_TOP/libtorch_plugin/build/liblibtorch_plugin.so         $dst_dir
-    copy_file $TPUTRAIN_TOP/build/sgdnn/libsgdnn.so                             $dst_dir
-    copy_file $TPUTRAIN_TOP/build/firmware_core/libbm1684x_kernel_module.so     $dst_dir
-    copy_file $TPUTRAIN_TOP/third_party/libbm1684x.a                            $dst_dir
 }
 
 function clean_python_pack(){
