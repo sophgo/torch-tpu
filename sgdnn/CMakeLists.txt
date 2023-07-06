@@ -26,6 +26,7 @@ endif()
 
 include_directories(${CMAKE_CURRENT_SOURCE_DIR}/include)
 include_directories(${PROJECT_ROOT}/common/include)
+include_directories(${PROJECT_ROOT}/third_party/include)
 include_directories(/opt/sophon/libsophon-current/include)
 include_directories(${CMAKE_BINARY_DIR}/firmware_core)
 

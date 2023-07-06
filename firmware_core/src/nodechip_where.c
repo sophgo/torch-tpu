@@ -1,6 +1,7 @@
 #include "sg_api_struct.h"
 #include "tpu_kernel.h"
 
+static
 void nodechip_where_bcast (
 global_addr_t out_global_addr,
 global_addr_t cond_global_addr,

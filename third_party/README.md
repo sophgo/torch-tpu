@@ -1,4 +1,7 @@
 # tpu_kernel
+### include
+    commit 2f18e869d9662fcaaadb20d6b7937a2ae94b3bd5
+    tpu_defs.h tpu_kernel.h
 ### bm1684x
     commit 2f18e869d9662fcaaadb20d6b7937a2ae94b3bd5
     libbm1684x.a libbmlib_cmodel.so libcmodel_fireware.so
@@ -22,3 +25,7 @@ Note:
   [2]Debug Pattern
     1)Please update commit id if you want to change .so for a specific backend.
     2)Remember to update DEBUG verions of .so using export EXTRA_CONFIG=-DDEBUG=ON
+  
+  [3] include
+   cp TPU1686/kernel/include/tpu_kernel.h .
+   cp TPU1686/kernel/include/tpu_defs.h .

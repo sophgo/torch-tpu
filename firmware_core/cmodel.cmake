@@ -21,6 +21,7 @@ add_library(firmware SHARED ${KERNEL_SRC_FILES})
 target_include_directories(firmware PRIVATE
 	include
 	$ENV{TPUTRAIN_TOP}/common/include
+	$ENV{TPUTRAIN_TOP}/third_party/include
 )
 target_compile_definitions(firmware PRIVATE -DUSING_CMODEL)
 
