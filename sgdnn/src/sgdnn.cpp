@@ -803,6 +803,23 @@ bm_status_t sgdnnLayernorm ( bm_handle_t handle,
   SAFE_CALL ( sgdnnTPUKernelLaunch ( handle, "tpu_kernel_api_layernorm", &api, sizeof ( api ) ) );
 #elif defined SGDNN_BACKEND_2260
   SGDNN_CHECK ( false );
+  sg_api_layernorm_forward_multi_core_t api;
+  api.input_global_addr = input.addr;
+  api.weight_global_addr = weight.addr;
+  api.bias_global_addr = bias.addr;
+  api.mean_global_addr = mean.addr;
+  api.rstd_global_addr = rstd.addr;
+  api.output_global_addr = output.addr;
+  api.dims = input.dim;
+  api.axis = start_dim;
+  api.eps = eps;
+  api.affine = true;
+  api.dtype = sgdnnTPUKernelDType ( input.dtype );
+  for ( int i = 0; i < input.dim; ++i )
+  {
+    api.shape[i] = input.shape[i];
+  }
+
 #else
   SGDNN_CHECK ( false );
 #endif

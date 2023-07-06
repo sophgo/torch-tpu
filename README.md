@@ -5,7 +5,7 @@
 2.5) You can download lisophon from:
     ftp 172.28.141.89
     User：AI
-    PassWd：SophgoRelease202
+    PassWd：SophgoRelease2022
 3)  Install lisophon:
     apt install  ./sophon-libsophon_0.4.x_amd64.deb ./sophon-libsophon-dev_0.4.x_amd64.deb
 4)  Set Path:

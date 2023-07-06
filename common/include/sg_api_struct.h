@@ -623,5 +623,50 @@ __attribute__ ( ( packed ) ) sg_api_norm2_t;
 sg_api_norm2_t;
 #endif
 
+typedef struct {
+  unsigned long long input_global_addr;
+  unsigned long long weight_global_addr;
+  unsigned long long bias_global_addr;
+  unsigned long long mean_global_addr;
+  unsigned long long rstd_global_addr;
+  unsigned long long output_global_addr;
+  int                shape[FW_MAX_SHAPE_DIMS];
+  int                dims;
+  int                axis;
+  float              eps;
+  int                affine;
+  int                dtype;
+#ifndef WIN32
+}
+__attribute__ ( ( packed ) ) sg_api_layernorm_forward_multi_core_t;
+#else
+}
+sg_api_layernorm_forward_multi_core_t;
+#endif
+
+typedef struct {
+  unsigned long long grad_output_global_addr;
+  unsigned long long input_global_addr;
+  unsigned long long weight_global_addr;
+  unsigned long long mean_global_addr;
+  unsigned long long rstd_global_addr;
+  unsigned long long grad_input_global_addr;
+  unsigned long long grad_weight_global_addr;
+  unsigned long long grad_bias_global_addr;
+  unsigned long long grad_weight_reduce_buffer;
+  unsigned long long grad_bias_reduce_buffer;
+  int                shape[FW_MAX_SHAPE_DIMS];
+  int                dims;
+  int                axis;
+  int                affine;
+  int                dtype;
+#ifndef WIN32
+}
+__attribute__ ( ( packed ) ) sg_api_layernorm_backward_multi_core_t;
+#else
+}
+sg_api_layernorm_backward_multi_core_t;
+#endif
+
 #pragma pack(pop)
 #endif  // SG_API_STRUCT_H

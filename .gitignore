@@ -33,3 +33,4 @@ build_soc
 out
 build_zh
 build_en
+sgdnn/include/config_sgdnn_backend.h
