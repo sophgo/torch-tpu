@@ -1,7 +1,18 @@
 #include "sg_api_struct.h"
 #include "tpu_kernel.h"
+#define DEFAULT_LOCAL_ADDR 0xFFFFFFFF
 
-static inline void nodechip_batchnorm2d_backward (
+// Input Normalized = ( Input − Saved Mean ) × Saved Invstd
+// Grad Weight = ∑<n, h, w> Grad Output × Input Normalized
+// Grad Bias = ∑<n, h, w> Grad Output
+// Grad Input = Weight × Saved Invstd × ( Grad Output − ( Input Normalized × Grad Weight + Grad Bias ) / NHW )
+//                         Grad Output       Input       Weight       Mean       Invstd       Input Normalized       Grad Weight       Grad Bias
+// Input Normalized        X                 O           X            O          O            SELF                   X                 X
+// grad_input_enable       O                 X           O            X          O            O                      O                 O
+// grad_weight_enable      O                 X           X            X          X            O                      SELF              X
+// grad_bias_enable        O                 X           X            X          X            X                      X                 SELF
+
+static inline bool nodechip_batchnorm2d_backward_split_c_only_all_fp32 (
 global_addr_t grad_output_global_addr,
 global_addr_t input_global_addr,
 global_addr_t weight_global_addr,
@@ -16,266 +27,1495 @@ int grad_input_enable,
 int grad_weight_enable,
 int grad_bias_enable )
 {
-  const int N = shape.n;
-  const int C = shape.c;
-  const int H = shape.h;
-  const int W = shape.w;
-  const dim4 TotalShape = { .n = N, .c = C, .h = H, .w = W };
-  dim4 GlobalStride;
-  tpu_continuous_stride ( &GlobalStride, &TotalShape );
-  const int CPerNPU = DIV_UP ( C, NPU_NUM );
-  const padding_t ZeroPadding = { .top = 0, .bottom = 0, .left = 0, .right = 0 };
-  const dim2 OneStride = { .h = 1, .w = 1 };
-  const dim2 OneDilation = { .h = 1, .w = 1 };
-  const scalar_t OneFP = { .f32 = 1.f };
-  const scalar_t InvNHW = { .f32 = 1.0 / ( ( double ) N * H * W ) };
-  const int DataSize = tpu_data_type_size ( dtype );
-  /*
-  *  grad_output    : [ NMax, CMax, HMax,     W ]
-  *  input & prod   : [ NMax, CMax, HMax,     W ]
-  *  input_norm     : [ NMax, CMax, HMax,     W ]
-  *  pooling_tmp1   : [ NMax, CMax, HMax,     1 ]
-  *  pooling_tmp2   : [ NMax, CMax,    1,     1 ]
-  *  grad_bias_tmp  : [ 1,    CMax,    1,  NMax ]
-  *  grad_weight_tmp: [ 1,    CMax,    1,  NMax ]
-  *  grad_bias      : [ 1,    CMax,    1,     1 ]
-  *  grad_weight    : [ 1,    CMax,    1,     1 ]
-  *  weight         : [ 1,    CMax,    1,     1 ]
-  *  mean           : [ 1,    CMax,    1,     1 ]
-  *  invstd         : [ 1,    CMax,    1,     1 ]
-  */
-  int HMax = H, NMax = N, CMax = CPerNPU * NPU_NUM;
-  local_addr_t grad_inputAddr, grad_outputAddr;
-  local_addr_t inputAddr, input_normAddr, prodAddr;
-  local_addr_t pooling_tmp1, pooling_tmp2;
-  local_addr_t grad_weight_tmp, grad_bias_tmp;
-  local_addr_t grad_biasAddr, grad_weightAddr;
-  local_addr_t meanAddr, invstdAddr, weightAddr;
-  bool Split_N_or_H = false;
+  const int dsize = tpu_data_type_size ( dtype );
+  const int tile = tpu_eu_num ( dtype );
+  dim4 input_global_stride; tpu_continuous_stride ( &input_global_stride, &shape );
+  dim4 grad_output_global_stride; tpu_continuous_stride ( &grad_output_global_stride, &shape );
+  dim4 grad_input_global_stride; tpu_continuous_stride ( &grad_input_global_stride, &shape );
+  const scalar_t zero = { .u32 = 0 };
+  const scalar_t one_fp32 = { .f32 = 1.f };
+  const scalar_t neg_inv_nhw_fp32 = { .f32 = -1.0 / ( 1UL * shape.n * shape.h * shape.w ) };
+  const dim2 stride_one = { .h = 1, .w = 1 };
+  const dim2 dilation_one = { .h = 1, .w = 1 };
+  const padding_t zero_pad = { .top = 0, .left = 0, .bottom = 0, .right = 0 };
+  local_addr_t input_local_addrs[2] = { DEFAULT_LOCAL_ADDR }, grad_output_local_addrs[2] = { DEFAULT_LOCAL_ADDR };
+  local_addr_t input_normalized_fp32_local_addr = DEFAULT_LOCAL_ADDR;
+  local_addr_t saved_mean_local_addrs[2] = { DEFAULT_LOCAL_ADDR }, saved_invstd_local_addrs[2] = { DEFAULT_LOCAL_ADDR }, weight_local_addrs[2] = { DEFAULT_LOCAL_ADDR };
+  local_addr_t saved_mean_fp32_local_addr = DEFAULT_LOCAL_ADDR, saved_invstd_fp32_local_addr = DEFAULT_LOCAL_ADDR, weight_fp32_local_addr = DEFAULT_LOCAL_ADDR;
+  local_addr_t grad_output_reduce_tile_fp32_local_addr = DEFAULT_LOCAL_ADDR;
+  local_addr_t grad_output_reduce_tile_n_piece_fp32_local_addr = DEFAULT_LOCAL_ADDR, grad_bias_local_addrs[2] = { DEFAULT_LOCAL_ADDR };
+  local_addr_t grad_output_input_normalized_fp32_local_addr = DEFAULT_LOCAL_ADDR;
+  local_addr_t grad_output_input_normalized_reduce_tile_fp32_local_addr = DEFAULT_LOCAL_ADDR;
+  local_addr_t grad_output_input_normalized_reduce_tile_n_piece_fp32_local_addr = DEFAULT_LOCAL_ADDR, grad_weight_local_addrs[2] = { DEFAULT_LOCAL_ADDR };
+  local_addr_t grad_output_fp32_local_addr = DEFAULT_LOCAL_ADDR, grad_bias_fp32_local_addr = DEFAULT_LOCAL_ADDR, grad_weight_fp32_local_addr = DEFAULT_LOCAL_ADDR;
+  local_addr_t grad_input_local_addrs[2] = { DEFAULT_LOCAL_ADDR };
+  local_addr_t next = 0;
+  int cmax = shape.c;
   while ( true )
   {
-    Split_N_or_H = NMax != N || HMax != H ;
-    grad_outputAddr = 0;
-    int grad_outputSize = NMax * DIV_UP ( CMax, NPU_NUM ) * tpu_aligned_feature_size ( HMax, W, dtype );
-    inputAddr = grad_outputAddr + grad_outputSize;
-    int inputSize = NMax * DIV_UP ( CMax, NPU_NUM ) * tpu_aligned_feature_size ( HMax, W, dtype );
-    if ( Split_N_or_H )
+    int tile_size = shape.n * DIV_UP ( cmax, NPU_NUM ) * tpu_aligned_feature_size ( DIV_UP ( shape.h * shape.w, tile ), tile, dtype );
+    int tile_fp32_size = shape.n * DIV_UP ( cmax, NPU_NUM ) * tpu_aligned_feature_size ( DIV_UP ( shape.h * shape.w, tile ), tile, DT_FP32 );
+    int channel_size = DIV_UP ( cmax, NPU_NUM ) * tpu_aligned_feature_size ( 1, 1, dtype );
+    int channel_fp32_size = DIV_UP ( cmax, NPU_NUM ) * tpu_aligned_feature_size ( 1, 1, DT_FP32 );
+    int reduce_tile_fp32_size = shape.n * DIV_UP ( cmax, NPU_NUM ) * tpu_aligned_feature_size ( 1, tile, DT_FP32 );
+    int reduce_tile_n_piece_fp32_size = DIV_UP ( cmax, NPU_NUM ) * tpu_aligned_feature_size ( 1, tile, DT_FP32 );
+    int reduce_fp32_size = DIV_UP ( cmax, NPU_NUM ) * tpu_aligned_feature_size ( 1, 1, DT_FP32 );
+    int grad_bias_size = DIV_UP ( cmax, NPU_NUM ) * tpu_aligned_feature_size ( 1, 1, dtype );
+    int grad_weight_size = DIV_UP ( cmax, NPU_NUM ) * tpu_aligned_feature_size ( 1, 1, dtype );
+    next = 0;
+    input_local_addrs[0] = next; next += tile_size;
+    input_local_addrs[1] = next; next += tile_size;
+    grad_output_local_addrs[0] = next; next += tile_size;
+    grad_output_local_addrs[1] = next; next += tile_size;
+    input_normalized_fp32_local_addr = next; next += tile_fp32_size;
+    saved_mean_local_addrs[0] = next; next += channel_size;
+    saved_mean_local_addrs[1] = next; next += channel_size;
+    if ( dtype != DT_FP32 )
     {
-      input_normAddr = inputAddr;
+      saved_mean_fp32_local_addr = next; next += channel_fp32_size;
     }
-    else
+    saved_invstd_local_addrs[0] = next; next += channel_size;
+    saved_invstd_local_addrs[1] = next; next += channel_size;
+    if ( dtype != DT_FP32 )
     {
-      input_normAddr = inputAddr + inputSize;
+      saved_invstd_fp32_local_addr = next; next += channel_fp32_size;
     }
-    int input_normSize = NMax * DIV_UP ( CMax, NPU_NUM ) * tpu_aligned_feature_size ( HMax, W, dtype );
-    pooling_tmp1 = input_normAddr + input_normSize;
-    int poolingSize_dim3 = NMax * DIV_UP ( CMax, NPU_NUM ) * tpu_aligned_feature_size ( HMax, 1, dtype );
-    pooling_tmp2 = pooling_tmp1 + poolingSize_dim3;
-    int poolingSize_dim2 = NMax * DIV_UP ( CMax, NPU_NUM ) * tpu_aligned_feature_size ( 1, 1, dtype );
-    grad_bias_tmp = pooling_tmp2 + poolingSize_dim2;
-    int tmpSize1 = DIV_UP ( CMax, NPU_NUM ) * tpu_aligned_feature_size ( 1, NMax, dtype );
-    grad_weight_tmp = grad_bias_tmp + tmpSize1;
-    int tmpSize2 = DIV_UP ( CMax, NPU_NUM ) * tpu_aligned_feature_size ( 1, NMax, dtype );
-    grad_biasAddr = grad_weight_tmp + tmpSize2;
-    int cSize = DIV_UP ( CMax, NPU_NUM ) * tpu_aligned_feature_size ( 1,  1, dtype );
-    grad_weightAddr = grad_biasAddr + cSize;
-    weightAddr = grad_weightAddr + cSize;
-    meanAddr = weightAddr + cSize;
-    invstdAddr = meanAddr + cSize;
-    grad_inputAddr = grad_outputAddr;
-    prodAddr = inputAddr;
-    if ( ( int ) invstdAddr + cSize <= LOCAL_MEM_SIZE ) { break; }
-    else
+    if ( grad_input_enable )
     {
-      if ( CMax > NPU_NUM )
+      weight_local_addrs[0] = next; next += channel_size;
+      weight_local_addrs[1] = next; next += channel_size;
+      if ( dtype != DT_FP32 )
       {
-        CMax -= NPU_NUM;
-        continue;
+        weight_fp32_local_addr = next; next += channel_fp32_size;
       }
-      else if ( NMax > 1 )
+      grad_input_local_addrs[0] = next; next += tile_size;
+      grad_input_local_addrs[1] = next; next += tile_size;
+    }
+    if ( grad_input_enable || grad_bias_enable )
+    {
+      grad_output_reduce_tile_fp32_local_addr = next; next += reduce_tile_fp32_size;
+      grad_output_reduce_tile_n_piece_fp32_local_addr = next; next += reduce_tile_n_piece_fp32_size;
+      if ( dtype != DT_FP32 )
       {
-        NMax /= 2;
-        continue;
+        grad_bias_fp32_local_addr = next; next += reduce_fp32_size;
       }
-      else if ( HMax > 1 )
+      grad_bias_local_addrs[0] = next; next += grad_bias_size;
+      grad_bias_local_addrs[1] = next; next += grad_bias_size;
+    }
+    if ( grad_weight_enable || grad_input_enable )
+    {
+      grad_output_input_normalized_fp32_local_addr = next; next += tile_fp32_size;
+      grad_output_input_normalized_reduce_tile_fp32_local_addr = next; next += reduce_tile_fp32_size;
+      grad_output_input_normalized_reduce_tile_n_piece_fp32_local_addr = next; next += reduce_tile_n_piece_fp32_size;
+      if ( dtype != DT_FP32 )
       {
-        HMax /= 2;
+        grad_weight_fp32_local_addr = next; next += reduce_fp32_size;
+      }
+      grad_weight_local_addrs[0] = next; next += grad_weight_size;
+      grad_weight_local_addrs[1] = next; next += grad_weight_size;
+    }
+    if ( dtype != DT_FP32 )
+    {
+      grad_output_fp32_local_addr = next; next += tile_fp32_size;
+    }
+    if ( ( int ) next > LOCAL_MEM_SIZE )
+    {
+      if ( cmax > NPU_NUM )
+      {
+        cmax -= ( ( cmax % NPU_NUM > 0 ) ? ( cmax % NPU_NUM ) : NPU_NUM );
         continue;
       }
       else
       {
-        TPUKERNEL_ASSERT ( false );
+        return false;
       }
     }
-  }
-  dim4 Shape = { .w = W };
-  int CTodo = C, CDone = 0;
-  while ( CTodo > 0 )
-  {
-    Shape.c = MIN ( CTodo, CMax );
-    const dim4 CShape = { .n = 1, .c = Shape.c, .h = 1, .w = 1 };
-    dim4 CStride;
-    tpu_aligned_stride ( &CStride, 0, &CShape, dtype );
-    dim4 CBcastStride = { .n = 0, .c = CStride.c, .h = 0, .w = 0 };
-    global_addr_t meanGAddr = saved_mean_global_addr + CDone * DataSize;
-    global_addr_t invstdGAddr = saved_invstd_global_addr + CDone * DataSize;
-    global_addr_t weightGAddr = weight_global_addr + CDone * DataSize;
-    tpu_gdma_cpy_S2L ( meanAddr, meanGAddr, &CShape, NULL, NULL, dtype );
-    tpu_gdma_cpy_S2L ( invstdAddr, invstdGAddr, &CShape, NULL, NULL, dtype );
-    tpu_gdma_cpy_S2L ( weightAddr, weightGAddr, &CShape, NULL, NULL, dtype );
-    /*
-     * compute grad weight & bias :
-     * grad_bias   = pooling ( grad_output, dim=(n,h,w) )
-     * grad_weight = pooling ( grad_output * input_norm, dim=(n,h,w) )
-     */
-    int NTodo = N, NDone = 0;
-    while ( NTodo > 0 )
+    else
     {
-      Shape.n = MIN ( NTodo, NMax );
-      dim4 poolingShapeDim2 = { .n = Shape.n, .c = Shape.c, .h = 1, .w = 1 };
-      dim4 transedShapeDim2 = { .n = 1, .c = Shape.c, .h = 1, .w = Shape.n };
-      int HTodo = H, HDone = 0;
-      while ( HTodo > 0 )
+      break;
+    }
+  }
+  bool l2s_grad_bias = false, l2s_grad_weight = false, l2s_grad_input = false;
+  local_addr_t l2s_grad_bias_local_addr = DEFAULT_LOCAL_ADDR, l2s_grad_weight_local_addr = DEFAULT_LOCAL_ADDR, l2s_grad_input_local_addr = DEFAULT_LOCAL_ADDR;
+  global_addr_t l2s_grad_bias_global_addr = DEFAULT_LOCAL_ADDR, l2s_grad_weight_global_addr = DEFAULT_LOCAL_ADDR, l2s_grad_input_global_addr = DEFAULT_LOCAL_ADDR;
+  dim4 l2s_grad_bias_shape, l2s_grad_weight_shape, l2s_grad_input_shape;
+  dim4 work_shape = { .n = shape.n, .h = shape.h, .w = shape.w };
+  int index = 0;
+  int ctodo = shape.c, cdone = 0;
+  while ( ctodo != 0 )
+  {
+    work_shape.c = MIN ( ctodo, cmax );
+    dim4 channel_shape = { .n = 1, .c = work_shape.c, .h = 1, .w = 1 };
+    dim4 channel_stride; tpu_aligned_stride ( &channel_stride, 0, &channel_shape, dtype );
+    channel_stride.n = 0, channel_stride.h = 0, channel_stride.w = 0;
+    dim4 reduce_tile_shape = { .n = work_shape.n, .c = work_shape.c, .h = 1, .w = tile };
+    dim4 reduce_tile_fp32_stride; tpu_aligned_stride ( &reduce_tile_fp32_stride, 0, &reduce_tile_shape, DT_FP32 );
+    dim4 reduce_tile_n_piece_shape = { .n = 1, .c = work_shape.c, .h = 1, .w = tile };
+    dim4 reduce_shape = { .n = 1, .c = work_shape.c, .h = 1, .w = 1 };
+    dim2 reduce_kernel = { .h = 1, .w = tile };
+    dim4 tile_shape = { .n = work_shape.n, .c = work_shape.c, .h = DIV_UP ( ( work_shape.h * work_shape.w ), tile ), .w = tile };
+    dim4 tile_stride; tpu_aligned_stride ( &tile_stride, 0, &tile_shape, dtype );
+    dim4 tile_fp32_stride; tpu_aligned_stride ( &tile_fp32_stride, 0, &tile_shape, DT_FP32 );
+    dim4 tail_shape = { .n = work_shape.n, .c = work_shape.c, .h = 1, .w = tile - ( ( work_shape.h * work_shape.w ) % tile ) };
+    dim2 reduce_tile_kernel = { .h = tile_shape.h, .w = 1 };
+    // Move Saved Mean from global to local memory
+    tpu_gdma_cpy_S2L ( saved_mean_local_addrs[index],
+                       saved_mean_global_addr + 1UL * cdone * dsize,
+                       &channel_shape,
+                       NULL,
+                       NULL,
+                       dtype );
+    // Move Saved Invstd from global to lobal memory
+    tpu_gdma_cpy_S2L ( saved_invstd_local_addrs[index],
+                       saved_invstd_global_addr + 1UL * cdone * dsize,
+                       &channel_shape,
+                       NULL,
+                       NULL,
+                       dtype );
+    // Move Weight from global to local memory
+    if ( grad_input_enable )
+    {
+      tpu_gdma_cpy_S2L ( weight_local_addrs[index],
+                         weight_global_addr + 1UL * cdone * dsize,
+                         &channel_shape,
+                         NULL,
+                         NULL,
+                         dtype );
+    }
+    // Move Input from global memory to local memory
+    tpu_gdma_cpy_S2L ( input_local_addrs[index],
+                       input_global_addr + 1UL * cdone * input_global_stride.c * dsize,
+                       &work_shape,
+                       NULL, // tile is eu num of dtype, so NULL is OK
+                       &input_global_stride,
+                       dtype );
+    // Move Grad Output from global memory to local memory
+    tpu_gdma_cpy_S2L ( grad_output_local_addrs[index],
+                       grad_output_global_addr + 1UL * cdone * grad_output_global_stride.c * dsize,
+                       &work_shape,
+                       NULL, // tile is eu num of dtype, so NULL is OK
+                       &grad_output_global_stride,
+                       dtype );
+    // Synchronize Point
+    if ( tpu_is_parallel_state() )
+    {
+      tpu_parallel_end();
+    }
+    tpu_parallel_start();
+    // Move Grad Bias from local memory to global memory
+    if ( l2s_grad_bias )
+    {
+      tpu_gdma_cpy_L2S ( l2s_grad_bias_global_addr,
+                         l2s_grad_bias_local_addr,
+                         &l2s_grad_bias_shape,
+                         NULL,
+                         NULL,
+                         dtype );
+      l2s_grad_bias = false;
+    }
+    // Move Grad Weight from local memory to global memory
+    if ( l2s_grad_weight )
+    {
+      tpu_gdma_cpy_L2S ( l2s_grad_weight_global_addr,
+                         l2s_grad_weight_local_addr,
+                         &l2s_grad_weight_shape,
+                         NULL,
+                         NULL,
+                         dtype );
+      l2s_grad_weight = false;
+    }
+    // Move Grad Input from local memory to global memory
+    if ( l2s_grad_input )
+    {
+      tpu_gdma_cpy_L2S ( l2s_grad_input_global_addr,
+                         l2s_grad_input_local_addr,
+                         &l2s_grad_input_shape,
+                         &grad_input_global_stride,
+                         NULL,
+                         dtype );
+      l2s_grad_input = false;
+    }
+    // Set ∑<n ( partial ), h, w> Grad Output zeros
+    if ( grad_input_enable || grad_bias_enable )
+    {
+      tpu_bdc_set_C ( grad_output_reduce_tile_n_piece_fp32_local_addr,
+                      zero,
+                      &reduce_tile_n_piece_shape,
+                      NULL,
+                      DT_FP32 );
+    }
+    // Set ∑<n ( partial ), h, w> Grad Output x Intpu Normalized zeros
+    if ( grad_input_enable || grad_weight_enable )
+    {
+      tpu_bdc_set_C ( grad_output_input_normalized_reduce_tile_n_piece_fp32_local_addr,
+                      zero,
+                      &reduce_tile_n_piece_shape,
+                      NULL,
+                      DT_FP32 );
+    }
+    if ( dtype != DT_FP32 )
+    {
+      tpu_bdc_cast ( saved_mean_fp32_local_addr,
+                     saved_mean_local_addrs[index],
+                     &channel_shape,
+                     NULL,
+                     NULL,
+                     DT_FP32,
+                     dtype,
+                     RM_HALF_TO_EVEN );
+      tpu_bdc_cast ( saved_invstd_fp32_local_addr,
+                     saved_invstd_local_addrs[index],
+                     &channel_shape,
+                     NULL,
+                     NULL,
+                     DT_FP32,
+                     dtype,
+                     RM_HALF_TO_EVEN );
+      if ( grad_input_enable )
       {
-        Shape.h = MIN ( HTodo, HMax );
-        int TotalDone = ( NDone * GlobalStride.n + CDone * GlobalStride.c + HDone * GlobalStride.h ) * DataSize;
-        global_addr_t grad_outputGAddr = grad_output_global_addr + TotalDone;
-        global_addr_t inputGAddr = input_global_addr + TotalDone;
-        tpu_gdma_cpy_S2L ( grad_outputAddr, grad_outputGAddr, &Shape, NULL, &GlobalStride, dtype );
-        tpu_gdma_cpy_S2L ( inputAddr, inputGAddr, &Shape, NULL, &GlobalStride, dtype );
-        /* compute input_norm */
-        tpu_bdc_fp_sub ( input_normAddr, inputAddr, meanAddr, &Shape, NULL, NULL, &CBcastStride, dtype );
-        tpu_bdc_fp_mul ( input_normAddr, input_normAddr, invstdAddr, &Shape, NULL, NULL, &CBcastStride, dtype );
-        /* compute grad_output * input_norm */
-        tpu_bdc_fp_mul ( prodAddr, input_normAddr, grad_outputAddr, &Shape, NULL, NULL, NULL, dtype );
-        dim2 KernelSizeDim3 = { .h = 1, .w = Shape.w };
-        dim2 KernelSizeDim2 = { .h = Shape.h, .w = 1 };
-        dim4 poolingShapeDim3 = { .n = Shape.n, .c = Shape.c, .h = Shape.h, .w = 1 };
-        dim4 poolingStrideDim2;
-        tpu_aligned_stride ( &poolingStrideDim2, 0, &poolingShapeDim2, dtype );
-        dim4 transedStride = { .n = poolingStrideDim2.w, .c = poolingStrideDim2.c, .h = poolingStrideDim2.h, .w = poolingStrideDim2.n };
-        /* compute grad_bias */
-        tpu_bdc_fp_avg_pool2d ( pooling_tmp1, grad_outputAddr, &Shape, &KernelSizeDim3, &ZeroPadding, &OneStride, &OneDilation, dtype, OneFP );
-        tpu_bdc_fp_avg_pool2d ( pooling_tmp2, pooling_tmp1, &poolingShapeDim3, &KernelSizeDim2, &ZeroPadding, &OneStride, &OneDilation, dtype, OneFP );
-        if ( HDone == 0 )
+        tpu_bdc_cast ( weight_fp32_local_addr,
+                       weight_local_addrs[index],
+                       &channel_shape,
+                       NULL,
+                       NULL,
+                       DT_FP32,
+                       dtype,
+                       RM_HALF_TO_EVEN );
+      }
+    }
+    else
+    {
+      saved_mean_fp32_local_addr = saved_mean_local_addrs[index];
+      saved_invstd_fp32_local_addr = saved_invstd_local_addrs[index];
+      if ( grad_input_enable )
+      {
+        weight_fp32_local_addr = weight_local_addrs[index];
+      }
+    }
+    // Input Normalized = ( Input − Saved Mean ) × Saved Invstd
+    if ( dtype != DT_FP32 )
+    {
+      tpu_bdc_cast ( input_normalized_fp32_local_addr,
+                     input_local_addrs[index],
+                     &tile_shape,
+                     NULL,
+                     NULL,
+                     DT_FP32,
+                     dtype,
+                     RM_HALF_TO_EVEN );
+      tpu_bdc_fp_sub ( input_normalized_fp32_local_addr,
+                       input_normalized_fp32_local_addr,
+                       saved_mean_fp32_local_addr,
+                       &tile_shape,
+                       NULL,
+                       NULL,
+                       &channel_stride,
+                       DT_FP32 );
+      tpu_bdc_fp_mul ( input_normalized_fp32_local_addr,
+                       input_normalized_fp32_local_addr,
+                       saved_invstd_fp32_local_addr,
+                       &tile_shape,
+                       NULL,
+                       NULL,
+                       &channel_stride,
+                       DT_FP32 );
+    }
+    else
+    {
+      tpu_bdc_fp_sub ( input_normalized_fp32_local_addr,
+                       input_local_addrs[index],
+                       saved_mean_fp32_local_addr,
+                       &tile_shape,
+                       NULL,
+                       NULL,
+                       &channel_stride,
+                       DT_FP32 );
+      tpu_bdc_fp_mul ( input_normalized_fp32_local_addr,
+                       input_normalized_fp32_local_addr,
+                       saved_invstd_local_addrs[index],
+                       &tile_shape,
+                       NULL,
+                       NULL,
+                       &channel_stride,
+                       DT_FP32 );
+    }
+    // Grad Bias
+    if ( grad_input_enable || grad_bias_enable )
+    {
+      if ( dtype != DT_FP32 )
+      {
+        tpu_bdc_cast ( grad_output_fp32_local_addr,
+                       grad_output_local_addrs[index],
+                       &tile_shape,
+                       NULL,
+                       NULL,
+                       DT_FP32,
+                       dtype,
+                       RM_HALF_TO_EVEN );
+      }
+      else
+      {
+        grad_output_fp32_local_addr = grad_output_local_addrs[index];
+      }
+      // Set tile zeros
+      if ( ( work_shape.h * work_shape.w ) % tile != 0 )
+      {
+        tpu_bdc_set_C ( grad_output_fp32_local_addr + work_shape.h * work_shape.w * sizeof ( float ),
+                        zero,
+                        &tail_shape,
+                        &tile_fp32_stride,
+                        DT_FP32 );
+      }
+      // [ work_shape.n, work_shape.c, DIV_UP ( work_shape.w, tile ), tile ] -> [ work_shape.n, work_shape.c, 1, tile ]
+      tpu_bdc_fp_avg_pool2d ( grad_output_reduce_tile_fp32_local_addr,
+                              grad_output_fp32_local_addr,
+                              &tile_shape,
+                              &reduce_tile_kernel,
+                              &zero_pad,
+                              &stride_one,
+                              &dilation_one,
+                              DT_FP32,
+                              one_fp32 );
+    }
+    // Grad Weight
+    if ( grad_weight_enable || grad_input_enable )
+    {
+      // Grad Output × Input Normalized
+      if ( dtype != DT_FP32 )
+      {
+        tpu_bdc_cast ( grad_output_input_normalized_fp32_local_addr,
+                       grad_output_local_addrs[index],
+                       &tile_shape,
+                       NULL,
+                       NULL,
+                       DT_FP32,
+                       dtype,
+                       RM_HALF_TO_EVEN );
+        tpu_bdc_fp_mul ( grad_output_input_normalized_fp32_local_addr,
+                         grad_output_input_normalized_fp32_local_addr,
+                         input_normalized_fp32_local_addr,
+                         &tile_shape,
+                         NULL,
+                         NULL,
+                         NULL,
+                         DT_FP32 );
+      }
+      else
+      {
+        tpu_bdc_fp_mul ( grad_output_input_normalized_fp32_local_addr,
+                         grad_output_local_addrs[index],
+                         input_normalized_fp32_local_addr,
+                         &tile_shape,
+                         NULL,
+                         NULL,
+                         NULL,
+                         DT_FP32 );
+      }
+      // Set tile zeros
+      if ( ( work_shape.h * work_shape.w ) % tile != 0 )
+      {
+        tpu_bdc_set_C ( grad_output_input_normalized_fp32_local_addr + work_shape.h * work_shape.w * sizeof ( float ),
+                        zero,
+                        &tail_shape,
+                        &tile_fp32_stride,
+                        DT_FP32 );
+      }
+      // [ work_shape.n, work_shape.c, DIV_UP ( work_shape.w, tile ), tile ] -> [ work_shape.n, work_shape.c, 1, tile ]
+      tpu_bdc_fp_avg_pool2d ( grad_output_input_normalized_reduce_tile_fp32_local_addr,
+                              grad_output_input_normalized_fp32_local_addr,
+                              &tile_shape,
+                              &reduce_tile_kernel,
+                              &zero_pad,
+                              &stride_one,
+                              &dilation_one,
+                              DT_FP32,
+                              one_fp32 );
+    }
+    // Grad Bias
+    if ( grad_input_enable || grad_bias_enable )
+    {
+      // [ work_shape.n, work_shape.c, 1, tile ] -> [ 1, work_shape.c, 1, tile ]
+      for ( int i = 0; i < work_shape.n; ++i )
+      {
+        tpu_bdc_fp_add ( grad_output_reduce_tile_n_piece_fp32_local_addr,
+                         grad_output_reduce_tile_n_piece_fp32_local_addr,
+                         grad_output_reduce_tile_fp32_local_addr + i * reduce_tile_fp32_stride.n * sizeof ( float ),
+                         &reduce_tile_n_piece_shape,
+                         NULL,
+                         NULL,
+                         NULL,
+                         DT_FP32 );
+      }
+    }
+    // Grad Weight
+    if ( grad_input_enable || grad_weight_enable )
+    {
+      // [ work_shape.n, work_shape.c, 1, tile ] -> [ 1, work_shape.c, 1, tile ]
+      for ( int i = 0; i < work_shape.n; ++i )
+      {
+        tpu_bdc_fp_add ( grad_output_input_normalized_reduce_tile_n_piece_fp32_local_addr,
+                         grad_output_input_normalized_reduce_tile_n_piece_fp32_local_addr,
+                         grad_output_input_normalized_reduce_tile_fp32_local_addr + i * reduce_tile_fp32_stride.n * sizeof ( float ),
+                         &reduce_tile_n_piece_shape,
+                         NULL,
+                         NULL,
+                         NULL,
+                         DT_FP32 );
+      }
+    }
+    // Grad Bias
+    if ( grad_input_enable || grad_bias_enable )
+    {
+      if ( dtype != DT_FP32 )
+      {
+        // [ 1, work_shape.c, 1, tile ] -> [ 1, work_shape.c, 1, 1 ]
+        tpu_bdc_fp_avg_pool2d ( grad_bias_fp32_local_addr,
+                                grad_output_reduce_tile_n_piece_fp32_local_addr,
+                                &reduce_tile_n_piece_shape,
+                                &reduce_kernel,
+                                &zero_pad,
+                                &stride_one,
+                                &dilation_one,
+                                DT_FP32,
+                                one_fp32 );
+        tpu_bdc_cast ( grad_bias_local_addrs[index],
+                       grad_bias_fp32_local_addr,
+                       &reduce_shape,
+                       NULL,
+                       NULL,
+                       dtype,
+                       DT_FP32,
+                       RM_HALF_TO_EVEN );
+      }
+      else
+      {
+        // [ 1, work_shape.c, 1, tile ] -> [ 1, work_shape.c, 1, 1 ]
+        tpu_bdc_fp_avg_pool2d ( grad_bias_local_addrs[index],
+                                grad_output_reduce_tile_n_piece_fp32_local_addr,
+                                &reduce_tile_n_piece_shape,
+                                &reduce_kernel,
+                                &zero_pad,
+                                &stride_one,
+                                &dilation_one,
+                                DT_FP32,
+                                one_fp32 );
+        grad_bias_fp32_local_addr = grad_bias_local_addrs[index];
+      }
+      if ( grad_bias_enable )
+      {
+        l2s_grad_bias = true;
+        l2s_grad_bias_local_addr = grad_bias_local_addrs[index];
+        l2s_grad_bias_global_addr = grad_bias_global_addr + 1UL * cdone * dsize;
+        l2s_grad_bias_shape = channel_shape;
+      }
+    }
+    // Grad Weight
+    if ( grad_input_enable || grad_weight_enable )
+    {
+      if ( dtype != DT_FP32 )
+      {
+        // [ 1, work_shape.c, 1, tile ] -> [ 1, work_shape.c, 1, 1 ]
+        tpu_bdc_fp_avg_pool2d ( grad_weight_fp32_local_addr,
+                                grad_output_input_normalized_reduce_tile_n_piece_fp32_local_addr,
+                                &reduce_tile_n_piece_shape,
+                                &reduce_kernel,
+                                &zero_pad,
+                                &stride_one,
+                                &dilation_one,
+                                DT_FP32,
+                                one_fp32 );
+        tpu_bdc_cast ( grad_weight_local_addrs[index],
+                       grad_weight_fp32_local_addr,
+                       &reduce_shape,
+                       NULL,
+                       NULL,
+                       dtype,
+                       DT_FP32,
+                       RM_HALF_TO_EVEN );
+      }
+      else
+      {
+        // [ 1, work_shape.c, 1, tile ] -> [ 1, work_shape.c, 1, 1 ]
+        tpu_bdc_fp_avg_pool2d ( grad_weight_local_addrs[index],
+                                grad_output_input_normalized_reduce_tile_n_piece_fp32_local_addr,
+                                &reduce_tile_n_piece_shape,
+                                &reduce_kernel,
+                                &zero_pad,
+                                &stride_one,
+                                &dilation_one,
+                                DT_FP32,
+                                one_fp32 );
+        grad_weight_fp32_local_addr = grad_weight_local_addrs[index];
+      }
+      if ( grad_weight_enable )
+      {
+        l2s_grad_weight = true;
+        l2s_grad_weight_local_addr = grad_weight_local_addrs[index];
+        l2s_grad_weight_global_addr = grad_weight_global_addr + 1UL * cdone * dsize;
+        l2s_grad_weight_shape = channel_shape;
+      }
+    }
+    // Grad input
+    if ( grad_input_enable )
+    {
+      // Input Normalized = - ( Input Normalized × Grad Weight + Grad Bias ) / NHW
+      tpu_bdc_fp_mul ( input_normalized_fp32_local_addr,
+                       input_normalized_fp32_local_addr,
+                       grad_weight_fp32_local_addr,
+                       &tile_shape,
+                       NULL,
+                       NULL,
+                       &channel_stride,
+                       DT_FP32 );
+      tpu_bdc_fp_add ( input_normalized_fp32_local_addr,
+                       input_normalized_fp32_local_addr,
+                       grad_bias_fp32_local_addr,
+                       &tile_shape,
+                       NULL,
+                       NULL,
+                       &channel_stride,
+                       DT_FP32 );
+      tpu_bdc_fp_mul_C ( input_normalized_fp32_local_addr,
+                         input_normalized_fp32_local_addr,
+                         neg_inv_nhw_fp32,
+                         &tile_shape,
+                         NULL,
+                         NULL,
+                         DT_FP32 );
+      // Grad Output = Grad Output + Input Normalized
+      tpu_bdc_fp_add ( grad_output_fp32_local_addr,
+                       grad_output_fp32_local_addr,
+                       input_normalized_fp32_local_addr,
+                       &tile_shape,
+                       NULL,
+                       NULL,
+                       NULL,
+                       DT_FP32 );
+      // Grad Input = Weight × Saved Invstd × Grad Output
+      tpu_bdc_fp_mul ( grad_output_fp32_local_addr,
+                       grad_output_fp32_local_addr,
+                       saved_invstd_fp32_local_addr,
+                       &tile_shape,
+                       NULL,
+                       NULL,
+                       &channel_stride,
+                       DT_FP32 );
+      if ( dtype != DT_FP32 )
+      {
+        tpu_bdc_fp_mul ( grad_output_fp32_local_addr,
+                         grad_output_fp32_local_addr,
+                         weight_fp32_local_addr,
+                         &tile_shape,
+                         NULL,
+                         NULL,
+                         &channel_stride,
+                         DT_FP32 );
+        tpu_bdc_cast ( grad_input_local_addrs[index],
+                       grad_output_fp32_local_addr,
+                       &tile_shape,
+                       NULL,
+                       NULL,
+                       dtype,
+                       DT_FP32,
+                       RM_HALF_TO_EVEN );
+      }
+      else
+      {
+        tpu_bdc_fp_mul ( grad_input_local_addrs[index],
+                         grad_output_fp32_local_addr,
+                         weight_fp32_local_addr,
+                         &tile_shape,
+                         NULL,
+                         NULL,
+                         &channel_stride,
+                         DT_FP32 );
+      }
+      l2s_grad_input = true;
+      l2s_grad_input_local_addr = grad_input_local_addrs[index];
+      l2s_grad_input_global_addr = grad_input_global_addr + 1UL * cdone * grad_input_global_stride.c * dsize;
+      l2s_grad_input_shape = work_shape;
+    }
+    ctodo -= work_shape.c;
+    cdone += work_shape.c;
+    index = 1 - index;
+  }
+  // Synchronize Point
+  if ( tpu_is_parallel_state() )
+  {
+    tpu_parallel_end();
+  }
+  // Move Grad Bias from local memory to global memory
+  if ( l2s_grad_bias )
+  {
+    tpu_gdma_cpy_L2S ( l2s_grad_bias_global_addr,
+                       l2s_grad_bias_local_addr,
+                       &l2s_grad_bias_shape,
+                       NULL,
+                       NULL,
+                       dtype );
+    l2s_grad_bias = false;
+  }
+  // Move Grad Weight from local memory to global memory
+  if ( l2s_grad_weight )
+  {
+    tpu_gdma_cpy_L2S ( l2s_grad_weight_global_addr,
+                       l2s_grad_weight_local_addr,
+                       &l2s_grad_weight_shape,
+                       NULL,
+                       NULL,
+                       dtype );
+    l2s_grad_weight = false;
+  }
+  // Move Grad Input from local memory to global memory
+  if ( l2s_grad_input )
+  {
+    tpu_gdma_cpy_L2S ( l2s_grad_input_global_addr,
+                       l2s_grad_input_local_addr,
+                       &l2s_grad_input_shape,
+                       &grad_input_global_stride,
+                       NULL,
+                       dtype );
+    l2s_grad_input = false;
+  }
+  return true;
+}
+
+static inline void nodechip_batchnorm2d_backward_all_fp32 (
+global_addr_t grad_output_global_addr,
+global_addr_t input_global_addr,
+global_addr_t weight_global_addr,
+global_addr_t saved_mean_global_addr,
+global_addr_t saved_invstd_global_addr,
+global_addr_t grad_input_global_addr,
+global_addr_t grad_weight_global_addr,
+global_addr_t grad_bias_global_addr,
+dim4 shape,
+data_type_t dtype,
+int grad_input_enable,
+int grad_weight_enable,
+int grad_bias_enable )
+{
+  const int dsize = tpu_data_type_size ( dtype );
+  const int tile = tpu_eu_num ( dtype );
+  dim4 input_global_stride; tpu_continuous_stride ( &input_global_stride, &shape );
+  dim4 grad_output_global_stride; tpu_continuous_stride ( &grad_output_global_stride, &shape );
+  dim4 grad_input_global_stride; tpu_continuous_stride ( &grad_input_global_stride, &shape );
+  const scalar_t zero = { .u32 = 0 };
+  const scalar_t one_fp32 = { .f32 = 1.f };
+  const scalar_t neg_inv_nhw_fp32 = { .f32 = -1.0 / ( 1UL * shape.n * shape.h * shape.w ) };
+  const dim2 stride_one = { .h = 1, .w = 1 };
+  const dim2 dilation_one = { .h = 1, .w = 1 };
+  const padding_t zero_pad = { .top = 0, .left = 0, .bottom = 0, .right = 0 };
+  local_addr_t input_local_addrs[2] = { DEFAULT_LOCAL_ADDR }, grad_output_local_addrs[2] = { DEFAULT_LOCAL_ADDR };
+  local_addr_t input_normalized_fp32_local_addr = DEFAULT_LOCAL_ADDR;
+  local_addr_t saved_mean_local_addr = DEFAULT_LOCAL_ADDR, saved_invstd_local_addr = DEFAULT_LOCAL_ADDR, weight_local_addr = DEFAULT_LOCAL_ADDR;
+  local_addr_t saved_mean_fp32_local_addr = DEFAULT_LOCAL_ADDR, saved_invstd_fp32_local_addr = DEFAULT_LOCAL_ADDR, weight_fp32_local_addr = DEFAULT_LOCAL_ADDR;
+  local_addr_t grad_output_reduce_tile_fp32_local_addrs[2] = { DEFAULT_LOCAL_ADDR };
+  local_addr_t grad_output_reduce_tile_n_piece_fp32_local_addr = DEFAULT_LOCAL_ADDR, grad_bias_local_addr = DEFAULT_LOCAL_ADDR;
+  local_addr_t grad_output_input_normalized_reduce_tile_fp32_local_addrs[2] = { DEFAULT_LOCAL_ADDR };
+  local_addr_t grad_output_input_normalized_reduce_tile_n_piece_fp32_local_addr = DEFAULT_LOCAL_ADDR, grad_weight_local_addr = DEFAULT_LOCAL_ADDR;
+  local_addr_t common_tile_fp32_local_addr = DEFAULT_LOCAL_ADDR, grad_bias_fp32_local_addr = DEFAULT_LOCAL_ADDR, grad_weight_fp32_local_addr = DEFAULT_LOCAL_ADDR;
+  local_addr_t grad_input_local_addrs[2] = { DEFAULT_LOCAL_ADDR };
+  local_addr_t next = 0;
+  int nmax = shape.n, cmax = shape.c, hwmax = shape.h * shape.w;
+  while ( true )
+  {
+    int tile_size = nmax * DIV_UP ( cmax, NPU_NUM ) * tpu_aligned_feature_size ( DIV_UP ( hwmax, tile ), tile, dtype );
+    int tile_fp32_size = nmax * DIV_UP ( cmax, NPU_NUM ) * tpu_aligned_feature_size ( DIV_UP ( hwmax, tile ), tile, DT_FP32 );
+    int channel_size = DIV_UP ( cmax, NPU_NUM ) * tpu_aligned_feature_size ( 1, 1, dtype );
+    int channel_fp32_size = DIV_UP ( cmax, NPU_NUM ) * tpu_aligned_feature_size ( 1, 1, DT_FP32 );
+    int reduce_tile_fp32_size = nmax * DIV_UP ( cmax, NPU_NUM ) * tpu_aligned_feature_size ( 1, tile, DT_FP32 );
+    int reduce_tile_n_piece_fp32_size = DIV_UP ( cmax, NPU_NUM ) * tpu_aligned_feature_size ( 1, tile, DT_FP32 );
+    int reduce_fp32_size = DIV_UP ( cmax, NPU_NUM ) * tpu_aligned_feature_size ( 1, 1, DT_FP32 );
+    int grad_bias_size = DIV_UP ( cmax, NPU_NUM ) * tpu_aligned_feature_size ( 1, 1, dtype );
+    int grad_weight_size = DIV_UP ( cmax, NPU_NUM ) * tpu_aligned_feature_size ( 1, 1, dtype );
+    next = 0;
+    input_local_addrs[0] = next; next += tile_size;
+    input_local_addrs[1] = next; next += tile_size;
+    grad_output_local_addrs[0] = next; next += tile_size;
+    grad_output_local_addrs[1] = next; next += tile_size;
+    saved_mean_local_addr = next; next += channel_size;
+    if ( dtype != DT_FP32 )
+    {
+      saved_mean_fp32_local_addr = next; next += channel_fp32_size;
+    }
+    saved_invstd_local_addr = next; next += channel_size;
+    if ( dtype != DT_FP32 )
+    {
+      saved_invstd_fp32_local_addr = next; next += channel_fp32_size;
+    }
+    if ( grad_input_enable )
+    {
+      weight_local_addr = next; next += channel_size;
+      if ( dtype != DT_FP32 )
+      {
+        weight_fp32_local_addr = next; next += channel_fp32_size;
+      }
+      grad_input_local_addrs[0] = next; next += tile_size;
+      grad_input_local_addrs[1] = next; next += tile_size;
+    }
+    if ( grad_input_enable || grad_bias_enable )
+    {
+      grad_output_reduce_tile_fp32_local_addrs[0] = next; next += reduce_tile_fp32_size;
+      grad_output_reduce_tile_fp32_local_addrs[1] = next; next += reduce_tile_fp32_size;
+      grad_output_reduce_tile_n_piece_fp32_local_addr = next; next += reduce_tile_n_piece_fp32_size;
+      if ( dtype != DT_FP32 )
+      {
+        grad_bias_fp32_local_addr = next; next += reduce_fp32_size;
+      }
+      grad_bias_local_addr = next; next += grad_bias_size;
+    }
+    if ( grad_weight_enable || grad_input_enable )
+    {
+      grad_output_input_normalized_reduce_tile_fp32_local_addrs[0] = next; next += reduce_tile_fp32_size;
+      grad_output_input_normalized_reduce_tile_fp32_local_addrs[1] = next; next += reduce_tile_fp32_size;
+      grad_output_input_normalized_reduce_tile_n_piece_fp32_local_addr = next; next += reduce_tile_n_piece_fp32_size;
+      if ( dtype != DT_FP32 )
+      {
+        grad_weight_fp32_local_addr = next; next += reduce_fp32_size;
+      }
+      grad_weight_local_addr = next; next += grad_weight_size;
+    }
+    if ( dtype != DT_FP32 )
+    {
+      input_normalized_fp32_local_addr = next; next += tile_fp32_size;
+      common_tile_fp32_local_addr = next; next += tile_fp32_size;
+    }
+    if ( ( int ) next > LOCAL_MEM_SIZE )
+    {
+      if ( cmax > NPU_NUM )
+      {
+        cmax -= ( ( cmax % NPU_NUM > 0 ) ? ( cmax % NPU_NUM ) : NPU_NUM );
+        continue;
+      }
+      else if ( nmax > 1 )
+      {
+        nmax /= 2;
+      }
+      else if ( hwmax > 1 )
+      {
+        hwmax /= 2;
+      }
+      else
+      {
+        TPUKERNEL_ASSERT ( 0 );
+      }
+    }
+    else
+    {
+      break;
+    }
+  }
+  bool l2s_grad_input = false;
+  local_addr_t l2s_grad_input_local_addr = DEFAULT_LOCAL_ADDR;
+  global_addr_t l2s_grad_input_global_addr = DEFAULT_LOCAL_ADDR;
+  dim4 l2s_grad_input_shape;
+  dim4 work_shape;
+  int ctodo = shape.c, cdone = 0;
+  while ( ctodo != 0 )
+  {
+    work_shape.c = MIN ( ctodo, cmax );
+    dim4 channel_shape = { .n = 1, .c = work_shape.c, .h = 1, .w = 1 };
+    dim4 channel_stride; tpu_aligned_stride ( &channel_stride, 0, &channel_shape, dtype );
+    channel_stride.n = 0, channel_stride.h = 0, channel_stride.w = 0;
+    dim4 reduce_tile_n_piece_shape = { .n = 1, .c = work_shape.c, .h = 1, .w = tile };
+    dim2 reduce_kernel = { .h = 1, .w = tile };
+    dim4 reduce_shape = { .n = 1, .c = work_shape.c, .h = 1, .w = 1 };
+    // Move Saved Mean from global to local memory
+    tpu_gdma_cpy_S2L ( saved_mean_local_addr,
+                       saved_mean_global_addr + 1UL * cdone * dsize,
+                       &channel_shape,
+                       NULL,
+                       NULL,
+                       dtype );
+    // Move Saved Invstd from global to lobal memory
+    tpu_gdma_cpy_S2L ( saved_invstd_local_addr,
+                       saved_invstd_global_addr + 1UL * cdone * dsize,
+                       &channel_shape,
+                       NULL,
+                       NULL,
+                       dtype );
+    // Move Weight from global to local memory
+    if ( grad_input_enable )
+    {
+      tpu_gdma_cpy_S2L ( weight_local_addr,
+                         weight_global_addr + 1UL * cdone * dsize,
+                         &channel_shape,
+                         NULL,
+                         NULL,
+                         dtype );
+    }
+    // Set ∑<n ( partial ), h, w> Grad Output zeros
+    if ( grad_input_enable || grad_bias_enable )
+    {
+      tpu_bdc_set_C ( grad_output_reduce_tile_n_piece_fp32_local_addr,
+                      zero,
+                      &reduce_tile_n_piece_shape,
+                      NULL,
+                      DT_FP32 );
+    }
+    // Set ∑<n ( partial ), h, w> Grad Output x Intpu Normalized zeros
+    if ( grad_input_enable || grad_weight_enable )
+    {
+      tpu_bdc_set_C ( grad_output_input_normalized_reduce_tile_n_piece_fp32_local_addr,
+                      zero,
+                      &reduce_tile_n_piece_shape,
+                      NULL,
+                      DT_FP32 );
+    }
+    if ( dtype != DT_FP32 )
+    {
+      tpu_bdc_cast ( saved_mean_fp32_local_addr,
+                     saved_mean_local_addr,
+                     &channel_shape,
+                     NULL,
+                     NULL,
+                     DT_FP32,
+                     dtype,
+                     RM_HALF_TO_EVEN );
+      tpu_bdc_cast ( saved_invstd_fp32_local_addr,
+                     saved_invstd_local_addr,
+                     &channel_shape,
+                     NULL,
+                     NULL,
+                     DT_FP32,
+                     dtype,
+                     RM_HALF_TO_EVEN );
+      if ( grad_input_enable )
+      {
+        tpu_bdc_cast ( weight_fp32_local_addr,
+                       weight_local_addr,
+                       &channel_shape,
+                       NULL,
+                       NULL,
+                       DT_FP32,
+                       dtype,
+                       RM_HALF_TO_EVEN );
+      }
+    }
+    else
+    {
+      saved_mean_fp32_local_addr = saved_mean_local_addr;
+      saved_invstd_fp32_local_addr = saved_invstd_local_addr;
+      if ( grad_input_enable )
+      {
+        weight_fp32_local_addr = weight_local_addr;
+      }
+    }
+    int index = 0;
+    int ntodo = shape.n, ndone = 0;
+    while ( ntodo != 0 )
+    {
+      work_shape.n = MIN ( ntodo, nmax );
+      dim4 reduce_tile_shape = { .n = work_shape.n, .c = work_shape.c, .h = 1, .w = tile };
+      dim4 reduce_tile_fp32_stride; tpu_aligned_stride ( &reduce_tile_fp32_stride, 0, &reduce_tile_shape, DT_FP32 );
+      int hwtodo = shape.h * shape.w, hwdone = 0;
+      while ( hwtodo != 0 )
+      {
+        work_shape.h = 1;
+        work_shape.w = MIN ( hwtodo, hwmax );
+        // Move Input from global memory to local memory
+        tpu_gdma_cpy_S2L ( input_local_addrs[index],
+                           input_global_addr + (
+                           1UL * ndone * input_global_stride.n +
+                           1UL * cdone * input_global_stride.c +
+                           1UL * hwdone * input_global_stride.w ) * dsize,
+                           &work_shape,
+                           NULL, // tile is eu num of dtype, so NULL is OK
+                           &input_global_stride,
+                           dtype );
+        // Move Grad Output from global memory to local memory
+        tpu_gdma_cpy_S2L ( grad_output_local_addrs[index],
+                           grad_output_global_addr + (
+                           1UL * ndone * grad_output_global_stride.n +
+                           1UL * cdone * grad_output_global_stride.c +
+                           1UL * hwdone * grad_output_global_stride.w ) * dsize,
+                           &work_shape,
+                           NULL, // tile is eu num of dtype, so NULL is OK
+                           &grad_output_global_stride,
+                           dtype );
+        if ( tpu_is_parallel_state() )
         {
-          tpu_bdc_cpy ( grad_bias_tmp, pooling_tmp2, &transedShapeDim2, NULL, &transedStride, dtype );
+          tpu_parallel_end();
+        }
+        tpu_parallel_start();
+        dim4 tile_shape = { .n = work_shape.n, .c = work_shape.c, .h = DIV_UP ( ( work_shape.h * work_shape.w ), tile ), .w = tile };
+        dim4 tile_stride; tpu_aligned_stride ( &tile_stride, 0, &tile_shape, dtype );
+        dim4 tile_fp32_stride; tpu_aligned_stride ( &tile_fp32_stride, 0, &tile_shape, DT_FP32 );
+        dim4 tail_shape = { .n = work_shape.n, .c = work_shape.c, .h = 1, .w = tile - ( ( work_shape.h * work_shape.w ) % tile ) };
+        dim2 reduce_tile_kernel = { .h = tile_shape.h, .w = 1 };
+        // Grad Bias
+        if ( grad_input_enable || grad_bias_enable )
+        {
+          local_addr_t grad_output_fp32_local_addr = DEFAULT_LOCAL_ADDR;
+          if ( dtype != DT_FP32 )
+          {
+            grad_output_fp32_local_addr = common_tile_fp32_local_addr;
+            tpu_bdc_cast ( grad_output_fp32_local_addr,
+                           grad_output_local_addrs[index],
+                           &tile_shape,
+                           NULL,
+                           NULL,
+                           DT_FP32,
+                           dtype,
+                           RM_HALF_TO_EVEN );
+          }
+          else
+          {
+            grad_output_fp32_local_addr = grad_output_local_addrs[index];
+          }
+          // Set tile zeros
+          if ( ( work_shape.h * work_shape.w ) % tile != 0 )
+          {
+            tpu_bdc_set_C ( grad_output_fp32_local_addr + work_shape.h * work_shape.w * sizeof ( float ),
+                            zero,
+                            &tail_shape,
+                            &tile_fp32_stride,
+                            DT_FP32 );
+          }
+          // [ work_shape.n, work_shape.c, DIV_UP ( work_shape.w, tile ), tile ] -> [ work_shape.n, work_shape.c, 1, tile ]
+          tpu_bdc_fp_avg_pool2d ( grad_output_reduce_tile_fp32_local_addrs[index],
+                                  grad_output_fp32_local_addr,
+                                  &tile_shape,
+                                  &reduce_tile_kernel,
+                                  &zero_pad,
+                                  &stride_one,
+                                  &dilation_one,
+                                  DT_FP32,
+                                  one_fp32 );
+          if ( hwdone > 0 )
+          {
+            tpu_bdc_fp_add ( grad_output_reduce_tile_fp32_local_addrs[index],
+                             grad_output_reduce_tile_fp32_local_addrs[index],
+                             grad_output_reduce_tile_fp32_local_addrs[1 - index],
+                             &reduce_tile_shape,
+                             NULL,
+                             NULL,
+                             NULL,
+                             DT_FP32 );
+          }
+        }
+        // Input Normalized = ( Input − Saved Mean ) × Saved Invstd
+        if ( dtype != DT_FP32 )
+        {
+          tpu_bdc_cast ( input_normalized_fp32_local_addr,
+                         input_local_addrs[index],
+                         &tile_shape,
+                         NULL,
+                         NULL,
+                         DT_FP32,
+                         dtype,
+                         RM_HALF_TO_EVEN );
+          tpu_bdc_fp_sub ( input_normalized_fp32_local_addr,
+                           input_normalized_fp32_local_addr,
+                           saved_mean_fp32_local_addr,
+                           &tile_shape,
+                           NULL,
+                           NULL,
+                           &channel_stride,
+                           DT_FP32 );
+          tpu_bdc_fp_mul ( input_normalized_fp32_local_addr,
+                           input_normalized_fp32_local_addr,
+                           saved_invstd_fp32_local_addr,
+                           &tile_shape,
+                           NULL,
+                           NULL,
+                           &channel_stride,
+                           DT_FP32 );
         }
         else
         {
-          tpu_bdc_fp_add ( grad_bias_tmp, grad_bias_tmp, pooling_tmp2, &transedShapeDim2, NULL, NULL, &transedStride, dtype );
+          input_normalized_fp32_local_addr = input_local_addrs[index];
+          tpu_bdc_fp_sub ( input_normalized_fp32_local_addr,
+                           input_local_addrs[index],
+                           saved_mean_fp32_local_addr,
+                           &tile_shape,
+                           NULL,
+                           NULL,
+                           &channel_stride,
+                           DT_FP32 );
+          tpu_bdc_fp_mul ( input_normalized_fp32_local_addr,
+                           input_normalized_fp32_local_addr,
+                           saved_invstd_fp32_local_addr,
+                           &tile_shape,
+                           NULL,
+                           NULL,
+                           &channel_stride,
+                           DT_FP32 );
         }
-        /* compute grad_weight */
-        tpu_bdc_fp_avg_pool2d ( pooling_tmp1, prodAddr, &Shape, &KernelSizeDim3, &ZeroPadding, &OneStride, &OneDilation, dtype, OneFP );
-        tpu_bdc_fp_avg_pool2d ( pooling_tmp2, pooling_tmp1, &poolingShapeDim3, &KernelSizeDim2, &ZeroPadding, &OneStride, &OneDilation, dtype, OneFP );
-        if ( HDone == 0 )
+        // Grad Weight
+        if ( grad_weight_enable || grad_input_enable )
         {
-          tpu_bdc_cpy ( grad_weight_tmp, pooling_tmp2, &transedShapeDim2, NULL, &transedStride, dtype );
+          // Grad Output × Input Normalized
+          local_addr_t grad_output_input_normalized_fp32_local_addr = DEFAULT_LOCAL_ADDR;
+          if ( dtype != DT_FP32 )
+          {
+            grad_output_input_normalized_fp32_local_addr = common_tile_fp32_local_addr;
+            tpu_bdc_cast ( grad_output_input_normalized_fp32_local_addr,
+                           grad_output_local_addrs[index],
+                           &tile_shape,
+                           NULL,
+                           NULL,
+                           DT_FP32,
+                           dtype,
+                           RM_HALF_TO_EVEN );
+            tpu_bdc_fp_mul ( grad_output_input_normalized_fp32_local_addr,
+                             grad_output_input_normalized_fp32_local_addr,
+                             input_normalized_fp32_local_addr,
+                             &tile_shape,
+                             NULL,
+                             NULL,
+                             NULL,
+                             DT_FP32 );
+          }
+          else
+          {
+            grad_output_input_normalized_fp32_local_addr = grad_output_local_addrs[index];
+            tpu_bdc_fp_mul ( grad_output_input_normalized_fp32_local_addr,
+                             grad_output_local_addrs[index],
+                             input_normalized_fp32_local_addr,
+                             &tile_shape,
+                             NULL,
+                             NULL,
+                             NULL,
+                             DT_FP32 );
+          }
+          // Set tile zeros
+          if ( ( work_shape.h * work_shape.w ) % tile != 0 )
+          {
+            tpu_bdc_set_C ( grad_output_input_normalized_fp32_local_addr + work_shape.h * work_shape.w * sizeof ( float ),
+                            zero,
+                            &tail_shape,
+                            &tile_fp32_stride,
+                            DT_FP32 );
+          }
+          // [ work_shape.n, work_shape.c, DIV_UP ( work_shape.w, tile ), tile ] -> [ work_shape.n, work_shape.c, 1, tile ]
+          tpu_bdc_fp_avg_pool2d ( grad_output_input_normalized_reduce_tile_fp32_local_addrs[index],
+                                  grad_output_input_normalized_fp32_local_addr,
+                                  &tile_shape,
+                                  &reduce_tile_kernel,
+                                  &zero_pad,
+                                  &stride_one,
+                                  &dilation_one,
+                                  DT_FP32,
+                                  one_fp32 );
+          if ( hwdone > 0 )
+          {
+            tpu_bdc_fp_add ( grad_output_input_normalized_reduce_tile_fp32_local_addrs[index],
+                             grad_output_input_normalized_reduce_tile_fp32_local_addrs[index],
+                             grad_output_input_normalized_reduce_tile_fp32_local_addrs[1 - index],
+                             &reduce_tile_shape,
+                             NULL,
+                             NULL,
+                             NULL,
+                             DT_FP32 );
+          }
         }
-        else
+        hwtodo -= work_shape.h * work_shape.w;
+        hwdone += work_shape.h * work_shape.w;
+        index = 1 - index;
+      }
+      // Grad Bias
+      if ( grad_input_enable || grad_bias_enable )
+      {
+        // [ work_shape.n, work_shape.c, 1, tile ] -> [ 1, work_shape.c, 1, tile ]
+        for ( int i = 0; i < work_shape.n; ++i )
         {
-          tpu_bdc_fp_add ( grad_weight_tmp, grad_weight_tmp, pooling_tmp2, &transedShapeDim2, NULL, NULL, &transedStride, dtype );
+          tpu_bdc_fp_add ( grad_output_reduce_tile_n_piece_fp32_local_addr,
+                           grad_output_reduce_tile_n_piece_fp32_local_addr,
+                           grad_output_reduce_tile_fp32_local_addrs[1 - index] + i * reduce_tile_fp32_stride.n * sizeof ( float ),
+                           &reduce_tile_n_piece_shape,
+                           NULL,
+                           NULL,
+                           NULL,
+                           DT_FP32 );
         }
-        HTodo -= Shape.h;
-        HDone += Shape.h;
       }
-      dim2 KernelSizeDim1 = { .h = transedShapeDim2.h, .w = transedShapeDim2.w };
-      tpu_bdc_fp_avg_pool2d ( NDone == 0 ? grad_biasAddr : pooling_tmp2, grad_bias_tmp, &transedShapeDim2, &KernelSizeDim1, &ZeroPadding, &OneStride, &OneDilation, dtype, OneFP );
-      if ( NDone > 0 )
+      // Grad Weight
+      if ( grad_input_enable || grad_weight_enable )
       {
-        tpu_bdc_fp_add ( grad_biasAddr, grad_biasAddr, pooling_tmp2, &CShape, NULL, NULL, NULL, dtype );
+        // [ work_shape.n, work_shape.c, 1, tile ] -> [ 1, work_shape.c, 1, tile ]
+        for ( int i = 0; i < work_shape.n; ++i )
+        {
+          tpu_bdc_fp_add ( grad_output_input_normalized_reduce_tile_n_piece_fp32_local_addr,
+                           grad_output_input_normalized_reduce_tile_n_piece_fp32_local_addr,
+                           grad_output_input_normalized_reduce_tile_fp32_local_addrs[1 - index] + i * reduce_tile_fp32_stride.n * sizeof ( float ),
+                           &reduce_tile_n_piece_shape,
+                           NULL,
+                           NULL,
+                           NULL,
+                           DT_FP32 );
+        }
       }
-      tpu_bdc_fp_avg_pool2d ( NDone == 0 ? grad_weightAddr : pooling_tmp2, grad_weight_tmp, &transedShapeDim2, &KernelSizeDim1, &ZeroPadding, &OneStride, &OneDilation, dtype, OneFP );
-      if ( NDone > 0 )
+      ntodo -= work_shape.n;
+      ndone += work_shape.n;
+    }
+    // Grad Bias
+    if ( grad_input_enable || grad_bias_enable )
+    {
+      if ( dtype != DT_FP32 )
       {
-        tpu_bdc_fp_add ( grad_weightAddr, grad_weightAddr, pooling_tmp2, &CShape, NULL, NULL, NULL, dtype );
+        // [ 1, work_shape.c, 1, tile ] -> [ 1, work_shape.c, 1, 1 ]
+        tpu_bdc_fp_avg_pool2d ( grad_bias_fp32_local_addr,
+                                grad_output_reduce_tile_n_piece_fp32_local_addr,
+                                &reduce_tile_n_piece_shape,
+                                &reduce_kernel,
+                                &zero_pad,
+                                &stride_one,
+                                &dilation_one,
+                                DT_FP32,
+                                one_fp32 );
+        tpu_bdc_cast ( grad_bias_local_addr,
+                       grad_bias_fp32_local_addr,
+                       &reduce_shape,
+                       NULL,
+                       NULL,
+                       dtype,
+                       DT_FP32,
+                       RM_HALF_TO_EVEN );
       }
-      NTodo -= Shape.n;
-      NDone += Shape.n;
+      else
+      {
+        // [ 1, work_shape.c, 1, tile ] -> [ 1, work_shape.c, 1, 1 ]
+        tpu_bdc_fp_avg_pool2d ( grad_bias_local_addr,
+                                grad_output_reduce_tile_n_piece_fp32_local_addr,
+                                &reduce_tile_n_piece_shape,
+                                &reduce_kernel,
+                                &zero_pad,
+                                &stride_one,
+                                &dilation_one,
+                                DT_FP32,
+                                one_fp32 );
+        grad_bias_fp32_local_addr = grad_bias_local_addr;
+      }
+    }
+    // Grad Weight
+    if ( grad_input_enable || grad_weight_enable )
+    {
+      if ( dtype != DT_FP32 )
+      {
+        // [ 1, work_shape.c, 1, tile ] -> [ 1, work_shape.c, 1, 1 ]
+        tpu_bdc_fp_avg_pool2d ( grad_weight_fp32_local_addr,
+                                grad_output_input_normalized_reduce_tile_n_piece_fp32_local_addr,
+                                &reduce_tile_n_piece_shape,
+                                &reduce_kernel,
+                                &zero_pad,
+                                &stride_one,
+                                &dilation_one,
+                                DT_FP32,
+                                one_fp32 );
+        tpu_bdc_cast ( grad_weight_local_addr,
+                       grad_weight_fp32_local_addr,
+                       &reduce_shape,
+                       NULL,
+                       NULL,
+                       dtype,
+                       DT_FP32,
+                       RM_HALF_TO_EVEN );
+      }
+      else
+      {
+        // [ 1, work_shape.c, 1, tile ] -> [ 1, work_shape.c, 1, 1 ]
+        tpu_bdc_fp_avg_pool2d ( grad_weight_local_addr,
+                                grad_output_input_normalized_reduce_tile_n_piece_fp32_local_addr,
+                                &reduce_tile_n_piece_shape,
+                                &reduce_kernel,
+                                &zero_pad,
+                                &stride_one,
+                                &dilation_one,
+                                DT_FP32,
+                                one_fp32 );
+        grad_weight_fp32_local_addr = grad_weight_local_addr;
+      }
+    }
+    // Synchronize Point
+    if ( tpu_is_parallel_state() )
+    {
+      tpu_parallel_end();
     }
     if ( grad_bias_enable )
     {
-      global_addr_t grad_biasGAddr = grad_bias_global_addr + CDone * DataSize;
-      tpu_gdma_cpy_L2S ( grad_biasGAddr, grad_biasAddr, &CShape, NULL, NULL, dtype );
+      tpu_gdma_cpy_L2S ( grad_bias_global_addr + 1UL * cdone * dsize,
+                         grad_bias_local_addr,
+                         &channel_shape,
+                         NULL,
+                         NULL,
+                         dtype );
     }
     if ( grad_weight_enable )
     {
-      global_addr_t grad_weightGAddr = grad_weight_global_addr + CDone * DataSize;
-      tpu_gdma_cpy_L2S ( grad_weightGAddr, grad_weightAddr, &CShape, NULL, NULL, dtype );
+      tpu_gdma_cpy_L2S ( grad_weight_global_addr + 1UL * cdone * dsize,
+                         grad_weight_local_addr,
+                         &channel_shape,
+                         NULL,
+                         NULL,
+                         dtype );
     }
-    /* compute weight * invstd & weight * invstd * invnhw */
-    tpu_bdc_fp_mul ( weightAddr, weightAddr, invstdAddr, &CShape, NULL, NULL, NULL, dtype );
-    /*
-     * compute grad input :
-     * part1 = weight * invstd * grad_output
-     * part2 = weight * invstd * invnhw
-     * grad_input = part1 - part2 * (input_norm * grad_weight + grad_bias)
-     */
-    NTodo = N, NDone = 0;
-    while ( NTodo > 0 )
+    // Grad input
+    if ( grad_input_enable )
     {
-      Shape.n = MIN ( NTodo, NMax );
-      int HTodo = H, HDone = 0;
-      while ( HTodo > 0 )
+      int index = 0;
+      int ntodo = shape.n, ndone = 0;
+      while ( ntodo != 0 )
       {
-        Shape.h = MIN ( HTodo, HMax );
-        int TotalDone = ( NDone * GlobalStride.n + CDone * GlobalStride.c + HDone * GlobalStride.h ) * DataSize;
-        if ( Split_N_or_H )
+        work_shape.n = MIN ( ntodo, nmax );
+        int hwtodo = shape.h * shape.w, hwdone = 0;
+        while ( hwtodo != 0 )
         {
-          global_addr_t grad_outputGAddr = grad_output_global_addr + TotalDone;
-          global_addr_t inputGAddr = input_global_addr + TotalDone;
-          tpu_gdma_cpy_S2L ( grad_outputAddr, grad_outputGAddr, &Shape, NULL, &GlobalStride, dtype );
-          tpu_gdma_cpy_S2L ( inputAddr, inputGAddr, &Shape, NULL, &GlobalStride, dtype );
-          tpu_bdc_fp_sub ( input_normAddr, inputAddr, meanAddr, &Shape, NULL, NULL, &CBcastStride, dtype );
-          tpu_bdc_fp_mul ( input_normAddr, input_normAddr, invstdAddr, &Shape, NULL, NULL, &CBcastStride, dtype );
+          work_shape.h = 1;
+          work_shape.w = MIN ( hwtodo, hwmax );
+          // Move Input from global memory to local memory
+          tpu_gdma_cpy_S2L ( input_local_addrs[index],
+                             input_global_addr + (
+                             1UL * ndone * input_global_stride.n +
+                             1UL * cdone * input_global_stride.c +
+                             1UL * hwdone * input_global_stride.w ) * dsize,
+                             &work_shape,
+                             NULL, // tile is eu num of dtype, so NULL is OK
+                             &input_global_stride,
+                             dtype );
+          // Move Grad Output from global memory to local memory
+          tpu_gdma_cpy_S2L ( grad_output_local_addrs[index],
+                             grad_output_global_addr + (
+                             1UL * ndone * grad_output_global_stride.n +
+                             1UL * cdone * grad_output_global_stride.c +
+                             1UL * hwdone * grad_output_global_stride.w ) * dsize,
+                             &work_shape,
+                             NULL, // tile is eu num of dtype, so NULL is OK
+                             &grad_output_global_stride,
+                             dtype );
+          if ( tpu_is_parallel_state() )
+          {
+            tpu_parallel_end();
+          }
+          tpu_parallel_start();
+          // Move Grad Input from local memory to global memory
+          if ( l2s_grad_input )
+          {
+            tpu_gdma_cpy_L2S ( l2s_grad_input_global_addr,
+                               l2s_grad_input_local_addr,
+                               &l2s_grad_input_shape,
+                               &grad_input_global_stride,
+                               NULL,
+                               dtype );
+            l2s_grad_input = false;
+          }
+          dim4 tile_shape = { .n = work_shape.n, .c = work_shape.c, .h = DIV_UP ( ( work_shape.h * work_shape.w ), tile ), .w = tile };
+          dim4 tile_stride; tpu_aligned_stride ( &tile_stride, 0, &tile_shape, dtype );
+          dim4 tile_fp32_stride; tpu_aligned_stride ( &tile_fp32_stride, 0, &tile_shape, DT_FP32 );
+          // Input Normalized = ( Input − Saved Mean ) × Saved Invstd
+          if ( dtype != DT_FP32 )
+          {
+            tpu_bdc_cast ( input_normalized_fp32_local_addr,
+                           input_local_addrs[index],
+                           &tile_shape,
+                           NULL,
+                           NULL,
+                           DT_FP32,
+                           dtype,
+                           RM_HALF_TO_EVEN );
+            tpu_bdc_fp_sub ( input_normalized_fp32_local_addr,
+                             input_normalized_fp32_local_addr,
+                             saved_mean_fp32_local_addr,
+                             &tile_shape,
+                             NULL,
+                             NULL,
+                             &channel_stride,
+                             DT_FP32 );
+            tpu_bdc_fp_mul ( input_normalized_fp32_local_addr,
+                             input_normalized_fp32_local_addr,
+                             saved_invstd_fp32_local_addr,
+                             &tile_shape,
+                             NULL,
+                             NULL,
+                             &channel_stride,
+                             DT_FP32 );
+          }
+          else
+          {
+            input_normalized_fp32_local_addr = input_local_addrs[index];
+            tpu_bdc_fp_sub ( input_normalized_fp32_local_addr,
+                             input_local_addrs[index],
+                             saved_mean_fp32_local_addr,
+                             &tile_shape,
+                             NULL,
+                             NULL,
+                             &channel_stride,
+                             DT_FP32 );
+            tpu_bdc_fp_mul ( input_normalized_fp32_local_addr,
+                             input_normalized_fp32_local_addr,
+                             saved_invstd_fp32_local_addr,
+                             &tile_shape,
+                             NULL,
+                             NULL,
+                             &channel_stride,
+                             DT_FP32 );
+          }
+          // Input Normalized = - ( Input Normalized × Grad Weight + Grad Bias ) / NHW
+          tpu_bdc_fp_mul ( input_normalized_fp32_local_addr,
+                           input_normalized_fp32_local_addr,
+                           grad_weight_fp32_local_addr,
+                           &tile_shape,
+                           NULL,
+                           NULL,
+                           &channel_stride,
+                           DT_FP32 );
+          tpu_bdc_fp_add ( input_normalized_fp32_local_addr,
+                           input_normalized_fp32_local_addr,
+                           grad_bias_fp32_local_addr,
+                           &tile_shape,
+                           NULL,
+                           NULL,
+                           &channel_stride,
+                           DT_FP32 );
+          tpu_bdc_fp_mul_C ( input_normalized_fp32_local_addr,
+                             input_normalized_fp32_local_addr,
+                             neg_inv_nhw_fp32,
+                             &tile_shape,
+                             NULL,
+                             NULL,
+                             DT_FP32 );
+          local_addr_t grad_output_fp32_local_addr = DEFAULT_LOCAL_ADDR;
+          if ( dtype != DT_FP32 )
+          {
+            grad_output_fp32_local_addr = common_tile_fp32_local_addr;
+            tpu_bdc_cast ( grad_output_fp32_local_addr,
+                           grad_output_local_addrs[index],
+                           &tile_shape,
+                           NULL,
+                           NULL,
+                           DT_FP32,
+                           dtype,
+                           RM_HALF_TO_EVEN );
+          }
+          else
+          {
+            grad_output_fp32_local_addr = grad_output_local_addrs[index];
+          }
+          // Grad Output = Grad Output + Input Normalized
+          tpu_bdc_fp_add ( grad_output_fp32_local_addr,
+                           grad_output_fp32_local_addr,
+                           input_normalized_fp32_local_addr,
+                           &tile_shape,
+                           NULL,
+                           NULL,
+                           NULL,
+                           DT_FP32 );
+          // Grad Input = Weight × Saved Invstd × Grad Output
+          tpu_bdc_fp_mul ( grad_output_fp32_local_addr,
+                           grad_output_fp32_local_addr,
+                           saved_invstd_fp32_local_addr,
+                           &tile_shape,
+                           NULL,
+                           NULL,
+                           &channel_stride,
+                           DT_FP32 );
+          if ( dtype != DT_FP32 )
+          {
+            tpu_bdc_fp_mul ( grad_output_fp32_local_addr,
+                             grad_output_fp32_local_addr,
+                             weight_fp32_local_addr,
+                             &tile_shape,
+                             NULL,
+                             NULL,
+                             &channel_stride,
+                             DT_FP32 );
+            tpu_bdc_cast ( grad_input_local_addrs[index],
+                           grad_output_fp32_local_addr,
+                           &tile_shape,
+                           NULL,
+                           NULL,
+                           dtype,
+                           DT_FP32,
+                           RM_HALF_TO_EVEN );
+          }
+          else
+          {
+            tpu_bdc_fp_mul ( grad_input_local_addrs[index],
+                             grad_output_fp32_local_addr,
+                             weight_fp32_local_addr,
+                             &tile_shape,
+                             NULL,
+                             NULL,
+                             &channel_stride,
+                             DT_FP32 );
+          }
+          l2s_grad_input = true;
+          l2s_grad_input_local_addr = grad_input_local_addrs[index];
+          l2s_grad_input_global_addr = grad_input_global_addr + (
+                                       1UL * ndone * grad_input_global_stride.n +
+                                       1UL * cdone * grad_input_global_stride.c +
+                                       1UL * hwdone * grad_input_global_stride.w ) * dsize;
+          l2s_grad_input_shape = work_shape;
+          hwtodo -= work_shape.h * work_shape.w;
+          hwdone += work_shape.h * work_shape.w;
+          index = 1 - index;
         }
-        /* compute weight * invstd * grad_output */
-        tpu_bdc_fp_mul ( grad_outputAddr, grad_outputAddr, weightAddr, &Shape, NULL, NULL, &CBcastStride, dtype );
-        /* compute input_norm * grad_weight + grad_bias */
-        tpu_bdc_fp_mul ( input_normAddr, input_normAddr, grad_weightAddr, &Shape, NULL, NULL, &CBcastStride, dtype );
-        tpu_bdc_fp_add ( input_normAddr, input_normAddr, grad_biasAddr, &Shape, NULL, NULL, &CBcastStride, dtype );
-        tpu_bdc_fp_mul ( input_normAddr, input_normAddr, weightAddr, &Shape, NULL, NULL, &CBcastStride, dtype );
-        tpu_bdc_fp_mul_C ( input_normAddr, input_normAddr, InvNHW, &Shape, NULL, NULL, dtype );
-        /* compute grad input */
-        tpu_bdc_fp_sub ( grad_inputAddr, grad_outputAddr, input_normAddr, &Shape, NULL, NULL, NULL, dtype );
-        if ( grad_input_enable )
-        {
-          global_addr_t grad_inputGAddr = grad_input_global_addr + TotalDone * DataSize;
-          tpu_gdma_cpy_L2S ( grad_inputGAddr, grad_inputAddr, &Shape, NULL, NULL, dtype );
-        }
-        else { TPUKERNEL_ASSERT ( false ); }
-        HTodo -= Shape.h;
-        HDone += Shape.h;
+        ntodo -= work_shape.n;
+        ndone += work_shape.n;
       }
-      NTodo -= Shape.n;
-      NDone += Shape.n;
+      // Synchronize Point
+      if ( tpu_is_parallel_state() )
+      {
+        tpu_parallel_end();
+      }
+      // Move Grad Input from local memory to global memory
+      if ( l2s_grad_input )
+      {
+        tpu_gdma_cpy_L2S ( l2s_grad_input_global_addr,
+                           l2s_grad_input_local_addr,
+                           &l2s_grad_input_shape,
+                           &grad_input_global_stride,
+                           NULL,
+                           dtype );
+        l2s_grad_input = false;
+      }
     }
-    CTodo -= Shape.c;
-    CDone += Shape.c;
+    ctodo -= work_shape.c;
+    cdone += work_shape.c;
   }
 }
 
 void tpu_kernel_api_batchnorm2d_backward ( const void *args )
 {
-  sg_api_batchnorm2d_backward_t *api = ( sg_api_batchnorm2d_backward_t * ) args;
-  dim4 shape = {api->shape[0], api->shape[1], api->shape[2], api->shape[3]};
-  // TODO:fp16 to fp32 local type convert
+  sg_api_batchnorm2d_backward_t * api = ( sg_api_batchnorm2d_backward_t * ) args;
+  dim4 shape = { .n = api->shape[0], .c = api->shape[1], .h = api->shape[2], .w = api->shape[3] };
   TPUKERNEL_ASSERT ( api->dtype == DT_FP32 || api->dtype == DT_FP16 || api->dtype == DT_BFP16 );
   tpu_initialize();
-  nodechip_batchnorm2d_backward (
-  api->grad_output_global_addr,
-  api->input_global_addr,
-  api->weight_global_addr,
-  api->saved_mean_global_addr,
-  api->saved_invstd_global_addr,
-  api->grad_input_global_addr,
-  api->grad_weight_global_addr,
-  api->grad_bias_global_addr,
-  shape,
-  ( data_type_t ) api->dtype,
-  api->grad_input_global_addr != 0,
-  api->grad_weight_global_addr != 0,
-  api->grad_bias_global_addr != 0 );
+  if ( api->grad_input_global_addr != 0 || api->grad_weight_global_addr != 0 || api->grad_bias_global_addr != 0 )
+  {
+    bool split_c_only = nodechip_batchnorm2d_backward_split_c_only_all_fp32 (
+                        api->grad_output_global_addr,
+                        api->input_global_addr,
+                        api->weight_global_addr,
+                        api->saved_mean_global_addr,
+                        api->saved_invstd_global_addr,
+                        api->grad_input_global_addr,
+                        api->grad_weight_global_addr,
+                        api->grad_bias_global_addr,
+                        shape,
+                        ( data_type_t ) api->dtype,
+                        api->grad_input_global_addr != 0,
+                        api->grad_weight_global_addr != 0,
+                        api->grad_bias_global_addr != 0 );
+    if ( !split_c_only )
+    {
+      nodechip_batchnorm2d_backward_all_fp32 (
+      api->grad_output_global_addr,
+      api->input_global_addr,
+      api->weight_global_addr,
+      api->saved_mean_global_addr,
+      api->saved_invstd_global_addr,
+      api->grad_input_global_addr,
+      api->grad_weight_global_addr,
+      api->grad_bias_global_addr,
+      shape,
+      ( data_type_t ) api->dtype,
+      api->grad_input_global_addr != 0,
+      api->grad_weight_global_addr != 0,
+      api->grad_bias_global_addr != 0 );
+    }
+  }
   tpu_poll();
 }
 TPUKERNEL_FUNC_REGISTER ( tpu_kernel_api_batchnorm2d_backward );
