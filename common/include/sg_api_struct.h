@@ -726,6 +726,39 @@ typedef struct {
 #endif
 
 typedef struct {
+    unsigned long long input_addr;
+    unsigned long long output_addr;
+    int shape[FW_MAX_SHAPE_DIMS];
+    int dims;
+    int binary_type;
+    int dtype;
+    float const_value;
+    int is_inversed;
+#ifndef WIN32
+} __attribute__((packed)) sg_api_const_binary_float_t;
+#else
+} sg_api_const_binary_float_t;
+#endif
+
+typedef struct {
+  unsigned long long input0_addr;
+  unsigned long long input1_addr;
+  unsigned long long output_addr;
+  int in0_shape[FW_MAX_SHAPE_DIMS];
+  int in1_shape[FW_MAX_SHAPE_DIMS];
+  int in0_dims;
+  int in1_dims;
+  float in0_scale;
+  float in1_scale;
+  int binary_type;
+  int dtype;
+#ifndef WIN32
+} __attribute__((packed)) sg_api_binary_multi_core_t;
+#else
+} sg_api_binary_multi_core_t;
+#endif
+
+typedef struct {
     int core_idx;
     int core_num;
     int core_msg_id;

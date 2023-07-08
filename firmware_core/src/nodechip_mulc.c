@@ -305,3 +305,36 @@ void tpu_kernel_api_csub ( const void * args )
   tpu_poll();
 }
 TPUKERNEL_FUNC_REGISTER ( tpu_kernel_api_csub );
+
+extern void nodechip_const_binary_fp_multi_core(
+    global_addr_t A_global_addr,
+    global_addr_t res_global_addr,
+    const int* shape,
+    int shape_dim,
+    float B_const_val,
+    int inversed,
+    int binary_type,      // 0: add, 1: sub, 2: mul, 3:div
+    data_type_t dtype,
+    int if_relu,
+    float relu_upper_limit);
+
+void tpu_kernel_api_const_binary_multi_core(const void* api_buf) {
+
+    sg_api_const_binary_float_t *api = (sg_api_const_binary_float_t*)api_buf;
+    tpu_initialize();
+
+    nodechip_const_binary_fp_multi_core(
+        api->input_addr,
+        api->output_addr,
+        api->shape,
+        api->dims,
+        api->const_value,
+        api->is_inversed,
+        api->binary_type,
+        (data_type_t)(api->dtype),
+        0, 0);
+
+    tpu_poll();
+}
+
+TPUKERNEL_FUNC_REGISTER(tpu_kernel_api_const_binary_multi_core);

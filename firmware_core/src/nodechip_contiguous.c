@@ -259,3 +259,21 @@ void tpu_kernel_api_strided_copy ( const void *args )
 }
 
 TPUKERNEL_FUNC_REGISTER ( tpu_kernel_api_strided_copy );
+
+void tpu_kernel_api_strided_copy_multi_core(const void *args) {
+  sg_api_strided_copy_t *api = (sg_api_strided_copy_t*)args;
+  if (tpu_core_index() == 0) {
+    tpu_initialize();
+    nodechip_strided_copy(
+        api->input_global_addr,
+        api->output_global_addr,
+        api->dim,
+        api->shape,
+        api->input_stride,
+        api->output_stride,
+        (data_type_t)api->dtype);
+    tpu_poll();
+  }
+}
+
+TPUKERNEL_FUNC_REGISTER(tpu_kernel_api_strided_copy_multi_core);

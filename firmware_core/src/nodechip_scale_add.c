@@ -119,3 +119,46 @@ void tpu_kernel_api_add ( const void * args )
   tpu_poll();
 }
 TPUKERNEL_FUNC_REGISTER ( tpu_kernel_api_add );
+
+void tpu_kernel_api_add_multi_core ( const void * args )
+{
+  sg_api_add_t * api = ( sg_api_add_t * ) args;
+  TPUKERNEL_ASSERT ( api->dtype == DT_FP32 || api->dtype == DT_FP16 || api->dtype == DT_BFP16 );
+  scalar_t value;
+  if ( api->dtype == DT_FP32 )
+  {
+    value.f32 = api->value;
+  }
+  else
+  {
+    scalar_t value_f32 = { .f32 = api->value };
+    value = tpu_fp_cast ( value_f32, ( data_type_t ) api->dtype, DT_FP32, RM_HALF_TO_EVEN );
+  }
+  int length = 1;
+  for ( int i = 0; i < api->dim; ++i )
+  {
+    length *= api->shape[i];
+  }
+  tpu_initialize();
+
+  int core_num = tpu_core_num();
+  int core_idx = tpu_core_index();
+
+  int length_slice = DIV_UP(length, core_num);
+  int length_secs = DIV_UP(length, length_slice);
+  TPUKERNEL_ASSERT(length_secs <= core_num);
+
+  int cur_length_slice = length_slice;
+  if (core_idx == length_secs - 1)
+    cur_length_slice = length - length_slice * (length_secs - 1);
+  nodechip_scale_add(
+      api->input_global_addr + (length_slice * core_idx) * tpu_data_type_size(api->dtype),
+      api->other_global_addr + (length_slice * core_idx) * tpu_data_type_size(api->dtype),
+      api->output_global_addr + (length_slice * core_idx) * tpu_data_type_size(api->dtype),
+      value,
+      cur_length_slice,
+      (data_type_t)api->dtype);
+
+  tpu_poll();
+}
+TPUKERNEL_FUNC_REGISTER ( tpu_kernel_api_add_multi_core );

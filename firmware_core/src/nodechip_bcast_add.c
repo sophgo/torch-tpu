@@ -212,3 +212,51 @@ void tpu_kernel_api_bcast_add ( const void * args )
   tpu_poll();
 }
 TPUKERNEL_FUNC_REGISTER ( tpu_kernel_api_bcast_add );
+
+extern void nodechip_binary_multi_core(
+    global_addr_t A_global_addr,
+    global_addr_t B_global_addr,
+    global_addr_t res_global_addr,
+    const int* A_shape,
+    const int* B_shape,
+    int A_dim,
+    int B_dim,
+    int binary_type,          // 0: add, 1: sub, 2: mul, 3:div
+    data_type_t dtype,
+    int if_relu,
+    float relu_upper_limit);
+
+void tpu_kernel_api_binary_multi_core(const void* api_buf) {
+    sg_api_binary_multi_core_t *api = (sg_api_binary_multi_core_t *)api_buf;
+    TPUKERNEL_ASSERT(api->in0_scale == 1.f && api->in1_scale == 1.f);
+    int ashape[FW_MAX_SHAPE_DIMS], bshape[FW_MAX_SHAPE_DIMS];
+    for (int i = 0; i < api->in0_dims; ++i) {
+      ashape[i] = api->in0_shape[i];
+    }
+    for (int i = 0; i < api->in1_dims; ++i) {
+      bshape[i] = api->in1_shape[i];
+    }
+    int r_dim = api->in0_dims > api->in1_dims ? api->in0_dims : api->in1_dims;
+    int add_dim = r_dim < 4 ? 4 - r_dim : 0;
+    for (int i = 0; i < add_dim; ++i) {
+      ashape[api->in0_dims + i] = 1;
+      bshape[api->in1_dims + i] = 1;
+    }
+
+    tpu_initialize();
+    nodechip_binary_multi_core(
+        api->input0_addr,
+        api->input1_addr,
+        api->output_addr,
+        ashape,
+        bshape,
+        api->in0_dims + add_dim,
+        api->in1_dims + add_dim,
+        api->binary_type,
+        (data_type_t)api->dtype,
+        0,
+        -1.f);
+    tpu_poll();
+}
+
+TPUKERNEL_FUNC_REGISTER(tpu_kernel_api_binary_multi_core);
