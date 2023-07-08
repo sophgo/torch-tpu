@@ -668,5 +668,41 @@ __attribute__ ( ( packed ) ) sg_api_layernorm_backward_multi_core_t;
 sg_api_layernorm_backward_multi_core_t;
 #endif
 
+typedef struct {
+  unsigned long long output_addr;
+  unsigned long long cond_addr;
+  unsigned long long self_addr;
+  unsigned long long other_addr;
+  int out_shape[FW_MAX_SHAPE_DIMS];
+  int cond_shape[FW_MAX_SHAPE_DIMS];
+  int self_shape[FW_MAX_SHAPE_DIMS];
+  int other_shape[FW_MAX_SHAPE_DIMS];
+  int dims;
+  int cond_dtype;
+  int dtype;
+  int self_is_scalar;
+  int other_is_scalar;
+  float self_val;
+  float other_val;
+#ifndef WIN32
+} __attribute__((packed)) sg_api_where_multi_core_t;
+#else
+} sg_api_where_multi_core_t;
+#endif
+
+typedef struct {
+    int core_idx;
+    int core_num;
+    int core_msg_id;
+    int name_len;
+    int api_id;
+    int api_size;
+    unsigned char api_data[0];
+#ifndef WIN32
+} __attribute__((packed)) sg_api_core_info_t;
+#else
+} sg_api_core_info_t;
+#endif
+
 #pragma pack(pop)
 #endif  // SG_API_STRUCT_H

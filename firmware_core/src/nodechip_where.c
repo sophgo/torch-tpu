@@ -262,3 +262,44 @@ void tpu_kernel_api_where ( const void * args )
   tpu_poll();
 }
 TPUKERNEL_FUNC_REGISTER ( tpu_kernel_api_where );
+
+extern void nodechip_where_multi_core(
+    global_addr_t out_global_addr,
+    global_addr_t cond_global_addr,
+    global_addr_t self_global_addr,
+    global_addr_t other_global_addr,
+    bool          self_is_scalar,
+    bool          other_is_scalar,
+    float         self_val,
+    float         other_val,
+    int*          out_shape,
+    int*          cond_shape,
+    int*          self_shape,
+    int*          other_shape,
+    int           dim,
+    data_type_t   cond_dtype,
+    data_type_t   dtype);
+
+void tpu_kernel_api_where_multi_core(const void * args)
+{
+  sg_api_where_multi_core_t * api = (sg_api_where_multi_core_t *) args;
+  TPUKERNEL_ASSERT (api->dtype == DT_FP32 || api->dtype == DT_FP16 || api->dtype == DT_BFP16);
+  tpu_initialize();
+  nodechip_where_multi_core(api->output_addr,
+                            api->cond_addr,
+                            api->self_addr,
+                            api->other_addr,
+                            api->self_is_scalar,
+                            api->other_is_scalar,
+                            api->self_val,
+                            api->other_val,
+                            api->out_shape,
+                            api->cond_shape,
+                            api->self_shape,
+                            api->other_shape,
+                            api->dims,
+                            (data_type_t)api->cond_dtype,
+                            (data_type_t)api->dtype);
+  tpu_poll();
+}
+TPUKERNEL_FUNC_REGISTER(tpu_kernel_api_where_multi_core);

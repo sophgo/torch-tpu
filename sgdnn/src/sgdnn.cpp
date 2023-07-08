@@ -5,6 +5,7 @@
 #include <memory>
 #include <stdio.h>
 #include "config_sgdnn_backend.h"
+#include "tpukernel_multicore.hpp"
 
 #define SGDNN_CHECK(expression) \
 do \
@@ -160,7 +161,15 @@ static inline int sgdnnTPUKernelDType ( SgdnnDataType_t dtype )
   else if ( dtype == SGDNN_DTYPE_UINT32 ) { return ( 4 << 1 ) | 0; }
   else if ( dtype == SGDNN_DTYPE_FP32 )   { return ( 2 << 1 ) | 1; }
 #elif defined SGDNN_BACKEND_2260
-  SGDNN_CHECK ( false );
+  if ( dtype == SGDNN_DTYPE_INT8 )        { return 2; }
+  else if ( dtype == SGDNN_DTYPE_UINT8 )  { return 3; }
+  else if ( dtype == SGDNN_DTYPE_INT16 )  { return 4; }
+  else if ( dtype == SGDNN_DTYPE_UINT16 ) { return 5; }
+  else if ( dtype == SGDNN_DTYPE_FP16 )   { return 1; }
+  else if ( dtype == SGDNN_DTYPE_BF16 )   { return 8; }
+  else if ( dtype == SGDNN_DTYPE_INT32 )  { return 6; }
+  else if ( dtype == SGDNN_DTYPE_UINT32 ) { return 7; }
+  else if ( dtype == SGDNN_DTYPE_FP32 )   { return 0; }
 #else
   SGDNN_CHECK ( false );
 #endif
@@ -182,7 +191,6 @@ bm_status_t sgdnnInitialize ( bm_handle_t handle )
   tpu_kernel_module_t tpu_module = tpu_kernel_load_module ( handle, ( const char * ) p, length );
   tpu_kernel_module.insert ( std::pair<bm_handle_t, tpu_kernel_module_t> ( handle, tpu_module ) );
 #elif defined SGDNN_BACKEND_2260
-  SGDNN_CHECK ( false );
 #else
   SGDNN_CHECK ( false );
 #endif
@@ -198,7 +206,6 @@ bm_status_t sgdnnDeinitialize ( bm_handle_t handle )
   }
   SGDNN_CHECK ( tpu_kernel_module.erase ( handle ) );
 #elif defined SGDNN_BACKEND_2260
-  SGDNN_CHECK ( false );
 #else
   SGDNN_CHECK ( false );
 #endif
@@ -217,7 +224,8 @@ size_t api_size )
   func_id = tpu_kernel_get_function ( handle, tpu_module, func_name );
   return tpu_kernel_launch ( handle, func_id, ( void * ) api, api_size );
 #elif defined SGDNN_BACKEND_2260
-  SGDNN_CHECK ( false );
+  TPUKernelLauncher launcher(handle);
+  return launcher.all_cores().launch_sync(func_name, api, api_size);
 #else
   SGDNN_CHECK ( false );
 #endif
@@ -803,23 +811,22 @@ bm_status_t sgdnnLayernorm ( bm_handle_t handle,
   SAFE_CALL ( sgdnnTPUKernelLaunch ( handle, "tpu_kernel_api_layernorm", &api, sizeof ( api ) ) );
 #elif defined SGDNN_BACKEND_2260
   SGDNN_CHECK ( false );
-  sg_api_layernorm_forward_multi_core_t api;
-  api.input_global_addr = input.addr;
-  api.weight_global_addr = weight.addr;
-  api.bias_global_addr = bias.addr;
-  api.mean_global_addr = mean.addr;
-  api.rstd_global_addr = rstd.addr;
-  api.output_global_addr = output.addr;
-  api.dims = input.dim;
-  api.axis = start_dim;
-  api.eps = eps;
-  api.affine = true;
-  api.dtype = sgdnnTPUKernelDType ( input.dtype );
-  for ( int i = 0; i < input.dim; ++i )
-  {
-    api.shape[i] = input.shape[i];
-  }
-
+  // sg_api_layernorm_forward_multi_core_t api;
+  // api.input_global_addr = input.addr;
+  // api.weight_global_addr = weight.addr;
+  // api.bias_global_addr = bias.addr;
+  // api.mean_global_addr = mean.addr;
+  // api.rstd_global_addr = rstd.addr;
+  // api.output_global_addr = output.addr;
+  // api.dims = input.dim;
+  // api.axis = start_dim;
+  // api.eps = eps;
+  // api.affine = true;
+  // api.dtype = sgdnnTPUKernelDType ( input.dtype );
+  // for ( int i = 0; i < input.dim; ++i )
+  // {
+  //   api.shape[i] = input.shape[i];
+  // }
 #else
   SGDNN_CHECK ( false );
 #endif
@@ -1308,7 +1315,43 @@ bm_status_t sgdnnWhere ( bm_handle_t handle,
   }
   SAFE_CALL ( sgdnnTPUKernelLaunch ( handle, "tpu_kernel_api_where", &api, sizeof ( api ) ) );
 #elif defined SGDNN_BACKEND_2260
-  SGDNN_CHECK ( false );
+  sg_api_where_multi_core_t api;
+  api.output_addr = output.addr;
+  api.cond_addr = cond.addr;
+  api.self_addr = self.addr;
+  api.other_addr = other.addr;
+  api.dims = output.dim;
+  api.cond_dtype = sgdnnTPUKernelDType(cond.dtype);
+  api.dtype = sgdnnTPUKernelDType(output.dtype);
+  api.self_is_scalar = false;
+  api.self_val = 0.f;
+  api.other_is_scalar = false;
+  api.other_val = 0.f;
+  for (int i = 0; i < cond.dim; ++i) {
+    api.cond_shape[i] = cond.shape[i];
+  }
+  if (self.dim > 0) {
+    for (int i = 0; i < self.dim; ++i) {
+      api.self_shape[i] = self.shape[i];
+    }
+  } else {
+    for (int i = 0; i < output.dim; ++i) {
+      api.self_shape[i] = 1;
+    }
+  }
+  if (other.dim > 0) {
+    for (int i = 0; i < other.dim; ++i) {
+      api.other_shape[i] = other.shape[i];
+    }
+  } else {
+    for (int i = 0; i < output.dim; ++i) {
+      api.other_shape[i] = 1;
+    }
+  }
+  for (int i = 0; i < output.dim; ++i) {
+    api.out_shape[i] = output.shape[i];
+  }
+  SAFE_CALL(sgdnnTPUKernelLaunch(handle, "where_multi_core", &api, sizeof(api)));
 #else
   SGDNN_CHECK ( false );
 #endif
