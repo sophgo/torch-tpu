@@ -221,6 +221,76 @@ int             log,
 float           scale_val,
 data_type_t     dtype );
 
+extern void nodechip_softmax_forward_fp16 (
+global_addr_t IGAddr,
+global_addr_t OGAddr,
+int           Row,
+int           Column,
+data_type_t   DType );
+
+void nodechip_softmax_forward_multi_core (
+global_addr_t input_global_addr,
+global_addr_t output_global_addr,
+int*          shape,
+int           dims,
+int           begin_dim,
+int           end_dim,
+float         scale_val,
+data_type_t   dtype )
+{
+  int slice_num = tpu_core_num();
+  int slice_idx = tpu_core_index();
+  TPUKERNEL_ASSERT ( slice_num > 0 );
+  TPUKERNEL_ASSERT ( 0 <= slice_idx && slice_idx < slice_num );
+  int outer_num = 1, chns = 1, inner_num = 1;
+  for (int i = 0; i < begin_dim; i++)
+  {
+      outer_num *= shape[i];
+  }
+  for (int i = begin_dim; i <= end_dim; i++)
+  {
+      chns *= shape[i];
+  }
+  for (int i = end_dim + 1; i < dims; i++)
+  {
+      inner_num *= shape[i];
+  }
+  int slice = DIV_UP (outer_num, slice_num);
+  int offset = slice_idx * slice * chns * inner_num;
+  if( slice * (slice_idx + 1) > outer_num )
+  {
+    slice = outer_num - slice * slice_idx;
+  }
+  if ( slice > 0 )
+  {
+    const int dsize = tpu_data_type_size( dtype );
+    int multi_core_shape[] = {slice, chns, inner_num};
+    if ( inner_num == 1 && dtype != DT_FP32 )
+    {
+      nodechip_softmax_forward_fp16 (
+        input_global_addr + offset * dsize,
+        output_global_addr + offset * dsize,
+        slice,
+        chns,
+        dtype );
+    }
+    else
+    {
+      nodechip_softmax(
+        input_global_addr + offset * dsize,
+        output_global_addr + offset * dsize,
+        multi_core_shape,
+        3,
+        1,
+        1,
+        0,
+        scale_val,
+        dtype );
+    }
+  }
+  tpu_sync_all();
+}
+
 void tpu_kernel_api_softmax ( const void *args )
 {
   sg_api_softmax_t *api = ( sg_api_softmax_t * ) args;
@@ -257,3 +327,22 @@ void tpu_kernel_api_softmax ( const void *args )
   tpu_poll();
 }
 TPUKERNEL_FUNC_REGISTER ( tpu_kernel_api_softmax );
+
+void tpu_kernel_api_softmax_multi_core ( const void *args )
+{
+  sg_api_softmax_t *api = ( sg_api_softmax_t * ) args;
+  TPUKERNEL_ASSERT ( api->dtype == DT_FP32 || api->dtype == DT_FP16 || api->dtype == DT_BFP16 );
+  tpu_initialize();
+  nodechip_softmax_forward_multi_core (
+    api->input_global_addr,
+    api->output_global_addr,
+    api->shape,
+    api->dim,
+    api->axis,
+    api->axis,
+    1.f,
+    ( data_type_t ) api->dtype );
+  tpu_poll();
+}
+TPUKERNEL_FUNC_REGISTER ( tpu_kernel_api_softmax_multi_core );
+
