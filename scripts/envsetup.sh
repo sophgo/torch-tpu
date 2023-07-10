@@ -20,6 +20,7 @@ function format_code {
 }
 
 export BMLIB_CMODEL_PATH=$TPUTRAIN_TOP/third_party/$CHIP_ARCH/libcmodel_firmware.so
+export BMLIB_PATH=$TPUTRAIN_TOP/third_party/$CHIP_ARCH/libbmlib.so
 echo "USING_CMODEL_PATH = $BMLIB_CMODEL_PATH"
 source ${TPUTRAIN_TOP}/scripts/build_helper.sh
 source ${TPUTRAIN_TOP}/scripts/release.sh

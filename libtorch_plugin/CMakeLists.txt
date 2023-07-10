@@ -14,7 +14,7 @@ configure_file(
     "${PROJECT_SOURCE_DIR}/common/config.h.in"
     "${PROJECT_SOURCE_DIR}/common/config.h" )
 
-include_directories(/opt/sophon/libsophon-current/include)
+include_directories($ENV{TPUTRAIN_TOP}/third_party/include)
 include_directories($ENV{TPUTRAIN_TOP}/libtorch/include/torch/csrc/api/include)
 include_directories($ENV{TPUTRAIN_TOP}/libtorch/include)
 include_directories(${CMAKE_CURRENT_SOURCE_DIR}/tpu)

@@ -1,5 +1,6 @@
 set(CMAKE_BUILD_TYPE "Debug")
 
+if($ENV{CHIP_ARCH} STREQUAL "bm1684x")
 find_package(libsophon REQUIRED)
 include_directories(${LIBSOPHON_INCLUDE_DIRS})
 include_directories(include)
@@ -27,3 +28,15 @@ target_compile_definitions(firmware PRIVATE -DUSING_CMODEL)
 
 target_link_libraries(firmware PRIVATE $ENV{BMLIB_CMODEL_PATH} m)
 set_target_properties(firmware PROPERTIES OUTPUT_NAME cmodel)
+
+elseif($ENV{CHIP_ARCH} STREQUAL "sg2260")
+	include_directories($ENV{TPUTRAIN_TOP}/common/include)
+	include_directories($ENV{TPUTRAIN_TOP}/third_party/include)
+
+	aux_source_directory(src KERNEL_SRC_FILES)
+
+	add_library(firmware SHARED ${KERNEL_SRC_FILES})
+	target_link_libraries(firmware PRIVATE $ENV{BMLIB_PATH} m)
+	set_target_properties(firmware PROPERTIES OUTPUT_NAME cmodel)
+
+endif()

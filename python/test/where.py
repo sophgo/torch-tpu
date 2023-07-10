@@ -20,8 +20,8 @@ if __name__ == "__main__":
     casual_mask_tpu = casual_mask.to(device)
 
 
-    res_cpu = torch.where(casual_mask.bool(), attn_weights, mask_value)
-    res_tpu = torch.where(casual_mask_tpu.bool(), attn_weights_tpu, mask_value_tpu)
+    res_cpu = torch.where(casual_mask, attn_weights, mask_value)
+    res_tpu = torch.where(casual_mask_tpu, attn_weights_tpu, mask_value_tpu)
     print("cpu ======")
     print(res_cpu)
     print("tpu ======")

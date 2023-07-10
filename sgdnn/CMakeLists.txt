@@ -26,24 +26,24 @@ endif()
 
 include_directories(${CMAKE_CURRENT_SOURCE_DIR}/include)
 include_directories(${PROJECT_ROOT}/common/include)
-include_directories(${PROJECT_ROOT}/third_party/include)
 include_directories(/opt/sophon/libsophon-current/include)
-include_directories(${CMAKE_BINARY_DIR}/firmware_core)
+include_directories(${PROJECT_ROOT}/third_party/include)
 
 if(USING_CMODEL)
   link_directories(${PROJECT_ROOT}/third_party/$ENV{CHIP_ARCH})
 endif()
 
-#link_directories(/opt/sophon/libsophon-current/lib)
 
 if(SGDNN_BACKEND_1684X)
+  include_directories(${CMAKE_BINARY_DIR}/firmware_core)
+  link_directories(/opt/sophon/libsophon-current/lib)
   add_library(sgdnn SHARED ${CMAKE_CURRENT_SOURCE_DIR}/src/sgdnn.cpp)
 elseif(SGDNN_BACKEND_2260)
   add_library(sgdnn SHARED ${CMAKE_CURRENT_SOURCE_DIR}/src/sgdnn.cpp ${CMAKE_CURRENT_SOURCE_DIR}/src/tpukernel_multicore.cpp)
 endif()
 
 if(USING_CMODEL)
-  target_link_libraries(sgdnn bmlib_cmodel)
+  target_link_libraries(sgdnn bmlib)
 else()
   target_link_libraries(sgdnn bmodel bmlib)
 endif()

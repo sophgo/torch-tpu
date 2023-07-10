@@ -1,11 +1,13 @@
 #include "sgdnn_api.h"
 #include "sg_api_struct.h"
-#include "kernel_module_data.h"
 #include <map>
 #include <memory>
 #include <stdio.h>
 #include "config_sgdnn_backend.h"
 #include "tpukernel_multicore.hpp"
+#if defined SGDNN_BACKEND_1684X
+#include "kernel_module_data.h"
+#endif
 
 #define SGDNN_CHECK(expression) \
 do \
@@ -161,15 +163,15 @@ static inline int sgdnnTPUKernelDType ( SgdnnDataType_t dtype )
   else if ( dtype == SGDNN_DTYPE_UINT32 ) { return ( 4 << 1 ) | 0; }
   else if ( dtype == SGDNN_DTYPE_FP32 )   { return ( 2 << 1 ) | 1; }
 #elif defined SGDNN_BACKEND_2260
-  if ( dtype == SGDNN_DTYPE_INT8 )        { return 2; }
-  else if ( dtype == SGDNN_DTYPE_UINT8 )  { return 3; }
-  else if ( dtype == SGDNN_DTYPE_INT16 )  { return 4; }
-  else if ( dtype == SGDNN_DTYPE_UINT16 ) { return 5; }
-  else if ( dtype == SGDNN_DTYPE_FP16 )   { return 1; }
-  else if ( dtype == SGDNN_DTYPE_BF16 )   { return 8; }
-  else if ( dtype == SGDNN_DTYPE_INT32 )  { return 6; }
-  else if ( dtype == SGDNN_DTYPE_UINT32 ) { return 7; }
-  else if ( dtype == SGDNN_DTYPE_FP32 )   { return 0; }
+  if ( dtype == SGDNN_DTYPE_INT8 )        { return ( 0 << 1 ) | 1; }
+  else if ( dtype == SGDNN_DTYPE_UINT8 )  { return ( 0 << 1 ) | 0; }
+  else if ( dtype == SGDNN_DTYPE_INT16 )  { return ( 3 << 1 ) | 1; }
+  else if ( dtype == SGDNN_DTYPE_UINT16 ) { return ( 3 << 1 ) | 0; }
+  else if ( dtype == SGDNN_DTYPE_FP16 )   { return ( 1 << 1 ) | 1; }
+  else if ( dtype == SGDNN_DTYPE_BF16 )   { return ( 5 << 1 ) | 1; }
+  else if ( dtype == SGDNN_DTYPE_INT32 )  { return ( 4 << 1 ) | 1; }
+  else if ( dtype == SGDNN_DTYPE_UINT32 ) { return ( 4 << 1 ) | 0; }
+  else if ( dtype == SGDNN_DTYPE_FP32 )   { return ( 2 << 1 ) | 1; }
 #else
   SGDNN_CHECK ( false );
 #endif
@@ -177,7 +179,10 @@ static inline int sgdnnTPUKernelDType ( SgdnnDataType_t dtype )
   SGDNN_CHECK ( false );
 }
 
+#if defined SGDNN_BACKEND_1684X
 static std::map<bm_handle_t, tpu_kernel_module_t> tpu_kernel_module;
+#elif defined SGDNN_BACKEND_2260
+#endif
 
 bm_status_t sgdnnInitialize ( bm_handle_t handle )
 {
@@ -1351,7 +1356,7 @@ bm_status_t sgdnnWhere ( bm_handle_t handle,
   for (int i = 0; i < output.dim; ++i) {
     api.out_shape[i] = output.shape[i];
   }
-  SAFE_CALL(sgdnnTPUKernelLaunch(handle, "where_multi_core", &api, sizeof(api)));
+  SAFE_CALL(sgdnnTPUKernelLaunch(handle, "tpu_kernel_api_where_multi_core", &api, sizeof(api)));
 #else
   SGDNN_CHECK ( false );
 #endif
