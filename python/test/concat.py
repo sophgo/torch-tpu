@@ -4,7 +4,7 @@ import torch.nn.functional as F
 
 torch.ops.load_library("../../libtorch_plugin/build/liblibtorch_plugin.so")
 
-def case1():
+def case1(use_fp16):
     ############## config ###################
     device = "privateuseone"
     batch = 2
@@ -19,15 +19,21 @@ def case1():
     dq_tpu = dq.to(device)
     dk_tpu = dk.to(device)
     dv_tpu = dv.to(device)
+    if use_fp16:     
+        dq_tpu = dq_tpu.half()
+        dk_tpu = dk_tpu.half()
+        dv_tpu = dv_tpu.half()
 
     print("=======forward")
     out = torch.concatenate((dq,dk,dv), dim=-1)
-    out_tpu = torch.concatenate((dq_tpu, dk_tpu, dv_tpu), dim=-1)
+    out_tpu = torch.concatenate((dq_tpu, dk_tpu, dv_tpu), dim=-1).half()
+    if use_fp16: 
+        out_tpu = out_tpu.half()
 
     print("============compare result =======")
     diff = out - out_tpu.cpu()
     print("max diff : ", torch.max(abs(diff)))
-
+    print("max diff : ", out_tpu.cpu())
 def case2():
     """split backward
     """
@@ -56,5 +62,5 @@ def case2():
 
 
 if __name__ == "__main__":
-    # case1()
-    case2()
+    case1(use_fp16 =1 )
+    # case2()
