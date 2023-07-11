@@ -222,6 +222,25 @@ __attribute__ ( ( packed ) ) sg_api_batch_matmul_t;
 sg_api_batch_matmul_t;
 #endif
 
+typedef struct {
+    unsigned long long left_global_addr;
+    unsigned long long right_global_addr;
+    unsigned long long bias_global_addr;
+    unsigned long long output_global_addr;
+    int                L_shape[FW_MAX_SHAPE_DIMS];
+    int                R_shape[FW_MAX_SHAPE_DIMS];
+    int                L_dims;
+    int                R_dims;
+    int                L_trans;
+    int                R_trans;
+    int                in_dtype;
+    int                out_dtype;
+#ifndef WIN32
+} __attribute__((packed)) sg_api_matmul_multi_core_t;
+#else
+} sg_api_matmul_multi_core_t;
+#endif
+
 typedef struct
 {
   unsigned long long input_global_addr;
@@ -406,6 +425,22 @@ __attribute__ ( ( packed ) ) sg_api_sqrt_t;
 #else
 }
 sg_api_sqrt_t;
+#endif
+
+typedef struct
+{
+  unsigned long long input_global_addr;
+  unsigned long long output_global_addr;
+  int shape[FW_MAX_SHAPE_DIMS];
+  int dim;
+  int dtype;
+  int active_type;
+#ifndef WIN32
+}
+__attribute__ ( ( packed ) ) sg_api_active_t;
+#else
+}
+sg_api_active_t;
 #endif
 
 typedef struct

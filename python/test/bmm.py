@@ -6,19 +6,19 @@ torch.manual_seed(1000)
 if __name__ == "__main__":
     device = "privateuseone"
 
+    b = 2
     m = 2
-    n = 2
+    k = 3
+    n = 3
 
-    t = torch.rand(m, n)
-    t1 = torch.rand(m, n)
-    t2 = torch.rand(m, n)
+    mat1 = torch.rand(b, m, k)
+    mat2 = torch.rand(b, k, n)
 
-    t_tpu = t.to(device)
-    t1_tpu = t1.to(device)
-    t2_tpu = t2.to(device)
+    mat1_tpu = mat1.to(device)
+    mat2_tpu = mat2.to(device)
 
-    res_cpu = torch.addcdiv(t, t1, t2)
-    res_tpu = torch.addcdiv(t_tpu, t1_tpu, t2_tpu)
+    res_cpu = torch.bmm(mat1, mat2)
+    res_tpu = torch.bmm(mat1_tpu, mat2_tpu)
 
     print("cpu ======")
     print(res_cpu)

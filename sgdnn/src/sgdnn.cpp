@@ -1908,7 +1908,20 @@ bm_status_t sgdnnMatmul ( bm_handle_t handle,
     bm_free_device ( handle, left_contiguous_mem );
   }
 #elif defined SGDNN_BACKEND_2260
-  SGDNN_CHECK ( false );
+  sg_api_matmul_multi_core_t api;
+  api.left_global_addr = left.addr;
+  api.right_global_addr = right.addr;
+  api.bias_global_addr = bias.addr;
+  api.output_global_addr = output.addr;
+  memcpy(api.L_shape, left.shape, 8 * sizeof(int));
+  memcpy(api.R_shape, right.shape, 8 * sizeof(int));
+  api.L_dims = 3;
+  api.R_dims = 3;
+  api.L_trans = sgdnnIsTensorTransposed ( &left );
+  api.R_trans = sgdnnIsTensorTransposed ( &right );
+  api.in_dtype = sgdnnTPUKernelDType ( left.dtype );
+  api.out_dtype = sgdnnTPUKernelDType ( output.dtype );
+  SAFE_CALL ( sgdnnTPUKernelLaunch ( handle, "matmul_multi_core", &api, sizeof ( api ) ) );
 #else
   SGDNN_CHECK ( false );
 #endif
@@ -1971,7 +1984,20 @@ bm_status_t sgdnnBatchMatmul ( bm_handle_t handle,
     bm_free_device ( handle, left_contiguous_mem );
   }
 #elif defined SGDNN_BACKEND_2260
-  SGDNN_CHECK ( false );
+  sg_api_matmul_multi_core_t api;
+  api.left_global_addr = left.addr;
+  api.right_global_addr = right.addr;
+  api.bias_global_addr = 0;
+  api.output_global_addr = output.addr;
+  memcpy(api.L_shape, left.shape, 8 * sizeof(int));
+  memcpy(api.R_shape, right.shape, 8 * sizeof(int));
+  api.L_dims = 3;
+  api.R_dims = 3;
+  api.L_trans = sgdnnIsTensorTransposed ( &left );
+  api.R_trans = sgdnnIsTensorTransposed ( &right );
+  api.in_dtype = sgdnnTPUKernelDType ( left.dtype );
+  api.out_dtype = sgdnnTPUKernelDType ( output.dtype );
+  SAFE_CALL ( sgdnnTPUKernelLaunch ( handle, "matmul_multi_core", &api, sizeof ( api ) ) );
 #else
   SGDNN_CHECK ( false );
 #endif
@@ -2237,7 +2263,17 @@ bm_status_t sgdnnSqrt ( bm_handle_t handle,
   api.dtype = sgdnnTPUKernelDType ( input.dtype );
   SAFE_CALL ( sgdnnTPUKernelLaunch ( handle, "tpu_kernel_api_sqrt", &api, sizeof ( api ) ) );
 #elif defined SGDNN_BACKEND_2260
-  SGDNN_CHECK ( false );
+  sg_api_active_t api;
+  api.input_global_addr = input.addr;
+  api.output_global_addr = output.addr;
+  api.dim = input.dim;
+  for ( int i = 0; i < input.dim; ++i )
+  {
+    api.shape[i] = input.shape[i];
+  }
+  api.dtype = sgdnnTPUKernelDType ( input.dtype );
+  api.active_type = 5;//ACTIVE_SQRT;
+  SAFE_CALL ( sgdnnTPUKernelLaunch ( handle, "active_multi_core", &api, sizeof ( api ) ) );
 #else
   SGDNN_CHECK ( false );
 #endif
@@ -2279,7 +2315,20 @@ bm_status_t sgdnnAddCMul ( bm_handle_t handle,
   api.value = scalar;
   SAFE_CALL ( sgdnnTPUKernelLaunch ( handle, "tpu_kernel_api_addcmul", &api, sizeof ( api ) ) );
 #elif defined SGDNN_BACKEND_2260
-  SGDNN_CHECK ( false );
+  //SGDNN_CHECK ( false );
+  sg_api_addcmul_t api;
+  api.input_global_addr = input.addr;
+  api.tensor1_global_addr = tensor1.addr;
+  api.tensor2_global_addr = tensor2.addr;
+  api.output_global_addr = output.addr;
+  api.dim = input.dim;
+  for ( int i = 0; i < input.dim; ++i )
+  {
+    api.shape[i] = input.shape[i];
+  }
+  api.dtype = sgdnnTPUKernelDType ( input.dtype );
+  api.value = scalar;
+  SAFE_CALL ( sgdnnTPUKernelLaunch ( handle, "addcmul_multi_core", &api, sizeof ( api ) ) );
 #else
   SGDNN_CHECK ( false );
 #endif
@@ -2321,7 +2370,19 @@ bm_status_t sgdnnAddCDiv ( bm_handle_t handle,
   api.value = scalar;
   SAFE_CALL ( sgdnnTPUKernelLaunch ( handle, "tpu_kernel_api_addcdiv", &api, sizeof ( api ) ) );
 #elif defined SGDNN_BACKEND_2260
-  SGDNN_CHECK ( false );
+  sg_api_addcdiv_t api;
+  api.input_global_addr = input.addr;
+  api.tensor1_global_addr = tensor1.addr;
+  api.tensor2_global_addr = tensor2.addr;
+  api.output_global_addr = output.addr;
+  api.dim = input.dim;
+  for ( int i = 0; i < input.dim; ++i )
+  {
+    api.shape[i] = input.shape[i];
+  }
+  api.dtype = sgdnnTPUKernelDType ( input.dtype );
+  api.value = scalar;
+  SAFE_CALL ( sgdnnTPUKernelLaunch ( handle, "addcdiv_multi_core", &api, sizeof ( api ) ) );
 #else
   SGDNN_CHECK ( false );
 #endif
