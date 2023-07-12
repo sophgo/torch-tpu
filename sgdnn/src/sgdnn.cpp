@@ -2037,8 +2037,8 @@ bm_status_t sgdnnMatmul ( bm_handle_t handle,
   api.output_global_addr = output.addr;
   memcpy(api.L_shape, left.shape, 8 * sizeof(int));
   memcpy(api.R_shape, right.shape, 8 * sizeof(int));
-  api.L_dims = 3;
-  api.R_dims = 3;
+  api.L_dims = 2;
+  api.R_dims = 2;
   api.L_trans = sgdnnIsTensorTransposed ( &left );
   api.R_trans = sgdnnIsTensorTransposed ( &right );
   api.in_dtype = sgdnnTPUKernelDType ( left.dtype );
