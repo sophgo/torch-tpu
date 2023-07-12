@@ -2059,7 +2059,7 @@ bm_status_t sgdnnMatmul ( bm_handle_t handle,
   api.R_trans = sgdnnIsTensorTransposed ( &right );
   api.in_dtype = sgdnnTPUKernelDType ( left.dtype );
   api.out_dtype = sgdnnTPUKernelDType ( output.dtype );
-  SAFE_CALL ( sgdnnTPUKernelLaunch ( handle, "matmul_multi_core", &api, sizeof ( api ) ) );
+  SAFE_CALL ( sgdnnTPUKernelLaunch ( handle, "tpu_kernel_api_matmul_multi_core", &api, sizeof ( api ) ) );
 #else
   SGDNN_CHECK ( false );
 #endif
@@ -2135,7 +2135,7 @@ bm_status_t sgdnnBatchMatmul ( bm_handle_t handle,
   api.R_trans = sgdnnIsTensorTransposed ( &right );
   api.in_dtype = sgdnnTPUKernelDType ( left.dtype );
   api.out_dtype = sgdnnTPUKernelDType ( output.dtype );
-  SAFE_CALL ( sgdnnTPUKernelLaunch ( handle, "matmul_multi_core", &api, sizeof ( api ) ) );
+  SAFE_CALL ( sgdnnTPUKernelLaunch ( handle, "tpu_kernel_api_matmul_multi_core", &api, sizeof ( api ) ) );
 #else
   SGDNN_CHECK ( false );
 #endif
