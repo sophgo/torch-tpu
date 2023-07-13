@@ -295,13 +295,12 @@ if __name__ == "__main__":
     batch = 6
     sequence = 4096
     ########################################
-
+    
+    DI.dump("Copy_input")
     inp = torch.rand(batch, sequence, configure.hidden_size).to("privateuseone:0").half()
-    #inp_tpu = inp.clone().to("privateuseone:0").half()
 
+    DI.dump("Copy_model_weight")
     net = GPT2Block(configure).to("privateuseone:0").half()
-    for k in net.state_dict().keys():
-        print(k, net.state_dict()[k].shape)
 
     t1 = time.time()
     out_cpu = net(inp)
