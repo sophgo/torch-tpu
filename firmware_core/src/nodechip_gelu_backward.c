@@ -2,7 +2,7 @@
 #include "tpu_kernel.h"
 #include <math.h>
 
-void nodechip_gelu_backward (
+static inline void nodechip_gelu_backward (
   global_addr_t DXGlobalAddr,
   global_addr_t DYGlobalAddr,
   global_addr_t XGlobalAddr,
@@ -127,7 +127,7 @@ void nodechip_gelu_backward (
   tpu_gdma_cpy_L2S ( DXGlobalAddr + LastDone * DSize, DXAddrs[1 - Index], &LastShape, NULL, NULL, dtype );
 }
 
-void nodechip_gelu_backward_multi_core (
+static void nodechip_gelu_backward_multi_core (
   global_addr_t grad_input_global_addr,
   global_addr_t grad_output_global_addr,
   global_addr_t input_global_addr,

@@ -16,7 +16,7 @@ int           axis,
 int           affine,
 data_type_t   dtype );
 
-void nodechip_layernorm_backward_multi_core (
+static void nodechip_layernorm_backward_multi_core (
 global_addr_t grad_output_global_addr,
 global_addr_t input_global_addr,
 global_addr_t weight_global_addr,

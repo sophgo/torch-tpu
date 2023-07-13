@@ -12,7 +12,7 @@ int           dims,
 int           axis,
 data_type_t   dtype );
 
-void nodechip_softmax_backward_multi_core (
+static void nodechip_softmax_backward_multi_core (
 global_addr_t grad_input_global_addr,
 global_addr_t grad_output_global_addr,
 global_addr_t output_global_addr,
