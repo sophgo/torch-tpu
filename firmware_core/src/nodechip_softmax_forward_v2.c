@@ -228,7 +228,7 @@ int           Row,
 int           Column,
 data_type_t   DType );
 
-void nodechip_softmax_forward_multi_core (
+static void nodechip_softmax_forward_multi_core (
 global_addr_t input_global_addr,
 global_addr_t output_global_addr,
 int*          shape,

@@ -32,6 +32,7 @@ def case1():
     out_cpu = net_cpu(inp_cpu)
     out_tpu = net_tpu(inp_tpu)
 
+    import pdb;pdb.set_trace();
     out_cpu.backward(grad_cpu)
     out_tpu.backward(grad_tpu)
 
@@ -43,6 +44,7 @@ def case1():
     print(inp_tpu_grad.flatten()[:10])
 
     print(torch.max(abs(diff)))
+    import pdb;pdb.set_trace();
     
 def case2():
     device = "privateuseone"
@@ -81,7 +83,7 @@ def test(use_half = False, test_backward = False):
     inp_cpu.require_grad = True
     inp_tpu.require_grad = True
 
-    gelu_cpu = nn.Softmax(-1)
+    gelu_cpu = nn.GELU()
     gelu_tpu = copy.deepcopy(gelu_cpu)
     gelu_tpu = gelu_tpu.to(device)
 
@@ -114,4 +116,5 @@ def test(use_half = False, test_backward = False):
         print (torch.max(abs(grad_diff)))
 
 if __name__ == "__main__":
-    test(True, False)
+    test(False, False)
+    # case1()
