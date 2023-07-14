@@ -1,5 +1,6 @@
 import ctypes as ct
 import os
+from tkinter.messagebox import NO
 import torch
 torch.ops.load_library("../../../libtorch_plugin/build/liblibtorch_plugin.so")
 os.environ['FORBID_CMD_EXECUTE'] ="1"
@@ -20,7 +21,7 @@ class ForwardHack(torch.autograd.Function):
     
     @staticmethod
     def backward(ctx, arg1):
-        return arg1, arg1
+        return None, arg1
 
 class BackwardHack(torch.autograd.Function):
     @staticmethod
@@ -30,5 +31,6 @@ class BackwardHack(torch.autograd.Function):
     
     @staticmethod
     def backward(ctx, args):
+        print("===========================", ctx.name)
         DumpIns().dump(ctx.name)
-        return args
+        return None, args
