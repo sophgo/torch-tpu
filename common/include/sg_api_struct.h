@@ -582,6 +582,23 @@ sg_api_bcast_add_t;
 typedef struct
 {
   unsigned long long input_global_addr;
+  unsigned long long other_global_addr;
+  unsigned long long output_global_addr;
+  int shape[FW_MAX_SHAPE_DIMS];
+  int dim;
+  float value;
+  int dtype;
+#ifndef WIN32
+}
+__attribute__ ( ( packed ) ) sg_api_mul_eltwise_t;
+#else
+}
+sg_api_mul_eltwise_t;
+#endif
+
+typedef struct
+{
+  unsigned long long input_global_addr;
   unsigned long long output_global_addr;
   int shape[FW_MAX_SHAPE_DIMS];
   int dim;

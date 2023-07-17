@@ -21,6 +21,24 @@ def case1():
     print("cpu : ", inp )
     print("tpu : ", inp_tpu.cpu())
 
+def case2():
+    B = 6
+    S = 1024
+    H = 768
+
+    a = torch.randn((B,S,H))
+    b = torch.randn((B,S,H))
+
+    a_tpu = a.to(device)
+    b_tpu = b.to(device)
+
+    o = a * b
+    o_tpu = a_tpu * b_tpu
+
+    diff = o - o_tpu.cpu()
+    print(torch.max(torch.abs(diff)))
+
+
 
 if __name__ == "__main__":
-    case1()
+    case2()
