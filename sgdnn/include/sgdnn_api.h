@@ -530,6 +530,14 @@ bm_status_t sgdnnReduce ( bm_handle_t handle,
                           int mode,
                           SgdnnTensor_t output );
 
+/*
+ * OUTPUT = CONCAT ( INPUTS, DIM )
+ * Note:
+ * 1. The data types of INPUT and OUTPUT must be the same
+ * 2. The shape of INPUT0 is ( D0, D1, ..., D(A-1), DA0, D(A+1), ... ), INPUT1 is ( D0, D1, ..., D(A-1), DA1, D(A+1), ... ),
+ *    where DA0, DA1, ... are the "DIM" dimension of the corresponding tensors, the shape of OUTPUT is ( D0, D1, ..., D(A-1), ( DA0 + DA1 + ... ), D(A+1), ... )
+ * 3. INPUTS and OUTPUT must be contiguous
+ */
 bm_status_t sgdnnConcat ( bm_handle_t handle,
                           const SgdnnTensor_t * inputs,
                           int input_num,
@@ -568,6 +576,24 @@ bm_status_t sgdnnEmbeddingBackward ( bm_handle_t handle,
                                      SgdnnTensor_t grad_output,
                                      SgdnnTensor_t indices,
                                      SgdnnTensor_t grad_input );
+
+/*
+ * [ OUTPUT, MASK ] = DROPOUT ( INPUT, SEED, THRESHOLD )
+ * MASK = RANDOM ( SEED ) > THRESHOLD ? 1 : 0
+ * OUTPUT = INPUT * MASK
+ * Note:
+ * 1. The data types of INPUT and OUTPUT must be the same, MASK must be UINT8
+ * 2. The shapes of INPUT, OUTPUT and MASK must be the same
+ * 3. INPUT, OUTPUT and MASK must be contiguous
+ * 4. The random values are uniformly distributed in 0 ~ 1
+ * 5. MASK is optional
+ */
+bm_status_t sgdnnDropout ( bm_handle_t handle,
+                           SgdnnTensor_t input,
+                           unsigned long long seed,
+                           float threshold,
+                           SgdnnTensor_t output,
+                           SgdnnTensor_t mask );
 
 #if defined(__cplusplus)
 }

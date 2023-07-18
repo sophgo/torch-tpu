@@ -31,7 +31,8 @@ typedef struct
 }
 __attribute__ ( ( packed ) ) sg_api_conv2d_backward_t;
 #else
-} sg_api_conv2d_backward_t;
+}
+sg_api_conv2d_backward_t;
 #endif
 
 typedef struct
@@ -50,7 +51,8 @@ typedef struct
 }
 __attribute__ ( ( packed ) ) sg_api_batchnorm2d_backward_t;
 #else
-} sg_api_batchnorm2d_backward_t;
+}
+sg_api_batchnorm2d_backward_t;
 #endif
 
 typedef struct
@@ -222,23 +224,26 @@ __attribute__ ( ( packed ) ) sg_api_batch_matmul_t;
 sg_api_batch_matmul_t;
 #endif
 
-typedef struct {
-    unsigned long long left_global_addr;
-    unsigned long long right_global_addr;
-    unsigned long long bias_global_addr;
-    unsigned long long output_global_addr;
-    int                L_shape[FW_MAX_SHAPE_DIMS];
-    int                R_shape[FW_MAX_SHAPE_DIMS];
-    int                L_dims;
-    int                R_dims;
-    int                L_trans;
-    int                R_trans;
-    int                in_dtype;
-    int                out_dtype;
+typedef struct
+{
+  unsigned long long left_global_addr;
+  unsigned long long right_global_addr;
+  unsigned long long bias_global_addr;
+  unsigned long long output_global_addr;
+  int                L_shape[FW_MAX_SHAPE_DIMS];
+  int                R_shape[FW_MAX_SHAPE_DIMS];
+  int                L_dims;
+  int                R_dims;
+  int                L_trans;
+  int                R_trans;
+  int                in_dtype;
+  int                out_dtype;
 #ifndef WIN32
-} __attribute__((packed)) sg_api_matmul_multi_core_t;
+}
+__attribute__ ( ( packed ) ) sg_api_matmul_multi_core_t;
 #else
-} sg_api_matmul_multi_core_t;
+}
+sg_api_matmul_multi_core_t;
 #endif
 
 typedef struct
@@ -675,19 +680,20 @@ __attribute__ ( ( packed ) ) sg_api_norm2_t;
 sg_api_norm2_t;
 #endif
 
-typedef struct {
+typedef struct
+{
   unsigned long long input_global_addr;
   unsigned long long weight_global_addr;
   unsigned long long bias_global_addr;
   unsigned long long mean_global_addr;
   unsigned long long rstd_global_addr;
   unsigned long long output_global_addr;
-  int                shape[FW_MAX_SHAPE_DIMS];
-  int                dims;
-  int                axis;
-  float              eps;
-  int                affine;
-  int                dtype;
+  int shape[FW_MAX_SHAPE_DIMS];
+  int dims;
+  int axis;
+  float eps;
+  int affine;
+  int dtype;
 #ifndef WIN32
 }
 __attribute__ ( ( packed ) ) sg_api_layernorm_forward_multi_core_t;
@@ -696,7 +702,8 @@ __attribute__ ( ( packed ) ) sg_api_layernorm_forward_multi_core_t;
 sg_api_layernorm_forward_multi_core_t;
 #endif
 
-typedef struct {
+typedef struct
+{
   unsigned long long grad_output_global_addr;
   unsigned long long input_global_addr;
   unsigned long long weight_global_addr;
@@ -707,11 +714,11 @@ typedef struct {
   unsigned long long grad_bias_global_addr;
   unsigned long long grad_weight_reduce_buffer;
   unsigned long long grad_bias_reduce_buffer;
-  int                shape[FW_MAX_SHAPE_DIMS];
-  int                dims;
-  int                axis;
-  int                affine;
-  int                dtype;
+  int shape[FW_MAX_SHAPE_DIMS];
+  int dims;
+  int axis;
+  int affine;
+  int dtype;
 #ifndef WIN32
 }
 __attribute__ ( ( packed ) ) sg_api_layernorm_backward_multi_core_t;
@@ -720,7 +727,8 @@ __attribute__ ( ( packed ) ) sg_api_layernorm_backward_multi_core_t;
 sg_api_layernorm_backward_multi_core_t;
 #endif
 
-typedef struct {
+typedef struct
+{
   unsigned long long output_addr;
   unsigned long long cond_addr;
   unsigned long long self_addr;
@@ -737,27 +745,33 @@ typedef struct {
   float self_val;
   float other_val;
 #ifndef WIN32
-} __attribute__((packed)) sg_api_where_multi_core_t;
+}
+__attribute__ ( ( packed ) ) sg_api_where_multi_core_t;
 #else
-} sg_api_where_multi_core_t;
+}
+sg_api_where_multi_core_t;
 #endif
 
-typedef struct {
-    unsigned long long input_addr;
-    unsigned long long output_addr;
-    int shape[FW_MAX_SHAPE_DIMS];
-    int dims;
-    int binary_type;
-    int dtype;
-    float const_value;
-    int is_inversed;
+typedef struct
+{
+  unsigned long long input_addr;
+  unsigned long long output_addr;
+  int shape[FW_MAX_SHAPE_DIMS];
+  int dims;
+  int binary_type;
+  int dtype;
+  float const_value;
+  int is_inversed;
 #ifndef WIN32
-} __attribute__((packed)) sg_api_const_binary_float_t;
+}
+__attribute__ ( ( packed ) ) sg_api_const_binary_float_t;
 #else
-} sg_api_const_binary_float_t;
+}
+sg_api_const_binary_float_t;
 #endif
 
-typedef struct {
+typedef struct
+{
   unsigned long long input0_addr;
   unsigned long long input1_addr;
   unsigned long long output_addr;
@@ -770,23 +784,46 @@ typedef struct {
   int binary_type;
   int dtype;
 #ifndef WIN32
-} __attribute__((packed)) sg_api_binary_multi_core_t;
+}
+__attribute__ ( ( packed ) ) sg_api_binary_multi_core_t;
 #else
-} sg_api_binary_multi_core_t;
+}
+sg_api_binary_multi_core_t;
 #endif
 
-typedef struct {
-    int core_idx;
-    int core_num;
-    int core_msg_id;
-    int name_len;
-    int api_id;
-    int api_size;
-    unsigned char api_data[0];
+typedef struct
+{
+  int core_idx;
+  int core_num;
+  int core_msg_id;
+  int name_len;
+  int api_id;
+  int api_size;
+  unsigned char api_data[0];
 #ifndef WIN32
-} __attribute__((packed)) sg_api_core_info_t;
+}
+__attribute__ ( ( packed ) ) sg_api_core_info_t;
 #else
-} sg_api_core_info_t;
+}
+sg_api_core_info_t;
+#endif
+
+typedef struct
+{
+  unsigned long long input_global_addr;
+  unsigned long long output_global_addr;
+  unsigned long long mask_global_addr;
+  int shape[FW_MAX_SHAPE_DIMS];
+  int dim;
+  unsigned long long seed;
+  float threshold;
+  int dtype;
+#ifndef WIN32
+}
+__attribute__ ( ( packed ) ) sg_api_dropout_t;
+#else
+}
+sg_api_dropout_t;
 #endif
 
 #pragma pack(pop)
