@@ -2041,6 +2041,14 @@ bm_status_t sgdnnMatmul ( bm_handle_t handle,
   api.R_dims = 2;
   api.L_trans = sgdnnIsTensorTransposed ( &left );
   api.R_trans = sgdnnIsTensorTransposed ( &right );
+  if (api.L_trans) {
+    api.L_shape[0] = left.shape[1];
+    api.L_shape[1] = left.shape[0];
+  }
+  if (api.R_trans) {
+    api.R_shape[0] = right.shape[1];
+    api.R_shape[1] = right.shape[0];
+  }
   api.in_dtype = sgdnnTPUKernelDType ( left.dtype );
   api.out_dtype = sgdnnTPUKernelDType ( output.dtype );
   SAFE_CALL ( sgdnnTPUKernelLaunch ( handle, "tpu_kernel_api_matmul_multi_core", &api, sizeof ( api ) ) );
@@ -2117,6 +2125,14 @@ bm_status_t sgdnnBatchMatmul ( bm_handle_t handle,
   api.R_dims = 3;
   api.L_trans = sgdnnIsTensorTransposed ( &left );
   api.R_trans = sgdnnIsTensorTransposed ( &right );
+  if (api.L_trans) {
+    api.L_shape[1] = left.shape[2];
+    api.L_shape[2] = left.shape[1];
+  }
+  if (api.R_trans) {
+    api.R_shape[1] = right.shape[2];
+    api.R_shape[2] = right.shape[1];
+  }
   api.in_dtype = sgdnnTPUKernelDType ( left.dtype );
   api.out_dtype = sgdnnTPUKernelDType ( output.dtype );
   SAFE_CALL ( sgdnnTPUKernelLaunch ( handle, "tpu_kernel_api_matmul_multi_core", &api, sizeof ( api ) ) );
