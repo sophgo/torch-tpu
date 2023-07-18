@@ -1,27 +1,42 @@
 [1]PrePare:
 1) Link host device to your docker:
-    docker run --restart always --privileged -v /dev:/dev -td -v $PWD:/workspace --name <YOUR_NAME> sophgo/tpuc_dev:latest bash
-2)  docker exec -it <YOUR_NAME> bash
-2.5) You can download lisophon from:
-    ftp 172.28.141.89
-    User：AI
-    PassWd：SophgoRelease2022
-3)  Install lisophon:
-    apt install  ./sophon-libsophon_0.4.x_amd64.deb ./sophon-libsophon-dev_0.4.x_amd64.deb
-4)  Set Path:
-    source /etc/profile.d/libsophon-bin-path.sh
+    docker run --restart always --privileged -v /dev:/dev -td -v $PWD:/workspace --name <YOURS> sophgo/tpuc_dev:latest bash
+    docker exec -it <YOURS>  bash
+2) We offer two ways for libsophon
+   2.A) "stable" mode: Install Libsophon from .deb, usually in /opt/sophon/libsophon-current
+        2.A.1)You can download lisophon from:
+                ftp 172.28.141.89
+                User：AI
+                PassWd：SophgoRelease2022
+        2.A.2)  Then, install lisophon:
+                apt install  ./sophon-libsophon_0.4.x_amd64.deb ./sophon-libsophon-dev_0.4.x_amd64.deb
+        2.A.3)   Set Device Path:
+                source /etc/profile.d/libsophon-bin-path.sh
+        2.A.4)   Using bm-smi to check your TPU device in docker
+    2.B) "latest" mode: Directly using libsphon-latest from gerrit-project
+        2.B.1)  Just clone libsphon-latest
+        2.B.2)  Usually, libsophon is not same with the driver installed on the server, so please do not map device info to docker.
+    2.C) You need to choose stable or latest mode when source scripts/envsetup.sh
+
 Note:
     Do not compile tpu-train or nntoolchain in ONE same docker container, because libsophon for tpu-train and LIBSOPHON_TOP for nntoolchain is not same usually.
 
 [2]How to build:
     source scripts/envsetup.sh
-
+    #it's default version, which means source scripts/envsetup.sh bm1684x latest
 Or More detailed:
-    source scripts/envsetup.sh bm1684x (sg2260)
+    2.a) source scripts/envsetup.sh bm1684x latest
+        #CHIP_ARCH is bm1684x, and libsophon is using  tpu-train/../libsophon (gerrit-latest)
 
-Notice:
-   1)default backend is bm1684x. Motice the docker front change to GREEN tpu-bm1684x(sg2260).
-   2)if backend is changed, you need to rewalk following compiling steps again COMPLETELY!
+    2.b) source scripts/envsetup.sh bm1684x stable
+        #CHIP_ARCH is bm1684x, and libsophon is using  /opt/sophon/libsophon-current (.deb)
+
+    2.c) source scripts/envsetup.sh sg2260 latest
+        #CHIP_ARCH is sg2260,  and libsophon is using  tpu-train/../libsophon (gerrit-latest)
+
+    2.d) source scripts/envsetup.sh sg2260 stable
+        #CHIP_ARCH is sg2260,  and libsophon is using  /opt/sophon/libsophon-current (.deb)
+
 
 [3]cmodel mode:
 1. mkdir build && (re)build_all

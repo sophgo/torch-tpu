@@ -1,0 +1,49 @@
+How to gen dependency files for bm1684x?
+1) Inside docker for nntoolchain:
+	cd /workspace/nntoolchain/net_compiler
+
+    export GLOG_v=4
+	export GLOG_logtostderr=1
+	export GLOG_log_prefix=false
+	export FLAGS_log_prefix=false
+	export BMLANG_CONFIG="DEBUG=1"
+	export BMNETC_CONFIG="DEBUG=1"
+	export BMNETU_CONFIG="DEBUG=1"
+	export BMRUNTIME_CONFIG="DEBUG=1"
+	export CPU_CONFIG="DEBUG=1"
+	export DYNAMIC_CONTEXT_DEBUG=1
+	source scripts/envsetup.sh
+	rebuild_all_nntc
+	2
+	1
+	3
+	1
+	
+
+   
+    cd /workspace/nntoolchain/TPU1686
+    source scripts/envsetup.sh  bm1684x
+	export EXTRA_CONFIG=-DDEBUG=ON
+	rebuild_all
+	rebuild_test sgdnnn
+	rebuild_firmware
+	Y
+	
+	
+	cd /workspace/nntoolchain
+	rm -rf target&&mkdir target
+    cp ./net_compiler/out/install/lib/libbmlib.so target/.
+    cp ./TPU1686/build/firmware_core/libcmodel_firmware.so ./target/
+    cp ./TPU1686/build/firmware_core/libfirmware_core.a ./target/
+
+    cd  /workspace/nntoolchain/target
+    mv libbmlib.so libbmlib_cmodel.so
+    mv libfirmware_core.a libbm1684x.a
+    cd ..
+	
+###############################################
+2) Inside docker for tpu-mlir:
+
+   rm -rf /workspace/tpu-train/third_party/bm1684x
+   cp -r /workspace/nntoolchain/target /workspace/tpu-train/third_party/bm1684x
+   chmod -R 777 /workspace/tpu-train/third_party/bm1684x/

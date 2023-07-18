@@ -1,7 +1,12 @@
 set(CMAKE_BUILD_TYPE "Debug")
-
 if($ENV{CHIP_ARCH} STREQUAL "bm1684x")
-find_package(libsophon REQUIRED)
+if($ENV{LIBSOPHON_PATTERN} MATCHES $ENV{LIBSOPHON_STABLE})
+	find_package(libsophon REQUIRED)
+elseif($ENV{LIBSOPHON_PATTERN} MATCHES $ENV{LIBSOPHON_LATEST})
+	include_directories($ENV{LIBSOPHON_TOP}/bmlib/include)
+	include_directories($ENV{LIBSOPHON_TOP}/bmlib/src)
+	link_directories($ENV{LIBSOPHON_TOP}/build/bmlib)
+endif()
 include_directories(${LIBSOPHON_INCLUDE_DIRS})
 include_directories(include)
 include_directories($ENV{TPUTRAIN_TOP}/include)
@@ -11,8 +16,8 @@ link_directories(${CMAKE_BINARY_DIR})
 
 set(KERNEL_HEADER "${CMAKE_BINARY_DIR}/firmware_core/kernel_module_data.h")
 add_custom_command(
-    OUTPUT ${KERNEL_HEADER}
-    COMMAND echo "const unsigned int kernel_module_data[] = {0}\;" > ${KERNEL_HEADER}
+	OUTPUT ${KERNEL_HEADER}
+	COMMAND echo "const unsigned int kernel_module_data[] = {0}\;" > ${KERNEL_HEADER}
 )
 # Add a custom target that depends on the custom command
 add_custom_target(kernel_module ALL DEPENDS ${KERNEL_HEADER})

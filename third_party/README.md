@@ -3,7 +3,7 @@
     commit 2f18e869d9662fcaaadb20d6b7937a2ae94b3bd5
     tpu_defs.h tpu_kernel.h
 ### bm1684x
-    commit 2f18e869d9662fcaaadb20d6b7937a2ae94b3bd5
+    commit 604e732b5d7336769b14477cc38e12b9bf544e3d
     libbm1684x.a libbmlib_cmodel.so libcmodel_fireware.so
 ### sg2260
     commit 6fc547f6cc8c34283cc73b0c0d5603cf2068da58
@@ -13,15 +13,7 @@
 Note:
   [1]How to Compile BM1684X .so?
     --- for BM1684X
-      1) cd TPU1686
-      2) source scripts/envsetup.sh  bm1684x
-      3) export EXTRA_CONFIG=-DDEBUG=ON
-      4) rebuild_all #gen  libcmodel_firmware.so
-      5) rebuild_test sgdnn
-      5.5) mkdir target && cd target
-      6) cp ../build/firmware_core/libcmodel_firmware.so .
-      6) cp  ../build_test/bmlib_tmp/libbmlib.so   libbmlib_cmodel.so&&ln -s libbmlib_cmodel.so libbmlib.so.0 #gen  libbmlib_cmodel.so && libbmlib.so.0
-      7) cp  ../build_test/firmware_core/libfirmware_core.a libbm1684x.a  #gen libbm1684x.a
+      1)Please check  tpu-train/third_party/bm1684x/README.md
     --- for sg2260
       1) cd TPU1686
       2) source scripts/envsetup.sh  bm1684x
