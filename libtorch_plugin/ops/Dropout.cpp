@@ -10,18 +10,41 @@
 
 namespace at
 {
-    Tensor & bernouli_float_tpu(
-            Tensor& self, double p, c10::optional<at::Generator> generator=c10::nullopt) {
+    Tensor dropout_tpu(const at::Tensor & input, double p, bool train) {
 #if 1
-    auto out_ = bernoulli(self.cpu(), p, generator);
-    self = out_.to(self.device());
+    auto input_cpu =input.cpu();
+    auto out_cpu = dropout(input_cpu, p, train);
+    auto output_tpu = out_cpu.to(input.device());
 #endif
-    return self;
+    return output_tpu;
     }
-
 
 TORCH_LIBRARY_IMPL ( aten, TPU, m )
 {
-  m.impl ( "bernoulli_.float", bernouli_float_tpu );
+  m.impl ( "dropout", dropout_tpu );
 }
+TORCH_LIBRARY_IMPL ( aten, AutogradPrivateUse1, m )
+{
+  m.impl ( "dropout", dropout_tpu );
+}
+
+
+    Tensor & dropout__tpu(at::Tensor & input, double p, bool train) {
+#if 1
+    auto input_cpu =input.cpu();
+    auto out_cpu = dropout_(input_cpu, p, train);
+    input = out_cpu.to(input.device());
+#endif
+    return input;
+    }
+
+TORCH_LIBRARY_IMPL ( aten, TPU, m )
+{
+  m.impl ( "dropout_", dropout__tpu );
+}
+TORCH_LIBRARY_IMPL ( aten, AutogradPrivateUse1, m )
+{
+  m.impl ( "dropout_", dropout__tpu );
+}
+
 } // namespace at

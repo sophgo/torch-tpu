@@ -14,17 +14,21 @@ if __name__ == "__main__":
     nHead = 12
     Hidden = 768
     sequence = 1024
-    p_drop = 0.1
+    p_drop = 0.5
     device = "privateuseone"
     ###################################
     inp = torch.randn((Batch, nHead, sequence, sequence))
+    inp =torch.ones((3,3))
     inp_tpu = inp.to(device)
 
-    net = nn.Dropout(p_drop)
+    net = nn.Dropout(p_drop,inplace=True)
     net_tpu = copy.deepcopy(net).to(device)
 
     o = net(inp)
     o_t = net_tpu(inp_tpu)
+    print(inp)
+    print(o)
+    print(o_t.cpu())
 
     diff = o - o_t.cpu()
     print(torch.max(torch.abs(diff)))
