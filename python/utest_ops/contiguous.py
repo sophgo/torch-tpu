@@ -9,19 +9,23 @@ def case1():
     set_bacis_info(seed)
 
     #step1: define test model
+    batch = 32
+    head_num = 12
+    hidden_size = 768
+    sequence = 256
     class Test_Module(nn.Module):
             def __init__(self):
                 super(Test_Module, self).__init__()
-            def forward(self, a1, a2, a3):
-                return torch.addmm(a1,a2,a3)
-
+            def forward(self, inp):
+                    q,k,v = inp.split(hidden_size, -1)
+                    q1 = q.view(batch, sequence, head_num, hidden_size // head_num)
+                    q2 = q1.permute(0, 2, 1, 3)
+                    q3 = q2.transpose(-1,-2)
+                    q4 = q3.contiguous()
+                    return q4
     #step2: prepare input data, Notice that the input data will be adopted not only their shapes
-    input_data = {
-         "simple0": [torch.rand((3)),  torch.rand((2,3)),  torch.rand((3,3))],
-    }
-    #list is also acceptable
     input_data = [
-        [torch.rand((3)),  torch.rand((2,3)),  torch.rand((3,3))],
+         [torch.rand(batch, sequence, hidden_size * 3)],
     ]
     metric_table = ['max_diff','MAE']
     epsilon_dict = {'f32':1e-6,'f16':1e-2}

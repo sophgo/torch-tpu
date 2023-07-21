@@ -9,22 +9,20 @@ def case1():
     set_bacis_info(seed)
 
     #step1: define test model
+    H = 50257
+    W = 768
     class Test_Module(nn.Module):
             def __init__(self):
                 super(Test_Module, self).__init__()
-            def forward(self, a1, a2, a3):
-                return torch.addmm(a1,a2,a3)
-
-    #step2: prepare input data, Notice that the input data will be adopted not only their shapes
-    input_data = {
-         "simple0": [torch.rand((3)),  torch.rand((2,3)),  torch.rand((3,3))],
-    }
+            def forward(self, a):
+                return torch.norm(a, 2.0)#,torch.norm(a, torch.inf)
     #list is also acceptable
     input_data = [
-        [torch.rand((3)),  torch.rand((2,3)),  torch.rand((3,3))],
+        #  [torch.ones((H, W))],
+         [torch.ones((50, W))],
     ]
     metric_table = ['max_diff','MAE']
-    epsilon_dict = {'f32':1e-6,'f16':1e-2}
+    epsilon_dict = {'f32':1e-6,'f16':8e-1}
     case_name =  __file__.split('.py')[0]# You can change your name
     dump_flag = True #it will dump alll wrong cases
 

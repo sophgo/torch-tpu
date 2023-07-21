@@ -12,16 +12,11 @@ def case1():
     class Test_Module(nn.Module):
             def __init__(self):
                 super(Test_Module, self).__init__()
-            def forward(self, a1, a2, a3):
-                return torch.addmm(a1,a2,a3)
-
+            def forward(self, b,aa):
+                return b/(torch.norm(aa, 2.0)+ 1e-6)
     #step2: prepare input data, Notice that the input data will be adopted not only their shapes
-    input_data = {
-         "simple0": [torch.rand((3)),  torch.rand((2,3)),  torch.rand((3,3))],
-    }
-    #list is also acceptable
     input_data = [
-        [torch.rand((3)),  torch.rand((2,3)),  torch.rand((3,3))],
+         [1, torch.ones((5,5))],
     ]
     metric_table = ['max_diff','MAE']
     epsilon_dict = {'f32':1e-6,'f16':1e-2}
@@ -31,7 +26,6 @@ def case1():
     device = torch.device("privateuseone:0")
     My_Tester = Tester_Basic(case_name, device, metric_table, epsilon_dict,seed, dump_flag)
     return My_Tester.Torch_Test_Forward_Function(Test_Module, input_data)
-
 
 if __name__ == "__main__":
     case1()

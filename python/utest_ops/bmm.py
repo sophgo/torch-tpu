@@ -12,16 +12,20 @@ def case1():
     class Test_Module(nn.Module):
             def __init__(self):
                 super(Test_Module, self).__init__()
-            def forward(self, a1, a2, a3):
-                return torch.addmm(a1,a2,a3)
+            def forward(self, a1, a2):
+                return torch.bmm(a1,a2)
+    b = 2
+    m = 2
+    k = 3
+    n = 3
 
     #step2: prepare input data, Notice that the input data will be adopted not only their shapes
     input_data = {
-         "simple0": [torch.rand((3)),  torch.rand((2,3)),  torch.rand((3,3))],
+         "simple0": [torch.rand(b, m, k),  torch.rand(b, k, n)]
     }
     #list is also acceptable
     input_data = [
-        [torch.rand((3)),  torch.rand((2,3)),  torch.rand((3,3))],
+         [torch.rand(b, m, k),  torch.rand(b, k, n)],
     ]
     metric_table = ['max_diff','MAE']
     epsilon_dict = {'f32':1e-6,'f16':1e-2}

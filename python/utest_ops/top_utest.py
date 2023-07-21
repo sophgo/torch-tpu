@@ -31,10 +31,18 @@ def get_TPU_ops_support():
         TPU_ops_train[i]=TPU_ops_train[i].split(".c")[0].split("nodechip_")[1]
     print(TPU_ops_train)
 
-# move a tensor/dict/list structto target device and dtype
+def set_bacis_info(seed):
+    torch.manual_seed(seed)
+    torch.set_printoptions(precision=6)
+
+#move a tensor/dict/list structto target device and dtype
+#case support : T, int/float, list, tuple, dict
 def move_to(obj, device, dtype):
+  assert obj is not None
   if torch.is_tensor(obj):
-    return obj.to(device=device,dtype=dtype)
+     obj = obj.to(device,dtype=dtype)
+     assert obj.device ==device, (obj.device,device )
+     return obj
   elif isinstance(obj, dict):
     res = {}
     for k, v in obj.items():
@@ -51,194 +59,399 @@ def move_to(obj, device, dtype):
       res = res + (move_to(v, device, dtype),)
     return res
   elif isinstance(obj, int) or isinstance(obj, float):
-     return obj
+    return obj
   else:
     raise TypeError("Invalid type for move_to")
 
-# the total nums of output for a given model
-def compute_output_num(obj):
+#set T or [T,T] requires_grad
+# This function can only apply in customized_execute_function
+# And Must nearest to input_sample_isolation in case of leaf nodes
+def set_requires_grad(obj, grad_flag= True):
   if torch.is_tensor(obj):
-    return 1
+     obj.requires_grad = grad_flag
+     return obj
   elif isinstance(obj, list):
-    return len(obj)
-  elif isinstance(obj, tuple):
-    return len(obj)
+    res =[]
+    for i in obj:
+       i.requires_grad = grad_flag
+       res +=[i]
+    return res
   else:
-    raise TypeError("Invalid type for compute_output_num")
+    raise TypeError("Invalid type for move_to")
 
-#convert readable dtyoe to torch dtype
-def convert_dtype(dtype):
-   convert_table = {'f32':torch.float32,
-                    'i32':torch.int32,
-                    'f16':torch.half}
+# Just a dump function 
+class Dumper():
+  def __init__(self, case_name, device = torch.device("cpu")):
+     self.case_name = case_name
+     self.chip_case_path = ""
+     self.device_cpu =device
 
-   if dtype not in convert_table.keys():
-      assert 0,"{} not support".foramt(dtype)
-   return convert_table[dtype]
+  def dump_path_gen(self):
+    outfile_path = str(pathlib.Path().resolve()) + "/" + os.environ['CHIP_ARCH']
+    new_path = outfile_path + "/" + self.case_name
+    if not os.path.exists(new_path):
+        os.makedirs(new_path)
+    self.chip_case_path = new_path
 
-#convert compute error and check whether error is larger than epsilon
-def metric_compute(tensor_a, tensor_b, mode, epsilon):
-   assert tensor_a.shape==tensor_b.shape
-   if mode=="max_diff":
-      temp = torch.max(torch.abs(tensor_a-tensor_b)).item()
-      return  temp,  temp < epsilon
-   if mode=="MAE":
-      temp =  torch.sum(torch.abs(tensor_a-tensor_b))/torch.numel(tensor_a)
-      temp = temp.item()
-      return  temp,  temp < epsilon
-   raise TypeError("Invalid mode for metric_compute")
+  def dump_network_info(self):
+    #TODO
+    return 0
 
+  def dump_tensor(self, dump_count, dict_execute_result, dtype):
+    tensor_cpu = dict_execute_result["output_cpu"]
+    tensor_tpu = dict_execute_result["output_tpu"]
+    ouput_tpu = move_to(tensor_tpu.detach(), self.device_cpu,dtype) #tensor_tpu.cpu().numpy()
+    output_cpu = move_to(tensor_cpu.detach(), self.device_cpu,dtype) #tensor_cpu.cpu().numpy()
+    tensor_path = self.chip_case_path + "/" + "dump_{}_sample_{}".format(str(dtype).split(".")[-1], dump_count)
+    np.savez(tensor_path, ouput_tpu=ouput_tpu, output_cpu=output_cpu)
 
-#cmp every output,  nodechip vs torch
-#output: #output_nums for 1 sample in 1 dtype {"metric_value", "metric_flag", "passed_flag"}
-def cmp_output(metric_table,output_cpu, output_tpu, dtype, epsilon=0.01):
- num_output_cpu = compute_output_num(output_cpu)
- num_output_tpu = compute_output_num(output_tpu)
- assert (num_output_cpu==num_output_tpu)
- all_output_dict_for_one_sample_one_dtype = []
- for i in range(num_output_tpu):
-   dict_each_output_value = {}
-   dict_each_output_CMP_flag= {}
-   for j in range(len(metric_table)):
-     dict_each_output_value[metric_table[j]],dict_each_output_CMP_flag[metric_table[j]] = metric_compute(output_cpu[i], output_tpu[i],metric_table[j], epsilon)
-
-   temp_cmp_pass_flag = True
-   for j in range(len(metric_table)):
-      temp_cmp_pass_flag = temp_cmp_pass_flag and (dict_each_output_CMP_flag[metric_table[j]])
-
-   temp_result = { "metric_value":dict_each_output_value, "metric_flag":dict_each_output_CMP_flag, "passed_flag_one_sample_one_dtype":temp_cmp_pass_flag}
-   all_output_dict_for_one_sample_one_dtype+=[temp_result]
- return all_output_dict_for_one_sample_one_dtype
-
-def dump_path_gen(case_name):
-   outfile_path = str(pathlib.Path().resolve()) + "/" + os.environ['CHIP_ARCH']
-   new_path = outfile_path + "/" + case_name
-   if not os.path.exists(new_path):
-      os.makedirs(new_path)
-   return new_path
-
-def dump_network_info():
-   #TODO
-   return 0
-
-def dump_tensor(dump_count, chip_case_path, tensor_tpu, tensor_cpu,dtype):
-   ouput_tpu = move_to(tensor_tpu, "cpu",dtype) #tensor_tpu.cpu().numpy()
-   output_cpu = move_to(tensor_cpu, "cpu",dtype) #tensor_cpu.cpu().numpy()
-   tensor_path = chip_case_path + "/" + "dump_{}_sample_{}".format(str(dtype).split(".")[-1], dump_count)
-   np.savez(tensor_path, ouput_tpu=ouput_tpu, output_cpu=output_cpu)
-
-def dump_info(dump_count, case_name,tensor_tpu, tensor_cpu,dtype):
-    chip_case_path = dump_path_gen(case_name)
-    dump_network_info()
-    dump_tensor(dump_count, chip_case_path, tensor_tpu, tensor_cpu, dtype)
-
-# test a single input
-def Torch_Test_Forward_Function_Per(sample_count, case_name, module_native, input_sample,  metric_table = ['max_diff','MAE']
-               , epsilon_dict = {'f32':1e-6,'f16':1e-2,'i32':1e-6}, seed=1000, dump = False):\
-
-    naive_dtype_list =list(epsilon_dict.keys())
-    assert len(naive_dtype_list)>=0
-
-    ####collect computing data
-    final_result = {}
-    for naive_dtype in naive_dtype_list:
-        torch_dtype = convert_dtype(naive_dtype)
-        device = "privateuseone"#"TODO: privateuseone"
-        torch.ops.load_library("../../libtorch_plugin/build/liblibtorch_plugin.so")
-        #### You cannot set seed here because the rand input has been given
-        #### torch.manual_seed(seed)
-
-        net_cpu = module_native()
-        output_cpu = net_cpu(*input_sample)
-
-        input_sample_tpu= move_to(input_sample, device,torch_dtype)
-        net_tpu = copy.deepcopy(net_cpu).to(device)
-        output_tpu = net_tpu(*input_sample_tpu)
-        output_tpu = move_to(output_tpu, "cpu",torch_dtype)
-        final_result[naive_dtype] = cmp_output(metric_table, output_cpu, output_tpu, torch_dtype, epsilon_dict[naive_dtype])
-        pass_flag_all_outputs = True
-        output_num = len(final_result[naive_dtype])
-        for i in range(output_num):
-           pass_flag_all_outputs = pass_flag_all_outputs and final_result[naive_dtype][i]["passed_flag_one_sample_one_dtype"]
-        if dump and not pass_flag_all_outputs:
-           dump_info(sample_count, case_name, output_cpu,output_tpu,torch_dtype)
-
-    ###Value Cmp
-    count = 0
-    is_correct_dtype = {}
-    for naive_dtype in naive_dtype_list:
-       temp_result = False
-       for each_metric in metric_table:
-           temp_result = temp_result or  final_result[naive_dtype][0]['metric_flag'][each_metric]
-       output_num = len(final_result[naive_dtype])
-
-       if (temp_result):
-         count = count +1
-         for idx_output in range(output_num):
-           print("[Result]",case_name,"{}  output-{} is success".format(naive_dtype, idx_output), final_result[naive_dtype][0]['metric_value'])
-         is_correct_dtype[naive_dtype] = 1
-       else:
-         for idx_output in range(output_num):
-           print("[Result]",case_name, "{}  output-{} is failed".format(naive_dtype, idx_output), final_result[naive_dtype][0]['metric_value'])
-         is_correct_dtype[naive_dtype] = 0
-
-    return count ==len(naive_dtype_list),is_correct_dtype
+  def dump_info(self, dump_count,dict_execute_result,dtype):
+      self.dump_path_gen()
+      self.dump_network_info()
+      self.dump_tensor(dump_count, dict_execute_result, dtype)
 
 
+class Tester_Basic():
+  def __init__(self, case_name, device_tpu, metric_table = ['max_diff','MAE'], epsilon_dict = {'f32':1e-6,'f16':1e-2,'i32':1e-6}, seed = 1000, dump_flag = True):
+      self.device = device_tpu
+      self.device_cpu = torch.device('cpu')
+      self.dump_flag = dump_flag
+      self.case_name = case_name
+      self.Dumper = Dumper(self.case_name, self.device_cpu)
+      torch.ops.load_library("../../libtorch_plugin/build/liblibtorch_plugin.so")
+  
+      self.convert_table = {'f32':torch.float32,
+                      'i32':torch.int32,
+                      'f16':torch.half}
 
-# print test info for all inputs, which means each input sharing same seed
-def print_info(case_name, metric_table,epsilon_dict,seed):
-    print(("*****************Test {} START INFO*************************").format(case_name))
-    print("Seed:                   ", seed)
-    print("Metrics for Compare:    ",  metric_table)
-    print("Dtype and allowed error:", epsilon_dict)
-
-
-# print shape for each inputs
-def print_each_input_batch_shape(inputs):
-   for idx,input_idx in enumerate(inputs):
-      if torch.is_tensor(input_idx):
-        print("Input {} shape is {}".format(idx, input_idx.shape))
-      else:
-        print("Input {} is 0-dim value".format(idx))
-
-def Torch_Test_Forward_Function(case_name, module_native, input_sample_collection,  metric_table = ['max_diff','MAE']
-               , epsilon_dict = {'f32':1e-6,'f16':1e-2,'i32':1e-6}, seed=1000, dump=False):
-
-    input_sample_processed = input_sample_collection
-    naive_dtype_list =list(epsilon_dict.keys())
-    if isinstance(input_sample_collection, dict):
-        input_sample_processed = list(input_sample_collection.values())
-    elif isinstance(input_sample_collection, list):
-       input_sample_processed =  input_sample_collection
-
-    print_info(case_name, metric_table,epsilon_dict,seed)
-    current_correct_num = 0
-    static_corret_dtype_case = dict.fromkeys(naive_dtype_list, 0)
-    for idx, input_sample in enumerate(input_sample_processed):
-        print("--------------------------------------------------------")
-        print("Case {} Sample {} is started".format(case_name, idx))
-        print("--------------------------------------------------------")
-
-        print_each_input_batch_shape(input_sample)
-        temp_flag,is_correct_dtype = Torch_Test_Forward_Function_Per(idx, case_name, module_native, input_sample,  metric_table
-               , epsilon_dict, seed, dump)
-        current_correct_num += temp_flag == 1
-        for dtype_per in naive_dtype_list:
-            if (is_correct_dtype[dtype_per]):
-                static_corret_dtype_case[dtype_per] +=1
-    print("*****************Basic Stats CMP INFO*************************")
-    correct_dtype_list = []
-    for i in naive_dtype_list:
-       if static_corret_dtype_case[i] == len(input_sample_processed):
-            print("Case {}: dtype {} is all corrected".format(case_name, i))
-            correct_dtype_list+=[i]
-    wrong_dtype = list(set(naive_dtype_list) - set(correct_dtype_list))
-    if (len(wrong_dtype)>0):
-        print("Case {}: dtype {} exist errors".format(case_name, wrong_dtype))
-    print("Case {}: {}/{} Samples is completely corrected".format(case_name, current_correct_num, len(input_sample_processed)))
-    print(("*****************Test {} All End*************************").format(case_name))
+      
+      self.metric_table = metric_table
+      self.epsilon_dict = epsilon_dict
+      self.seed = seed
+      ######customized 
+      assert isinstance(self.metric_table, list)
+      assert isinstance(epsilon_dict, dict)
+      self.num_metric = len(metric_table)
+      self.naive_dtype_list =list(self.epsilon_dict.keys())
+      self.dtype_num = len(self.naive_dtype_list)
+      assert self.dtype_num >0
+      self.num_multi_output = 1
 
 
+  # the total nums of output for a given model
+  # Usually multi_output is a tuple struct
+  # function case:
+  # 1) T->1
+  # 2) list->len
+  # 3) tuple->len
+  def compute_multi_output_num(self, obj):
+    if torch.is_tensor(obj):
+      self.num_multi_output = 1
+      return 1
+    elif isinstance(obj, list):
+      self.num_multi_output = len(obj)
+      return len(obj)
+    elif isinstance(obj, tuple):
+      self.num_multi_output = len(obj)
+      return len(obj)
+    else:
+      raise TypeError("Invalid type for compute_multi_output_num")
 
 
+  #convert readable dtyoe to torch dtype
+  #function input: dtype 1 str
+  #function output: dtype torch.dtype
+  def convert_dtype_2_torch_style(self,dtype):
+    if dtype not in self.convert_table.keys():
+        assert 0,"{} not support".format(dtype)
+    return self.convert_table[dtype]
+
+
+  #convert compute error and check whether error is larger than epsilon
+  #only compute between tensor
+  #function input:
+  # 1)tensor_a, T
+  # 2)tensor_b, T
+  # 3)mode: 1 str
+  # 4)epsilon: 1 float
+  #function output:
+  #1) metric_value: 1 float
+  #2) flag: 1 bool  is metric_value < epsilon?
+  def metric_compute(self, tensor_a, tensor_b, mode, epsilon):
+    assert not isinstance(tensor_a, list) and not isinstance(tensor_b, list)
+    assert not isinstance(tensor_a, tuple) and not isinstance(tensor_b, tuple)
+
+    assert tensor_a.shape==tensor_b.shape, "Shape cpu {} vs tpu {}".format(tensor_a.shape,tensor_b.shape)
+    if mode=="max_diff":
+        metric_value = torch.max(torch.abs(tensor_a-tensor_b)).item()
+        return  metric_value,  metric_value < epsilon
+    elif mode=="MAE":
+        metric_value =  torch.sum(torch.abs(tensor_a-tensor_b))/torch.numel(tensor_a)
+        metric_value = metric_value.item()
+        return  metric_value,  metric_value < epsilon
+    raise TypeError("Invalid mode for metric_compute")
+
+
+  # output whehter one output from multi_ouput is passed for all metrics
+  # function input: dict  #keys = #metric
+  # function output:
+  # bool flag: is one output from one multiouput passed all metrics?
+  def metric_post_processed(self, dict_each_output_CMP_flag):
+      #whether this output is passed multi_metric == & every element in CMP_flag
+      temp_cmp_pass_flag_all_metrics_one_ouput = True
+      assert len(dict_each_output_CMP_flag)==self.num_metric
+      for j in range(self.num_metric):
+          temp_cmp_pass_flag_all_metrics_one_ouput &= dict_each_output_CMP_flag[self.metric_table[j]]
+      assert temp_cmp_pass_flag_all_metrics_one_ouput==all(dict_each_output_CMP_flag.values())
+      return temp_cmp_pass_flag_all_metrics_one_ouput
+
+
+  #in case that output is 0-dim, where output[i] will be an fault
+  #function output:
+  ##case 1:  T    - > T
+  ##case 2: (T,T,T)  -> (T,T,T)[idx]
+  ##case 3: 0-dim  -> 0->dim
+  def each_output_0_dim(self,obj,idx):
+     if isinstance(obj, tuple): 
+        assert idx<=len(obj) - 1
+        return obj[idx]
+     elif obj.dim()==0 :
+        assert idx==0
+        return obj
+     elif torch.is_tensor(obj):
+        assert idx==0
+        return obj
+     else:
+        raise TypeError("Invalid mode for each_output_0_dim")
+
+  #cmp every output,  nodechip vs torch
+  #function input: dict_execute_result dict {"output_cpu", "output_tpu"}
+  #function output: #output_nums for 1 sample in 1 dtype {"metric_value", "metric_flag", "passed_flag"}
+  #metric_value: 
+  #metric_flag: is this mertic < error_allowed
+  #passed_flag is this sample of this dtype for all metrics passed?
+  def cmp_multi_output(self, dict_execute_result, epsilon=0.01):
+    output_cpu = dict_execute_result['output_cpu']
+    output_tpu = dict_execute_result['output_tpu']
+    num_output_cpu = self.compute_multi_output_num(output_cpu)
+    num_output_tpu = self.compute_multi_output_num(output_tpu)
+    assert (num_output_cpu==num_output_tpu)
+    all_output_dict_for_one_sample_one_dtype = [] #order is output_1,output_2,...,output_n
+    #cmp order-1: multi_output
+    for i in range(num_output_tpu):
+      dict_each_output_value, dict_each_output_CMP_flag = {}, {}
+      #cmp order-2:  multi_metric
+      for j in range(self.num_metric ):
+        output_cpu_processed = self.each_output_0_dim(output_cpu, i)
+        output_tpu_processed =self.each_output_0_dim(output_tpu, i)
+        dict_each_output_value[self.metric_table[j]],dict_each_output_CMP_flag[self.metric_table[j]] = self.metric_compute(output_cpu_processed,output_tpu_processed,self.metric_table[j], epsilon)
+      
+      #whether this output is passed multi_metric == & every element in CMP_flag
+      temp_cmp_pass_flag_all_metrics_one_ouput =  self.metric_post_processed(dict_each_output_CMP_flag)
+      temp_result_one_output = { "metric_value":dict_each_output_value, "metric_flag":dict_each_output_CMP_flag, "passed_flag_one_sample_one_dtype":temp_cmp_pass_flag_all_metrics_one_ouput}
+      # each input sample has cmp_out struct:  [#nums_output,3]
+      all_output_dict_for_one_sample_one_dtype +=[temp_result_one_output]
+    return all_output_dict_for_one_sample_one_dtype
+
+
+  #You must put this function nearest to input_sample_isolation
+  def customized_execute_function(self, input_sample_cpu, input_sample_tpu, net_cpu, net_tpu, dtype):
+    assert not (isinstance(input_sample_cpu, int) or isinstance(input_sample_cpu, float))
+    assert torch.is_tensor(input_sample_cpu) or isinstance(input_sample_cpu,list)
+    output_cpu = net_cpu(*input_sample_cpu)
+    output_tpu = net_tpu(*input_sample_tpu)
+    #tpu-first
+    return output_tpu, output_cpu
+  
+  #move model to target device and type
+  #ModuleList, ModuleArray are not supoorted now
+  def move_model(self, obj, device, dtype):
+    return obj.to(device=device,dtype=dtype)
+
+
+  #lowest execute_function
+  #function input:
+  #1)module_native 
+  #2torch_dtype torch.dtype
+  #3)input_sample_cpu: T or list T
+  #function output: dict_execute_result dict {"output_cpu", "output_tpu"}
+  def global_execute_function(self, module_native, torch_dtype, input_sample_cpu):
+     #### [WARNING] You cannot set seed here because the rand input has been given
+          #### [WARNING] torch.manual_seed(seed)
+          net_cpu = module_native()
+          net_tpu = copy.deepcopy(net_cpu)
+          net_tpu = self.move_model(net_tpu, self.device ,torch_dtype)
+          #Note: 2nd detach isolation incase of leaf node, input_sample_isolation must be lowest enough to customized_execute_function
+          input_sample_incase_leaf_node = self.input_sample_isolation(input_sample_cpu)
+          fake_input = copy.deepcopy(input_sample_incase_leaf_node)
+          input_sample_tpu= move_to(fake_input, self.device ,torch_dtype)
+          #tpu-first
+          output_tpu, output_cpu = self.customized_execute_function(input_sample_incase_leaf_node, input_sample_tpu, net_cpu, net_tpu,torch_dtype)
+          output_tpu = move_to(output_tpu, self.device_cpu,torch_dtype)
+
+               
+          dict_execute_result = {"output_tpu":output_tpu, "output_cpu":output_cpu}
+          self.output_effectiveness_verification(dict_execute_result)
+          return dict_execute_result
+  
+  def output_effectiveness_verification(self, dict_execute_result):
+    output_cpu = dict_execute_result['output_cpu']
+    output_tpu = dict_execute_result['output_tpu']
+    if torch.is_tensor(output_cpu):
+      assert output_cpu.device==self.device_cpu
+      assert output_tpu.device==self.device_cpu
+      assert torch.sum(torch.abs(output_cpu))>0, "You must ensure cpu output is non-zero Tensor"
+
+    elif isinstance(output_cpu,tuple):
+      for i  in range(self.num_multi_output):
+        assert output_cpu[i].device==self.device_cpu
+        assert output_tpu[i].device==self.device_cpu
+        assert torch.sum(torch.abs(output_cpu[i]))>0, ("You must ensure {}-th-cpu-output is non-zero Tensor".format(i),output_cpu[i])
+
+    else:
+        assert 0,"Usually output is Tensor or Tuple of Tensors"
+
+  # test a single input
+  #function input:
+  #1)sample_count int 
+  #module_native 
+  #3)input_sample_cpu: T or list T
+  #function output:
+  #1) bool flag: is one multioutput passed all metrics && for all dtypes?
+  #2) dict: is correct for this_dtype via all metrics?
+  def Torch_Test_Forward_Function_Per(self, sample_count, module_native, input_sample_cpu):
+      #final_result -> dtype, output_nums, 3(vale,flag,all_flag)
+      final_result = {}
+      for naive_dtype in self.naive_dtype_list:
+          print("Case {} Sample {} Dtype {} is started".format(self.case_name, sample_count, naive_dtype))
+          torch_dtype = self.convert_dtype_2_torch_style(naive_dtype)
+
+
+          #execute step 2:start cmp metrics 
+          dict_execute_result = self.global_execute_function(module_native, torch_dtype, input_sample_cpu)
+
+          #execute step 3:start cmp metrics 
+          final_result[naive_dtype] = self.cmp_multi_output(dict_execute_result, self.epsilon_dict[naive_dtype])
+          pass_flag_all_outputs = True
+          output_num = len(final_result[naive_dtype])
+          for idx_output in range(output_num):
+            pass_flag_all_outputs &= final_result[naive_dtype][idx_output]["passed_flag_one_sample_one_dtype"]
+          if self.dump_flag and not pass_flag_all_outputs:
+             self.Dumper.dump_info(sample_count,  dict_execute_result,torch_dtype)
+
+      ###Value Cmp
+      count_all_correct_dtype = 0
+      dict_is_this_dtype_correct = {}
+      for naive_dtype in self.naive_dtype_list:
+        is_all_outputs_all_metrics_passed = False
+        assert self.num_multi_output==len(final_result[naive_dtype])
+        for each_metric in self.metric_table:
+            for idx_output in range(self.num_multi_output):
+                is_all_outputs_all_metrics_passed |=   final_result[naive_dtype][idx_output]['metric_flag'][each_metric]
+
+        ###output info level-1, correct for each input_sample
+        if (is_all_outputs_all_metrics_passed):
+          count_all_correct_dtype +=1
+          for idx_output in range(output_num):
+            print("[Result]",self.case_name,"{}  output-{} is success".format(naive_dtype, idx_output), final_result[naive_dtype][idx_output]['metric_value'])
+          dict_is_this_dtype_correct[naive_dtype] = 1
+        else:
+          for idx_output in range(output_num):
+            print("[Result]",self.case_name, "{}  output-{} is failed".format(naive_dtype, idx_output), final_result[naive_dtype][idx_output]['metric_value'])
+          dict_is_this_dtype_correct[naive_dtype] = 0
+      return count_all_correct_dtype ==self.dtype_num,dict_is_this_dtype_correct
+
+
+  # print test info for all inputs, which means each input sharing same seed
+  def print_global_info(self):
+      print(("*****************Test {} START INFO*************************").format(self.case_name))
+      print("Seed:                   ", self.seed)
+      print("Metrics for Compare:    ",  self.metric_table)
+      print("Dtype and allowed error:", self.epsilon_dict)
+
+
+  # print shape for each inputs
+  def print_each_input_batch_shape(self, inputs):
+    if torch.is_tensor(inputs):
+       print("Single Input shape is {}".format( inputs.shape))
+    elif isinstance(inputs, list):
+      for idx,input_idx in enumerate(inputs):
+          if torch.is_tensor(input_idx):
+            print("Input {} shape is {}".format(idx, input_idx.shape))
+          else:
+            print("Input {} is 0-dim value".format(idx))
+    elif isinstance(inputs, int) or isinstance(inputs, float):
+       print("Single Input is 0-dim value")
+    else:
+      raise TypeError("Invalid format of input shape!")
+
+
+#Note: 2nd detach isolation incase of leaf node, input_sample_isolation must be lowest enough to customized_execute_function
+#input is same with output, only T is detached
+  def input_sample_isolation(self, inputs):
+    if torch.is_tensor(inputs):
+       return inputs.detach()
+    elif isinstance(inputs, list):
+      res = []
+      for idx,input_idx in enumerate(inputs):
+          if torch.is_tensor(input_idx):
+            res +=[input_idx.detach()]
+          else:
+            res +=[input_idx] #ofcourse has no
+      return res
+    elif isinstance(inputs, int) or isinstance(inputs, float):
+       return inputs
+    else:
+      raise TypeError("Invalid format of input shape!")
+
+  #function input -> output:
+  #case 1 [[T]]->[[T]]
+  #case 2 [T] -> [T]
+  #case 3  T ->  [T]
+  #case 3  int/float ->  int/float
+  def func_input_sample_process(self, input_sample_collection):
+      if isinstance(input_sample_collection, dict):
+        return  list(input_sample_collection.values())
+      elif isinstance(input_sample_collection, list):
+        return  input_sample_collection
+      elif isinstance(input_sample_collection, float) or isinstance(input_sample_collection, int):
+         return  input_sample_collection
+      elif torch.is_tensor(input_sample_collection):
+         #same as [tensor a]
+         return  [input_sample_collection]
+      raise TypeError("Invalid  format of input sample only {tensor, dict,list,int,float} is supported!")
+
+
+  def Torch_Test_Forward_Function(self, module_native, input_sample_collection):
+
+      input_sample_processed = self.func_input_sample_process(input_sample_collection)
+
+      #level 3 global info: print basic seed
+      self.print_global_info()
+
+      current_correct_num = 0
+      static_corret_dtype_case = dict.fromkeys(self.naive_dtype_list, 0)
+      #Notice: if input is tensor_a ,then collection is [tensor_a], processed is [[tensor_a]]
+      for idx, input_sample in enumerate(input_sample_processed):
+          print("--------------------------------------------------------")
+          print("Case {} Sample {} is started".format(self.case_name, idx))
+          print("--------------------------------------------------------")
+
+          self.print_each_input_batch_shape(input_sample)
+          temp_flag,is_correct_dtype = self.Torch_Test_Forward_Function_Per(idx,  module_native, input_sample)
+          current_correct_num += temp_flag == 1
+          for dtype_per in self.naive_dtype_list:
+              if (is_correct_dtype[dtype_per]):
+                  static_corret_dtype_case[dtype_per] +=1
+      #level 2 static info: print correct for all samples
+      print("*****************Basic Stats CMP INFO*************************")
+      correct_dtype_list = []
+      for i in self.naive_dtype_list:
+        if static_corret_dtype_case[i] == len(input_sample_processed):
+              print("Case {}: dtype {} is all corrected".format(self.case_name, i))
+              correct_dtype_list+=[i]
+      wrong_dtype = list(set(self.naive_dtype_list) - set(correct_dtype_list))
+      if (len(wrong_dtype)>0):
+          print("Case {}: dtype {} exist errors".format(self.case_name, wrong_dtype))
+      print("Case {}: {}/{} Samples is completely corrected".format(self.case_name, current_correct_num, len(input_sample_processed)))
+      print(("*****************Test {} All End*************************").format(self.case_name))

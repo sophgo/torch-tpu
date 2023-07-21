@@ -12,26 +12,24 @@ def case1():
     class Test_Module(nn.Module):
             def __init__(self):
                 super(Test_Module, self).__init__()
-            def forward(self, a1, a2, a3):
-                return torch.addmm(a1,a2,a3)
+            def forward(self, a1 , p ,q):
+                return a1.transpose(p ,q),a1.transpose(p ,q)
 
     #step2: prepare input data, Notice that the input data will be adopted not only their shapes
-    input_data = {
-         "simple0": [torch.rand((3)),  torch.rand((2,3)),  torch.rand((3,3))],
-    }
-    #list is also acceptable
     input_data = [
-        [torch.rand((3)),  torch.rand((2,3)),  torch.rand((3,3))],
+        #  [torch.randn(32, 256, 768, 768//12), -1, -2], #    [N C H W] => [N C W H] 
+         [torch.randn(128, 512, 512), 1, 2],         #    [C H W] => [C W H] 
+        #  [torch.randn(128, 512 * 512), -1, -2],        #    [C H ] => [H ,C] 
+
     ]
     metric_table = ['max_diff','MAE']
     epsilon_dict = {'f32':1e-6,'f16':1e-2}
-    case_name =  __file__.split('.py')[0]# You can change your name
+    case_name =  __file__.split('.py')[0]
     dump_flag = True #it will dump alll wrong cases
 
     device = torch.device("privateuseone:0")
     My_Tester = Tester_Basic(case_name, device, metric_table, epsilon_dict,seed, dump_flag)
     return My_Tester.Torch_Test_Forward_Function(Test_Module, input_data)
-
 
 if __name__ == "__main__":
     case1()
