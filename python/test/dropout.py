@@ -10,25 +10,31 @@ optimer = Optimer(PLUGIN_PATH)
 
 if __name__ == "__main__":
     ###############configure##########
-    Batch = 8
-    nHead = 12
-    Hidden = 768
-    sequence = 1024
+    Batch = 1
+    nHead = 1
+    Hidden = 8
+    sequence = 8
     p_drop = 0.5
     device = "privateuseone"
     ###################################
     inp = torch.randn((Batch, nHead, sequence, sequence))
-    inp =torch.ones((3,3))
     inp_tpu = inp.to(device)
+    inp.requires_grad = True
+    inp_tpu.requires_grad = True
 
-    net = nn.Dropout(p_drop,inplace=True)
+    ref = torch.ones((Batch, nHead, sequence, sequence)) * 2
+    ref_tpu = ref.to(device)
+
+    net = nn.Dropout(p_drop)
     net_tpu = copy.deepcopy(net).to(device)
 
+    print("=====forward====")
     o = net(inp)
     o_t = net_tpu(inp_tpu)
-    print(inp)
-    print(o)
-    print(o_t.cpu())
-
-    diff = o - o_t.cpu()
-    print(torch.max(torch.abs(diff)))
+    print("====backward===")
+    o.backward(ref)
+    o_t.backward(ref_tpu)
+    print("====cat result===")
+    print("out", o_t.cpu())
+    print("inp", inp_tpu.cpu())
+    print("in.grad", inp_tpu.grad.cpu())
