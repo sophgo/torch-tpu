@@ -2617,3 +2617,183 @@ bm_status_t sgdnnDropout ( bm_handle_t handle,
 #endif
   return BM_SUCCESS;
 }
+
+bm_status_t sgdnnMlp ( bm_handle_t handle,
+                          SgdnnTensor_t input,
+                          SgdnnTensor_t w1,
+                          SgdnnTensor_t w2,
+                          SgdnnTensor_t b1,
+                          SgdnnTensor_t b2,
+                          SgdnnTensor_t out1,
+                          SgdnnTensor_t p,
+                          SgdnnTensor_t output )
+{
+  SGDNN_CHECK ( input.dtype == w1.dtype );
+  SGDNN_CHECK ( input.dtype == w2.dtype );
+  SGDNN_CHECK ( input.dtype == out1.dtype );
+  SGDNN_CHECK ( input.dtype == p.dtype );
+  SGDNN_CHECK ( input.dtype == output.dtype );
+  SGDNN_CHECK ( input.dtype == SGDNN_DTYPE_FP32 ||
+                input.dtype == SGDNN_DTYPE_FP16 ||
+                input.dtype == SGDNN_DTYPE_BF16 );
+  if ( b1.addr != 0 )
+  {
+    SGDNN_CHECK ( input.dtype == b1.dtype );
+  }
+  if ( b2.addr != 0 )
+  {
+    SGDNN_CHECK ( input.dtype == b2.dtype );
+  }
+
+  SGDNN_CHECK ( input.shape[2] == w1.shape[0] );
+  SGDNN_CHECK ( out1.shape[2] == w1.shape[1] );
+  SGDNN_CHECK ( sgdnnIsSameShape( &out1, &p ) );
+  SGDNN_CHECK ( p.shape[2] == w2.shape[0] );
+  SGDNN_CHECK ( output.shape[2] == w2.shape[1] );
+  SGDNN_CHECK ( input.shape[0] == output.shape[0] );
+  SGDNN_CHECK ( input.shape[1] == output.shape[1] );
+
+  if ( b1.addr != 0 )
+  {
+    SGDNN_CHECK ( b1.dim == 1 );
+    SGDNN_CHECK ( b1.shape[0] == w1.shape[1] );
+    SGDNN_CHECK ( b1.shape[0] == out1.shape[2] );
+  }
+
+  if ( b2.addr != 0 )
+  {
+    SGDNN_CHECK ( b2.dim == 1 );
+    SGDNN_CHECK ( b2.shape[0] == w2.shape[1] );
+    SGDNN_CHECK ( b2.shape[0] == output.shape[2] );
+  }
+
+  SGDNN_CHECK ( sgdnnIsTensorContiguous ( &input ) );
+  SGDNN_CHECK ( sgdnnIsTensorContiguous ( &w1 ) );
+  SGDNN_CHECK ( sgdnnIsTensorContiguous ( &w2 ) );
+  SGDNN_CHECK ( sgdnnIsTensorContiguous ( &out1 ) );
+  SGDNN_CHECK ( sgdnnIsTensorContiguous ( &p ) );
+
+  if ( b1.addr != 0 )
+  {
+    SGDNN_CHECK ( sgdnnIsTensorContiguous ( &b1 ) );
+  }
+  if ( b2.addr != 0 )
+  {
+    SGDNN_CHECK ( sgdnnIsTensorContiguous ( &b2 ) );
+  }
+  SGDNN_CHECK ( sgdnnIsTensorContiguous ( &output ) );
+
+#if defined SGDNN_BACKEND_2260
+  SGDNN_CHECK ( false );
+#else
+  SGDNN_CHECK ( false );
+#endif
+  return BM_SUCCESS;
+}
+
+
+bm_status_t sgdnnMlpBackward ( bm_handle_t handle,
+                                  SgdnnTensor_t grad_output,
+                                  SgdnnTensor_t input,
+                                  SgdnnTensor_t w1,
+                                  SgdnnTensor_t w2,
+                                  SgdnnTensor_t out1,
+                                  SgdnnTensor_t p,
+                                  SgdnnTensor_t grad_input,
+                                  SgdnnTensor_t grad_w1,
+                                  SgdnnTensor_t grad_w2,
+                                  SgdnnTensor_t grad_b1,
+                                  SgdnnTensor_t grad_b2)
+{
+  SGDNN_CHECK ( input.dtype == w1.dtype );
+  SGDNN_CHECK ( input.dtype == w2.dtype );
+  SGDNN_CHECK ( input.dtype == out1.dtype );
+  SGDNN_CHECK ( input.dtype == p.dtype );
+  SGDNN_CHECK ( input.dtype == grad_output.dtype );
+  if ( grad_input.addr != 0 )
+  {
+    SGDNN_CHECK ( input.dtype == grad_input.dtype );
+  }
+  if ( grad_w1.addr != 0 )
+  {
+    SGDNN_CHECK ( input.dtype == grad_w1.dtype );
+  }
+  if ( grad_b1.addr != 0 )
+  {
+    SGDNN_CHECK ( input.dtype == grad_b1.dtype );
+  }
+  if ( grad_w2.addr != 0 )
+  {
+    SGDNN_CHECK ( input.dtype == grad_w2.dtype );
+  }
+  if ( grad_b2.addr != 0 )
+  {
+    SGDNN_CHECK ( input.dtype == grad_b2.dtype );
+  }
+
+  SGDNN_CHECK ( input.dtype == SGDNN_DTYPE_FP32 ||
+                input.dtype == SGDNN_DTYPE_FP16 ||
+                input.dtype == SGDNN_DTYPE_BF16 );
+
+  SGDNN_CHECK ( input.shape[0] == grad_output.shape[0] );
+  SGDNN_CHECK ( input.shape[1] == grad_output.shape[1] );
+  SGDNN_CHECK ( sgdnnIsSameShape( &out1, &p ) );
+  SGDNN_CHECK ( input.shape[2] == w1.shape[0] );
+  SGDNN_CHECK ( out1.shape[2] == w1.shape[1] );
+  SGDNN_CHECK ( p.shape[2] == w2.shape[0] );
+
+  if ( grad_input.addr != 0 )
+  {
+    SGDNN_CHECK ( sgdnnIsSameShape ( &input, &grad_input ) );
+  }
+  if ( grad_w1.addr != 0 )
+  {
+    SGDNN_CHECK ( sgdnnIsSameShape ( &w1, &grad_w1 ) );
+  }
+  if ( grad_w2.addr != 0 )
+  {
+    SGDNN_CHECK ( sgdnnIsSameShape ( &w2, &grad_w2 ) );
+  }
+  if ( grad_b1.addr != 0 )
+  {
+    SGDNN_CHECK ( grad_b1.shape[0] == out1.shape[2] );
+  }
+  if ( grad_b2.addr != 0 )
+  {
+    SGDNN_CHECK ( grad_b2.shape[0] == grad_w2.shape[1] );
+  }
+
+  SGDNN_CHECK ( sgdnnIsTensorContiguous ( &input ) );
+  SGDNN_CHECK ( sgdnnIsTensorContiguous ( &w1 ) );
+  SGDNN_CHECK ( sgdnnIsTensorContiguous ( &w2 ) );
+  SGDNN_CHECK ( sgdnnIsTensorContiguous ( &out1 ) );
+  SGDNN_CHECK ( sgdnnIsTensorContiguous ( &p ) );
+  SGDNN_CHECK ( sgdnnIsTensorContiguous ( &grad_output ) );
+  if ( grad_input.addr != 0 )
+  {
+    SGDNN_CHECK ( sgdnnIsTensorContiguous ( &grad_input ) );
+  }
+  if ( grad_w1.addr != 0 )
+  {
+    SGDNN_CHECK ( sgdnnIsTensorContiguous ( &grad_w1 ) );
+  }
+  if ( grad_w2.addr != 0 )
+  {
+    SGDNN_CHECK ( sgdnnIsTensorContiguous ( &grad_w2 ) );
+  }
+  if ( grad_b1.addr != 0 )
+  {
+    SGDNN_CHECK ( sgdnnIsTensorContiguous ( &grad_b1 ) );
+  }
+  if ( grad_b2.addr != 0 )
+  {
+    SGDNN_CHECK ( sgdnnIsTensorContiguous ( &grad_b2 ) );
+  }
+
+#if defined SGDNN_BACKEND_2260
+  SGDNN_CHECK ( false );
+#else
+  SGDNN_CHECK ( false );
+#endif
+  return BM_SUCCESS;
+}

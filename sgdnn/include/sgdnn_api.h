@@ -595,6 +595,49 @@ bm_status_t sgdnnDropout ( bm_handle_t handle,
                            SgdnnTensor_t output,
                            SgdnnTensor_t mask );
 
+/*
+ * OUTPUT = MLP ( INPUT, W1, W2, B1, B2, OUT1, P )
+ * Note:
+ * 1. The data types of INPUT, W1, W2, B1, B2, OUT1, P must be the same and one of FP32, FP16 and BF16
+ * 2. The dimensions of INPUT OUT1 P and OUTPUT must be 3, W1 W2 must be 2, B1 B2 must be 1
+ * 3. The shape of INPUT is ( B, M, N ), W1 is ( N, D1 ), B1 is ( D1 ), W2 is ( D1, D2 ), B2 is ( D2 ), OUT1 P is ( B, M, D1 ), OUTPUT is ( B, M, D2 )
+ * 4. INPUT, W1, W2, B1, B2, OUT1, P and OUTPUT must be contiguous
+ * 5. W1 B1 represents the weight and bias of first layer, OUT1 represents the output of first layer, P represents output of activation function,
+ * W2 B2 represents the weight and bias of second layer
+ */
+bm_status_t sgdnnMlp ( bm_handle_t handle,
+                          SgdnnTensor_t input,
+                          SgdnnTensor_t w1,
+                          SgdnnTensor_t w2,
+                          SgdnnTensor_t b1,
+                          SgdnnTensor_t b2,
+                          SgdnnTensor_t out1,
+                          SgdnnTensor_t p,
+                          SgdnnTensor_t output );
+
+/*
+ * [ GRAD_INPUT, GRAD_W1, GRAD_W2, GRAD_B1, GRAD_B2 ] = MLP BACKWARD ( GRAD_OUTPUT, INPUT, W1, W2, OUT1, P )
+ * Note:
+ * 1. The data types of all the tensors must be the same and one of FP32, FP16 and BF16
+ * 2. The dimensions of INPUT, GRAD_OUTPUT, OUT1, P and GRAD_INPUT must be 3; W1, W2, GRAD_W1 and GRAD_W2 must be 2; GRAD_B1, GRAD_B2 must be 1
+ * 3. The shape of INPUT and GRAD_INPUT is ( B, M, N ); W1 and GRAD_W1 is ( N, D1 ); W2 and GRAD_W2 is ( D1, D2 ); OUT1, P is ( B, M, D1 ); GRAD_B1 is ( D1 ); GRAD_B2 is ( D2 ); GRAD_OUTPUT is ( B, M, D2 )
+ * 4. All the tensors must be contiguous
+ * 5. W1 B1 represents the weight and bias of first layer, OUT1 represents the output of first layer, P represents output of activation function,
+ * W1 B1 represents the weight and bias of second layer, GRAD_x means the gradient of tensor x
+ */
+bm_status_t sgdnnMlpBackward ( bm_handle_t handle,
+                                  SgdnnTensor_t grad_output,
+                                  SgdnnTensor_t input,
+                                  SgdnnTensor_t w1,
+                                  SgdnnTensor_t w2,
+                                  SgdnnTensor_t out1,
+                                  SgdnnTensor_t p,
+                                  SgdnnTensor_t grad_input,
+                                  SgdnnTensor_t grad_w1,
+                                  SgdnnTensor_t grad_w2,
+                                  SgdnnTensor_t grad_b1,
+                                  SgdnnTensor_t grad_b2);
+
 #if defined(__cplusplus)
 }
 #endif

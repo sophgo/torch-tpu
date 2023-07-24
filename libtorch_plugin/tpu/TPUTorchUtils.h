@@ -248,6 +248,8 @@ typedef enum
   C_DIV,
   NORM2,
   BCAST_ADD,
+  MLP_FORWARD,
+  MLP_BACKWARD,
   OP_NUM
 }
 OpType;
@@ -301,7 +303,9 @@ static const char * OpTypeStr[OP_NUM] =
   "CSub",
   "CDiv",
   "Norm2",
-  "Bcast Add"
+  "Bcast Add",
+  "MLP Forward",
+  "MLP Backward"
 };
 
 struct OpTimer
