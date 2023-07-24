@@ -74,23 +74,23 @@ class GPT2Attention(nn.Module):
     def _attn(self, query, key, value, attention_mask=None, head_mask=None):
         DI.dump("Matmul_QK")
         attn_weights = torch.matmul(query, key.transpose(-1, -2))
-        attn_weights = BackwardHack.apply("**Matmul_QK_dx", attn_weights)
+        attn_weights = BackwardHack.apply("Matmul_QK_dqk_", attn_weights)
 
         if self.scale_attn_weights:
             DI.dump("Norm_QK[Div]")
             attn_weights = attn_weights / (float(value.size(-1)) ** 0.5)
-            attn_weights = BackwardHack.apply("**Norm_QK[Div]", attn_weights)
+            attn_weights = BackwardHack.apply("Norm_QK[Div]_d_", attn_weights)
 
 
         if not self.is_cross_attention:
             query_length, key_length = query.size(-2), key.size(-2)
             DI.dump("Get_QK_MASK")
             causal_mask = self.bias[:, :, key_length - query_length : key_length, :key_length].bool()
-            causal_mask = BackwardHack.apply("**Get_QK_MASK", causal_mask)
+            causal_mask = BackwardHack.apply("Get_QK_MASK_", causal_mask)
 
             DI.dump("WHERE_ON_QK")
             attn_weights = torch.where(causal_mask, attn_weights, self.masked_bias.to(attn_weights.dtype))
-            attn_weights = BackwardHack.apply("**WHERE_ON_dqkv", attn_weights)
+            attn_weights = BackwardHack.apply("WHERE_ON_dqkv_", attn_weights)
 
         if attention_mask is not None:
             # Apply the attention mask
@@ -98,7 +98,7 @@ class GPT2Attention(nn.Module):
         
         DI.dump("SOFTMAX_QK")
         attn_weights = nn.Softmax(dim=-1)(attn_weights)
-        attn_weights = BackwardHack.apply("**SOFTMAX_QK_d", attn_weights)
+        attn_weights = BackwardHack.apply("SOFTMAX_QK_d_", attn_weights)
 
         attn_weights = self.attn_dropout(attn_weights)
         if head_mask is not None:
@@ -106,7 +106,7 @@ class GPT2Attention(nn.Module):
 
         DI.dump("Matmul_QKV")
         attn_output = torch.matmul(attn_weights, value)
-        attn_output = BackwardHack.apply("**Matmul_QKV_dqkv", attn_output)
+        attn_output = BackwardHack.apply("Matmul_QKV_dqkv_", attn_output)
 
         return attn_output, attn_weights
 
@@ -150,7 +150,7 @@ class GPT2Attention(nn.Module):
         else:
             DI.dump("FC_QKV")
             x = self.c_attn(hidden_states)
-            x = BackwardHack.apply("**FC_QKV_dwi", x)
+            x = BackwardHack.apply("FC_QKV_dwi_", x)
 
             query, key, value = x.split(self.split_size, dim=2)
 
@@ -172,12 +172,12 @@ class GPT2Attention(nn.Module):
 
         DI.dump("Concat_heads")
         attn_output = self._merge_heads(attn_output, self.num_heads, self.head_dim)
-        attn_output = BackwardHack.apply("**Concat_heads", attn_output)
+        attn_output = BackwardHack.apply("Concat_heads_d_", attn_output)
 
 
         DI.dump("FC_proj")
         attn_output = self.c_proj(attn_output)
-        attn_output = BackwardHack.apply("**FC_mlp0_dwi", attn_output)
+        attn_output = BackwardHack.apply("FC_proj_dwi_", attn_output)
 
         attn_output = self.resid_dropout(attn_output)
 
@@ -199,15 +199,15 @@ class GPT2MLP(nn.Module):
     def forward(self, hidden_states):
         DI.dump("FC_mlp0")
         hidden_states = self.c_fc(hidden_states)
-        hidden_states = BackwardHack.apply("**FC_mlp0_dwi", hidden_states)
+        hidden_states = BackwardHack.apply("FC_mlp0_dwi_", hidden_states)
 
         DI.dump("GeLU")
         hidden_states = self.act(hidden_states)
-        hidden_states = BackwardHack.apply("**gelu_dx", hidden_states)
+        hidden_states = BackwardHack.apply("gelu_dx_", hidden_states)
 
         DI.dump("FC_mlp1")
         hidden_states = self.c_proj(hidden_states)
-        hidden_states = BackwardHack.apply("**FC_mlp1_dwi", hidden_states)
+        hidden_states = BackwardHack.apply("FC_mlp1_dwi_", hidden_states)
 
         hidden_states = self.dropout(hidden_states)
         return hidden_states
@@ -242,7 +242,7 @@ class GPT2Block(nn.Module):
         residual = hidden_states
         DI.dump("LayerNorm_embedded_input")
         hidden_states = self.ln_1(hidden_states)
-        hidden_states = BackwardHack.apply("**LayerNorm_embedded_input_drbi", hidden_states)
+        hidden_states = BackwardHack.apply("LayerNorm_embedded_input_drbi_", hidden_states)
 
         attn_outputs = self.attn(
             hidden_states,
@@ -259,7 +259,7 @@ class GPT2Block(nn.Module):
 
         DI.dump("Add_atten")
         hidden_states = attn_output + residual
-        hidden_states = BackwardHack.apply("**Add_atten", hidden_states)
+        hidden_states = BackwardHack.apply("Add_atten_", hidden_states)
 
         if encoder_hidden_states is not None:
             # add one self-attention block for cross-attention
@@ -286,7 +286,7 @@ class GPT2Block(nn.Module):
         residual = hidden_states
         DI.dump("LayerNorm_atten")
         hidden_states = self.ln_2(hidden_states)
-        hidden_states = BackwardHack.apply("**LayerNorm_atten_drbi", hidden_states)
+        hidden_states = BackwardHack.apply("LayerNorm_atten_drbi_", hidden_states)
 
         feed_forward_hidden_states = self.mlp(hidden_states)
         #t2 = time.time()
@@ -295,7 +295,7 @@ class GPT2Block(nn.Module):
         # residual connection
         DI.dump("Add_layer_result")
         hidden_states = residual + feed_forward_hidden_states
-        hidden_states = BackwardHack.apply("**Add_layer_result_d", hidden_states)
+        hidden_states = BackwardHack.apply("Add_layer_result_d_", hidden_states)
 
         if use_cache:
             outputs = (hidden_states,) + outputs

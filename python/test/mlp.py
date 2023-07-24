@@ -128,9 +128,9 @@ def check_mlp():
     net_cpu = GPT2Mlp(embed_dim, intermediate_size)
 
     # w1 = torch.tensor(copy.deepcopy(net_cpu.state_dict()['c_fc.weight']), requires_grad=True).to(device)
-    w1 = net_cpu.state_dict()['c_fc.weight'].clone().detach().transpose(0,1).requires_grad_(True).to(device)   # TODO
+    w1 = net_cpu.state_dict()['c_fc.weight'].clone().detach().transpose(0,1).contiguous().requires_grad_(True).to(device)   # TODO
     b1 = net_cpu.state_dict()['c_fc.bias'].clone().detach().requires_grad_(True).to(device)
-    w2 = net_cpu.state_dict()['c_proj.weight'].clone().detach().transpose(0,1).requires_grad_(True).to(device)
+    w2 = net_cpu.state_dict()['c_proj.weight'].clone().detach().transpose(0,1).contiguous().requires_grad_(True).to(device)
     b2 = net_cpu.state_dict()['c_proj.bias'].clone().detach().requires_grad_(True).to(device)
 
     net_tpu = MlpBlock(w1, w2, b1, b2)
@@ -141,6 +141,7 @@ def check_mlp():
     out_cpu = net_cpu(x.cpu())
     out_diff = out_cpu - out_tpu.float().to("cpu")
     print (torch.max(abs(out_diff)))
+    import pdb;pdb.set_trace()
 
     print("=====backward======")
     ref_tpu = torch.ones(batch_size, length, b2.shape[0]).to(device)

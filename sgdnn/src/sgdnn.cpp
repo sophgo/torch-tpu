@@ -2682,9 +2682,37 @@ bm_status_t sgdnnMlp ( bm_handle_t handle,
     SGDNN_CHECK ( sgdnnIsTensorContiguous ( &b2 ) );
   }
   SGDNN_CHECK ( sgdnnIsTensorContiguous ( &output ) );
-
-#if defined SGDNN_BACKEND_2260
+#if defined SGDNN_BACKEND_1684X
   SGDNN_CHECK ( false );
+#elif defined SGDNN_BACKEND_2260
+  sg_api_mlp_multi_core_t api;
+  api.input_addr    = input.addr;
+  api.weight0_addr  = w1.addr;
+  api.weight1_addr  = w2.addr;
+  api.bias0_addr    = b1.addr;
+  api.bias1_addr    = b2.addr;
+  api.output_addr   = output.addr;
+  api.in_dims       = input.dim;
+  api.w0_dims       = w1.dim;
+  api.w1_dims       = w2.dim;
+  api.has_bias      = (int)(b1.addr != 0)  + 2 * (int)(b2.addr != 0);
+  api.use_fast      = 0;
+  api.in_dtype      = sgdnnTPUKernelDType ( input.dtype );
+  api.out_dtype     = sgdnnTPUKernelDType ( output.dtype );
+
+  for ( int i = 0; i < input.dim; ++i )
+  {
+    api.in_shape[i] = input.shape[i];
+  }
+  for ( int i = 0; i < w1.dim; ++i )
+  {
+    api.w0_shape[i] = w1.shape[i];
+  }
+  for ( int i = 0; i < w2.dim; ++i )
+  {
+    api.w1_shape[i] = w2.shape[i];
+  } 
+  SAFE_CALL ( sgdnnTPUKernelLaunch ( handle, "tpu_kernel_api_", &api, sizeof ( api ) ) );
 #else
   SGDNN_CHECK ( false );
 #endif

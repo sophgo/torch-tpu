@@ -826,5 +826,28 @@ __attribute__ ( ( packed ) ) sg_api_dropout_t;
 sg_api_dropout_t;
 #endif
 
+typedef struct {
+  unsigned long long input_addr;
+  unsigned long long weight0_addr;
+  unsigned long long weight1_addr;
+  unsigned long long bias0_addr;
+  unsigned long long bias1_addr;
+  unsigned long long output_addr;
+  int in_shape[FW_MAX_SHAPE_DIMS];
+  int w0_shape[FW_MAX_SHAPE_DIMS];
+  int w1_shape[FW_MAX_SHAPE_DIMS];
+  int in_dims;
+  int w0_dims;
+  int w1_dims;
+  int in_dtype;
+  int out_dtype;
+  int has_bias;
+  int use_fast;
+#ifndef WIN32
+} __attribute__((packed)) sg_api_mlp_multi_core_t;
+#else
+} sg_api_mlp_multi_core_t;
+#endif
+
 #pragma pack(pop)
 #endif  // SG_API_STRUCT_H
