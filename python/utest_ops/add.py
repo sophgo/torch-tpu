@@ -34,7 +34,11 @@ def case1():
     device = torch.device("privateuseone:0")
 
     My_Tester = Tester_Basic(case_name, device, metric_table, epsilon_dict,seed, dump_flag)
-    return My_Tester.Torch_Test_Forward_Function(Test_Module, input_data)
+    return My_Tester.Torch_Test_Forward_Function(Test_Module(), input_data)
 
 if __name__ == "__main__":
     case1()
+
+#######################
+##  case1():forward [[T,T]]
+########################

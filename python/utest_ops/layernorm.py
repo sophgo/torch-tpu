@@ -18,7 +18,7 @@ def case1():
                 super(Test_Module, self).__init__()
                 self.LayerNorm = nn.LayerNorm(hidden_size, eps=layer_norm_epsilon)
             def forward(self, a1):
-                return self.LayerNorm(a1) 
+                return self.LayerNorm(a1)
     #step2: prepare input data, Notice that the input data will be adopted not only their shapes
     input_data = [
          [ torch.randn(batch, sequence, hidden_size)],
@@ -46,12 +46,16 @@ def case1():
         output_tpu.backward(grad_o_tpu)
         #tpu-first
         return input_sample_tpu[0].grad, input_sample_cpu[0].grad #Notice [0] because input_data has [],[]
-    
+
     My_Tester = Tester_Basic(case_name, device, metric_table, epsilon_dict,seed, dump_flag)
     My_Tester.customized_execute_function = customized_execute_function
-    return My_Tester.Torch_Test_Forward_Function(Test_Module, input_data)
+    return My_Tester.Torch_Test_Forward_Function(Test_Module(), input_data)
 
 
 if __name__ == "__main__":
     #This example shows all  [], [[]] is acceptable
-    case1() 
+    case1()
+
+#######################
+##  case1():forward + backward [[T]]
+########################

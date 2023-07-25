@@ -29,7 +29,7 @@ def case1():
     # if backward , input_cpu you can not set requires_grad here
     # otherwise input_tpu will be a leaf node without grad!
     input_data = [
-        [torch.rand(6, 1024, 1, 768), torch.rand(1, 1024, 1, 768)], 
+        [torch.rand(6, 1024, 1, 768), torch.rand(1, 1024, 1, 768)],
     ]
     metric_table = ['max_diff','MAE']
     epsilon_dict = {'f32':1e-6, 'f16':1e-2}
@@ -38,8 +38,12 @@ def case1():
     device = torch.device("privateuseone:0")
 
     My_Tester = Tester_Basic(case_name, device, metric_table, epsilon_dict,seed, dump_flag)
-    return My_Tester.Torch_Test_Forward_Function(Test_Module, input_data)
+    return My_Tester.Torch_Test_Forward_Function(Test_Module(), input_data)
 
 
 if __name__ == "__main__":
-    case1() 
+    case1()
+
+#######################
+##  case1():forward [[T,T]]
+########################

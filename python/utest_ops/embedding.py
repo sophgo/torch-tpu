@@ -23,14 +23,14 @@ def case1():
             def __init__(self):
                 super(Test_Module, self).__init__()
                 self.Embedding = nn.Embedding(vocab_size, embed_dim)
-                self.weight = nn.Parameter(torch.ones((vocab_size, embed_dim)))
+                self.Embedding.weight = nn.Parameter(torch.ones((vocab_size, embed_dim)))
 
             def forward(self, a1):
                 return self.Embedding(a1) 
     #step2: prepare input data, Notice that the input data will be adopted not only their shapes
     input_data = [
         #  [torch.randint(0, vocab_size, (batch, sequence)).int()] 
-         [torch.range(0, batch * sequence - 1).view((batch, sequence)).to(torch.int32) ]
+         [torch.range(0, batch * sequence - 1).view((batch, sequence)).int()]
     ]
     metric_table = ['max_diff','MAE']
     epsilon_dict = {'f32':1e-6}
@@ -53,13 +53,18 @@ def case1():
 
         output_cpu.backward(grad_o)
         output_tpu.backward(grad_o_tpu)
+
         #tpu-first
-        return net_tpu.weight.grad, net_cpu.weight.grad
+        return net_tpu.Embedding.weight.grad, net_cpu.Embedding.weight.grad
     My_Tester = Tester_Basic(case_name, device, metric_table, epsilon_dict,seed, dump_flag)
     My_Tester.customized_execute_function = customized_execute_function
-    # return My_Tester.Torch_Test_Forward_Function(Test_Module, input_data)
+    return My_Tester.Torch_Test_Forward_Function(Test_Module(), input_data)
 
 
 if __name__ == "__main__":
     #This example shows all  [], [[]] is acceptable
     case1() 
+
+#######################
+##  case1():forward + backward [[T]]
+########################

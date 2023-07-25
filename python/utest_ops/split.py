@@ -9,7 +9,7 @@ def case1():
     #step0:set seed
     seed=1000
     set_bacis_info(seed)
-    
+
     #step1: define test model
     batch = 2
     sequence = 8
@@ -23,7 +23,7 @@ def case1():
                 # a1,a2,a3 = inp.split(hidden_size, dim=2)
                 # y = a1.contiguous()+a2.contiguous()+a3.contiguous()
                 # return y
-            
+
                 # 2.split
                 q,k,v = inp.split(hidden_size, dim=2)
 
@@ -41,23 +41,23 @@ def case1():
 
     #step2: prepare input data, Notice that the input data will be adopted not only their shapes
     input_data = [
-        [torch.rand((batch, sequence, hidden_size* 3))], 
+        [torch.rand((batch, sequence, hidden_size* 3))],
     ]
     metric_table = ['max_diff','MAE']
     epsilon_dict = {'f32':1e-6, 'f16':1e-2}
     case_name =  __file__.split('.py')[0]# You can change your name
     dump_flag = True #it will dump alll wrong cases
     device = torch.device("privateuseone:0")
-    
+
     My_Tester = Tester_Basic(case_name, device, metric_table, epsilon_dict,seed, dump_flag)
-    return My_Tester.Torch_Test_Forward_Function(Test_Module, input_data)
+    return My_Tester.Torch_Test_Forward_Function(Test_Module(), input_data)
 
 
 def case2():
     #step0:set seed
     seed=1000
     set_bacis_info(seed)
-    
+
     #step1: define test model
     batch = 2
     sequence = 8
@@ -69,10 +69,10 @@ def case2():
                 a1,a2,a3 = inp.split(hidden_size, dim=2)
                 y = a1.contiguous()+a2.contiguous()+a3.contiguous()
                 return y
-            
+
     #step2: prepare input data, Notice that the input data will be adopted not only their shapes
     input_data = [
-        [torch.rand((batch, sequence, hidden_size* 3))], 
+        [torch.rand((batch, sequence, hidden_size* 3))],
     ]
     metric_table = ['max_diff','MAE']
     epsilon_dict = {'f32':1e-6, 'f16':1e-2}
@@ -97,11 +97,16 @@ def case2():
         output_tpu.backward(grad_o_tpu)
         #tpu-first
         return input_sample_tpu[0].grad,input_sample_cpu[0].grad #Notice [0] because input_data has [],[]
-    
+
     My_Tester = Tester_Basic(case_name, device, metric_table, epsilon_dict,seed, dump_flag)
     My_Tester.customized_execute_function = customized_execute_function
-    return My_Tester.Torch_Test_Forward_Function(Test_Module, input_data)
+    return My_Tester.Torch_Test_Forward_Function(Test_Module(), input_data)
 
 if __name__ == "__main__":
     #This example shows all  [], [[]] is acceptable
-    case1() 
+    case1()
+
+
+#######################
+##  case1():forward + backward[[T]]
+########################

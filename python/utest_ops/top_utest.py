@@ -40,8 +40,20 @@ def set_bacis_info(seed):
 def move_to(obj, device, dtype):
   assert obj is not None
   if torch.is_tensor(obj):
-     obj = obj.to(device,dtype=dtype)
-     assert obj.device ==device, (obj.device,device )
+     origin_dtype = obj.dtype
+     if origin_dtype != torch.int32 and origin_dtype != torch.int64:
+        obj = obj.to(device,dtype=dtype)
+        assert obj.device ==device, (obj.device,device )
+     elif origin_dtype == torch.int32:
+        obj = obj.to(device)
+        assert obj.device ==device, (obj.device,device )
+        assert obj.dtype ==torch.int32, (obj.dtype  )
+        print('\033[95m' + "[Warning] This tensor-dtype is {}, ensure such T.to is under your consideration".format(obj.dtype)+ '\033[0m')
+     elif origin_dtype == torch.int64:
+        obj = obj.to(device)
+        assert obj.device ==device, (obj.device,device )
+        assert obj.dtype ==torch.int64, (obj.dtype  )
+        print('\033[95m' + "[Warning] This tensor-dtype is {}, ensure such T.to is under your consideration".format(obj.dtype)+ '\033[0m')
      return obj
   elif isinstance(obj, dict):
     res = {}
@@ -72,14 +84,17 @@ def set_requires_grad(obj, grad_flag= True):
      return obj
   elif isinstance(obj, list):
     res =[]
-    for i in obj:
-       i.requires_grad = grad_flag
+    for idx, i in enumerate(obj):
+       if i.dtype==torch.int32 or i.dtype==torch.int64:
+          print('\033[95m' + "[Warning] Maybe input-{}-th is label as its  dtype is {}, do not set it in <Test_Module>, set it inside <Torch_Test_Forward_Function>!".format(idx, i.dtype)+ '\033[0m')
+       else:
+          i.requires_grad = grad_flag
        res +=[i]
     return res
   else:
     raise TypeError("Invalid type for move_to")
 
-# Just a dump function 
+# Just a dump function
 class Dumper():
   def __init__(self, case_name, device = torch.device("cpu")):
      self.case_name = case_name
@@ -100,8 +115,8 @@ class Dumper():
   def dump_tensor(self, dump_count, dict_execute_result, dtype):
     tensor_cpu = dict_execute_result["output_cpu"]
     tensor_tpu = dict_execute_result["output_tpu"]
-    ouput_tpu = move_to(tensor_tpu.detach(), self.device_cpu,dtype) #tensor_tpu.cpu().numpy()
-    output_cpu = move_to(tensor_cpu.detach(), self.device_cpu,dtype) #tensor_cpu.cpu().numpy()
+    ouput_tpu = move_to(tensor_tpu, self.device_cpu,dtype) #tensor_tpu.cpu().numpy()
+    output_cpu = move_to(tensor_cpu, self.device_cpu,dtype) #tensor_cpu.cpu().numpy()
     tensor_path = self.chip_case_path + "/" + "dump_{}_sample_{}".format(str(dtype).split(".")[-1], dump_count)
     np.savez(tensor_path, ouput_tpu=ouput_tpu, output_cpu=output_cpu)
 
@@ -119,16 +134,21 @@ class Tester_Basic():
       self.case_name = case_name
       self.Dumper = Dumper(self.case_name, self.device_cpu)
       torch.ops.load_library("../../libtorch_plugin/build/liblibtorch_plugin.so")
-  
-      self.convert_table = {'f32':torch.float32,
+
+      self.convert_table = {
+                      'f32':torch.float32,
                       'i32':torch.int32,
                       'f16':torch.half}
+      self.mankind_dtype_table = {
+                      'fp32': 'f32',
+                      'float32': 'f32',
+                      'i32':'i32',
+                      'fp16':'f16'}
 
-      
       self.metric_table = metric_table
       self.epsilon_dict = epsilon_dict
       self.seed = seed
-      ######customized 
+      ######customized
       assert isinstance(self.metric_table, list)
       assert isinstance(epsilon_dict, dict)
       self.num_metric = len(metric_table)
@@ -157,14 +177,19 @@ class Tester_Basic():
     else:
       raise TypeError("Invalid type for compute_multi_output_num")
 
+  def dtype_mankind_friendly(self,human_dtype):
+    if human_dtype in self.convert_table.keys():
+       return human_dtype
+    if human_dtype not in self.mankind_dtype_table.keys() and human_dtype not in self.convert_table.keys() :
+        assert 0,"{} not support".format(human_dtype)
+    return self.mankind_dtype_table[human_dtype]
 
   #convert readable dtyoe to torch dtype
   #function input: dtype 1 str
   #function output: dtype torch.dtype
-  def convert_dtype_2_torch_style(self,dtype):
-    if dtype not in self.convert_table.keys():
-        assert 0,"{} not support".format(dtype)
-    return self.convert_table[dtype]
+  def convert_dtype_2_torch_style(self,human_dtype):
+    machine_dtype = self.dtype_mankind_friendly(human_dtype)
+    return self.convert_table[machine_dtype]
 
 
   #convert compute error and check whether error is larger than epsilon
@@ -212,7 +237,7 @@ class Tester_Basic():
   ##case 2: (T,T,T)  -> (T,T,T)[idx]
   ##case 3: 0-dim  -> 0->dim
   def each_output_0_dim(self,obj,idx):
-     if isinstance(obj, tuple): 
+     if isinstance(obj, tuple):
         assert idx<=len(obj) - 1
         return obj[idx]
      elif obj.dim()==0 :
@@ -227,7 +252,7 @@ class Tester_Basic():
   #cmp every output,  nodechip vs torch
   #function input: dict_execute_result dict {"output_cpu", "output_tpu"}
   #function output: #output_nums for 1 sample in 1 dtype {"metric_value", "metric_flag", "passed_flag"}
-  #metric_value: 
+  #metric_value:
   #metric_flag: is this mertic < error_allowed
   #passed_flag is this sample of this dtype for all metrics passed?
   def cmp_multi_output(self, dict_execute_result, epsilon=0.01):
@@ -245,7 +270,7 @@ class Tester_Basic():
         output_cpu_processed = self.each_output_0_dim(output_cpu, i)
         output_tpu_processed =self.each_output_0_dim(output_tpu, i)
         dict_each_output_value[self.metric_table[j]],dict_each_output_CMP_flag[self.metric_table[j]] = self.metric_compute(output_cpu_processed,output_tpu_processed,self.metric_table[j], epsilon)
-      
+
       #whether this output is passed multi_metric == & every element in CMP_flag
       temp_cmp_pass_flag_all_metrics_one_ouput =  self.metric_post_processed(dict_each_output_CMP_flag)
       temp_result_one_output = { "metric_value":dict_each_output_value, "metric_flag":dict_each_output_CMP_flag, "passed_flag_one_sample_one_dtype":temp_cmp_pass_flag_all_metrics_one_ouput}
@@ -262,7 +287,7 @@ class Tester_Basic():
     output_tpu = net_tpu(*input_sample_tpu)
     #tpu-first
     return output_tpu, output_cpu
-  
+
   #move model to target device and type
   #ModuleList, ModuleArray are not supoorted now
   def move_model(self, obj, device, dtype):
@@ -271,14 +296,14 @@ class Tester_Basic():
 
   #lowest execute_function
   #function input:
-  #1)module_native 
+  #1)module_native
   #2torch_dtype torch.dtype
   #3)input_sample_cpu: T or list T
   #function output: dict_execute_result dict {"output_cpu", "output_tpu"}
   def global_execute_function(self, module_native, torch_dtype, input_sample_cpu):
      #### [WARNING] You cannot set seed here because the rand input has been given
           #### [WARNING] torch.manual_seed(seed)
-          net_cpu = module_native()
+          net_cpu = module_native
           net_tpu = copy.deepcopy(net_cpu)
           net_tpu = self.move_model(net_tpu, self.device ,torch_dtype)
           #Note: 2nd detach isolation incase of leaf node, input_sample_isolation must be lowest enough to customized_execute_function
@@ -289,11 +314,10 @@ class Tester_Basic():
           output_tpu, output_cpu = self.customized_execute_function(input_sample_incase_leaf_node, input_sample_tpu, net_cpu, net_tpu,torch_dtype)
           output_tpu = move_to(output_tpu, self.device_cpu,torch_dtype)
 
-               
           dict_execute_result = {"output_tpu":output_tpu, "output_cpu":output_cpu}
           self.output_effectiveness_verification(dict_execute_result)
           return dict_execute_result
-  
+
   def output_effectiveness_verification(self, dict_execute_result):
     output_cpu = dict_execute_result['output_cpu']
     output_tpu = dict_execute_result['output_tpu']
@@ -313,8 +337,8 @@ class Tester_Basic():
 
   # test a single input
   #function input:
-  #1)sample_count int 
-  #module_native 
+  #1)sample_count int
+  #module_native
   #3)input_sample_cpu: T or list T
   #function output:
   #1) bool flag: is one multioutput passed all metrics && for all dtypes?
@@ -323,14 +347,15 @@ class Tester_Basic():
       #final_result -> dtype, output_nums, 3(vale,flag,all_flag)
       final_result = {}
       for naive_dtype in self.naive_dtype_list:
-          print("Case {} Sample {} Dtype {} is started".format(self.case_name, sample_count, naive_dtype))
+          print("Case {} Sample {} Net-Level-Dtype {} is started".format(self.case_name, sample_count, naive_dtype))
+          print('\033[95m' + "[Warning]Parts of inputs might be int64/int32, then they will be kept in func <move_to>"+ '\033[0m')
           torch_dtype = self.convert_dtype_2_torch_style(naive_dtype)
 
 
-          #execute step 2:start cmp metrics 
+          #execute step 2:start cmp metrics
           dict_execute_result = self.global_execute_function(module_native, torch_dtype, input_sample_cpu)
 
-          #execute step 3:start cmp metrics 
+          #execute step 3:start cmp metrics
           final_result[naive_dtype] = self.cmp_multi_output(dict_execute_result, self.epsilon_dict[naive_dtype])
           pass_flag_all_outputs = True
           output_num = len(final_result[naive_dtype])
@@ -448,10 +473,11 @@ class Tester_Basic():
       correct_dtype_list = []
       for i in self.naive_dtype_list:
         if static_corret_dtype_case[i] == len(input_sample_processed):
-              print("Case {}: dtype {} is all corrected".format(self.case_name, i))
+              print("[CMD]Case {}: dtype {} is all corrected".format(self.case_name, i))
               correct_dtype_list+=[i]
       wrong_dtype = list(set(self.naive_dtype_list) - set(correct_dtype_list))
       if (len(wrong_dtype)>0):
-          print("Case {}: dtype {} exist errors".format(self.case_name, wrong_dtype))
+          for idx, per_dtype in enumerate(wrong_dtype):
+            print("[CMD]Case {}: dtype {} exist errors".format(self.case_name, per_dtype))
       print("Case {}: {}/{} Samples is completely corrected".format(self.case_name, current_correct_num, len(input_sample_processed)))
-      print(("*****************Test {} All End*************************").format(self.case_name))
+      print(("*****************Test {} Completely End*************************").format(self.case_name))

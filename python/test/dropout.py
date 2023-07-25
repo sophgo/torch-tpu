@@ -38,3 +38,4 @@ if __name__ == "__main__":
     print("out", o_t.cpu())
     print("inp", inp_tpu.cpu())
     print("in.grad", inp_tpu.grad.cpu())
+    print("grad diff",max(inp_tpu.grad.cpu()-inp.grad.cpu()))

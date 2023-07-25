@@ -17,9 +17,9 @@ def case1():
 
     #step2: prepare input data, Notice that the input data will be adopted not only their shapes
     input_data = [
-        #  [torch.randn(32, 256, 768, 768//12), -1, -2], #    [N C H W] => [N C W H] 
-         [torch.randn(128, 512, 512), 1, 2],         #    [C H W] => [C W H] 
-        #  [torch.randn(128, 512 * 512), -1, -2],        #    [C H ] => [H ,C] 
+        #  [torch.randn(32, 256, 768, 768//12), -1, -2], #    [N C H W] => [N C W H]
+         [torch.randn(128, 512, 512), 1, 2],         #    [C H W] => [C W H]
+        #  [torch.randn(128, 512 * 512), -1, -2],        #    [C H ] => [H ,C]
 
     ]
     metric_table = ['max_diff','MAE']
@@ -29,7 +29,11 @@ def case1():
 
     device = torch.device("privateuseone:0")
     My_Tester = Tester_Basic(case_name, device, metric_table, epsilon_dict,seed, dump_flag)
-    return My_Tester.Torch_Test_Forward_Function(Test_Module, input_data)
+    return My_Tester.Torch_Test_Forward_Function(Test_Module(), input_data)
 
 if __name__ == "__main__":
     case1()
+
+#######################
+##  case1():forward [[T]]
+########################

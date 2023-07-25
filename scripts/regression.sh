@@ -67,7 +67,8 @@ function run_online_regression_test() {
   #   mkdir $TEST_DIR
   # fi
   test_CHIP_ARCH=${1:-bm1684x}
-  LIBSOPHON_LINK_PATTERN=${2:-latest}
+  LIBSOPHON_LINK_PATTERN=${2:-latest} #latest or stable
+  TEST_PATTERN=${3:-normal} #normal or fast
   echo "[INFO]test_CHIP_ARCH:$test_CHIP_ARCH"
   echo "[INFO]LIBSOPHON_LINK_PATTERN=$LIBSOPHON_LINK_PATTERN"
 
@@ -85,10 +86,12 @@ function run_online_regression_test() {
   fi
   build_libtorch_plugin
   echo "*************** LIBTORCH_PLUGIN IS BUILT *************"
-  ops_utest; ret_ops_utest=$?
-  if [ $ret_ops_utest -ne 1 ];then
-    echo "[RESULT-$test_CHIP_ARCH] all ops_utest are computed, Please check Results above"
-  else
-    echo "[RESULT-$test_CHIP_ARCH] some ops_utest are failed!"
+  if [ $TEST_PATTERN = "normal" ];then
+    ops_utest; ret_ops_utest=$?
+    if [ $ret_ops_utest -ne 1 ];then
+      echo "[RESULT-$test_CHIP_ARCH] all ops_utest are computed, Please check Results above"
+    else
+      echo "[RESULT-$test_CHIP_ARCH] some ops_utest are failed!"
+    fi
   fi
 }

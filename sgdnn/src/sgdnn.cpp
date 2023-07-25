@@ -417,6 +417,7 @@ bm_status_t sgdnnConv2dBackward ( bm_handle_t handle,
       weight_reordered.dtype = weight.dtype;
       size_t weight_reordered_size = sgdnnTensorBytes ( &weight_reordered );
       SgdnnTensor_t grad_output_reordered;
+      grad_output_reordered.dim = 4;
       sgdnn32OCShape ( grad_output.shape, grad_output_reordered.shape );
       grad_output_reordered.dtype = grad_output.dtype;
       size_t grad_output_reordered_size = sgdnnTensorBytes ( &grad_output_reordered );

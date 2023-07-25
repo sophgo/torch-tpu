@@ -25,7 +25,7 @@ def case1():
     metric_table = ['max_diff','MAE']
     epsilon_dict = {'f32':1e-6, 'f16':1e-2}
     case_name =  __file__.split('.py')[0]# You can change your name
-    dump_flag = True 
+    dump_flag = True
     device = torch.device("privateuseone:0")
 
     # you can write your own forward and backward fucntion
@@ -45,13 +45,10 @@ def case1():
         output_tpu.backward(grad_o_tpu)
         #tpu_first
         return input_sample_tpu.grad, input_sample_cpu.grad
-    
-
-
 
     My_Tester = Tester_Basic(case_name, device, metric_table, epsilon_dict,seed, dump_flag)
     My_Tester.customized_execute_function = customized_execute_function
-    return My_Tester.Torch_Test_Forward_Function(Test_Module, input_data)
+    return My_Tester.Torch_Test_Forward_Function(Test_Module(), input_data)
 
 
 def case2():
@@ -75,7 +72,7 @@ def case2():
     # if backward , input_cpu you can not set requires_grad here
     # otherwise input_tpu will be a leaf node without grad!
     input_data = [
-        [torch.rand((N,C,H,W))], 
+        [torch.rand((N,C,H,W))],
     ]
     metric_table = ['max_diff','MAE']
     epsilon_dict = {'f32':1e-6, 'f16':1e-2}
@@ -100,10 +97,10 @@ def case2():
         output_tpu.backward(grad_o_tpu)
         #tpu_first
         return input_sample_tpu[0].grad, input_sample_cpu[0].grad #Notice [0] because input_data has [],[]
-    
+
     My_Tester = Tester_Basic(case_name, device, metric_table, epsilon_dict,seed, dump_flag)
     My_Tester.customized_execute_function = customized_execute_function
-    return My_Tester.Torch_Test_Forward_Function(Test_Module, input_data)
+    return My_Tester.Torch_Test_Forward_Function(Test_Module(), input_data)
 
 
 def case3():
@@ -128,7 +125,7 @@ def case3():
     # if backward , input_cpu you can not set requires_grad here
     # otherwise input_tpu will be a leaf node without grad!
     input_data = [
-        torch.rand((N,C,H,W)), 
+        torch.rand((N,C,H,W)),
     ]
     metric_table = ['max_diff','MAE']
     epsilon_dict = {'f32':1e-6, 'f16':1e-2}
@@ -153,14 +150,18 @@ def case3():
         output_tpu.backward(grad_o_tpu)
         #tpu first
         return input_sample_tpu.grad, input_sample_cpu.grad
-    
 
     My_Tester = Tester_Basic(case_name, device, metric_table, epsilon_dict,seed, dump_flag)
     My_Tester.customized_execute_function = customized_execute_function
-    return My_Tester.Torch_Test_Forward_Function(Test_Module, input_data)
+    return My_Tester.Torch_Test_Forward_Function(Test_Module(), input_data)
 
 if __name__ == "__main__":
     #This example shows all  [], [[]] is acceptable
-    case1() # tensor
-    # case2() # [[tensor]]
+    case2() # [[tensor]]
     # case3() # [tensor]
+
+#######################
+##  case1():forward+backward T
+##  case2():forward+backward [[T,T]]
+##  case3():forward+backward [T]
+########################
