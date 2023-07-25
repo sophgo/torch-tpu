@@ -5,8 +5,6 @@ import numpy as np
 import sys
 import copy
 
-from utils import Optimer, compare_model_grad, compare_model_weight
-
 
 torch.ops.load_library("../../libtorch_plugin/build/liblibtorch_plugin.so")
 torch.manual_seed(1000)
@@ -128,20 +126,21 @@ def check_mlp():
     net_cpu = GPT2Mlp(embed_dim, intermediate_size)
 
     # w1 = torch.tensor(copy.deepcopy(net_cpu.state_dict()['c_fc.weight']), requires_grad=True).to(device)
-    w1 = net_cpu.state_dict()['c_fc.weight'].clone().detach().transpose(0,1).contiguous().requires_grad_(True).to(device)   # TODO
-    b1 = net_cpu.state_dict()['c_fc.bias'].clone().detach().requires_grad_(True).to(device)
-    w2 = net_cpu.state_dict()['c_proj.weight'].clone().detach().transpose(0,1).contiguous().requires_grad_(True).to(device)
-    b2 = net_cpu.state_dict()['c_proj.bias'].clone().detach().requires_grad_(True).to(device)
+    w1 = net_cpu.state_dict()['c_fc.weight'].clone().detach().transpose(0,1).contiguous().requires_grad_(True).to(device).half()   # TODO
+    b1 = net_cpu.state_dict()['c_fc.bias'].clone().detach().requires_grad_(True).to(device).half()
+    w2 = net_cpu.state_dict()['c_proj.weight'].clone().detach().transpose(0,1).contiguous().requires_grad_(True).to(device).half()
+    b2 = net_cpu.state_dict()['c_proj.bias'].clone().detach().requires_grad_(True).to(device).half()
 
     net_tpu = MlpBlock(w1, w2, b1, b2)
 
     print("=====forward======")
-    x = torch.randn(batch_size, length, embed_dim, requires_grad=True).to(device)
-    out_tpu = net_tpu(x)
-    out_cpu = net_cpu(x.cpu())
+    x = torch.randn(batch_size, length, embed_dim, requires_grad=True)
+    x_tpu = x.to(device).half()
+    out_tpu = net_tpu(x_tpu)
+    out_cpu = net_cpu(x)
     out_diff = out_cpu - out_tpu.float().to("cpu")
     print (torch.max(abs(out_diff)))
-    import pdb;pdb.set_trace()
+    # import pdb;pdb.set_trace()
 
     print("=====backward======")
     ref_tpu = torch.ones(batch_size, length, b2.shape[0]).to(device)
@@ -149,8 +148,108 @@ def check_mlp():
     out_tpu.backward(ref_tpu)
     out_cpu.backward(ref_cpu)
 
-    compare_model_grad(net_cpu, net_tpu)
-    compare_model_weight(net_cpu, net_tpu)
+    compare_mlp_grad(net_cpu, net_tpu)
+    compare_mlp_weight(net_cpu, net_tpu)
+    return
 
-check_mlp()
 
+def compare_mlp_grad(net_cpu, net_tpu):
+    w1_cpu = net_cpu.c_fc.weight.grad.numpy().transpose()
+    w2_cpu = net_cpu.c_proj.weight.grad.numpy().transpose()
+    b1_cpu = net_cpu.c_fc.bias.grad.numpy()
+    b2_cpu = net_cpu.c_proj.bias.grad.numpy()
+
+    w1_tpu = net_tpu.w1.grad.numpy()
+    w2_tpu = net_tpu.w2.grad.numpy()
+    b1_tpu = net_tpu.b1.grad.numpy()
+    b2_tpu = net_tpu.b2.grad.numpy()
+
+    grad_name = ['w1', 'w2', 'b1', 'b2']
+    cpu_grad = {
+        'w1':w1_cpu,
+        'w2':w2_cpu,
+        'b1':b1_cpu,
+        'b2':b2_cpu,
+    }
+    tpu_grad = {
+        'w1':w1_tpu,
+        'w2':w2_tpu,
+        'b1':b1_tpu,
+        'b2':b2_tpu,
+    }
+
+    for k in grad_name:
+        c_g = cpu_grad[k]
+        t_g = tpu_grad[k]
+        diff = abs(c_g - t_g)
+        # index_abs = diff.argmax()
+        related_diff = abs(diff/c_g)
+        # index_related = related_diff.argmax()
+        print(k, 
+                ",max abs diff: ", np.max(diff),
+                ",max rel diff: ", np.max(related_diff)
+            )
+
+    return
+
+
+def compare_mlp_weight(net_cpu, net_tpu):
+    w1_cpu = net_cpu.c_fc.weight.numpy().transpose()
+    w2_cpu = net_cpu.c_proj.weight.numpy().transpose()
+    b1_cpu = net_cpu.c_fc.bias.numpy()
+    b2_cpu = net_cpu.c_proj.bias.numpy()
+
+    w1_tpu = net_tpu.w1.numpy()
+    w2_tpu = net_tpu.w2.numpy()
+    b1_tpu = net_tpu.b1.numpy()
+    b2_tpu = net_tpu.b2.numpy()
+
+    grad_name = ['w1', 'w2', 'b1', 'b2']
+    cpu_weight = {
+        'w1':w1_cpu,
+        'w2':w2_cpu,
+        'b1':b1_cpu,
+        'b2':b2_cpu,
+    }
+    tpu_weight = {
+        'w1':w1_tpu,
+        'w2':w2_tpu,
+        'b1':b1_tpu,
+        'b2':b2_tpu,
+    }
+
+    for k in grad_name:
+        c_g = cpu_weight[k]
+        t_g = tpu_weight[k]
+        diff = abs(c_g - t_g)
+        # index_abs = diff.argmax()
+        related_diff = abs(diff/c_g)
+        # index_related = related_diff.argmax()
+        print(k, 
+                ",max abs diff: ", np.max(diff),
+                ",max rel diff: ", np.max(related_diff)
+            )
+    return
+
+
+# def test():
+#     batch_size = 4
+#     length = 10
+#     embed_dim = 32
+#     intermediate_size = 128
+#     net_cpu = GPT2Mlp(embed_dim, intermediate_size)
+#     w1 = net_cpu.state_dict()['c_fc.weight'].clone().detach()
+#     b2 = net_cpu.state_dict()['c_proj.bias'].clone().detach()
+#     x = torch.randn(batch_size, length, embed_dim, requires_grad=True)
+#     out_cpu = net_cpu(x)
+
+#     ref_cpu = torch.ones(batch_size, length, b2.shape[0])
+#     out_cpu.backward(ref_cpu)
+
+#     return
+    
+
+
+if __name__ == "__main__":
+    check_mlp()
+    # test()
