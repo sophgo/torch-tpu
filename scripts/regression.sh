@@ -84,9 +84,9 @@ function run_online_regression_test() {
     set_cmodel_firmware $TPU_TRAIN_CMODEL_PATH
     echo "*************** CMODEL IS SET *************"
   fi
-  build_libtorch_plugin
-  echo "*************** LIBTORCH_PLUGIN IS BUILT *************"
   if [ $TEST_PATTERN = "normal" ];then
+    build_libtorch_plugin
+    echo "*************** LIBTORCH_PLUGIN IS BUILT *************"
     ops_utest; ret_ops_utest=$?
     if [ $ret_ops_utest -ne 1 ];then
       echo "[RESULT-$test_CHIP_ARCH] all ops_utest are computed, Please check Results above"

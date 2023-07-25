@@ -293,6 +293,25 @@ class Tester_Basic():
   def move_model(self, obj, device, dtype):
     return obj.to(device=device,dtype=dtype)
 
+  #output detach 
+  #case 1； T->T.detach()
+  #case 2: (T,T)->(T.detach(), T.detach())
+  def output_isolation(self, dict_execute_result):
+    output_cpu = dict_execute_result['output_cpu']
+    output_tpu = dict_execute_result['output_tpu']
+    if torch.is_tensor(output_cpu):
+        dict_execute_result['output_cpu'] = output_cpu.detach()
+        dict_execute_result['output_tpu'] = output_tpu.detach()
+    elif isinstance(output_cpu, tuple):
+       output_cpu_new, output_tpu_new = (), ()
+       for idx, obj in enumerate(output_cpu):
+          output_cpu_new += (output_cpu[idx].detach(),)
+          output_tpu_new += (output_tpu[idx].detach(),)
+          dict_execute_result['output_cpu'] = output_cpu_new
+          dict_execute_result['output_tpu'] = output_tpu_new
+    else:
+       assert 0, "output_isolation not support such output formula!"
+    return dict_execute_result
 
   #lowest execute_function
   #function input:
@@ -303,19 +322,20 @@ class Tester_Basic():
   def global_execute_function(self, module_native, torch_dtype, input_sample_cpu):
      #### [WARNING] You cannot set seed here because the rand input has been given
           #### [WARNING] torch.manual_seed(seed)
-          net_cpu = module_native
-          net_tpu = copy.deepcopy(net_cpu)
-          net_tpu = self.move_model(net_tpu, self.device ,torch_dtype)
           #Note: 2nd detach isolation incase of leaf node, input_sample_isolation must be lowest enough to customized_execute_function
           input_sample_incase_leaf_node = self.input_sample_isolation(input_sample_cpu)
           fake_input = copy.deepcopy(input_sample_incase_leaf_node)
           input_sample_tpu= move_to(fake_input, self.device ,torch_dtype)
+          #[Warning]]sometimes model will change input as model is initialized, so input_tpu must copy before net_model
+          net_cpu = module_native
+          net_tpu = copy.deepcopy(net_cpu)
+          net_tpu = self.move_model(net_tpu, self.device ,torch_dtype)
           #tpu-first
           output_tpu, output_cpu = self.customized_execute_function(input_sample_incase_leaf_node, input_sample_tpu, net_cpu, net_tpu,torch_dtype)
           output_tpu = move_to(output_tpu, self.device_cpu,torch_dtype)
-
           dict_execute_result = {"output_tpu":output_tpu, "output_cpu":output_cpu}
           self.output_effectiveness_verification(dict_execute_result)
+          dict_execute_result = self.output_isolation(dict_execute_result)
           return dict_execute_result
 
   def output_effectiveness_verification(self, dict_execute_result):
@@ -413,6 +433,10 @@ class Tester_Basic():
 
 #Note: 2nd detach isolation incase of leaf node, input_sample_isolation must be lowest enough to customized_execute_function
 #input is same with output, only T is detached
+#inputs->outputs
+#case 1: Tensor -> Tensor.detach()
+#case 2: [T, T] ->[T.detach(,T.detach())]
+#case 3: [int ,flaot] , no detach
   def input_sample_isolation(self, inputs):
     if torch.is_tensor(inputs):
        return inputs.detach()
@@ -422,7 +446,7 @@ class Tester_Basic():
           if torch.is_tensor(input_idx):
             res +=[input_idx.detach()]
           else:
-            res +=[input_idx] #ofcourse has no
+            res +=[input_idx] #ofcourse value has no detach
       return res
     elif isinstance(inputs, int) or isinstance(inputs, float):
        return inputs
