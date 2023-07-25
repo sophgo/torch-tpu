@@ -2712,7 +2712,7 @@ bm_status_t sgdnnMlp ( bm_handle_t handle,
   {
     api.w1_shape[i] = w2.shape[i];
   } 
-  SAFE_CALL ( sgdnnTPUKernelLaunch ( handle, "tpu_kernel_api_", &api, sizeof ( api ) ) );
+  SAFE_CALL ( sgdnnTPUKernelLaunch ( handle, "tpu_kernel_mlp_multi_core", &api, sizeof ( api ) ) );
 #else
   SGDNN_CHECK ( false );
 #endif
