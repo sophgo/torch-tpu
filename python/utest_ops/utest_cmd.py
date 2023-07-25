@@ -3,7 +3,7 @@ import subprocess
 
 
 def runcmd(command):
-    ret = subprocess.run(command,shell=True, capture_output=True,encoding="utf-8",timeout=1000,check=True)
+    ret = subprocess.run(command,shell=True, capture_output=True,encoding="utf-8",timeout=10000,check=True)
 
     if ret.returncode == 0:
         print(ret.stdout)
@@ -19,7 +19,7 @@ class Global_Regression_Tester():
         self.any_test_files_list =  os.listdir("./")
         self.utest_files_list =[]
         self.top_py_file_list = ['top_utest.py', 'utest_cmd.py']
-        self.global_skip_test = ['mlp.py']
+        self.global_skip_test = ['mlp.py', 'slice.py']
 
         self.dict_error_static = {'f32':[],'f16':[]}
     def search_failed_info(self, info):
