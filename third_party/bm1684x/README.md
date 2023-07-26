@@ -18,9 +18,8 @@ How to gen dependency files for bm1684x?
 	1
 	3
 	1
-	
 
-   
+
     cd /workspace/nntoolchain/TPU1686
     source scripts/envsetup.sh  bm1684x
 	export EXTRA_CONFIG=-DDEBUG=ON
@@ -28,8 +27,8 @@ How to gen dependency files for bm1684x?
 	rebuild_test sgdnnn
 	rebuild_firmware
 	Y
-	
-	
+
+
 	cd /workspace/nntoolchain
 	rm -rf target&&mkdir target
     cp ./net_compiler/out/install/lib/libbmlib.so target/.
@@ -39,8 +38,9 @@ How to gen dependency files for bm1684x?
     cd  /workspace/nntoolchain/target
     mv libbmlib.so libbmlib_cmodel.so
     mv libfirmware_core.a libbm1684x.a
+    ln -s libbmlib_cmodel.so libbmlib.so.0
     cd ..
-	
+
 ###############################################
 2) Inside docker for tpu-mlir:
 
