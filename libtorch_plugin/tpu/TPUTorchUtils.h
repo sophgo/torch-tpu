@@ -254,6 +254,8 @@ typedef enum
   BCAST_ADD,
   MLP_FORWARD,
   MLP_BACKWARD,
+  ATTN_FORWARD,
+  ATTN_BACKWARD,
   OP_NUM
 }
 OpType;
@@ -309,7 +311,9 @@ static const char * OpTypeStr[OP_NUM] =
   "Norm2",
   "Bcast Add",
   "MLP Forward",
-  "MLP Backward"
+  "MLP Backward",
+  "Attention Forward",
+  "Attention Backward"
 };
 
 struct OpTimer

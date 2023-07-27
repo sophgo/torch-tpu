@@ -2771,18 +2771,10 @@ bm_status_t sgdnnMlpBackward ( bm_handle_t handle,
   SGDNN_CHECK ( out1.shape[2] == w1.shape[1] );
   SGDNN_CHECK ( p.shape[2] == w2.shape[0] );
 
-  if ( grad_input.addr != 0 )
-  {
-    SGDNN_CHECK ( sgdnnIsSameShape ( &input, &grad_input ) );
-  }
-  if ( grad_w1.addr != 0 )
-  {
-    SGDNN_CHECK ( sgdnnIsSameShape ( &w1, &grad_w1 ) );
-  }
-  if ( grad_w2.addr != 0 )
-  {
-    SGDNN_CHECK ( sgdnnIsSameShape ( &w2, &grad_w2 ) );
-  }
+  SGDNN_CHECK ( sgdnnIsSameShape ( &input, &grad_input ) );
+  SGDNN_CHECK ( sgdnnIsSameShape ( &w1, &grad_w1 ) );
+  SGDNN_CHECK ( sgdnnIsSameShape ( &w2, &grad_w2 ) );
+
   if ( grad_b1.addr != 0 )
   {
     SGDNN_CHECK ( grad_b1.shape[0] == out1.shape[2] );
@@ -2798,18 +2790,11 @@ bm_status_t sgdnnMlpBackward ( bm_handle_t handle,
   SGDNN_CHECK ( sgdnnIsTensorContiguous ( &out1 ) );
   SGDNN_CHECK ( sgdnnIsTensorContiguous ( &p ) );
   SGDNN_CHECK ( sgdnnIsTensorContiguous ( &grad_output ) );
-  if ( grad_input.addr != 0 )
-  {
-    SGDNN_CHECK ( sgdnnIsTensorContiguous ( &grad_input ) );
-  }
-  if ( grad_w1.addr != 0 )
-  {
-    SGDNN_CHECK ( sgdnnIsTensorContiguous ( &grad_w1 ) );
-  }
-  if ( grad_w2.addr != 0 )
-  {
-    SGDNN_CHECK ( sgdnnIsTensorContiguous ( &grad_w2 ) );
-  }
+
+  SGDNN_CHECK ( sgdnnIsTensorContiguous ( &grad_input ) );
+  SGDNN_CHECK ( sgdnnIsTensorContiguous ( &grad_w1 ) );
+  SGDNN_CHECK ( sgdnnIsTensorContiguous ( &grad_w2 ) );
+
   if ( grad_b1.addr != 0 )
   {
     SGDNN_CHECK ( sgdnnIsTensorContiguous ( &grad_b1 ) );
@@ -2817,6 +2802,197 @@ bm_status_t sgdnnMlpBackward ( bm_handle_t handle,
   if ( grad_b2.addr != 0 )
   {
     SGDNN_CHECK ( sgdnnIsTensorContiguous ( &grad_b2 ) );
+  }
+
+#if defined SGDNN_BACKEND_2260
+  SGDNN_CHECK ( false );
+#else
+  SGDNN_CHECK ( false );
+#endif
+  return BM_SUCCESS;
+}
+
+
+bm_status_t sgdnnAttn ( bm_handle_t handle,
+                          SgdnnTensor_t input,
+                          SgdnnTensor_t w_attn,
+                          SgdnnTensor_t w_proj,
+                          SgdnnTensor_t b_attn,
+                          SgdnnTensor_t b_proj,
+                          SgdnnTensor_t q,
+                          SgdnnTensor_t k,
+                          SgdnnTensor_t v,
+                          SgdnnTensor_t softmax_out,
+                          SgdnnTensor_t soft_v,
+                          SgdnnTensor_t out )
+{
+  SGDNN_CHECK ( input.dim == 3 );
+  SGDNN_CHECK ( q.dim == 3 );
+  SGDNN_CHECK ( k.dim == 3 );
+  SGDNN_CHECK ( v.dim == 3 );
+  SGDNN_CHECK ( softmax_out.dim == 4 );
+  SGDNN_CHECK ( soft_v.dim == 4 );
+  SGDNN_CHECK ( out.dim == 3 );
+
+  SGDNN_CHECK ( input.dtype == w_attn.dtype );
+  SGDNN_CHECK ( input.dtype == w_proj.dtype );
+  SGDNN_CHECK ( input.dtype == q.dtype );
+  SGDNN_CHECK ( input.dtype == k.dtype );
+  SGDNN_CHECK ( input.dtype == v.dtype );
+  SGDNN_CHECK ( input.dtype == softmax_out.dtype );
+  SGDNN_CHECK ( input.dtype == soft_v.dtype );
+  SGDNN_CHECK ( input.dtype == out.dtype );
+  SGDNN_CHECK ( input.dtype == SGDNN_DTYPE_FP32 ||
+                input.dtype == SGDNN_DTYPE_FP16 ||
+                input.dtype == SGDNN_DTYPE_BF16 );
+  if ( b_attn.addr != 0 )
+  {
+    SGDNN_CHECK ( input.dtype == b_attn.dtype );
+  }
+  if ( b_proj.addr != 0 )
+  {
+    SGDNN_CHECK ( input.dtype == b_proj.dtype );
+  }
+
+  SGDNN_CHECK ( input.shape[2] == w_attn.shape[0] );
+  SGDNN_CHECK ( q.shape[2] == w_attn.shape[1]/3 );
+  SGDNN_CHECK ( k.shape[2] == w_attn.shape[1]/3 );
+  SGDNN_CHECK ( v.shape[2] == w_attn.shape[1]/3 );
+  SGDNN_CHECK ( softmax_out.shape[2] == input.shape[1] && softmax_out.shape[3] == input.shape[1] );
+  SGDNN_CHECK ( soft_v.shape[1] == softmax_out.shape[1] && soft_v.shape[2] == softmax_out.shape[2] );
+  SGDNN_CHECK ( soft_v.shape[3] == q.shape[2] / soft_v.shape[1] );
+  SGDNN_CHECK ( w_proj.shape[0] == w_attn.shape[1]/3 );
+  SGDNN_CHECK ( w_proj.shape[1] == input.shape[2] );
+  SGDNN_CHECK ( out.shape[2] == w_proj.shape[1] );
+  SGDNN_CHECK ( sgdnnIsSameShape( &input, &out ) );
+
+  if ( b_attn.addr != 0 )
+  {
+    SGDNN_CHECK ( b_attn.dim == 1 );
+    SGDNN_CHECK ( b_attn.shape[0] == w_attn.shape[1] );
+  }
+
+  if ( b_proj.addr != 0 )
+  {
+    SGDNN_CHECK ( b_proj.dim == 1 );
+    SGDNN_CHECK ( b_proj.shape[0] == w_proj.shape[1] );
+  }
+
+  SGDNN_CHECK ( sgdnnIsTensorContiguous ( &input ) );
+  SGDNN_CHECK ( sgdnnIsTensorContiguous ( &w_attn ) );
+  SGDNN_CHECK ( sgdnnIsTensorContiguous ( &w_proj ) );
+  SGDNN_CHECK ( sgdnnIsTensorContiguous ( &q ) );
+  SGDNN_CHECK ( sgdnnIsTensorContiguous ( &k ) );
+  SGDNN_CHECK ( sgdnnIsTensorContiguous ( &v ) );
+  SGDNN_CHECK ( sgdnnIsTensorContiguous ( &softmax_out ) );
+  SGDNN_CHECK ( sgdnnIsTensorContiguous ( &soft_v ) );
+
+  if ( b_attn.addr != 0 )
+  {
+    SGDNN_CHECK ( sgdnnIsTensorContiguous ( &b_attn ) );
+  }
+  if ( b_proj.addr != 0 )
+  {
+    SGDNN_CHECK ( sgdnnIsTensorContiguous ( &b_proj ) );
+  }
+  SGDNN_CHECK ( sgdnnIsTensorContiguous ( &out ) );
+#if defined SGDNN_BACKEND_1684X
+  SGDNN_CHECK ( false );
+#elif defined SGDNN_BACKEND_2260
+  SGDNN_CHECK ( false );
+#else
+  SGDNN_CHECK ( false );
+#endif
+  return BM_SUCCESS;
+}
+
+
+bm_status_t sgdnnAttnBackward ( bm_handle_t handle,
+                                  SgdnnTensor_t grad_output,
+                                  SgdnnTensor_t input,
+                                  SgdnnTensor_t w_attn,
+                                  SgdnnTensor_t w_proj,
+                                  SgdnnTensor_t q,
+                                  SgdnnTensor_t k,
+                                  SgdnnTensor_t v,
+                                  SgdnnTensor_t softmax_out,
+                                  SgdnnTensor_t soft_v,
+                                  SgdnnTensor_t bias,
+                                  SgdnnTensor_t grad_input,
+                                  SgdnnTensor_t grad_w_attn,
+                                  SgdnnTensor_t grad_w_proj,
+                                  SgdnnTensor_t grad_b_attn,
+                                  SgdnnTensor_t grad_b_proj)
+{
+  SGDNN_CHECK ( input.dtype == w_attn.dtype );
+  SGDNN_CHECK ( input.dtype == w_proj.dtype );
+  SGDNN_CHECK ( input.dtype == q.dtype );
+  SGDNN_CHECK ( input.dtype == k.dtype );
+  SGDNN_CHECK ( input.dtype == v.dtype );
+  SGDNN_CHECK ( input.dtype == softmax_out.dtype );
+  SGDNN_CHECK ( input.dtype == soft_v.dtype );
+  SGDNN_CHECK ( input.dtype == grad_output.dtype );
+  SGDNN_CHECK ( input.dtype == grad_input.dtype );
+
+  SGDNN_CHECK ( input.dtype == grad_w_attn.dtype );
+  SGDNN_CHECK ( input.dtype == grad_w_proj.dtype );
+  if ( grad_b_attn.addr != 0 )
+  {
+    SGDNN_CHECK ( input.dtype == grad_b_attn.dtype );
+  }
+  if ( grad_b_proj.addr != 0 )
+  {
+    SGDNN_CHECK ( input.dtype == grad_b_proj.dtype );
+  }
+
+  SGDNN_CHECK ( input.dtype == SGDNN_DTYPE_FP32 ||
+                input.dtype == SGDNN_DTYPE_FP16 ||
+                input.dtype == SGDNN_DTYPE_BF16 );
+
+  SGDNN_CHECK ( input.shape[2] == w_attn.shape[0] );
+  SGDNN_CHECK ( q.shape[2] == w_attn.shape[1]/3 );
+  SGDNN_CHECK ( k.shape[2] == w_attn.shape[1]/3 );
+  SGDNN_CHECK ( v.shape[2] == w_attn.shape[1]/3 );
+  SGDNN_CHECK ( softmax_out.shape[2] == input.shape[1] && softmax_out.shape[3] == input.shape[1] );
+  SGDNN_CHECK ( soft_v.shape[1] == softmax_out.shape[1] && soft_v.shape[2] == softmax_out.shape[2] );
+  SGDNN_CHECK ( soft_v.shape[3] == q.shape[2] / soft_v.shape[1] );
+  SGDNN_CHECK ( w_proj.shape[0] == w_attn.shape[1]/3 );
+  SGDNN_CHECK ( w_proj.shape[1] == input.shape[2] );
+  SGDNN_CHECK ( bias.shape[2] == input.shape[1] );
+
+  SGDNN_CHECK ( sgdnnIsSameShape ( &input, &grad_input ) );
+  SGDNN_CHECK ( sgdnnIsSameShape ( &w_attn, &grad_w_attn ) );
+  SGDNN_CHECK ( sgdnnIsSameShape ( &w_proj, &grad_w_proj ) );
+  if ( grad_b_attn.addr != 0 )
+  {
+    SGDNN_CHECK ( grad_b_attn.shape[0] == grad_w_attn.shape[1] );
+  }
+  if ( grad_b_proj.addr != 0 )
+  {
+    SGDNN_CHECK ( grad_b_proj.shape[0] == grad_w_proj.shape[1] );
+  }
+
+  SGDNN_CHECK ( sgdnnIsTensorContiguous ( &input ) );
+  SGDNN_CHECK ( sgdnnIsTensorContiguous ( &w_attn ) );
+  SGDNN_CHECK ( sgdnnIsTensorContiguous ( &w_proj ) );
+  SGDNN_CHECK ( sgdnnIsTensorContiguous ( &q ) );
+  SGDNN_CHECK ( sgdnnIsTensorContiguous ( &k ) );
+  SGDNN_CHECK ( sgdnnIsTensorContiguous ( &v ) );
+  SGDNN_CHECK ( sgdnnIsTensorContiguous ( &softmax_out ) );
+  SGDNN_CHECK ( sgdnnIsTensorContiguous ( &soft_v ) );
+  SGDNN_CHECK ( sgdnnIsTensorContiguous ( &bias ) );
+  SGDNN_CHECK ( sgdnnIsTensorContiguous ( &grad_output ) );
+
+  SGDNN_CHECK ( sgdnnIsTensorContiguous ( &grad_input ) );
+  SGDNN_CHECK ( sgdnnIsTensorContiguous ( &grad_w_attn ) );
+  SGDNN_CHECK ( sgdnnIsTensorContiguous ( &grad_w_proj ) );
+  if ( grad_b_attn.addr != 0 )
+  {
+    SGDNN_CHECK ( sgdnnIsTensorContiguous ( &grad_b_attn ) );
+  }
+  if ( grad_b_proj.addr != 0 )
+  {
+    SGDNN_CHECK ( sgdnnIsTensorContiguous ( &grad_b_proj ) );
   }
 
 #if defined SGDNN_BACKEND_2260

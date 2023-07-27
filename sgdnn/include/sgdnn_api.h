@@ -623,7 +623,7 @@ bm_status_t sgdnnMlp ( bm_handle_t handle,
  * 3. The shape of INPUT and GRAD_INPUT is ( B, M, N ); W1 and GRAD_W1 is ( N, D1 ); W2 and GRAD_W2 is ( D1, D2 ); OUT1, P is ( B, M, D1 ); GRAD_B1 is ( D1 ); GRAD_B2 is ( D2 ); GRAD_OUTPUT is ( B, M, D2 )
  * 4. All the tensors must be contiguous
  * 5. W1 B1 represents the weight and bias of first layer, OUT1 represents the output of first layer, P represents output of activation function,
- * W1 B1 represents the weight and bias of second layer, GRAD_x means the gradient of tensor x
+ *    W2 B2 represents the weight and bias of second layer, GRAD_x means the gradient of tensor x
  */
 bm_status_t sgdnnMlpBackward ( bm_handle_t handle,
                                   SgdnnTensor_t grad_output,
@@ -637,6 +637,61 @@ bm_status_t sgdnnMlpBackward ( bm_handle_t handle,
                                   SgdnnTensor_t grad_w2,
                                   SgdnnTensor_t grad_b1,
                                   SgdnnTensor_t grad_b2);
+
+/*
+ * OUT = ATTENTION ( INPUT, W_ATTN, W_PROJ, B_ATTN, B_PROJ, Q, K, V, SOFTMAX_OUT, SOFT_V )
+ * Note:
+ * 1. The data types of all the tensors must be the same and one of FP32, FP16 and BF16
+ * 2. The dimensions of INPUT Q K V and OUT must be 3, W_ATTN W_PROJ must be 2, B_ATTN B_PROJ must be 1, SOFTMAX_OUT SOFT_V must be 4
+ * 3. The shape of INPUT is ( B, M, N ), W_PROJ is ( N, D_attn ), B1 is ( D_attn ), W_PROJ is ( D_attn/3, N ), B2 is ( N ), 
+ *    Q K V is ( B, M, D_attn/3 ), SOFTMAX_OUT is ( B, H, M, M ), SOFT_V is ( B, H, M, D_attn/3 ), OUTPUT is ( B, M, N )
+ * 4. All the tensors must be contiguous
+ * 5. W_ATTN B_ATTN represents the weight and bias of attention layer (which generates Q K V), W_PROJ B_PROJ represents the weight and bias of projection layer
+ * 6. SOFT_V = SOFTMAX_OUT * V
+ */
+bm_status_t sgdnnAttn ( bm_handle_t handle,
+                          SgdnnTensor_t input,
+                          SgdnnTensor_t w_attn,
+                          SgdnnTensor_t w_proj,
+                          SgdnnTensor_t b_attn,
+                          SgdnnTensor_t b_proj,
+                          SgdnnTensor_t q,
+                          SgdnnTensor_t k,
+                          SgdnnTensor_t v,
+                          SgdnnTensor_t softmax_out,
+                          SgdnnTensor_t soft_v,
+                          SgdnnTensor_t out );
+
+/*
+ * [ GRAD_INPUT, GRAD_W_ATTN, GRAD_W_PROJ, GRAD_B_ATTN, GRAD_B_PROJ ] = ATTENTION BACKWARD ( GRAD_OUTPUT, INPUT, W_ATTN, W_PROJ, Q, K, V, SOFTMAX_OUT, SOFT_V, BIAS )
+ * Note:
+ * 1. The data types of all the tensors must be the same and one of FP32, FP16 and BF16
+ * 2. The dimensions of INPUT, GRAD_OUTPUT, Q, K, V and GRAD_INPUT must be 3; W_ATTN, W_PROJ, GRAD_W_ATTN and GRAD_W_PROJ must be 2; GRAD_B_ATTN, GRAD_B_PROJ must be 1, 
+ *    SOFTMAX_OUT, SOFT_V and BIAS must be 4
+ * 3. The shape of INPUT and GRAD_INPUT is ( B, M, N ); W_ATTN and GRAD_W_ATTN is ( N, D_attn ); W_PROJ and GRAD_W_PROJ is ( D_attn/3, N ); 
+ *    Q K V is ( B, M, D_attn/3 ); SOFTMAX_OUT is ( B, H, M, M ); SOFT_V is ( B, H, M, D_attn/3 );  BIAS is ( 1, 1, M, M );
+ *    GRAD_B_ATTN is ( D_attn ); GRAD_B_PROJ is ( N ); GRAD_OUTPUT is ( B, M, N )
+ * 4. All the tensors must be contiguous
+ * 5. W_ATTN B_ATTN represents the weight and bias of attention layer (which generates Q K V), W_PROJ B_PROJ represents the weight and bias of projection layer, 
+ *    GRAD_x means the gradient of tensor x, BIAS represents triangular matrix (mask).
+ */
+bm_status_t sgdnnAttnBackward ( bm_handle_t handle,
+                                  SgdnnTensor_t grad_output,
+                                  SgdnnTensor_t input,
+                                  SgdnnTensor_t w_attn,
+                                  SgdnnTensor_t w_proj,
+                                  SgdnnTensor_t q,
+                                  SgdnnTensor_t k,
+                                  SgdnnTensor_t v,
+                                  SgdnnTensor_t softmax_out,
+                                  SgdnnTensor_t soft_v,
+                                  SgdnnTensor_t bias,
+                                  SgdnnTensor_t grad_input,
+                                  SgdnnTensor_t grad_w_attn,
+                                  SgdnnTensor_t grad_w_proj,
+                                  SgdnnTensor_t grad_b_attn,
+                                  SgdnnTensor_t grad_b_proj);
+
 
 #if defined(__cplusplus)
 }
