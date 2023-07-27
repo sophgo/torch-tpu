@@ -41,3 +41,5 @@ echo "[INFO]USING_CMODEL_PATH=$BMLIB_CMODEL_PATH"
 source ${TPUTRAIN_TOP}/scripts/build_helper.sh
 source ${TPUTRAIN_TOP}/scripts/release.sh
 source ${TPUTRAIN_TOP}/scripts/regression.sh
+
+export LD_LIBRARY_PATH=$TPUTRAIN_TOP/third_party/oneDNN/lib:$LD_LIBRARY_PATH
