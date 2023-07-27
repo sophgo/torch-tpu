@@ -41,7 +41,7 @@ elseif($ENV{CHIP_ARCH} STREQUAL "sg2260")
 	aux_source_directory(src KERNEL_SRC_FILES)
 
 	add_library(firmware SHARED ${KERNEL_SRC_FILES})
-	target_link_libraries(firmware PRIVATE $ENV{BMLIB_PATH} m)
+	target_link_libraries(firmware PRIVATE $ENV{BMLIB_CMODEL_PATH} m)
 	set_target_properties(firmware PROPERTIES OUTPUT_NAME cmodel)
 
 endif()

@@ -271,6 +271,7 @@ inline static void pipeline_move(int *array, int num) {
     array[i] = array[i - 1];
   }
 }
+static
 void one_hot_core(
     local_addr_t input_addr,
     local_addr_t target_addr,
@@ -337,6 +338,7 @@ void one_hot_core(
   }
 }
 
+static
 void sum_core(
     local_addr_t input_addr,
     local_addr_t buffer_addr,
@@ -385,6 +387,7 @@ void sum_core(
   }
 }
 
+static
 void nodechip_coress_entropy_local(
     local_addr_t input_addr,
     local_addr_t target_addr,
@@ -446,6 +449,7 @@ typedef struct {
   local_addr_t one_hot_sum_addr;
   local_addr_t log_sum_addr;
 } loc_scheme_t;
+static
 void cal_cw_split(int c, int w, int* cw_split, loc_scheme_t* sm, data_type_t dtype) {
   const int eu_num = tpu_eu_num(dtype);
   int c_split = c, w_split = w;

@@ -14,7 +14,11 @@ configure_file(
     "${PROJECT_SOURCE_DIR}/common/config.h.in"
     "${PROJECT_SOURCE_DIR}/common/config.h" )
 
-include_directories($ENV{TPUTRAIN_TOP}/third_party/include)
+if($ENV{LIBSOPHON_PATTERN} MATCHES $ENV{LIBSOPHON_STABLE})
+  include_directories(/opt/sophon/libsophon-current/include)
+elseif($ENV{LIBSOPHON_PATTERN} MATCHES $ENV{LIBSOPHON_LATEST})
+  include_directories($ENV{LIBSOPHON_TOP}/bmlib/include)
+endif()
 include_directories($ENV{TPUTRAIN_TOP}/libtorch/include/torch/csrc/api/include)
 include_directories($ENV{TPUTRAIN_TOP}/libtorch/include)
 include_directories(${CMAKE_CURRENT_SOURCE_DIR}/tpu)

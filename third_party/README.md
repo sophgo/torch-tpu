@@ -6,8 +6,8 @@
     commit 604e732b5d7336769b14477cc38e12b9bf544e3d
     libbm1684x.a libbmlib_cmodel.so libcmodel_fireware.so
 ### sg2260
-    commit 6fc547f6cc8c34283cc73b0c0d5603cf2068da58
-    libbmlib.so
+    commit 01b05535b034085854f3e418a3a9bc68ff399a93
+    libbmlib.so.0 libcmodel_fireware.so
 
 
 Note:
@@ -16,10 +16,12 @@ Note:
       1)Please check  tpu-train/third_party/bm1684x/README.md
     --- for sg2260
       1) cd TPU1686
-      2) source scripts/envsetup.sh  bm1684x
+      2) source scripts/envsetup.sh sg2260
       3) export EXTRA_CONFIG=-DDEBUG=ON
       4) rebuild_test sgdnn
-      5) cp  ../build_test/bmlib_tmp/libbmlib.so libbmlib.so
+      5) cp libsophon/build/bmlib/libbmlib.so.0 libbmlib.so.0
+      6) ln -s libbmlib.so.0 libbmlib.so
+      7) cp build/firmware_core/libcmodel_firmware.so libcmodel_fireware.so
 
   [2]Debug Pattern
     1)Please update commit id if you want to change .so for a specific backend.
