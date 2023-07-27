@@ -1,15 +1,18 @@
 import os
 import subprocess
-
+import sys
 
 def runcmd(command):
-    ret = subprocess.run(command,shell=True, capture_output=True,encoding="utf-8",timeout=10000,check=True)
-
-    if ret.returncode == 0:
-        print(ret.stdout)
-    else:
-        print("error:",command, "failed!")
-    return ret.stdout
+    try:
+         ret = subprocess.run(command,shell=True, capture_output=True,encoding="utf-8",timeout=1000,check=True)
+         if ret.returncode == 0:
+            print(ret.stdout)
+         else:
+            print("error:",command, "failed!")
+         return ret.stdout
+    except subprocess.CalledProcessError as e:
+        print(e.output)
+        return  "error:"+command +"failed!"
 
 class Global_Regression_Tester():
     def __init__(self):
@@ -19,7 +22,7 @@ class Global_Regression_Tester():
         self.any_test_files_list =  os.listdir("./")
         self.utest_files_list =[]
         self.top_py_file_list = ['top_utest.py', 'utest_cmd.py']
-        self.global_skip_test = ['mlp.py', 'slice.py']
+        self.global_skip_test = ['mlp.py','slice.py']
 
         self.dict_error_static = {'f32':[],'f16':[]}
     def search_failed_info(self, info):
@@ -62,11 +65,11 @@ class Global_Regression_Tester():
         print("SUCCESS Cases:", succeed_result)
         print("Failed Cases:", failed_result)
         print("Skipped Cases:", self.global_skip_test)
-        if (len(failed_result)>0):
-            print("*************EXIST ERROR!********************")
-        if (len(succeed_result)==all_num_utest):
+
+        #Judger for jenkins
+        if (len(failed_result)==0):
             print("*************[CHIP-{}]ALL SUCCESSED AND PASSED ********************".format(self.chip))
-            return True #for jenkins check
+            sys.exit(0) #for jenkins check when true, cannot use 1 otherwise exit(1) will corrupt the scripts
         else:
             print("*************[CHIP-{}]ERROR CASES EXISTS ********************".format(self.chip))
             self.dict_error_static
@@ -75,7 +78,7 @@ class Global_Regression_Tester():
                     print("Error {} Cases:".format(dtype), self.dict_error_static[dtype])
                 else:
                     print("All {} cases passed".format(dtype))
-            return False #for jenkins check
+            sys.exit(255) #for jenkins check when failed
 
 if __name__ == "__main__":
     tester = Global_Regression_Tester()

@@ -10,9 +10,11 @@ function ops_utest() {
     echo "[INFO]PYTHON_UTEST_PATH:$PYTHON_UTEST_PATH"
     pushd $PYTHON_UTEST_PATH
     cmd_utest="python3 utest_cmd.py"
-    $cmd_utest
+    $cmd_utest; cmd_utest_result=$?
+    echo "[INFO]cmd_utest_result:$cmd_utest_result"
     popd
     echo "*********** UTEST ENDED ***************"
+    return $cmd_utest_result
 }
 
 
@@ -88,10 +90,14 @@ function run_online_regression_test() {
     build_libtorch_plugin
     echo "*************** LIBTORCH_PLUGIN IS BUILT *************"
     ops_utest; ret_ops_utest=$?
-    if [ $ret_ops_utest -ne 1 ];then
+    echo "[INFO]ret_ops_utest:$ret_ops_utest"
+    if [ $ret_ops_utest -eq 0 ];then #must return [0,255] otherwise it will cause scripts fault early
       echo "[RESULT-$test_CHIP_ARCH] all ops_utest are computed, Please check Results above"
+      exit 0
     else
       echo "[RESULT-$test_CHIP_ARCH] some ops_utest are failed!"
+      exit 1
     fi
   fi
+  exit 0
 }
