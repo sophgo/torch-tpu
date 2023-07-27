@@ -86,7 +86,7 @@ def set_requires_grad(obj, grad_flag= True):
     res =[]
     for idx, i in enumerate(obj):
        if i.dtype==torch.int32 or i.dtype==torch.int64:
-          print('\033[95m' + "[Warning] Maybe input-{}-th is label as its  dtype is {}, do not set it in <Test_Module>, set it inside <Torch_Test_Forward_Function>!".format(idx, i.dtype)+ '\033[0m')
+          print('\033[95m' + "[Warning] Maybe input-{}-th is label as its  dtype is {}, do not set it in <Test_Module>, set it inside <Torch_Test_Execution_Function>!".format(idx, i.dtype)+ '\033[0m')
        else:
           i.requires_grad = grad_flag
        res +=[i]
@@ -278,6 +278,8 @@ class Tester_Basic():
       all_output_dict_for_one_sample_one_dtype +=[temp_result_one_output]
     return all_output_dict_for_one_sample_one_dtype
 
+  def default_execute_function(self, input_sample_cpu, input_sample_tpu, net_cpu, net_tpu, dtype):
+     return 0
 
   #You must put this function nearest to input_sample_isolation
   def customized_execute_function(self, input_sample_cpu, input_sample_tpu, net_cpu, net_tpu, dtype):
@@ -363,7 +365,7 @@ class Tester_Basic():
   #function output:
   #1) bool flag: is one multioutput passed all metrics && for all dtypes?
   #2) dict: is correct for this_dtype via all metrics?
-  def Torch_Test_Forward_Function_Per(self, sample_count, module_native, input_sample_cpu):
+  def Torch_Test_Execution_Function_Per(self, sample_count, module_native, input_sample_cpu):
       #final_result -> dtype, output_nums, 3(vale,flag,all_flag)
       final_result = {}
       for naive_dtype in self.naive_dtype_list:
@@ -471,7 +473,7 @@ class Tester_Basic():
       raise TypeError("Invalid  format of input sample only {tensor, dict,list,int,float} is supported!")
 
 
-  def Torch_Test_Forward_Function(self, module_native, input_sample_collection):
+  def Torch_Test_Execution_Function(self, module_native, input_sample_collection):
 
       input_sample_processed = self.func_input_sample_process(input_sample_collection)
 
@@ -487,7 +489,7 @@ class Tester_Basic():
           print("--------------------------------------------------------")
 
           self.print_each_input_batch_shape(input_sample)
-          temp_flag,is_correct_dtype = self.Torch_Test_Forward_Function_Per(idx,  module_native, input_sample)
+          temp_flag,is_correct_dtype = self.Torch_Test_Execution_Function_Per(idx,  module_native, input_sample)
           current_correct_num += temp_flag == 1
           for dtype_per in self.naive_dtype_list:
               if (is_correct_dtype[dtype_per]):

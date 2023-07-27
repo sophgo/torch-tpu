@@ -61,7 +61,7 @@ def case1():
     My_Tester = Tester_Basic(case_name, device, metric_table, epsilon_dict,seed, dump_flag)
     My_Tester.customized_execute_function = customized_execute_function
     #When you pass a model not a class of nn.module do not use()
-    return My_Tester.Torch_Test_Forward_Function(Resnet, input_data)
+    return My_Tester.Torch_Test_Execution_Function(Resnet, input_data)
 
 
 if __name__ == "__main__":

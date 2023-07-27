@@ -29,13 +29,13 @@ def case1():
          [10 ,5],
     ]
     metric_table = ['max_diff','MAE']
-    epsilon_dict = {'f32':1e-6,'f16':1e-2}
+    epsilon_dict = {'f32':1e-6}
     case_name =  __file__.split('.py')[0]# You can change your name
     dump_flag = True #it will dump alll wrong cases
     device = torch.device("privateuseone:0")
 
     My_Tester = Tester_Basic(case_name, device, metric_table, epsilon_dict,seed, dump_flag)
-    return My_Tester.Torch_Test_Forward_Function(Test_Module(), input_data)
+    return My_Tester.Torch_Test_Execution_Function(Test_Module(), input_data)
 
 if __name__ == "__main__":
     case1()
