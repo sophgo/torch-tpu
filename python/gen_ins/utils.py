@@ -1,13 +1,13 @@
 import ctypes as ct
 import os
-from tkinter.messagebox import NO
+# from tkinter.messagebox import NO
 import torch
-torch.ops.load_library("../../../libtorch_plugin/build/liblibtorch_plugin.so")
+torch.ops.load_library("../../libtorch_plugin/build/liblibtorch_plugin.so")
 os.environ['FORBID_CMD_EXECUTE'] ="1"
 os.environ['FILE_DUMP_CMD'] ="ins"
 
 class DumpIns:
-    def __init__(self, lib_path = "../../../third_party/sg2260/libbmlib.so") -> None:
+    def __init__(self, lib_path = "../../third_party/sg2260/libbmlib.so") -> None:
         self.libpath = lib_path
         self._lib = ct.cdll.LoadLibrary(lib_path)
     def dump(self, path):
