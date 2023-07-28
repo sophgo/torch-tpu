@@ -15,24 +15,35 @@ public:
   static at::Tensor forward(AutogradContext *ctx, const at::Tensor& self,
                             double p, bool train)
   {
-  TensorOptions option = TensorOptions( ).dtype ( self.dtype() );
-  at::Tensor mask_cpu = torch::empty( self.sizes(), option );
-  at::Tensor mask = torch::bernoulli(mask_cpu, p).to(self.device());
+  CHECK_TENSOR_IN_DEVICE ( self );
   ctx->saved_data["p"] = p;
   ctx->saved_data["train"] = train;
-  ctx->save_for_backward( {mask} );
-  auto out = mask * self * (1/(1-p));
-  return out;
+  if ( p == 0 ) {
+    return self;
+  } else {
+#if 1
+    TensorOptions option = TensorOptions( ).dtype ( torch::kFloat );
+    at::Tensor mask_cpu = torch::empty( self.sizes(), option );
+    at::Tensor mask = torch::bernoulli(mask_cpu, p).to(self.device()).to(self.dtype());
+#endif
+    ctx->save_for_backward( {mask} );
+    auto out = mask * self * (1/(1-p));
+    return out;
+  }
   }
 
   static tensor_list backward(AutogradContext *ctx, tensor_list gradout)
   {
     auto p = ctx->saved_data["p"].toDouble();
     auto train = ctx->saved_data["train"].toBool();
-    auto saved = ctx->get_saved_variables();
-    auto mask = saved[0];
-    auto gradinp = mask * gradout[0];
-    return {gradinp, at::Tensor(), at::Tensor(), at::Tensor(), at::Tensor(), at::Tensor() };
+    if (p == 0) {
+      return {gradout[0], at::Tensor(), at::Tensor(), at::Tensor(), at::Tensor(), at::Tensor() };
+    }else{
+      auto saved = ctx->get_saved_variables();
+      auto mask = saved[0];
+      auto gradinp = mask * gradout[0];
+      return {gradinp, at::Tensor(), at::Tensor(), at::Tensor(), at::Tensor(), at::Tensor() };
+    }
   }
 };
 } // namespace autograd
