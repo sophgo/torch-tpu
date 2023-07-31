@@ -99,10 +99,4 @@ namespace at
 #endif
 		return std::tuple<Tensor, Tensor, Tensor, c10::optional<Tensor>, c10::optional<Tensor>>(grad_input, grad_w1, grad_w2, grad_b1, grad_b2);
 	}
-
-	TORCH_LIBRARY(my_ops, m)
-	{
-		m.def("mlp_backward", mlp_backward);
-		m.def("mlp_forward", mlp_forward);
-	}
 }

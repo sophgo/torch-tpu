@@ -144,19 +144,19 @@ class AttnFunc(torch.autograd.Function):
         H = num_head
         D_attn = w_attn.shape[1]
         assert w_attn.shape == (N, D_attn)
-        assert w_proj.shape == (D_attn/3, N)  # TODO
+        assert w_proj.shape == (D_attn//3, N)  # TODO
         if b_attn != None:
             assert b_attn.shape == (D_attn,)
         if b_proj != None:
-            assert b_proj.shape == (D_attn/3,)
+            assert b_proj.shape == (D_attn//3,)
 
-        q = torch.empty(B, M, D_attn/3).type_as(x).to(device)
-        k = torch.empty(B, M, D_attn/3).type_as(x).to(device)
-        v = torch.empty(B, M, D_attn/3).type_as(x).to(device)
+        q = torch.empty((B, M, D_attn//3), dtype = x.dtype, device = x.device)
+        k = torch.empty((B, M, D_attn//3), dtype = x.dtype, device = x.device)
+        v = torch.empty((B, M, D_attn//3), dtype = x.dtype, device = x.device)
 
-        softmax_out = torch.empty(B, H, M, M).type_as(x).to(device)
-        soft_v = torch.empty(B, H, M, D_attn/(3*H)).type_as(x).to(device)
-        out = torch.empty(B, M, N).type_as(x).to(device)
+        softmax_out = torch.empty((B, H, M, M), dtype = x.dtype, device = x.device)
+        soft_v = torch.empty((B, H, M, D_attn//(3*H)), dtype = x.dtype, device = x.device)
+        out = torch.empty((B, M, N), dtype = x.dtype, device = x.device)
 
         torch.ops.my_ops.attn_forward(x,
                                      w_attn,
@@ -180,17 +180,16 @@ class AttnFunc(torch.autograd.Function):
         B, M, N = x.shape
         H = softmax_out.shape[1]
         D_attn = w_attn.shape[1]
-        grad_output.to(device)
 
-        grad_x = torch.ones(x.shape, dtype=x.dtype).to(device)
-        grad_w_attn = torch.ones(w_attn.shape, dtype=x.dtype).to(device)
-        grad_w_proj = torch.ones(w_proj.shape, dtype=x.dtype).to(device)
+        grad_x = torch.ones(x.shape, dtype=x.dtype, device = grad_output.device)
+        grad_w_attn = torch.ones(w_attn.shape, dtype=x.dtype, device = grad_output.device)
+        grad_w_proj = torch.ones(w_proj.shape, dtype=x.dtype, device = grad_output.device)
 
         grad_b_attn = grad_b_proj = None
         if ctx.needs_input_grad[3]:
-            grad_b_attn = torch.ones((D_attn,), dtype=x.dtype).to(device)
+            grad_b_attn = torch.ones((D_attn,), dtype=x.dtype, device = grad_output.device)
         if ctx.needs_input_grad[4]:
-            grad_b_proj = torch.ones((D_attn/3,), dtype=x.dtype).to(device)
+            grad_b_proj = torch.ones((D_attn//3,), dtype=x.dtype, device = grad_output.device)
 
         torch.ops.my_ops.attn_backward(grad_output,
                                         x,
@@ -256,7 +255,7 @@ def check_attention():
     print("=====forward======")
     x = torch.randn(batch_size, length, config.hidden_size, requires_grad=True)
     x_tpu = x.to(device).half()
-    import pdb;pdb.set_trace()
+    # import pdb;pdb.set_trace()
     out_tpu = net_tpu(x_tpu)
     out_cpu = net_cpu(x)
     out_diff = out_cpu - out_tpu.float().to("cpu")

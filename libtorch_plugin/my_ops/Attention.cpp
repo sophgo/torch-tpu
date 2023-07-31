@@ -121,10 +121,4 @@ namespace at
 #endif
 		return std::tuple<Tensor, Tensor, Tensor, c10::optional<Tensor>, c10::optional<Tensor>>(grad_input, grad_w_attn, grad_w_proj, grad_b_attn, grad_b_proj);
 	}
-
-	TORCH_LIBRARY_IMPL(aten, TPU, m)
-	{
-		m.impl("attn_forward", attn_forward);
-		m.impl("attn_backward", attn_backward);
-	}
 }

@@ -36,6 +36,7 @@ file(GLOB_RECURSE SRCS
   tpu/TPUTorchUtils.cpp
   tpu/TPUCtypeApi.cpp
   ops/*.cpp
+  my_ops/*.cpp
 )
 
 add_library(libtorch_plugin SHARED ${SRCS})

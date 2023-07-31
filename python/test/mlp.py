@@ -61,9 +61,9 @@ class MlpFunc(torch.autograd.Function):
             assert b1.shape == (D1,)
         if b2 != None:
             assert b2.shape == (D2,)
-        out1 = torch.empty(B, M, D1).type_as(x).to(device)
-        p = torch.empty(B, M, D1).type_as(x).to(device)
-        out2 = torch.empty(B, M, D2).type_as(x).to(device)
+        out1 = torch.empty((B, M, D1), dtype = x.dtype, device = x.device)
+        p = torch.empty((B, M, D1), dtype = x.dtype, device = x.device)
+        out2 = torch.empty((B, M, D2), dtype = x.dtype, device = x.device)
 
         torch.ops.my_ops.mlp_forward(x,
                                      w1,
@@ -85,17 +85,17 @@ class MlpFunc(torch.autograd.Function):
         B, M, N = x.shape
         D1 = w1.shape[1]
         D2 = w2.shape[1]
-        grad_output.to(device)
-        grad_x = torch.ones(x.shape, dtype = x.dtype).to(device)
-        grad_w1 = torch.ones(w1.shape, dtype = x.dtype).to(device)
-        grad_w2 = torch.ones(w2.shape, dtype = x.dtype).to(device)
+
+        grad_x = torch.ones(x.shape, dtype = x.dtype, device = grad_output.device)
+        grad_w1 = torch.ones(w1.shape, dtype = x.dtype, device = grad_output.device)
+        grad_w2 = torch.ones(w2.shape, dtype = x.dtype, device = grad_output.device)
 
         grad_b1 = grad_b2 = None
 
         if ctx.needs_input_grad[3]:
-            grad_b1 = torch.ones((D1,), dtype = x.dtype).to(device)
+            grad_b1 = torch.ones((D1,), dtype = x.dtype, device = grad_output.device)
         if ctx.needs_input_grad[4]:
-            grad_b2 = torch.ones((D2,), dtype = x.dtype).to(device)
+            grad_b2 = torch.ones((D2,), dtype = x.dtype, device = grad_output.device)
 
         torch.ops.my_ops.mlp_backward(grad_output,
                                         x,

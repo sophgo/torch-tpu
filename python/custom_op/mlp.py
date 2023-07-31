@@ -15,8 +15,10 @@ class MlpFunc(torch.autograd.Function):
         D2 = w2.shape[1]
         assert w1.shape == (N, D1)
         assert w2.shape == (D1, D2)
-        assert b1.shape == (D1,)
-        assert b2.shape == (D2,)
+        if b1 != None:
+            assert b1.shape == (D1,)
+        if b2 != None:
+            assert b2.shape == (D2,)
         out1 = torch.empty((B, M, D1), dtype = x.dtype, device = x.device)
         p = torch.empty((B, M, D1), dtype = x.dtype, device = x.device)
         out2 = torch.empty((B, M, D2), dtype = x.dtype, device = x.device)
