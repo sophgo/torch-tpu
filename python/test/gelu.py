@@ -11,12 +11,12 @@ def case1():
     gelu backward 
     """
     device = "privateuseone"
-    batch = 8
+    batch = 1
     sequence = 1024
     hidden_size = 768
 
     inp_cpu = torch.rand(batch, sequence, hidden_size)
-    inp_tpu = copy.deepcopy(inp_cpu).to(device)#.half()
+    inp_tpu = copy.deepcopy(inp_cpu).to(device).half()
     
     #inp_cpu.retain_grad = True
     inp_cpu.requires_grad = True
@@ -32,7 +32,7 @@ def case1():
     out_cpu = net_cpu(inp_cpu)
     out_tpu = net_tpu(inp_tpu)
 
-    import pdb;pdb.set_trace();
+    # import pdb;pdb.set_trace();
     out_cpu.backward(grad_cpu)
     out_tpu.backward(grad_tpu)
 
@@ -71,17 +71,14 @@ def case2():
 
 def test(use_half = False, test_backward = False):
     device = "privateuseone"
-    batch = 8
+    batch = 1
     sequence = 1024
     hidden_size = 3072
 
     inp_cpu = torch.randn(batch, sequence, hidden_size)
-    inp_tpu = inp_cpu.to(device)
+    inp_tpu = copy.deepcopy(inp_cpu).to(device)
     grad_cpu = torch.randn(batch, sequence, hidden_size)
     grad_tpu = grad_cpu.to(device)
-
-    inp_cpu.require_grad = True
-    inp_tpu.require_grad = True
 
     gelu_cpu = nn.GELU()
     gelu_tpu = copy.deepcopy(gelu_cpu)
@@ -91,6 +88,9 @@ def test(use_half = False, test_backward = False):
         inp_tpu = inp_tpu.half()
         grad_tpu = grad_tpu.half()
         gelu_tpu = gelu_tpu.half()
+
+    inp_cpu.requires_grad = True
+    inp_tpu.requires_grad = True
 
     out_cpu = gelu_cpu(inp_cpu)
     out_tpu = gelu_tpu(inp_tpu)
@@ -116,5 +116,5 @@ def test(use_half = False, test_backward = False):
         print (torch.max(abs(grad_diff)))
 
 if __name__ == "__main__":
-    test(False, False)
+    test(True, True)
     # case1()

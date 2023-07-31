@@ -313,8 +313,8 @@ void tpu_kernel_api_gelu_backward ( const void * args )
   {
     nodechip_gelu_backward_parallel_fp16 (
       api->grad_input_global_addr,
-      api->grad_output_global_addr,
       api->input_global_addr,
+      api->grad_output_global_addr,
       Len,
       ( data_type_t ) api->dtype );
   }
