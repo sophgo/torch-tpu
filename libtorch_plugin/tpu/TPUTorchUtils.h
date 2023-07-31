@@ -65,6 +65,10 @@ static inline SgdnnDataType_t TPUConvertDType ( caffe2::TypeMeta dtype )
   {
     return SGDNN_DTYPE_FP16;
   }
+  else if ( dtype == caffe2::TypeMeta::Make<at::BFloat16>() )
+  {
+    return SGDNN_DTYPE_BF16;
+  }
   else if ( dtype == caffe2::TypeMeta::Make<int>() )
   {
     return SGDNN_DTYPE_INT32;

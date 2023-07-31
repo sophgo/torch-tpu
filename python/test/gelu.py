@@ -16,7 +16,7 @@ def case1():
     hidden_size = 768
 
     inp_cpu = torch.rand(batch, sequence, hidden_size)
-    inp_tpu = copy.deepcopy(inp_cpu).to(device).half()
+    inp_tpu = copy.deepcopy(inp_cpu).to(device).to(torch.bfloat16)
     
     #inp_cpu.retain_grad = True
     inp_cpu.requires_grad = True
@@ -24,10 +24,10 @@ def case1():
     inp_tpu.requires_grad = True
 
     grad_cpu = torch.rand(batch, sequence, hidden_size)
-    grad_tpu = grad_cpu.to(device).half()
+    grad_tpu = grad_cpu.to(device).to(torch.bfloat16)
 
     net_cpu = nn.GELU()
-    net_tpu = copy.deepcopy(net_cpu).to(device)#.half()
+    net_tpu = copy.deepcopy(net_cpu).to(device).to(torch.bfloat16)
 
     out_cpu = net_cpu(inp_cpu)
     out_tpu = net_tpu(inp_tpu)
@@ -116,5 +116,5 @@ def test(use_half = False, test_backward = False):
         print (torch.max(abs(grad_diff)))
 
 if __name__ == "__main__":
-    test(True, True)
-    # case1()
+    #test(True, True)
+    case1()
