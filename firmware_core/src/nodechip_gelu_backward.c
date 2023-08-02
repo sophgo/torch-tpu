@@ -254,41 +254,13 @@ static inline void nodechip_gelu_backward (
   tpu_gdma_cpy_L2S ( DXGlobalAddr + LastDone * DSize, DXAddrs[1 - Index], &LastShape, NULL, NULL, dtype );
 }
 
-static void nodechip_gelu_backward_multi_core (
+extern void nodechip_gelu_backward_multi_core (
   global_addr_t grad_input_global_addr,
   global_addr_t grad_output_global_addr,
   global_addr_t input_global_addr,
   int*          shape,
   int           dims,
-  data_type_t   dtype )
-{
-  int slice_num = tpu_core_num();
-  int slice_idx = tpu_core_index();
-  TPUKERNEL_ASSERT ( slice_num > 0 );
-  TPUKERNEL_ASSERT ( 0 <= slice_idx && slice_idx < slice_num );
-  int numel = 1;
-  for ( int i = 0; i < dims; i++ )
-  {
-    numel *= shape[i];
-  }
-  int slice = DIV_UP ( numel, slice_num );
-  if( slice * (slice_idx + 1) > numel )
-  {
-    slice = numel - slice * slice_idx;
-  }
-  int offset = slice_idx * DIV_UP ( numel, slice_num );
-  if ( slice > 0 )
-  {
-    int dsize = tpu_data_type_size( dtype );
-    nodechip_gelu_backward (
-      grad_input_global_addr + offset * dsize,
-      grad_output_global_addr + offset * dsize,
-      input_global_addr + offset * dsize,
-      slice,
-      dtype );
-  }
-  tpu_sync_all();
-}
+  data_type_t   dtype );
 
 void tpu_kernel_api_gelu_backward ( const void * args )
 {
