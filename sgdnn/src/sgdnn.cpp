@@ -3002,3 +3002,29 @@ bm_status_t sgdnnAttnBackward ( bm_handle_t handle,
 #endif
   return BM_SUCCESS;
 }
+
+bm_status_t sgdnnArange ( bm_handle_t handle,
+                                int start,
+                                int end,
+                                int step,
+                                SgdnnTensor_t out)
+{
+  SGDNN_CHECK ( sgdnnIsTensorContiguous ( &out ) );
+#if defined SGDNN_BACKEND_1684X
+  sg_api_arange_t api;
+  api.start = start;
+  api.end = end;
+  api.step = step;
+  api.output_global_addr = out.addr;
+  api.dtype = sgdnnTPUKernelDType ( out.dtype );
+  api.dim = out.dim;
+  // arange just need 1 dimension.
+  SGDNN_CHECK( out.dim == 1);
+  api.shape[0] = out.shape[0];
+
+  SAFE_CALL ( sgdnnTPUKernelLaunch ( handle, "tpu_kernel_api_arange", &api, sizeof ( api ) ) );
+#else
+  SGDNN_CHECK ( false );
+#endif
+  return BM_SUCCESS;
+}

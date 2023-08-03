@@ -849,5 +849,23 @@ typedef struct {
 } sg_api_mlp_multi_core_t;
 #endif
 
+typedef struct
+{
+  int start;
+  int end;
+  int step;
+  unsigned long long output_global_addr;
+  int dtype;
+  int dim;
+  int shape[FW_MAX_SHAPE_DIMS];
+
+#ifndef WIN32
+}
+__attribute__ ( ( packed ) ) sg_api_arange_t;
+#else
+}
+sg_api_arange_t;
+#endif
+
 #pragma pack(pop)
 #endif  // SG_API_STRUCT_H

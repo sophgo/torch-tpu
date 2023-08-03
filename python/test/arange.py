@@ -7,11 +7,18 @@ torch.set_printoptions(precision=6)
 device = "privateuseone:0"
 
 def case1():
-    
-    out=torch.arange(1,3,0.1,device=device)
-    print("Tpu: ", out.cpu())
-    out2=torch.arange(1,2,1,device="cpu")
-    print("cpu: ", out2)
+    length = 2
+    end = 65536*64*10
+    out1=torch.arange(0, end, length,device="cpu")
+    print("cpu: ", out1)
+
+    # TPU: just support arange(int,int,int) currentlly.
+    out2=torch.arange(0, end, length,device=device)
+    print("Tpu: ", out2.cpu())
+
+    diff = torch.sum( out1 - out2.cpu() )
+    print( "Difference: ", diff)
+
 
 
 

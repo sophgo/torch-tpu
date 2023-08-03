@@ -693,6 +693,17 @@ bm_status_t sgdnnAttnBackward ( bm_handle_t handle,
                                   SgdnnTensor_t grad_b_proj);
 
 
+/*
+ *  OUTPUT  = ARANGE ( START, END, STEP )
+ *  Note:
+ *  1. START, END and STEP only support int dtype.
+ */
+bm_status_t sgdnnArange ( bm_handle_t handle,
+                                int start,
+                                int end,
+                                int step,
+                                SgdnnTensor_t out);
+
 #if defined(__cplusplus)
 }
 #endif
