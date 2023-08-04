@@ -794,6 +794,16 @@ data_type_t dtype )
   return true;
 }
 
+extern void nodechip_softmax_forward_multi_core (
+global_addr_t input_global_addr,
+global_addr_t output_global_addr,
+int*          shape,
+int           dims,
+int           begin_dim,
+int           end_dim,
+float         scale_val,
+data_type_t   dtype );
+
 extern void nodechip_softmax ( global_addr_t bottom_global_offset,
                                global_addr_t top_global_offset,
                                const int * shape,
@@ -849,3 +859,21 @@ void tpu_kernel_api_softmax ( const void * args )
   tpu_poll();
 }
 TPUKERNEL_FUNC_REGISTER ( tpu_kernel_api_softmax );
+
+void tpu_kernel_api_softmax_multi_core ( const void *args )
+{
+  sg_api_softmax_t *api = ( sg_api_softmax_t * ) args;
+  TPUKERNEL_ASSERT ( api->dtype == DT_FP32 || api->dtype == DT_FP16 || api->dtype == DT_BFP16 );
+  tpu_initialize();
+  nodechip_softmax_forward_multi_core (
+    api->input_global_addr,
+    api->output_global_addr,
+    api->shape,
+    api->dim,
+    api->axis,
+    api->axis,
+    1.f,
+    ( data_type_t ) api->dtype );
+  tpu_poll();
+}
+TPUKERNEL_FUNC_REGISTER ( tpu_kernel_api_softmax_multi_core );
