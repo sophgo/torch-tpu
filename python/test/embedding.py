@@ -17,8 +17,10 @@ def case_embedding():
     embed_dim  = 768
     ##########################
 
-    inp = torch.randint(0, vocab_size, (batch, sequence)).int()
+    inp = torch.randint(0, vocab_size, (batch, sequence))#.int()
     inp_tpu = inp.to(device)
+    if inp.dtype==torch.int64:
+        assert(torch.max(torch.abs(inp))<65535)
 
     net = nn.Embedding(vocab_size, embed_dim)
     net_tpu = copy.deepcopy(net)
@@ -30,6 +32,7 @@ def case_embedding():
     print("============compare result =======")
     diff = out - out_tpu.cpu()
     print("max diff : ", torch.max(abs(diff)))
+    print("max of inp abs",torch.max(torch.abs(inp)))
 
 
 def case_embedding_backward():
@@ -41,8 +44,12 @@ def case_embedding_backward():
     ##########################
 
     #inp = torch.randint(0, vocab_size, (batch, sequence)).int()
-    inp = torch.range(0, batch * sequence - 1) 
-    inp =  inp.view((batch, sequence)).int()
+    inp = torch.range(0, batch * sequence - 1)
+    inp = torch.randint(0, vocab_size, (batch, sequence))#.int()
+    if inp.dtype==torch.int64:
+        assert(torch.max(torch.abs(inp))<65535)
+
+    inp =  inp.view((batch, sequence))#.int()
     print(inp)
     inp_tpu = inp.to(device)
 
@@ -58,20 +65,29 @@ def case_embedding_backward():
     #OPT.reset()
     out_tpu = net_tpu(inp_tpu)
     #OPT.dump()
+    print("cpu",out.cpu())
+    print("tpu",out_tpu.cpu())
+    # print("diff forward tpu-cpu",torch.sum(torch.abs(out.cpu().flatten()-out_tpu.cpu().flatten())))
 
-    print("============compare result =======")
-    diff = out - out_tpu.cpu()
-    print("max diff : ", torch.max(abs(diff)))
+    # print("============compare result =======")
+    # diff = out - out_tpu.cpu()
+    # print("max diff : ", torch.max(abs(diff)))
 
     print("============start backward ========")
     out.backward(ref)
     #OPT.reset()
     out_tpu.backward(ref_tpu)
+
+    print("cpu",out.cpu())
+    print("tpu",out_tpu.cpu())
+    print("diff tpu-cpu",torch.sum(torch.abs(out.cpu().flatten()-out_tpu.cpu().flatten())))
     #OPT.dump()
     print("============compare grad =======")
-    print(net_tpu.weight.grad.cpu())
-    print(net.weight.grad.cpu())
+    print("cpu",net.weight.grad.cpu())
+    print("tpu",net_tpu.weight.grad.cpu())
+    print("diff grad tpu-cpu",torch.sum(torch.abs(net.weight.grad.cpu().flatten()-net_tpu.weight.grad.cpu().flatten())))
     #import pdb;pdb.set_trace()
+    print("inp", inp)
     compare_model_grad(net, net_tpu)
 
 def case_embedding_backward_simulate():
@@ -105,6 +121,6 @@ def case_embedding_backward_simulate():
     print(ref)
 
 if __name__ == "__main__":
-    # case_embedding()
-    case_embedding_backward()
+    case_embedding()
+    # case_embedding_backward()
     #case_embedding_backward_simulate()

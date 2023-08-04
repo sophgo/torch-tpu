@@ -136,12 +136,14 @@ class Global_Regression_Tester():
             for dtype in self.dict_error_static.keys():
                 if len(self.dict_error_static[dtype]) > 0:
                     print("Error {} Cases:".format(dtype), self.dict_error_static[dtype])
-                else:
-                    print("All {} cases passed".format(dtype))
                     #don't worry, repeated dtype error ops will just be ignored in set deleting
                     regression_outerlier = list(set(regression_outerlier)- set(self.dict_error_static[dtype]))
+                else:
+                    print("All {} cases passed".format(dtype))
             if len(regression_outerlier)>0:
-                 print("*************[CHIP-{}] SERIOUS ERRORS: ON-LINE REGRESSION IS NOT SAME WITH YOUR HOST for case: {}********************".format(self.chip, regression_outerlier))
+                 print("*************[CHIP-{}] SERIOUS ERRORS: ON-LINE REGRESSION IS NOT SAME WITH YOUR HOST********************".format(self.chip))
+                 print("On-line Error Cases:",regression_outerlier)
+                 print("[NOTE] SG2260 will print dozens of online error due to libsopon&cmodel bugs, but values CMP might be passed")
             sys.exit(255) #for jenkins check when failed
 
 if __name__ == "__main__":

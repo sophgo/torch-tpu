@@ -1505,7 +1505,6 @@ bm_status_t sgdnnIndexSelect ( bm_handle_t handle,
   SGDNN_CHECK ( sgdnnIsTensorContiguous ( &indices ) );
   SGDNN_CHECK ( sgdnnIsTensorContiguous ( &output ) );
 #if defined SGDNN_BACKEND_1684X
-  SGDNN_CHECK ( indices.dtype == SGDNN_DTYPE_INT32 );
   sg_api_index_select_t api;
   api.input_global_addr = input.addr;
   api.index_global_addr = indices.addr;
@@ -1525,7 +1524,24 @@ bm_status_t sgdnnIndexSelect ( bm_handle_t handle,
   api.is_index_int64 = indices.dtype == SGDNN_DTYPE_INT64;
   SAFE_CALL ( sgdnnTPUKernelLaunch ( handle, "tpu_kernel_api_index_select", &api, sizeof ( api ) ) );
 #elif defined SGDNN_BACKEND_2260
-  SGDNN_CHECK ( false );
+  sg_api_index_select_t api;
+  api.input_global_addr = input.addr;
+  api.index_global_addr = indices.addr;
+  api.output_global_addr = output.addr;
+  for ( int i = 0; i < input.dim; ++i )
+  {
+    api.input_shape[i] = input.shape[i];
+  }
+  api.dim = input.dim;
+  api.index_num = 1;
+  for ( int i = 0; i < indices.dim; ++i )
+  {
+    api.index_num *= indices.shape[i];
+  }
+  api.axis = dim;
+  api.dtype = sgdnnTPUKernelDType ( input.dtype );
+  api.is_index_int64 = indices.dtype == SGDNN_DTYPE_INT64;
+  SAFE_CALL ( sgdnnTPUKernelLaunch ( handle, "tpu_kernel_api_index_select_multi_core", &api, sizeof ( api ) ) );
 #else
   SGDNN_CHECK ( false );
 #endif
@@ -2496,7 +2512,47 @@ bm_status_t sgdnnEmbeddingBackward ( bm_handle_t handle,
   bm_free_device ( handle, from_index );
   bm_free_device ( handle, to_index );
 #elif defined SGDNN_BACKEND_2260
-  SGDNN_CHECK ( false );
+  sg_api_embedding_backward_t api;
+  int indices_num = 1;
+  for ( int i = 0; i < indices.dim; ++i )
+  {
+    indices_num *= indices.shape[i];
+  }
+  bm_device_mem_t sorted_index, sorted_index_index, from_index, to_index;
+  SAFE_CALL ( bm_malloc_device_byte ( handle, &sorted_index, indices_num * sizeof ( int ) ) );
+  SAFE_CALL ( bm_malloc_device_byte ( handle, &sorted_index_index, indices_num * sizeof ( int ) ) );
+  SAFE_CALL ( bm_malloc_device_byte ( handle, &from_index, indices_num * sizeof ( int ) ) );
+  SAFE_CALL ( bm_malloc_device_byte ( handle, &to_index, indices_num * sizeof ( int ) ) );
+  api.grad_output_global_addr = grad_output.addr;
+  api.index_global_addr = indices.addr;
+  api.grad_input_global_addr = grad_input.addr;
+  api.sorted_index_global_addr = bm_mem_get_device_addr ( sorted_index );
+  api.sorted_index_index_global_addr = bm_mem_get_device_addr ( sorted_index_index );
+  api.from_index_global_addr = bm_mem_get_device_addr ( from_index );
+  api.to_index_global_addr = bm_mem_get_device_addr ( to_index );
+  api.grad_output_dim = grad_output.dim;
+  for ( int i = 0; i < grad_output.dim; ++i )
+  {
+    api.grad_output_shape[i] = grad_output.shape[i];
+  }
+  api.index_dim = indices.dim;
+  for ( int i = 0; i < indices.dim; ++i )
+  {
+    api.index_shape[i] = indices.shape[i];
+  }
+  api.grad_input_dim = grad_input.dim;
+  for ( int i = 0; i < grad_input.dim; ++i )
+  {
+    api.grad_input_shape[i] = grad_input.shape[i];
+  }
+  api.window_size = 1;
+  api.grad_output_dtype = sgdnnTPUKernelDType ( grad_output.dtype );
+  api.is_index_int64 = indices.dtype == SGDNN_DTYPE_INT64;
+  SAFE_CALL ( sgdnnTPUKernelLaunch ( handle, "tpu_kernel_api_embedding_backward_multi_core", &api, sizeof ( api ) ) );
+  bm_free_device ( handle, sorted_index );
+  bm_free_device ( handle, sorted_index_index );
+  bm_free_device ( handle, from_index );
+  bm_free_device ( handle, to_index );
 #else
   SGDNN_CHECK ( false );
 #endif
@@ -2961,7 +3017,7 @@ bm_status_t sgdnnMlp ( bm_handle_t handle,
   for ( int i = 0; i < w2.dim; ++i )
   {
     api.w1_shape[i] = w2.shape[i];
-  } 
+  }
   SAFE_CALL ( sgdnnTPUKernelLaunch ( handle, "tpu_kernel_mlp_multi_core", &api, sizeof ( api ) ) );
 #else
   SGDNN_CHECK ( false );
