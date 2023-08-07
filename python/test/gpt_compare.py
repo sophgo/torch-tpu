@@ -2,10 +2,15 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 import numpy as np
+import copy
+import time
 from transformers.models.gpt2.modeling_gpt2 import GPT2LMHeadModel
 from utils import compare_model_grad, compare_model_weight
+from transformers import GPT2Config
+
 
 torch.manual_seed(1000)
+torch.ops.load_library("../../libtorch_plugin/build/liblibtorch_plugin.so")
 TP = 16
 
 class Conv1D(nn.Module):
@@ -77,6 +82,8 @@ class GPT2Attention(nn.Module):
         if self.scale_attn_weights:
             attn_weights = attn_weights / (float(value.size(-1)) ** 0.5)
 
+        # res_list.append(attn_weights.clone().detach().cpu().numpy())
+
 
         if not self.is_cross_attention:
             query_length, key_length = query.size(-2), key.size(-2)
@@ -84,17 +91,21 @@ class GPT2Attention(nn.Module):
 
             attn_weights = torch.where(causal_mask, attn_weights, self.masked_bias.to(attn_weights.dtype))
 
+        # res_list.append(attn_weights.clone().detach().cpu().numpy())
+
         if attention_mask is not None:
             # Apply the attention mask
             attn_weights = attn_weights + attention_mask
         
         attn_weights = nn.Softmax(dim=-1)(attn_weights)
 
-        # attn_weights = self.attn_dropout(attn_weights)
+        attn_weights = self.attn_dropout(attn_weights)
         if head_mask is not None:
             attn_weights = attn_weights * head_mask
 
         attn_output = torch.matmul(attn_weights, value)
+
+        # res_list.append(attn_output.clone().detach().cpu().numpy())
 
         return attn_output, attn_weights
 
@@ -143,7 +154,13 @@ class GPT2Attention(nn.Module):
         query = self._split_heads(query, self.num_heads, self.head_dim)
         key = self._split_heads(key, self.num_heads, self.head_dim)
         value = self._split_heads(value, self.num_heads, self.head_dim)
-
+        query.register_hook(print_grad)
+        key.register_hook(print_grad)
+        value.register_hook(print_grad)
+        
+        res_list.append(query.clone().detach().cpu().numpy())
+        res_list.append(key.clone().detach().cpu().numpy()) 
+        res_list.append(value.clone().detach().cpu().numpy()) 
 
         if layer_past is not None:
             past_key, past_value = layer_past
@@ -157,10 +174,14 @@ class GPT2Attention(nn.Module):
         attn_output, attn_weights = self._attn(query, key, value, attention_mask, head_mask)
 
         attn_output = self._merge_heads(attn_output, self.num_heads, self.head_dim)
+        attn_output.register_hook(print_grad)
+        res_list.append(attn_output.clone().detach().cpu().numpy())
 
         attn_output = self.c_proj(attn_output)
+        attn_output.register_hook(print_grad)
+        res_list.append(attn_output.clone().detach().cpu().numpy())
 
-        # attn_output = self.resid_dropout(attn_output)
+        attn_output = self.resid_dropout(attn_output)
 
         outputs = (attn_output, present)
         if output_attentions:
@@ -179,9 +200,15 @@ class GPT2MLP(nn.Module):
 
     def forward(self, hidden_states):
         hidden_states = self.c_fc(hidden_states)
+        hidden_states.register_hook(print_grad)
+        res_list.append(hidden_states.clone().detach().cpu().numpy())
         hidden_states = self.act(hidden_states)
+        hidden_states.register_hook(print_grad)
+        res_list.append(hidden_states.clone().detach().cpu().numpy())
         hidden_states = self.c_proj(hidden_states)
-        # hidden_states = self.dropout(hidden_states)
+        hidden_states.register_hook(print_grad)
+        res_list.append(hidden_states.clone().detach().cpu().numpy())
+        hidden_states = self.dropout(hidden_states)
         return hidden_states
 
 class GPT2Block(nn.Module):
@@ -213,6 +240,8 @@ class GPT2Block(nn.Module):
     ):
         residual = hidden_states
         hidden_states = self.ln_1(hidden_states)
+        hidden_states.register_hook(print_grad)
+        res_list.append(hidden_states.clone().detach().cpu().numpy())
 
         attn_outputs = self.attn(
             hidden_states,
@@ -225,6 +254,8 @@ class GPT2Block(nn.Module):
         #t4 = time.time()
         #print("attetion time", t4 - t3)
         attn_output = attn_outputs[0]  # output_attn: a, present, (attentions)
+        attn_output.register_hook(print_grad)
+        res_list.append(attn_output.clone().detach().cpu().numpy())
         outputs = attn_outputs[1:]
 
         hidden_states = attn_output + residual
@@ -253,8 +284,12 @@ class GPT2Block(nn.Module):
 
         residual = hidden_states
         hidden_states = self.ln_2(hidden_states)
+        hidden_states.register_hook(print_grad)
+        res_list.append(hidden_states.clone().detach().cpu().numpy())
 
         feed_forward_hidden_states = self.mlp(hidden_states)
+        feed_forward_hidden_states.register_hook(print_grad)
+        res_list.append(feed_forward_hidden_states.clone().detach().cpu().numpy())
         #t2 = time.time()
         #print("mlp time", t2 - t1)
 
@@ -269,60 +304,95 @@ class GPT2Block(nn.Module):
         return outputs  # hidden_states, present, (attentions, cross_attentions)
     
 
-def check_gpt3():
+def compare_model(res_cpu, res_tpu):
+    num = len(res_cpu)
+    for i in range(num):
+        print("=================")
+        print(i, 
+              "max diff", np.max(abs(res_cpu[i] - res_tpu[i])),
+              "mean diff", np.mean(abs(res_cpu[i] - res_tpu[i])),
+              "min diff", np.min(abs(res_cpu[i] - res_tpu[i])))
+    return
+
+
+def check_gpt3(use_half = False, test_backward = False):
     from transformers import GPT2Config
-    import copy
     import time
-    torch.ops.load_library("../../libtorch_plugin/build/liblibtorch_plugin.so")
-    torch.manual_seed(1000)
-    torch.set_printoptions(precision=6)
-    device = "privateuseone:0"
+    # torch.ops.load_library("../../libtorch_plugin/build/liblibtorch_plugin.so")
+    # torch.manual_seed(1000)
+    # device = "privateuseone:0"
+    device = torch.device("privateuseone:0")
     ############# configure ###############
     configure = GPT2Config()
     configure.attn_pdrop = 0
     configure.embd_pdrop = 0
     configure.resid_pdrop = 0
     configure.activation_function= "gelu"
-    # configure.n_positions = 4096
-    # configure.n_embd = 12288
-    # configure.n_head = 96
-    # configure.n_layer = 1
-    # batch = 6
-    # sequence = 4096
-
-    configure.n_positions = 256
-    configure.n_embd = 768
-    configure.n_head = 16
+    configure.n_positions = 4096
+    configure.n_embd = 12288
+    configure.n_head = 96
     configure.n_layer = 1
-    batch = 1
-    sequence = 256
+    batch = 6
+    sequence = 4096
+
+    # configure.n_positions = 256
+    # configure.n_embd = 768
+    # configure.n_head = 16
+    # configure.n_layer = 1
+    # batch = 1
+    # sequence = 256
 
     inp_cpu = torch.rand(batch, sequence, configure.hidden_size)
     inp_tpu = copy.deepcopy(inp_cpu)
-    inp_cpu.requires_grad = True
     inp_tpu = inp_tpu.to(device)
-    inp_tpu.requires_grad = True
 
     net_cpu = GPT2Block(configure)
     net_tpu = copy.deepcopy(net_cpu)
     net_tpu = net_tpu.to(device)
-    import pdb;pdb.set_trace()
-    out_cpu = net_cpu(inp_cpu)
-    out_tpu = net_tpu(inp_tpu)
-    diff = out_cpu - out_tpu.cpu()
-    print(torch.max(abs(diff)))
 
     grad_o = torch.ones((batch, sequence, configure.hidden_size))
     grad_o_tpu = grad_o.to(device)
-    out_cpu.backward(grad_o)
-    out_tpu.backward(grad_o_tpu)
 
-    diff = inp_cpu.grad - inp_tpu.grad.cpu()
+    if use_half:
+        inp_tpu = inp_tpu.half()
+        grad_o_tpu = grad_o_tpu.half()
+        net_tpu = net_tpu.half()
+    
+    inp_tpu.requires_grad = True
+    inp_cpu.requires_grad = True
+
+    out_cpu = net_cpu(inp_cpu)
+    out_tpu = net_tpu(inp_tpu)
+    diff = out_cpu[0] - out_tpu[0].cpu()
     print(torch.max(abs(diff)))
-    # compare_model_grad(net_cpu, net_tpu)
-    # compare_model_weight(net_cpu, net_tpu)
+    compare_model_weight(net_cpu, net_tpu)
+
+    res_cpu = res_list[:len(res_list)//2]
+    res_tpu = res_list[len(res_list)//2:]
+    compare_model(res_cpu, res_tpu)
+    import pdb;pdb.set_trace()
+
+    if test_backward:
+        out_cpu[0].backward(grad_o)
+        out_tpu[0].backward(grad_o_tpu)
+
+        diff_grad = inp_cpu.grad - inp_tpu.grad.cpu()
+        print(torch.max(abs(diff_grad)))
+        compare_model_grad(net_cpu, net_tpu)
+        grad_inter_cpu = grads_list[:len(grads_list)//2]
+        grad_inter_tpu = grads_list[len(grads_list)//2:]
+        compare_model(grad_inter_cpu, grad_inter_tpu)
+        import pdb;pdb.set_trace()
     return
+
+def print_grad(grad):
+    grads_list.append(grad.cpu().numpy())
+
 
 
 if __name__ == "__main__":
-    check_gpt3()
+    use_half = False
+    test_backward = True
+    res_list = []
+    grads_list = []
+    check_gpt3(use_half, test_backward)
