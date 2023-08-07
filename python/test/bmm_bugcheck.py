@@ -6,6 +6,9 @@ from utils import get_model_grad, Optimer, compare_model_grad
 from transformers import GPT2Config
 import copy
 import time
+import unittest
+from parameterized import  parameterized,param
+
 torch.manual_seed(1000)
 torch.ops.load_library("../../libtorch_plugin/build/liblibtorch_plugin.so")
 optimer = Optimer("../../libtorch_plugin/build/liblibtorch_plugin.so")
@@ -160,6 +163,11 @@ class GPT2Attention(nn.Module):
             attention_mask = encoder_attention_mask
         else:
             query, key, value = self.c_attn(hidden_states).split(self.split_size, dim=2)
+            # x = self.c_attn(hidden_states) 
+            # import pdb;pdb.set_trace()
+            # query = x[:,:,:self.split_size]
+            # key = x[:,:,self.split_size:2*self.split_size]
+            # value = x[:,:,2*self.split_size:]
         
         t1 = time.time()
         query = self._split_heads(query, self.num_heads, self.head_dim)
@@ -320,7 +328,9 @@ class GPT2Block(nn.Module):
             outputs = (hidden_states,) + outputs[1:]
         return outputs  # hidden_states, present, (attentions, cross_attentions)
 
-def case_gptblock_backward():
+def case_gptblock_backward(bs=2, h=12, m=16, d=768, use_half=True):
+    global grads_list
+    grads_list = []
     ############# configure ###############
     device = torch.device("privateuseone:0")
     configure = GPT2Config()
@@ -328,24 +338,29 @@ def case_gptblock_backward():
     configure.embd_pdrop = 0
     configure.resid_pdrop = 0
     configure.activation_function= "gelu"
-    configure.n_head = 16
-    configure.n_embd = 128
+    configure.n_head = h
+    configure.n_embd = d
 
-    batch = 1
-    sequence = 32
+    batch = bs
+    sequence = m
     ########################################
 
     inp = torch.rand(batch, sequence, configure.hidden_size)
     ref = torch.rand(batch, sequence, configure.hidden_size)
-    inp_tpu = inp.to(device).half()
-    ref_tpu = ref.to(device).half()
+    # inp = torch.ones(batch, sequence, configure.hidden_size)
+    # ref = torch.ones(batch, sequence, configure.hidden_size)
+    inp_tpu = inp.to(device)
+    ref_tpu = ref.to(device)
+    net = GPT2Block(configure)
+    net_tpu = copy.deepcopy(net)
+    net_tpu.to(device)
+    if use_half:
+        inp_tpu = inp_tpu.half()
+        ref_tpu = ref_tpu.half()
+        net_tpu = net_tpu.half()
 
     inp.requires_grad = True
     inp_tpu.requires_grad = True
-
-    net = GPT2Block(configure)
-    net_tpu = copy.deepcopy(net)
-    net_tpu.to(device).half()
 
     print("===== forward =========")
     t1 = time.time()
@@ -381,8 +396,17 @@ def case_gptblock_backward():
     grad_inter_cpu = grads_list[:len(grads_list)//2]
     grad_inter_tpu = grads_list[len(grads_list)//2:]
     compare_inter_grad(grad_inter_cpu, grad_inter_tpu)
+    # import pdb;pdb.set_trace()
 
-    import pdb;pdb.set_trace()
+    grad_k_cpu = grad_inter_cpu[11]
+    grad_v_cpu = grad_inter_cpu[12]
+    grad_inp_cpu = grad_inter_cpu[-1]
+
+    grad_k_tpu = grad_inter_tpu[11]
+    grad_v_tpu = grad_inter_tpu[12]
+    grad_inp_tpu = grad_inter_tpu[-1]
+
+    return grad_k_cpu, grad_v_cpu, grad_inp_cpu, grad_k_tpu, grad_v_tpu, grad_inp_tpu
 
 
 def print_grad(grad):
@@ -399,6 +423,28 @@ def compare_inter_grad(grad_inter_cpu, grad_inter_tpu):
     return
 
 
+class TestBmm(unittest.TestCase):
+
+    params = [(1, 16, 32, 128), (2, 12, 16, 768)] # bs, h, m, d
+
+    @parameterized.expand(params)
+    def test_bmm_fp32(self, bs, h, m, d):
+        grad_k_cpu, grad_v_cpu, grad_inp_cpu, grad_k_tpu, grad_v_tpu, grad_inp_tpu = case_gptblock_backward(bs, h, m, d, use_half=False)
+        thresh = 1e-5
+        self.assertLess(np.max(abs(grad_k_cpu - grad_k_tpu)), thresh, msg=None)
+        self.assertLess(np.max(abs(grad_v_cpu - grad_v_tpu)), thresh, msg=None)
+        self.assertLess(np.max(abs(grad_inp_cpu - grad_inp_tpu)), thresh, msg=None)
+
+    @parameterized.expand(params)
+    def test_bmm_fp16(self, bs, h, m, d):
+        grad_k_cpu, grad_v_cpu, grad_inp_cpu, grad_k_tpu, grad_v_tpu, grad_inp_tpu = case_gptblock_backward(bs, h, m, d, use_half=True)
+        thresh = 1e-2
+        self.assertLess(np.max(abs(grad_k_cpu - grad_k_tpu)), thresh, msg=None)
+        self.assertLess(np.max(abs(grad_v_cpu - grad_v_tpu)), thresh, msg=None)
+        self.assertLess(np.max(abs(grad_inp_cpu - grad_inp_tpu)), thresh, msg=None)
+
+
 if __name__ == "__main__":
     grads_list = []
-    case_gptblock_backward()
+    # case_gptblock_backward(bs=2, h=12, m=16, d=768, use_half = True)
+    unittest.main()

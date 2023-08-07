@@ -2132,7 +2132,7 @@ bm_status_t sgdnnBatchMatmul ( bm_handle_t handle,
     left_contiguous.shape[0] = left.shape[0];
     left_contiguous.shape[1] = left.shape[1];
     left_contiguous.shape[2] = left.shape[2];
-    left_contiguous.stride[0] = left.shape[0];
+    left_contiguous.stride[0] = left.stride[0];
     left_contiguous.stride[1] = left.shape[2];
     left_contiguous.stride[2] = 1;
     left_contiguous.dtype = left.dtype;
