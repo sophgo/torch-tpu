@@ -10,6 +10,14 @@
 #define FW_MAX_CONCAT_NUM     10
 #endif
 
+
+#ifndef WIN32
+#define WITH_PLATFORM(x) __attribute__ ((packed)) x
+#else
+#define WITH_PLATFORM(x) x
+#endif
+
+
 typedef struct
 {
   unsigned long long  input_global_addr;
@@ -27,13 +35,7 @@ typedef struct
   int dilation[2];
   int pad[4];
   int dtype;
-#ifndef WIN32
-}
-__attribute__ ( ( packed ) ) sg_api_conv2d_backward_t;
-#else
-}
-sg_api_conv2d_backward_t;
-#endif
+} WITH_PLATFORM(sg_api_conv2d_backward_t);
 
 typedef struct
 {
@@ -47,13 +49,7 @@ typedef struct
   unsigned long long grad_bias_global_addr;
   int shape[4];
   int dtype;
-#ifndef WIN32
-}
-__attribute__ ( ( packed ) ) sg_api_batchnorm2d_backward_t;
-#else
-}
-sg_api_batchnorm2d_backward_t;
-#endif
+} WITH_PLATFORM(sg_api_batchnorm2d_backward_t);
 
 typedef struct
 {
@@ -63,13 +59,7 @@ typedef struct
   int shape[FW_MAX_SHAPE_DIMS];
   int dim;
   int dtype;
-#ifndef WIN32
-}
-__attribute__ ( ( packed ) ) sg_api_relu_backward_t;
-#else
-}
-sg_api_relu_backward_t;
-#endif
+} WITH_PLATFORM(sg_api_relu_backward_t);
 
 typedef struct
 {
@@ -85,13 +75,7 @@ typedef struct
   int dilation[2];
   int pad[4];
   int dtype;
-#ifndef WIN32
-}
-__attribute__ ( ( packed ) ) sg_api_conv2d_t;
-#else
-}
-sg_api_conv2d_t;
-#endif
+} WITH_PLATFORM(sg_api_conv2d_t);
 
 typedef struct
 {
@@ -107,13 +91,7 @@ typedef struct
   float momentum;
   float eps;
   int dtype;
-#ifndef WIN32
-}
-__attribute__ ( ( packed ) ) sg_api_batchnorm2d_t;
-#else
-}
-sg_api_batchnorm2d_t;
-#endif
+} WITH_PLATFORM(sg_api_batchnorm2d_t);
 
 typedef struct
 {
@@ -128,13 +106,7 @@ typedef struct
   int axis;
   float eps;
   int dtype;
-#ifndef WIN32
-}
-__attribute__ ( ( packed ) ) sg_api_layernorm_t;
-#else
-}
-sg_api_layernorm_t;
-#endif
+} WITH_PLATFORM(sg_api_layernorm_t);
 
 typedef struct
 {
@@ -150,13 +122,7 @@ typedef struct
   int dim;
   int axis;
   int dtype;
-#ifndef WIN32
-}
-__attribute__ ( ( packed ) ) sg_api_layernorm_backward_t;
-#else
-}
-sg_api_layernorm_backward_t;
-#endif
+} WITH_PLATFORM(sg_api_layernorm_backward_t);
 
 typedef struct
 {
@@ -165,13 +131,7 @@ typedef struct
   int shape[FW_MAX_SHAPE_DIMS];
   int dim;
   int dtype;
-#ifndef WIN32
-}
-__attribute__ ( ( packed ) ) sg_api_relu_t;
-#else
-}
-sg_api_relu_t;
-#endif
+} WITH_PLATFORM(sg_api_relu_t);
 
 typedef struct
 {
@@ -181,13 +141,7 @@ typedef struct
   int dim;
   int input_dtype;
   int output_dtype;
-#ifndef WIN32
-}
-__attribute__ ( ( packed ) ) sg_api_dtype_convert_t;
-#else
-}
-sg_api_dtype_convert_t;
-#endif
+} WITH_PLATFORM(sg_api_dtype_convert_t);
 
 typedef struct
 {
@@ -195,13 +149,7 @@ typedef struct
   unsigned long long output_global_addr;
   int shape[4];
   int mode;
-#ifndef WIN32
-}
-__attribute__ ( ( packed ) ) sg_api_conv_weight_reorder_t;
-#else
-}
-sg_api_conv_weight_reorder_t;
-#endif
+} WITH_PLATFORM(sg_api_conv_weight_reorder_t);
 
 typedef struct
 {
@@ -216,13 +164,7 @@ typedef struct
   int is_left_transposed;
   int is_right_transposed;
   int dtype;
-#ifndef WIN32
-}
-__attribute__ ( ( packed ) ) sg_api_batch_matmul_t;
-#else
-}
-sg_api_batch_matmul_t;
-#endif
+} WITH_PLATFORM(sg_api_batch_matmul_t);
 
 typedef struct
 {
@@ -238,13 +180,7 @@ typedef struct
   int                R_trans;
   int                in_dtype;
   int                out_dtype;
-#ifndef WIN32
-}
-__attribute__ ( ( packed ) ) sg_api_matmul_multi_core_t;
-#else
-}
-sg_api_matmul_multi_core_t;
-#endif
+} WITH_PLATFORM(sg_api_matmul_multi_core_t);
 
 typedef struct
 {
@@ -254,13 +190,7 @@ typedef struct
   int dim;
   int axis;
   int dtype;
-#ifndef WIN32
-}
-__attribute__ ( ( packed ) ) sg_api_softmax_t;
-#else
-}
-sg_api_softmax_t;
-#endif
+} WITH_PLATFORM(sg_api_softmax_t);
 
 typedef struct
 {
@@ -271,13 +201,7 @@ typedef struct
   int dim;
   int axis;
   int dtype;
-#ifndef WIN32
-}
-__attribute__ ( ( packed ) ) sg_api_softmax_backward_t;
-#else
-}
-sg_api_softmax_backward_t;
-#endif
+} WITH_PLATFORM(sg_api_softmax_backward_t);
 
 typedef struct
 {
@@ -286,13 +210,7 @@ typedef struct
   int shape[FW_MAX_SHAPE_DIMS];
   int dim;
   int dtype;
-#ifndef WIN32
-}
-__attribute__ ( ( packed ) ) sg_api_gelu_t;
-#else
-}
-sg_api_gelu_t;
-#endif
+} WITH_PLATFORM(sg_api_gelu_t);
 
 typedef struct
 {
@@ -302,13 +220,7 @@ typedef struct
   int shape[FW_MAX_SHAPE_DIMS];
   int dim;
   int dtype;
-#ifndef WIN32
-}
-__attribute__ ( ( packed ) ) sg_api_gelu_backward_t;
-#else
-}
-sg_api_gelu_backward_t;
-#endif
+} WITH_PLATFORM(sg_api_gelu_backward_t);
 
 typedef struct
 {
@@ -319,13 +231,7 @@ typedef struct
   int input_stride[FW_MAX_SHAPE_DIMS];
   int output_stride[FW_MAX_SHAPE_DIMS];
   int dtype;
-#ifndef WIN32
-}
-__attribute__ ( ( packed ) ) sg_api_strided_copy_t;
-#else
-}
-sg_api_strided_copy_t;
-#endif
+} WITH_PLATFORM(sg_api_strided_copy_t);
 
 typedef struct
 {
@@ -340,13 +246,7 @@ typedef struct
   int dim;
   int cond_dtype;
   int dtype;
-#ifndef WIN32
-}
-__attribute__ ( ( packed ) ) sg_api_where_t;
-#else
-}
-sg_api_where_t;
-#endif
+} WITH_PLATFORM(sg_api_where_t);
 
 typedef struct
 {
@@ -357,13 +257,7 @@ typedef struct
   int input_num;
   int axis;
   int dtype;
-#ifndef WIN32
-}
-__attribute__ ( ( packed ) ) sg_api_concat_t;
-#else
-}
-sg_api_concat_t;
-#endif
+} WITH_PLATFORM(sg_api_concat_t);
 
 typedef struct
 {
@@ -375,13 +269,7 @@ typedef struct
   int end_dim;
   int dtype;
   int mode;
-#ifndef WIN32
-}
-__attribute__ ( ( packed ) ) sg_api_reduce_t;
-#else
-}
-sg_api_reduce_t;
-#endif
+} WITH_PLATFORM(sg_api_reduce_t);
 
 typedef struct
 {
@@ -394,13 +282,7 @@ typedef struct
   int axis;
   int dtype;
   int is_index_int64;
-#ifndef WIN32
-}
-__attribute__ ( ( packed ) ) sg_api_index_select_t;
-#else
-}
-sg_api_index_select_t;
-#endif
+} WITH_PLATFORM(sg_api_index_select_t);
 
 typedef struct
 {
@@ -409,13 +291,7 @@ typedef struct
   int dim;
   unsigned int value;
   int dtype;
-#ifndef WIN32
-}
-__attribute__ ( ( packed ) ) sg_api_constant_fill_t;
-#else
-}
-sg_api_constant_fill_t;
-#endif
+} WITH_PLATFORM(sg_api_constant_fill_t);
 
 typedef struct
 {
@@ -424,13 +300,7 @@ typedef struct
   int shape[FW_MAX_SHAPE_DIMS];
   int dim;
   int dtype;
-#ifndef WIN32
-}
-__attribute__ ( ( packed ) ) sg_api_sqrt_t;
-#else
-}
-sg_api_sqrt_t;
-#endif
+} WITH_PLATFORM(sg_api_sqrt_t);
 
 typedef struct
 {
@@ -440,13 +310,7 @@ typedef struct
   int dim;
   int dtype;
   int active_type;
-#ifndef WIN32
-}
-__attribute__ ( ( packed ) ) sg_api_active_t;
-#else
-}
-sg_api_active_t;
-#endif
+} WITH_PLATFORM(sg_api_active_t);
 
 typedef struct
 {
@@ -458,13 +322,7 @@ typedef struct
   int dim;
   float value;
   int dtype;
-#ifndef WIN32
-}
-__attribute__ ( ( packed ) ) sg_api_addcdiv_t;
-#else
-}
-sg_api_addcdiv_t;
-#endif
+} WITH_PLATFORM(sg_api_addcdiv_t);
 
 typedef struct
 {
@@ -476,13 +334,7 @@ typedef struct
   int dim;
   float value;
   int dtype;
-#ifndef WIN32
-}
-__attribute__ ( ( packed ) ) sg_api_addcmul_t;
-#else
-}
-sg_api_addcmul_t;
-#endif
+} WITH_PLATFORM(sg_api_addcmul_t);
 
 typedef struct
 {
@@ -495,13 +347,7 @@ typedef struct
   float label_smoothing;
   int dtype;
   int is_target_int64;
-#ifndef WIN32
-}
-__attribute__ ( ( packed ) ) sg_api_cross_entropy_loss_t;
-#else
-}
-sg_api_cross_entropy_loss_t;
-#endif
+} WITH_PLATFORM(sg_api_cross_entropy_loss_t);
 
 typedef struct
 {
@@ -515,13 +361,7 @@ typedef struct
   float label_smoothing;
   int dtype;
   int is_target_int64;
-#ifndef WIN32
-}
-__attribute__ ( ( packed ) ) sg_api_cross_entropy_loss_backward_t;
-#else
-}
-sg_api_cross_entropy_loss_backward_t;
-#endif
+} WITH_PLATFORM(sg_api_cross_entropy_loss_backward_t);
 
 typedef struct
 {
@@ -541,13 +381,7 @@ typedef struct
   int window_size;
   int grad_output_dtype;
   int is_index_int64;
-#ifndef WIN32
-}
-__attribute__ ( ( packed ) ) sg_api_embedding_backward_t;
-#else
-}
-sg_api_embedding_backward_t;
-#endif
+} WITH_PLATFORM(sg_api_embedding_backward_t);
 
 typedef struct
 {
@@ -558,13 +392,7 @@ typedef struct
   int dim;
   float value;
   int dtype;
-#ifndef WIN32
-}
-__attribute__ ( ( packed ) ) sg_api_add_t;
-#else
-}
-sg_api_add_t;
-#endif
+} WITH_PLATFORM(sg_api_add_t);
 
 typedef struct
 {
@@ -576,13 +404,7 @@ typedef struct
   int dim;
   float value;
   int dtype;
-#ifndef WIN32
-}
-__attribute__ ( ( packed ) ) sg_api_bcast_add_t;
-#else
-}
-sg_api_bcast_add_t;
-#endif
+} WITH_PLATFORM(sg_api_bcast_add_t);
 
 typedef struct
 {
@@ -593,13 +415,7 @@ typedef struct
   int dim;
   float value;
   int dtype;
-#ifndef WIN32
-}
-__attribute__ ( ( packed ) ) sg_api_mul_eltwise_t;
-#else
-}
-sg_api_mul_eltwise_t;
-#endif
+} WITH_PLATFORM(sg_api_mul_eltwise_t);
 
 typedef struct
 {
@@ -609,13 +425,7 @@ typedef struct
   int dim;
   float value;
   int dtype;
-#ifndef WIN32
-}
-__attribute__ ( ( packed ) ) sg_api_mulc_t;
-#else
-}
-sg_api_mulc_t;
-#endif
+} WITH_PLATFORM(sg_api_mulc_t);
 
 typedef struct
 {
@@ -625,13 +435,7 @@ typedef struct
   int dim;
   float value;
   int dtype;
-#ifndef WIN32
-}
-__attribute__ ( ( packed ) ) sg_api_addc_t;
-#else
-}
-sg_api_addc_t;
-#endif
+} WITH_PLATFORM(sg_api_addc_t);
 
 typedef struct
 {
@@ -641,13 +445,7 @@ typedef struct
   int dim;
   float value;
   int dtype;
-#ifndef WIN32
-}
-__attribute__ ( ( packed ) ) sg_api_cdiv_t;
-#else
-}
-sg_api_cdiv_t;
-#endif
+} WITH_PLATFORM(sg_api_cdiv_t);
 
 typedef struct
 {
@@ -657,13 +455,7 @@ typedef struct
   int dim;
   float value;
   int dtype;
-#ifndef WIN32
-}
-__attribute__ ( ( packed ) ) sg_api_csub_t;
-#else
-}
-sg_api_csub_t;
-#endif
+} WITH_PLATFORM(sg_api_csub_t);
 
 typedef struct
 {
@@ -672,13 +464,7 @@ typedef struct
   int shape[FW_MAX_SHAPE_DIMS];
   int dim;
   int dtype;
-#ifndef WIN32
-}
-__attribute__ ( ( packed ) ) sg_api_norm2_t;
-#else
-}
-sg_api_norm2_t;
-#endif
+} WITH_PLATFORM(sg_api_norm2_t);
 
 typedef struct
 {
@@ -694,13 +480,7 @@ typedef struct
   float eps;
   int affine;
   int dtype;
-#ifndef WIN32
-}
-__attribute__ ( ( packed ) ) sg_api_layernorm_forward_multi_core_t;
-#else
-}
-sg_api_layernorm_forward_multi_core_t;
-#endif
+} WITH_PLATFORM(sg_api_layernorm_forward_multi_core_t);
 
 typedef struct
 {
@@ -719,13 +499,7 @@ typedef struct
   int axis;
   int affine;
   int dtype;
-#ifndef WIN32
-}
-__attribute__ ( ( packed ) ) sg_api_layernorm_backward_multi_core_t;
-#else
-}
-sg_api_layernorm_backward_multi_core_t;
-#endif
+} WITH_PLATFORM(sg_api_layernorm_backward_multi_core_t);
 
 typedef struct
 {
@@ -744,13 +518,7 @@ typedef struct
   int other_is_scalar;
   float self_val;
   float other_val;
-#ifndef WIN32
-}
-__attribute__ ( ( packed ) ) sg_api_where_multi_core_t;
-#else
-}
-sg_api_where_multi_core_t;
-#endif
+} WITH_PLATFORM(sg_api_where_multi_core_t);
 
 typedef struct
 {
@@ -762,13 +530,7 @@ typedef struct
   int dtype;
   float const_value;
   int is_inversed;
-#ifndef WIN32
-}
-__attribute__ ( ( packed ) ) sg_api_const_binary_float_t;
-#else
-}
-sg_api_const_binary_float_t;
-#endif
+} WITH_PLATFORM(sg_api_const_binary_float_t);
 
 typedef struct
 {
@@ -783,13 +545,7 @@ typedef struct
   float in1_scale;
   int binary_type;
   int dtype;
-#ifndef WIN32
-}
-__attribute__ ( ( packed ) ) sg_api_binary_multi_core_t;
-#else
-}
-sg_api_binary_multi_core_t;
-#endif
+} WITH_PLATFORM(sg_api_binary_multi_core_t);
 
 typedef struct
 {
@@ -800,13 +556,7 @@ typedef struct
   int api_id;
   int api_size;
   unsigned char api_data[0];
-#ifndef WIN32
-}
-__attribute__ ( ( packed ) ) sg_api_core_info_t;
-#else
-}
-sg_api_core_info_t;
-#endif
+} WITH_PLATFORM(sg_api_core_info_t);
 
 typedef struct
 {
@@ -818,13 +568,7 @@ typedef struct
   unsigned long long seed;
   float threshold;
   int dtype;
-#ifndef WIN32
-}
-__attribute__ ( ( packed ) ) sg_api_dropout_t;
-#else
-}
-sg_api_dropout_t;
-#endif
+} WITH_PLATFORM(sg_api_dropout_t);
 
 typedef struct {
   unsigned long long input_addr;
@@ -859,13 +603,7 @@ typedef struct
   int dim;
   int shape[FW_MAX_SHAPE_DIMS];
 
-#ifndef WIN32
-}
-__attribute__ ( ( packed ) ) sg_api_arange_t;
-#else
-}
-sg_api_arange_t;
-#endif
+} WITH_PLATFORM(sg_api_arange_t);
 
 #pragma pack(pop)
 #endif  // SG_API_STRUCT_H
