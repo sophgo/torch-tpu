@@ -259,6 +259,7 @@ typedef enum
   BITWISE_XOR,
   BITWISE_XOR_BCAST,
   BITWISE_XOR_C,
+  ABS_FORWARD,
   OP_NUM
 }
 OpType;
@@ -320,6 +321,7 @@ static const char * OpTypeStr[OP_NUM] =
   "BITWISE_XOR",
   "BITWISE_XOR_BCAST",
   "BITWISE_XOR_C"
+  "Abs Forward",
 };
 
 struct OpTimer
