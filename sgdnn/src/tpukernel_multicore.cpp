@@ -107,6 +107,29 @@ bm_status_t tpukernel_launch_async_on_cores(
   return BM_SUCCESS;
 }
 
+#include <dlfcn.h>
+
+struct CmdDump
+{
+    void *handle;
+    typedef void (*Func)();
+    Func inc_file_dump_group_num = nullptr;
+    CmdDump()
+    {
+        char *fw_path = getenv("TPUKERNEL_FIRMWARE_PATH");
+        if (!fw_path)
+            return;
+        handle = dlopen(fw_path, RTLD_LAZY);
+        inc_file_dump_group_num = (Func)(dlsym(handle, "inc_file_dump_group_num"));
+    }
+
+    void operator()()
+    {
+        if (inc_file_dump_group_num)
+            inc_file_dump_group_num();
+    }
+} cmd_dump;
+
 bm_status_t tpukernel_sync_cores(bm_handle_t handle, const std::vector<int>& core_list) {
   if(core_list.empty()){
     return bm_sync_api(handle);
@@ -117,6 +140,9 @@ bm_status_t tpukernel_sync_cores(bm_handle_t handle, const std::vector<int>& cor
       return status;
     }
   }
+
+  cmd_dump();
+
   return BM_SUCCESS;
 }
 
