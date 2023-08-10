@@ -704,6 +704,27 @@ bm_status_t sgdnnArange ( bm_handle_t handle,
                                 int step,
                                 SgdnnTensor_t out);
 
+/*
+ *  OUTPUT  = BITWISE_XOR ( input, other, output )
+ *  Note:
+ *  1. input, other and output only support int dtype.
+ */
+bm_status_t sgdnnBitwiseXor ( bm_handle_t handle,
+                              SgdnnTensor_t input,
+                              SgdnnTensor_t other,
+                              SgdnnTensor_t output );
+
+bm_status_t sgdnnBitwiseXorBcast ( bm_handle_t handle,
+                                   SgdnnTensor_t input,
+                                   SgdnnTensor_t other,
+                                   SgdnnTensor_t output );
+
+bm_status_t sgdnnBitwiseXorC ( bm_handle_t handle,
+                               SgdnnTensor_t input,
+                               int scalar,
+                               SgdnnTensor_t output ); 
+
+
 #if defined(__cplusplus)
 }
 #endif

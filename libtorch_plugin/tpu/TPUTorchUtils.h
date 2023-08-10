@@ -256,6 +256,9 @@ typedef enum
   MLP_BACKWARD,
   ATTN_FORWARD,
   ATTN_BACKWARD,
+  BITWISE_XOR,
+  BITWISE_XOR_BCAST,
+  BITWISE_XOR_C,
   OP_NUM
 }
 OpType;
@@ -313,7 +316,10 @@ static const char * OpTypeStr[OP_NUM] =
   "MLP Forward",
   "MLP Backward",
   "Attention Forward",
-  "Attention Backward"
+  "Attention Backward",
+  "BITWISE_XOR",
+  "BITWISE_XOR_BCAST",
+  "BITWISE_XOR_C"
 };
 
 struct OpTimer

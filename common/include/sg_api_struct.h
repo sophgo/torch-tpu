@@ -605,5 +605,57 @@ typedef struct
 
 } WITH_PLATFORM(sg_api_arange_t);
 
+
+typedef struct
+{
+  unsigned long long input_global_addr;
+  unsigned long long other_global_addr;
+  unsigned long long output_global_addr;
+  int shape[FW_MAX_SHAPE_DIMS];
+  int dim;
+  float value;
+  int dtype;
+#ifndef WIN32
+}
+__attribute__ ( ( packed ) ) sg_api_bitwise_xor_t;
+#else
+}
+sg_api_bitwise_xor_t;
+#endif
+
+typedef struct
+{
+  unsigned long long input_global_addr;
+  unsigned long long other_global_addr;
+  unsigned long long output_global_addr;
+  int input_shape[FW_MAX_SHAPE_DIMS];
+  int other_shape[FW_MAX_SHAPE_DIMS];
+  int dim;
+  float value;
+  int dtype;
+#ifndef WIN32
+}
+__attribute__ ( ( packed ) ) sg_api_bitwise_xor_bcast_t;
+#else
+}
+sg_api_bitwise_xor_bcast_t;
+#endif
+
+typedef struct
+{
+  unsigned long long input_global_addr;
+  unsigned long long output_global_addr;
+  int shape[FW_MAX_SHAPE_DIMS];
+  int dim;
+  int value;
+  int dtype;
+#ifndef WIN32
+}
+__attribute__ ( ( packed ) ) sg_api_bitwise_xorc_t;
+#else
+}
+sg_api_bitwise_xorc_t;
+#endif
+
 #pragma pack(pop)
 #endif  // SG_API_STRUCT_H

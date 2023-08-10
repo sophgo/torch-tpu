@@ -3028,3 +3028,142 @@ bm_status_t sgdnnArange ( bm_handle_t handle,
 #endif
   return BM_SUCCESS;
 }
+
+bm_status_t sgdnnBitwiseXor ( bm_handle_t handle,
+                              SgdnnTensor_t input,
+                              SgdnnTensor_t other,
+                              SgdnnTensor_t output ) {
+  SGDNN_CHECK ( input.dtype == other.dtype );
+  SGDNN_CHECK ( input.dtype == output.dtype );
+  SGDNN_CHECK ( input.dtype == SGDNN_DTYPE_INT32 ||
+                input.dtype == SGDNN_DTYPE_UINT32 );
+  SGDNN_CHECK ( sgdnnIsSameShape ( &input, &other ) );
+  SGDNN_CHECK ( sgdnnIsSameShape ( &input, &output ) );
+  SGDNN_CHECK ( sgdnnIsTensorContiguous ( &input ) );
+  SGDNN_CHECK ( sgdnnIsTensorContiguous ( &other ) );
+  SGDNN_CHECK ( sgdnnIsTensorContiguous ( &output ) );
+
+#if defined SGDNN_BACKEND_1684X
+  sg_api_bitwise_xor_t api;
+  api.input_global_addr = input.addr;
+  api.other_global_addr = other.addr;
+  api.output_global_addr = output.addr;
+  api.dim = input.dim;
+  for ( int i = 0; i < input.dim; ++i ) {
+    api.shape[i] = input.shape[i];
+  }
+  api.dtype = sgdnnTPUKernelDType ( input.dtype );
+  SAFE_CALL ( sgdnnTPUKernelLaunch ( handle, "tpu_kernel_api_bitwise_xor", &api, sizeof ( api ) ) );
+#elif defined SGDNN_BACKEND_2260
+  sg_api_bitwise_xor_t api;
+  api.input_global_addr = input.addr;
+  api.other_global_addr = other.addr;
+  api.output_global_addr = output.addr;
+  api.dim = input.dim;
+  for ( int i = 0; i < input.dim; ++i ) {
+    api.shape[i] = input.shape[i];
+  }
+  api.dtype = sgdnnTPUKernelDType ( input.dtype );
+  SAFE_CALL ( sgdnnTPUKernelLaunch ( handle, "tpu_kernel_api_bitwise_xor_multi_core", &api, sizeof ( api ) ) );
+#else
+  SGDNN_CHECK ( false );
+#endif
+  
+  return BM_SUCCESS;
+}
+
+bm_status_t sgdnnBitwiseXorBcast ( bm_handle_t handle,
+                                   SgdnnTensor_t input,
+                                   SgdnnTensor_t other,
+                                   SgdnnTensor_t output ) {
+  SGDNN_CHECK ( input.dtype == other.dtype );
+  SGDNN_CHECK ( input.dtype == output.dtype );
+  SGDNN_CHECK ( input.dtype == SGDNN_DTYPE_INT32 ||
+                input.dtype == SGDNN_DTYPE_UINT32 );
+  SGDNN_CHECK ( input.dim == other.dim );
+  SGDNN_CHECK ( input.dim == output.dim );
+  for ( int i = 0; i < input.dim; ++i ) {
+    SGDNN_CHECK ( input.shape[i] == 1 || input.shape[i] == output.shape[i] );
+  }
+  for ( int i = 0; i < other.dim; ++i ) {
+    SGDNN_CHECK ( other.shape[i] == 1 || other.shape[i] == output.shape[i] );
+  }
+  SGDNN_CHECK ( sgdnnIsTensorContiguous ( &input ) );
+  SGDNN_CHECK ( sgdnnIsTensorContiguous ( &other ) );
+  SGDNN_CHECK ( sgdnnIsTensorContiguous ( &output ) );
+
+#if defined SGDNN_BACKEND_1684X
+  sg_api_bitwise_xor_bcast_t api;
+  api.input_global_addr = input.addr;
+  api.other_global_addr = other.addr;
+  api.output_global_addr = output.addr;
+  api.dim = input.dim;
+  for ( int i = 0; i < input.dim; ++i ) {
+    api.input_shape[i] = input.shape[i];
+  }
+  for ( int i = 0; i < other.dim; ++i ) {
+    api.other_shape[i] = other.shape[i];
+  }
+  api.dtype = sgdnnTPUKernelDType ( input.dtype );
+  SAFE_CALL ( sgdnnTPUKernelLaunch ( handle, "tpu_kernel_api_bitwise_xor_bcast", &api, sizeof ( api ) ) );
+#elif defined SGDNN_BACKEND_2260
+  sg_api_bitwise_xor_bcast_t api;
+  api.input_global_addr = input.addr;
+  api.other_global_addr = other.addr;
+  api.output_global_addr = output.addr;
+  api.dim = input.dim;
+  for ( int i = 0; i < input.dim; ++i ) {
+    api.input_shape[i] = input.shape[i];
+  }
+  for ( int i = 0; i < other.dim; ++i ) {
+    api.other_shape[i] = other.shape[i];
+  }
+  api.dtype = sgdnnTPUKernelDType ( input.dtype );
+  SAFE_CALL ( sgdnnTPUKernelLaunch ( handle, "tpu_kernel_api_bitwise_xor_bcast_multi_core", &api, sizeof ( api ) ) );
+#else
+  SGDNN_CHECK ( false );
+#endif
+
+  return BM_SUCCESS;
+}
+
+bm_status_t sgdnnBitwiseXorC ( bm_handle_t handle,
+                              SgdnnTensor_t input,
+                              int scalar,
+                              SgdnnTensor_t output ) {
+  SGDNN_CHECK ( input.dtype == output.dtype );
+  SGDNN_CHECK ( input.dtype == SGDNN_DTYPE_INT32 ||
+                input.dtype == SGDNN_DTYPE_UINT32 );
+  SGDNN_CHECK ( input.dim == output.dim );
+  SGDNN_CHECK ( sgdnnIsSameShape ( &input, &output ));
+  SGDNN_CHECK ( sgdnnIsTensorContiguous ( &input ) );
+  SGDNN_CHECK ( sgdnnIsTensorContiguous ( &output ) );
+
+#if defined SGDNN_BACKEND_1684X
+  sg_api_bitwise_xorc_t api;
+  api.input_global_addr = input.addr;
+  api.output_global_addr = output.addr;
+  api.dim = input.dim;
+  for ( int i = 0; i < input.dim; ++i ) {
+    api.shape[i] = input.shape[i];
+  }
+  api.dtype = sgdnnTPUKernelDType ( input.dtype );
+  api.value = scalar;
+  SAFE_CALL( sgdnnTPUKernelLaunch ( handle, "tpu_kernel_api_bitwise_xorc", &api, sizeof( api ) ) );
+#elif defined SGDNN_BACKEND_2260
+  sg_api_bitwise_xorc_t api;
+  api.input_global_addr = input.addr;
+  api.output_global_addr = output.addr;
+  api.dim = input.dim;
+  for ( int i = 0; i < input.dim; ++i ) {
+    api.shape[i] = input.shape[i];
+  }
+  api.dtype = sgdnnTPUKernelDType ( input.dtype );
+  api.value = scalar;
+  SAFE_CALL ( sgdnnTPUKernelLaunch ( handle, "tpu_kernel_api_bitwise_xorc_multi_core", &api, sizeof ( api ) ) );
+#else
+  SGDNN_CHECK ( false );
+#endif
+
+  return BM_SUCCESS;
+}

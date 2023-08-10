@@ -437,4 +437,98 @@ TORCH_LIBRARY_IMPL ( aten, TPU, m )
 {
   m.impl ( "div.out", div_out_tpu );
 }
+
+Tensor &bitwise_xor_out_tpu ( const Tensor & self, const Tensor & other, Tensor & out ) {
+  if ( self.dim() > 0 )  { CHECK_TENSOR_IN_DEVICE ( self ); }
+  if ( other.dim() > 0 ) { CHECK_TENSOR_IN_DEVICE ( other ); }
+  CHECK_TENSOR_IN_DEVICE(out);
+
+  if(self.dim() == 0 && other.dim() == 0) {
+    auto out_cpu = bitwise_xor(self.cpu(), self.cpu());
+    tpu::TPUCopyHostToDevice(out.data_ptr(), out_cpu.contiguous().data_ptr(), out.nbytes());
+  }
+  else if(IS_TPU_TENSOR(self) && IS_TPU_TENSOR(other)) {
+    if(tpu::TPUIsSameShape(self, other)) {
+
+#ifdef TPU_OP_TIMING
+      auto timer = tpu::Timer().Start();
+#endif
+
+      bm_status_t status = sgdnnBitwiseXor(tpu::TPUGetDeviceHandle(),
+                                           tpu:: TPUGenerateSgdnnTensor ( self ),
+                                           tpu:: TPUGenerateSgdnnTensor ( other ),
+                                           tpu:: TPUGenerateSgdnnTensor ( out ) );
+      TORCH_CHECK ( status == BM_SUCCESS );
+
+#ifdef TPU_OP_TIMING
+      tpu::OpTimer::Instance().AddTime ( tpu::BITWISE_XOR, timer.ElapsedUS() );
+#endif
+
+    }
+    else {
+
+#ifdef TPU_OP_TIMING
+      auto timer = tpu::Timer().Start();
+#endif
+
+      bm_status_t status = sgdnnBitwiseXorBcast(tpu::TPUGetDeviceHandle(),
+                                                tpu:: TPUGenerateSgdnnTensor ( self ),
+                                                tpu:: TPUGenerateSgdnnTensor ( other ),                                              
+                                                tpu:: TPUGenerateSgdnnTensor ( out ) );
+      TORCH_CHECK ( status == BM_SUCCESS );
+
+#ifdef TPU_OP_TIMING
+      tpu::OpTimer::Instance().AddTime ( tpu::BITWISE_XOR_BCAST, timer.ElapsedUS() );
+#endif
+
+    }
+  }
+  else if((IS_TPU_TENSOR(self) && IS_CPU_TENSOR(other)) ||
+          (IS_CPU_TENSOR(self) && IS_TPU_TENSOR(other))) {
+    if(IS_CPU_TENSOR(other)) {
+      TORCH_CHECK ( other.dim() == 0, "OTHER must be a scalar" );
+      
+#ifdef TPU_OP_TIMING
+      auto timer = tpu::Timer().Start();
+#endif
+
+      bm_status_t status = sgdnnBitwiseXorC(tpu::TPUGetDeviceHandle(),
+                                            tpu:: TPUGenerateSgdnnTensor ( self ),
+                                            *other.data_ptr<int>(),                                              
+                                            tpu:: TPUGenerateSgdnnTensor ( out ) );
+      TORCH_CHECK ( status == BM_SUCCESS );
+
+#ifdef TPU_OP_TIMING
+      tpu::OpTimer::Instance().AddTime ( tpu::BITWISE_XOR_C, timer.ElapsedUS() );
+#endif
+
+    }
+    else {
+
+#ifdef TPU_OP_TIMING
+      auto timer = tpu::Timer().Start();
+#endif
+
+      bm_status_t status = sgdnnBitwiseXorC(tpu::TPUGetDeviceHandle(),
+                                            tpu:: TPUGenerateSgdnnTensor ( other ),
+                                            *self.data_ptr<int>(),                                              
+                                            tpu:: TPUGenerateSgdnnTensor ( out ) );
+      TORCH_CHECK ( status == BM_SUCCESS );
+
+#ifdef TPU_OP_TIMING
+      tpu::OpTimer::Instance().AddTime ( tpu::BITWISE_XOR_C, timer.ElapsedUS() );
+#endif
+
+    }
+  }
+  else {
+    TORCH_CHECK ( false, "At least one input is required in TPU device" );
+  }
+
+  return out;
+}
+TORCH_LIBRARY_IMPL ( aten, TPU, m ) {
+  m.impl ( "bitwise_xor.Tensor_out", bitwise_xor_out_tpu );
+}
+
 } // namespace at
