@@ -18,26 +18,34 @@ function ops_utest() {
 }
 
 
-export stable_libsophon_path="sophon-libsophon_0.4.6_amd64.deb"
+export stable_libsophon_path="/workspace/libsophon_Release_20230605_025400"
 # function for online regression
 function link_libsophon() {
     echo "********************************************"
     echo "[STEP]install libsophon"
     CURRENT_DIR=$(dirname ${BASH_SOURCE})
     LIBSOPHON_LINK_PATTERN=${1:-latest}
+    DEB_PATH_STABLE=${2:-none}
+    VERSION_PATH_STABLE=${3:-0.4.8}
     if [ $LIBSOPHON_LINK_PATTERN = 'stable' ]; then
       echo "[NOTE]STABLE LIBSOHON IS ADAPATED FROM .deb"
-      LIBSOPHON_PATH_TPU_TRAIN=$CURRENT_DIR/../../libsophon_install
-      echo "[INFO]LIBSOPHON_PATH_TPU_TRAIN:$LIBSOPHON_PATH_TPU_TRAIN"
-      pushd "$LIBSOPHON_PATH_TPU_TRAIN"
-      if [  ! -r "$stable_libsophon_path" ]; then
-        echo "libsophon_dependency $stable_libsophon_path is not found!"
-        exit 1
+      if [ $DEB_PATH_STABLE = 'none' ]; then
+        echo "You are giving wrong libsophon .deb upper-path!"
+        return 255
       else
-        libsohpon_install_cmd="apt install  ./sophon-libsophon_0.4.6_amd64.deb ./sophon-libsophon-dev_0.4.6_amd64.deb"
-        $libsohpon_install_cmd
+        echo "[INFO]LIBSOPHON_PATH_TPU_TRAIN:$DEB_PATH_STABLE"
+        pushd "$DEB_PATH_STABLE"
+        if [  ! -r "$DEB_PATH_STABLE" ]; then
+          echo "libsophon_dependency: $DEB_PATH_STABLE is not found!"
+        else
+          cd
+          libsohpon_install_cmd="apt install  ./sophon-libsophon_${VERSION_PATH_STABLE}_amd64.deb ./sophon-libsophon-dev_${VERSION_PATH_STABLE}_amd64.deb"
+          $libsohpon_install_cmd
+          device_project="source /etc/profile.d/libsophon-bin-path.sh"
+          $device_project
+        fi
+        popd
       fi
-      popd
     else
       echo "LATEST LIBSOHON IS ADAPATED from libsophon-file"
     fi
@@ -71,30 +79,62 @@ function run_online_regression_test() {
   test_CHIP_ARCH=${1:-bm1684x}
   LIBSOPHON_LINK_PATTERN=${2:-latest} #latest or stable
   TEST_PATTERN=${3:-normal} #normal or fast
+  DEB_PATH_STABLE=${4:-none} #none or given path
+  VERSION_PATH_STABLE=${5:-0.4.8}
+
   echo "[INFO]test_CHIP_ARCH:$test_CHIP_ARCH"
   echo "[INFO]LIBSOPHON_LINK_PATTERN=$LIBSOPHON_LINK_PATTERN"
 
-  link_libsophon $LIBSOPHON_LINK_PATTERN; ret_libsophon=$?
-  if [ $ret_libsophon -eq 1 ]; then
-    exit 1
+  link_libsophon $LIBSOPHON_LINK_PATTERN $DEB_PATH_STABLE $VERSION_PATH_STABLE; ret_libsophon=$?
+  if [ $ret_libsophon -eq 255 ]; then
+    exit 255
   else
-    echo "************** $LIBSOPHON_LINK_PATTERN-LIBSOPHON IS REAEDY *********"
-    source  $CURRENT_DIR/envsetup.sh $test_CHIP_ARCH
-    rebuild_all
-    TPU_TRAIN_CMODEL_PATH=$CURRENT_DIR/../build/firmware_core/libcmodel.so
-    echo "[INFO]tpu_train_cmodel_path:$TPU_TRAIN_CMODEL_PATH"
-    set_cmodel_firmware $TPU_TRAIN_CMODEL_PATH
-    echo "*************** CMODEL IS SET *************"
-  fi
-  if [ $TEST_PATTERN = "normal" ];then
-    build_libtorch_plugin
-    echo "*************** LIBTORCH_PLUGIN IS BUILT *************"
-    ops_utest; ret_ops_utest=$?
-    echo "[INFO]ret_ops_utest:$ret_ops_utest"
-    if [ $ret_ops_utest -eq 0 ];then #must return [0,255] otherwise it will cause scripts fault early
-      echo "[RESULT-$test_CHIP_ARCH] all ops_utest are computed, Please check Results above"
-    else
-      echo "[RESULT-$test_CHIP_ARCH] some ops_utest are failed!"
+    if [ $LIBSOPHON_LINK_PATTERN = 'stable' ];then
+      echo "[INFO]test_CHIP_ARCH:$test_CHIP_ARCH"
+      export CROSS_TOOLCHAINS=/workspace/bm_prebuilt_toolchains
+      if [ ! -f "$CROSS_TOOLCHAINS" ]; then
+        echo "[bm_prebuilt_tolchian] $CROSS_TOOLCHAINS is not found !"
+        exit 255
+      fi
+      dumpinstall="apt-get install bsdmainutils" #[TODO]in case hexdump error
+      $dumpinstall
+      pushd $CURRENT_DIR/..
+      rm -rf build
+      mkdir build && cd build
+      cmake .. -DCMAKE_BUILD_TYPE=Debug -DUSING_CMODEL=OFF -DPCIE_MODE=ON
+      make kernel_module
+      make -j
+      popd
+
+    elif [ $LIBSOPHON_LINK_PATTERN = 'latest' ];then
+      echo "************** $LIBSOPHON_LINK_PATTERN-LIBSOPHON IS REAEDY *********"
+      source  $CURRENT_DIR/envsetup.sh $test_CHIP_ARCH
+      rebuild_all
+      TPU_TRAIN_CMODEL_PATH=$CURRENT_DIR/../build/firmware_core/libcmodel.so
+      echo "[INFO]tpu_train_cmodel_path:$TPU_TRAIN_CMODEL_PATH"
+      set_cmodel_firmware $TPU_TRAIN_CMODEL_PATH
+      echo "*************** CMODEL IS SET *************"
+    fi
+    if [ $TEST_PATTERN = "normal" ];then
+      build_libtorch_plugin
+      echo "*************** LIBTORCH_PLUGIN IS BUILT *************"
+      ops_utest; ret_ops_utest=$?
+      echo "[INFO]ret_ops_utest:$ret_ops_utest"
+      if [ $ret_ops_utest -eq 0 ];then #must return [0,255] otherwise it will cause scripts fault early
+        echo "[RESULT-$test_CHIP_ARCH] all ops_utest are computed, Please check Results above"
+      else
+        echo "[RESULT-$test_CHIP_ARCH] some ops_utest are failed!"
+      fi
     fi
   fi
+}
+
+
+function fast_build_bm1684x_stable() {
+  DEB_PATH_STABLE=${1:-none}
+  run_online_regression_test bm1684x stable fast $DEB_PATH_STABLE 0.4.8
+}
+
+function fast_build_bm1684x_latest() {
+  run_online_regression_test bm1684x latest fast
 }

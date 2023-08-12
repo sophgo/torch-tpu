@@ -1,7 +1,7 @@
 [1]PrePare:
 1) Link host device to your docker:
-    docker run --restart always --privileged -v /dev:/dev -td -v $PWD:/workspace --name <YOURS> sophgo/tpuc_dev:latest bash
-    docker exec -it <YOURS>  bash
+    sudo docker run --restart always --privileged -v /dev:/dev -td -v $PWD:/workspace --name <YOUR_NAME> sophgo/tpuc_dev:latest bash
+    sudo docker exec -it <YOUR_NAME>  bash
 2) We offer two ways for libsophon
    2.A) "stable" mode: Install Libsophon from .deb, usually in /opt/sophon/libsophon-current
         2.A.1)You can download lisophon from:
@@ -43,13 +43,14 @@ Or More detailed:
 2. set_cmodel_firmware ./build/firmware_core/libcmodel.so
 
 [4]pcie_mode or soc_mode:
-firstly make USING_CMODEL OFF && PCIE_MODE or SOC_MODE ON in config_common.cmake,
+firstly make USING_CMODEL OFF && PCIE_MODE or SOC_MODE ON in config_common.cmake, (or directly set -D in cmake)
 if you use SOC_MODE or need pybind, make ENABLE_PYBIND ON
 1. if you have bm_prebuilt_toolchains, first set:
     export CROSS_TOOLCHAINS=path_to_bm_prebuilt_toolchains  (absolute path ex. /workspace/bm_prebuilt_toolchains )
     else run prepare_toolchains.sh first
 2. mkdir build && cd build
-3. cmake .. (-DCMAKE_BUILD_TYPE=Debug)
+3. cmake .. (-DCMAKE_BUILD_TYPE=Debug -DUSING_CMODEL=OFF -DPCIE_MODE=ON
+)
 4. make kernel_module
 5. make -j
 
