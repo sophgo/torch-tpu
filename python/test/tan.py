@@ -7,14 +7,14 @@ torch.manual_seed(1000)
 torch.set_printoptions(precision=6)
 device = "privateuseone:0"
 
-def case1():
 
-    a1 = torch.rand((30,2500,500)) - 0.5
+def case1():
+    a1 = torch.rand((5, 5)) - 0.5
+    a1 = torch.linspace(-10, 10, 50)
     a2 = a1.clone()
     a2_tpu = a2.to(device)
     a3 = 1
     a4 = a2.clone()
-
 
     # tensor add tensor
     # a2.add_(a1)
@@ -31,15 +31,18 @@ def case1():
     # print("tpu : ", a2_tpu.cpu())
 
     # broadcast add
-    
-    a2.abs_()
-    a2_tpu = a2_tpu.abs()
-    assert (a2 == a2_tpu.to('cpu')).all()
-    # torch.abs(a2_tpu)
-    print("origin: ",a1)
-    print("cpu : ", a2 )
-    print("tpu : ", a2_tpu.cpu())
-
+    print(a2)
+    a2.tan_()
+    a2_tpu = a2_tpu.tan()
+    print(a2)
+    print(a2_tpu.to("cpu"))
+    print((a2 - a2_tpu.to("cpu")))
+    assert (a2 - a2_tpu.to("cpu")).mean()  < 1e-6
+    print("pass")
+    # torch.tan(a2_tpu)
+    # print("origin: ", a1)
+    # print("cpu : ", a2)
+    # print("tpu : ", a2_tpu.cpu())
 
 
 if __name__ == "__main__":

@@ -222,6 +222,37 @@ bm_status_t sgdnnAbs ( bm_handle_t handle,
 
 
 /*
+ * OUTPUT = Cos(INPUT)
+ * Note:
+ * 1. The data types of INPUT must be the same and one of FP32, FP16 and BF16
+ * 2. INPUT must be contiguous
+ */
+bm_status_t sgdnnCos ( bm_handle_t handle,
+                       SgdnnTensor_t input, 
+                       SgdnnTensor_t output);
+
+/*
+ * OUTPUT = Tan(INPUT)
+ * Note:
+ * 1. The data types of INPUT must be the same and one of FP32, FP16 and BF16
+ * 2. INPUT must be contiguous
+ */
+bm_status_t sgdnnTan ( bm_handle_t handle,
+                       SgdnnTensor_t input, 
+                       SgdnnTensor_t output);
+
+/*
+ * OUTPUT = Sin(INPUT)
+ * Note:
+ * 1. The data types of INPUT must be the same and one of FP32, FP16 and BF16
+ * 2. INPUT must be contiguous
+ */
+bm_status_t sgdnnSin ( bm_handle_t handle,
+                       SgdnnTensor_t input, 
+                       SgdnnTensor_t output);
+
+
+/*
  * OUTPUT = INPUT + SCALAR * OTHER
  * Note:
  * 1. The data types of INPUT, OTHER and OUTPUT must be the same and one of FP32, FP16 and BF16
