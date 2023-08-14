@@ -127,7 +127,7 @@ class Dumper():
 
 
 class Tester_Basic():
-  def __init__(self, case_name, device_tpu, metric_table = ['max_diff','MAE'], epsilon_dict = {'f32':1e-6,'f16':1e-2,'i32':1e-6}, seed = 1000, dump_flag = True):
+  def __init__(self, case_name = "None", device_tpu=None, metric_table = ['max_diff','MAE'], epsilon_dict = {'f32':1e-6,'f16':1e-2,'i32':1e-6}, seed = 1000, dump_flag = True):
       self.device = device_tpu
       self.device_cpu = torch.device('cpu')
       self.dump_flag = dump_flag
@@ -138,13 +138,15 @@ class Tester_Basic():
       self.convert_table = {
                       'f32':torch.float32,
                       'i32':torch.int32,
-                      'f16':torch.half}
+                      'f16':torch.half,
+                      'bf16':torch.torch.bfloat16}
       self.mankind_dtype_table = {
                       'fp32': 'f32',
                       'float32': 'f32',
                       'i32':'i32',
-                      'fp16':'f16'}
-
+                      'fp16':'f16',
+                      'bf16':'bf16'}
+      self.tested_dtype = set() # no_repeated
       self.metric_table = metric_table
       self.epsilon_dict = epsilon_dict
       self.seed = seed
@@ -372,6 +374,7 @@ class Tester_Basic():
           print("Case {} Sample {} Net-Level-Dtype {} is started".format(self.case_name, sample_count, naive_dtype))
           print('\033[95m' + "[Warning]Parts of inputs might be int64/int32, then they will be kept in func <move_to>"+ '\033[0m')
           torch_dtype = self.convert_dtype_2_torch_style(naive_dtype)
+          self.tested_dtype.add(torch_dtype)
 
 
           #execute step 2:start cmp metrics
@@ -496,6 +499,7 @@ class Tester_Basic():
                   static_corret_dtype_case[dtype_per] +=1
       #level 2 static info: print correct for all samples
       print("*****************Basic Stats CMP INFO*************************")
+      print("[INFO]Tested_Dtype includes: ",self.tested_dtype ,["[INFO_END]"])
       correct_dtype_list = []
       for i in self.naive_dtype_list:
         if static_corret_dtype_case[i] == len(input_sample_processed):

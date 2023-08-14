@@ -2,7 +2,7 @@ import os
 import subprocess
 import sys
 GLOBAL_FAILED = "fail"
-
+from top_utest import Tester_Basic
 def runcmd(command):
     try:
          ret = subprocess.run(command,shell=True, capture_output=True,encoding="utf-8",timeout=1000,check=True)
@@ -10,11 +10,11 @@ def runcmd(command):
             print(ret.stdout)
             return ret.stdout
          else:
-            print("Try error:",command, GLOBAL_FAILED)
+            print("error:",command, GLOBAL_FAILED)
             return ret.stdout + GLOBAL_FAILED
     except subprocess.CalledProcessError as e:
-        print("e.output",e.output)
-        return  "Except error:"+command +GLOBAL_FAILED
+        print(e.output)
+        return  "error:"+command +GLOBAL_FAILED
 
 class Global_Regression_Tester():
     # control top file must be skipped
@@ -37,17 +37,23 @@ class Global_Regression_Tester():
         self.any_utest_files_list =  os.listdir("./")
         self.utest_files_list =[]
         self.top_python_file_list = ['top_utest.py', 'utest_cmd.py']
-        self.global_skip_utest = ['mlp.py','slice.py',"stack.py"]
+        self.global_skip_utest = ['mlp.py','slice.py']
         self.filter_skipped_path_utest_new()
 
         ###[HELPER]You can test specific utest when changing self.any_utest_files_list
         #self.global_skip_utest = []
-        #self.any_utest_files_list =["slice.py"]
+        #self.any_utest_files_list =["add.py","mul.py"]
         self.cmp_old_test_files_list = os.listdir("./../test")
         self.skip_old_test = ['utils.py']
         self.filter_skipped_path_old_test()
 
         self.dict_error_static = {'f32':[],'f16':[]}
+
+        tmp_class = Tester_Basic()
+        self.convert_table = tmp_class.convert_table
+        self.exist_dtype  ={}
+        for i in self.convert_table.keys():
+            self.exist_dtype[str(self.convert_table[i])] = []
 
     #this function is voliently searching GLOBAL_FAILED in each utest print info
     def search_failed_info(self, info):
@@ -62,6 +68,28 @@ class Global_Regression_Tester():
         for dtype in self.dict_error_static.keys():
             if "dtype {} exist errors".format(dtype) in info:
                 self.dict_error_static[dtype] +=[single_utest_name]
+    def get_file_name(self, single_utest):
+        return single_utest.split(self.control_cmd)[1]
+    #this function will gather static info about not-tested dtype for every utest
+    def dtype_check_all_test(self, info, single_utest):
+        if ("[INFO]Tested_Dtype includes:" in info):
+            tmp_dtype = info.split("[INFO]Tested_Dtype includes:")[1].split("[INFO_END]")[0]
+            for keys_tmp in self.exist_dtype.keys():
+                if keys_tmp not in tmp_dtype:
+                    self.exist_dtype[keys_tmp] += [self.get_file_name(single_utest)]
+
+    def dtype_check_all_test_print(self):
+        exist_not_covered_dtype = 0
+        for keys_tmp in self.exist_dtype.keys():
+            if len(self.exist_dtype[keys_tmp]) >0:
+                exist_not_covered_dtype = 1
+                break
+        if (exist_not_covered_dtype):
+            print("*********CURRENT UTEST DTYPE-SUPPORT INFO***************")
+            print("[Warning] Some dtype is not compeletly tested for all utest!")
+            for keys_tmp in self.exist_dtype.keys():
+
+                print(keys_tmp, "Not Tested",self.exist_dtype[keys_tmp])
 
     #This function will print info about what's the files presented in python/test but not in python/utest
     def cmp_old_test(self):
@@ -109,7 +137,9 @@ class Global_Regression_Tester():
 
         for single_utest in self.utest_files_list:
             info = runcmd(single_utest)
-            single_utest_name = single_utest.split(self.control_cmd)[1]
+            #this function will gather static info about not-tested dtype for every utest
+            self.dtype_check_all_test(info, single_utest)
+            single_utest_name = self.get_file_name(single_utest)
             if self.search_failed_info(info):
                 failed_result +=[single_utest_name]
             else:
@@ -122,8 +152,9 @@ class Global_Regression_Tester():
         print("Failed Cases:", failed_result)
         print("Skipped Cases:", self.global_skip_utest)
 
-       #This function will print info about what's the files presented in python/test but not in python/utest
+        #This function will print info about what's the files presented in python/test but not in python/utest
         self.cmp_old_test()
+        self.dtype_check_all_test_print()
 
         #Judger for jenkins
         if (len(failed_result)==0):
