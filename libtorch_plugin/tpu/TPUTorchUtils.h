@@ -263,6 +263,7 @@ typedef enum
   COS_FORWARD,
   SIN_FORWARD,
   TAN_FORWARD,
+  LOG_FORWARD,
   OP_NUM
 }
 OpType;
@@ -328,6 +329,7 @@ static const char * OpTypeStr[OP_NUM] =
   "Cos Forward"
   "Sin Forward"
   "Tan Forward"
+  "Log Forward"
 };
 
 struct OpTimer

@@ -250,6 +250,15 @@ bm_status_t sgdnnTan ( bm_handle_t handle,
 bm_status_t sgdnnSin ( bm_handle_t handle,
                        SgdnnTensor_t input, 
                        SgdnnTensor_t output);
+/*
+ * OUTPUT = log(INPUT)
+ * Note:
+ * 1. The data types of INPUT must be the same and one of FP32, FP16 and BF16
+ * 2. INPUT must be contiguous
+ */
+bm_status_t sgdnnLog ( bm_handle_t handle,
+                       SgdnnTensor_t input, 
+                       SgdnnTensor_t output);
 
 
 /*
