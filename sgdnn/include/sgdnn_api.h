@@ -311,6 +311,17 @@ bm_status_t sgdnnAdd ( bm_handle_t handle,
                        SgdnnTensor_t output );
 
 /*
+ * OUTPUT = math.exp(INPUT)
+ * Note:
+ * 1. The data types of INPUT must be the same and one of FP32, FP16 and BF16
+ * 2. INPUT must be contiguous
+ */
+
+bm_status_t sgdnnExp ( bm_handle_t handle,
+                       SgdnnTensor_t input,
+                       SgdnnTensor_t output );
+
+/*
  * OUTPUT = INPUT - SCALAR * OTHER
  * Note:
  * 1. The data types of INPUT, OTHER and OUTPUT must be the same and one of FP32, FP16 and BF16

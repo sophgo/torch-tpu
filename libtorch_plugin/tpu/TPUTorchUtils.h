@@ -267,6 +267,7 @@ typedef enum
   ACOSH_FORWARD,
   ASINH_FORWARD,
   ATANH_FORWARD,
+  EXP_FORWARD,
   OP_NUM
 }
 OpType;
@@ -334,8 +335,9 @@ static const char * OpTypeStr[OP_NUM] =
   "Tan Forward",
   "Log Forward",
   "ACosH Forward",
-  "ASinH Forward"  
+  "ASinH Forward",  
   "ATanH Forward",
+  "Exp Forward"
 };
 
 struct OpTimer
