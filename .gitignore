@@ -34,3 +34,14 @@ out
 build_zh
 build_en
 sgdnn/include/config_sgdnn_backend.h
+libtorch
+*.whl
+*.egg-info/
+*.zip
+Makefile
+*.cmake
+*.marks
+*.a
+libtorch_plugin/common/config.h
+python/setup.py
+python/**/*.so
