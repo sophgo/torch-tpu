@@ -232,6 +232,42 @@ bm_status_t sgdnnCos ( bm_handle_t handle,
                        SgdnnTensor_t output);
 
 /*
+ * OUTPUT = log(x+ sqrt(x-1)sqrt(x+1))
+ * domain (1, +inf)
+ * range (-inf, +inf)
+ * Note:
+ * 1. The data types of INPUT must be the same and one of FP32
+ * 2. INPUT must be contiguous
+ */
+bm_status_t sgdnnACosH ( bm_handle_t handle,
+                       SgdnnTensor_t input, 
+                       SgdnnTensor_t output);
+
+/*
+ * OUTPUT = log(x + sqrt(x^2 + 1))
+ * domain (-inf, +inf)
+ * range (-inf, +inf)
+ * Note:
+ * 1. The data types of INPUT must be the same and one of FP32, FP16 and BF16
+ * 2. INPUT must be contiguous
+ */
+bm_status_t sgdnnASinH ( bm_handle_t handle,
+                       SgdnnTensor_t input, 
+                       SgdnnTensor_t output);
+
+/*
+ * OUTPUT = Cos(INPUT)
+ * domain (-1, +1)
+ * range (-inf, +inf)
+ * Note:
+ * 1. The data types of INPUT must be the same and one of FP32, FP16 and BF16
+ * 2. INPUT must be contiguous
+ */
+bm_status_t sgdnnATanH ( bm_handle_t handle,
+                       SgdnnTensor_t input, 
+                       SgdnnTensor_t output);
+
+/*
  * OUTPUT = Tan(INPUT)
  * Note:
  * 1. The data types of INPUT must be the same and one of FP32, FP16 and BF16

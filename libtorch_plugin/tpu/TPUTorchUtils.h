@@ -264,6 +264,9 @@ typedef enum
   SIN_FORWARD,
   TAN_FORWARD,
   LOG_FORWARD,
+  ACOSH_FORWARD,
+  ASINH_FORWARD,
+  ATANH_FORWARD,
   OP_NUM
 }
 OpType;
@@ -324,12 +327,15 @@ static const char * OpTypeStr[OP_NUM] =
   "Attention Backward",
   "BITWISE_XOR",
   "BITWISE_XOR_BCAST",
-  "BITWISE_XOR_C"
+  "BITWISE_XOR_C",
   "Abs Forward",
-  "Cos Forward"
-  "Sin Forward"
-  "Tan Forward"
-  "Log Forward"
+  "Cos Forward",
+  "Sin Forward",
+  "Tan Forward",
+  "Log Forward",
+  "ACosH Forward",
+  "ASinH Forward"  
+  "ATanH Forward",
 };
 
 struct OpTimer
