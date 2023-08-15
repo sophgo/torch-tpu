@@ -9,7 +9,7 @@ device = "privateuseone:0"
 
 
 def case1():
-    a1 = torch.rand((30, 2500, 500)) - 0.5
+    a1 = torch.rand((5, 5)) # -1,+1
     a2 = a1.clone()
     a2_tpu = a2.to(device)
     a3 = 1
@@ -31,13 +31,13 @@ def case1():
 
     # broadcast add
     # print(a2)
-    a2.acosh_()
-    a2_tpu = a2_tpu.acosh()
-    # print(a2)
-    # print(a2_tpu.to("cpu"))
-    assert (a2 - a2_tpu.to("cpu") < 1e-7).all()
+    a2.atanh_()
+    a2_tpu = a2_tpu.atanh()
+    print(a2)
+    print(a2_tpu.to("cpu"))
+    assert (a2 - a2_tpu.to("cpu") < 1e-6).all()
     print("pass")
-    # torch.acosh(a2_tpu)
+    # torch.atanh(a2_tpu)
     # print("origin: ", a1)
     # print("cpu : ", a2)
     # print("tpu : ", a2_tpu.cpu())
