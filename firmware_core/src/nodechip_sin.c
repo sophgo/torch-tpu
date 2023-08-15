@@ -20,7 +20,7 @@ void nodechip_sin(global_addr_t out_global_addr,
   // 2 bank for work0, 2 bank for work1, 1 bank for coeff and table
   // 2 bank for input, 2 bank for output
 
-  int bank_size = tpu_local_mem_size_per_npu() / tpu_bank_num();
+  unsigned int bank_size = tpu_local_mem_size_per_npu() / tpu_bank_num();
   local_addr_t in_local_addr[2] = {0, 2 * bank_size};
   local_addr_t out_local_addr[2] = {4 * bank_size, 6 * bank_size};
   local_addr_t buffer_addr = 8 * bank_size;
@@ -28,14 +28,7 @@ void nodechip_sin(global_addr_t out_global_addr,
   tpu_bdc_load_fp32_sin_coeff(coeff_addr);
   int npu_num = tpu_npu_num();
   int eu_num = tpu_eu_num(dtype);
-  int tensor_w = eu_num * 2;
-  for (int i = 3; i < 65536 / (npu_num * eu_num); i++)
-  {
-    if (length >= (unsigned long long)npu_num * eu_num * i)
-      tensor_w = eu_num * i;
-    else
-      break;
-  }
+  int tensor_w = MAX(DIV_UP(MIN(length, bank_size), npu_num), DIV_UP((unsigned)128, eu_num * tpu_data_type_size(dtype)));
   unsigned long long slice = MIN(length, (unsigned long long)npu_num * tensor_w);
 
   unsigned long long cur_idx[3] = {0}, cur_len[3] = {0};
