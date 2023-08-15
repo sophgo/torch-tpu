@@ -1498,6 +1498,61 @@ Tensor &atan2_out_tpu (const Tensor &self, const Tensor &other, Tensor &out){
 TORCH_LIBRARY_IMPL( aten, TPU, m ){
   m.impl("atan2.out", atan2_out_tpu);
 }
+Tensor &pow_out_tpu(const Tensor &self, const Tensor &other, Tensor &out)
+    {
+        if (self.dim() > 0)
+        {
+            CHECK_TENSOR_IN_DEVICE(self);
+        }
+        CHECK_TENSOR_IN_DEVICE(other);
+        CHECK_TENSOR_IN_DEVICE(out);
+#if 0
+ 
+  auto self_cpu = pow ( self.cpu(),other.cpu());
+  tpu::TPUCopyHostToDevice ( self.data_ptr(),self.contiguous().data_ptr(), self.nbytes() );
+  tpu::TPUCopyHostToDevice ( other.data_ptr(),other.contiguous().data_ptr(), other.nbytes() );
+#else
+        if (self.dim() == 0)
+        {
+            auto self_cpu = pow(self.cpu(), other.cpu());
+            tpu::TPUCopyHostToDevice(self.data_ptr(), self.contiguous().data_ptr(), self.nbytes());
+            tpu::TPUCopyHostToDevice (other.data_ptr(),other.contiguous().data_ptr(), other.nbytes() );
+        }
+        else if (IS_TPU_TENSOR(self))
+        {
+
+#ifdef TPU_OP_TIMING
+            auto timer = tpu::Timer().Start();
+#endif
+            bm_status_t status = sgdnnPow(
+                tpu::TPUGetDeviceHandle(),
+                tpu::TPUGenerateSgdnnTensor(self),
+                tpu::TPUGenerateSgdnnTensor(other),
+                tpu::TPUGenerateSgdnnTensor(out));
+            TORCH_CHECK(status == BM_SUCCESS);
+#ifdef TPU_OP_TIMING
+            tpu::OpTimer::Instance().AddTime(tpu::POW_FORWARD, timer.ElapsedUS());
+#endif
+        }
+        else
+        {
+            TORCH_CHECK(false, "At least one input is required in TPU device");
+        }
+#endif
+        return out;
+    }
+
+Tensor &pow_tpu(const Tensor &self, const Tensor &other)
+{
+      auto out = empty(self.sizes(), self.options());
+      return pow_out_tpu(self, other, out);
+}
+
+TORCH_LIBRARY_IMPL(aten, TPU, m)
+{
+      // m.impl("pow.out", pow_out_tpu);
+      m.impl("pow.Tensor_Tensor_out", pow_out_tpu);
+}
 
 Tensor &fmax_out_tpu (const Tensor &self, const Tensor &other, Tensor &out){
     if (self.dim()>0) {CHECK_TENSOR_IN_DEVICE(self);}

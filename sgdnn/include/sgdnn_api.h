@@ -297,6 +297,17 @@ bm_status_t sgdnnExpm1 ( bm_handle_t handle,
  */
 
 bm_status_t sgdnnLogicalAnd ( bm_handle_t handle,
+                              SgdnnTensor_t input,
+                              SgdnnTensor_t other,
+                              SgdnnTensor_t output );
+/*
+ * OUTPUT = math.pow (INPUT, OTHER)
+ * Note:
+ * 1. The data types of INPUT, OTHER and OUTPUT must be the same and one of FP32, FP16 and BF16
+ * 2. The shapes of INPUT, OTHER and OUTPUT must be the same
+ * 3. INPUT, OTHER and OUTPUT must be contiguous
+ */
+bm_status_t sgdnnPow ( bm_handle_t handle,
                        SgdnnTensor_t input,
                        SgdnnTensor_t other,
                        SgdnnTensor_t output );

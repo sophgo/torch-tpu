@@ -20,5 +20,22 @@ def case1():
     diff = out_cpu - out_tpu.cpu()
     print("max diff: ", torch.max(torch.abs(diff)))
 
+def case2():
+    a1 = torch.rand((5,5))*2
+    a2 = a1.clone()
+    a2_tpu = a2.to(device)
+    a3 = torch.randn((5,5))*2
+
+    a1.pow_(a3)
+    a2_tpu = a2_tpu.pow(a3.to(device))
+    # assert (a2 - a2_tpu.to("cpu") < 1e-5).all()
+    print("a1: ",a1)
+    print("a3: ",a3)
+    print("cpu : ", a1 )
+    print("tpu : ", a2_tpu.cpu())
+    print("max diff: ", abs(a1 - a2_tpu.to("cpu")).max().item())
+
+
 if __name__ == "__main__":
     case1()
+    case2()

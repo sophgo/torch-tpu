@@ -335,6 +335,7 @@ typedef enum
   LN_MM_FORWARD,
   UPSAMPLING_BILINEAR,
   ERF,
+  POW_FORWARD,
   OP_NUM
 
 }
@@ -459,6 +460,7 @@ static const char * OpTypeStr[OP_NUM] =
   "CLAMP",
   "layernorm Matmul"
   "ERF"
+  "Pow Forward"
 };
 
 struct OpTimer
