@@ -87,24 +87,24 @@ function run_online_regression_test() {
 
   link_libsophon $LIBSOPHON_LINK_PATTERN $DEB_PATH_STABLE $VERSION_PATH_STABLE; ret_libsophon=$?
   if [ $ret_libsophon -eq 255 ]; then
-    exit 255
+    echo "[INFO]test_CHIP_ARCH:$test_CHIP_ARCH libsophon setting failed!"
   else
     if [ $LIBSOPHON_LINK_PATTERN = 'stable' ];then
       echo "[INFO]test_CHIP_ARCH:$test_CHIP_ARCH"
-      export CROSS_TOOLCHAINS=/workspace/bm_prebuilt_toolchains
-      if [ ! -f "$CROSS_TOOLCHAINS" ]; then
-        echo "[bm_prebuilt_tolchian] $CROSS_TOOLCHAINS is not found !"
-        exit 255
+      export CROSS_TOOLCHAINS="$CURRENT_DIR/../../bm_prebuilt_toolchains/"
+      if [ ! -d $CROSS_TOOLCHAINS ]; then
+        echo "[bm_prebuilt_toolchains]:$CROSS_TOOLCHAINS is not found !"
+      else
+        dumpinstall="apt-get install bsdmainutils"
+        $dumpinstall
+        pushd $CURRENT_DIR/..
+        rm -rf build
+        mkdir build && cd build
+        cmake .. -DCMAKE_BUILD_TYPE=Debug -DUSING_CMODEL=OFF -DPCIE_MODE=ON
+        make kernel_module
+        make -j
+        popd
       fi
-      dumpinstall="apt-get install bsdmainutils" #[TODO]in case hexdump error
-      $dumpinstall
-      pushd $CURRENT_DIR/..
-      rm -rf build
-      mkdir build && cd build
-      cmake .. -DCMAKE_BUILD_TYPE=Debug -DUSING_CMODEL=OFF -DPCIE_MODE=ON
-      make kernel_module
-      make -j
-      popd
 
     elif [ $LIBSOPHON_LINK_PATTERN = 'latest' ];then
       echo "************** $LIBSOPHON_LINK_PATTERN-LIBSOPHON IS REAEDY *********"
@@ -137,4 +137,8 @@ function fast_build_bm1684x_stable() {
 
 function fast_build_bm1684x_latest() {
   run_online_regression_test bm1684x latest fast
+}
+
+function fast_build_sg2260_latest() {
+  run_online_regression_test sg2260 latest fast
 }
