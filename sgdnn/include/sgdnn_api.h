@@ -244,6 +244,17 @@ bm_status_t sgdnnLogicalOr ( bm_handle_t handle,
                        SgdnnTensor_t output );
 
 /*
+ * OUTPUT = logical_not(INPUT)
+ * Note:
+ * 1. The data types of INPUT must be the same and one of FP32, FP16 and BF16
+ * 2. INPUT must be contiguous
+ */
+
+bm_status_t sgdnnLogicalNot ( bm_handle_t handle,
+                       SgdnnTensor_t input,
+                       SgdnnTensor_t output );
+
+/*
  * OUTPUT = INPUT + SCALAR * OTHER
  * Note:
  * 1. The data types of INPUT, OTHER and OUTPUT must be the same and one of FP32, FP16 and BF16
