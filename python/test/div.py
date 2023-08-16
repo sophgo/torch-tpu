@@ -1,0 +1,30 @@
+import torch
+import torch.nn as nn
+import torch.nn.functional as F
+
+torch.ops.load_library("../../libtorch_plugin/build/liblibtorch_plugin.so")
+torch.manual_seed(1000)
+torch.set_printoptions(precision=6)
+device = "privateuseone:0"
+
+def case1():
+
+    a1 = torch.randint(0, 5, (5, 5), dtype=torch.float32)
+    a1_clone = a1.clone()
+    a1_tpu = a1.clone().to(device)
+    a2 = torch.randint(1 ,5, (5, 5), dtype=torch.float32)
+    a2_clone = a2.clone()
+    a2_tpu = a2.clone().to(device)
+
+
+    a1.div_(a2)
+    a1_tpu.div_(a2_tpu)
+    print("a1: ",a1_clone)
+    print("a2 : ", a2_clone)
+    print("cpu : ", a1)
+    print("tpu : ", a1_tpu.cpu())
+
+
+
+if __name__ == "__main__":
+    case1()
