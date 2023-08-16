@@ -28,7 +28,7 @@ void nodechip_tan(global_addr_t out_global_addr,
   tpu_bdc_load_fp32_tan_coeff(coeff_addr);
   int npu_num = tpu_npu_num();
   int eu_num = tpu_eu_num(dtype);
-  int tensor_w = MAX(DIV_UP(MIN(length, bank_size), npu_num), DIV_UP((unsigned)128, eu_num * tpu_data_type_size(dtype)));
+  int tensor_w = MAX(DIV_UP(MIN(length, 2 * bank_size), npu_num), DIV_UP((unsigned)128, eu_num * tpu_data_type_size(dtype)));
   unsigned long long slice = MIN(length, (unsigned long long)npu_num * tensor_w);
 
   unsigned long long cur_idx[3] = {0}, cur_len[3] = {0};
@@ -45,21 +45,17 @@ void nodechip_tan(global_addr_t out_global_addr,
     // store output
     if (stage_idx > 1)
     {
-      tpu_gdma_matrix_L2S(
-          out_global_addr + cur_idx[2] * tpu_data_type_size(dtype),
-          out_local_addr[stage_idx & 0x1],
-          1, cur_len[2], tensor_w,
-          1, dtype);
+      tpu_gdma_vector_L2S(
+          out_global_addr + cur_idx[2] * tpu_data_type_size(dtype), out_local_addr[stage_idx & 0x1],
+          cur_len[2], tensor_w, dtype);
     }
 
     // load input
     if (draning_idx < 1)
     {
-      tpu_gdma_matrix_S2L(
-          in_local_addr[stage_idx & 0x1],
-          in_global_addr + cur_idx[0] * tpu_data_type_size(dtype),
-          1, cur_len[0], tensor_w,
-          1, dtype);
+      tpu_gdma_vector_S2L(
+          in_local_addr[stage_idx & 0x1], in_global_addr + cur_idx[0] * tpu_data_type_size(dtype),
+          cur_len[0], tensor_w, dtype);
     }
 
     // compute
