@@ -1,5 +1,5 @@
 import torch
-from typing import List, Union
+from typing import Any, List, Union, Callable
 from torch import nn
 import numpy as np
 
@@ -88,6 +88,80 @@ class NumberFunc:
     def all(domain=[-1, 1]):
         yield from NumberFunc.gauss(domain=domain)
         yield from NumberFunc.init_weight(domain=domain)
+
+
+class Evaluator:
+    def __init__(self) -> None:
+        self.fns: List[
+            Callable[[torch.Tensor, torch.Tensor], Union[None, AssertionError]]
+        ] = []
+
+    def add_metric(self, fn):
+        self.fns.append(fn)
+        return self
+
+    def __call__(self, funcs: Union[List[nn.Module], nn.Module], *iters):
+        return self.evavlute(funcs, *iters)
+
+    def add_abs_evalute(self, f32_eps=1e-6, f16_eps=0.05):
+        def abs_evalute(c_data: torch.Tensor, t_data: torch.Tensor, *ipts):
+            eps = torch.abs(c_data - t_data)
+            max_eps = eps.max().item()
+            if t_data.dtype == torch.float32:
+                thr = f32_eps
+            elif t_data.dtype == torch.float16 or t_data.dtype == torch.bfloat16:
+                thr = f16_eps
+
+            if max_eps < thr:
+                return
+
+            mask = eps > thr
+            index = torch.where(mask)[0]
+            failed_input = [i[mask] for i in ipts]
+            failed_output = t_data[mask]
+            failed_ref = c_data[mask]
+            return AssertionError(
+                f"max_eps = {max_eps}, {index[:10]}, Failed input: {failed_input[:10]},  Failed output: {failed_output[:10]}, Reference: {failed_ref[:10]}"
+            )
+
+        return self.add_metric(abs_evalute)
+
+    def evavlute(self, funcs: Union[List[nn.Module], nn.Module], *iters):
+        if isinstance(funcs, nn.Module):
+            funcs = [funcs]
+
+        message = []
+        for ipts in zip(*iters):
+            for func in funcs:
+                try:
+                    cpu_data = func(*ipts)
+                except Exception as e:
+                    print(e)
+                    continue
+
+                tpu_data = func(*[i.to(device) for i in ipts])
+
+                if isinstance(cpu_data, torch.Tensor):
+                    cpu_data = [cpu_data]
+                    tpu_data = [tpu_data]
+                for index, (c_data, t_data) in enumerate(zip(cpu_data, tpu_data)):
+                    t_data = t_data.to("cpu")
+
+                    
+                    for fn in self.fns:
+                        ret = fn(c_data, t_data, *ipts)
+                        if isinstance(ret, AssertionError):
+                            message.append([ret, func, index])
+
+        if any(message):
+            raise AssertionError(
+                "\n".join(
+                    [
+                        f"{func}@{index} Failed: {str(i)}"
+                        for i, func, index in message
+                    ]
+                )
+            )
 
 
 def evaluate(funcs: Union[List[nn.Module], nn.Module], *iters):
