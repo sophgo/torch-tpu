@@ -294,7 +294,8 @@ bm_status_t sgdnnSin ( bm_handle_t handle,
  */
 bm_status_t sgdnnLog ( bm_handle_t handle,
                        SgdnnTensor_t input, 
-                       SgdnnTensor_t output);
+                       SgdnnTensor_t output, 
+                       int log_type);
 
 
 /*

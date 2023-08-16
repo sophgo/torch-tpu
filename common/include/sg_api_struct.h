@@ -408,6 +408,7 @@ typedef struct
   int shape[FW_MAX_SHAPE_DIMS];
   int dim;
   int dtype;
+  int log_type; // 0 for log, 1 for log1p, 2 for log2, 10 for log10
 } WITH_PLATFORM(sg_api_log_t);
 
 typedef struct

@@ -9,13 +9,17 @@ inline static void pipeline_move(unsigned long long *array, int num)
   }
 }
 
+// tpu_bdc_fp32_log1p
+// tpu_bdc_fp32_logx
+
 /*
  * output = log(input)
  */
 void nodechip_log(global_addr_t out_global_addr,
                   global_addr_t in_global_addr,
                   unsigned long long length,
-                  data_type_t dtype)
+                  data_type_t dtype,
+                  int log_type)
 {
   // 2 bank for work0, 2 bank for work1, 1 bank for coeff and table
   // 2 bank for input, 2 bank for output
@@ -50,6 +54,9 @@ void nodechip_log(global_addr_t out_global_addr,
           cur_len[2], tensor_w, dtype);
     }
 
+    // dim != 0
+    // dim = 0
+
     // load input
     if (draning_idx < 1)
     {
@@ -62,12 +69,30 @@ void nodechip_log(global_addr_t out_global_addr,
     if (stage_idx > 0 && draning_idx < 2)
     {
       dim4 cur_shape = {1, DIV_UP(cur_len[1], tensor_w), tensor_w, 1};
-
-      tpu_bdc_fp_log(out_local_addr[(stage_idx - 1) & 0x1],
-                     in_local_addr[(stage_idx - 1) & 0x1],
-                     buffer_addr,
-                     coeff_addr,
-                     &cur_shape, dtype);
+      if (log_type == 0)
+      {
+        tpu_bdc_fp_log(out_local_addr[(stage_idx - 1) & 0x1],
+                       in_local_addr[(stage_idx - 1) & 0x1],
+                       buffer_addr,
+                       coeff_addr,
+                       &cur_shape, dtype);
+      }
+      else if (log_type == 1)
+      {
+        tpu_bdc_fp32_log1p(out_local_addr[(stage_idx - 1) & 0x1],
+                           in_local_addr[(stage_idx - 1) & 0x1],
+                           buffer_addr,
+                           coeff_addr,
+                           &cur_shape);
+      }
+      else if (log_type == 2 || log_type == 10)
+      {
+        tpu_bdc_fp32_logx(out_local_addr[(stage_idx - 1) & 0x1],
+                          in_local_addr[(stage_idx - 1) & 0x1],
+                          buffer_addr,
+                          coeff_addr,
+                          &cur_shape, log_type);
+      }
     }
 
     tpu_parallel_end();
@@ -91,7 +116,7 @@ void nodechip_log(global_addr_t out_global_addr,
 
 void tpu_kernel_api_log(const void *args)
 {
-  sg_api_trifunc_t *api = (sg_api_trifunc_t *)args;
+  sg_api_log_t *api = (sg_api_log_t *)args;
   TPUKERNEL_ASSERT(api->dtype == DT_FP32 || api->dtype == DT_FP16 || api->dtype == DT_BFP16);
 
   unsigned long long length = 1;
@@ -100,7 +125,7 @@ void tpu_kernel_api_log(const void *args)
     length *= api->shape[i];
   }
   tpu_initialize();
-  nodechip_log(api->output_global_addr, api->input_global_addr, length, (data_type_t)api->dtype);
+  nodechip_log(api->output_global_addr, api->input_global_addr, length, (data_type_t)api->dtype, api->log_type);
   tpu_poll();
 }
 TPUKERNEL_FUNC_REGISTER(tpu_kernel_api_log);

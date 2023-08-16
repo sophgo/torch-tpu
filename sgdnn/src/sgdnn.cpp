@@ -1765,11 +1765,17 @@ bm_status_t sgdnnTan ( bm_handle_t handle,
 
 bm_status_t sgdnnLog ( bm_handle_t handle,
                        SgdnnTensor_t input,
-                       SgdnnTensor_t output )
+                       SgdnnTensor_t output, 
+                       int log_type)
 {
-  SGDNN_CHECK ( input.dtype == SGDNN_DTYPE_FP32 ||
-                input.dtype == SGDNN_DTYPE_FP16 ||
-                input.dtype == SGDNN_DTYPE_BF16 );
+
+  if(log_type == 0){
+    SGDNN_CHECK ( input.dtype == SGDNN_DTYPE_FP32 ||
+                  input.dtype == SGDNN_DTYPE_FP16 ||
+                  input.dtype == SGDNN_DTYPE_BF16 );
+  }else{
+    SGDNN_CHECK ( input.dtype == SGDNN_DTYPE_FP32);
+  }
   SGDNN_CHECK ( sgdnnIsTensorContiguous ( &input ) );
   sg_api_log_t api;
   api.input_global_addr = input.addr;
@@ -1780,6 +1786,7 @@ bm_status_t sgdnnLog ( bm_handle_t handle,
     api.shape[i] = input.shape[i];
   }
   api.dtype = sgdnnTPUKernelDType ( input.dtype );
+  api.log_type = log_type;
 #if defined SGDNN_BACKEND_1684X
   SAFE_CALL ( sgdnnTPUKernelLaunch ( handle, "tpu_kernel_api_log", &api, sizeof ( api ) ) );
 #elif defined SGDNN_BACKEND_2260
