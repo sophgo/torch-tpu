@@ -279,6 +279,7 @@ typedef enum
   BITWISE_NOT,
   MINIMUM,
   LOGICAL_AND, 
+  LOGICAL_OR,
   OP_NUM
 }
 OpType;
@@ -361,6 +362,7 @@ static const char * OpTypeStr[OP_NUM] =
   "MINIMUM"
   "Exp Forward",
   "Logical And"
+  "Logical Or"
 };
 
 struct OpTimer

@@ -299,6 +299,18 @@ bm_status_t sgdnnLog ( bm_handle_t handle,
 
 
 /*
+ * OUTPUT = INPUT || OTHER
+ * Note:
+ * 1. The data types of INPUT must be the same and one of FP32, FP16 and BF16
+ * INPUT and OTHER must be contiguous
+ */
+
+bm_status_t sgdnnLogicalOr ( bm_handle_t handle,
+                       SgdnnTensor_t input,
+                       SgdnnTensor_t other,
+                       SgdnnTensor_t output );
+
+/*
  * OUTPUT = INPUT + SCALAR * OTHER
  * Note:
  * 1. The data types of INPUT, OTHER and OUTPUT must be the same and one of FP32, FP16 and BF16
