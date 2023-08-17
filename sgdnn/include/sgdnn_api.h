@@ -823,6 +823,94 @@ bm_status_t sgdnnBitwiseXorC ( bm_handle_t handle,
                                int scalar,
                                SgdnnTensor_t output ); 
 
+/*
+ * OUTPUT = ASIN(INPUT)
+ * Note:
+ * 1. The data types of INPUT and OUTPUT must be the same and FP32
+ * 2. The shapes of INPUT and OUTPUT must be the same
+ * 3. INPUT and OUTPUT must be contiguous
+ */
+bm_status_t sgdnnAsin (bm_handle_t handle,
+                       SgdnnTensor_t input,
+                       SgdnnTensor_t output );
+
+/*
+ * OUTPUT = ACOS(INPUT)
+ * Note:
+ * 1. The data types of INPUT and OUTPUT must be the same and FP32
+ * 2. The shapes of INPUT and OUTPUT must be the same
+ * 3. INPUT and OUTPUT must be contiguous
+ */
+bm_status_t sgdnnAcos (bm_handle_t handle,
+                       SgdnnTensor_t input,
+                       SgdnnTensor_t output );
+
+/*
+ * OUTPUT = ATAN(INPUT)
+ * Note:
+ * 1. The data types of INPUT and OUTPUT must be the same and FP32
+ * 2. The shapes of INPUT and OUTPUT must be the same
+ * 3. INPUT and OUTPUT must be contiguous
+ */
+bm_status_t sgdnnAtan (bm_handle_t handle,
+                       SgdnnTensor_t input,
+                       SgdnnTensor_t output );
+
+/*
+ * OUTPUT = CEIL(INPUT)
+ * Note:
+ * 1. The data types of INPUT and OUTPUT must be the same and one of FP32, FP16 and BF16
+ * 2. The shapes of INPUT and OUTPUT must be the same
+ * 3. INPUT and OUTPUT must be contiguous
+ */
+bm_status_t sgdnnCeil (bm_handle_t handle,
+                       SgdnnTensor_t input,
+                       SgdnnTensor_t output );
+
+/*
+ * OUTPUT = FLOOR(INPUT)
+ * Note:
+ * 1. The data types of INPUT and OUTPUT must be the same and one of FP32, FP16 and BF16
+ * 2. The shapes of INPUT and OUTPUT must be the same
+ * 3. INPUT and OUTPUT must be contiguous
+ */
+bm_status_t sgdnnFloor (bm_handle_t handle,
+                       SgdnnTensor_t input,
+                       SgdnnTensor_t output );
+
+/*
+ * OUTPUT = ROUND(INPUT)
+ * Note:
+ * 1. The data types of INPUT and OUTPUT must be the same and one of FP32, FP16 and BF16
+ * 2. The shapes of INPUT and OUTPUT must be the same
+ * 3. INPUT and OUTPUT must be contiguous
+ */
+bm_status_t sgdnnRound (bm_handle_t handle,
+                       SgdnnTensor_t input,
+                       SgdnnTensor_t output );
+
+/*
+ * OUTPUT = EXP2(INPUT)
+ * Note:
+ * 1. The data types of INPUT and OUTPUT must be the same and FP32
+ * 2. The shapes of INPUT and OUTPUT must be the same
+ * 3. INPUT and OUTPUT must be contiguous
+ */
+bm_status_t sgdnnExp2 (bm_handle_t handle,
+                       SgdnnTensor_t input,
+                       SgdnnTensor_t output );
+
+/*
+ * OUTPUT = ISFINITE(INPUT)
+ * Note:
+ * 1. The data types of INPUT and OUTPUT must be the same and one of FP32, FP16 and BF16
+ * 2. The shapes of INPUT and OUTPUT must be the same
+ * 3. INPUT and OUTPUT must be contiguous
+ */
+bm_status_t sgdnnIsfinite(bm_handle_t handle,
+                       SgdnnTensor_t input,
+                       SgdnnTensor_t output );                       
+
 
 #if defined(__cplusplus)
 }

@@ -694,5 +694,76 @@ __attribute__ ( ( packed ) ) sg_api_bitwise_xorc_t;
 sg_api_bitwise_xorc_t;
 #endif
 
+typedef struct
+{
+  unsigned long long input_global_addr;
+  unsigned long long output_global_addr;
+  int shape[FW_MAX_SHAPE_DIMS];
+  int dim;
+  int dtype;
+} WITH_PLATFORM(sg_api_asin_t);
+
+typedef struct
+{
+  unsigned long long input_global_addr;
+  unsigned long long output_global_addr;
+  int shape[FW_MAX_SHAPE_DIMS];
+  int dim;
+  int dtype;
+} WITH_PLATFORM(sg_api_acos_t);
+
+typedef struct
+{
+  unsigned long long input_global_addr;
+  unsigned long long output_global_addr;
+  int shape[FW_MAX_SHAPE_DIMS];
+  int dim;
+  int dtype;
+} WITH_PLATFORM(sg_api_atan_t);
+
+typedef struct
+{
+  unsigned long long input_global_addr;
+  unsigned long long output_global_addr;
+  int shape[FW_MAX_SHAPE_DIMS];
+  int dim;
+  int dtype;
+} WITH_PLATFORM(sg_api_ceil_t);
+
+typedef struct
+{
+  unsigned long long input_global_addr;
+  unsigned long long output_global_addr;
+  int shape[FW_MAX_SHAPE_DIMS];
+  int dim;
+  int dtype;
+} WITH_PLATFORM(sg_api_floor_t);
+
+typedef struct
+{
+  unsigned long long input_global_addr;
+  unsigned long long output_global_addr;
+  int shape[FW_MAX_SHAPE_DIMS];
+  int dim;
+  int dtype;
+} WITH_PLATFORM(sg_api_round_t);
+typedef struct
+{
+  unsigned long long input_global_addr;
+  unsigned long long output_global_addr;
+  int shape[FW_MAX_SHAPE_DIMS];
+  int dim;
+  int dtype;
+} WITH_PLATFORM(sg_api_exp2_t);
+
+typedef struct
+{
+  unsigned long long input_global_addr;
+  unsigned long long output_global_addr;
+  int shape[FW_MAX_SHAPE_DIMS];
+  int dim;
+  int dtype;
+} WITH_PLATFORM(sg_api_isfinite_t);
+
 #pragma pack(pop)
 #endif  // SG_API_STRUCT_H
