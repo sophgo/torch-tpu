@@ -901,6 +901,17 @@ bm_status_t sgdnnExp2 (bm_handle_t handle,
                        SgdnnTensor_t output );
 
 /*
+ * OUTPUT = BITWISE_NOT(INPUT)
+ * Note:
+ * 1. The data types of INPUT and OUTPUT must be the same and FP32
+ * 2. The shapes of INPUT and OUTPUT must be the same
+ * 3. INPUT and OUTPUT must be contiguous
+ */
+bm_status_t sgdnnBitwiseNot (bm_handle_t handle,
+                       SgdnnTensor_t input,
+                       SgdnnTensor_t output );
+
+/*
  * OUTPUT = ISFINITE(INPUT)
  * Note:
  * 1. The data types of INPUT and OUTPUT must be the same and one of FP32, FP16 and BF16

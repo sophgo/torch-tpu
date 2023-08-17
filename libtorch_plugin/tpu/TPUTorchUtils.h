@@ -276,6 +276,7 @@ typedef enum
   ROUND,
   EXP2,
   ISFINITE,
+  BITWISE_NOT,
   MINIMUM,
   OP_NUM
 }
@@ -355,6 +356,7 @@ static const char * OpTypeStr[OP_NUM] =
   "ROUND"
   "EXP2"
   "ISFINITE"
+  "BITWISE_NOT"
   "MINIMUM"
 };
 
