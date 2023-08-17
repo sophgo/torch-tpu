@@ -9,10 +9,7 @@ inline static void pipeline_move(unsigned long long *array, int num)
   }
 }
 
-// tpu_bdc_fp32_log1p
-// tpu_bdc_fp32_logx
-
-/*
+/**
  * output = log(input)
  */
 void nodechip_log(global_addr_t out_global_addr,
@@ -21,54 +18,85 @@ void nodechip_log(global_addr_t out_global_addr,
                   data_type_t dtype,
                   int log_type)
 {
-  // 2 bank for work0, 2 bank for work1, 1 bank for coeff and table
-  // 2 bank for input, 2 bank for output
+  if (length == 0)
+  {
+    return;
+  }
 
-  unsigned int bank_size = tpu_local_mem_size_per_npu() / tpu_bank_num();
-  local_addr_t in_local_addr[2] = {0, 2 * bank_size};
-  local_addr_t out_local_addr[2] = {4 * bank_size, 6 * bank_size};
-  local_addr_t buffer_addr = 8 * bank_size;
-  local_addr_t coeff_addr = 10 * bank_size;
-  tpu_bdc_load_fp_log_coeff(coeff_addr, dtype);
+  unsigned int bank_bsize = tpu_local_mem_size_per_npu() / tpu_bank_num();
+
+  int tensor_num = 2 + 2 + 1 + 1; // 2 inputs, 2 outputs, 1 buffer, 1 coeff_buffer
+  int tensor_bsize_pnpu = tpu_bank_num() / tensor_num * bank_bsize;
+  TPUKERNEL_ASSERT(tensor_bsize_pnpu > 0);
+
+  local_addr_t in_local_addr[2] = {0, tensor_bsize_pnpu};
+  local_addr_t out_local_addr[2] = {2 * tensor_bsize_pnpu, 3 * tensor_bsize_pnpu};
+  local_addr_t buffer_addr = 4 * tensor_bsize_pnpu;
+  local_addr_t coeff_addr = 5 * tensor_bsize_pnpu;
+
+  int dtype_size = tpu_data_type_size(dtype);
   int npu_num = tpu_npu_num();
-  int eu_num = tpu_eu_num(dtype);
-  int tensor_w = MAX(DIV_UP(MIN(length, 2 * bank_size), npu_num), DIV_UP((unsigned)128, eu_num * tpu_data_type_size(dtype)));
-  unsigned long long slice = MIN(length, (unsigned long long)npu_num * tensor_w);
 
-  unsigned long long cur_idx[3] = {0}, cur_len[3] = {0};
+  // max local memory is tpu_local_mem_size_per_npu() * tpu_npu_num()
+  // for bm1684x, is (16384   *   16)    *   64
+  //                    ↑          ↑          ↑
+  //                bank_size * bank_num * npu_num
+  // (tpu_gdma_shape_limit(TENSOR_C_DIM) + 1) >> 1 = 32768,
+  // when `m_dim` is set to this value, it ensures both n and m dim to not exceed **shape limit**
+  const unsigned int max_m_dim = (tpu_gdma_shape_limit(TENSOR_C_DIM) + 1) >> 1;
+
+  // w should larger equal than tpu_eu_num(dtype) to make full use of eu(execution unit)
+  const unsigned int w_dim = tpu_eu_num(dtype);
+
+  const int tensor_size_pnpu = tensor_bsize_pnpu / dtype_size;
+  const int n_dim = tensor_size_pnpu * npu_num / max_m_dim;
+
+  tpu_bdc_load_fp_log_coeff(coeff_addr, dtype);
+
+  unsigned long long cur_idx[3] = {0}, cur_n_dim[3] = {0}, cur_m_dim[3] = {0};
   int stage_idx = 0, draning_idx = 0;
   while (cur_idx[2] < length)
   {
     tpu_parallel_start();
+
     // update load info
     if (draning_idx < 1)
     {
-      cur_len[0] = MIN(length - cur_idx[0], slice);
+      unsigned long long cur_len = MIN(
+          length - cur_idx[0], // remained element size
+          n_dim * max_m_dim        // max matrix element size, n_dim * m_dim < tensor_size_pnpu * npu_num
+      );
+
+      // if cur_len is larger than m_dim (for a big matrix), limit `m` to not exceed max_m_dim, in this case n > 1
+      // else, take cur_len as m, in this case n = 1
+      // NOTE: n_dim * max_m_dim <= tensor_size_pnpu * npu_num, it's always a legal size.
+      cur_m_dim[0] = MIN(cur_len, max_m_dim);
+      cur_n_dim[0] = cur_len / cur_m_dim[0]; // cur_len / cur_m_dim[0] >= 1
     }
 
     // store output
     if (stage_idx > 1)
     {
-      tpu_gdma_vector_L2S(
-          out_global_addr + cur_idx[2] * tpu_data_type_size(dtype), out_local_addr[stage_idx & 0x1],
-          cur_len[2], tensor_w, dtype);
+      tpu_gdma_matrix_L2S(
+          out_global_addr + cur_idx[2] * dtype_size,
+          out_local_addr[stage_idx & 0x1],
+          /**rows, cols, cols_per_channel, row_stride*/
+          cur_n_dim[2], cur_m_dim[2], w_dim, cur_m_dim[2], dtype);
     }
-
-    // dim != 0
-    // dim = 0
 
     // load input
     if (draning_idx < 1)
     {
-      tpu_gdma_vector_S2L(
-          in_local_addr[stage_idx & 0x1], in_global_addr + cur_idx[0] * tpu_data_type_size(dtype),
-          cur_len[0], tensor_w, dtype);
+      tpu_gdma_matrix_S2L(
+          in_local_addr[stage_idx & 0x1],
+          in_global_addr + cur_idx[0] * dtype_size,
+          cur_n_dim[0], cur_m_dim[0], w_dim, cur_m_dim[0], dtype);
     }
 
     // compute
     if (stage_idx > 0 && draning_idx < 2)
     {
-      dim4 cur_shape = {1, DIV_UP(cur_len[1], tensor_w), tensor_w, 1};
+      dim4 cur_shape = {cur_n_dim[1], DIV_UP(cur_m_dim[1], w_dim), 1, w_dim}; // matrix layout shape (n, c, h, w)
       if (log_type == 0)
       {
         tpu_bdc_fp_log(out_local_addr[(stage_idx - 1) & 0x1],
@@ -97,10 +125,11 @@ void nodechip_log(global_addr_t out_global_addr,
 
     tpu_parallel_end();
     pipeline_move(cur_idx, 3);
-    pipeline_move(cur_len, 3);
+    pipeline_move(cur_m_dim, 3);
+    pipeline_move(cur_n_dim, 3);
     if (draning_idx < 1)
     {
-      cur_idx[0] += cur_len[0];
+      cur_idx[0] += cur_m_dim[0] * cur_n_dim[0];
       if (cur_idx[0] >= length)
       {
         draning_idx++;
