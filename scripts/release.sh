@@ -23,13 +23,17 @@ function copy_build_binary(){
     fi
 }
 
-function clean_python_pack(){
+function clean_python_pack_build(){
     src_dir=$TPUTRAIN_TOP/python
     pushd $src_dir
     rm -rf build
     rm -rf dist
     rm -rf tpu_plugin.egg-info
-    popd
+    popd 
+}
+
+function clean_python_pack(){
+    clean_python_pack_build;
 
     src_dir=$TPUTRAIN_TOP
     pushd $src_dir
@@ -56,6 +60,7 @@ function python_pack(){
 function build_bdist_wheel(){
     copy_build_binary;
     python_pack;
+    clean_python_pack_build;
 }
 
 function rebuild_bdist_wheel(){

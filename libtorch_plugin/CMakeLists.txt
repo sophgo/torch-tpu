@@ -24,6 +24,7 @@ include_directories($ENV{TPUTRAIN_TOP}/libtorch/include)
 include_directories(${CMAKE_CURRENT_SOURCE_DIR}/tpu)
 include_directories($ENV{TPUTRAIN_TOP}/sgdnn/include)
 include_directories($ENV{TPUTRAIN_TOP}/common/include)
+include_directories(${CMAKE_CURRENT_SOURCE_DIR}/distributed/include)
 include_directories(${CMAKE_CURRENT_SOURCE_DIR})
 
 link_directories($ENV{TPUTRAIN_TOP}/libtorch/lib)
@@ -37,6 +38,7 @@ file(GLOB_RECURSE SRCS
   tpu/TPUCtypeApi.cpp
   ops/*.cpp
   my_ops/*.cpp
+  distOps/*.cpp
 )
 
 add_library(libtorch_plugin SHARED ${SRCS})
