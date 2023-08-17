@@ -277,6 +277,7 @@ typedef enum
   EXP2,
   ISFINITE,
   MINIMUM,
+  LOGICAL_AND, 
   OP_NUM
 }
 OpType;
@@ -356,6 +357,8 @@ static const char * OpTypeStr[OP_NUM] =
   "EXP2"
   "ISFINITE"
   "MINIMUM"
+  "Exp Forward",
+  "Logical And"
 };
 
 struct OpTimer
