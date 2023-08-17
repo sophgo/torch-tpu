@@ -278,6 +278,7 @@ typedef enum
   ISFINITE,
   BITWISE_NOT,
   MINIMUM,
+  LOGICAL_AND, 
   OP_NUM
 }
 OpType;
@@ -358,6 +359,8 @@ static const char * OpTypeStr[OP_NUM] =
   "ISFINITE"
   "BITWISE_NOT"
   "MINIMUM"
+  "Exp Forward",
+  "Logical And"
 };
 
 struct OpTimer
