@@ -280,6 +280,18 @@ typedef enum
   MINIMUM,
   LOGICAL_AND, 
   LOGICAL_OR,
+  BITWISE_AND,
+  BITWISE_AND_BCAST,
+  BITWISE_AND_C,
+  BITWISE_OR,
+  BITWISE_OR_BCAST,
+  BITWISE_OR_C,
+  EQUAL,
+  EQUAL_C,
+  GREATER_OR_EQUAL,
+  GREATER_OR_EQUAL_C,
+  GREATER,
+  GREATER_C,
   OP_NUM
 }
 OpType;
@@ -349,20 +361,31 @@ static const char * OpTypeStr[OP_NUM] =
   "ACosH Forward",
   "ASinH Forward",  
   "ATanH Forward",
-  "Exp Forward"
-  "ASIN"
-  "ACOS"
-  "ATAN"
-  "CEIL"
-  "FLOOR"
-  "ROUND"
-  "EXP2"
-  "ISFINITE"
-  "BITWISE_NOT"
-  "MINIMUM"
   "Exp Forward",
-  "Logical And"
-  "Logical Or"
+  "ASIN",
+  "ACOS",
+  "ATAN",
+  "CEIL",
+  "FLOOR",
+  "ROUND",
+  "EXP2",
+  "ISFINITE",
+  "BITWISE_NOT",
+  "MINIMUM",
+  "Logical And",
+  "Logical Or",
+  "BITWISE_AND",
+  "BITWISE_AND_BCAST",
+  "BITWISE_AND_C",
+  "BITWISE_OR",
+  "BITWISE_OR_BCAST",
+  "BITWISE_OR_C",
+  "EQUAL",
+  "EQUAL_C",
+  "GREATER_OR_EQUAL",
+  "GREATER_OR_EQUAL_C",
+  "GREATER",
+  "GREATER_C"
 };
 
 struct OpTimer

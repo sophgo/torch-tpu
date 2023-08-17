@@ -1,17 +1,17 @@
 #include "sg_api_struct.h"
 #include "tpu_kernel.h"
 
-void nodechip_bitwise_xor(
+void nodechip_bitwise_or(
 global_addr_t input_global_addr,
 global_addr_t other_global_addr,
 global_addr_t output_global_addr,
 int length,
 data_type_t dtype) {
     const int dsize = tpu_data_type_size(dtype);
-    int wmax = DIV_UP(length, NPU_NUM);     // 按npu个数切分一次
+    int wmax = DIV_UP(length, NPU_NUM);
     local_addr_t input_local_addrs[2], other_local_addrs[2], output_local_addrs[2];
     local_addr_t next = 0;
-    while(true) {    // 按每个npu的内存大小循环切分
+    while(true) {
         next = 0;
         int size = tpu_aligned_feature_size(1, wmax, dtype);
         input_local_addrs[0]  = next; next += size;
@@ -21,11 +21,11 @@ data_type_t dtype) {
         output_local_addrs[0] = next; next += size;
         output_local_addrs[1] = next; next += size;
         if((int)next <= LOCAL_MEM_SIZE) {
-            break;  // 如果块大小小于每个npu的内存大小，跳出循环
+            break;
         }
-        else {       // 如果块大小大于每个npu的内存大小
-            if(wmax > 1) {   // 如果w方向还能切分
-                wmax /= 2;  // 对半切
+        else {
+            if(wmax > 1) {
+                wmax /= 2;
                 continue;
             }
             else {
@@ -74,7 +74,7 @@ data_type_t dtype) {
                              NULL,
                              dtype);
         }
-        tpu_bdc_xor(output_local_addrs[index],
+        tpu_bdc_or(output_local_addrs[index],
                     input_local_addrs[index],
                     other_local_addrs[index],
                     &shape,
@@ -102,27 +102,30 @@ data_type_t dtype) {
                          dtype);
     }
 }
-void tpu_kernel_api_bitwise_xor(const void *args) {
-    sg_api_bitwise_xor_t *api = (sg_api_bitwise_xor_t*)args;
-    TPUKERNEL_ASSERT(api->dtype == DT_INT32 || api->dtype == DT_UINT32);
+void tpu_kernel_api_bitwise_or(const void *args) {
+    sg_api_bitwise_or_t *api = (sg_api_bitwise_or_t*)args;
+    TPUKERNEL_ASSERT(api->dtype == DT_INT32 || api->dtype == DT_UINT32 ||
+                     api->dtype == DT_INT8 || api->dtype == DT_UINT8);
 
     int length = 1;
     for(int i = 0; i < api->dim; ++i){
         length *= api->shape[i];
     }
+
     tpu_initialize();
-    nodechip_bitwise_xor(api->input_global_addr,
+    nodechip_bitwise_or(api->input_global_addr,
                          api->other_global_addr,
                          api->output_global_addr,
                          length,
                          (data_type_t)api->dtype);
     tpu_poll();
 }
-TPUKERNEL_FUNC_REGISTER(tpu_kernel_api_bitwise_xor);
+TPUKERNEL_FUNC_REGISTER(tpu_kernel_api_bitwise_or);
 
-void tpu_kernel_api_bitwise_xor_multi_core(const void *args) {
-    sg_api_bitwise_xor_t *api = (sg_api_bitwise_xor_t*)args;
-    TPUKERNEL_ASSERT(api->dtype == DT_INT32 || api->dtype == DT_UINT32);
+void tpu_kernel_api_bitwise_or_multi_core(const void *args) {
+    sg_api_bitwise_and_t *api = (sg_api_bitwise_and_t*)args;
+    TPUKERNEL_ASSERT(api->dtype == DT_INT32 || api->dtype == DT_UINT32 ||
+                     api->dtype == DT_INT8 || api->dtype == DT_UINT8);
 
     int length = 1;
     for(int i = 0; i < api->dim; ++i){
@@ -140,16 +143,16 @@ void tpu_kernel_api_bitwise_xor_multi_core(const void *args) {
     if (core_idx == length_secs - 1) {
         cur_length_slice = length - length_slice * (length_secs - 1);
     }
-    nodechip_bitwise_xor(api->input_global_addr + (length_slice * core_idx) * tpu_data_type_size(api->dtype),
+    nodechip_bitwise_or(api->input_global_addr + (length_slice * core_idx) * tpu_data_type_size(api->dtype),
                          api->other_global_addr + (length_slice * core_idx) * tpu_data_type_size(api->dtype),
                          api->output_global_addr + (length_slice * core_idx) * tpu_data_type_size(api->dtype),
                          cur_length_slice,
                          (data_type_t)api->dtype);
     tpu_poll();
 }
-TPUKERNEL_FUNC_REGISTER(tpu_kernel_api_bitwise_xor_multi_core);
+TPUKERNEL_FUNC_REGISTER(tpu_kernel_api_bitwise_or_multi_core);
 
-void nodechip_bitwise_xor_bcast(
+void nodechip_bitwise_or_bcast(
 global_addr_t input_global_addr,
 global_addr_t other_global_addr,
 global_addr_t output_global_addr,
@@ -295,7 +298,7 @@ data_type_t   dtype) {
                 }
                 
                 // Select
-                tpu_bdc_xor(output_addr, input_addr, other_addr, &shape, NULL, NULL, NULL, dtype);
+                tpu_bdc_or(output_addr, input_addr, other_addr, &shape, NULL, NULL, NULL, dtype);
                 // Move out from local memory to global memory
                 global_addr_t output_global_addr_gdma = output_global_addr +
                                 (ndone * output_global_stride.n +
@@ -317,10 +320,11 @@ data_type_t   dtype) {
         cdone += shape.c;
     }
 }
-void tpu_kernel_api_bitwise_xor_bcast(const void *args) {
-    sg_api_bitwise_xor_bcast_t *api = (sg_api_bitwise_xor_bcast_t*) args;
+void tpu_kernel_api_bitwise_or_bcast(const void *args) {
+    sg_api_bitwise_or_bcast_t *api = (sg_api_bitwise_or_bcast_t*) args;
     TPUKERNEL_ASSERT(api->dim > 0 && api->dim <= 4);
-    TPUKERNEL_ASSERT(api->dtype == DT_INT32 || api->dtype == DT_UINT32);
+    TPUKERNEL_ASSERT(api->dtype == DT_INT32 || api->dtype == DT_UINT32 ||
+                     api->dtype == DT_INT8 || api->dtype == DT_UINT8);
 
     dim4 input_shape = { .n = 1, .c = 1, .h = 1, .w = 1 };
     dim4 other_shape = { .n = 1, .c = 1, .h = 1, .w = 1 };
@@ -347,7 +351,7 @@ void tpu_kernel_api_bitwise_xor_bcast(const void *args) {
     }
 
     tpu_initialize();
-    nodechip_bitwise_xor_bcast(api->input_global_addr,
+    nodechip_bitwise_or_bcast(api->input_global_addr,
                                api->other_global_addr,
                                api->output_global_addr,
                                &input_shape,
@@ -356,9 +360,9 @@ void tpu_kernel_api_bitwise_xor_bcast(const void *args) {
                                api->dtype);
     tpu_poll();
 }
-TPUKERNEL_FUNC_REGISTER(tpu_kernel_api_bitwise_xor_bcast);
+TPUKERNEL_FUNC_REGISTER(tpu_kernel_api_bitwise_or_bcast);
 
-void nodechip_bitwise_xorc(
+void nodechip_bitwise_orc(
 global_addr_t input_global_addr,
 global_addr_t output_global_addr,
 scalar_t value,
@@ -424,7 +428,7 @@ data_type_t dtype) {
                              NULL,
                              dtype);
         }
-        tpu_bdc_xor_C(output_local_addrs[index],
+        tpu_bdc_or_C(output_local_addrs[index],
                       input_local_addrs[index],
                       value,
                       &shape,
@@ -451,15 +455,18 @@ data_type_t dtype) {
                          dtype);
     }
 }
-void tpu_kernel_api_bitwise_xorc(const void *args) {
-    sg_api_bitwise_xorc_t *api = (sg_api_bitwise_xorc_t*)args;
-    TPUKERNEL_ASSERT(api->dtype == DT_INT32 || api->dtype == DT_UINT32);
+void tpu_kernel_api_bitwise_orc(const void *args) {
+    sg_api_bitwise_orc_t *api = (sg_api_bitwise_orc_t*)args;
+    TPUKERNEL_ASSERT(api->dtype == DT_INT32 || api->dtype == DT_UINT32 ||
+                     api->dtype == DT_INT8 || api->dtype == DT_UINT8);
+
     scalar_t value;
     if(api->dtype == DT_INT32) {
         value.s32 = api->value;
     }
     else {
-        value.u32 = api->value;
+        scalar_t value_s32 = {.s32 = api->value};
+        value = tpu_cast(value_s32, (data_type_t)api->dtype, DT_INT32, RM_HALF_TO_EVEN);
     }
 
     int length = 1;
@@ -468,17 +475,20 @@ void tpu_kernel_api_bitwise_xorc(const void *args) {
     }
 
     tpu_initialize();
-    nodechip_bitwise_xorc(api->input_global_addr,
+    nodechip_bitwise_orc(api->input_global_addr,
                           api->output_global_addr,
                           value,
                           length,
                           (data_type_t)api->dtype);
     tpu_poll();
 }
-TPUKERNEL_FUNC_REGISTER(tpu_kernel_api_bitwise_xorc);
-void tpu_kernel_api_bitwise_xorc_multi_core(const void *args) {
-    sg_api_bitwise_xorc_t *api = (sg_api_bitwise_xorc_t*)args;
-    TPUKERNEL_ASSERT(api->dtype == DT_INT32 || api->dtype == DT_UINT32);
+TPUKERNEL_FUNC_REGISTER(tpu_kernel_api_bitwise_orc);
+
+void tpu_kernel_api_bitwise_orc_multi_core(const void *args) {
+    sg_api_bitwise_orc_t *api = (sg_api_bitwise_orc_t*)args;
+    TPUKERNEL_ASSERT(api->dtype == DT_INT32 || api->dtype == DT_UINT32 ||
+                     api->dtype == DT_INT8 || api->dtype == DT_UINT8);
+
     scalar_t value;
     if(api->dtype == DT_INT32) {
         value.s32 = api->value;
@@ -504,11 +514,11 @@ void tpu_kernel_api_bitwise_xorc_multi_core(const void *args) {
     if (core_idx == length_secs - 1) {
         cur_length_slice = length - length_slice * (length_secs - 1);
     }
-    nodechip_bitwise_xorc(api->input_global_addr + (length_slice * core_idx) * tpu_data_type_size(api->dtype),
+    nodechip_bitwise_orc(api->input_global_addr + (length_slice * core_idx) * tpu_data_type_size(api->dtype),
                           api->output_global_addr + (length_slice * core_idx) * tpu_data_type_size(api->dtype),
                           value,
                           cur_length_slice,
                           (data_type_t)api->dtype);
     tpu_poll();
 }
-TPUKERNEL_FUNC_REGISTER(tpu_kernel_api_bitwise_xorc_multi_core);
+TPUKERNEL_FUNC_REGISTER(tpu_kernel_api_bitwise_orc_multi_core);

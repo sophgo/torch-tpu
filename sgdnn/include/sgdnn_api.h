@@ -827,21 +827,35 @@ bm_status_t sgdnnArange ( bm_handle_t handle,
                                 int step,
                                 SgdnnTensor_t out);
 
+
 /*
  *  OUTPUT  = BITWISE_XOR ( input, other, output )
  *  Note:
- *  1. input, other and output only support int dtype.
+ *  1. input, other and output only support int32 uint32 int8 uint8.
+ *  2. input, other and output must be the same shape.
  */
 bm_status_t sgdnnBitwiseXor ( bm_handle_t handle,
                               SgdnnTensor_t input,
                               SgdnnTensor_t other,
                               SgdnnTensor_t output );
 
+/*
+ *  OUTPUT  = BITWISE_XOR ( input, other, output )
+ *  Note:
+ *  1. input, other and output only support int32 uint32 int8 uint8.
+ *  2. input and output must be the same shape.
+ *  3. input and other must be the same dim.
+ */
 bm_status_t sgdnnBitwiseXorBcast ( bm_handle_t handle,
                                    SgdnnTensor_t input,
                                    SgdnnTensor_t other,
                                    SgdnnTensor_t output );
-
+/*
+ *  OUTPUT  = BITWISE_XOR ( input, other, output )
+ *  Note:
+ *  1. input, other and output only support int32 uint32 int8 uint8.
+ *  2. input and output must be the same shape.
+ */
 bm_status_t sgdnnBitwiseXorC ( bm_handle_t handle,
                                SgdnnTensor_t input,
                                int scalar,
@@ -946,6 +960,142 @@ bm_status_t sgdnnIsfinite(bm_handle_t handle,
                        SgdnnTensor_t input,
                        SgdnnTensor_t output );                       
 
+/*
+ *  OUTPUT  = BITWISE_AND ( input, other, output )
+ *  Note:
+ *  1. input, other and output only support int32 uint32 int8 uint8.
+ *  2. input, other and output must be the same shape.
+ */
+bm_status_t sgdnnBitwiseAnd ( bm_handle_t handle,
+                              SgdnnTensor_t input,
+                              SgdnnTensor_t other,
+                              SgdnnTensor_t output );
+
+/*
+ *  OUTPUT  = BITWISE_AND ( input, other, output )
+ *  Note:
+ *  1. input, other and output only support int32 uint32 int8 uint8.
+ *  2. input and output must be the same shape.
+ *  3. input and other must be the same dim.
+ */
+bm_status_t sgdnnBitwiseAndBcast ( bm_handle_t handle,
+                                   SgdnnTensor_t input,
+                                   SgdnnTensor_t other,
+                                   SgdnnTensor_t output );
+/*
+ *  OUTPUT  = BITWISE_AND ( input, other, output )
+ *  Note:
+ *  1. input, scalar and output only support int32 uint32 int8 uint8.
+ *  2. input and output must be the same shape.
+ */
+bm_status_t sgdnnBitwiseAndC ( bm_handle_t handle,
+                               SgdnnTensor_t input,
+                               int scalar,
+                               SgdnnTensor_t output ); 
+
+/*
+ *  OUTPUT  = BITWISE_OR ( input, other, output )
+ *  Note:
+ *  1. input, other and output only support int32 uint32 int8 uint8.
+ *  2. input, other and output must be the same shape.
+ */
+bm_status_t sgdnnBitwiseOr ( bm_handle_t handle,
+                              SgdnnTensor_t input,
+                              SgdnnTensor_t other,
+                              SgdnnTensor_t output );
+
+/*
+ *  OUTPUT  = BITWISE_OR ( input, other, output )
+ *  Note:
+ *  1. input, other and output only support int32 uint32 int8 uint8.
+ *  2. input and output must be the same shape.
+ *  3. input and other must be the same dim.
+ */
+bm_status_t sgdnnBitwiseOrBcast ( bm_handle_t handle,
+                                   SgdnnTensor_t input,
+                                   SgdnnTensor_t other,
+                                   SgdnnTensor_t output );
+/*
+ *  OUTPUT  = BITWISE_OR ( input, other, output )
+ *  Note:
+ *  1. input, scalar and output only support int32 uint32 int8 uint8.
+ *  2. input and output must be the same shape.
+ */
+bm_status_t sgdnnBitwiseOrC ( bm_handle_t handle,
+                               SgdnnTensor_t input,
+                               int scalar,
+                               SgdnnTensor_t output );  
+
+/*
+ *  OUTPUT  = EQUAL ( input, other, output )
+ *  Note:
+ *  1. input, other and output only support int dtype.
+ *  2. input, other and output must be the same shape.
+ */
+bm_status_t sgdnnEqual ( bm_handle_t handle,
+                         SgdnnTensor_t input,
+                         SgdnnTensor_t other,
+                         SgdnnTensor_t output );
+
+/*
+ *  OUTPUT  = EQUAL ( input, other, output )
+ *  Note:
+ *  1. input, other and output only support int dtype.
+ *  2. one of input and other must be a scalar.
+ *  3. input and output must be in the same shape.
+ */
+bm_status_t sgdnnEqualC ( bm_handle_t handle,
+                          SgdnnTensor_t input,
+                          float scalar,
+                          SgdnnTensor_t output );
+
+
+/*
+ *  OUTPUT  = GREATER_OR_EQUAL ( input, other, output )
+ *  Note:
+ *  1. input, other and output only support int dtype.
+ *  2. input, other and output must be the same shape.
+ */
+bm_status_t sgdnnGe ( bm_handle_t handle,
+                      SgdnnTensor_t input,
+                      SgdnnTensor_t other,
+                      SgdnnTensor_t output );
+
+/*
+ *  OUTPUT  = GREATER_OR_EQUAL ( input, other, output )
+ *  Note:
+ *  1. input, other and output only support int dtype.
+ *  2. one of input and other must be a scalar.
+ *  3. input and output must be in the same shape.
+ */
+bm_status_t sgdnnGeC ( bm_handle_t handle,
+                       SgdnnTensor_t input,
+                       float scalar,
+                       SgdnnTensor_t output );
+
+
+/*
+ *  OUTPUT  = GREATER ( input, other, output )
+ *  Note:
+ *  1. input, other and output only support int dtype.
+ *  2. input, other and output must be the same shape.
+ */
+bm_status_t sgdnnGt ( bm_handle_t handle,
+                      SgdnnTensor_t input,
+                      SgdnnTensor_t other,
+                      SgdnnTensor_t output );
+
+/*
+ *  OUTPUT  = GREATER ( input, other, output )
+ *  Note:
+ *  1. input, other and output only support int dtype.
+ *  2. one of input and other must be a scalar.
+ *  3. input and output must be in the same shape.
+ */
+bm_status_t sgdnnGtC ( bm_handle_t handle,
+                       SgdnnTensor_t input,
+                       float scalar,
+                       SgdnnTensor_t output );
 
 #if defined(__cplusplus)
 }

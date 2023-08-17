@@ -729,6 +729,200 @@ sg_api_bitwise_xorc_t;
 typedef struct
 {
   unsigned long long input_global_addr;
+  unsigned long long other_global_addr;
+  unsigned long long output_global_addr;
+  int shape[FW_MAX_SHAPE_DIMS];
+  int dim;
+  int dtype;
+#ifndef WIN32
+}
+__attribute__ ( ( packed ) ) sg_api_bitwise_and_t;
+#else
+}
+sg_api_bitwise_and_t;
+#endif
+
+typedef struct
+{
+  unsigned long long input_global_addr;
+  unsigned long long other_global_addr;
+  unsigned long long output_global_addr;
+  int input_shape[FW_MAX_SHAPE_DIMS];
+  int other_shape[FW_MAX_SHAPE_DIMS];
+  int dim;
+  int dtype;
+#ifndef WIN32
+}
+__attribute__ ( ( packed ) ) sg_api_bitwise_and_bcast_t;
+#else
+}
+sg_api_bitwise_and_bcast_t;
+#endif
+
+typedef struct
+{
+  unsigned long long input_global_addr;
+  unsigned long long output_global_addr;
+  int shape[FW_MAX_SHAPE_DIMS];
+  int dim;
+  int value;
+  int dtype;
+#ifndef WIN32
+}
+__attribute__ ( ( packed ) ) sg_api_bitwise_andc_t;
+#else
+}
+sg_api_bitwise_andc_t;
+#endif
+
+typedef struct
+{
+  unsigned long long input_global_addr;
+  unsigned long long other_global_addr;
+  unsigned long long output_global_addr;
+  int shape[FW_MAX_SHAPE_DIMS];
+  int dim;
+  int dtype;
+#ifndef WIN32
+}
+__attribute__ ( ( packed ) ) sg_api_bitwise_or_t;
+#else
+}
+sg_api_bitwise_or_t;
+#endif
+
+typedef struct
+{
+  unsigned long long input_global_addr;
+  unsigned long long other_global_addr;
+  unsigned long long output_global_addr;
+  int input_shape[FW_MAX_SHAPE_DIMS];
+  int other_shape[FW_MAX_SHAPE_DIMS];
+  int dim;
+  int dtype;
+#ifndef WIN32
+}
+__attribute__ ( ( packed ) ) sg_api_bitwise_or_bcast_t;
+#else
+}
+sg_api_bitwise_or_bcast_t;
+#endif
+
+typedef struct
+{
+  unsigned long long input_global_addr;
+  unsigned long long output_global_addr;
+  int shape[FW_MAX_SHAPE_DIMS];
+  int dim;
+  int value;
+  int dtype;
+#ifndef WIN32
+}
+__attribute__ ( ( packed ) ) sg_api_bitwise_orc_t;
+#else
+}
+sg_api_bitwise_orc_t;
+#endif
+
+typedef struct
+{
+  unsigned long long input_global_addr;
+  unsigned long long other_global_addr;
+  unsigned long long output_global_addr;
+  int shape[FW_MAX_SHAPE_DIMS];
+  int dim;
+  int dtype;
+#ifndef WIN32
+}
+__attribute__ ( ( packed ) ) sg_api_equal_t;
+#else
+}
+sg_api_equal_t;
+#endif
+
+typedef struct
+{
+  unsigned long long input_global_addr;
+  unsigned long long output_global_addr;
+  int shape[FW_MAX_SHAPE_DIMS];
+  int dim;
+  int dtype;
+  float const_value;
+#ifndef WIN32
+}
+__attribute__ ( ( packed ) ) sg_api_equal_c_t;
+#else
+}
+sg_api_equal_c_t;
+#endif
+
+typedef struct
+{
+  unsigned long long input_global_addr;
+  unsigned long long other_global_addr;
+  unsigned long long output_global_addr;
+  int shape[FW_MAX_SHAPE_DIMS];
+  int dim;
+  int dtype;
+#ifndef WIN32
+}
+__attribute__ ( ( packed ) ) sg_api_ge_t;
+#else
+}
+sg_api_ge_t;
+#endif
+
+typedef struct
+{
+  unsigned long long input_global_addr;
+  unsigned long long output_global_addr;
+  int shape[FW_MAX_SHAPE_DIMS];
+  int dim;
+  int dtype;
+  float const_value;
+#ifndef WIN32
+}
+__attribute__ ( ( packed ) ) sg_api_ge_c_t;
+#else
+}
+sg_api_ge_c_t;
+#endif
+
+typedef struct
+{
+  unsigned long long input_global_addr;
+  unsigned long long other_global_addr;
+  unsigned long long output_global_addr;
+  int shape[FW_MAX_SHAPE_DIMS];
+  int dim;
+  int dtype;
+#ifndef WIN32
+}
+__attribute__ ( ( packed ) ) sg_api_gt_t;
+#else
+}
+sg_api_gt_t;
+#endif
+
+typedef struct
+{
+  unsigned long long input_global_addr;
+  unsigned long long output_global_addr;
+  int shape[FW_MAX_SHAPE_DIMS];
+  int dim;
+  int dtype;
+  float const_value;
+#ifndef WIN32
+}
+__attribute__ ( ( packed ) ) sg_api_gt_c_t;
+#else
+}
+sg_api_gt_c_t;
+#endif
+
+typedef struct
+{
+  unsigned long long input_global_addr;
   unsigned long long output_global_addr;
   int shape[FW_MAX_SHAPE_DIMS];
   int dim;

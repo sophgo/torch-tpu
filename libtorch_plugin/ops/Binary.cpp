@@ -444,22 +444,50 @@ Tensor &bitwise_xor_out_tpu ( const Tensor & self, const Tensor & other, Tensor 
   CHECK_TENSOR_IN_DEVICE(out);
 
   if(self.dim() == 0 && other.dim() == 0) {
-    auto out_cpu = bitwise_xor(self.cpu(), self.cpu());
+    auto out_cpu = bitwise_xor(self.cpu(), other.cpu());
     tpu::TPUCopyHostToDevice(out.data_ptr(), out_cpu.contiguous().data_ptr(), out.nbytes());
   }
-  else if(IS_TPU_TENSOR(self) && IS_TPU_TENSOR(other)) {
+  else if(self.dim() == 0) {
+
+#ifdef TPU_OP_TIMING
+    auto timer = tpu::Timer().Start();
+#endif
+    bm_status_t status = sgdnnBitwiseXorC(tpu::TPUGetDeviceHandle(),
+                                          tpu:: TPUGenerateSgdnnTensor ( other ),
+                                          self.item().toInt(),
+                                          tpu:: TPUGenerateSgdnnTensor ( out ) );
+    TORCH_CHECK ( status == BM_SUCCESS );
+#ifdef TPU_OP_TIMING
+    tpu::OpTimer::Instance().AddTime ( tpu::BITWISE_XOR_C, timer.ElapsedUS() );
+#endif
+
+  }
+  else if(other.dim() == 0) {
+
+#ifdef TPU_OP_TIMING
+    auto timer = tpu::Timer().Start();
+#endif
+    bm_status_t status = sgdnnBitwiseXorC(tpu::TPUGetDeviceHandle(),
+                                          tpu:: TPUGenerateSgdnnTensor ( self ),
+                                          other.item().toInt(),
+                                          tpu:: TPUGenerateSgdnnTensor ( out ) );
+    TORCH_CHECK ( status == BM_SUCCESS );
+#ifdef TPU_OP_TIMING
+    tpu::OpTimer::Instance().AddTime ( tpu::BITWISE_XOR_C, timer.ElapsedUS() );
+#endif
+
+  }
+  else if(self.dim() == other.dim()) {
     if(tpu::TPUIsSameShape(self, other)) {
 
 #ifdef TPU_OP_TIMING
       auto timer = tpu::Timer().Start();
 #endif
-
       bm_status_t status = sgdnnBitwiseXor(tpu::TPUGetDeviceHandle(),
                                            tpu:: TPUGenerateSgdnnTensor ( self ),
                                            tpu:: TPUGenerateSgdnnTensor ( other ),
                                            tpu:: TPUGenerateSgdnnTensor ( out ) );
       TORCH_CHECK ( status == BM_SUCCESS );
-
 #ifdef TPU_OP_TIMING
       tpu::OpTimer::Instance().AddTime ( tpu::BITWISE_XOR, timer.ElapsedUS() );
 #endif
@@ -470,36 +498,79 @@ Tensor &bitwise_xor_out_tpu ( const Tensor & self, const Tensor & other, Tensor 
 #ifdef TPU_OP_TIMING
       auto timer = tpu::Timer().Start();
 #endif
-
       bm_status_t status = sgdnnBitwiseXorBcast(tpu::TPUGetDeviceHandle(),
                                                 tpu:: TPUGenerateSgdnnTensor ( self ),
                                                 tpu:: TPUGenerateSgdnnTensor ( other ),                                              
                                                 tpu:: TPUGenerateSgdnnTensor ( out ) );
       TORCH_CHECK ( status == BM_SUCCESS );
-
 #ifdef TPU_OP_TIMING
       tpu::OpTimer::Instance().AddTime ( tpu::BITWISE_XOR_BCAST, timer.ElapsedUS() );
 #endif
 
     }
   }
-  else if((IS_TPU_TENSOR(self) && IS_CPU_TENSOR(other)) ||
-          (IS_CPU_TENSOR(self) && IS_TPU_TENSOR(other))) {
-    if(IS_CPU_TENSOR(other)) {
-      TORCH_CHECK ( other.dim() == 0, "OTHER must be a scalar" );
-      
+  else {
+    TORCH_CHECK ( false, "unsupported dims" );
+  }
+
+  return out;
+}
+TORCH_LIBRARY_IMPL ( aten, TPU, m ) {
+  m.impl ( "bitwise_xor.Tensor_out", bitwise_xor_out_tpu );
+}
+
+Tensor &bitwise_and_out_tpu ( const Tensor & self, const Tensor & other, Tensor & out ) {
+  if ( self.dim() > 0 )  { CHECK_TENSOR_IN_DEVICE ( self ); }
+  if ( other.dim() > 0 ) { CHECK_TENSOR_IN_DEVICE ( other ); }
+  CHECK_TENSOR_IN_DEVICE(out);
+
+  if(self.dim() == 0 && other.dim() == 0) {
+    auto out_cpu = bitwise_and(self.cpu(), other.cpu());
+    tpu::TPUCopyHostToDevice(out.data_ptr(), out_cpu.contiguous().data_ptr(), out.nbytes());
+  }
+  else if(self.dim() == 0) {
+
+#ifdef TPU_OP_TIMING
+    auto timer = tpu::Timer().Start();
+#endif
+    bm_status_t status = sgdnnBitwiseAndC(tpu::TPUGetDeviceHandle(),
+                                          tpu:: TPUGenerateSgdnnTensor ( other ),
+                                          self.item().toInt(),
+                                          tpu:: TPUGenerateSgdnnTensor ( out ) );
+    TORCH_CHECK ( status == BM_SUCCESS );
+#ifdef TPU_OP_TIMING
+    tpu::OpTimer::Instance().AddTime ( tpu::BITWISE_AND_C, timer.ElapsedUS() );
+#endif
+
+  }
+  else if(other.dim() == 0) {
+
+#ifdef TPU_OP_TIMING
+    auto timer = tpu::Timer().Start();
+#endif
+    bm_status_t status = sgdnnBitwiseAndC(tpu::TPUGetDeviceHandle(),
+                                          tpu:: TPUGenerateSgdnnTensor ( self ),
+                                          other.item().toInt(),
+                                          tpu:: TPUGenerateSgdnnTensor ( out ) );
+    TORCH_CHECK ( status == BM_SUCCESS );
+#ifdef TPU_OP_TIMING
+    tpu::OpTimer::Instance().AddTime ( tpu::BITWISE_AND_C, timer.ElapsedUS() );
+#endif
+
+  }
+  else if(self.dim() == other.dim()) {
+    if(tpu::TPUIsSameShape(self, other)) {
+
 #ifdef TPU_OP_TIMING
       auto timer = tpu::Timer().Start();
 #endif
-
-      bm_status_t status = sgdnnBitwiseXorC(tpu::TPUGetDeviceHandle(),
-                                            tpu:: TPUGenerateSgdnnTensor ( self ),
-                                            *other.data_ptr<int>(),                                              
-                                            tpu:: TPUGenerateSgdnnTensor ( out ) );
+      bm_status_t status = sgdnnBitwiseAnd(tpu::TPUGetDeviceHandle(),
+                                           tpu:: TPUGenerateSgdnnTensor ( self ),
+                                           tpu:: TPUGenerateSgdnnTensor ( other ),
+                                           tpu:: TPUGenerateSgdnnTensor ( out ) );
       TORCH_CHECK ( status == BM_SUCCESS );
-
 #ifdef TPU_OP_TIMING
-      tpu::OpTimer::Instance().AddTime ( tpu::BITWISE_XOR_C, timer.ElapsedUS() );
+      tpu::OpTimer::Instance().AddTime ( tpu::BITWISE_AND, timer.ElapsedUS() );
 #endif
 
     }
@@ -508,27 +579,298 @@ Tensor &bitwise_xor_out_tpu ( const Tensor & self, const Tensor & other, Tensor 
 #ifdef TPU_OP_TIMING
       auto timer = tpu::Timer().Start();
 #endif
-
-      bm_status_t status = sgdnnBitwiseXorC(tpu::TPUGetDeviceHandle(),
-                                            tpu:: TPUGenerateSgdnnTensor ( other ),
-                                            *self.data_ptr<int>(),                                              
-                                            tpu:: TPUGenerateSgdnnTensor ( out ) );
+      bm_status_t status = sgdnnBitwiseAndBcast(tpu::TPUGetDeviceHandle(),
+                                                tpu:: TPUGenerateSgdnnTensor ( self ),
+                                                tpu:: TPUGenerateSgdnnTensor ( other ),                                              
+                                                tpu:: TPUGenerateSgdnnTensor ( out ) );
       TORCH_CHECK ( status == BM_SUCCESS );
-
 #ifdef TPU_OP_TIMING
-      tpu::OpTimer::Instance().AddTime ( tpu::BITWISE_XOR_C, timer.ElapsedUS() );
+      tpu::OpTimer::Instance().AddTime ( tpu::BITWISE_AND_BCAST, timer.ElapsedUS() );
 #endif
 
     }
   }
   else {
-    TORCH_CHECK ( false, "At least one input is required in TPU device" );
+    TORCH_CHECK ( false, "unsupported dims" );
   }
 
   return out;
 }
 TORCH_LIBRARY_IMPL ( aten, TPU, m ) {
-  m.impl ( "bitwise_xor.Tensor_out", bitwise_xor_out_tpu );
+  m.impl ( "bitwise_and.Tensor_out", bitwise_and_out_tpu );
+}
+
+Tensor &bitwise_or_out_tpu ( const Tensor & self, const Tensor & other, Tensor & out ) {
+  if ( self.dim() > 0 )  { CHECK_TENSOR_IN_DEVICE ( self ); }
+  if ( other.dim() > 0 ) { CHECK_TENSOR_IN_DEVICE ( other ); }
+  CHECK_TENSOR_IN_DEVICE(out);
+
+  if(self.dim() == 0 && other.dim() == 0) {
+    auto out_cpu = bitwise_or(self.cpu(), other.cpu());
+    tpu::TPUCopyHostToDevice(out.data_ptr(), out_cpu.contiguous().data_ptr(), out.nbytes());
+  }
+  else if(self.dim() == 0) {
+
+#ifdef TPU_OP_TIMING
+    auto timer = tpu::Timer().Start();
+#endif
+    bm_status_t status = sgdnnBitwiseOrC(tpu::TPUGetDeviceHandle(),
+                                         tpu:: TPUGenerateSgdnnTensor ( other ),
+                                         self.item().toInt(),
+                                         tpu:: TPUGenerateSgdnnTensor ( out ) );
+    TORCH_CHECK ( status == BM_SUCCESS );
+#ifdef TPU_OP_TIMING
+    tpu::OpTimer::Instance().AddTime ( tpu::BITWISE_OR_C, timer.ElapsedUS() );
+#endif
+
+  }
+  else if(other.dim() == 0) {
+
+#ifdef TPU_OP_TIMING
+    auto timer = tpu::Timer().Start();
+#endif
+    bm_status_t status = sgdnnBitwiseOrC(tpu::TPUGetDeviceHandle(),
+                                         tpu:: TPUGenerateSgdnnTensor ( self ),
+                                         other.item().toInt(),
+                                         tpu:: TPUGenerateSgdnnTensor ( out ) );
+    TORCH_CHECK ( status == BM_SUCCESS );
+#ifdef TPU_OP_TIMING
+    tpu::OpTimer::Instance().AddTime ( tpu::BITWISE_OR_C, timer.ElapsedUS() );
+#endif
+
+  }
+  else if(self.dim() == other.dim()) {
+    if(tpu::TPUIsSameShape(self, other)) {
+
+#ifdef TPU_OP_TIMING
+      auto timer = tpu::Timer().Start();
+#endif
+      bm_status_t status = sgdnnBitwiseOr(tpu::TPUGetDeviceHandle(),
+                                          tpu:: TPUGenerateSgdnnTensor ( self ),
+                                          tpu:: TPUGenerateSgdnnTensor ( other ),
+                                          tpu:: TPUGenerateSgdnnTensor ( out ) );
+      TORCH_CHECK ( status == BM_SUCCESS );
+#ifdef TPU_OP_TIMING
+      tpu::OpTimer::Instance().AddTime ( tpu::BITWISE_OR, timer.ElapsedUS() );
+#endif
+
+    }
+    else {
+
+#ifdef TPU_OP_TIMING
+      auto timer = tpu::Timer().Start();
+#endif
+      bm_status_t status = sgdnnBitwiseAndBcast(tpu::TPUGetDeviceHandle(),
+                                                tpu:: TPUGenerateSgdnnTensor ( self ),
+                                                tpu:: TPUGenerateSgdnnTensor ( other ),                                              
+                                                tpu:: TPUGenerateSgdnnTensor ( out ) );
+      TORCH_CHECK ( status == BM_SUCCESS );
+#ifdef TPU_OP_TIMING
+      tpu::OpTimer::Instance().AddTime ( tpu::BITWISE_OR_BCAST, timer.ElapsedUS() );
+#endif
+
+    }
+  }
+  else {
+    TORCH_CHECK ( false, "unsupported dims" );
+  }
+
+  return out;
+}
+TORCH_LIBRARY_IMPL ( aten, TPU, m ) {
+  m.impl ( "bitwise_or.Tensor_out", bitwise_or_out_tpu );
+}
+
+Tensor & equal_out_tpu( const Tensor &self, const Tensor &other, Tensor &out) {
+  if ( self.dim() > 0 )  { CHECK_TENSOR_IN_DEVICE ( self ); }
+  if ( other.dim() > 0 ) { CHECK_TENSOR_IN_DEVICE ( other ); }
+  CHECK_TENSOR_IN_DEVICE(out);
+
+  if(self.dim() == 0 && other.dim() == 0) {
+    auto out_cpu = eq(self.cpu(), other.cpu());
+    tpu::TPUCopyHostToDevice(out.data_ptr(), out_cpu.contiguous().data_ptr(), out.nbytes());
+  }
+  else if(self.dim() == 0) {
+
+#ifdef TPU_OP_TIMING
+      auto timer = tpu::Timer().Start();
+#endif
+      bm_status_t status = sgdnnEqualC(tpu::TPUGetDeviceHandle(),
+                                       tpu:: TPUGenerateSgdnnTensor ( other ),
+                                       self.item().toFloat(),
+                                       tpu:: TPUGenerateSgdnnTensor ( out ) );
+      TORCH_CHECK ( status == BM_SUCCESS );
+#ifdef TPU_OP_TIMING
+      tpu::OpTimer::Instance().AddTime ( tpu::EQUAL_C, timer.ElapsedUS() );
+#endif
+
+  }
+  else if(other.dim() == 0) {
+
+#ifdef TPU_OP_TIMING
+      auto timer = tpu::Timer().Start();
+#endif
+      bm_status_t status = sgdnnEqualC(tpu::TPUGetDeviceHandle(),
+                                       tpu:: TPUGenerateSgdnnTensor ( self ),
+                                       other.item().toFloat(),
+                                       tpu:: TPUGenerateSgdnnTensor ( out ) );
+      TORCH_CHECK ( status == BM_SUCCESS );
+#ifdef TPU_OP_TIMING
+      tpu::OpTimer::Instance().AddTime ( tpu::EQUAL_C, timer.ElapsedUS() );
+#endif
+
+  }
+  else if(tpu::TPUIsSameShape(self, other)){
+
+#ifdef TPU_OP_TIMING
+      auto timer = tpu::Timer().Start();
+#endif
+      bm_status_t status = sgdnnEqual(tpu::TPUGetDeviceHandle(),
+                                      tpu:: TPUGenerateSgdnnTensor ( self ),
+                                      tpu:: TPUGenerateSgdnnTensor ( other ),
+                                      tpu:: TPUGenerateSgdnnTensor ( out ) );
+      TORCH_CHECK ( status == BM_SUCCESS );
+#ifdef TPU_OP_TIMING
+      tpu::OpTimer::Instance().AddTime ( tpu::BITWISE_XOR, timer.ElapsedUS() );
+#endif
+
+  }
+  else {
+    TORCH_CHECK ( false, "unsupported dims" );
+  }
+
+  return out;
+}
+TORCH_LIBRARY_IMPL( aten, TPU, m) {
+  m.impl ( "eq.Tensor_out", equal_out_tpu );
+}
+
+Tensor & greater_or_equal_out_tpu( const Tensor &self, const Tensor &other, Tensor &out) {
+  if ( self.dim() > 0 )  { CHECK_TENSOR_IN_DEVICE ( self ); }
+  if ( other.dim() > 0 ) { CHECK_TENSOR_IN_DEVICE ( other ); }
+  CHECK_TENSOR_IN_DEVICE(out);
+
+  if(self.dim() == 0 && other.dim() == 0) {
+    auto out_cpu = ge(self.cpu(), other.cpu());
+    tpu::TPUCopyHostToDevice(out.data_ptr(), out_cpu.contiguous().data_ptr(), out.nbytes());
+  }
+  else if(self.dim() == 0) {
+
+#ifdef TPU_OP_TIMING
+      auto timer = tpu::Timer().Start();
+#endif
+      bm_status_t status = sgdnnGeC(tpu::TPUGetDeviceHandle(),
+                                    tpu:: TPUGenerateSgdnnTensor ( other ),
+                                    self.item().toFloat(),
+                                    tpu:: TPUGenerateSgdnnTensor ( out ) );
+      TORCH_CHECK ( status == BM_SUCCESS );
+#ifdef TPU_OP_TIMING
+      tpu::OpTimer::Instance().AddTime ( tpu::GREATER_OR_EQUAL_C, timer.ElapsedUS() );
+#endif
+
+  }
+  else if(other.dim() == 0) {
+
+#ifdef TPU_OP_TIMING
+      auto timer = tpu::Timer().Start();
+#endif
+      bm_status_t status = sgdnnGeC(tpu::TPUGetDeviceHandle(),
+                                    tpu:: TPUGenerateSgdnnTensor ( self ),
+                                    other.item().toFloat(),
+                                    tpu:: TPUGenerateSgdnnTensor ( out ) );
+      TORCH_CHECK ( status == BM_SUCCESS );
+#ifdef TPU_OP_TIMING
+      tpu::OpTimer::Instance().AddTime ( tpu::GREATER_OR_EQUAL_C, timer.ElapsedUS() );
+#endif
+
+  }
+  else if(tpu::TPUIsSameShape(self, other)){
+
+#ifdef TPU_OP_TIMING
+      auto timer = tpu::Timer().Start();
+#endif
+      bm_status_t status = sgdnnGe(tpu::TPUGetDeviceHandle(),
+                                   tpu:: TPUGenerateSgdnnTensor ( self ),
+                                   tpu:: TPUGenerateSgdnnTensor ( other ),
+                                   tpu:: TPUGenerateSgdnnTensor ( out ) );
+      TORCH_CHECK ( status == BM_SUCCESS );
+#ifdef TPU_OP_TIMING
+      tpu::OpTimer::Instance().AddTime ( tpu::GREATER_OR_EQUAL, timer.ElapsedUS() );
+#endif
+
+  }
+  else {
+    TORCH_CHECK ( false, "unsupported dims" );
+  }
+
+  return out;
+}
+TORCH_LIBRARY_IMPL( aten, TPU, m) {
+  m.impl ( "ge.Tensor_out", greater_or_equal_out_tpu );
+}
+
+Tensor & greater_out_tpu( const Tensor &self, const Tensor &other, Tensor &out) {
+  if ( self.dim() > 0 )  { CHECK_TENSOR_IN_DEVICE ( self ); }
+  if ( other.dim() > 0 ) { CHECK_TENSOR_IN_DEVICE ( other ); }
+  CHECK_TENSOR_IN_DEVICE(out);
+
+  if(self.dim() == 0 && other.dim() == 0) {
+    auto out_cpu = gt(self.cpu(), other.cpu());
+    tpu::TPUCopyHostToDevice(out.data_ptr(), out_cpu.contiguous().data_ptr(), out.nbytes());
+  }
+  else if(self.dim() == 0) {
+
+#ifdef TPU_OP_TIMING
+      auto timer = tpu::Timer().Start();
+#endif
+      bm_status_t status = sgdnnGtC(tpu::TPUGetDeviceHandle(),
+                                    tpu:: TPUGenerateSgdnnTensor ( other ),
+                                    self.item().toFloat(),
+                                    tpu:: TPUGenerateSgdnnTensor ( out ) );
+      TORCH_CHECK ( status == BM_SUCCESS );
+#ifdef TPU_OP_TIMING
+      tpu::OpTimer::Instance().AddTime ( tpu::GREATER_C, timer.ElapsedUS() );
+#endif
+
+  }
+  else if(other.dim() == 0) {
+
+#ifdef TPU_OP_TIMING
+      auto timer = tpu::Timer().Start();
+#endif
+      bm_status_t status = sgdnnGtC(tpu::TPUGetDeviceHandle(),
+                                    tpu:: TPUGenerateSgdnnTensor ( self ),
+                                    other.item().toFloat(),
+                                    tpu:: TPUGenerateSgdnnTensor ( out ) );
+      TORCH_CHECK ( status == BM_SUCCESS );
+#ifdef TPU_OP_TIMING
+      tpu::OpTimer::Instance().AddTime ( tpu::GREATER_C, timer.ElapsedUS() );
+#endif
+
+  }
+  else if(tpu::TPUIsSameShape(self, other)){
+
+#ifdef TPU_OP_TIMING
+      auto timer = tpu::Timer().Start();
+#endif
+      bm_status_t status = sgdnnGt(tpu::TPUGetDeviceHandle(),
+                                   tpu:: TPUGenerateSgdnnTensor ( self ),
+                                   tpu:: TPUGenerateSgdnnTensor ( other ),
+                                   tpu:: TPUGenerateSgdnnTensor ( out ) );
+      TORCH_CHECK ( status == BM_SUCCESS );
+#ifdef TPU_OP_TIMING
+      tpu::OpTimer::Instance().AddTime ( tpu::GREATER, timer.ElapsedUS() );
+#endif
+
+  }
+  else {
+    TORCH_CHECK ( false, "unsupported dims" );
+  }
+
+  return out;
+}
+TORCH_LIBRARY_IMPL( aten, TPU, m) {
+  m.impl ( "gt.Tensor_out", greater_out_tpu );
 }
 
 } // namespace at
