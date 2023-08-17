@@ -12,7 +12,7 @@ inline static void pipeline_move(unsigned long long *array, int num)
 /*
  * output = math.exp(input)
  */
-void nodechip_exp(global_addr_t out_global_addr,
+void nodechip_exp_single_core(global_addr_t out_global_addr,
                   global_addr_t in_global_addr,
                   unsigned long long length,
                   data_type_t dtype)
@@ -104,7 +104,7 @@ void tpu_kernel_api_exp(const void *args)
     length *= api->shape[i];
   }
   tpu_initialize();
-  nodechip_exp(api->output_global_addr, api->input_global_addr, length, (data_type_t)api->dtype);
+  nodechip_exp_single_core(api->output_global_addr, api->input_global_addr, length, (data_type_t)api->dtype);
   tpu_poll();
 }
 TPUKERNEL_FUNC_REGISTER(tpu_kernel_api_exp);

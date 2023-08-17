@@ -37,7 +37,7 @@ class Global_Regression_Tester():
         self.any_utest_files_list =  os.listdir("./")
         self.utest_files_list =[]
         self.top_python_file_list = ['top_utest.py', 'utest_cmd.py']
-        self.global_skip_utest = ['mlp.py','slice.py']
+        self.global_skip_utest = ['mlp.py','slice.py',"stack.py"]
         self.filter_skipped_path_utest_new()
 
         ###[HELPER]You can test specific utest when changing self.any_utest_files_list

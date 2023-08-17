@@ -38,7 +38,6 @@ function link_libsophon() {
         if [  ! -r "$DEB_PATH_STABLE" ]; then
           echo "libsophon_dependency: $DEB_PATH_STABLE is not found!"
         else
-          cd
           libsohpon_install_cmd="apt install  ./sophon-libsophon_${VERSION_PATH_STABLE}_amd64.deb ./sophon-libsophon-dev_${VERSION_PATH_STABLE}_amd64.deb"
           $libsohpon_install_cmd
           device_project="source /etc/profile.d/libsophon-bin-path.sh"
