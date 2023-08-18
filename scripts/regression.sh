@@ -53,6 +53,15 @@ function link_libsophon() {
 
 function build_libtorch_plugin() {
   CURRENT_DIR=$(dirname ${BASH_SOURCE})
+  pushd  $CURRENT_DIR/..
+  cmd_rm="rm -rf libtorch"
+  $cmd_rm
+  get_libtorch="wget https://download.pytorch.org/libtorch/cpu/libtorch-cxx11-abi-shared-with-deps-2.0.1%2Bcpu.zip"
+  $get_libtorch
+  unzip_code="unzip libtorch-cxx11-abi-shared-with-deps-2.0.1+cpu.zip"
+  $unzip_code
+  popd
+
   LIBTORCH_PLUGIN_PATH=$CURRENT_DIR/../libtorch_plugin
   echo "[INFO]LIBTORCH_PLUGIN_PATH:$LIBTORCH_PLUGIN_PATH"
   pushd "$LIBTORCH_PLUGIN_PATH"
@@ -66,6 +75,9 @@ function build_libtorch_plugin() {
 }
 
 function run_online_regression_test() {
+  echo "[INFO]Ubuntu version"
+  version_cmd="cat /etc/os-release"
+  $version_cmd
   CURRENT_DIR=$(dirname ${BASH_SOURCE})
   echo "********************************************"
   echo "[NOTE]Print_necessary_info"

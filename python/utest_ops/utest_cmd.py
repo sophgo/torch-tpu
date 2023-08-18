@@ -10,11 +10,11 @@ def runcmd(command):
             print(ret.stdout)
             return ret.stdout
          else:
-            print("error:",command, GLOBAL_FAILED)
+            print("Try error:",command, GLOBAL_FAILED)
             return ret.stdout + GLOBAL_FAILED
     except subprocess.CalledProcessError as e:
-        print(e.output)
-        return  "error:"+command +GLOBAL_FAILED
+        print("e.output",e.output)
+        return  "Except error:"+command +GLOBAL_FAILED
 
 class Global_Regression_Tester():
     # control top file must be skipped

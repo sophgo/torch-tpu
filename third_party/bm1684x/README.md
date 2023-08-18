@@ -21,6 +21,9 @@ How to gen dependency files for bm1684x?
 
 
     cd /workspace/nntoolchain/TPU1686
+    rm -rf build
+    rm -rf build_test
+    rm -rf build_runtime
     source scripts/envsetup.sh  bm1684x
 	export EXTRA_CONFIG=-DDEBUG=ON
 	rebuild_all
@@ -32,18 +35,23 @@ How to gen dependency files for bm1684x?
 	cd /workspace/nntoolchain
 	rm -rf target&&mkdir target
     cp ./net_compiler/out/install/lib/libbmlib.so target/.
-    cp ./TPU1686/build/firmware_core/libcmodel_firmware.so ./target/
+    cp ./TPU1686/build_test/firmware_core/libcmodel_firmware.so ./target/
     cp ./TPU1686/build/firmware_core/libfirmware_core.a ./target/
 
     cd  /workspace/nntoolchain/target
-    mv libbmlib.so libbmlib_cmodel.so
+    cp libbmlib.so libbmlib_cmodel.so
     mv libfirmware_core.a libbm1684x.a
-    ln -s libbmlib_cmodel.so libbmlib.so.0
+    ln -s libbmlib.so libbmlib.so.0
     cd ..
 
 ###############################################
-2) Inside docker for tpu-mlir:
+2) Inside docker for tpu-train:
 
    rm -rf /workspace/tpu-train/third_party/bm1684x
    cp -r /workspace/nntoolchain/target /workspace/tpu-train/third_party/bm1684x
    chmod -R 777 /workspace/tpu-train/third_party/bm1684x/
+
+###############################################
+Or) Copy Jump Inside docker for tpu-train:
+    cp /workspace/nntoolchain/TPU1686/build_test/firmware_core/libcmodel_firmware.so       /workspace/tpu-train/third_party/bm1684x/libcmodel_firmware.so
+    cp /workspace/nntoolchain/TPU1686/build/firmware_core/libfirmware_core.a               /workspace/tpu-train/third_party/bm1684x/libbm1684x.a

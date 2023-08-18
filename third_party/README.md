@@ -3,10 +3,10 @@
     commit 2f18e869d9662fcaaadb20d6b7937a2ae94b3bd5
     tpu_defs.h tpu_kernel.h
 ### bm1684x
-    commit 8c1da04efed24f66872a93e0f47ed981b3d8bd4f
+    commit 6e7f0b86cd77496d7bcbfd81e04be6b89a18dc71
     libbm1684x.a libbmlib_cmodel.so libcmodel_fireware.so
 ### sg2260
-    commit 710b06ef54fd7eab0a9c4a5a0ea346358e8b5c9c
+    commit 6e7f0b86cd77496d7bcbfd81e04be6b89a18dc71
     libbmlib.so.0 libcmodel_fireware.so
 
 
