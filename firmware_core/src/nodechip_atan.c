@@ -16,18 +16,18 @@ data_type_t dtype )
   int npu_num=tpu_npu_num();
   int bank_num=tpu_bank_num();
   int bank_size = tpu_local_mem_size_per_npu()/bank_num;
-  int tensor_num=2+2+2; // 2 inputs, 2 outputs, 2 buffer
+  int tensor_num=2+2+3; // 2 inputs, 2 outputs, 3 buffer
   int coeff_bank_num= 4 ; // 4 coeff
   int tensor_size = (bank_num-coeff_bank_num)/tensor_num * bank_size;
   TPUKERNEL_ASSERT(tensor_size>0);
 
   local_addr_t input_local_addrs[2] = {0, 1 * tensor_size};
   local_addr_t output_local_addrs[2] = {2 * tensor_size, 3 * tensor_size};
-  local_addr_t work_local_addr[2] = {4 * tensor_size, 5 * tensor_size};
-  local_addr_t exp_coeff_local_addr = 6 * tensor_size;
-  local_addr_t log_coeff_local_addr = 6 * tensor_size + 1 * bank_size; 
-  local_addr_t exp_table_local_addr = 6 * tensor_size + 2 * bank_size; 
-  local_addr_t arcsin_coeff_local_addr = 6 * tensor_size + 3 * bank_size; 
+  local_addr_t work_local_addr[3] = {4 * tensor_size, 5 * tensor_size, 6 * tensor_size};
+  local_addr_t exp_coeff_local_addr = 7 * tensor_size;
+  local_addr_t log_coeff_local_addr = 7 * tensor_size + 1 * bank_size; 
+  local_addr_t exp_table_local_addr = 7 * tensor_size + 2 * bank_size; 
+  local_addr_t arcsin_coeff_local_addr = 7 * tensor_size + 3 * bank_size; 
 
   int dtype_size = tpu_data_type_size(dtype);
   int tensor_w = DIV_UP(MIN(length, tensor_size*npu_num/dtype_size), npu_num);
@@ -69,14 +69,14 @@ data_type_t dtype )
     {
       tpu_gdma_cpy_L2S ( l2s_global_addr, l2s_local_addr, &l2s_shape, NULL, NULL, dtype );
     }
-    tpu_bdc_abs(output_local_addrs[index],input_local_addrs[index],&shape,NULL,NULL,dtype);
-    tpu_bdc_fp32_pow_C(output_local_addrs[index],output_local_addrs[index],work_local_addr[0],work_local_addr[1],
+    
+    tpu_bdc_abs(work_local_addr[2],input_local_addrs[index],&shape,NULL,NULL,dtype);
+    tpu_bdc_fp32_pow_C(output_local_addrs[index],work_local_addr[2],work_local_addr[0],work_local_addr[1],
                               exp_coeff_local_addr,log_coeff_local_addr,exp_table_local_addr,POW_C,&shape);
-    tpu_bdc_fp_add_C(output_local_addrs[index],output_local_addrs[index], ADD_C, &shape, NULL, NULL, dtype); 
-    tpu_bdc_fp32_rsqrt(output_local_addrs[index],output_local_addrs[index],&shape) ;
-    tpu_bdc_fp_mul(output_local_addrs[index],output_local_addrs[index],input_local_addrs[index],&shape,NULL,NULL,NULL,dtype);
-    tpu_bdc_cpy(input_local_addrs[index],output_local_addrs[index],&shape,NULL,NULL,dtype);
-    tpu_bdc_fp32_arcsin(output_local_addrs[index],input_local_addrs[index], work_local_addr[0],arcsin_coeff_local_addr,&shape);
+    tpu_bdc_fp_add_C(work_local_addr[2],output_local_addrs[index], ADD_C, &shape, NULL, NULL, dtype); 
+    tpu_bdc_fp32_rsqrt(output_local_addrs[index],work_local_addr[2],&shape) ;
+    tpu_bdc_fp_mul(work_local_addr[2],output_local_addrs[index],input_local_addrs[index],&shape,NULL,NULL,NULL,dtype);
+    tpu_bdc_fp32_arcsin(output_local_addrs[index],work_local_addr[2], work_local_addr[0],arcsin_coeff_local_addr,&shape);
 
     l2s = true;
     l2s_global_addr = output_global_addr + done * dtype_size;

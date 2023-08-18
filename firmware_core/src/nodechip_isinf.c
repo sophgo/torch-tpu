@@ -2,10 +2,10 @@
 #include "tpu_kernel.h"
 
 /*
- * output = isfinite(input)
+ * output = isinf(input)
  */
 
-void nodechip_isfinite (
+void nodechip_isinf (
 global_addr_t input_global_addr,
 global_addr_t output_global_addr,
 int length,
@@ -38,6 +38,7 @@ data_type_t dtype )
   local_addr_t l2s_local_addr = 0;
 
   scalar_t inf_C = {.u32 = (dtype == DT_FP32 ? 0x7f800000 : (dtype == DT_FP16 ? 0x7c00 : 0x7f80))};
+  scalar_t neg_C = {.u32 = (dtype == DT_FP32 ? 0x7fffffff : (dtype == DT_FP16 ? 0x7fff : 0x7fff))};
   scalar_t C = {.u8 = 1};
 
   while ( todo != 0 )
@@ -63,8 +64,8 @@ data_type_t dtype )
       tpu_gdma_cpy_L2S ( l2s_global_addr, l2s_local_addr, &l2s_shape, NULL, NULL, DT_UINT8 );
     }
     
-    tpu_bdc_and_C(work_local_addr, input_local_addrs[index], inf_C, &shape, NULL, NULL, dtype);
-    tpu_bdc_not_equal_C(output_local_addrs[index], work_local_addr, inf_C, C, &shape, NULL, NULL, DT_UINT8, dtype);
+    tpu_bdc_and_C(work_local_addr, input_local_addrs[index], neg_C, &shape, NULL, NULL, dtype);
+    tpu_bdc_equal_C(output_local_addrs[index], work_local_addr, inf_C, C, &shape, NULL, NULL, DT_UINT8, dtype);
 
     l2s = true;
     l2s_global_addr = output_global_addr + done;
@@ -84,9 +85,9 @@ data_type_t dtype )
   }
 }
 
-void tpu_kernel_api_isfinite ( const void * args )
+void tpu_kernel_api_isinf ( const void * args )
 {
-  sg_api_isfinite_t * api = ( sg_api_isfinite_t * ) args;
+  sg_api_isinf_t * api = ( sg_api_isinf_t * ) args;
   
   int length = 1;
   for ( int i = 0; i < api->dim; ++i )
@@ -94,14 +95,14 @@ void tpu_kernel_api_isfinite ( const void * args )
     length *= api->shape[i];
   }
   tpu_initialize();
-  nodechip_isfinite ( api->input_global_addr, api->output_global_addr, length, ( data_type_t ) api->dtype );
+  nodechip_isinf ( api->input_global_addr, api->output_global_addr, length, ( data_type_t ) api->dtype );
   tpu_poll();
 }
-TPUKERNEL_FUNC_REGISTER ( tpu_kernel_api_isfinite );
+TPUKERNEL_FUNC_REGISTER ( tpu_kernel_api_isinf );
 
-void tpu_kernel_api_isfinite_multi_core ( const void * args )
+void tpu_kernel_api_isinf_multi_core ( const void * args )
 {
-  sg_api_isfinite_t * api = ( sg_api_isfinite_t * ) args;
+  sg_api_isinf_t * api = ( sg_api_isinf_t * ) args;
   int length = 1;
   for ( int i = 0; i < api->dim; ++i )
   {
@@ -117,7 +118,7 @@ void tpu_kernel_api_isfinite_multi_core ( const void * args )
   int cur_length_slice = length_slice;
   if (core_idx == length_secs - 1)
     cur_length_slice = length - length_slice * (length_secs - 1);
-  nodechip_isfinite(
+  nodechip_isinf(
       api->input_global_addr + (length_slice * core_idx) * tpu_data_type_size(api->dtype),
       api->output_global_addr + (length_slice * core_idx) * tpu_data_type_size(api->dtype),
       cur_length_slice,
@@ -125,4 +126,4 @@ void tpu_kernel_api_isfinite_multi_core ( const void * args )
 
   tpu_poll();
 }
-TPUKERNEL_FUNC_REGISTER ( tpu_kernel_api_isfinite_multi_core );
+TPUKERNEL_FUNC_REGISTER ( tpu_kernel_api_isinf_multi_core );

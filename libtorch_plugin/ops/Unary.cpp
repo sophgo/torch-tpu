@@ -352,6 +352,85 @@ TORCH_LIBRARY_IMPL ( aten, TPU, m )
   m.impl ( "isfinite", isfinite_tpu );
 }
 
+Tensor isinf_tpu ( const Tensor & self )
+{
+  auto out = empty_like(self,kBool);
+
+  if ( self.dim() > 0 )  { CHECK_TENSOR_IN_DEVICE ( self ); }
+  CHECK_TENSOR_IN_DEVICE ( out );
+#if 0
+  
+#else
+  if ( self.dim() == 0)
+  {
+    auto out_cpu = isinf ( self.cpu());
+    tpu::TPUCopyHostToDevice ( out.data_ptr(), out_cpu.contiguous().data_ptr(), out.nbytes() );
+  }
+  else if ( IS_TPU_TENSOR ( self ))
+  {
+    
+#ifdef TPU_OP_TIMING
+      auto timer = tpu::Timer().Start();
+#endif
+      bm_status_t status = sgdnnIsinf (
+                           tpu::TPUGetDeviceHandle(),
+                           tpu:: TPUGenerateSgdnnTensor ( self ),
+                           tpu:: TPUGenerateSgdnnTensor ( out ) );
+      TORCH_CHECK ( status == BM_SUCCESS );
+#ifdef TPU_OP_TIMING
+      tpu::OpTimer::Instance().AddTime ( tpu::ISINF, timer.ElapsedUS() );
+#endif
+
+  }
+#endif
+  return out;
+}
+
+TORCH_LIBRARY_IMPL ( aten, TPU, m )
+{
+  m.impl ( "isinf", isinf_tpu );
+}
+
+
+Tensor isnan_tpu ( const Tensor & self )
+{
+  auto out = empty_like(self,kBool);
+
+  if ( self.dim() > 0 )  { CHECK_TENSOR_IN_DEVICE ( self ); }
+  CHECK_TENSOR_IN_DEVICE ( out );
+#if 0
+  
+#else
+  if ( self.dim() == 0)
+  {
+    auto out_cpu = isnan ( self.cpu());
+    tpu::TPUCopyHostToDevice ( out.data_ptr(), out_cpu.contiguous().data_ptr(), out.nbytes() );
+  }
+  else if ( IS_TPU_TENSOR ( self ))
+  {
+    
+#ifdef TPU_OP_TIMING
+      auto timer = tpu::Timer().Start();
+#endif
+      bm_status_t status = sgdnnIsnan (
+                           tpu::TPUGetDeviceHandle(),
+                           tpu:: TPUGenerateSgdnnTensor ( self ),
+                           tpu:: TPUGenerateSgdnnTensor ( out ) );
+      TORCH_CHECK ( status == BM_SUCCESS );
+#ifdef TPU_OP_TIMING
+      tpu::OpTimer::Instance().AddTime ( tpu::ISNAN, timer.ElapsedUS() );
+#endif
+
+  }
+#endif
+  return out;
+}
+
+TORCH_LIBRARY_IMPL ( aten, TPU, m )
+{
+  m.impl ( "isnan", isnan_tpu );
+}
+
 Tensor & bitwise_not_out_tpu ( const Tensor & self, Tensor & out )
 {
   if ( self.dim() > 0 )  { CHECK_TENSOR_IN_DEVICE ( self ); }
