@@ -1969,7 +1969,17 @@ bm_status_t sgdnnDiv ( bm_handle_t handle,
   api.dtype = sgdnnTPUKernelDType ( input.dtype );
   SAFE_CALL ( sgdnnTPUKernelLaunch ( handle, "tpu_kernel_api_div_eltwise", &api, sizeof ( api ) ) );
 #else
-  SGDNN_CHECK ( false );
+  sg_api_div_eltwise_t api;
+  api.input_global_addr = input.addr;
+  api.other_global_addr = other.addr;
+  api.output_global_addr = output.addr;
+  api.dim = input.dim;
+  for ( int i = 0; i < input.dim; ++i )
+  {
+    api.shape[i] = input.shape[i];
+  }
+  api.dtype = sgdnnTPUKernelDType ( input.dtype );
+  SAFE_CALL ( sgdnnTPUKernelLaunch ( handle, "tpu_kernel_api_div_multi_core", &api, sizeof ( api ) ) );
 #endif
   return BM_SUCCESS;
 }

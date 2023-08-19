@@ -9,8 +9,8 @@ device = "privateuseone:0"
 
 def case1():
 
-    a1 = torch.ones((5, 5), dtype=torch.float32)
-    a2 = torch.ones((5, 5), dtype=torch.float32)
+    a1 = torch.randint(0,3,(5, 5), dtype=torch.float32)
+    a2 = torch.randint(0,3,(5, 5), dtype=torch.float32)
     a2_tpu = a2.to(device)
     a3 = True
     a4 = torch.zeros((5, 5), dtype=torch.float32)
