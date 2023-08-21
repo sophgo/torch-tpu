@@ -7,51 +7,51 @@ torch.manual_seed(1000)
 device = "privateuseone:0"
 
 def case1():
-    # # ge fp
+    # # le fp
     # a1 = torch.rand((5, 6))
     # a1_tpu = a1.to(device)
     # a2 = torch.rand((5, 6))
     # a2_tpu = a2.to(device)
-    # cpu_res = torch.ge(a1, a2)
-    # tpu_res = torch.ge(a1_tpu, a2_tpu)
+    # cpu_res = torch.le(a1, a2)
+    # tpu_res = torch.le(a1_tpu, a2_tpu)
 
-    # # ge int
+    # # le int
     # a1 = torch.randint(1, 10, (3, 5), dtype=torch.int32)
     # a1_tpu = a1.to(device)
     # a2 = torch.randint(1, 10, (3, 5), dtype=torch.int32)
     # a2_tpu = a2.to(device)
-    # cpu_res = torch.ge(a1, a2)
-    # tpu_res = torch.ge(a1_tpu, a2_tpu)
+    # cpu_res = torch.le(a1, a2)
+    # tpu_res = torch.le(a1_tpu, a2_tpu)
 
-    # # ge c1 fp
+    # # le c1 fp
     # a1 = torch.rand((1, 5))
     # a1_tpu = a1.to(device)
     # a2 = torch.tensor(0.5)
-    # cpu_res = torch.ge(a1, a2)
-    # # tpu_res = torch.ge(a1_tpu, a2)
-    # tpu_res = torch.ge(a1_tpu, a2.to(device))
+    # cpu_res = torch.le(a1, a2)
+    # tpu_res = torch.le(a1_tpu, a2)
+    # # tpu_res = torch.le(a1_tpu, a2.to(device))
 
-    # # ge c2 int
-    # a1 = torch.randint(1, 10, (1, 5), dtype=torch.int)
+    # # le c2 int
+    # a1 = torch.randint(1, 10, (5, 5, 64), dtype=torch.int)
     # a1_tpu = a1.to(device)
     # a2 = torch.tensor(5)
-    # cpu_res = torch.ge(a1, a2)
-    # # tpu_res = torch.ge(a1_tpu, a2)
-    # tpu_res = torch.ge(a1_tpu, a2.to(device))
+    # cpu_res = torch.le(a1, a2)
+    # tpu_res = torch.le(a1_tpu, a2)
+    # # tpu_res = torch.le(a1_tpu, a2.to(device))
 
-    # ge bcast1 int
+    # le bcast1 int
     a1 = torch.randint(1, 10, (3, 555, 35), dtype=torch.int)
     a1_tpu = a1.to(device)
     a2 = torch.randint(1, 10, (1, 1, 35), dtype=torch.int)
-    cpu_res = torch.ge(a1, a2)
-    tpu_res = torch.ge(a1_tpu, a2.to(device))
+    cpu_res = torch.le(a1, a2)
+    tpu_res = torch.le(a1_tpu, a2.to(device))
 
-    # # ge bcast2 float
+    # # le bcast2 float
     # a1 = torch.rand((3, 555, 35))
     # a1_tpu = a1.to(device)
     # a2 = torch.rand((1, 1, 35))
-    # cpu_res = torch.ge(a1, a2)
-    # tpu_res = torch.ge(a1_tpu, a2.to(device))
+    # cpu_res = torch.le(a1, a2)
+    # tpu_res = torch.le(a1_tpu, a2.to(device))
 
     print("a1 : ", a1)
     print("a2 : ", a2)

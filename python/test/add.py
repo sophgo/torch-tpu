@@ -9,11 +9,11 @@ device = "privateuseone:0"
 
 def case1():
 
-    a1 = torch.ones((5,5))
-    a2 = torch.ones((5,5))
+    a1 = torch.tensor(1, dtype=torch.int)
+    a2 = torch.tensor(1.0, dtype=torch.float)
     a2_tpu = a2.to(device)
     a3 = 1
-    a4 = torch.ones((1,5))
+    a4 = torch.tensor(1, dtype=torch.int)
 
 
     # tensor add tensor

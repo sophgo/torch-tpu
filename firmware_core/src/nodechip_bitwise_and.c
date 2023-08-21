@@ -7,32 +7,17 @@ global_addr_t other_global_addr,
 global_addr_t output_global_addr,
 int length,
 data_type_t dtype) {
-    const int dsize = tpu_data_type_size(dtype);
-    int wmax = DIV_UP(length, NPU_NUM);
-    local_addr_t input_local_addrs[2], other_local_addrs[2], output_local_addrs[2];
-    local_addr_t next = 0;
-    while(true) {
-        next = 0;
-        int size = tpu_aligned_feature_size(1, wmax, dtype);
-        input_local_addrs[0]  = next; next += size;
-        input_local_addrs[1]  = next; next += size;
-        other_local_addrs[0]  = next; next += size;
-        other_local_addrs[1]  = next; next += size;
-        output_local_addrs[0] = next; next += size;
-        output_local_addrs[1] = next; next += size;
-        if((int)next <= LOCAL_MEM_SIZE) {
-            break;
-        }
-        else {
-            if(wmax > 1) {
-                wmax /= 2;
-                continue;
-            }
-            else {
-                TPUKERNEL_ASSERT(false);
-            }
-        }
-    }
+    if(0 == length) return;
+    const int bank_size = LOCAL_MEM_SIZE / LOCAL_MEM_BANKS;
+    const int tensor_num = 2 + 2 + 2;     // 2 inputs, 2 others, 2 outputs
+    int tensor_size = LOCAL_MEM_BANKS / tensor_num * bank_size;
+    TPUKERNEL_ASSERT(tensor_size > 0);
+
+    const int dtype_size = tpu_data_type_size(dtype);
+    local_addr_t input_local_addrs[] = {0, tensor_size};
+    local_addr_t other_local_addrs[] = {2 * tensor_size, 3 * tensor_size};
+    local_addr_t output_local_addrs[] = {4 * tensor_size, 5 * tensor_size};
+    int tensor_w = DIV_UP(MIN(length, tensor_size * NPU_NUM / dtype_size), NPU_NUM);
 
     int todo = length, done = 0;
     dim4 shape = {.n = 1, .h = 1};
@@ -44,20 +29,20 @@ data_type_t dtype) {
     while(todo != 0) {
         if(todo > NPU_NUM){
             shape.c = NPU_NUM;
-            shape.w = MIN(todo / NPU_NUM, wmax);
+            shape.w = MIN(todo / NPU_NUM, tensor_w);
         }
         else {
             shape.c = todo;
             shape.w = 1;
         }
         tpu_gdma_cpy_S2L(input_local_addrs[index],
-                         input_global_addr + done * dsize,
+                         input_global_addr + done * dtype_size,
                          &shape,
                          NULL,
                          NULL,
                          dtype);
         tpu_gdma_cpy_S2L(other_local_addrs[index],
-                         other_global_addr + done * dsize,
+                         other_global_addr + done * dtype_size,
                          &shape,
                          NULL,
                          NULL,
@@ -83,7 +68,7 @@ data_type_t dtype) {
                     NULL,
                     dtype);
         l2s = true;
-        l2s_global_addr = output_global_addr + done * dsize;
+        l2s_global_addr = output_global_addr + done * dtype_size;
         l2s_local_addr = output_local_addrs[index];
         l2s_shape = shape;
         todo -= shape.c * shape.w;
@@ -368,29 +353,16 @@ global_addr_t output_global_addr,
 scalar_t value,
 int length,
 data_type_t dtype) {
-    const int dsize = tpu_data_type_size(dtype);
-    int wmax = DIV_UP(length, NPU_NUM);
-    local_addr_t input_local_addrs[2], output_local_addrs[2];
-    local_addr_t next = 0;
-    while(true) {
-        next = 0;
-        int size = tpu_aligned_feature_size ( 1, wmax, dtype );
-        input_local_addrs[0] = next; next += size;
-        input_local_addrs[1] = next; next += size;
-        output_local_addrs[0] = next; next += size;
-        output_local_addrs[1] = next; next += size;
-        if((int)next <= LOCAL_MEM_SIZE) {
-            break;
-        }
-        else {
-            if(wmax > 1) {
-                wmax /= 2;
-            }
-            else {
-                TPUKERNEL_ASSERT(false);
-            }
-        }
-    }
+    if(0 == length) return;
+    const int bank_size = LOCAL_MEM_SIZE / LOCAL_MEM_BANKS;
+    const int tensor_num = 2 + 2;     // 2 inputs, 2 outputs
+    int tensor_size = LOCAL_MEM_BANKS / tensor_num * bank_size;
+    TPUKERNEL_ASSERT(tensor_size > 0);
+
+    const int dtype_size = tpu_data_type_size(dtype);
+    local_addr_t input_local_addrs[]  = {0, tensor_size};
+    local_addr_t output_local_addrs[] = {2 * tensor_size, 3 * tensor_size};
+    int tensor_w = DIV_UP(MIN(length, tensor_size * NPU_NUM / dtype_size), NPU_NUM);
 
     int todo = length;
     int done = 0;
@@ -403,7 +375,7 @@ data_type_t dtype) {
     while(todo != 0) {
         if(todo > NPU_NUM) {
             shape.c = NPU_NUM;
-            shape.w = MIN(todo / NPU_NUM, wmax);
+            shape.w = MIN(todo / NPU_NUM, tensor_w);
         }
         else {
             shape.c = todo;
@@ -411,7 +383,7 @@ data_type_t dtype) {
         }
 
         tpu_gdma_cpy_S2L(input_local_addrs[index],
-                         input_global_addr + done * dsize,
+                         input_global_addr + done * dtype_size,
                          &shape,
                          NULL,
                          NULL,
@@ -436,7 +408,7 @@ data_type_t dtype) {
                       NULL,
                       dtype);
         l2s = true;
-        l2s_global_addr = output_global_addr + done * dsize;
+        l2s_global_addr = output_global_addr + done * dtype_size;
         l2s_local_addr = output_local_addrs[index];
         l2s_shape = shape;
         todo -= shape.c * shape.w;

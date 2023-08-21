@@ -31,7 +31,7 @@ def case1():
     # print("tpu : ", a1_tpu.cpu())
 
     # # andc
-    a1 = torch.randint(1, 10, (5,1), dtype=torch.int)
+    a1 = torch.randint(1, 10, (3,500,100), dtype=torch.int)
     a1_tpu = a1.to(device)
     a2 = torch.tensor(2, dtype=torch.int)
     a3 = a1.bitwise_and(a2)
