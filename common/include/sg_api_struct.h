@@ -354,6 +354,27 @@ typedef struct
   unsigned long long output_global_addr;
   int shape[FW_MAX_SHAPE_DIMS];
   int dim;
+  float negative_slope;
+  int dtype;
+} WITH_PLATFORM(sg_api_leakyrelu_t);
+
+typedef struct
+{
+  unsigned long long input_global_addr;
+  unsigned long long grad_output_global_addr;
+  unsigned long long grad_input_global_addr;
+  int shape[FW_MAX_SHAPE_DIMS];
+  int dim;
+  float negative_slope;
+  int dtype;
+} WITH_PLATFORM(sg_api_leakyrelu_backward_t);
+
+typedef struct
+{
+  unsigned long long input_global_addr;
+  unsigned long long output_global_addr;
+  int shape[FW_MAX_SHAPE_DIMS];
+  int dim;
   int input_stride[FW_MAX_SHAPE_DIMS];
   int output_stride[FW_MAX_SHAPE_DIMS];
   int dtype;

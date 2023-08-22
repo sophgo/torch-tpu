@@ -231,6 +231,7 @@ typedef enum
   RELU_BACKWARD,
   GELU,
   GELU_BACKWARD,
+  LEAKY_RELU,
   MM,
   ADDMM,
   BMM,
@@ -343,7 +344,6 @@ typedef enum
   ERF,
   POW_FORWARD,
   OP_NUM
-
 }
 OpType;
 
@@ -363,6 +363,7 @@ static const char * OpTypeStr[OP_NUM] =
   "ReLU Backward",
   "GeLU",
   "GeLU Backward",
+  "Leaky ReLU",
   "MatMul",
   "Add MatMul",
   "Batch MatMul",

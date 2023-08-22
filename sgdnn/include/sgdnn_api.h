@@ -500,6 +500,19 @@ bm_status_t sgdnnGELUBackward ( bm_handle_t handle,
                                 SgdnnTensor_t input,
                                 SgdnnTensor_t grad_input );
 
+
+/*
+ * OUTPUT = LeakyRelu (INPUT)
+ * Note:
+ * 1. The data types of INPUT must be the same and one of FP32, FP16 and BF16
+ * 2. INPUT must be contiguous
+ */
+
+bm_status_t sgdnnLeakyReLU ( bm_handle_t handle,
+                       SgdnnTensor_t input,
+                       SgdnnTensor_t output,
+                       float negative_slope );
+
 /*
  * OUTPUT = COPY ( INPUT )
  * Note:

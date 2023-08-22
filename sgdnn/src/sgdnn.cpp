@@ -1753,9 +1753,9 @@ bm_status_t sgdnnActive(bm_handle_t handle, SgdnnTensor_t input,
                         SgdnnTensor_t output, sg_active_type_t active_type) {
   /**
    *
-   * ACTIVE_RELU、ACTIVE_LEAKY_RELU、ACTIVE_ABSVAL
+   * ACTIVE_RELU、ACTIVE_ABSVAL
    * 的输入输出可以是FLOAT32/INT8/UINT8/INT16/UINT16，其它数据类型只能是FLOAT32。ACTIVE_RELU、ACTIVE_ABSVAL输入是INT8/UINT8/INT16/UINT16，输出可以是INT8/UINT8/INT16/UINT16，输入输出数据类型不要求一致，结果超出位宽时做饱和处理。
-   * BM1684X：ACTIVE_RELU、ACTIVE_LEAKY_RELU、ACTIVE_ABSVAL、ACTIVE_ROUND、ACTIVE_CEIL、ACTIVE_FLOOR额外支持FLOAT16，其余同BM1684。
+   * BM1684X：ACTIVE_RELU、ACTIVE_ABSVAL、ACTIVE_ROUND、ACTIVE_CEIL、ACTIVE_FLOOR额外支持FLOAT16，其余同BM1684。
    *
    */
   SGDNN_CHECK(input.dtype == output.dtype);
@@ -3007,6 +3007,45 @@ bm_status_t sgdnnGELUBackward ( bm_handle_t handle,
   SAFE_CALL ( sgdnnTPUKernelLaunch ( handle, "tpu_kernel_api_gelu_backward", &api, sizeof ( api ) ) );
 #elif defined SGDNN_BACKEND_2260
   SAFE_CALL ( sgdnnTPUKernelLaunch ( handle, "tpu_kernel_api_gelu_backward_multi_core", &api, sizeof ( api ) ) );
+#else
+  SGDNN_CHECK ( false );
+#endif
+  return BM_SUCCESS;
+}
+
+bm_status_t sgdnnLeakyReLU ( bm_handle_t handle,
+                       SgdnnTensor_t input,
+                       SgdnnTensor_t output,
+                       float negative_slope )
+{
+  SGDNN_CHECK ( input.dtype == SGDNN_DTYPE_FP32 ||
+                input.dtype == SGDNN_DTYPE_FP16 ||
+                input.dtype == SGDNN_DTYPE_BF16 );
+  SGDNN_CHECK ( sgdnnIsTensorContiguous ( &input ) );
+#if defined SGDNN_BACKEND_1684X
+  sg_api_leakyrelu_t api;
+  api.input_global_addr = input.addr;
+  api.output_global_addr = output.addr;
+  api.dim = input.dim;
+  for ( int i = 0; i < input.dim; ++i )
+  {
+    api.shape[i] = input.shape[i];
+  }
+  api.dtype = sgdnnTPUKernelDType ( input.dtype );
+  api.negative_slope = negative_slope;
+  SAFE_CALL ( sgdnnTPUKernelLaunch ( handle, "tpu_kernel_api_leakyrelu", &api, sizeof ( api ) ) );
+#elif defined SGDNN_BACKEND_2260
+  sg_api_leakyrelu_t api;
+  api.input_global_addr = input.addr;
+  api.output_global_addr = output.addr;
+  api.dim = input.dim;
+  for ( int i = 0; i < input.dim; ++i )
+  {
+    api.shape[i] = input.shape[i];
+  }
+  api.dtype = sgdnnTPUKernelDType ( input.dtype );
+  api.negative_slope = negative_slope;
+  SAFE_CALL ( sgdnnTPUKernelLaunch ( handle, "tpu_kernel_api_leakyrelu_multi_core", &api, sizeof ( api ) ) );
 #else
   SGDNN_CHECK ( false );
 #endif

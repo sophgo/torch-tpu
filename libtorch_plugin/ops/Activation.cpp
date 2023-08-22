@@ -217,4 +217,69 @@ TORCH_LIBRARY_IMPL ( aten, TPU, m )
   m.impl ( "sigmoid.out", sigmoid_out_tpu );
 }
 
+Tensor & leakyrelu__tpu ( Tensor & self,Scalar negative_slope )
+{
+  static int count = 0;
+#ifdef SHOW_OP_INFO
+  std::cout << "LeakyReLU " << count << std::endl;
+  ++count;
+#endif
+  CHECK_TENSOR_IN_DEVICE ( self );
+#if 0
+  auto self_cpu = self.cpu();
+  self_cpu = leakyRelu_ ( self_cpu );
+  tpu::TPUCopyHostToDevice ( self.data_ptr(), self_cpu.contiguous().data_ptr(), self.nbytes() );
+  return self;
+#else
+#ifdef TPU_OP_TIMING
+  auto timer = tpu::Timer().Start();
+#endif
+  bm_status_t status = sgdnnLeakyReLU ( tpu::TPUGetDeviceHandle(),
+                                   tpu::TPUGenerateSgdnnTensor ( self ),
+                                   tpu::TPUGenerateSgdnnTensor ( self ),
+                                   negative_slope.to<double>() );
+  TORCH_CHECK ( status == BM_SUCCESS );
+#ifdef TPU_OP_TIMING
+  tpu::OpTimer::Instance().AddTime ( tpu::LEAKY_RELU, timer.ElapsedUS() );
+#endif
+  return self;
+#endif
+}
+TORCH_LIBRARY_IMPL ( aten, TPU, m )
+{
+  m.impl ( "leakyRelu_", leakyrelu__tpu );
+}
+
+Tensor & leakyrelu_tpu ( const Tensor & self ,const Scalar & negative_slope, Tensor & out)
+{
+  static int count = 0;
+#ifdef SHOW_OP_INFO
+  std::cout << "LEAKYRELU " << count << std::endl;
+  ++count;
+#endif
+  CHECK_TENSOR_IN_DEVICE ( self );
+#if 0
+  auto self_cpu = self.cpu();
+  self_cpu = leakyRelu_ ( self_cpu );
+  tpu::TPUCopyHostToDevice ( self.data_ptr(), self_cpu.contiguous().data_ptr(), self.nbytes() );
+  return self;
+#else
+#ifdef TPU_OP_TIMING
+  auto timer = tpu::Timer().Start();
+#endif
+  bm_status_t status = sgdnnLeakyReLU ( tpu::TPUGetDeviceHandle(),
+                                   tpu::TPUGenerateSgdnnTensor ( self ),
+                                   tpu::TPUGenerateSgdnnTensor ( out ),
+                                   negative_slope.to<double>());
+  TORCH_CHECK ( status == BM_SUCCESS );
+#ifdef TPU_OP_TIMING
+  tpu::OpTimer::Instance().AddTime ( tpu::LEAKY_RELU, timer.ElapsedUS() );
+#endif
+  return out;
+#endif
+}
+TORCH_LIBRARY_IMPL ( aten, TPU, m )
+{
+  m.impl ( "leaky_relu.out", leakyrelu_tpu);
+}
 } // namespace at
