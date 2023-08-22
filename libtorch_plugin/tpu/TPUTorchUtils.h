@@ -276,6 +276,8 @@ typedef enum
   ROUND,
   EXP2,
   ISFINITE,
+  ISINF,
+  ISNAN,
   BITWISE_NOT,
   MINIMUM,
   LOGICAL_AND, 
@@ -370,6 +372,8 @@ static const char * OpTypeStr[OP_NUM] =
   "ROUND",
   "EXP2",
   "ISFINITE",
+  "ISINF",
+  "ISNAN",
   "BITWISE_NOT",
   "MINIMUM",
   "Logical And",
@@ -386,6 +390,7 @@ static const char * OpTypeStr[OP_NUM] =
   "GREATER_OR_EQUAL_C",
   "GREATER",
   "GREATER_C"
+
 };
 
 struct OpTimer

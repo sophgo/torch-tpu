@@ -961,6 +961,28 @@ bm_status_t sgdnnIsfinite(bm_handle_t handle,
                        SgdnnTensor_t output );                       
 
 /*
+ * OUTPUT = ISINF(INPUT)
+ * Note:
+ * 1. The data types of INPUT and OUTPUT must be the same and one of FP32, FP16 and BF16
+ * 2. The shapes of INPUT and OUTPUT must be the same
+ * 3. INPUT and OUTPUT must be contiguous
+ */
+bm_status_t sgdnnIsinf(bm_handle_t handle,
+                       SgdnnTensor_t input,
+                       SgdnnTensor_t output );
+
+/*
+ * OUTPUT = ISNAN(INPUT)
+ * Note:
+ * 1. The data types of INPUT and OUTPUT must be the same and one of FP32, FP16 and BF16
+ * 2. The shapes of INPUT and OUTPUT must be the same
+ * 3. INPUT and OUTPUT must be contiguous
+ */
+bm_status_t sgdnnIsnan(bm_handle_t handle,
+                       SgdnnTensor_t input,
+                       SgdnnTensor_t output );  
+                       
+/*
  *  OUTPUT  = BITWISE_AND ( input, other, output )
  *  Note:
  *  1. input, other and output only support int32 uint32 int8 uint8.
@@ -1096,6 +1118,8 @@ bm_status_t sgdnnGtC ( bm_handle_t handle,
                        SgdnnTensor_t input,
                        float scalar,
                        SgdnnTensor_t output );
+                     
+
 
 #if defined(__cplusplus)
 }
