@@ -18,15 +18,59 @@
 #endif
 
 
-typedef struct
-{
-  unsigned long long  input_global_addr;
-  unsigned long long  weight_global_addr;
-  unsigned long long  grad_output_global_addr;
-  unsigned long long  grad_input_global_addr;
-  unsigned long long  grad_weight_global_addr;
-  unsigned long long  grad_bias_global_addr;
-  unsigned long long  buffer_global_addr;
+typedef enum {
+  ACTIVE_TANH = 0,
+  ACTIVE_SIGMOID = 1,
+  ACTIVE_RELU = 2,
+  ACTIVE_EXP = 3,
+  ACTIVE_ELU = 4,
+  ACTIVE_SQRT = 5,
+  ACTIVE_SQUARE = 6,
+  ACTIVE_RSQRT = 7,
+  ACTIVE_ABSVAL = 8,
+  ACTIVE_LN = 9,
+  ACTIVE_ROUND = 10,
+  ACTIVE_CEIL = 11,
+  ACTIVE_FLOOR = 12,
+  ACTIVE_SIN = 13,
+  ACTIVE_COS = 14,
+  ACTIVE_IS_FINITE = 15,
+  ACTIVE_MISH = 16,
+  ACTIVE_SWISH = 17,
+  ACTIVE_HSWISH = 18,
+  ACTIVE_SILU = 19,
+  ACTIVE_ARCSIN = 20,
+  ACTIVE_ARCCOS = 21,
+  ACTIVE_ARCSINH = 22,
+  ACTIVE_ARCCOSH = 23,
+  ACTIVE_ARCTANH = 24,
+  ACTIVE_SINH = 25,
+  ACTIVE_COSH = 26,
+  ACTIVE_TAN = 27,
+  ACTIVE_SIGN = 28,
+  ACTIVE_GELU = 29,
+  ACTIVE_ERF = 30,
+  ACTIVE_HSIGMOID = 31,
+  ACTIVE_LOG_SIGMOID = 32,
+  ACTIVE_SOFT_PLUS = 33,
+  ACTIVE_SOFT_SIGN = 34,
+} sg_active_type_t;
+
+typedef enum {
+  LOG_E = 0,
+  LOG_1P = 1,
+  LOG_2 = 2,
+  LOG_10 = 10,
+} sg_log_type_t;
+
+typedef struct {
+  unsigned long long input_global_addr;
+  unsigned long long weight_global_addr;
+  unsigned long long grad_output_global_addr;
+  unsigned long long grad_input_global_addr;
+  unsigned long long grad_weight_global_addr;
+  unsigned long long grad_bias_global_addr;
+  unsigned long long buffer_global_addr;
   int input_shape[4];
   int output_shape[4];
   int groups;
@@ -329,7 +373,7 @@ typedef struct
   int shape[FW_MAX_SHAPE_DIMS];
   int dim;
   int dtype;
-  int active_type;
+  sg_active_type_t active_type;
 } WITH_PLATFORM(sg_api_active_t);
 
 typedef struct
@@ -428,7 +472,7 @@ typedef struct
   int shape[FW_MAX_SHAPE_DIMS];
   int dim;
   int dtype;
-  int log_type; // 0 for log, 1 for log1p, 2 for log2, 10 for log10
+  sg_log_type_t log_type; // 0 for log, 1 for log1p, 2 for log2, 10 for log10
 } WITH_PLATFORM(sg_api_log_t);
 
 typedef struct

@@ -11,7 +11,7 @@
 namespace at
 {
 
-    Tensor &logx_out_tpu(const Tensor &self, Tensor &out, int log_type)
+    Tensor &logx_out_tpu(const Tensor &self, Tensor &out, sg_log_type_t log_type)
     {
         if (self.dim() > 0)
         {
@@ -52,7 +52,7 @@ namespace at
         return out;
     }
 
-    Tensor logx_tpu(const Tensor &self, int log_type)
+    Tensor logx_tpu(const Tensor &self, sg_log_type_t log_type)
     {
         auto out = empty(self.sizes(), self.options());
         return logx_out_tpu(self, out, log_type);
@@ -60,22 +60,22 @@ namespace at
 
     Tensor &log_out_tpu(const Tensor &self, Tensor &out)
     {
-        return logx_out_tpu(self, out, 0);
+        return logx_out_tpu(self, out, LOG_E);
     }
 
     Tensor &log1p_out_tpu(const Tensor &self, Tensor &out)
     {
-        return logx_out_tpu(self, out, 1);
+        return logx_out_tpu(self, out, LOG_1P);
     }
 
     Tensor &log2_out_tpu(const Tensor &self, Tensor &out)
     {
-        return logx_out_tpu(self, out, 2);
+        return logx_out_tpu(self, out, LOG_2);
     }
 
     Tensor &log10_out_tpu(const Tensor &self, Tensor &out)
     {
-        return logx_out_tpu(self, out, 10);
+        return logx_out_tpu(self, out, LOG_10);
     }
 
     Tensor log_tpu(const Tensor &self)

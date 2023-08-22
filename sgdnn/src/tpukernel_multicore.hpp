@@ -1,6 +1,7 @@
 #pragma once
-
+#include <memory>
 #include <vector>
+
 #include "device_mem_allocator.h"
 
 /**

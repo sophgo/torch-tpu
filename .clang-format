@@ -1,0 +1,7 @@
+BasedOnStyle: LLVM
+AlwaysBreakTemplateDeclarations: Yes
+# BinPackParameters: false
+# AlignAfterOpenBracket: Align
+# AllowAllParametersOfDeclarationOnNextLine: false
+# BinPackArguments: false
+# ExperimentalAutoDetectBinPacking: false

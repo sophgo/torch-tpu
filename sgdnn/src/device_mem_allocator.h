@@ -1,12 +1,13 @@
 #ifndef DEVICE_MEM_ALLOCATOR_H
 #define DEVICE_MEM_ALLOCATOR_H
 
-#include <set>
-#include <map>
-#include <functional>
-#include <cstring>
 #include "sgdnn_api.h"
 #include "tpu_defs.h"
+#include <cstring>
+#include <functional>
+#include <map>
+#include <set>
+#include <stdio.h>
 
 #define ASSERT_INFO(_cond, fmt, ...)                                             \
   do {                                                                           \

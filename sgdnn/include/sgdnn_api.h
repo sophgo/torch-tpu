@@ -2,6 +2,7 @@
 #define SGDNN_API_H
 
 #include "bmlib_runtime.h"
+#include "sg_api_struct.h"
 
 #if defined(__cplusplus)
 extern "C" {
@@ -211,81 +212,13 @@ bm_status_t sgdnnBatchMatmul ( bm_handle_t handle,
                                SgdnnTensor_t output );
 
 /*
- * OUTPUT = Abs(INPUT)
+ * OUTPUT = Active(INPUT)
  * Note:
  * 1. The data types of INPUT must be the same and one of FP32, FP16 and BF16
  * 2. INPUT must be contiguous
  */
-bm_status_t sgdnnAbs ( bm_handle_t handle,
-                       SgdnnTensor_t input, 
-                       SgdnnTensor_t output);
-
-
-/*
- * OUTPUT = Cos(INPUT)
- * Note:
- * 1. The data types of INPUT must be the same and one of FP32, FP16 and BF16
- * 2. INPUT must be contiguous
- */
-bm_status_t sgdnnCos ( bm_handle_t handle,
-                       SgdnnTensor_t input, 
-                       SgdnnTensor_t output);
-
-/*
- * OUTPUT = log(x+ sqrt(x-1)sqrt(x+1))
- * domain (1, +inf)
- * range (-inf, +inf)
- * Note:
- * 1. The data types of INPUT must be the same and one of FP32
- * 2. INPUT must be contiguous
- */
-bm_status_t sgdnnACosH ( bm_handle_t handle,
-                       SgdnnTensor_t input, 
-                       SgdnnTensor_t output);
-
-/*
- * OUTPUT = log(x + sqrt(x^2 + 1))
- * domain (-inf, +inf)
- * range (-inf, +inf)
- * Note:
- * 1. The data types of INPUT must be the same and one of FP32, FP16 and BF16
- * 2. INPUT must be contiguous
- */
-bm_status_t sgdnnASinH ( bm_handle_t handle,
-                       SgdnnTensor_t input, 
-                       SgdnnTensor_t output);
-
-/*
- * OUTPUT = Cos(INPUT)
- * domain (-1, +1)
- * range (-inf, +inf)
- * Note:
- * 1. The data types of INPUT must be the same and one of FP32, FP16 and BF16
- * 2. INPUT must be contiguous
- */
-bm_status_t sgdnnATanH ( bm_handle_t handle,
-                       SgdnnTensor_t input, 
-                       SgdnnTensor_t output);
-
-/*
- * OUTPUT = Tan(INPUT)
- * Note:
- * 1. The data types of INPUT must be the same and one of FP32, FP16 and BF16
- * 2. INPUT must be contiguous
- */
-bm_status_t sgdnnTan ( bm_handle_t handle,
-                       SgdnnTensor_t input, 
-                       SgdnnTensor_t output);
-
-/*
- * OUTPUT = Sin(INPUT)
- * Note:
- * 1. The data types of INPUT must be the same and one of FP32, FP16 and BF16
- * 2. INPUT must be contiguous
- */
-bm_status_t sgdnnSin ( bm_handle_t handle,
-                       SgdnnTensor_t input, 
-                       SgdnnTensor_t output);
+bm_status_t sgdnnActive(bm_handle_t handle, SgdnnTensor_t input,
+                        SgdnnTensor_t output, sg_active_type_t active_type);
 /*
  * OUTPUT = log(INPUT)
  * Note:
@@ -295,7 +228,7 @@ bm_status_t sgdnnSin ( bm_handle_t handle,
 bm_status_t sgdnnLog ( bm_handle_t handle,
                        SgdnnTensor_t input, 
                        SgdnnTensor_t output, 
-                       int log_type);
+                       sg_log_type_t log_type);
 
 
 /*
