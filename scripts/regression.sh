@@ -3,6 +3,7 @@
 #[INFO] echo information
 #[STEP] when some procedures are started
 #[RESULT] the results of some procedures
+#[ERROR]  some params are wrong or files not exist
 
 function ops_utest() {
     CURRENT_DIR=$(dirname ${BASH_SOURCE})
@@ -30,13 +31,13 @@ function link_libsophon() {
     if [ $LIBSOPHON_LINK_PATTERN = 'stable' ]; then
       echo "[NOTE]STABLE LIBSOHON IS ADAPATED FROM .deb"
       if [ $DEB_PATH_STABLE = 'none' ]; then
-        echo "You are giving wrong libsophon .deb upper-path!"
+        echo "[ERROR]Wrong libsophon .deb upper-path!"
         return 255
       else
         echo "[INFO]LIBSOPHON_PATH_TPU_TRAIN:$DEB_PATH_STABLE"
         pushd "$DEB_PATH_STABLE"
         if [  ! -r "$DEB_PATH_STABLE" ]; then
-          echo "libsophon_dependency: $DEB_PATH_STABLE is not found!"
+          echo "[ERROR]libsophon_dependency: $DEB_PATH_STABLE is not found!"
         else
           libsohpon_install_cmd="apt install  ./sophon-libsophon_${VERSION_PATH_STABLE}_amd64.deb ./sophon-libsophon-dev_${VERSION_PATH_STABLE}_amd64.deb"
           $libsohpon_install_cmd
@@ -52,23 +53,30 @@ function link_libsophon() {
 }
 
 function build_libtorch_plugin() {
+  LIBTORCH_DOWNLOAD_FLAG=${1:-normal}
   CURRENT_DIR=$(dirname ${BASH_SOURCE})
-  pushd  $CURRENT_DIR/..
-  cmd_rm="rm -rf libtorch"
-  $cmd_rm
-  get_libtorch="wget https://download.pytorch.org/libtorch/cpu/libtorch-cxx11-abi-shared-with-deps-2.0.1%2Bcpu.zip"
-  $get_libtorch
-  unzip_code="unzip libtorch-cxx11-abi-shared-with-deps-2.0.1+cpu.zip"
-  $unzip_code
-  popd
-
+  echo "[INFO]LIBTORCH_DOWNLOAD_FLAG:$LIBTORCH_DOWNLOAD_FLAG"
+  if [ $LIBTORCH_DOWNLOAD_FLAG = 'normal' ];then
+    pushd  $CURRENT_DIR/..
+    cmd_rm="rm -rf libtorch"
+    $cmd_rm
+    get_libtorch="wget https://download.pytorch.org/libtorch/cpu/libtorch-cxx11-abi-shared-with-deps-2.0.1%2Bcpu.zip"
+    $get_libtorch
+    unzip_code="unzip libtorch-cxx11-abi-shared-with-deps-2.0.1+cpu.zip"
+    $unzip_code
+    popd
+  fi
   LIBTORCH_PLUGIN_PATH=$CURRENT_DIR/../libtorch_plugin
   echo "[INFO]LIBTORCH_PLUGIN_PATH:$LIBTORCH_PLUGIN_PATH"
   pushd "$LIBTORCH_PLUGIN_PATH"
   if [ ! -f "./build" ]; then
-    rm -rf ./build
+    rm_build_cmd="rm -rf $LIBTORCH_PLUGIN_PATH/build"
+    $rm_build_cmd
+    echo "[INFO] libtorch_plugin/build has been rm"
   fi
-  mkdir build&&cd build
+  mkdir build
+  popd
+  pushd $LIBTORCH_PLUGIN_PATH/build
   cmake .. -DCMAKE_BUILD_TYPE=Debug
   make -j && cd ..
   popd
@@ -150,6 +158,17 @@ function fast_build_bm1684x_latest() {
   run_online_regression_test bm1684x latest fast
 }
 
+function fast_build_bm1684x_latest_and_libtorch_plugin() {
+  run_online_regression_test bm1684x latest fast
+  build_libtorch_plugin fast
+}
+
 function fast_build_sg2260_latest() {
   run_online_regression_test sg2260 latest fast
+}
+
+function fast_build_sg2260_latest_and_libtorch_plugin() {
+  run_online_regression_test sg2260 latest fast
+  build_libtorch_plugin fast
+
 }

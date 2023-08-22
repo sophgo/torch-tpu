@@ -42,10 +42,14 @@ def case_embedding_backward():
     vocab_size = 100
     embed_dim  = 768
     ##########################
+    batch      = 6
+    sequence   = 4096
+    vocab_size = 2
+    embed_dim  = 12288
 
     #inp = torch.randint(0, vocab_size, (batch, sequence)).int()
     inp = torch.range(0, batch * sequence - 1)
-    inp = torch.randint(0, vocab_size, (batch, sequence))#.int()
+    inp = torch.randint(0, vocab_size, (batch, sequence))
     if inp.dtype==torch.int64:
         assert(torch.max(torch.abs(inp))<65535)
 
@@ -121,6 +125,6 @@ def case_embedding_backward_simulate():
     print(ref)
 
 if __name__ == "__main__":
-    case_embedding()
-    # case_embedding_backward()
+    # case_embedding()
+    case_embedding_backward()
     #case_embedding_backward_simulate()

@@ -2490,10 +2490,15 @@ bm_status_t sgdnnEmbeddingBackward ( bm_handle_t handle,
     indices_num *= indices.shape[i];
   }
   bm_device_mem_t sorted_index, sorted_index_index, from_index, to_index;
-  SAFE_CALL ( bm_malloc_device_byte ( handle, &sorted_index, indices_num * sizeof ( int ) ) );
-  SAFE_CALL ( bm_malloc_device_byte ( handle, &sorted_index_index, indices_num * sizeof ( int ) ) );
-  SAFE_CALL ( bm_malloc_device_byte ( handle, &from_index, indices_num * sizeof ( int ) ) );
-  SAFE_CALL ( bm_malloc_device_byte ( handle, &to_index, indices_num * sizeof ( int ) ) );
+  //[Error] [CONFLICT-INFO] loop=0,core=1; loop=0,core =2  if not enough or aligned correctly overlap area on these 4 index buffers will be flushed by mutli-thread.
+  //Sgdnn needs corresponding changes, create mem for 8 cores.
+  //If NUM_V_reused could be computed on host, index_mem_size could be shrinked to max(group_index_loop_or_sliced)
+  const int index_mem_size = DIV_UP(indices_num * sgdnnTPUKernelDType(grad_output.dtype), 64)*64 * 8;
+  SAFE_CALL ( bm_malloc_device_byte ( handle, &sorted_index      , index_mem_size));
+  SAFE_CALL ( bm_malloc_device_byte ( handle, &sorted_index_index, index_mem_size));
+  SAFE_CALL ( bm_malloc_device_byte ( handle, &from_index        , index_mem_size));
+  SAFE_CALL ( bm_malloc_device_byte ( handle, &to_index          , index_mem_size));
+  api.grad_output_global_addr = grad_output.addr;
   api.grad_output_global_addr = grad_output.addr;
   api.index_global_addr = indices.addr;
   api.grad_input_global_addr = grad_input.addr;

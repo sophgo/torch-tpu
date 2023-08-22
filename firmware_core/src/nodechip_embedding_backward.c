@@ -3,6 +3,7 @@
 #include <stdlib.h>
 #include <string.h>
 
+//[Error] will lead you to some improvements.
 //CONTROL_CODE
 #define SG2260_GLOBAL_MEM 0x100000000
 #define SG2260_LOCAL_MEM  LOCAL_MEM_SIZE
@@ -352,34 +353,22 @@ static inline void compute_current_slice_info_multi_core_1D(int total_num, int* 
 //Function: (X,Y)->(X, Y_loop, loop_num)
 //          Given:       total_num, num_loop_upper, current_loop_id
 //          Source       Free       Free            Free
-//          Target       expected_current_slice, expected_avg_slice, expected_secs
-//          Compute:     total_num = expected_avg_slice * expected_secs + expected_left_slice
+//          Target       expected_current_slice, expected_avg_slice
+//          Compute:     total_num = expected_avg_slice * (loop_num - 1) + expected_left_slice
 //          Constraints: expected_secs <= num_loop_upper
-//          where expected_current_slice = expected_avg_slice   (current_loop_id <  expected_secs-1)
-//                                     or= expected_left_slice  (current_loop_id == expected_secs-1)
+//          where expected_current_slice = expected_avg_slice   (current_loop_id <  loop_num-1)
+//                                     or= expected_left_slice  (current_loop_id == loop_num-1)
 static inline void compute_current_loop_info_each_core_1D_with_loop_idx(int total_num, int* expected_current_slice,
-                                                         int* expected_avg_slice, int* expected_secs, int num_loop_upper, int current_loop_id) {
-  const int max_core_num = num_loop_upper;
-  const int core_idx = current_loop_id;
-  compute_current_slice_info_multi_core_1D_with_given_cores_with_given_id(total_num, expected_current_slice,
-                                                         expected_avg_slice,  expected_secs, max_core_num, core_idx);
-}
+                                                         int* expected_avg_slice, int num_loop_upper, int current_loop_id) {
+  const int avgnum_element_each_loop = DIV_UP(total_num, num_loop_upper);
 
-//Function: Find proper expected_secs (min_loop_num)
-//          Given:       total_num, num_loop_upper, current_loop_id
-//          Source       Free       Free            0
-//          Target       expected_secs
-//          Compute:     total_num = expected_avg_slice * expected_secs + expected_left_slice
-//          Constraints: expected_secs <= num_loop_upper
-//          where expected_current_slice = expected_avg_slice   (current_loop_id <  expected_secs-1)
-//                                     or= expected_left_slice  (current_loop_id == expected_secs-1)
-//Usage:
-//  You must first use it before  <compute_current_loop_info_each_core_1D_with_loop_idx>
-static inline void compute_current_loop_info_each_core_max_loop(int total_num, int* expected_secs, int num_loop_upper) {
-  int expected_current_slice_unused = 1;
-  int  expected_avg_slice_unused = 1;
-  compute_current_loop_info_each_core_1D_with_loop_idx(total_num, &expected_current_slice_unused,
-                                                          &expected_avg_slice_unused, expected_secs, num_loop_upper, 0);
+  int current_num_for_current_loop = avgnum_element_each_loop;
+  if (current_loop_id == num_loop_upper - 1) {
+    current_num_for_current_loop = total_num - avgnum_element_each_loop * (num_loop_upper - 1);
+  }
+  TPUKERNEL_ASSERT_INFO(current_num_for_current_loop > 0, "Split Loop Error!");
+  *expected_current_slice = current_num_for_current_loop;
+  *expected_avg_slice     = avgnum_element_each_loop;
 }
 
 
@@ -522,13 +511,18 @@ void TENSOR_MEM_ISOLATED_PRECHECK_L1_dim4(dim4 object, data_type_t  dtype) {
     TPUKERNEL_ASSERT(object.n*object.h*object.w*object.c * tpu_data_type_size(dtype) <=l1_mem_sg2260); //only 256KB (8Mb) local_bitwidth is 18
 }
 
+static inline int gen_bank_4_size() {
+   int bank_size =  tpu_local_mem_size_per_npu() / tpu_bank_num();
+   int bank_4 = 4* bank_size;//SG2260_LOCAL_MEM;
+   return  bank_4;
+}
 //Function:  grad_W[v,h]=sum(W[X[i',j'],h]; grad_Y=W
 //HAU_sorted [i',j']->[i,j]: grad_W[v,h]=sum(W[X_sorted[i,j],h]
 //X_sorted_duplicate  resorted_if_has_same_duplicate_num
 //    grad_Y:W  [ij_0_v_0,ij_1_v_1,ij_2_v_1, ij_3_v_2] -> grad_Y[{ij_0_v_0,ij_3_v_2},{ij_1_v_1,ij_2_v_1}]
 //num_repeated  [1,       2,                 1]        ->       [{1,1}              , 2]
 //value_repeated[v_0,     v_1                v_2]      ->       [v_0,     ,v_2,       v_1]
-void Function_Recollect_Index(
+static inline void Function_Recollect_Index(
   global_addr_t grad_Y_gathered_global_addr,
   global_addr_t recollected_global_flush_64b_aligned_addr,
   global_addr_t scatter_index_global_flush_64b_aligned_addr,
@@ -695,25 +689,27 @@ void nodechip_embedding_backward_multi_core_basic_cell_patttern_one(
   const int H_sliced = grad_Y_shape.w;
   const int V = grad_W_shape.h; //different from NUM_V_used
   const int BS = grad_Y_shape.h;
-  const int local_offset_1 = BS * tpu_aligned_feature_size (1, H_sliced, grad_dtype );
-  const int local_offset_2 = V  * tpu_aligned_feature_size (1, H_sliced, grad_dtype ); //sum_num_per_v<=V
-  int bank_size =  tpu_local_mem_size_per_npu() / tpu_bank_num();
+  const int local_offset_1 = BS * H_sliced * len_grad_dtype; //tpu_aligned_feature_size (1, H_sliced, grad_dtype );
+  const int local_offset_2 = V  * H_sliced * len_grad_dtype; // tpu_aligned_feature_size (1, H_sliced, grad_dtype ); //sum_num_per_v<=V
+  int bank_4_size = gen_bank_4_size();
   local_addr_t grad_Y_gathered_local_addr    = 0;
-  local_addr_t reduce_no_parallel_local_addr = 4 * bank_size;
-  local_addr_t grad_Y_scatter_local_addr     = 8 * bank_size;
-  local_addr_t partial_sum_local_addr        = 12 * bank_size;
-  TPUKERNEL_ASSERT_INFO(local_offset_1 < 4 * bank_size, "BS is too large!");
-  TPUKERNEL_ASSERT_INFO(local_offset_2 < 4 * bank_size, "V is too large or not sparse enough!");
-  TPUKERNEL_ASSERT_INFO(partial_sum_local_addr+local_offset_2 < (u32)SG2260_LOCAL_MEM, "BS_Loop is too large");
-  const dim4 grad_W_stride = {.n = 0, .c = H_native, .h = H_native, .w = 1};
-  if (first_loop_flag) {
-    tpu_gdma_set_C_system (
-      grad_Weight_global_addr,
-      zero_,
-      &grad_W_shape,
-      &grad_W_stride,
-      grad_dtype );
-  }
+  local_addr_t reduce_no_parallel_local_addr = bank_4_size;
+  local_addr_t grad_Y_scatter_local_addr     = 2 * bank_4_size;
+  local_addr_t partial_sum_local_addr        = 3 * bank_4_size;
+  TPUKERNEL_ASSERT_INFO(local_offset_1 < bank_4_size, "BS is too large!");
+  TPUKERNEL_ASSERT_INFO(local_offset_2 < bank_4_size, "V is too large or not sparse enough!");
+  TPUKERNEL_ASSERT_INFO(partial_sum_local_addr+local_offset_2 < (u32)tpu_local_mem_size_per_npu(), "BS_Loop is too large");
+  TPUKERNEL_ASSERT_INFO(partial_sum_local_addr+local_offset_1 < (u32)tpu_local_mem_size_per_npu(), "BS_Loop is too large");
+
+  // const dim4 grad_W_stride = {.n = 0, .c = H_native, .h = H_native, .w = 1};
+  // if (first_loop_flag) {
+    // tpu_gdma_set_C_system (
+    //   grad_Weight_global_addr,
+    //   zero_,
+    //   &grad_W_shape,
+    //   &grad_W_stride,
+    //   grad_dtype );
+  // }
   //Shape Checker
   TPUKERNEL_ASSERT(grad_Y_shape.w == grad_W_shape.w);
   TPUKERNEL_ASSERT(grad_Y_shape.h == NUM_full_Index);
@@ -791,25 +787,6 @@ void nodechip_embedding_backward_multi_core_basic_cell_patttern_one(
     NPU_Utils_Pattern = NPU_RECOLLECT_V_WITH_SAME_SUM; //NPU Compute 2
   else
     NPU_Utils_Pattern = NPU_LOOP_V; //NPU Compute 1
-
-
-  //Reduce
-  //Equation: SUM_{i,j}[ grad_Y[X[i,j], h] for R={(i,j); |v|==|X[i,j]|};
-  //Operation: apply SUM
-  //In: shape [#R0s v0, #R1s v1 ,...}
-  //out:  shape [value1, value2, value3,...]
-  // int counter_history = 0;
-  // for (int i=0;i < id_index_value_duplicate; i++) {
-  //   int sum_num_per_v = num_Basic_Cell_from_Partition[i];
-  //   nodechip_cdma_all_reduce(
-  //             grad_Y_gathered_global_addr +  counter_history * len_grad_dtype,
-  //             grad_Y_gathered_global_addr +  counter_history * len_grad_dtype,
-  //             sum_num_per_v ,
-  //             grad_dtype,
-  //             REDUCE_SUM);
-  //   counter_history += sum_num_per_v;
-  // };
-
 
   //Step 2.2 Full_Reduce
   //Step_Arch: GMEM-<GDMA>-L1-<SDMA>-L2-<SDMA>-GMEM
@@ -909,6 +886,7 @@ void nodechip_embedding_backward_multi_core_basic_cell_patttern_one(
           dim2 avg_dil_local_one = {1, 1};
           scalar_t avg_scale;
           avg_scale.f32 = 1.0f;
+          // printf("compute  %d ;loop: %d ;core: %d; fvg: %d %d\n", lhistory_id, loop, core, group_size_index_with_same_duplicate_num, sum_num_per_v); lhistory_id+=1;
           tpu_bdc_fp_avg_pool2d(reduce_no_parallel_local_addr,
                                 reduce_no_parallel_local_addr,
                                 &shape_temp,
@@ -962,10 +940,8 @@ void nodechip_embedding_backward_multi_core_basic_cell_patttern_one(
   tpu_gdma_set_C_local(partial_sum_local_addr,    zero_, &shape_scatter_L2_to_L1, NULL, grad_dtype);
   tpu_gdma_h_scatter_S2L ( grad_Y_scatter_local_addr, reduce_global_addr, scatter_index_global_flush_64b_aligned_addr, false, &shape_scatter_L2_to_L1,
       NUM_V_used, NULL, &stride_scatter_L2_to_L1, NULL, grad_dtype );
-  if(first_loop_flag==0) {
-    tpu_gdma_cpy_S2L(partial_sum_local_addr, grad_Weight_global_addr, &shape_scatter_L2_to_L1,NULL, &stride_scatter_L2_to_L1, grad_dtype);
-    tpu_bdc_fp_add(grad_Y_scatter_local_addr, partial_sum_local_addr, grad_Y_scatter_local_addr, &shape_scatter_L2_to_L1, NULL,NULL,NULL, grad_dtype);
-  }
+  tpu_gdma_cpy_S2L(partial_sum_local_addr, grad_Weight_global_addr, &shape_scatter_L2_to_L1,NULL, &stride_scatter_L2_to_L1, grad_dtype);
+  tpu_bdc_fp_add(grad_Y_scatter_local_addr, partial_sum_local_addr, grad_Y_scatter_local_addr, &shape_scatter_L2_to_L1, NULL,NULL,NULL, grad_dtype);
   //Note: H(.w-dim) is sliced, so each core operates sliced shape but strides in native shape.
   tpu_gdma_cpy_L2S(grad_Weight_global_addr, grad_Y_scatter_local_addr, &shape_scatter_L2_to_L1, &stride_scatter_L2_to_L1, NULL, grad_dtype);
 }
@@ -1004,6 +980,7 @@ void nodechip_embedding_backward_multi_core_basic_cell_pattern_two (
    const int len_grad_dtype = tpu_data_type_size(grad_dtype);
    int H_sliced_real        = 1, H_sliced_avg = 1, H_native = grad_W_shape.w;
    int min_cores_needed     = 1;
+   const int V = grad_W_shape.h;
 
     TPUKERNEL_ASSERT_INFO(grad_Y_shape.w == grad_W_shape.w, "check H of [BS, H] <--> [V ,H] failed");
     int BS_native = count_numel_dim4(X_shape);
@@ -1011,22 +988,31 @@ void nodechip_embedding_backward_multi_core_basic_cell_pattern_two (
     int excute_pattern_level_sub =  BS_native > H_native ? SUBPATTERN_CODE_LOOP_BS :  SUBPATTERN_CODE_LOOP_H;
     excute_pattern_level_sub = SUBPATTERN_CODE_LOOP_BS;
     TPUKERNEL_ASSERT_INFO(excute_pattern_level_sub == SUBPATTERN_CODE_LOOP_BS, "SUBPATTERN_CODE_LOOP_H is not supported now!");
-    int num_each_loop = excute_pattern_level_sub == SUBPATTERN_CODE_LOOP_BS ? BS_native :  H_native;
-    int num_each_loop_real = 1;
-    int num_loop_upper     = 1;
+    int PartRange_loop = excute_pattern_level_sub == SUBPATTERN_CODE_LOOP_BS ? BS_native :  H_native;
+    int FullRange_loop = PartRange_loop;
+    int num_loop_upper     = 0;
     compute_current_slice_info_multi_core_1D(H_native, &H_sliced_real, &H_sliced_avg, &min_cores_needed);
-    while(num_each_loop * H_sliced_real * len_grad_dtype >= SG2260_GLOBAL_MEM) {
-      num_each_loop   = DIV_UP(num_each_loop, 2);
+
+    //When core_num is small&& H is large, [BS,H]->[BS,H_sliced]-> [BS_loop, H_sliced_loop]
+    // int poor_core_num_flag = 0;
+    // [TO-DO]if V * H_sliced_real * len_grad_dtype >= gen_bank_4_size() H_sliced_real_loop
+    while(PartRange_loop * H_sliced_real * len_grad_dtype >= gen_bank_4_size()) { //SG2260_LOCAL_MEM;
+      if (( PartRange_loop==1 && V== 1 && H_sliced_real * len_grad_dtype >= gen_bank_4_size()) ||
+         2 * H_sliced_real * len_grad_dtype >=  gen_bank_4_size()) {
+        // poor_core_num_flag = 1;
+        break;
+      }
       num_loop_upper += 1;
+      PartRange_loop   = DIV_UP(FullRange_loop, num_loop_upper);
     }
-    //ERROR: BS_loop always abundant(num_loop_upper hardly > 1)
-    // num_loop_upper = 1;
-    compute_current_loop_info_each_core_max_loop(BS_native, &num_each_loop_real, num_loop_upper);
+    num_loop_upper = num_loop_upper > 0 ? num_loop_upper : 1;
 
     if (core_idx < min_cores_needed) {
+        //[Error] when [B,S,V,H]=[6, 4096,2,12288] num_loop_upper is 2458
+        // loop efficiency is low and Function_Recollect_Index cannot utilize same index among loops.
 
-        for (int loop_idx = 0 ; loop_idx < num_each_loop_real; loop_idx++) {
-          compute_current_loop_info_each_core_1D_with_loop_idx(BS_native, &BS_sliced_real, &BS_sliced_avg, &num_each_loop_real, num_loop_upper, loop_idx);
+        for (int loop_idx = 0 ; loop_idx < num_loop_upper; loop_idx++) {
+          compute_current_loop_info_each_core_1D_with_loop_idx(BS_native, &BS_sliced_real, &BS_sliced_avg, num_loop_upper, loop_idx);
 
           int  core_dim_sliced_avg =  excute_pattern_level_sub == SUBPATTERN_CODE_LOOP_BS ? H_sliced_avg   : BS_sliced_avg;
           int  loop_dim_sliced_avg =  excute_pattern_level_sub == SUBPATTERN_CODE_LOOP_BS ? BS_sliced_avg  : H_sliced_avg;
@@ -1045,33 +1031,36 @@ void nodechip_embedding_backward_multi_core_basic_cell_pattern_two (
           if (excute_pattern_level_sub == SUBPATTERN_CODE_LOOP_BS) {
             int core_offset          = core_idx * core_dim_sliced_avg * 1 * len_grad_dtype;
             //Grad_W [V,H]->[V, H_sliced]
+            //[NO-CONFLICT] core-free, loop-sequential
             grad_Weight_addr_sliced += core_offset;
             //Grad_Y [BS,H]->[BS_loop, H_sliced]
+            //[NO-CONFLICT] loop-core independent
             int loop_offset          = loop_idx * loop_dim_sliced_avg * 1 * len_grad_dtype;
             grad_Y_addr_sliced      += loop_offset * core_dim_native +  core_offset;
-            //Overlap Check: <Sequential_Loop, IntraCore> ----<BS_loop, H_sliced>
-            //Constraints:    core_offset[t] < loop_start[start] < loop_end[]  < core_offset[t+1]
-            TPUKERNEL_ASSERT_INFO(loop_dim_sliced_avg*core_dim_native>core_dim_sliced_avg, "loop-sliced Overlap");
             //X [B,S]->[BS]->[BS_loop]
+            //[Error] [CONFLICT-INFO] loop=0,core=1; loop=0,core =2  if not enough or aligned correctly overlap area on these 4 index buffers will be flushed by mutli-thread.
             X_addr_sliced                         += loop_offset;
-            int align_offset =  length_align_64bit_apporach(loop_idx * loop_dim_sliced_avg, Index_dtype);
-            sorted_index_value_global_addr_sliced += align_offset;
-            sorted_index_index_global_addr_sliced += align_offset;
-            scatter_index_global_addr_sliced      += align_offset;
-            recollected_global_addr_sliced        += align_offset;
+            int align_offset_core =  core_idx * length_align_64bit_apporach(BS_native, Index_dtype);
+            int align_offset =   loop_idx * length_align_64bit_apporach(loop_dim_sliced_avg, Index_dtype);
+            tpu_hau_poll();
+            sorted_index_value_global_addr_sliced += align_offset + align_offset_core;
+            sorted_index_index_global_addr_sliced += align_offset + align_offset_core;
+            scatter_index_global_addr_sliced      += align_offset + align_offset_core;
+            recollected_global_addr_sliced        += align_offset + align_offset_core;
             TPUKERNEL_ASSERT_INFO(sorted_index_value_global_addr_sliced % 64==0, "HAU addr mush be aligned to 65bit, using <length_align_64bit_apporach>!");
             TPUKERNEL_ASSERT_INFO(sorted_index_index_global_addr_sliced % 64==0, "HAU addr mush be aligned to 65bit, using <length_align_64bit_apporach>!");
             TPUKERNEL_ASSERT_INFO(scatter_index_global_addr_sliced % 64==0, "flush addr mush be aligned to 65bit, using <length_align_64bit_apporach>!");
             TPUKERNEL_ASSERT_INFO(recollected_global_addr_sliced   % 64==0, "flush addr mush be aligned to 65bit, using <length_align_64bit_apporach>!");
           } else { TPUKERNEL_ASSERT_INFO(0, "SUBPATTERN_CODE_LOOP_BS is not supported"); }
-          dim4 grad_Y_shape_sliced = grad_Y_shape;
-          dim4 grad_W_shape_sliced = grad_W_shape;
+          dim4 grad_Y_shape_sliced = {.n=1,.c=1,.h=1,.w= 1};
+          dim4 grad_W_shape_sliced = {.n=1,.c=1,.h=1,.w= 1};
           dim4 X_shape_sliced   = {.n=1,.c=1,.h=1,.w= 1};
           //Grad_Y [BS,H]->[BS_loop, H_slice]
           grad_Y_shape_sliced.w =  core_dim_sliced_real;
           grad_Y_shape_sliced.h =  loop_dim_sliced_real;
           //Grad_W [V,H]->[V, H_slice]
           grad_W_shape_sliced.w =  core_dim_sliced_real;
+          grad_W_shape_sliced.h =  V;
           //X [B,S]->[BS]->[BS_loop]
           X_shape_sliced.w      = loop_dim_sliced_real;
           TPUKERNEL_ASSERT(X_shape_sliced.h==1);
@@ -1132,7 +1121,7 @@ static inline int Decision_Adviosr_Top(
   //           (1) L2 must hold [V,H]+[BS]+[BS,H]
   //           (2) L1 might be not enough
   if (judger_mem < SG2260_GLOBAL_MEM) {
-    if (judger_mem >= SG2260_LOCAL_MEM) {
+    if (judger_mem >= SG2260_LOCAL_MEM || judger_mem >=  gen_bank_4_size()) {
         excute_pattern_level_top = TOP_CONCURRENCY_H_BS;
     }
   }
