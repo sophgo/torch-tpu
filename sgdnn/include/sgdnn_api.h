@@ -1082,6 +1082,122 @@ bm_status_t sgdnnGtC ( bm_handle_t handle,
                        float scalar,
                        SgdnnTensor_t output );
                      
+/*
+ * OUTPUT = MINIMUMC(INPUT,SCALAR)
+ * Note:
+ * 1. The data types of INPUT and OUTPUT must be the same and one of FP32, FP16 and BF16
+ * 2. The shapes of INPUT and OUTPUT must be the same
+ * 3. INPUT and OUTPUT must be contiguous
+ */
+bm_status_t sgdnnMinimumC ( bm_handle_t handle,
+                        SgdnnTensor_t input,
+                        float scalar,
+                        SgdnnTensor_t output );
+
+/*
+ * OUTPUT = MINIMUM(INPUT,SCALAR)
+ * Note:
+ * 1. The data types of INPUT and OUTPUT must be the same and one of FP32, FP16 and BF16
+ * 2. The shapes of INPUT and OUTPUT must be the same
+ * 3. INPUT and OUTPUT must be contiguous
+ */
+bm_status_t sgdnnMinimum ( bm_handle_t handle,
+                        SgdnnTensor_t input,
+                        SgdnnTensor_t other,
+                        SgdnnTensor_t output );
+
+/*
+ * OUTPUT = MINIMUMBCAST(INPUT,SCALAR)
+ * Note:
+ * 1. The data types of INPUT and OUTPUT must be the same and one of FP32, FP16 and BF16
+ * 2. INPUT and OUTPUT must be contiguous
+ */
+bm_status_t sgdnnMinimumBcast ( bm_handle_t handle,
+                        SgdnnTensor_t input,
+                        SgdnnTensor_t other,
+                        SgdnnTensor_t output );      
+/*
+ * OUTPUT = MAXIMUMC(INPUT,SCALAR)
+ * Note:
+ * 1. The data types of INPUT and OUTPUT must be the same and one of FP32, FP16 and BF16
+ * 2. The shapes of INPUT and OUTPUT must be the same
+ * 3. INPUT and OUTPUT must be contiguous
+ */
+bm_status_t sgdnnMaximumC ( bm_handle_t handle,
+                        SgdnnTensor_t input,
+                        float scalar,
+                        SgdnnTensor_t output );
+
+/*
+ * OUTPUT = MAXIMUM(INPUT,SCALAR)
+ * Note:
+ * 1. The data types of INPUT and OUTPUT must be the same and one of FP32, FP16 and BF16
+ * 2. The shapes of INPUT and OUTPUT must be the same
+ * 3. INPUT and OUTPUT must be contiguous
+ */
+bm_status_t sgdnnMaximum ( bm_handle_t handle,
+                        SgdnnTensor_t input,
+                        SgdnnTensor_t other,
+                        SgdnnTensor_t output );
+
+/*
+ * OUTPUT = MAXIMUMBCAST(INPUT,SCALAR)
+ * Note:
+ * 1. The data types of INPUT and OUTPUT must be the same and one of FP32, FP16 and BF16
+ * 2. INPUT and OUTPUT must be contiguous
+ */
+bm_status_t sgdnnMaximumBcast ( bm_handle_t handle,
+                        SgdnnTensor_t input,
+                        SgdnnTensor_t other,
+                        SgdnnTensor_t output );                   
+
+/*
+ * OUTPUT = ATAN2C(SCALAR,OTHER)
+ * Note:
+ * 1. The data types of INPUT and OUTPUT must be the same and one of FP32, FP16 and BF16
+ * 2. The shapes of INPUT and OUTPUT must be the same
+ * 3. OUTPUT must be contiguous
+ */
+bm_status_t sgdnnAtan2C ( bm_handle_t handle,
+                        float scalar,
+                        SgdnnTensor_t other,
+                        SgdnnTensor_t output );
+
+/*
+ * OUTPUT = ATAN2_C(INPUT,SCALAR)
+ * Note:
+ * 1. The data types of INPUT and OUTPUT must be the same and one of FP32, FP16 and BF16
+ * 2. The shapes of INPUT and OUTPUT must be the same
+ * 3. OUTPUT must be contiguous
+ */
+bm_status_t sgdnnAtan2_C ( bm_handle_t handle,
+                        SgdnnTensor_t input,
+                        float scalar,
+                        SgdnnTensor_t output );
+
+/*
+ * OUTPUT = ATAN2(INPUT,OTHER)
+ * Note:
+ * 1. The data types of INPUT and OUTPUT must be the same and one of FP32, FP16 and BF16
+ * 2. The shapes of INPUT and OUTPUT must be the same
+ * 3. OUTPUT must be contiguous
+ */
+bm_status_t sgdnnAtan2 ( bm_handle_t handle,
+                        SgdnnTensor_t input,
+                        SgdnnTensor_t other,
+                        SgdnnTensor_t output );
+
+/*
+ * OUTPUT = ATAN2BCAST(INPUT,OTHER)
+ * Note:
+ * 1. The data types of INPUT and OUTPUT must be the same and one of FP32, FP16 and BF16
+ * 2. The shapes of INPUT and OUTPUT must be the same
+ * 3. OUTPUT must be contiguous
+ */
+bm_status_t sgdnnAtan2Bcast ( bm_handle_t handle,
+                        SgdnnTensor_t input,
+                        SgdnnTensor_t other,
+                        SgdnnTensor_t output );
 
 
 /*

@@ -23,7 +23,7 @@ data_type_t dtype )
 
   local_addr_t input_local_addrs[2] = {0, 1 * tensor_size};
   local_addr_t output_local_addrs[2] = {2 * tensor_size, 3 * tensor_size};
-  local_addr_t work_local_addr[3] = {4 * tensor_size, 5 * tensor_size, 6 * tensor_size};
+  local_addr_t work_local_addrs[3] = {4 * tensor_size, 5 * tensor_size, 6 * tensor_size};
   local_addr_t exp_coeff_local_addr = 7 * tensor_size;
   local_addr_t log_coeff_local_addr = 7 * tensor_size + 1 * bank_size; 
   local_addr_t exp_table_local_addr = 7 * tensor_size + 2 * bank_size; 
@@ -70,13 +70,13 @@ data_type_t dtype )
       tpu_gdma_cpy_L2S ( l2s_global_addr, l2s_local_addr, &l2s_shape, NULL, NULL, dtype );
     }
     
-    tpu_bdc_abs(work_local_addr[2],input_local_addrs[index],&shape,NULL,NULL,dtype);
-    tpu_bdc_fp32_pow_C(output_local_addrs[index],work_local_addr[2],work_local_addr[0],work_local_addr[1],
+    tpu_bdc_abs(work_local_addrs[2],input_local_addrs[index],&shape,NULL,NULL,dtype);
+    tpu_bdc_fp32_pow_C(output_local_addrs[index],work_local_addrs[2],work_local_addrs[0],work_local_addrs[1],
                               exp_coeff_local_addr,log_coeff_local_addr,exp_table_local_addr,POW_C,&shape);
-    tpu_bdc_fp_add_C(work_local_addr[2],output_local_addrs[index], ADD_C, &shape, NULL, NULL, dtype); 
-    tpu_bdc_fp32_rsqrt(output_local_addrs[index],work_local_addr[2],&shape) ;
-    tpu_bdc_fp_mul(work_local_addr[2],output_local_addrs[index],input_local_addrs[index],&shape,NULL,NULL,NULL,dtype);
-    tpu_bdc_fp32_arcsin(output_local_addrs[index],work_local_addr[2], work_local_addr[0],arcsin_coeff_local_addr,&shape);
+    tpu_bdc_fp_add_C(work_local_addrs[2],output_local_addrs[index], ADD_C, &shape, NULL, NULL, dtype); 
+    tpu_bdc_fp32_rsqrt(output_local_addrs[index],work_local_addrs[2],&shape) ;
+    tpu_bdc_fp_mul(work_local_addrs[2],output_local_addrs[index],input_local_addrs[index],&shape,NULL,NULL,NULL,dtype);
+    tpu_bdc_fp32_arcsin(output_local_addrs[index],work_local_addrs[2], work_local_addrs[0],arcsin_coeff_local_addr,&shape);
 
     l2s = true;
     l2s_global_addr = output_global_addr + done * dtype_size;
