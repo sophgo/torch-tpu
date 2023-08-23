@@ -13,7 +13,7 @@ extern void nodechip_active_local(local_addr_t in_addr, local_addr_t out_addr,
                                   sg_active_type_t active_type,
                                   int if_local_layer, float *coef);
 
-void nodechip_active(global_addr_t in_global_addr,
+static void nodechip_active(global_addr_t in_global_addr,
                      global_addr_t out_global_addr, const int *shape,
                      int shape_dim, data_type_t dtype,
                      sg_active_type_t active_type, float *coef) {

@@ -105,7 +105,7 @@ namespace c10d {
 namespace {
 static const std::string GLOO_SOCKET_IFNAME_ENV = "GLOO_SOCKET_IFNAME";
 constexpr int kBytes = 8;
-std::vector<std::string> split(char separator, const std::string& string) {
+std::vector<std::string> split0(char separator, const std::string& string) {
   std::vector<std::string> pieces;
   std::stringstream ss(string);
   std::string item;
@@ -689,15 +689,15 @@ std::shared_ptr<::gloo::transport::Device> ProcessGroupSCCL::
   // use. Note: if the hostname does not resolve to an address (e.g.
   // because of misconfigured /etc/hosts file), this will not work.
   socketInitialize();
-  std::array<char, HOST_NAME_MAX> hostname{};
+ std::array<char, HOST_NAME_MAX> hostname{};
   auto rv = gethostname(hostname.data(), HOST_NAME_MAX);
-  if (rv != 0) {
+ if (rv != 0) {
     //throw std::system_error(errno, std::system_category());
   }
 
   // Use this machine's hostname if it resolves to an address.
   if (doesHostnameResolveToUsableAddress(hostname.data())) {
-    return ::c10d::SCCLDeviceFactory::makeDeviceForHostname(hostname.data());
+   return ::c10d::SCCLDeviceFactory::makeDeviceForHostname(hostname.data());
   }
 
   // Otherwise, use the loopback address.
@@ -705,7 +705,7 @@ std::shared_ptr<::gloo::transport::Device> ProcessGroupSCCL::
       "Unable to resolve hostname to a (local) address. ",
       "Using the loopback address as fallback. ",
       "Manually set the network interface to bind to with GLOO_SOCKET_IFNAME.");
-  return createDeviceForHostname(kLoopbackAddress);
+ return createDeviceForHostname(kLoopbackAddress);
 }
 #endif
 
@@ -2959,7 +2959,7 @@ c10::intrusive_ptr<ProcessGroup> ProcessGroupSCCL::createProcessGroupSCCL(
   // Use interfaces listed in "GLOO_SOCKET_IFNAME", if set.
   char* ifnameEnv = getenv(GLOO_SOCKET_IFNAME_ENV.c_str());
   if (ifnameEnv && strlen(ifnameEnv) > 1) {
-    for (const auto& iface : split(',', ifnameEnv)) {
+    for (const auto& iface : split0(',', ifnameEnv)) {
       options->devices.push_back(
           ::c10d::ProcessGroupSCCL::createDeviceForInterface(iface));
     }

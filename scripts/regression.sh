@@ -60,9 +60,9 @@ function build_libtorch_plugin() {
     pushd  $CURRENT_DIR/..
     cmd_rm="rm -rf libtorch"
     $cmd_rm
-    get_libtorch="wget https://download.pytorch.org/libtorch/cpu/libtorch-cxx11-abi-shared-with-deps-2.0.1%2Bcpu.zip"
+    get_libtorch="wget -nc https://download.pytorch.org/libtorch/cpu/libtorch-shared-with-deps-2.0.1%2Bcpu.zip"
     $get_libtorch
-    unzip_code="unzip libtorch-cxx11-abi-shared-with-deps-2.0.1+cpu.zip"
+    unzip_code="unzip libtorch-shared-with-deps-2.0.1+cpu.zip"
     $unzip_code
     popd
   fi
