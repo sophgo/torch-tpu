@@ -13,10 +13,6 @@
 #define TOP_CONCURRENCY_H_BS 2 //slice or loop H & NS,
 #define TOP_CONCURRENCY_V_H  3 //slice or loop V & H, not implemented
 
-//SubPattern for TOP_CONCURRENCY_H_BS
-#define SUBPATTERN_CODE_LOOP_H  0 //loop H, not implemented
-#define SUBPATTERN_CODE_LOOP_BS 1 //loop BS, default
-
 //NPU Computing Pattern
 #define NPU_LOOP_V 0                     // {v0,v1..}
 #define NPU_RECOLLECT_V_WITH_SAME_SUM 1  // {g0={v0,v1; |v0|==|v1|}}
@@ -284,7 +280,7 @@ static inline int count_numel_dim4(const dim4 shape) {
 }
 
 //Find a min 64k length apporaching to given length
-static inline int length_align_64bit_apporach(int origin_length, data_type_t Index_dtype){
+static inline int length_align_64bit_apporach(int origin_length,const  data_type_t Index_dtype){
   TPUKERNEL_ASSERT_INFO(Index_dtype == DT_INT32, "You are trying to align index_addr to 64bits, but Only INT32 is supported!");
   return DIV_UP(origin_length * (tpu_data_type_size(Index_dtype)), 64)*64;
 }
@@ -310,6 +306,8 @@ static inline void compute_current_slice_info_multi_core_1D_with_given_cores_wit
   if (core_idx == num_max_core_needed - 1) {
     current_num_for_current_core = total_num - avgnum_element_each_core * (num_max_core_needed - 1);
   }
+  TPUKERNEL_ASSERT_INFO(expected_current_slice <= expected_avg_slice, "Split  Error!");
+  TPUKERNEL_ASSERT_INFO(expected_current_slice > 0, "Split  Error!");
   *expected_current_slice = current_num_for_current_core;
   *expected_avg_slice     = avgnum_element_each_core;
   *expected_secs          = num_max_core_needed;
@@ -361,11 +359,11 @@ static inline void compute_current_slice_info_multi_core_1D(int total_num, int* 
 static inline void compute_current_loop_info_each_core_1D_with_loop_idx(int total_num, int* expected_current_slice,
                                                          int* expected_avg_slice, int num_loop_upper, int current_loop_id) {
   const int avgnum_element_each_loop = DIV_UP(total_num, num_loop_upper);
-
   int current_num_for_current_loop = avgnum_element_each_loop;
   if (current_loop_id == num_loop_upper - 1) {
     current_num_for_current_loop = total_num - avgnum_element_each_loop * (num_loop_upper - 1);
   }
+  TPUKERNEL_ASSERT_INFO(current_num_for_current_loop <= avgnum_element_each_loop, "Split Loop Error!");
   TPUKERNEL_ASSERT_INFO(current_num_for_current_loop > 0, "Split Loop Error!");
   *expected_current_slice = current_num_for_current_loop;
   *expected_avg_slice     = avgnum_element_each_loop;
@@ -404,7 +402,7 @@ static inline void compute_current_slice_info_multi_core_2D_correlated(int total
   //Assuming operate only 1 global_slice. In such case, just adjust some slices only if they are too long.
   TPUKERNEL_ASSERT(total_num_x * total_num_y * tpu_data_type_size(dtype) < SG2260_GLOBAL_MEM);
   //step 0
-  int max_dim = total_num_x > total_num_y ? 0 : 1;
+  const int max_dim = total_num_x > total_num_y ? 0 : 1;
   // int prority_num_1st = total_num_x > total_num_y ? total_num_x : total_num_y;
   int prority_num_2nd = total_num_x <= total_num_y ? total_num_x : total_num_y;
   //step 1
@@ -484,7 +482,7 @@ static inline void compute_current_slice_info_multi_core_2D_correlated(int total
 }
 
 //Function: if search_index_value is in data[:current_length]
-int check_duplicate_value(int search_index_value, int * data,int current_length) {
+int check_duplicate_value(const int search_index_value,const  int * data,const int current_length) {
   if (current_length==0) {
     return 0;
   }
@@ -496,7 +494,7 @@ int check_duplicate_value(int search_index_value, int * data,int current_length)
 }
 
 //Function: return id where data[id]==search_index_value && id <= current_length - 1
-int search_duplicate_id(int search_index_value, int * data,int current_length) {
+int search_duplicate_id(const int search_index_value,const int * data,const int current_length) {
   for(int i=0; i <current_length; i++) {
       if (data[i] == search_index_value)
         return i;
@@ -506,14 +504,25 @@ int search_duplicate_id(int search_index_value, int * data,int current_length) {
 
 //Function: check is Tensor T is larger than L1_MEM
 //          If not ,T can be fully hold on L1/L2/GMEM
-void TENSOR_MEM_ISOLATED_PRECHECK_L1_dim4(dim4 object, data_type_t  dtype) {
-    int l1_mem_sg2260 = SG2260_LOCAL_MEM;
-    TPUKERNEL_ASSERT(object.n*object.h*object.w*object.c * tpu_data_type_size(dtype) <=l1_mem_sg2260); //only 256KB (8Mb) local_bitwidth is 18
+void TENSOR_MEM_ISOLATED_PRECHECK_L1_dim4(const dim4 object,const  data_type_t  dtype) {
+    const int l1_mem_sg2260 = SG2260_LOCAL_MEM;
+    TPUKERNEL_ASSERT(count_numel_dim4(object) * tpu_data_type_size(dtype) <=l1_mem_sg2260); //only 256KB (8Mb) local_bitwidth is 18
 }
 
+//Function: get 4* banksize
+//Strategy: If bank_size is not enough, DIV_DOWN
 static inline int gen_bank_4_size() {
-   int bank_size =  tpu_local_mem_size_per_npu() / tpu_bank_num();
-   int bank_4 = 4* bank_size;//SG2260_LOCAL_MEM;
+   const int bank_num = tpu_bank_num();
+   const int bank_size_per =  tpu_local_mem_size_per_npu() / tpu_bank_num();
+   const int num_used_local_addr = 4;
+   //Expect: 16/4= 4; 16/5=3;
+   int num_bank_per = DIV_UP(bank_num, num_used_local_addr);
+   while (num_bank_per * num_used_local_addr > bank_num) {
+     num_bank_per -= 1;
+   }
+   const int bank_4 = num_bank_per * bank_size_per;//SG2260_LOCAL_MEM;
+   const int local_mem = SG2260_LOCAL_MEM;
+   TPUKERNEL_ASSERT_INFO(local_mem >= bank_size_per * num_used_local_addr, "[ERROR] Bank_size!");
    return  bank_4;
 }
 //Function:  grad_W[v,h]=sum(W[X[i',j'],h]; grad_Y=W
@@ -679,11 +688,11 @@ void nodechip_embedding_backward_multi_core_basic_cell_patttern_one(
   const dim4    grad_W_shape, //[V, H_sliced]
   const int     H_native,
   const int     first_loop_flag,
-  data_type_t   grad_dtype) {
+  const data_type_t   grad_dtype) {
   //Step 0: check and initalize
   // TPUKERNEL_ASSERT(USING_L2);
   // TPUKERNEL_ASSERT(IN_L2_SRAM(grad_Weight_global_addr));
-  scalar_t zero_ = {.u32 = 0};
+  const scalar_t zero_ = {.u32 = 0};
   const int len_grad_dtype = tpu_data_type_size(grad_dtype);
   const int NUM_full_Index = count_numel_dim4(X_shape);
   const int H_sliced = grad_Y_shape.w;
@@ -691,11 +700,11 @@ void nodechip_embedding_backward_multi_core_basic_cell_patttern_one(
   const int BS = grad_Y_shape.h;
   const int local_offset_1 = BS * H_sliced * len_grad_dtype; //tpu_aligned_feature_size (1, H_sliced, grad_dtype );
   const int local_offset_2 = V  * H_sliced * len_grad_dtype; // tpu_aligned_feature_size (1, H_sliced, grad_dtype ); //sum_num_per_v<=V
-  int bank_4_size = gen_bank_4_size();
-  local_addr_t grad_Y_gathered_local_addr    = 0;
-  local_addr_t reduce_no_parallel_local_addr = bank_4_size;
-  local_addr_t grad_Y_scatter_local_addr     = 2 * bank_4_size;
-  local_addr_t partial_sum_local_addr        = 3 * bank_4_size;
+  const int bank_4_size = gen_bank_4_size();
+  const local_addr_t grad_Y_gathered_local_addr    = 0;
+  const local_addr_t reduce_no_parallel_local_addr = bank_4_size;
+  const local_addr_t grad_Y_scatter_local_addr     = 2 * bank_4_size;
+  const local_addr_t partial_sum_local_addr        = 3 * bank_4_size;
   TPUKERNEL_ASSERT_INFO(local_offset_1 < bank_4_size, "BS is too large!");
   TPUKERNEL_ASSERT_INFO(local_offset_2 < bank_4_size, "V is too large or not sparse enough!");
   TPUKERNEL_ASSERT_INFO(partial_sum_local_addr+local_offset_2 < (u32)tpu_local_mem_size_per_npu(), "BS_Loop is too large");
@@ -728,10 +737,10 @@ void nodechip_embedding_backward_multi_core_basic_cell_patttern_one(
   //  Function: z =  grad_Y[X[i,j], h]; z = grad_W[v, h]; v is free for every |v|==|x[x,j]|
   //  Input: Index_sorted_by_Index_value~[B*S]
   //  Output: Output[index_sorted]~[B*S,H_sliced]
-  dim4 shape_gather_L2_to_L1 = {.n = 1, .c = 1, .h = BS, .w = H_sliced};
+  const dim4 shape_gather_L2_to_L1 = {.n = 1, .c = 1, .h = BS, .w = H_sliced};
   TENSOR_MEM_ISOLATED_PRECHECK_L1_dim4(shape_gather_L2_to_L1, grad_dtype);
   //Note: H(.w-dim) is sliced, so each core operates sliced shape but strides in native shape.
-  dim4 stride_gather_L2_to_L1 = {.n = 0, .c = 0, .h = H_native, .w = 1};
+  const dim4 stride_gather_L2_to_L1 = {.n = 0, .c = 0, .h = H_native, .w = 1};
   //Question: which is faster ? tpu_gdma_h_gather_S2L or tpu_gdma_h_gather_S2S
   tpu_gdma_h_gather_S2L(grad_Y_gathered_local_addr, grad_Y_global_addr, sorted_index_index_global_addr,  false, zero_, &shape_gather_L2_to_L1, BS, NULL, &stride_gather_L2_to_L1, NULL, grad_dtype );
   //Step 1.2: Prepare All_reduce
@@ -795,7 +804,7 @@ void nodechip_embedding_backward_multi_core_basic_cell_patttern_one(
   //output:    Operation ~ [NUM_V_used, H_sliced]
 
   global_addr_t reduce_global_addr = grad_Y_gathered_global_addr;
-  //CONTROL_CODE ERRPR
+  //CONTROL_CODE ERROR
   NPU_Utils_Pattern = NPU_RECOLLECT_V_WITH_SAME_SUM;
   if (NPU_Utils_Pattern==NPU_RECOLLECT_V_WITH_SAME_SUM) {
     Function_Recollect_Index(
@@ -829,11 +838,11 @@ void nodechip_embedding_backward_multi_core_basic_cell_patttern_one(
 
       global_addr_t reduce_global_addr_input    = grad_Y_gathered_global_addr +  counter_history * H_native * len_grad_dtype;
       global_addr_t reduce_global_addr_finished = reduce_global_addr          +  old_v_idx       * H_native * len_grad_dtype;
-      dim4 shape_temp       = {.n = 1, .c = group_size_index_with_same_duplicate_num, .h = sum_num_per_v, .w = H_sliced };
+      const dim4 shape_temp       = {.n = 1, .c = group_size_index_with_same_duplicate_num, .h = sum_num_per_v, .w = H_sliced };
       TPUKERNEL_ASSERT_INFO(shape_temp.h < 65535, "sum_num_per_v is too large!");
-      dim4 stride_tmp       = {.n = 0, .c = H_native * sum_num_per_v, .h = H_native, .w = 1};
-      dim4 shape_collected  = {.n = 1, .c = group_size_index_with_same_duplicate_num, .h = 1, .w = H_sliced};
-      dim4 stride_collected = {.n = 0, .c = H_native, .h = H_native, .w = 1};
+      const dim4 stride_tmp       = {.n = 0, .c = H_native * sum_num_per_v, .h = H_native, .w = 1};
+      const dim4 shape_collected  = {.n = 1, .c = group_size_index_with_same_duplicate_num, .h = 1, .w = H_sliced};
+      const dim4 stride_collected = {.n = 0, .c = H_native, .h = H_native, .w = 1};
 
       if (sum_num_per_v > 1) {
         TENSOR_MEM_ISOLATED_PRECHECK_L1_dim4(shape_temp, grad_dtype);
@@ -844,7 +853,7 @@ void nodechip_embedding_backward_multi_core_basic_cell_patttern_one(
           TPUKERNEL_ASSERT(USING_L2);
           using_L2_nodechip = NUM_V_used * H_native * len_grad_dtype + tpu_core_num() *  H_native * NUM_V_used * len_grad_dtype<L2_SRAM_SIZE;
         #endif
-        int reduce_pattern = AVG_SIM; //ERROR
+        const int reduce_pattern = AVG_SIM; //ERROR
         //Reduce Full Pattern:
         //1)SUPER_SET: ONly work when grad_out==ones
         //2)L2_PATTERN: Using L2
@@ -859,15 +868,15 @@ void nodechip_embedding_backward_multi_core_basic_cell_patttern_one(
           //Local_Input_Shape~[1, group_size_index_with_same_duplicate_num,sum_num_per_v,H_slice]
           const int core_idx = tpu_core_index();
           //group_size_index_with_same_duplicate_num <= NUM_V_used
-          dim4 shape_local_to_L2_addr  = {.n = 1, .c = group_size_index_with_same_duplicate_num, .h = 1, .w = H_sliced};
-          dim4 stride_local_to_L2_addr = {.n = 0, .c = H_sliced, .h = H_sliced, .w = 1};
+          const dim4 shape_local_to_L2_addr  = {.n = 1, .c = group_size_index_with_same_duplicate_num, .h = 1, .w = H_sliced};
+          const dim4 stride_local_to_L2_addr = {.n = 0, .c = H_sliced, .h = H_sliced, .w = 1};
 
-          int sdma_offset = core_idx *  H_native * V * len_grad_dtype;
+          const int sdma_offset = core_idx *  H_native * V * len_grad_dtype;
           TPUKERNEL_ASSERT(count_numel_dim4(shape_local_to_L2_addr) <  H_native * V);
           global_addr_t reduce_sdma_addr = L2_SRAM_START_ADDR + sdma_offset;
           TPUKERNEL_ASSERT( H_native * V < L2_SRAM_SIZE);
-          int psum_op = 1; //GDMA_ARE_PSUM_RW
-          int op_code = 1; //GDMA_ARE_ADD
+          const int psum_op = 1; //GDMA_ARE_PSUM_RW
+          const int op_code = 1; //GDMA_ARE_ADD
           tpu_sdma_set_C_system(reduce_sdma_addr, zero_, &shape_collected, NULL, grad_dtype);
           tpu_poll();
           for (int id_sdma =0; id_sdma<sum_num_per_v ; id_sdma++) {
@@ -875,17 +884,16 @@ void nodechip_embedding_backward_multi_core_basic_cell_patttern_one(
             tpu_gdma_cpy_reduce_L12L2(reduce_sdma_addr, local_to_L2_addr, &shape_local_to_L2_addr, NULL, &stride_local_to_L2_addr, grad_dtype, psum_op, op_code );
           }
           tpu_poll();
-          dim4 shape_collected2  = {.n = 1, .c = group_size_index_with_same_duplicate_num, .h = 1, .w = H_sliced};
-          dim4 stride_collected2 = {.n = 0, .c = H_native, .h = H_native, .w = 1};
+          const dim4 shape_collected2  = {.n = 1, .c = group_size_index_with_same_duplicate_num, .h = 1, .w = H_sliced};
+          const dim4 stride_collected2 = {.n = 0, .c = H_native, .h = H_native, .w = 1};
           tpu_sdma_cpy_S2S(reduce_global_addr_finished,reduce_sdma_addr,&shape_collected2, &stride_collected2, NULL, grad_dtype);
           tpu_poll();
         } else if (using_L2_nodechip&&reduce_pattern== AVG_SIM)  {
-          dim2 avg_kernel = {sum_num_per_v, 1};
-          padding_t avg_pad_local_zero = {0, 0};
-          dim2 avg_str_local_one = {1, 1};
-          dim2 avg_dil_local_one = {1, 1};
-          scalar_t avg_scale;
-          avg_scale.f32 = 1.0f;
+          const dim2 avg_kernel = {sum_num_per_v, 1};
+          const padding_t avg_pad_local_zero = {0, 0};
+          const dim2 avg_str_local_one = {1, 1};
+          const dim2 avg_dil_local_one = {1, 1};
+          const scalar_t avg_scale = {.f32 = 1.0f};
           // printf("compute  %d ;loop: %d ;core: %d; fvg: %d %d\n", lhistory_id, loop, core, group_size_index_with_same_duplicate_num, sum_num_per_v); lhistory_id+=1;
           tpu_bdc_fp_avg_pool2d(reduce_no_parallel_local_addr,
                                 reduce_no_parallel_local_addr,
@@ -912,14 +920,14 @@ void nodechip_embedding_backward_multi_core_basic_cell_patttern_one(
   //Function: grad_W [v, h] = temp_reduce_value
   // Input: [v,h] ~[V,H_sliced]; temp_reduce_value ~[NUM_V_used]
   // Output: grad_W~[V',H_sliced] V'~NUM_V_used<=V
-  dim4 shape_scatter_L2_to_L1 = {.n = 1, .c = 1, .h = V, .w = H_sliced};
+  const dim4 shape_scatter_L2_to_L1 = {.n = 1, .c = 1, .h = V, .w = H_sliced};
   TENSOR_MEM_ISOLATED_PRECHECK_L1_dim4(shape_scatter_L2_to_L1, grad_dtype);
 
   //Step 3.1 get scatter_index
   //Step_Arch: ARM-<AXI>-GDMA
   //Note: H is sliced, so each core operates sliced shape but strides in native shape.
   //      However,  grad_Y_gathered_global_addr is core-indepedent, so H_native is not considered on its coressponding stride
-  dim4 stride_scatter_L2_to_L1 = {.n = 0, .c =0, .h = H_native, .w = 1};
+  const dim4 stride_scatter_L2_to_L1 = {.n = 0, .c =0, .h = H_native, .w = 1};
   // Send duplicate_index from CPU to GMEM
   int* tmp2 = NULL;
   tmp2 = (int*) tpu_global_mem_addr(scatter_index_global_flush_64b_aligned_addr);
@@ -960,8 +968,13 @@ void nodechip_embedding_backward_multi_core_basic_cell_patttern_one(
 //    Projection represents one |v| correspondings to Groups of |x[i,j]|
 // Key Q: how to reduce x(i,j,loop) from different G_loop to same |v|?
 // Solution: BS_loop <-> Groups_loop, |v| <-> {|x[i_0,j_0]|}, ...,{|x[i_p,j_q]|} = {G1,G2,..G'}
-// Notice:   BS-loop not applied Index_sorted
-// Constraints: V*H_slice* dtype_size <= SG2260_LOCAL_MEM
+//Strategy: AS usually BS > V for LLM,   adopt (a) as (b)-(4) need to reloop B for larger slice-shape
+// Notice:   BS-loop not applied Index_sorted && V/BS never intracore sliced
+// (a) 1)H_slice; 2)ensue (V,H_Sliced_loop) < gen_bank_4_size()  3) (only when BS > V) loop B ensure (BS_loop,H_Sliced_loop) < gen_bank_4_size()
+// (b) 1)H_slice; 2)ensue (BS_loop,H_Sliced) < gen_bank_4_size() 3) (only when V > BS_loop) loop H ensure (V,H_Sliced_loop) < gen_bank_4_size() 4) (only when V > BS_loop) reloop B find a larger (BS_loop',H_Sliced_loop)   
+// Thus, Mem Constraints Prioirty:
+// 1)[Slice] Ensure grad_W_shape_sliced[V, H_sliced_loop]  < gen_bank_4_size()
+// 2)[Slice] Ensure grad_Y_shape_sliced[BS_loop. H_sliced] < gen_bank_4_size()
 void nodechip_embedding_backward_multi_core_basic_cell_pattern_two (
   global_addr_t gradout_global_addr,
   global_addr_t index_global_addr,
@@ -973,54 +986,52 @@ void nodechip_embedding_backward_multi_core_basic_cell_pattern_two (
   const dim4    grad_Y_shape, //[B*S, H_sliced]
   const dim4    X_shape,      //[B, S]
   const dim4    grad_W_shape, //[V, H_sliced]
-  data_type_t   grad_dtype,
-  data_type_t   Index_dtype
+  const data_type_t   grad_dtype,
+  const data_type_t   Index_dtype
 ) {
-   int core_idx = tpu_core_index();
+   TPUKERNEL_ASSERT_INFO(Index_dtype == DT_INT32, "You are trying to align index_addr to 64bits, but Only INT32 is supported!");
+   const int core_idx = tpu_core_index();
    const int len_grad_dtype = tpu_data_type_size(grad_dtype);
+   const int V = grad_W_shape.h;
+   const int BS_native = count_numel_dim4(X_shape);
+   TPUKERNEL_ASSERT_INFO(grad_Y_shape.w == grad_W_shape.w, "check H of [BS, H] <--> [V ,H] failed");
+   //[Slice] Step 1: H_sliced
    int H_sliced_real        = 1, H_sliced_avg = 1, H_native = grad_W_shape.w;
    int min_cores_needed     = 1;
-   const int V = grad_W_shape.h;
-
-    TPUKERNEL_ASSERT_INFO(grad_Y_shape.w == grad_W_shape.w, "check H of [BS, H] <--> [V ,H] failed");
-    int BS_native = count_numel_dim4(X_shape);
-    int BS_sliced_real = 1, BS_sliced_avg = 1;
-    int excute_pattern_level_sub =  BS_native > H_native ? SUBPATTERN_CODE_LOOP_BS :  SUBPATTERN_CODE_LOOP_H;
-    excute_pattern_level_sub = SUBPATTERN_CODE_LOOP_BS;
-    TPUKERNEL_ASSERT_INFO(excute_pattern_level_sub == SUBPATTERN_CODE_LOOP_BS, "SUBPATTERN_CODE_LOOP_H is not supported now!");
-    int PartRange_loop = excute_pattern_level_sub == SUBPATTERN_CODE_LOOP_BS ? BS_native :  H_native;
-    int FullRange_loop = PartRange_loop;
-    int num_loop_upper     = 0;
-    compute_current_slice_info_multi_core_1D(H_native, &H_sliced_real, &H_sliced_avg, &min_cores_needed);
-
-    //When core_num is small&& H is large, [BS,H]->[BS,H_sliced]-> [BS_loop, H_sliced_loop]
-    // int poor_core_num_flag = 0;
-    // [TO-DO]if V * H_sliced_real * len_grad_dtype >= gen_bank_4_size() H_sliced_real_loop
-    while(PartRange_loop * H_sliced_real * len_grad_dtype >= gen_bank_4_size()) { //SG2260_LOCAL_MEM;
-      if (( PartRange_loop==1 && V== 1 && H_sliced_real * len_grad_dtype >= gen_bank_4_size()) ||
-         2 * H_sliced_real * len_grad_dtype >=  gen_bank_4_size()) {
-        // poor_core_num_flag = 1;
-        break;
-      }
-      num_loop_upper += 1;
-      PartRange_loop   = DIV_UP(FullRange_loop, num_loop_upper);
+   compute_current_slice_info_multi_core_1D(H_native, &H_sliced_real, &H_sliced_avg, &min_cores_needed);
+   if (core_idx < min_cores_needed) {
+    //[Slice] Step 2: Ensue grad_W_shape_sliced(V,H_Sliced_loop) < gen_bank_4_size()
+    //[BS, H ,V] -> [BS, H_sliced, V] ->  [BS_loop, H_sliced_loop]
+    int num_loop_upper_H_sliced_loop = 1;
+    int H_sliced_loop_tmp = H_sliced_real;
+    while (V * H_sliced_loop_tmp * len_grad_dtype >= gen_bank_4_size()) {
+        num_loop_upper_H_sliced_loop += 1;
+        H_sliced_loop_tmp = DIV_UP(H_sliced_real, num_loop_upper_H_sliced_loop);
     }
-    num_loop_upper = num_loop_upper > 0 ? num_loop_upper : 1;
-
-    if (core_idx < min_cores_needed) {
+    for (int idx_H_sliced_loop = 0; idx_H_sliced_loop < num_loop_upper_H_sliced_loop; idx_H_sliced_loop++) {
+        int H_sliced_loop_real = 1, H_sliced_loop_avg  = 1;
+        compute_current_loop_info_each_core_1D_with_loop_idx(H_sliced_real, &H_sliced_loop_real, &H_sliced_loop_avg, num_loop_upper_H_sliced_loop, idx_H_sliced_loop);
+        //[Slice] Step 3: Ensure grad_Y_shape_sliced[BS_loop, H_sliced_loop] < gen_bank_4_size()
+        int BS_sliced_real = 1, BS_sliced_avg = 1;
+        int PartRange_loop_tmp =  BS_native;
+        int num_loop_upper_BS     = 1;
+        TPUKERNEL_ASSERT_INFO(V * H_sliced_loop_real * len_grad_dtype < gen_bank_4_size(), "at least svae one H_slice on L1!");
+        while(PartRange_loop_tmp * H_sliced_loop_real * len_grad_dtype >= gen_bank_4_size()) {
+          num_loop_upper_BS += 1;
+          PartRange_loop_tmp = DIV_UP(BS_native, num_loop_upper_BS);
+        }
         //[Error] when [B,S,V,H]=[6, 4096,2,12288] num_loop_upper is 2458
         // loop efficiency is low and Function_Recollect_Index cannot utilize same index among loops.
-
-        for (int loop_idx = 0 ; loop_idx < num_loop_upper; loop_idx++) {
-          compute_current_loop_info_each_core_1D_with_loop_idx(BS_native, &BS_sliced_real, &BS_sliced_avg, num_loop_upper, loop_idx);
-
-          int  core_dim_sliced_avg =  excute_pattern_level_sub == SUBPATTERN_CODE_LOOP_BS ? H_sliced_avg   : BS_sliced_avg;
-          int  loop_dim_sliced_avg =  excute_pattern_level_sub == SUBPATTERN_CODE_LOOP_BS ? BS_sliced_avg  : H_sliced_avg;
-          int  core_dim_sliced_real = excute_pattern_level_sub == SUBPATTERN_CODE_LOOP_BS ? H_sliced_real  : BS_sliced_real;
-          int  loop_dim_sliced_real = excute_pattern_level_sub == SUBPATTERN_CODE_LOOP_BS ? BS_sliced_real : H_sliced_real;
-          int  core_dim_native =      excute_pattern_level_sub == SUBPATTERN_CODE_LOOP_BS ? H_native       : BS_native;
-          //int  loop_dim_native =      excute_pattern_level_sub == SUBPATTERN_CODE_LOOP_BS ? BS_native      : H_native;
-
+        for (int idx_BS_loop = 0 ; idx_BS_loop < num_loop_upper_BS; idx_BS_loop++) {
+          compute_current_loop_info_each_core_1D_with_loop_idx(BS_native, &BS_sliced_real, &BS_sliced_avg, num_loop_upper_BS, idx_BS_loop);
+          const int  core_dim_sliced_avg  =  H_sliced_loop_avg;
+          const int  loop_dim_sliced_avg  =  BS_sliced_avg;
+          const int  core_dim_sliced_real =  H_sliced_loop_real;
+          const int  loop_dim_sliced_real =  BS_sliced_real;
+          TPUKERNEL_ASSERT_INFO(loop_dim_sliced_avg * core_dim_sliced_avg * len_grad_dtype <= gen_bank_4_size(), "[Slice] Step-2 Wrong");
+          const int offset_idx_H_slice_loop = idx_H_sliced_loop * core_dim_sliced_avg * 1 * len_grad_dtype;
+          const int offset_core_H_slice     = core_idx * H_sliced_avg * 1 * len_grad_dtype;
+          const int offset_H                = offset_idx_H_slice_loop + offset_core_H_slice;
           global_addr_t grad_Y_addr_sliced                    = gradout_global_addr;
           global_addr_t X_addr_sliced                         = index_global_addr;
           global_addr_t grad_Weight_addr_sliced               = grad_input_global_addr;
@@ -1028,62 +1039,52 @@ void nodechip_embedding_backward_multi_core_basic_cell_pattern_two (
           global_addr_t sorted_index_index_global_addr_sliced = sorted_index_index_global_addr;
           global_addr_t scatter_index_global_addr_sliced      =  scatter_index_global_flush_64b_aligned_addr;
           global_addr_t recollected_global_addr_sliced        = recollected_global_flush_64b_aligned_addr;
-          if (excute_pattern_level_sub == SUBPATTERN_CODE_LOOP_BS) {
-            int core_offset          = core_idx * core_dim_sliced_avg * 1 * len_grad_dtype;
-            //Grad_W [V,H]->[V, H_sliced]
-            //[NO-CONFLICT] core-free, loop-sequential
-            grad_Weight_addr_sliced += core_offset;
-            //Grad_Y [BS,H]->[BS_loop, H_sliced]
-            //[NO-CONFLICT] loop-core independent
-            int loop_offset          = loop_idx * loop_dim_sliced_avg * 1 * len_grad_dtype;
-            grad_Y_addr_sliced      += loop_offset * core_dim_native +  core_offset;
-            //X [B,S]->[BS]->[BS_loop]
-            //[Error] [CONFLICT-INFO] loop=0,core=1; loop=0,core =2  if not enough or aligned correctly overlap area on these 4 index buffers will be flushed by mutli-thread.
-            X_addr_sliced                         += loop_offset;
-            int align_offset_core =  core_idx * length_align_64bit_apporach(BS_native, Index_dtype);
-            int align_offset =   loop_idx * length_align_64bit_apporach(loop_dim_sliced_avg, Index_dtype);
-            tpu_hau_poll();
-            sorted_index_value_global_addr_sliced += align_offset + align_offset_core;
-            sorted_index_index_global_addr_sliced += align_offset + align_offset_core;
-            scatter_index_global_addr_sliced      += align_offset + align_offset_core;
-            recollected_global_addr_sliced        += align_offset + align_offset_core;
-            TPUKERNEL_ASSERT_INFO(sorted_index_value_global_addr_sliced % 64==0, "HAU addr mush be aligned to 65bit, using <length_align_64bit_apporach>!");
-            TPUKERNEL_ASSERT_INFO(sorted_index_index_global_addr_sliced % 64==0, "HAU addr mush be aligned to 65bit, using <length_align_64bit_apporach>!");
-            TPUKERNEL_ASSERT_INFO(scatter_index_global_addr_sliced % 64==0, "flush addr mush be aligned to 65bit, using <length_align_64bit_apporach>!");
-            TPUKERNEL_ASSERT_INFO(recollected_global_addr_sliced   % 64==0, "flush addr mush be aligned to 65bit, using <length_align_64bit_apporach>!");
-          } else { TPUKERNEL_ASSERT_INFO(0, "SUBPATTERN_CODE_LOOP_BS is not supported"); }
-          dim4 grad_Y_shape_sliced = {.n=1,.c=1,.h=1,.w= 1};
-          dim4 grad_W_shape_sliced = {.n=1,.c=1,.h=1,.w= 1};
-          dim4 X_shape_sliced   = {.n=1,.c=1,.h=1,.w= 1};
-          //Grad_Y [BS,H]->[BS_loop, H_slice]
-          grad_Y_shape_sliced.w =  core_dim_sliced_real;
-          grad_Y_shape_sliced.h =  loop_dim_sliced_real;
-          //Grad_W [V,H]->[V, H_slice]
-          grad_W_shape_sliced.w =  core_dim_sliced_real;
-          grad_W_shape_sliced.h =  V;
+          //Grad_W [V,H]->[V, H_sliced_loop]
+          grad_Weight_addr_sliced += offset_H;
+          //Grad_Y [BS,H]->[BS_loop, H_sliced_loop]
+          const int offset_BS_loop = idx_BS_loop    * loop_dim_sliced_avg * 1 * len_grad_dtype;
+          grad_Y_addr_sliced      += offset_BS_loop * H_native +  offset_H;
           //X [B,S]->[BS]->[BS_loop]
-          X_shape_sliced.w      = loop_dim_sliced_real;
-          TPUKERNEL_ASSERT(X_shape_sliced.h==1);
+          //[Note] Index(X) is free with idx_H_sliced_loop
+          //[Error] [CONFLICT-INFO] loop=0,core=1; loop=0,core =2  if not enough or aligned correctly overlap area on these 4 index buffers will be flushed by mutli-thread.
+          X_addr_sliced           += offset_BS_loop;
+          const int align_offset_core    =  core_idx    * length_align_64bit_apporach(BS_native, Index_dtype);
+          const int align_offset_loop    =  idx_BS_loop * length_align_64bit_apporach(loop_dim_sliced_avg, Index_dtype);
+          sorted_index_value_global_addr_sliced += align_offset_loop + align_offset_core;
+          sorted_index_index_global_addr_sliced += align_offset_loop + align_offset_core;
+          scatter_index_global_addr_sliced      += align_offset_loop + align_offset_core;
+          recollected_global_addr_sliced        += align_offset_loop + align_offset_core;
+          TPUKERNEL_ASSERT_INFO(sorted_index_value_global_addr_sliced % 64==0, "HAU addr mush be aligned to 65bit, using <length_align_64bit_apporach>!");
+          TPUKERNEL_ASSERT_INFO(sorted_index_index_global_addr_sliced % 64==0, "HAU addr mush be aligned to 65bit, using <length_align_64bit_apporach>!");
+          TPUKERNEL_ASSERT_INFO(scatter_index_global_addr_sliced % 64==0, "flush addr mush be aligned to 65bit, using <length_align_64bit_apporach>!");
+          TPUKERNEL_ASSERT_INFO(recollected_global_addr_sliced   % 64==0, "flush addr mush be aligned to 65bit, using <length_align_64bit_apporach>!");
+          //Grad_Y [BS,H]->[BS_loop, H_slice_loop]
+          const dim4 grad_Y_shape_sliced = {.n=1,.c=1,.h=loop_dim_sliced_real,.w= core_dim_sliced_real};
+          //Grad_W [V,H]->[V, H_slice_loop]
+          const dim4 grad_W_shape_sliced = {.n=1,.c=1,.h=V,                   .w= core_dim_sliced_real};
+          //X [B,S]->[BS]->[BS_loop]
+          const dim4 X_shape_sliced   = {.n=1,.c=1,.h=1,.w= loop_dim_sliced_real};
           //All slices are done before entering into pattern_one
           TENSOR_MEM_ISOLATED_PRECHECK_L1_dim4(grad_Y_shape_sliced, grad_dtype);
           TENSOR_MEM_ISOLATED_PRECHECK_L1_dim4(grad_W_shape_sliced, grad_dtype);
           nodechip_embedding_backward_multi_core_basic_cell_patttern_one(
-            grad_Y_addr_sliced,
-            X_addr_sliced,
-            grad_Weight_addr_sliced,
-            sorted_index_value_global_addr_sliced,
-            sorted_index_index_global_addr_sliced,
-            scatter_index_global_addr_sliced,
-            recollected_global_addr_sliced,
-            grad_Y_shape_sliced, //[BS_loop, H_sliced]
-            X_shape_sliced,      //[BS_loop]
-            grad_W_shape_sliced, //[V, H_sliced]
-            core_dim_native,
-            loop_idx==0 ? 1: 0,  //first_loop, grad_W is preset to 0 & no fp_add applied
-            grad_dtype
-            );
+              grad_Y_addr_sliced,
+              X_addr_sliced,
+              grad_Weight_addr_sliced,
+              sorted_index_value_global_addr_sliced,
+              sorted_index_index_global_addr_sliced,
+              scatter_index_global_addr_sliced,
+              recollected_global_addr_sliced,
+              grad_Y_shape_sliced, //[BS_loop, H_sliced_loop]
+              X_shape_sliced,      //[BS_loop]
+              grad_W_shape_sliced, //[V, H_sliced_loop]
+              H_native,
+              idx_BS_loop==0 ? 1: 0,  //first_loop, grad_W is preset to 0 & no fp_add applied
+              grad_dtype
+              );
+          }
         }
-      }
+    }
 }
 
 //Decision Level-1: Top Pattern: in case V is large
@@ -1097,10 +1098,10 @@ void nodechip_embedding_backward_multi_core_basic_cell_pattern_two (
 //Pattern_two->Pattern 2.1 (V,BS,H) -> (V,BS_loop, H_sliced)
 //Other patterns may be lowering to them
 static inline int Decision_Adviosr_Top(
-  dim4 grad_W_shape,
-  int BS,
-  int V,
-  data_type_t grad_dtype
+  const dim4 grad_W_shape,
+  const int BS,
+  const int V,
+  const data_type_t grad_dtype
 ) {
   const int len_grad_dtype = tpu_data_type_size(grad_dtype);
   //Decision Stage-1:
@@ -1116,11 +1117,15 @@ static inline int Decision_Adviosr_Top(
   compute_current_slice_info_multi_core_1D(H_native, &H_sliced_real, &H_sliced_avg, &min_cores_needed);
 
   //Basic_Cell: [BS], [BS,H_slice], [V, H_slice]
-  int judger_mem = (H_sliced_avg * BS + BS +  V * H_sliced_avg) *  len_grad_dtype;
+  const int judger_mem = (H_sliced_avg * BS + BS +  V * H_sliced_avg) *  len_grad_dtype;
   //Constraints:
   //           (1) L2 must hold [V,H]+[BS]+[BS,H]
   //           (2) L1 might be not enough
   if (judger_mem < SG2260_GLOBAL_MEM) {
+    //juder Rule:
+    //  1)                    judger_mem <  gen_bank_4_size()    Pattern_one [BS, V, H_sliced]
+    //  2) SG2260_LOCAL_MEM > judger_mem >  gen_bank_4_size()    Pattern_one + H_sliced_loop   => Patterb_Two degraded
+    //  3)                    judger_mem >  SG2260_LOCAL_MEM     Patterb_Two [BS_loop, V, H_sliced]=> enhanced [BS_loop, V, H_sliced_loop]
     if (judger_mem >= SG2260_LOCAL_MEM || judger_mem >=  gen_bank_4_size()) {
         excute_pattern_level_top = TOP_CONCURRENCY_H_BS;
     }
@@ -1145,7 +1150,7 @@ void nodechip_embedding_backward_multi_core (
   int           grad_input_dim,
   data_type_t   grad_dtype,
   bool is_index_int64 ) {
-  data_type_t Index_dtype = DT_INT32;
+  const data_type_t Index_dtype = DT_INT32;
 
   //Prepare multi_core Info:
   const int core_idx = tpu_core_index();
@@ -1200,7 +1205,7 @@ void nodechip_embedding_backward_multi_core (
 
   //Decision Level-1: Top Pattern: in case V is large
 
-  int excute_pattern_level_top = Decision_Adviosr_Top(grad_W_shape, BS, V, grad_dtype);
+  const int excute_pattern_level_top = Decision_Adviosr_Top(grad_W_shape, BS, V, grad_dtype);
 
   TPUKERNEL_ASSERT(excute_pattern_level_top==TOP_CONCURRENCY_H_BS || excute_pattern_level_top==TOP_CONCURRENCY_H);
   if (excute_pattern_level_top==TOP_CONCURRENCY_H) {

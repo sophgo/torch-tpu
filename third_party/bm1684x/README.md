@@ -46,9 +46,10 @@ How to gen dependency files for bm1684x?
 
 ###############################################
 2) Inside docker for tpu-train:
-
+   mv /workspace/tpu-train/third_party/bm1684x/README.md  /workspace/tpu-train/third_party/README_bm1684x.md
    rm -rf /workspace/tpu-train/third_party/bm1684x
    cp -r /workspace/nntoolchain/target /workspace/tpu-train/third_party/bm1684x
+   mv /workspace/tpu-train/third_party/README_bm1684x.md  /workspace/tpu-train/third_party/bm1684x/README.md
    chmod -R 777 /workspace/tpu-train/third_party/bm1684x/
 
 ###############################################
