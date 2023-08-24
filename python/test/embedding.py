@@ -16,8 +16,11 @@ def case_embedding():
     vocab_size = 50257
     embed_dim  = 768
     ##########################
-
-    inp = torch.randint(0, vocab_size, (batch, sequence))#.int()
+    batch      = 6
+    sequence   = 4096
+    vocab_size = 2
+    embed_dim  = 12288
+    inp = torch.randint(0, vocab_size, (batch, sequence)).int()
     inp_tpu = inp.to(device)
     if inp.dtype==torch.int64:
         assert(torch.max(torch.abs(inp))<65535)
@@ -33,6 +36,8 @@ def case_embedding():
     diff = out - out_tpu.cpu()
     print("max diff : ", torch.max(abs(diff)))
     print("max of inp abs",torch.max(torch.abs(inp)))
+    print("diff tpu-cpu",torch.sum(torch.abs(out.cpu().flatten()-out_tpu.cpu().flatten())))
+
 
 
 def case_embedding_backward():
@@ -49,7 +54,8 @@ def case_embedding_backward():
 
     #inp = torch.randint(0, vocab_size, (batch, sequence)).int()
     inp = torch.range(0, batch * sequence - 1)
-    inp = torch.randint(0, vocab_size, (batch, sequence))
+    inp = torch.randint(0, vocab_size, (batch, sequence)).int()
+
     if inp.dtype==torch.int64:
         assert(torch.max(torch.abs(inp))<65535)
 
@@ -57,7 +63,8 @@ def case_embedding_backward():
     print(inp)
     inp_tpu = inp.to(device)
 
-    ref = torch.ones(batch, sequence, embed_dim)
+    # ref = torch.ones(batch, sequence, embed_dim).to(torch.int32)
+    ref = torch.randint(0, 2, (batch, sequence, embed_dim)).to(torch.int32)
     ref_tpu = ref.to(device) #.half()
 
     net = nn.Embedding(vocab_size, embed_dim)
@@ -92,9 +99,10 @@ def case_embedding_backward():
     print("diff grad tpu-cpu",torch.sum(torch.abs(net.weight.grad.cpu().flatten()-net_tpu.weight.grad.cpu().flatten())))
     #import pdb;pdb.set_trace()
     print("inp", inp)
+    print('ref',ref)
     compare_model_grad(net, net_tpu)
 
-def case_embedding_backward_simulate():
+    def case_embedding_backward_simulate():
     """
     test case for simulate embedding's behavior
     """

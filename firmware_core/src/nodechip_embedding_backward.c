@@ -6,7 +6,6 @@
 //[Error] will lead you to some improvements.
 //CONTROL_CODE
 #define SG2260_GLOBAL_MEM 0x100000000
-#define SG2260_LOCAL_MEM  LOCAL_MEM_SIZE
 
 //Slicing Pattern
 #define TOP_CONCURRENCY_H    1 //only slice H
@@ -273,6 +272,13 @@ void tpu_kernel_api_embedding_backward ( const void* args ) {
 
 TPUKERNEL_FUNC_REGISTER ( tpu_kernel_api_embedding_backward );
 
+
+
+static inline int get_L1_TOTAL_MEM() {
+  int a1 = tpu_npu_num();
+  int a2 = tpu_local_mem_size_per_npu();
+  return a1 * a2;
+}
 // Counting total elemnet of a given shape
 // Assume MEM is densely contiguous
 static inline int count_numel_dim4(const dim4 shape) {
@@ -505,25 +511,37 @@ int search_duplicate_id(const int search_index_value,const int * data,const int 
 //Function: check is Tensor T is larger than L1_MEM
 //          If not ,T can be fully hold on L1/L2/GMEM
 void TENSOR_MEM_ISOLATED_PRECHECK_L1_dim4(const dim4 object,const  data_type_t  dtype) {
-    const int l1_mem_sg2260 = SG2260_LOCAL_MEM;
+    const int l1_mem_sg2260 = get_L1_TOTAL_MEM();
     TPUKERNEL_ASSERT(count_numel_dim4(object) * tpu_data_type_size(dtype) <=l1_mem_sg2260); //only 256KB (8Mb) local_bitwidth is 18
 }
 
 //Function: get 4* banksize
 //Strategy: If bank_size is not enough, DIV_DOWN
-static inline int gen_bank_4_size() {
+static inline int gen_bank_split_2_size() {
    const int bank_num = tpu_bank_num();
    const int bank_size_per =  tpu_local_mem_size_per_npu() / tpu_bank_num();
-   const int num_used_local_addr = 4;
+   const int num_used_local_addr = 2;
    //Expect: 16/4= 4; 16/5=3;
    int num_bank_per = DIV_UP(bank_num, num_used_local_addr);
    while (num_bank_per * num_used_local_addr > bank_num) {
      num_bank_per -= 1;
    }
-   const int bank_4 = num_bank_per * bank_size_per;//SG2260_LOCAL_MEM;
-   const int local_mem = SG2260_LOCAL_MEM;
+   const int bank_2 = num_bank_per * bank_size_per;
+   const int local_mem = tpu_local_mem_size_per_npu();
    TPUKERNEL_ASSERT_INFO(local_mem >= bank_size_per * num_used_local_addr, "[ERROR] Bank_size!");
-   return  bank_4;
+   return  bank_2;
+}
+
+static inline int gen_bank_split_2_size_total_npu() {
+  const int bank_2 = gen_bank_split_2_size();
+  return bank_2 * tpu_npu_num();
+}
+
+static inline int quick_for_loop(int * object, const int start ,const int end) {
+  int temp = 0;
+  for (int i =start; i <end; i++)
+     temp += object[i];
+  return temp;
 }
 //Function:  grad_W[v,h]=sum(W[X[i',j'],h]; grad_Y=W
 //HAU_sorted [i',j']->[i,j]: grad_W[v,h]=sum(W[X_sorted[i,j],h]
@@ -532,89 +550,105 @@ static inline int gen_bank_4_size() {
 //num_repeated  [1,       2,                 1]        ->       [{1,1}              , 2]
 //value_repeated[v_0,     v_1                v_2]      ->       [v_0,     ,v_2,       v_1]
 static inline void Function_Recollect_Index(
-  global_addr_t grad_Y_gathered_global_addr,
-  global_addr_t recollected_global_flush_64b_aligned_addr,
-  global_addr_t scatter_index_global_flush_64b_aligned_addr,
-  int * NumArray_Duplicate_Index_Value,
-  int * value_duplicate_index_value_recorder,
-  int NUM_full_Index,
+  global_addr_t grad_Y_gathered_global_addr, //[BS_loop， H_sliced_loop]
+  global_addr_t recollected_global_flush_64b_aligned_addr,   //[BS]
+  int * NumArray_Duplicate_Index_Value,                     //[NUM_V_used]
+  int * value_duplicate_index_value_recorder,               //[NUM_V_used]
+  int BS_loop,
   int NUM_V_used,
+  int H_sliced_loop,
+  int H_native,
   data_type_t grad_dtype)
-{
-  int * tmp_collected = NULL;
-  tmp_collected = (int* ) tpu_global_mem_addr ( grad_Y_gathered_global_addr );
-  int *tmp_collected_copy = ( int* ) malloc ( NUM_full_Index * sizeof ( int ) );
-  memset( tmp_collected_copy, 0, NUM_full_Index*sizeof(int) );
-  int flag_collect = 0;
-  for (int k_null=0;k_null<NUM_full_Index;k_null++)
-  for (int i_num_recollect=0;i_num_recollect<NUM_full_Index;i_num_recollect++) {
+  {
+  return;//ERROR
+  //[Warning] if BS_Loop is too small, regroup has no use, but H is greatly parallel this time;
+  const int len_grad_dtype = tpu_data_type_size(grad_dtype);
+  int *tmp_collected = (int*) malloc(BS_loop * H_sliced_loop * sizeof(int));
+  int *tmp_collected_native = NULL;
+  tmp_collected_native = (int*)tpu_global_mem_addr(grad_Y_gathered_global_addr);
+  for(int   i=0; i < BS_loop;      i++)
+    for(int j=0; j < H_sliced_loop;j++)  {
+     tmp_collected[i * H_sliced_loop + j] = tmp_collected_native[i * H_native + j] ;
+  }
+  int *tmp_collected_copy = (int*) malloc(BS_loop*H_sliced_loop*sizeof(int));
+  const int min_while_controller = BS_loop < NUM_V_used ? BS_loop : NUM_V_used;
+  int flag_collect = 1;
+  if(0){
+  for (int k_null=0;k_null<BS_loop;k_null++)
+  for (int i_num_recollect=0;i_num_recollect<BS_loop;i_num_recollect++) {
     int j_num_recollect = i_num_recollect+1;
-    while(j_num_recollect<NUM_V_used) {
+    while(j_num_recollect<min_while_controller) {
         int duplicate_value_i = NumArray_Duplicate_Index_Value[i_num_recollect];
         int duplicate_value_j = NumArray_Duplicate_Index_Value[j_num_recollect];
         //TODO we can further reduce by ++j_num_recollect if NumArray_Duplicate_Index_Value[j_num_recollect]==NumArray_Duplicate_Index_Value[j_num_recollect+1]
         if (duplicate_value_i > duplicate_value_j) {
+              memset(tmp_collected_copy,0, BS_loop * H_sliced_loop *sizeof(int) );
               flag_collect = 1;
               //reorder index
-              //seq_0, tmp_collected[i_start:i_end), seq_1,  tmp_collected[j_start:j_end), seq_2 ->
-              //seq_0, tmp_collected[j_start:j_end), seq_1,  tmp_collected[i_start:i_end), seq_2
+              //[FROM]seq_0, tmp_collected[i_start:i_end;H), seq_1,  tmp_collected[j_start:j_end;H), seq_2 ->
+              //[TO]  seq_0, tmp_collected[j_start:j_end;H), seq_1,  tmp_collected[i_start:i_end;H), seq_2
               //[start, end)
-              int i_start = 0;
-              for (int i_tmp=0; i_tmp<i_num_recollect;i_tmp++)
-               i_start += NumArray_Duplicate_Index_Value[i_tmp];
+              int i_start = quick_for_loop(NumArray_Duplicate_Index_Value, 0 , i_num_recollect);
               int i_end = i_start+duplicate_value_i;
 
-              int j_start = 0;
-              for (int i_tmp=0; i_tmp<j_num_recollect;i_tmp++)
-               j_start += NumArray_Duplicate_Index_Value[i_tmp];
+              int j_start = quick_for_loop(NumArray_Duplicate_Index_Value, 0 , j_num_recollect);
               int j_end = j_start+duplicate_value_j;
-
-              int size = i_start       * sizeof(int);
+              //[FROM]seq_0:tmp_collected[0, i_start;H)
+              //[TO]  seq_0:tmp_collected[0, i_start;H)
+              int size = i_start;
               int size_history =0;
               if(size)
-                for (int pp=0;pp<(int)(size/sizeof(int));pp++) {
-                  tmp_collected_copy[pp+(int)(size_history/sizeof(int))] = tmp_collected[pp];
+                for (int pp=0;pp<size;pp++) { for (int k_H = 0; k_H < H_sliced_loop; k_H++)
+                  tmp_collected_copy[pp * H_sliced_loop + k_H] = tmp_collected[pp * H_sliced_loop + k_H];
                 }
                 // memcpy(tmp_collected_copy, tmp_collected, size);
               size_history += size;
 
-              size = duplicate_value_j  * sizeof(int);
+              //[FROM]tmp_collected[i_start:i_end;H) ->
+              //[TO]  tmp_collected[j_start:j_end;H)
+              size = duplicate_value_j;
               if(size)
-                for (int pp=0;pp<(int)(size/sizeof(int));pp++) {
-                  tmp_collected_copy[pp+(int)(size_history/sizeof(int))] = tmp_collected[j_start+pp];
+                for (int pp=0;pp<size;pp++) { for (int k_H = 0; k_H < H_sliced_loop; k_H++)
+                  tmp_collected_copy[(pp+ size_history)*H_sliced_loop+ k_H] = tmp_collected[(j_start+pp)*H_sliced_loop+ k_H];
                 }
                 // memcpy(tmp_collected_copy + size_history, tmp_collected + j_start *sizeof(int), size);
               size_history += size;
 
-              size = (j_start-i_end)   * sizeof(int);
+              //[FROM]seq_1:tmp_collected[i_end:j_start;H) ->
+              //[TO]  seq_1:tmp_collected[j_end:i_start;H)
+              size = j_start-i_end;
               if(size)
-                for (int pp=0;pp<(int)(size/sizeof(int));pp++) {
-                  tmp_collected_copy[pp+(int)(size_history/sizeof(int))] = tmp_collected[i_end+pp];
+                for (int pp=0;pp<size;pp++) { for (int k_H = 0; k_H < H_sliced_loop; k_H++)
+                  tmp_collected_copy[(pp+size_history)*H_sliced_loop+ k_H] = tmp_collected[(i_end+pp)*H_sliced_loop+ k_H];
                 }
                 // memcpy(tmp_collected_copy + size_history, tmp_collected + i_end *sizeof(int), size);
               size_history += size;
 
-              size = duplicate_value_i   * sizeof(int);
+
+              //[FROM]tmp_collected[j_start:j_end;H) ->
+              //[TO]  tmp_collected[i_start:i_end;H)
+              size = duplicate_value_i;
               if(size)
-                for (int pp=0;pp<(int)(size/sizeof(int));pp++) {
-                  tmp_collected_copy[pp+(int)(size_history/sizeof(int))] = tmp_collected[i_start+pp];
+                for (int pp=0;pp<size;pp++) { for (int k_H = 0; k_H < H_sliced_loop; k_H++)
+                  tmp_collected_copy[(pp+size_history)*H_sliced_loop+ k_H] = tmp_collected[(i_start+pp)*H_sliced_loop+ k_H];
                 }
                 // memcpy(tmp_collected_copy + size_history, tmp_collected + i_start *sizeof(int), size);
               size_history += size;
 
-              size = (NUM_full_Index-j_end) * sizeof(int);
+              //[FROM]seq_2:tmp_collected[j_end:BS_loop;H) ->
+              //[TO]  seq_2:tmp_collected[i_end:BS_loop;H)
+              size = (BS_loop-j_end);
               if(size)
-              for (int pp=0;pp<(int)(size/sizeof(int));pp++) {
-                  tmp_collected_copy[pp+(int)(size_history/sizeof(int))] = tmp_collected[j_end+pp];
+                for (int pp=0;pp<size;pp++) { for (int k_H = 0; k_H < H_sliced_loop; k_H++)
+                  tmp_collected_copy[(pp+size_history)*H_sliced_loop+ k_H] = tmp_collected[(j_end+pp)*H_sliced_loop+ k_H];
               }
                 // memcpy(tmp_collected_copy + size_history, tmp_collected + j_end *sizeof(int), size);
               size_history += size;
-
-              for (int pp=0;pp<NUM_full_Index;pp++) {
-                  tmp_collected[pp] = tmp_collected_copy[pp];
+              for (int k_H = 0; k_H < H_sliced_loop; k_H++)
+              for (int pp=0;pp<BS_loop;pp++) {
+                  tmp_collected[pp*H_sliced_loop+ k_H] = tmp_collected_copy[pp*H_sliced_loop+ k_H];
               }
-
-              //memcpy(tmp_collected, tmp_collected_copy, NUM_full_Index*sizeof(int));
+              // memcpy(tmp_collected, tmp_collected_copy, H_sliced_loop * BS_loop *sizeof(int));
               //array_count from ancient, so duplicate_num latter
               int temp_duplicate_num = NumArray_Duplicate_Index_Value[i_num_recollect] ;
               NumArray_Duplicate_Index_Value[i_num_recollect] = NumArray_Duplicate_Index_Value[j_num_recollect] ;
@@ -631,18 +665,23 @@ static inline void Function_Recollect_Index(
         }
     }
   }
-  free(tmp_collected_copy);
-  if (flag_collect) {
-    int* tmp2_3 = NULL;
-    tmp2_3 = ( int* ) tpu_global_mem_addr ( recollected_global_flush_64b_aligned_addr );
-    for ( int i = 0; i < NUM_full_Index; i++ ) {
-      tmp2_3[i] = tmp_collected[i];
-    }
-    //Donot Reuse scatter_index_global_flush_64b_aligned_addr
-    tpu_flush_cache ( scatter_index_global_flush_64b_aligned_addr, ALIGN ( sizeof ( int ) * NUM_full_Index, 64 ) );
-    const dim4 shape_tmp_recollected = {.n=1,.c=1,.h=1,.w=NUM_full_Index};
-    tpu_gdma_cpy_S2S(grad_Y_gathered_global_addr,recollected_global_flush_64b_aligned_addr, &shape_tmp_recollected, NULL,NULL, grad_dtype);
   }
+  if (flag_collect) {
+    for ( int i = 0; i < H_sliced_loop; i++ ) {
+      int* tmp2_3 = NULL;
+      tmp2_3 = (int*)tpu_global_mem_addr(recollected_global_flush_64b_aligned_addr);//[BS_LOOP]
+      for(int j = 0; j < BS_loop; j++)  {
+          tmp2_3[j] =  tmp_collected[j*H_sliced_loop +i];
+      }
+      TPUKERNEL_ASSERT_INFO(recollected_global_flush_64b_aligned_addr%64==0, "NEED aligned to 64bit");
+      tpu_flush_cache ( recollected_global_flush_64b_aligned_addr, ALIGN ( sizeof ( int ) * BS_loop, 64 ) );
+      const dim4 shape_tmp_recollected = {.n=1,.c=1,.h=BS_loop,.w=1};
+      const dim4 stride_tmp_recollected = {.n=1,.c=1,.h=H_native,.w=1};
+      tpu_gdma_cpy_S2S(grad_Y_gathered_global_addr+ i * len_grad_dtype, recollected_global_flush_64b_aligned_addr, &shape_tmp_recollected, &stride_tmp_recollected, NULL, grad_dtype);
+    }
+  }
+  free(tmp_collected_copy);
+  free(tmp_collected);
 }
 
 //**********************************************************//
@@ -698,18 +737,18 @@ void nodechip_embedding_backward_multi_core_basic_cell_patttern_one(
   const int H_sliced = grad_Y_shape.w;
   const int V = grad_W_shape.h; //different from NUM_V_used
   const int BS = grad_Y_shape.h;
+  TPUKERNEL_ASSERT_INFO(BS == NUM_full_Index, "[ERROR] BS CHECK FAILED");
   const int local_offset_1 = BS * H_sliced * len_grad_dtype; //tpu_aligned_feature_size (1, H_sliced, grad_dtype );
   const int local_offset_2 = V  * H_sliced * len_grad_dtype; // tpu_aligned_feature_size (1, H_sliced, grad_dtype ); //sum_num_per_v<=V
-  const int bank_4_size = gen_bank_4_size();
+  const int bank_2_size = gen_bank_split_2_size();
   const local_addr_t grad_Y_gathered_local_addr    = 0;
-  const local_addr_t reduce_no_parallel_local_addr = bank_4_size;
-  const local_addr_t grad_Y_scatter_local_addr     = 2 * bank_4_size;
-  const local_addr_t partial_sum_local_addr        = 3 * bank_4_size;
-  TPUKERNEL_ASSERT_INFO(local_offset_1 < bank_4_size, "BS is too large!");
-  TPUKERNEL_ASSERT_INFO(local_offset_2 < bank_4_size, "V is too large or not sparse enough!");
+  const local_addr_t reduce_no_parallel_local_addr = 0;
+  const local_addr_t grad_Y_scatter_local_addr     = 1 * bank_2_size;
+  const local_addr_t partial_sum_local_addr        = 0;
+  TPUKERNEL_ASSERT_INFO(local_offset_1 < bank_2_size, "BS is too large!");
+  TPUKERNEL_ASSERT_INFO(local_offset_2 < bank_2_size, "V is too large or not sparse enough!");
   TPUKERNEL_ASSERT_INFO(partial_sum_local_addr+local_offset_2 < (u32)tpu_local_mem_size_per_npu(), "BS_Loop is too large");
   TPUKERNEL_ASSERT_INFO(partial_sum_local_addr+local_offset_1 < (u32)tpu_local_mem_size_per_npu(), "BS_Loop is too large");
-
   // const dim4 grad_W_stride = {.n = 0, .c = H_native, .h = H_native, .w = 1};
   // if (first_loop_flag) {
     // tpu_gdma_set_C_system (
@@ -721,16 +760,15 @@ void nodechip_embedding_backward_multi_core_basic_cell_patttern_one(
   // }
   //Shape Checker
   TPUKERNEL_ASSERT(grad_Y_shape.w == grad_W_shape.w);
-  TPUKERNEL_ASSERT(grad_Y_shape.h == NUM_full_Index);
   // Step 1.0 Sorting full-Index(X)
   // Step_Arch: HAU-<GDMA>-GMEM
   tpu_hau_sort_natural_index ( sorted_index_value_global_addr,
                                sorted_index_index_global_addr,
                                X_global_addr,
-                               NUM_full_Index, NUM_full_Index, false, DT_INT32 );
+                               BS, BS, false, DT_INT32 );
   tpu_hau_poll();
-  tpu_invalidate_cache ( sorted_index_value_global_addr, ALIGN ( NUM_full_Index * sizeof ( int ), 64 ) );
-  tpu_invalidate_cache ( sorted_index_index_global_addr, ALIGN ( NUM_full_Index * sizeof ( int ), 64 ) );
+  tpu_invalidate_cache ( sorted_index_value_global_addr, ALIGN ( BS * sizeof ( int ), 64 ) );
+  tpu_invalidate_cache ( sorted_index_index_global_addr, ALIGN ( BS * sizeof ( int ), 64 ) );
 
   //Step 1.1: Gather
   //Step_Arch: GMEM-<GDMA>-L1-<GDMA>-GMEM
@@ -754,15 +792,15 @@ void nodechip_embedding_backward_multi_core_basic_cell_patttern_one(
   //Step_Arch: GMEM-<AXI>-CPU
   //  Function: temp = SUM_{i,j}[ grad_Y[X[i,j], h] for {(i,j); |v|==|X[i,j]|}
   int* tmp1 = NULL;
-  int* value_duplicate_index_value_recorder        = (int*)malloc(NUM_full_Index * sizeof(int));
-  int* NumArray_Duplicate_Index_Value              = (int*)malloc(NUM_full_Index * sizeof(int));
+  int* value_duplicate_index_value_recorder        = (int*)malloc(BS * sizeof(int));
+  int* NumArray_Duplicate_Index_Value              = (int*)malloc(BS * sizeof(int));
 
   //[D2S]Send duplicate from  Sys to CPU
   tmp1 = ( int* ) tpu_global_mem_addr ( sorted_index_value_global_addr );
   // NUM_V_used : <=|V|. represents nums of V used
   int NUM_V_used = 0;
   //[CPU]Searching duplicate index from sorted Index
-  for (int i = 0; i < NUM_full_Index; i++) {
+  for (int i = 0; i < BS; i++) {
     if (check_duplicate_value(tmp1[i], value_duplicate_index_value_recorder, NUM_V_used)) {
       int current_duplicate_id = search_duplicate_id(tmp1[i], value_duplicate_index_value_recorder, NUM_V_used);
       NumArray_Duplicate_Index_Value[current_duplicate_id] += 1;
@@ -810,11 +848,12 @@ void nodechip_embedding_backward_multi_core_basic_cell_patttern_one(
     Function_Recollect_Index(
       grad_Y_gathered_global_addr,
       recollected_global_flush_64b_aligned_addr,
-      scatter_index_global_flush_64b_aligned_addr,
       NumArray_Duplicate_Index_Value,
       value_duplicate_index_value_recorder,
-      NUM_full_Index,
+      BS,
       NUM_V_used,
+      H_sliced,
+      H_native,
       grad_dtype);
   }
   int counter_history = 0;
@@ -934,6 +973,7 @@ void nodechip_embedding_backward_multi_core_basic_cell_patttern_one(
   for ( int i = 0; i < NUM_V_used; i++ ) {
     tmp2[i] = value_duplicate_index_value_recorder[i];
   }
+  // TPUKERNEL_ASSERT_INFO(NUM_V_used <= BS_native, "[ERROR]NUM_V_used>BS, as  scatter_index_global_flush_64b_aligned_addr created by BS");
   tpu_flush_cache(scatter_index_global_flush_64b_aligned_addr, ALIGN(sizeof(int) * NUM_V_used, 64));
 
 
@@ -970,11 +1010,11 @@ void nodechip_embedding_backward_multi_core_basic_cell_patttern_one(
 // Solution: BS_loop <-> Groups_loop, |v| <-> {|x[i_0,j_0]|}, ...,{|x[i_p,j_q]|} = {G1,G2,..G'}
 //Strategy: AS usually BS > V for LLM,   adopt (a) as (b)-(4) need to reloop B for larger slice-shape
 // Notice:   BS-loop not applied Index_sorted && V/BS never intracore sliced
-// (a) 1)H_slice; 2)ensue (V,H_Sliced_loop) < gen_bank_4_size()  3) (only when BS > V) loop B ensure (BS_loop,H_Sliced_loop) < gen_bank_4_size()
-// (b) 1)H_slice; 2)ensue (BS_loop,H_Sliced) < gen_bank_4_size() 3) (only when V > BS_loop) loop H ensure (V,H_Sliced_loop) < gen_bank_4_size() 4) (only when V > BS_loop) reloop B find a larger (BS_loop',H_Sliced_loop)   
+// (a) 1)H_slice; 2)ensue (V,H_Sliced_loop) < gen_bank_split_2_size()  3) (only when BS > V) loop B ensure (BS_loop,H_Sliced_loop) < gen_bank_split_2_size()
+// (b) 1)H_slice; 2)ensue (BS_loop,H_Sliced) < gen_bank_split_2_size() 3) (only when V > BS_loop) loop H ensure (V,H_Sliced_loop) < gen_bank_split_2_size() 4) (only when V > BS_loop) reloop B find a larger (BS_loop',H_Sliced_loop)   
 // Thus, Mem Constraints Prioirty:
-// 1)[Slice] Ensure grad_W_shape_sliced[V, H_sliced_loop]  < gen_bank_4_size()
-// 2)[Slice] Ensure grad_Y_shape_sliced[BS_loop. H_sliced] < gen_bank_4_size()
+// 1)[Slice] Ensure grad_W_shape_sliced[V, H_sliced_loop]  < gen_bank_split_2_size()
+// 2)[Slice] Ensure grad_Y_shape_sliced[BS_loop. H_sliced] < gen_bank_split_2_size()
 void nodechip_embedding_backward_multi_core_basic_cell_pattern_two (
   global_addr_t gradout_global_addr,
   global_addr_t index_global_addr,
@@ -1000,23 +1040,23 @@ void nodechip_embedding_backward_multi_core_basic_cell_pattern_two (
    int min_cores_needed     = 1;
    compute_current_slice_info_multi_core_1D(H_native, &H_sliced_real, &H_sliced_avg, &min_cores_needed);
    if (core_idx < min_cores_needed) {
-    //[Slice] Step 2: Ensue grad_W_shape_sliced(V,H_Sliced_loop) < gen_bank_4_size()
+    //[Slice] Step 2: Ensue grad_W_shape_sliced(V,H_Sliced_loop) < gen_bank_split_2_size()
     //[BS, H ,V] -> [BS, H_sliced, V] ->  [BS_loop, H_sliced_loop]
     int num_loop_upper_H_sliced_loop = 1;
     int H_sliced_loop_tmp = H_sliced_real;
-    while (V * H_sliced_loop_tmp * len_grad_dtype >= gen_bank_4_size()) {
+    while (V * H_sliced_loop_tmp * len_grad_dtype >= gen_bank_split_2_size()) {
         num_loop_upper_H_sliced_loop += 1;
         H_sliced_loop_tmp = DIV_UP(H_sliced_real, num_loop_upper_H_sliced_loop);
     }
     for (int idx_H_sliced_loop = 0; idx_H_sliced_loop < num_loop_upper_H_sliced_loop; idx_H_sliced_loop++) {
         int H_sliced_loop_real = 1, H_sliced_loop_avg  = 1;
         compute_current_loop_info_each_core_1D_with_loop_idx(H_sliced_real, &H_sliced_loop_real, &H_sliced_loop_avg, num_loop_upper_H_sliced_loop, idx_H_sliced_loop);
-        //[Slice] Step 3: Ensure grad_Y_shape_sliced[BS_loop, H_sliced_loop] < gen_bank_4_size()
+        //[Slice] Step 3: Ensure grad_Y_shape_sliced[BS_loop, H_sliced_loop] < gen_bank_split_2_size()
         int BS_sliced_real = 1, BS_sliced_avg = 1;
         int PartRange_loop_tmp =  BS_native;
         int num_loop_upper_BS     = 1;
-        TPUKERNEL_ASSERT_INFO(V * H_sliced_loop_real * len_grad_dtype < gen_bank_4_size(), "at least svae one H_slice on L1!");
-        while(PartRange_loop_tmp * H_sliced_loop_real * len_grad_dtype >= gen_bank_4_size()) {
+        TPUKERNEL_ASSERT_INFO(V * H_sliced_loop_real * len_grad_dtype < gen_bank_split_2_size(), "at least svae one H_slice on L1!");
+        while(PartRange_loop_tmp * H_sliced_loop_real * len_grad_dtype >= gen_bank_split_2_size()) {
           num_loop_upper_BS += 1;
           PartRange_loop_tmp = DIV_UP(BS_native, num_loop_upper_BS);
         }
@@ -1028,7 +1068,7 @@ void nodechip_embedding_backward_multi_core_basic_cell_pattern_two (
           const int  loop_dim_sliced_avg  =  BS_sliced_avg;
           const int  core_dim_sliced_real =  H_sliced_loop_real;
           const int  loop_dim_sliced_real =  BS_sliced_real;
-          TPUKERNEL_ASSERT_INFO(loop_dim_sliced_avg * core_dim_sliced_avg * len_grad_dtype <= gen_bank_4_size(), "[Slice] Step-2 Wrong");
+          TPUKERNEL_ASSERT_INFO(loop_dim_sliced_avg * core_dim_sliced_avg * len_grad_dtype <= gen_bank_split_2_size(), "[Slice] Step-2 Wrong");
           const int offset_idx_H_slice_loop = idx_H_sliced_loop * core_dim_sliced_avg * 1 * len_grad_dtype;
           const int offset_core_H_slice     = core_idx * H_sliced_avg * 1 * len_grad_dtype;
           const int offset_H                = offset_idx_H_slice_loop + offset_core_H_slice;
@@ -1123,10 +1163,11 @@ static inline int Decision_Adviosr_Top(
   //           (2) L1 might be not enough
   if (judger_mem < SG2260_GLOBAL_MEM) {
     //juder Rule:
-    //  1)                    judger_mem <  gen_bank_4_size()    Pattern_one [BS, V, H_sliced]
-    //  2) SG2260_LOCAL_MEM > judger_mem >  gen_bank_4_size()    Pattern_one + H_sliced_loop   => Patterb_Two degraded
-    //  3)                    judger_mem >  SG2260_LOCAL_MEM     Patterb_Two [BS_loop, V, H_sliced]=> enhanced [BS_loop, V, H_sliced_loop]
-    if (judger_mem >= SG2260_LOCAL_MEM || judger_mem >=  gen_bank_4_size()) {
+    //  1)                      judger_mem <  gen_bank_split_2_size()    Pattern_one [BS, V, H_sliced]
+    //  1)                      judger_mem <  gen_bank_split_2_size_total_npu()    Pattern_one [BS, V, H_sliced]
+    //  2) get_L1_TOTAL_MEM() > judger_mem >  gen_bank_split_2_size_total_npu()     Pattern_one + H_sliced_loop   => Patterb_Two degraded
+    //  3)                      judger_mem >  get_L1_TOTAL_MEM()     Patterb_Two [BS_loop, V, H_sliced]=> enhanced [BS_loop, V, H_sliced_loop]
+    if (judger_mem >= get_L1_TOTAL_MEM() || judger_mem >=  gen_bank_split_2_size_total_npu()) {
         excute_pattern_level_top = TOP_CONCURRENCY_H_BS;
     }
   }
