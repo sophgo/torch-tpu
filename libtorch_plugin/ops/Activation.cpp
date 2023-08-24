@@ -164,4 +164,22 @@ TORCH_LIBRARY_IMPL ( aten, TPU, m )
 {
   m.impl ( "gelu_backward.grad_input", gelu_backward_grad_input_tpu );
 }
+
+Tensor & silu_out_tpu(const Tensor & self, Tensor & out) {
+  CHECK_TENSOR_IN_DEVICE ( self );
+  CHECK_TENSOR_IN_DEVICE ( out );
+#if 1
+  LOG( WARNING ) << "silu use cpu impl";
+  auto out_cpu = silu(self.to(torch::kFloat).cpu());
+  out = out_cpu.to(out.device()).to(out.dtype());
+#else
+
+#endif
+  return out;
+}
+TORCH_LIBRARY_IMPL ( aten, TPU, m )
+{
+  m.impl ( "silu.out", silu_out_tpu );
+}
+
 } // namespace at

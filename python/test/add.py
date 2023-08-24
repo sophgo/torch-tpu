@@ -37,7 +37,22 @@ def case1():
     print("cpu : ", a2 )
     print("tpu : ", a2_tpu.cpu())
 
+def case_addbcast():
+    N = 1
+    C = 4096
+    H = 512
+    a = torch.randn(N, C, H)
+    b = torch.randn(H)
+    a_tpu = a.to(device)
+    b_tpu = b.to(device)
+
+    o_t = a_tpu + b_tpu
+    o = a + b
+
+    diff = o - o_t.cpu()
+    print(torch.max(torch.abs(diff)))
 
 
 if __name__ == "__main__":
-    case1()
+    #case1()
+    case_addbcast()

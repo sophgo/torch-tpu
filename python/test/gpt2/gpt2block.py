@@ -4,7 +4,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 from transformers.models.gpt2.modeling_gpt2 import GPT2LMHeadModel
 
-torch.ops.load_library("../../libtorch_plugin/build/liblibtorch_plugin.so")
+torch.ops.load_library("../../../libtorch_plugin/build/liblibtorch_plugin.so")
 torch.manual_seed(1000)
 
 tmp1 = None
@@ -343,6 +343,8 @@ if __name__ == "__main__":
     from transformers import GPT2Config
     import copy
     import time
+    import sys 
+    sys.path.append("..") 
     from utils import Optimer
     
     optimer = Optimer("/home/huyu/workspace/tpu-train/libtorch_plugin/build/liblibtorch_plugin.so")

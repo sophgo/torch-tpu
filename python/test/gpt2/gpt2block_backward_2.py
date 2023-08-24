@@ -2,13 +2,15 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 import numpy as np
+import sys 
+sys.path.append("..") 
 from utils import get_model_grad, Optimer, compare_model_grad
 from transformers import GPT2Config
 import copy
 import time
 torch.manual_seed(1000)
-torch.ops.load_library("../../libtorch_plugin/build/liblibtorch_plugin.so")
-optimer = Optimer("../../libtorch_plugin/build/liblibtorch_plugin.so")
+torch.ops.load_library("../../../libtorch_plugin/build/liblibtorch_plugin.so")
+optimer = Optimer("../../../libtorch_plugin/build/liblibtorch_plugin.so")
 
 class Conv1D(nn.Module):
     """

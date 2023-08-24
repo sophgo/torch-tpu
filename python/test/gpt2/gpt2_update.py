@@ -1,11 +1,13 @@
 import numpy as np
 import torch
+import sys 
+sys.path.append("..") 
 from utils import compare_model_grad, compare_model_weight, get_model_weight, Optimer
 from transformers.models.gpt2.modeling_gpt2 import GPT2LMHeadModel, GPT2Model
 
-torch.ops.load_library("../../libtorch_plugin/build/liblibtorch_plugin.so")
+torch.ops.load_library("../../../libtorch_plugin/build/liblibtorch_plugin.so")
 torch.manual_seed(1000)
-optimer = Optimer("../../libtorch_plugin/build/liblibtorch_plugin.so")
+optimer = Optimer("../../../libtorch_plugin/build/liblibtorch_plugin.so")
 
 
 if __name__ == "__main__":

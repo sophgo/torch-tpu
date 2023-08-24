@@ -147,4 +147,25 @@ TORCH_LIBRARY_IMPL ( aten, TPU, m )
 {
   m.impl ( "bmm.out", bmm_out_tpu );
 }
+
+
+Tensor & baddbmm_out_tpu(const at::Tensor & self, const at::Tensor & batch1, const at::Tensor & batch2, const at::Scalar & beta, const at::Scalar & alpha, at::Tensor & out )
+{
+  CHECK_TENSOR_IN_DEVICE_NO_CONTIGUOUS ( self );
+  CHECK_TENSOR_IN_DEVICE_NO_CONTIGUOUS ( batch1 );
+  CHECK_TENSOR_IN_DEVICE_NO_CONTIGUOUS ( batch2 );
+  CHECK_TENSOR_IN_DEVICE ( out );
+#if 1
+  LOG( WARNING ) << "baddbmm use cpu impl";
+  auto out_cpu = baddbmm ( self.to(torch::kFloat).cpu(), batch1.to(torch::kFloat).cpu(), batch2.to(torch::kFloat).cpu(), beta, alpha );
+  out = out_cpu.to(out.device()).to(out.dtype());
+#else
+//TODO
+#endif
+  return out;
+}
+TORCH_LIBRARY_IMPL ( aten, TPU, m )
+{
+  m.impl ( "baddbmm.out", baddbmm_out_tpu );
+}
 } // namespace at

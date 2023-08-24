@@ -2,13 +2,18 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 import numpy as np
-from utils import get_model_grad, Optimer, compare_model_grad
-from transformers import GPT2Config
 import copy
 import time
+from transformers.models.gpt2.modeling_gpt2 import GPT2LMHeadModel
+import sys 
+sys.path.append("..") 
+from utils import compare_model_grad, compare_model_weight
+from transformers import GPT2Config
+
+
 torch.manual_seed(1000)
-torch.ops.load_library("../../libtorch_plugin/build/liblibtorch_plugin.so")
-optimer = Optimer("../../libtorch_plugin/build/liblibtorch_plugin.so")
+torch.ops.load_library("../../../libtorch_plugin/build/liblibtorch_plugin.so")
+TP = 16
 
 class Conv1D(nn.Module):
     """
@@ -49,10 +54,10 @@ class GPT2Attention(nn.Module):
         self.register_buffer("masked_bias", torch.tensor(-1e4))
 
         self.embed_dim = config.hidden_size
-        self.num_heads = config.num_attention_heads
-        self.head_dim = self.embed_dim // self.num_heads
-        self.split_size = self.embed_dim
-        if self.head_dim * self.num_heads != self.embed_dim:
+        self.num_heads = config.num_attention_heads // TP
+        self.head_dim = self.embed_dim // TP // self.num_heads
+        self.split_size = self.embed_dim // TP
+        if self.head_dim * self.num_heads * TP != self.embed_dim:
             raise ValueError(
                 f"`embed_dim` must be divisible by num_heads (got `embed_dim`: {self.embed_dim} and `num_heads`: {self.num_heads})."
             )
@@ -64,57 +69,45 @@ class GPT2Attention(nn.Module):
             self.c_attn = Conv1D(2 * self.embed_dim, self.embed_dim)
             self.q_attn = Conv1D(self.embed_dim, self.embed_dim)
         else:
-            self.c_attn = Conv1D(3 * self.embed_dim, self.embed_dim)
-        self.c_proj = Conv1D(self.embed_dim, self.embed_dim)
+            self.c_attn = Conv1D(3 * self.embed_dim // TP, self.embed_dim)
+        self.c_proj = Conv1D(self.embed_dim, self.embed_dim//TP)
 
         self.attn_dropout = nn.Dropout(config.attn_pdrop)
         self.resid_dropout = nn.Dropout(config.resid_pdrop)
 
         self.pruned_heads = set()
 
+
     def _attn(self, query, key, value, attention_mask=None, head_mask=None):
-        t1 = time.time()
         attn_weights = torch.matmul(query, key.transpose(-1, -2))
-        t2 = time.time()
-        print("====inner_attn matmul-qk time ", t2 - t1)
+
         if self.scale_attn_weights:
             attn_weights = attn_weights / (float(value.size(-1)) ** 0.5)
 
+        # res_list.append(attn_weights.clone().detach().cpu().numpy())
+
+
         if not self.is_cross_attention:
-            # if only "normal" attention layer implements causal mask
-            t1 = time.time()
             query_length, key_length = query.size(-2), key.size(-2)
             causal_mask = self.bias[:, :, key_length - query_length : key_length, :key_length].bool()
+
             attn_weights = torch.where(causal_mask, attn_weights, self.masked_bias.to(attn_weights.dtype))
-            t2 = time.time()
-            print("====inner_attn where time ", t2 - t1)            
+
+        # res_list.append(attn_weights.clone().detach().cpu().numpy())
 
         if attention_mask is not None:
             # Apply the attention mask
             attn_weights = attn_weights + attention_mask
-
-        #import pdb;pdb.set_trace()
-        t1 = time.time()
-        attn_weights = nn.Softmax(dim=-1)(attn_weights)
-        t2 = time.time()
-        print("====inner_attn softmax time ", t2 - t1)
         
-        t1 = time.time()
+        attn_weights = nn.Softmax(dim=-1)(attn_weights)
+
         attn_weights = self.attn_dropout(attn_weights)
-        t2 = time.time()
-        print("====inner_attn attn_dropout time ", t2 - t1)
-
-        # Mask heads if we want to
         if head_mask is not None:
-            t1 = time.time()
             attn_weights = attn_weights * head_mask
-            t2 = time.time()
-            print("====inner_attn binary-mul attn time ", t2 - t1)
 
-        t1 = time.time()
         attn_output = torch.matmul(attn_weights, value)
-        t2 = time.time()
-        print("====inner_attn batch-mm time ", t2 - t1)
+
+        # res_list.append(attn_output.clone().detach().cpu().numpy())
 
         return attn_output, attn_weights
 
@@ -156,37 +149,40 @@ class GPT2Attention(nn.Module):
             key, value = self.c_attn(encoder_hidden_states).split(self.split_size, dim=2)
             attention_mask = encoder_attention_mask
         else:
-            query, key, value = self.c_attn(hidden_states).split(self.split_size, dim=2)
-        
-        t1 = time.time()
+            x = self.c_attn(hidden_states)
+
+            query, key, value = x.split(self.split_size, dim=2)
+
         query = self._split_heads(query, self.num_heads, self.head_dim)
         key = self._split_heads(key, self.num_heads, self.head_dim)
         value = self._split_heads(value, self.num_heads, self.head_dim)
-        t2 = time.time()
-        print("split time", t2 - t1)
+        query.register_hook(print_grad)
+        key.register_hook(print_grad)
+        value.register_hook(print_grad)
+        
+        res_list.append(query.clone().detach().cpu().numpy())
+        res_list.append(key.clone().detach().cpu().numpy()) 
+        res_list.append(value.clone().detach().cpu().numpy()) 
 
-        t1 = time.time()
         if layer_past is not None:
             past_key, past_value = layer_past
             key = torch.cat((past_key, key), dim=-2)
             value = torch.cat((past_value, value), dim=-2)
-        t2 = time.time()
-        print("cat time", t2 - t1)
 
         if use_cache is True:
             present = (key, value)
         else:
             present = None
-        t1 = time.time()
         attn_output, attn_weights = self._attn(query, key, value, attention_mask, head_mask)
-        t2 = time.time()
-        print("inner_att time", t2 - t1)
 
-        t1 = time.time()
         attn_output = self._merge_heads(attn_output, self.num_heads, self.head_dim)
-        t2 = time.time()
-        print("permute time", t2 - t1)
+        attn_output.register_hook(print_grad)
+        res_list.append(attn_output.clone().detach().cpu().numpy())
+
         attn_output = self.c_proj(attn_output)
+        attn_output.register_hook(print_grad)
+        res_list.append(attn_output.clone().detach().cpu().numpy())
+
         attn_output = self.resid_dropout(attn_output)
 
         outputs = (attn_output, present)
@@ -199,15 +195,21 @@ class GPT2MLP(nn.Module):
     def __init__(self, intermediate_size, config):
         super().__init__()
         embed_dim = config.hidden_size
-        self.c_fc = Conv1D(intermediate_size, embed_dim)
-        self.c_proj = Conv1D(embed_dim, intermediate_size)
+        self.c_fc = Conv1D(intermediate_size//TP, embed_dim)
+        self.c_proj = Conv1D(embed_dim, intermediate_size//TP)
         self.act = F.gelu
         self.dropout = nn.Dropout(config.resid_pdrop)
 
     def forward(self, hidden_states):
         hidden_states = self.c_fc(hidden_states)
+        hidden_states.register_hook(print_grad)
+        res_list.append(hidden_states.clone().detach().cpu().numpy())
         hidden_states = self.act(hidden_states)
+        hidden_states.register_hook(print_grad)
+        res_list.append(hidden_states.clone().detach().cpu().numpy())
         hidden_states = self.c_proj(hidden_states)
+        hidden_states.register_hook(print_grad)
+        res_list.append(hidden_states.clone().detach().cpu().numpy())
         hidden_states = self.dropout(hidden_states)
         return hidden_states
 
@@ -239,11 +241,10 @@ class GPT2Block(nn.Module):
         output_attentions=False,
     ):
         residual = hidden_states
-        t1 = time.time()
         hidden_states = self.ln_1(hidden_states)
-        t2 = time.time()
-        print("layernorm1 time ", t2 - t1)
-        t3 = time.time()
+        hidden_states.register_hook(print_grad)
+        res_list.append(hidden_states.clone().detach().cpu().numpy())
+
         attn_outputs = self.attn(
             hidden_states,
             layer_past=layer_past,
@@ -252,11 +253,13 @@ class GPT2Block(nn.Module):
             use_cache=use_cache,
             output_attentions=output_attentions,
         )
-        t4 = time.time()
-        print("attetion time", t4 - t3)
+        #t4 = time.time()
+        #print("attetion time", t4 - t3)
         attn_output = attn_outputs[0]  # output_attn: a, present, (attentions)
+        attn_output.register_hook(print_grad)
+        res_list.append(attn_output.clone().detach().cpu().numpy())
         outputs = attn_outputs[1:]
-        # residual connection
+
         hidden_states = attn_output + residual
 
         if encoder_hidden_states is not None:
@@ -281,16 +284,16 @@ class GPT2Block(nn.Module):
             hidden_states = residual + attn_output
             outputs = outputs + cross_attn_outputs[2:]  # add cross attentions if we output attention weights
 
-        t1 = time.time()
         residual = hidden_states
         hidden_states = self.ln_2(hidden_states)
-        t2 = time.time()
-        print("layernorm time", t2 - t1)
+        hidden_states.register_hook(print_grad)
+        res_list.append(hidden_states.clone().detach().cpu().numpy())
 
-        t1 = time.time()
         feed_forward_hidden_states = self.mlp(hidden_states)
-        t2 = time.time()
-        print("mlp time", t2 - t1)
+        feed_forward_hidden_states.register_hook(print_grad)
+        res_list.append(feed_forward_hidden_states.clone().detach().cpu().numpy())
+        #t2 = time.time()
+        #print("mlp time", t2 - t1)
 
         # residual connection
         hidden_states = residual + feed_forward_hidden_states
@@ -301,145 +304,97 @@ class GPT2Block(nn.Module):
             outputs = (hidden_states,) + outputs[1:]
         #import pdb;pdb.set_trace()
         return outputs  # hidden_states, present, (attentions, cross_attentions)
+    
 
-def case_gptblock_backward():
-    ############# configure ###############
+def compare_model(res_cpu, res_tpu):
+    num = len(res_cpu)
+    for i in range(num):
+        print("=================")
+        print(i, 
+              "max diff", np.max(abs(res_cpu[i] - res_tpu[i])),
+              "mean diff", np.mean(abs(res_cpu[i] - res_tpu[i])),
+              "min diff", np.min(abs(res_cpu[i] - res_tpu[i])))
+    return
+
+
+def check_gpt3(use_half = False, test_backward = False):
+    from transformers import GPT2Config
+    import time
+    # torch.ops.load_library("../../libtorch_plugin/build/liblibtorch_plugin.so")
+    # torch.manual_seed(1000)
+    # device = "privateuseone:0"
     device = torch.device("privateuseone:0")
+    ############# configure ###############
     configure = GPT2Config()
     configure.attn_pdrop = 0
     configure.embd_pdrop = 0
     configure.resid_pdrop = 0
     configure.activation_function= "gelu"
+    configure.n_positions = 4096
+    configure.n_embd = 12288
+    configure.n_head = 96
+    configure.n_layer = 1
+    batch = 6
+    sequence = 4096
 
-    batch = 32
-    sequence = 256 
-    ########################################
+    # configure.n_positions = 256
+    # configure.n_embd = 768
+    # configure.n_head = 16
+    # configure.n_layer = 1
+    # batch = 1
+    # sequence = 256
 
-    inp = torch.rand(batch, sequence, configure.hidden_size)
-    ref = torch.rand(batch, sequence, configure.hidden_size)
-    #inp = torch.ones(batch, sequence, configure.hidden_size)
-    #ref = torch.ones(batch, sequence, configure.hidden_size)
-    inp_tpu = inp.to(device).half()
-    ref_tpu = ref.to(device).half()
+    inp_cpu = torch.rand(batch, sequence, configure.hidden_size)
+    inp_tpu = copy.deepcopy(inp_cpu)
+    inp_tpu = inp_tpu.to(device)
 
-    net = GPT2Block(configure)
-    net_tpu = copy.deepcopy(net)
-    net_tpu.to(device).half()
+    net_cpu = GPT2Block(configure)
+    net_tpu = copy.deepcopy(net_cpu)
+    net_tpu = net_tpu.to(device)
 
-    print("===== forward =========")
-    t1 = time.time()
-    optimer.reset()
+    grad_o = torch.ones((batch, sequence, configure.hidden_size))
+    grad_o_tpu = grad_o.to(device)
+
+    if use_half:
+        inp_tpu = inp_tpu.half()
+        grad_o_tpu = grad_o_tpu.half()
+        net_tpu = net_tpu.half()
+    
+    inp_tpu.requires_grad = True
+    inp_cpu.requires_grad = True
+
+    out_cpu = net_cpu(inp_cpu)
     out_tpu = net_tpu(inp_tpu)
-    optimer.dump()
-    t2 = time.time()
-    print("tpu time :", (t2 - t1) * 1e6)
+    diff = out_cpu[0] - out_tpu[0].cpu()
+    print(torch.max(abs(diff)))
+    compare_model_weight(net_cpu, net_tpu)
 
-    t1 = time.time()
-    out_cpu = net(inp)
-    t2 = time.time()
-    print("cpu time :", t2 - t1)
+    res_cpu = res_list[:len(res_list)//2]
+    res_tpu = res_list[len(res_list)//2:]
+    compare_model(res_cpu, res_tpu)
+    import pdb;pdb.set_trace()
 
-    print("===== backward =========")
-    t1 = time.time()
-    optimer.reset()
-    out_tpu[0].backward(ref_tpu)
-    optimer.dump()
-    t2 = time.time()
-    print("tpu time :", (t2 - t1) * 1e6)
+    if test_backward:
+        out_cpu[0].backward(grad_o)
+        out_tpu[0].backward(grad_o_tpu)
 
-    t1 = time.time()
-    out_cpu[0].backward(ref)
-    t2 = time.time()
-    print("cpu time :", t2 - t1)
+        diff_grad = inp_cpu.grad - inp_tpu.grad.cpu()
+        print(torch.max(abs(diff_grad)))
+        compare_model_grad(net_cpu, net_tpu)
+        grad_inter_cpu = grads_list[:len(grads_list)//2]
+        grad_inter_tpu = grads_list[len(grads_list)//2:]
+        compare_model(grad_inter_cpu, grad_inter_tpu)
+        import pdb;pdb.set_trace()
+    return
 
-    compare_model_grad(net, net_tpu)
+def print_grad(grad):
+    grads_list.append(grad.cpu().numpy())
 
-    def my_print(out_cpu, out_tpu):
-        for i in range(len(out_cpu)):
-            o_c = out_cpu[i]
-            if isinstance(o_c, torch.Tensor):
-                o_t = out_tpu[i].to("cpu")
-                #print("cpu:")
-                #print(o_c)
-                #print("tpu:")
-                #print(o_t)
-                print("max diff:", torch.max(abs(o_c - o_t)))
-            elif isinstance(o_c, tuple):
-                my_print(out_cpu[i], out_tpu[i])
-            else:
-                return
-    my_print(out_cpu, out_tpu)    
-
-def case_gptmlp_backward():
-    ############# configure ###############
-    device = torch.device("privateuseone:0")
-    configure = GPT2Config()
-    configure.attn_pdrop = 0
-    configure.embd_pdrop = 0
-    configure.resid_pdrop = 0
-    configure.n_layer= 2
-    configure.activation_function= "gelu"
-
-    batch = 32
-    sequence = 256
-    ########################################
-
-    inp = torch.rand(batch, sequence, configure.hidden_size)
-    ref = torch.rand(batch, sequence, configure.hidden_size)
-    #inp = torch.ones(batch, sequence, configure.hidden_size)
-    #ref = torch.ones(batch, sequence, configure.hidden_size)
-    inp_tpu = inp.to(device).half()
-    ref_tpu = ref.to(device).half()
-
-    net = GPT2MLP(configure.hidden_size * 3, configure)
-    net_tpu = copy.deepcopy(net)
-    net_tpu.to(device).half()
-
-    print("===== forward =========")
-    t1 = time.time()
-    optimer.reset()
-    out_tpu = net_tpu(inp_tpu)
-    optimer.dump()
-    t2 = time.time()
-    print("tpu time :", t2 - t1)
-
-    t1 = time.time()
-    out_cpu = net(inp)
-    t2 = time.time()
-    print("cpu time :", t2 - t1)
-
-    print("===== backward =========")
-    t1 = time.time()
-    optimer.reset()
-    out_tpu.backward(ref_tpu)
-    optimer.dump()
-    t2 = time.time()
-    print("tpu time :", t2 - t1)
-
-    t1 = time.time()
-    out_cpu.backward(ref)
-    t2 = time.time()
-    print("cpu time :", t2 - t1)
-
-    compare_model_grad(net, net_tpu)
-
-    print(" ======== compare model's out  =======")
-    def my_print(out_cpu, out_tpu):
-        for i in range(len(out_cpu)):
-            o_c = out_cpu[i]
-            if isinstance(o_c, torch.Tensor):
-                o_t = out_tpu[i].to("cpu")
-                #print("cpu:")
-                #print(o_c)
-                #print("tpu:")
-                #print(o_t)
-                print("max diff:", torch.max(abs(o_c - o_t)))
-            elif isinstance(o_c, tuple):
-                my_print(out_cpu[i], out_tpu[i])
-            else:
-                return
-    my_print(out_cpu, out_tpu)    
 
 
 if __name__ == "__main__":
-    case_gptblock_backward()
+    use_half = False
+    test_backward = True
+    res_list = []
+    grads_list = []
+    check_gpt3(use_half, test_backward)

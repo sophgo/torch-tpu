@@ -2,8 +2,10 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from transformers.models.gpt2.modeling_gpt2 import GPT2LMHeadModel
+import sys 
+sys.path.append("..") 
 from utils import compare_model_grad, Optimer
-PLUGIN_PATH = "../../libtorch_plugin/build/liblibtorch_plugin.so"
+PLUGIN_PATH = "../../../libtorch_plugin/build/liblibtorch_plugin.so"
 TPU = "privateuseone:0"
 torch.ops.load_library(PLUGIN_PATH)
 optimer = Optimer(PLUGIN_PATH)

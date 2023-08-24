@@ -12,9 +12,9 @@ namespace at
 {
 Tensor & add_out_tpu ( const Tensor & self, const Tensor & other, const Scalar & alpha, Tensor & out )
 {
-  if ( self.dim() > 0 )  { CHECK_TENSOR_IN_DEVICE ( self ); }
-  if ( other.dim() > 0 ) { CHECK_TENSOR_IN_DEVICE ( other ); }
-  CHECK_TENSOR_IN_DEVICE ( out );
+  if ( self.dim() > 0 )  { CHECK_TENSOR_IN_DEVICE_NO_CONTIGUOUS ( self ); }
+  if ( other.dim() > 0 ) { CHECK_TENSOR_IN_DEVICE_NO_CONTIGUOUS ( other ); }
+  CHECK_TENSOR_IN_DEVICE_NO_CONTIGUOUS ( out );
 #if 0
   auto out_cpu = add ( self.cpu(), other.cpu(), alpha );
   tpu::TPUCopyHostToDevice ( out.data_ptr(), out_cpu.contiguous().data_ptr(), out.nbytes() );
@@ -26,7 +26,27 @@ Tensor & add_out_tpu ( const Tensor & self, const Tensor & other, const Scalar &
   }
   else if ( IS_TPU_TENSOR ( self ) && IS_TPU_TENSOR ( other ) )
   {
-    if ( tpu::TPUIsSameShape ( self, other ) )
+    if ( !self.is_contiguous() || !other.is_contiguous() || !other.is_contiguous() )
+    {
+      LOG( WARNING ) << "add_out not contiguous, use stride copy"
+                     << " self.is_contiguous : " << self.is_contiguous()
+                     << " other.is_contiguous : " << other.is_contiguous()
+                     << " out.is_contiguous : " << out.is_contiguous() ;
+
+      if ( other.is_contiguous() )
+      {
+         out = add ( self.contiguous(), other.contiguous(), alpha );
+      }
+      else
+      {
+         auto out_ = add ( self.contiguous(), other.contiguous(), alpha );
+         sgdnnStridedCopy(
+                  tpu::TPUGetDeviceHandle(),
+                  tpu::TPUGenerateSgdnnTensor ( out_ ),
+                  tpu::TPUGenerateSgdnnTensor ( out ));
+      }
+    }
+    else if ( tpu::TPUIsSameShape ( self, other ) )
     {
 #ifdef TPU_OP_TIMING
       auto timer = tpu::Timer().Start();
@@ -44,15 +64,28 @@ Tensor & add_out_tpu ( const Tensor & self, const Tensor & other, const Scalar &
     }
     else
     {
+      auto self_t  = tpu::TPUGenerateSgdnnTensor ( self );
+      auto other_t = tpu::TPUGenerateSgdnnTensor ( other );
+      auto out_t   = tpu::TPUGenerateSgdnnTensor ( out );
+      if ( self_t.dim != other_t.dim )
+      {
+         if ( other_t.dim == 1)
+         {
+            other_t.shape[ self_t.dim - 1 ]  = other_t.shape[0];
+            other_t.stride[ self_t.dim - 1 ] = 1;
+            other_t.dim = self_t.dim;
+            for ( int i = 0; i < self_t.dim - 1 ; i++ ) { other_t.shape[ i ] = 1; other_t.stride[i] = other_t.shape[0];}
+         }
+      }
 #ifdef TPU_OP_TIMING
       auto timer = tpu::Timer().Start();
 #endif
       bm_status_t status = sgdnnAddBcast (
                            tpu::TPUGetDeviceHandle(),
-                           tpu:: TPUGenerateSgdnnTensor ( self ),
-                           tpu:: TPUGenerateSgdnnTensor ( other ),
+                           self_t,
+                           other_t,
                            alpha.toDouble(),
-                           tpu:: TPUGenerateSgdnnTensor ( out ) );
+                           out_t );
       TORCH_CHECK ( status == BM_SUCCESS );
 #ifdef TPU_OP_TIMING
       tpu::OpTimer::Instance().AddTime ( tpu::BCAST_ADD, timer.ElapsedUS() );
