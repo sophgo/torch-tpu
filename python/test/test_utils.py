@@ -103,7 +103,7 @@ class Evaluator:
     def __call__(self, funcs: Union[List[nn.Module], nn.Module], *iters):
         return self.evavlute(funcs, *iters)
 
-    def add_abs_evalute(self, f32_eps=1e-6, f16_eps=0.05):
+    def add_abs_evalute(self, f32_eps=1e-6, f16_eps=0.05, int8_eps=0):
         def abs_evalute(c_data: torch.Tensor, t_data: torch.Tensor, *ipts):
             eps = torch.abs(c_data - t_data)
             max_eps = eps.max().item()
@@ -111,8 +111,10 @@ class Evaluator:
                 thr = f32_eps
             elif t_data.dtype == torch.float16 or t_data.dtype == torch.bfloat16:
                 thr = f16_eps
+            elif t_data.dtype == torch.int8:
+                thr = int8_eps
 
-            if max_eps < thr:
+            if max_eps <= thr:
                 return
 
             mask = eps > thr
@@ -147,7 +149,6 @@ class Evaluator:
                 for index, (c_data, t_data) in enumerate(zip(cpu_data, tpu_data)):
                     t_data = t_data.to("cpu")
 
-                    
                     for fn in self.fns:
                         ret = fn(c_data, t_data, *ipts)
                         if isinstance(ret, AssertionError):
@@ -156,10 +157,7 @@ class Evaluator:
         if any(message):
             raise AssertionError(
                 "\n".join(
-                    [
-                        f"{func}@{index} Failed: {str(i)}"
-                        for i, func, index in message
-                    ]
+                    [f"{func}@{index} Failed: {str(i)}" for i, func, index in message]
                 )
             )
 
@@ -184,6 +182,9 @@ def evaluate(funcs: Union[List[nn.Module], nn.Module], *iters):
             for c_data, t_data in zip(cpu_data, tpu_data):
                 t_data = t_data.to("cpu")
                 eps = torch.abs(c_data - t_data)
+                # np.testing.assert_allclose(
+                # actual, desired, rtol=1e-3, atol=1e-1, verbose=False
+                # )
 
                 if eps.max().item() > 1e-3:
                     mask = eps > 1e-3

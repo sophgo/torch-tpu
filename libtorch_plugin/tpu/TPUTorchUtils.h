@@ -69,6 +69,10 @@ static inline SgdnnDataType_t TPUConvertDType ( caffe2::TypeMeta dtype )
   {
     return SGDNN_DTYPE_BF16;
   }
+  else if ( dtype == caffe2::TypeMeta::Make<long>() )
+  {
+    return SGDNN_DTYPE_INT64;
+  }
   else if ( dtype == caffe2::TypeMeta::Make<int>() )
   {
     return SGDNN_DTYPE_INT32;
@@ -77,9 +81,9 @@ static inline SgdnnDataType_t TPUConvertDType ( caffe2::TypeMeta dtype )
             dtype == caffe2::TypeMeta::Make<unsigned char>() ) {
     return SGDNN_DTYPE_UINT8;
   }
-  else if ( dtype == caffe2::TypeMeta::Make<long>() )
+  else if ( dtype == caffe2::TypeMeta::Make<int8_t>() )
   {
-    return SGDNN_DTYPE_INT64;
+    return SGDNN_DTYPE_INT8;
   }
   else
   {
