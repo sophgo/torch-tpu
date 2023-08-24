@@ -388,6 +388,82 @@ void sum_core(
 }
 
 static
+void reduce_max_hw_core(
+    local_addr_t  input_addr,
+    local_addr_t  buffer_addr,
+    local_addr_t  output_addr,
+    dim4*         shape,
+    bool          cmp_result,
+    bool          is_last,
+    data_type_t   dtype) {
+
+  const padding_t zero_padding = {.top = 0, .bottom = 0, .left = 0, .right = 0};
+  const dim2 one_stride = {.h = 1, .w = 1};
+  const dim2 one_dilation = {.h = 1, .w = 1};
+  const scalar_t negmax = {.u32 = FP_NEG_MAX(dtype)};
+  const scalar_t zero = {.u32 = 0UL};
+  const int eu_num = tpu_eu_num(dtype);
+  const bool do_first_max = shape->h * shape->w > eu_num;
+
+  dim4 pooling_shape = {shape->n, shape->c, DIV_UP(shape->h * shape->w, eu_num), .w = eu_num};
+  dim4 pooling_stride; tpu_aligned_stride(&pooling_stride, 0, &pooling_shape, dtype);
+  dim2 kernel_size = {.h = pooling_shape.h, .w = 1};
+  if ((shape->h * shape->w) % eu_num) {
+    dim4 c_shape = { .n = shape->n, .c = shape->c, .h = 1, .w = eu_num - ((shape->h * shape->w) % eu_num)};
+    tpu_bdc_set_C(
+        input_addr + shape->h * shape->w * tpu_data_type_size(dtype),
+        negmax,
+        &c_shape,
+        &pooling_stride,
+        dtype);
+  }
+  if (do_first_max) {
+    tpu_bdc_fp_max_pool2d(
+        (is_last || cmp_result) ? buffer_addr : output_addr,
+        input_addr,
+        &pooling_shape,
+        &kernel_size,
+        &zero_padding,
+        &one_stride,
+        &one_dilation,
+        dtype,
+        zero);
+  } else {
+    if (!(cmp_result || is_last)) {
+      tpu_bdc_cpy(
+          output_addr,
+          input_addr,
+          &pooling_shape,
+          NULL, NULL,
+          dtype);
+    }
+  }
+  pooling_shape.h = 1;
+  if (cmp_result) {
+    tpu_bdc_max(
+        is_last ? buffer_addr : output_addr,
+        do_first_max ? buffer_addr : input_addr,
+        output_addr,
+        &pooling_shape,
+        NULL, NULL, NULL,
+        dtype);
+  }
+  if (is_last) {
+    kernel_size.h = 1; kernel_size.w = eu_num;
+    tpu_bdc_fp_max_pool2d(
+        output_addr,
+        (do_first_max || cmp_result) ? buffer_addr : input_addr,
+        &pooling_shape,
+        &kernel_size,
+        &zero_padding,
+        &one_stride,
+        &one_dilation,
+        dtype,
+        zero);
+  }
+}
+
+static
 void nodechip_coress_entropy_local(
     local_addr_t input_addr,
     local_addr_t target_addr,
@@ -398,6 +474,8 @@ void nodechip_coress_entropy_local(
     local_addr_t sequence_table,
     local_addr_t one_hot_sum_addr,
     local_addr_t exp_sum_addr,
+    local_addr_t exp_max_addr,
+    local_addr_t exp_old_max_addr,
     dim4* shape,
     int offset,
     int is_first,
@@ -419,6 +497,63 @@ void nodechip_coress_entropy_local(
       dtype);
   // SUM0 = sum(one_hot)
   sum_core(work1_addr, work0_addr, one_hot_sum_addr, shape, is_first == false, dtype);
+    // exp_max = reduce_max(input)
+  reduce_max_hw_core(input_addr, work0_addr, exp_max_addr, shape, false, true, dtype);
+  dim4 reduce_shape = {.n = shape->n, .c = shape->c, .h = 1, .w = 1};
+  dim4 reduce_stride = {0}; tpu_aligned_stride(&reduce_stride, 0, &reduce_shape, dtype);
+  reduce_stride.h = 0; reduce_stride.w = 0;
+  if (offset != 0) {  // update exp_sum
+    // exp_max = MAX(exp_max, exp_old_max)
+    tpu_bdc_max(
+        exp_max_addr,
+        exp_max_addr,
+        exp_old_max_addr,
+        &reduce_shape,
+        NULL, NULL, NULL,
+        dtype);
+    // exp_old_max = exp_old_max - exp_max
+    tpu_bdc_fp_sub(
+        exp_old_max_addr,
+        exp_old_max_addr,
+        exp_max_addr,
+        &reduce_shape,
+        NULL, NULL, NULL,
+        dtype);
+    // exp_old_max = exp(exp_old_max)
+    tpu_bdc_fp_exp(
+        exp_old_max_addr,
+        exp_old_max_addr,
+        work0_addr,
+        work1_addr,
+        exp_coeff_addr,
+        &reduce_shape,
+        dtype);
+    // exp_sum = exp_sum * exp_old_max
+    reduce_shape.w = tpu_eu_num(dtype);
+    tpu_bdc_fp_mul(
+        exp_sum_addr,
+        exp_sum_addr,
+        exp_old_max_addr,
+        &reduce_shape,
+        NULL, NULL, &reduce_stride,
+        dtype);
+    reduce_shape.w = 1;
+  }
+  // exp_old_max = exp_max
+  tpu_bdc_cpy(
+      exp_old_max_addr,
+      exp_max_addr,
+      &reduce_shape,
+      NULL, NULL,
+      dtype);
+  // input = input - exp_max
+  tpu_bdc_fp_sub(
+      input_addr,
+      input_addr,
+      exp_max_addr,
+      shape,
+      NULL, NULL, &reduce_stride,
+      dtype);
   // EXP = exp(x)
   tpu_bdc_fp_exp(
       work2_addr,
@@ -447,6 +582,8 @@ typedef struct {
   local_addr_t work1_addr;
   local_addr_t exp_sum_addr;
   local_addr_t one_hot_sum_addr;
+  local_addr_t exp_max_addr;
+  local_addr_t exp_old_max_addr;
   local_addr_t log_sum_addr;
 } loc_scheme_t;
 static
@@ -463,7 +600,7 @@ void cal_cw_split(int c, int w, int* cw_split, loc_scheme_t* sm, data_type_t dty
     int target_size = c_per_npu * tpu_aligned_feature_size(1, 1, DT_INT32);
     int log_size = c_per_npu * tpu_aligned_feature_size(1, 1, dtype);
     int sum_size = c_per_npu * tpu_aligned_feature_size(1, eu_num, dtype);
-    int mem_size = ALIGN(coeff_size * 2 + sequence_size + sum_size * 2 + target_size + log_size, BANK_SIZE);
+    int mem_size = ALIGN(coeff_size * 2 + sequence_size + sum_size * 4 + target_size + log_size, BANK_SIZE);
     mem_size += 3 * ALIGN(input_size, BANK_SIZE);
     mem_size += ALIGN(work1_size, BANK_SIZE);
     if (mem_size <= tpu_local_mem_size_per_npu()) {
@@ -472,7 +609,10 @@ void cal_cw_split(int c, int w, int* cw_split, loc_scheme_t* sm, data_type_t dty
       sm->seq_addr = sm->log_coeff_addr + coeff_size;
       sm->exp_sum_addr = sm->seq_addr + sequence_size;
       sm->one_hot_sum_addr = sm->exp_sum_addr + sum_size;
-      sm->log_sum_addr = sm->one_hot_sum_addr + sum_size;
+      // sm->log_sum_addr = sm->one_hot_sum_addr + sum_size;
+      sm->exp_max_addr = sm->one_hot_sum_addr + sum_size;
+      sm->exp_old_max_addr = sm->exp_max_addr + sum_size;
+      sm->log_sum_addr = sm->exp_old_max_addr + sum_size;
       sm->target_addr = sm->log_sum_addr + log_size;
       sm->input_addr[0] = ALIGN(sm->target_addr + target_size, BANK_SIZE);
       sm->input_addr[1] = ALIGN(sm->input_addr[0] + input_size, BANK_SIZE);
@@ -590,6 +730,8 @@ void nodechip_cross_entropy_loss_forward(
             loc_sm.seq_addr,
             loc_sm.one_hot_sum_addr,
             loc_sm.exp_sum_addr,
+            loc_sm.exp_max_addr,
+            loc_sm.exp_old_max_addr,
             &shape,
             cur_w_idx[1],
             cur_c_idx == 0 && cur_w_idx[1] == 0,
@@ -628,11 +770,19 @@ void nodechip_cross_entropy_loss_forward(
         one_fp);
     target_shape.w = 1;
     tpu_bdc_fp32_log(
-        cur_c_idx == 0 ? loc_sm.log_sum_addr : loc_sm.input_addr[1],
+        // cur_c_idx == 0 ? loc_sm.log_sum_addr : loc_sm.input_addr[1],
+        loc_sm.input_addr[1],
         loc_sm.work0_addr,
         loc_sm.work1_addr,
         loc_sm.log_coeff_addr,
         &target_shape);
+    tpu_bdc_fp_add(
+        cur_c_idx == 0 ? loc_sm.log_sum_addr : loc_sm.input_addr[1],
+        loc_sm.input_addr[1],
+        loc_sm.exp_old_max_addr,
+        &target_shape,
+        NULL, NULL, NULL,
+        dtype);
     if (cur_c_idx > 0) {
       dim4 sum_shape = {.n = 1, .c = cur_c_len, .h = 1, .w = 1};
       tpu_bdc_fp_add(
