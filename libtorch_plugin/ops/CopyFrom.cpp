@@ -110,8 +110,47 @@ Tensor _to_copy_tpu(const Tensor &self, c10::optional<ScalarType> dtype_opt,
 
   return _copy_from_tpu(self, dst, non_blocking);
 }
+
+Tensor _to_copy_out_tpu(const Tensor &self, Tensor &out,
+                        c10::optional<ScalarType> dtype_opt,
+                        c10::optional<Layout> layout_opt,
+                        c10::optional<Device> device_opt,
+                        c10::optional<bool> pin_memory_opt, bool non_blocking,
+                        c10::optional<MemoryFormat> memory_format_opt) {
+  TORCH_CHECK(non_blocking == false);
+
+  auto option = self.options();
+  auto dtype = dtype_opt.has_value() ? dtype_opt.value()
+                                     : typeMetaToScalarType(option.dtype());
+  auto layout = layout_opt.has_value() ? layout_opt.value() : option.layout();
+  auto device = device_opt.has_value() ? device_opt.value() : option.device();
+  auto pin_memory = pin_memory_opt.has_value() ? pin_memory_opt.value()
+                                               : option.pinned_memory();
+  auto memory_format = memory_format_opt.has_value()
+                           ? memory_format_opt
+                           : option.memory_format_opt();
+
+  out.to(dtype, layout, device, pin_memory, false, false, memory_format);
+  return _copy_from_tpu(self, out, non_blocking);
+}
+
+Tensor clone_tpu(const Tensor &self,
+                 c10::optional<MemoryFormat> memory_format_opt) {
+  auto dst = empty(self.sizes(), self.options(), memory_format_opt);
+  return _copy_from_tpu(self, dst, false);
+}
+
+Tensor &clone_out_tpu(const Tensor &self,
+                      c10::optional<MemoryFormat> memory_format_opt,
+                      Tensor &out) {
+  _copy_from_tpu(self, out, false);
+  return out;
+}
+
 TORCH_LIBRARY_IMPL(aten, TPU, m) {
   m.impl("_copy_from", _copy_from_tpu);
   m.impl("_to_copy", _to_copy_tpu);
+  m.impl("clone", clone_tpu);
+  m.impl("clone.out", clone_out_tpu);
 }
 } // namespace at
