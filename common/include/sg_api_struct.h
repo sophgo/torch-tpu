@@ -397,6 +397,16 @@ typedef struct
 
 typedef struct
 {
+  unsigned long long input_global_addr;
+  unsigned long long other_global_addr;
+  unsigned long long output_input_global_addr;
+  int shape[FW_MAX_SHAPE_DIMS];
+  int dim;
+  int dtype;
+} WITH_PLATFORM(sg_api_sigmoid_backward_t);
+
+typedef struct
+{
   unsigned long long input_global_addrs[FW_MAX_CONCAT_NUM];
   unsigned long long output_global_addr;
   int input_shapes[FW_MAX_CONCAT_NUM][FW_MAX_SHAPE_DIMS];
@@ -432,6 +442,31 @@ typedef struct
 typedef struct
 {
   unsigned long long input_global_addr;
+  unsigned long long other_global_addr;
+  unsigned long long output_global_addr;
+  int shape[FW_MAX_SHAPE_DIMS];
+  int dim;
+  int src_dtype;
+  int dst_dtype;
+  int other_dtype;
+} WITH_PLATFORM(sg_api_shift_left_t);
+
+typedef struct
+{
+  unsigned long long input_global_addr;
+  unsigned long long other_global_addr;
+  unsigned long long output_global_addr;
+  int input_shape[FW_MAX_SHAPE_DIMS];
+  int other_shape[FW_MAX_SHAPE_DIMS];
+  int dim;
+  int src_dtype;
+  int dst_dtype;
+  int other_dtype;
+}WITH_PLATFORM(sg_api_shift_left_bcast_t);
+
+typedef struct
+{
+  unsigned long long input_global_addr;
   unsigned long long output_global_addr;
   int shape[FW_MAX_SHAPE_DIMS];
   float min;
@@ -439,6 +474,57 @@ typedef struct
   int dim;
   int dtype;
 } WITH_PLATFORM(sg_api_clamp_t);
+
+typedef struct
+{
+  unsigned long long input_global_addr;
+  unsigned long long output_global_addr;
+  int shape[FW_MAX_SHAPE_DIMS];
+  int dim;
+  int dtype;
+  int src_dtype;
+  int dst_dtype;
+  int other_dtype;
+  char const_value;
+}WITH_PLATFORM(sg_api_shift_left_c_t);
+
+typedef struct
+{
+  unsigned long long input_global_addr;
+  unsigned long long other_global_addr;
+  unsigned long long output_global_addr;
+  int shape[FW_MAX_SHAPE_DIMS];
+  int dim;
+  int src_dtype;
+  int dst_dtype;
+  int other_dtype;
+} WITH_PLATFORM(sg_api_shift_right_arithmetic_t);
+
+typedef struct
+{
+  unsigned long long input_global_addr;
+  unsigned long long other_global_addr;
+  unsigned long long output_global_addr;
+  int input_shape[FW_MAX_SHAPE_DIMS];
+  int other_shape[FW_MAX_SHAPE_DIMS];
+  int dim;
+  int src_dtype;
+  int dst_dtype;
+  int other_dtype;
+}WITH_PLATFORM(sg_api_shift_right_arithmetic_bcast_t);
+
+typedef struct
+{
+  unsigned long long input_global_addr;
+  unsigned long long output_global_addr;
+  int shape[FW_MAX_SHAPE_DIMS];
+  int dim;
+  int dtype;
+  int src_dtype;
+  int dst_dtype;
+  int other_dtype;
+  char const_value;
+}WITH_PLATFORM(sg_api_shift_right_arithmetic_c_t);
 
 typedef struct
 {

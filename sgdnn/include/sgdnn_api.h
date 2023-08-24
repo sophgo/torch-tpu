@@ -48,6 +48,12 @@ typedef struct
 }
 SgdnnTensor_t;
 
+typedef enum
+{
+  SHIFT_LEFT_LOGICAL = 0,
+  SHIFT_RIGHT_ARITHMETIC = 1
+}
+SHIFT_TYPE;
 static inline SgdnnTensor_t sgdnnUndefinedTensor()
 {
   SgdnnTensor_t tensor = { .addr = 0 };
@@ -243,6 +249,75 @@ bm_status_t sgdnnLogicalOr ( bm_handle_t handle,
                        SgdnnTensor_t other,
                        SgdnnTensor_t output );
 
+
+/*
+ *  OUTPUT  = SHIFT_LEFT ( INPUT, OTHER)
+ *  Note:
+ *  1. input, other and output only support in dtype.
+ *  2. input and output must be the same shape.
+ *  3. input and other must be the same dim.
+ */
+bm_status_t sgdnnShiftLeft ( bm_handle_t handle,
+                         SgdnnTensor_t input,
+                         SgdnnTensor_t other,
+                         SgdnnTensor_t output );
+/*
+ *  OUTPUT  = SHIFT_LEFT ( INPUT, OTHER)
+ *  Note:
+ *  1. input, other and output only support in dtype.
+ *  2. input and output must be the same shape.
+ *  3. input and other must be the same dim.
+ */
+bm_status_t sgdnnShiftLeftBcast ( bm_handle_t handle,
+                              SgdnnTensor_t input,
+                              SgdnnTensor_t other,
+                              SgdnnTensor_t output );
+/*
+ *  OUTPUT  = SHIFT_LEFT ( INPUT, OTHER)
+ *  Note:
+ *  1. input, other and output only support in dtype.
+ *  2. one of input and other must be a scalar.
+ *  3. input and output must be in the same shape.
+ */
+bm_status_t sgdnnShiftLeftC ( bm_handle_t handle,
+                          SgdnnTensor_t input,
+                          char scalar,
+                          SgdnnTensor_t output );
+
+/*
+ *  OUTPUT  = SHIFT_RIGHT_ARITHMETIC ( INPUT, OTHER)
+ *  Note:
+ *  1. input, other and output only support in dtype.
+ *  2. input and output must be the same shape.
+ *  3. input and other must be the same dim.
+ */
+bm_status_t sgdnnShiftRightArithmetic ( bm_handle_t handle,
+                         SgdnnTensor_t input,
+                         SgdnnTensor_t other,
+                         SgdnnTensor_t output );
+/*
+ *  OUTPUT  = SHIFT_RIGHT_ARITHMETIC ( INPUT, OTHER)
+ *  Note:
+ *  1. input, other and output only support in dtype.
+ *  2. input and output must be the same shape.
+ *  3. input and other must be the same dim.
+ */
+bm_status_t sgdnnShiftRightArithmeticBcast ( bm_handle_t handle,
+                              SgdnnTensor_t input,
+                              SgdnnTensor_t other,
+                              SgdnnTensor_t output );
+/*
+ *  OUTPUT  = SHIFT_RIGHT_ARITHMETIC ( INPUT, OTHER)
+ *  Note:
+ *  1. input, other and output only support in dtype.
+ *  2. one of input and other must be a scalar.
+ *  3. input and output must be in the same shape.
+ */
+bm_status_t sgdnnShiftRightArithmeticC ( bm_handle_t handle,
+                          SgdnnTensor_t input,
+                          int scalar,
+                          SgdnnTensor_t output );
+
 /*
  * OUTPUT = logical_not(INPUT)
  * Note:
@@ -261,6 +336,7 @@ bm_status_t sgdnnLogicalNot ( bm_handle_t handle,
  * 2. The shapes of INPUT, OTHER and OUTPUT must be the same, broadcasting is not allowed
  * 3. INPUT, OTHER and OUTPUT must be contiguous
  */
+
 bm_status_t sgdnnAdd ( bm_handle_t handle,
                        SgdnnTensor_t input,
                        SgdnnTensor_t other,
