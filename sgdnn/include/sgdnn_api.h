@@ -223,10 +223,23 @@ bm_status_t sgdnnBatchMatmul ( bm_handle_t handle,
                                SgdnnTensor_t output );
 
 /*
+ * OUTPUT = GATHER ( INPUT, AXIS, INDEX )
+ * Note:
+ * 1. Input and index must have the same number of dimensions
+ * 2. index.size(d) <= input.size(d) for all dimensions d != dim
+ * 3. Output have the same shape as index, and do not broadcast against each other
+ */
+
+bm_status_t sgdnnGather ( bm_handle_t handle,
+                          SgdnnTensor_t input,
+                          SgdnnTensor_t index,
+                          SgdnnTensor_t output,
+                          int axis );
+/*
  * OUTPUT = Active(INPUT)
  * Note:
  * 1. The data types of INPUT must be the same and one of FP32, FP16 and BF16
- * 2. INPUT must be contiguous
+* 2. INPUT must be contiguous
  */
 bm_status_t sgdnnActive(bm_handle_t handle, SgdnnTensor_t input,
                         SgdnnTensor_t output, sg_active_type_t active_type);
