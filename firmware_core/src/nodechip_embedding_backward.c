@@ -312,8 +312,8 @@ static inline void compute_current_slice_info_multi_core_1D_with_given_cores_wit
   if (core_idx == num_max_core_needed - 1) {
     current_num_for_current_core = total_num - avgnum_element_each_core * (num_max_core_needed - 1);
   }
-  TPUKERNEL_ASSERT_INFO(expected_current_slice <= expected_avg_slice, "Split  Error!");
-  TPUKERNEL_ASSERT_INFO(expected_current_slice > 0, "Split  Error!");
+  TPUKERNEL_ASSERT_INFO(*expected_current_slice <= *expected_avg_slice, "Split  Error!");
+  TPUKERNEL_ASSERT_INFO(*expected_current_slice > 0, "Split  Error!");
   *expected_current_slice = current_num_for_current_core;
   *expected_avg_slice     = avgnum_element_each_core;
   *expected_secs          = num_max_core_needed;
@@ -517,7 +517,7 @@ void TENSOR_MEM_ISOLATED_PRECHECK_L1_dim4(const dim4 object,const  data_type_t  
 
 //Function: get 4* banksize
 //Strategy: If bank_size is not enough, DIV_DOWN
-static inline int gen_bank_split_2_size() {
+static inline int gen_bank_sizes_split_2_per_npu() {
    const int bank_num = tpu_bank_num();
    const int bank_size_per =  tpu_local_mem_size_per_npu() / tpu_bank_num();
    const int num_used_local_addr = 2;
@@ -532,8 +532,8 @@ static inline int gen_bank_split_2_size() {
    return  bank_2;
 }
 
-static inline int gen_bank_split_2_size_total_npu() {
-  const int bank_2 = gen_bank_split_2_size();
+static inline int gen_bank_sizes_split_2_all_npus() {
+  const int bank_2 = gen_bank_sizes_split_2_per_npu();
   return bank_2 * tpu_npu_num();
 }
 
@@ -714,7 +714,7 @@ static inline void Function_Recollect_Index(
 //Arch_solution_2   V              V                X                    V
 //Arch_solution_2   V              V                V                    V
 
-void nodechip_embedding_backward_multi_core_basic_cell_patttern_one(
+void nodechip_embedding_backward_multi_core_basic_cell_patttern_one_intercore(
   global_addr_t grad_Y_global_addr,
   global_addr_t X_global_addr,
   global_addr_t grad_Weight_global_addr,
@@ -740,16 +740,16 @@ void nodechip_embedding_backward_multi_core_basic_cell_patttern_one(
   TPUKERNEL_ASSERT_INFO(BS == NUM_full_Index, "[ERROR] BS CHECK FAILED");
   const int local_offset_1 = BS * H_sliced * len_grad_dtype; //tpu_aligned_feature_size (1, H_sliced, grad_dtype );
   const int local_offset_2 = V  * H_sliced * len_grad_dtype; // tpu_aligned_feature_size (1, H_sliced, grad_dtype ); //sum_num_per_v<=V
-  const int bank_2_size = gen_bank_split_2_size();
+  const int bank_2_size = gen_bank_sizes_split_2_per_npu();
   const local_addr_t grad_Y_gathered_local_addr    = 0;
   const local_addr_t reduce_no_parallel_local_addr = 0;
   const local_addr_t grad_Y_scatter_local_addr     = 1 * bank_2_size;
   const local_addr_t partial_sum_local_addr        = 0;
-  TPUKERNEL_ASSERT_INFO(local_offset_1 < bank_2_size, "BS is too large!");
-  TPUKERNEL_ASSERT_INFO(local_offset_2 < bank_2_size, "V is too large or not sparse enough!");
-  TPUKERNEL_ASSERT_INFO(partial_sum_local_addr+local_offset_2 < (u32)tpu_local_mem_size_per_npu(), "BS_Loop is too large");
-  TPUKERNEL_ASSERT_INFO(partial_sum_local_addr+local_offset_1 < (u32)tpu_local_mem_size_per_npu(), "BS_Loop is too large");
-  // const dim4 grad_W_stride = {.n = 0, .c = H_native, .h = H_native, .w = 1};
+  TPUKERNEL_ASSERT_INFO(local_offset_1 <= bank_2_size, "BS is too large!");
+  TPUKERNEL_ASSERT_INFO(local_offset_2 <= bank_2_size, "V is too large or not sparse enough!");
+  TPUKERNEL_ASSERT_INFO(partial_sum_local_addr+local_offset_2 <= (u32)tpu_local_mem_size_per_npu(), "BS_Loop is too large");
+  TPUKERNEL_ASSERT_INFO(partial_sum_local_addr+local_offset_1 <= (u32)tpu_local_mem_size_per_npu(), "BS_Loop is too large");
+// const dim4 grad_W_stride = {.n = 0, .c = H_native, .h = H_native, .w = 1};
   // if (first_loop_flag) {
     // tpu_gdma_set_C_system (
     //   grad_Weight_global_addr,
@@ -993,7 +993,116 @@ void nodechip_embedding_backward_multi_core_basic_cell_patttern_one(
   //Note: H(.w-dim) is sliced, so each core operates sliced shape but strides in native shape.
   tpu_gdma_cpy_L2S(grad_Weight_global_addr, grad_Y_scatter_local_addr, &shape_scatter_L2_to_L1, &stride_scatter_L2_to_L1, NULL, grad_dtype);
 }
+   
+//Function: MEM From Large-- <=L1 --slice
+//Slice Info [BS_loop, H_sliced_loop, V] rebase on [NPU_NUM, EU_NUM] style
+void nodechip_embedding_backward_multi_core_basic_cell_patttern_one_intracore(
+  global_addr_t grad_Y_global_addr,
+  global_addr_t X_global_addr,
+  global_addr_t grad_Weight_global_addr,
+  global_addr_t sorted_index_value_global_addr,
+  global_addr_t sorted_index_index_global_addr,
+  global_addr_t scatter_index_global_flush_64b_aligned_addr,
+  global_addr_t recollected_global_flush_64b_aligned_addr,
+  const dim4    grad_Y_shape, //[B*S, H_sliced]
+  const dim4    X_shape,      //[B, S]
+  const dim4    grad_W_shape, //[V, H_sliced]
+  const int     H_native,
+  const int     first_loop_flag,
+  const data_type_t   grad_dtype,
+  const data_type_t Index_dtype) {
+  const int len_grad_dtype = tpu_data_type_size(grad_dtype);
+  const int NUM_full_Index = count_numel_dim4(X_shape);
+  const int H_sliced = grad_Y_shape.w;
+  const int V = grad_W_shape.h; //different from NUM_V_used
+  const int BS = grad_Y_shape.h;
+  TPUKERNEL_ASSERT_INFO(BS == NUM_full_Index, "[ERROR] BS CHECK FAILED");
+  const int bank_2_size = gen_bank_sizes_split_2_per_npu();
 
+  // #Target:BS_secs_real
+  // #Function:
+  // #BS -> NUM_NPU *BS_slice_sophon + BS_secs_left
+  // #BS_secs_real = MIN(NUM_NPU, BS_secs_left)
+  // #Fact:  #num_loop_upper==BS_slice_sophon+1
+  int num_loop_upper_BS = DIV_UP(BS, NPU_NUM);
+  for (int idx_BS_loop=0; idx_BS_loop<num_loop_upper_BS; idx_BS_loop++) {
+    int BS_sliced_avg= MIN(BS, NPU_NUM);
+    int BS_sliced_real= idx_BS_loop == num_loop_upper_BS - 1 ? MAX(1, BS - idx_BS_loop * BS_sliced_avg) : BS_sliced_avg;
+    TPUKERNEL_ASSERT(BS_sliced_avg <= NPU_NUM && BS_sliced_real >= 1);
+
+    // #Target:H_sliced_real
+    // #Function: H_sliced -> (num_loop_upper -1) *H_sliced_avg + H_sliced_left
+    // #Constraints: If H_sliced_avg satisfied, so as H_sliced_real
+    // # bank_2 >= len_grad_dtype * BS_secs_real * H_sliced_avg >= k NPU_NUM* EU_NUM = len_grad_dtype * BS_secs_real * H_sliced_real
+    int  aligned_per_npu_mem_H_sliced = ALIGN_DOWN(bank_2_size / DIV_UP(BS_sliced_avg, NPU_NUM), EU_NUM);
+    int  H_sliced_avg_sophon = MIN(H_sliced ,aligned_per_npu_mem_H_sliced / BS_sliced_avg / len_grad_dtype);
+    int  num_loop_upper_H_sliced = DIV_UP(H_sliced, H_sliced_avg_sophon);
+    TPUKERNEL_ASSERT(bank_2_size >= len_grad_dtype * BS_sliced_real * H_sliced_avg_sophon);
+    TPUKERNEL_ASSERT(bank_2_size >= len_grad_dtype * BS_sliced_avg  * H_sliced_avg_sophon);
+    // #Function if BS_secs_real > V : naturally satisified skip V; else cut H_slice again base on V
+    if (V > BS_sliced_avg) {
+      aligned_per_npu_mem_H_sliced = ALIGN_DOWN(bank_2_size / DIV_UP(V, NPU_NUM), EU_NUM);
+      H_sliced_avg_sophon = MIN(H_sliced ,aligned_per_npu_mem_H_sliced / V / len_grad_dtype);
+      num_loop_upper_H_sliced = DIV_UP(H_sliced, H_sliced_avg_sophon);
+      TPUKERNEL_ASSERT(bank_2_size >= len_grad_dtype * BS_sliced_real * H_sliced_avg_sophon);
+    }
+    TPUKERNEL_ASSERT(bank_2_size >= len_grad_dtype * V * H_sliced_avg_sophon);
+    for (int idx_H_sliced=0; idx_H_sliced < num_loop_upper_H_sliced; idx_H_sliced++) {
+      int H_sliced_avg = H_sliced_avg_sophon;
+      int H_sliced_real= idx_H_sliced == num_loop_upper_H_sliced - 1 ? MAX(1, H_sliced - idx_H_sliced * H_sliced_avg) : H_sliced_avg;
+      //Parallel Relationship:
+      //Sequential-Loop (idx_BS_loop,idx_H_sliced)
+      //[Note] core_idx is not used here for H_sliced!
+      global_addr_t grad_Y_addr_sliced                    = grad_Y_global_addr;
+      global_addr_t X_addr_sliced                         = X_global_addr;
+      global_addr_t grad_Weight_addr_sliced               = grad_Weight_global_addr;
+      global_addr_t sorted_index_value_global_addr_sliced = sorted_index_value_global_addr;
+      global_addr_t sorted_index_index_global_addr_sliced = sorted_index_index_global_addr;
+      global_addr_t scatter_index_global_addr_sliced      =  scatter_index_global_flush_64b_aligned_addr;
+      global_addr_t recollected_global_addr_sliced        = recollected_global_flush_64b_aligned_addr;
+      const int offset_H                = idx_H_sliced * H_sliced_avg * 1 * len_grad_dtype;
+      //Grad_W [V,H_sliced]->[V, H_sliced_loop]->[V, H_sliced_loop__]
+      grad_Weight_addr_sliced += offset_H;
+      //Grad_Y [BS,H]->[BS_loop, H_sliced_loop]->[BS_loop__, H_sliced_loop__]
+      const int offset_BS_loop = idx_BS_loop    * BS_sliced_avg * 1 * len_grad_dtype;
+      grad_Y_addr_sliced      += offset_BS_loop * H_native +  offset_H;
+      //X [B,S]->[BS]->[BS_loop]->[BS_loop_]
+      //[Note] Index(X) is free with idx_H_sliced_loop
+      //[Error] [CONFLICT-INFO] loop=0,core=1; loop=0,core =2  if not enough or aligned correctly overlap area on these 4 index buffers will be flushed by mutli-thread.
+      X_addr_sliced           += offset_BS_loop;
+      const int align_offset_loop    =  idx_BS_loop * length_align_64bit_apporach(BS_sliced_avg, Index_dtype);
+      sorted_index_value_global_addr_sliced += align_offset_loop;
+      sorted_index_index_global_addr_sliced += align_offset_loop;
+      scatter_index_global_addr_sliced      += align_offset_loop;
+      recollected_global_addr_sliced        += align_offset_loop;
+      TPUKERNEL_ASSERT_INFO(sorted_index_value_global_addr_sliced % 64==0, "HAU addr mush be aligned to 65bit, using <length_align_64bit_apporach>!");
+      TPUKERNEL_ASSERT_INFO(sorted_index_index_global_addr_sliced % 64==0, "HAU addr mush be aligned to 65bit, using <length_align_64bit_apporach>!");
+      TPUKERNEL_ASSERT_INFO(scatter_index_global_addr_sliced % 64==0, "flush addr mush be aligned to 65bit, using <length_align_64bit_apporach>!");
+      TPUKERNEL_ASSERT_INFO(recollected_global_addr_sliced   % 64==0, "flush addr mush be aligned to 65bit, using <length_align_64bit_apporach>!");
+      const dim4 grad_Y_shape_sliced = {.n=1,.c=1,.h=BS_sliced_real,.w= H_sliced_real};
+      const dim4 grad_W_shape_sliced = {.n=1,.c=1,.h=V,             .w= H_sliced_real};
+      const dim4 X_shape_sliced   = {.n=1,.c=1,.h=1,.w= BS_sliced_real};
+      //All slices are done before entering into pattern_one
+      TENSOR_MEM_ISOLATED_PRECHECK_L1_dim4(grad_Y_shape_sliced, grad_dtype);
+      TENSOR_MEM_ISOLATED_PRECHECK_L1_dim4(grad_W_shape_sliced, grad_dtype);
+      nodechip_embedding_backward_multi_core_basic_cell_patttern_one_intercore(
+              grad_Y_addr_sliced,
+              X_addr_sliced,
+              grad_Weight_addr_sliced,
+              sorted_index_value_global_addr_sliced,
+              sorted_index_index_global_addr_sliced,
+              scatter_index_global_addr_sliced,
+              recollected_global_addr_sliced,
+              grad_Y_shape_sliced, //[BS_loop, H_sliced_loop]
+              X_shape_sliced,      //[BS_loop]
+              grad_W_shape_sliced, //[V, H_sliced_loop]
+              H_native,
+              1,
+              grad_dtype
+              );
+    }
+   }
+}
 
 //****************QUICK GUIDE********************//
 // Pattern 2
@@ -1010,11 +1119,11 @@ void nodechip_embedding_backward_multi_core_basic_cell_patttern_one(
 // Solution: BS_loop <-> Groups_loop, |v| <-> {|x[i_0,j_0]|}, ...,{|x[i_p,j_q]|} = {G1,G2,..G'}
 //Strategy: AS usually BS > V for LLM,   adopt (a) as (b)-(4) need to reloop B for larger slice-shape
 // Notice:   BS-loop not applied Index_sorted && V/BS never intracore sliced
-// (a) 1)H_slice; 2)ensue (V,H_Sliced_loop) < gen_bank_split_2_size()  3) (only when BS > V) loop B ensure (BS_loop,H_Sliced_loop) < gen_bank_split_2_size()
-// (b) 1)H_slice; 2)ensue (BS_loop,H_Sliced) < gen_bank_split_2_size() 3) (only when V > BS_loop) loop H ensure (V,H_Sliced_loop) < gen_bank_split_2_size() 4) (only when V > BS_loop) reloop B find a larger (BS_loop',H_Sliced_loop)   
+// (a) 1)H_slice; 2)ensue (V,H_Sliced_loop)  < gen_bank_sizes_split_2_all_npus()  3) (only when BS > V) loop B ensure (BS_loop,H_Sliced_loop) < gen_bank_sizes_split_2_all_npus()
+// (b) 1)H_slice; 2)ensue (BS_loop,H_Sliced) < gen_bank_sizes_split_2_all_npus()  3) (only when V > BS_loop) loop H ensure (V,H_Sliced_loop) < gen_bank_sizes_split_2_all_npus() 4) (only when V > BS_loop) reloop B find a larger (BS_loop',H_Sliced_loop)
 // Thus, Mem Constraints Prioirty:
-// 1)[Slice] Ensure grad_W_shape_sliced[V, H_sliced_loop]  < gen_bank_split_2_size()
-// 2)[Slice] Ensure grad_Y_shape_sliced[BS_loop. H_sliced] < gen_bank_split_2_size()
+// 1)[Slice] Ensure grad_W_shape_sliced[V, H_sliced_loop]  < gen_bank_sizes_split_2_all_npus()
+// 2)[Slice] Ensure grad_Y_shape_sliced[BS_loop. H_sliced] < gen_bank_sizes_split_2_all_npus()
 void nodechip_embedding_backward_multi_core_basic_cell_pattern_two (
   global_addr_t gradout_global_addr,
   global_addr_t index_global_addr,
@@ -1040,23 +1149,23 @@ void nodechip_embedding_backward_multi_core_basic_cell_pattern_two (
    int min_cores_needed     = 1;
    compute_current_slice_info_multi_core_1D(H_native, &H_sliced_real, &H_sliced_avg, &min_cores_needed);
    if (core_idx < min_cores_needed) {
-    //[Slice] Step 2: Ensue grad_W_shape_sliced(V,H_Sliced_loop) < gen_bank_split_2_size()
+    //[Slice] Step 2: Ensue grad_W_shape_sliced(V,H_Sliced_loop) < gen_bank_sizes_split_2_all_npus()
     //[BS, H ,V] -> [BS, H_sliced, V] ->  [BS_loop, H_sliced_loop]
     int num_loop_upper_H_sliced_loop = 1;
     int H_sliced_loop_tmp = H_sliced_real;
-    while (V * H_sliced_loop_tmp * len_grad_dtype >= gen_bank_split_2_size()) {
+    while (V * H_sliced_loop_tmp * len_grad_dtype >= gen_bank_sizes_split_2_all_npus()) {
         num_loop_upper_H_sliced_loop += 1;
         H_sliced_loop_tmp = DIV_UP(H_sliced_real, num_loop_upper_H_sliced_loop);
     }
     for (int idx_H_sliced_loop = 0; idx_H_sliced_loop < num_loop_upper_H_sliced_loop; idx_H_sliced_loop++) {
         int H_sliced_loop_real = 1, H_sliced_loop_avg  = 1;
         compute_current_loop_info_each_core_1D_with_loop_idx(H_sliced_real, &H_sliced_loop_real, &H_sliced_loop_avg, num_loop_upper_H_sliced_loop, idx_H_sliced_loop);
-        //[Slice] Step 3: Ensure grad_Y_shape_sliced[BS_loop, H_sliced_loop] < gen_bank_split_2_size()
+        //[Slice] Step 3: Ensure grad_Y_shape_sliced[BS_loop, H_sliced_loop] < gen_bank_sizes_split_2_all_npus()
         int BS_sliced_real = 1, BS_sliced_avg = 1;
         int PartRange_loop_tmp =  BS_native;
         int num_loop_upper_BS     = 1;
-        TPUKERNEL_ASSERT_INFO(V * H_sliced_loop_real * len_grad_dtype < gen_bank_split_2_size(), "at least svae one H_slice on L1!");
-        while(PartRange_loop_tmp * H_sliced_loop_real * len_grad_dtype >= gen_bank_split_2_size()) {
+        TPUKERNEL_ASSERT_INFO(V * H_sliced_loop_real * len_grad_dtype < gen_bank_sizes_split_2_all_npus(), "at least svae one H_slice on L1!");
+        while(PartRange_loop_tmp * H_sliced_loop_real * len_grad_dtype >=  gen_bank_sizes_split_2_all_npus()) {
           num_loop_upper_BS += 1;
           PartRange_loop_tmp = DIV_UP(BS_native, num_loop_upper_BS);
         }
@@ -1068,7 +1177,7 @@ void nodechip_embedding_backward_multi_core_basic_cell_pattern_two (
           const int  loop_dim_sliced_avg  =  BS_sliced_avg;
           const int  core_dim_sliced_real =  H_sliced_loop_real;
           const int  loop_dim_sliced_real =  BS_sliced_real;
-          TPUKERNEL_ASSERT_INFO(loop_dim_sliced_avg * core_dim_sliced_avg * len_grad_dtype <= gen_bank_split_2_size(), "[Slice] Step-2 Wrong");
+          TPUKERNEL_ASSERT_INFO(loop_dim_sliced_avg * core_dim_sliced_avg * len_grad_dtype <= gen_bank_sizes_split_2_all_npus(), "[Slice] Step-2 Wrong");
           const int offset_idx_H_slice_loop = idx_H_sliced_loop * core_dim_sliced_avg * 1 * len_grad_dtype;
           const int offset_core_H_slice     = core_idx * H_sliced_avg * 1 * len_grad_dtype;
           const int offset_H                = offset_idx_H_slice_loop + offset_core_H_slice;
@@ -1107,7 +1216,7 @@ void nodechip_embedding_backward_multi_core_basic_cell_pattern_two (
           //All slices are done before entering into pattern_one
           TENSOR_MEM_ISOLATED_PRECHECK_L1_dim4(grad_Y_shape_sliced, grad_dtype);
           TENSOR_MEM_ISOLATED_PRECHECK_L1_dim4(grad_W_shape_sliced, grad_dtype);
-          nodechip_embedding_backward_multi_core_basic_cell_patttern_one(
+          nodechip_embedding_backward_multi_core_basic_cell_patttern_one_intracore(
               grad_Y_addr_sliced,
               X_addr_sliced,
               grad_Weight_addr_sliced,
@@ -1119,8 +1228,9 @@ void nodechip_embedding_backward_multi_core_basic_cell_pattern_two (
               X_shape_sliced,      //[BS_loop]
               grad_W_shape_sliced, //[V, H_sliced_loop]
               H_native,
-              idx_BS_loop==0 ? 1: 0,  //first_loop, grad_W is preset to 0 & no fp_add applied
-              grad_dtype
+              idx_BS_loop,//==0 ? 1: 0,  //first_loop, grad_W is preset to 0 & no fp_add applied
+              grad_dtype,
+              Index_dtype
               );
           }
         }
@@ -1163,11 +1273,11 @@ static inline int Decision_Adviosr_Top(
   //           (2) L1 might be not enough
   if (judger_mem < SG2260_GLOBAL_MEM) {
     //juder Rule:
-    //  1)                      judger_mem <  gen_bank_split_2_size()    Pattern_one [BS, V, H_sliced]
-    //  1)                      judger_mem <  gen_bank_split_2_size_total_npu()    Pattern_one [BS, V, H_sliced]
-    //  2) get_L1_TOTAL_MEM() > judger_mem >  gen_bank_split_2_size_total_npu()     Pattern_one + H_sliced_loop   => Patterb_Two degraded
+    //  1)                      judger_mem <  gen_bank_sizes_split_2_per_npu()    Pattern_one [BS, V, H_sliced]
+    //  1)                      judger_mem <  gen_bank_sizes_split_2_all_npus()    Pattern_one [BS, V, H_sliced]
+    //  2) get_L1_TOTAL_MEM() > judger_mem >  gen_bank_sizes_split_2_all_npus()     Pattern_one + H_sliced_loop   => Patterb_Two degraded
     //  3)                      judger_mem >  get_L1_TOTAL_MEM()     Patterb_Two [BS_loop, V, H_sliced]=> enhanced [BS_loop, V, H_sliced_loop]
-    if (judger_mem >= get_L1_TOTAL_MEM() || judger_mem >=  gen_bank_split_2_size_total_npu()) {
+    if (judger_mem >= get_L1_TOTAL_MEM() || judger_mem >=  gen_bank_sizes_split_2_all_npus()) {
         excute_pattern_level_top = TOP_CONCURRENCY_H_BS;
     }
   }
@@ -1269,7 +1379,7 @@ void nodechip_embedding_backward_multi_core (
       //All slices are done before entering into pattern_one
       TENSOR_MEM_ISOLATED_PRECHECK_L1_dim4(grad_Y_shape_sliced, grad_dtype);
       TENSOR_MEM_ISOLATED_PRECHECK_L1_dim4(grad_W_shape_sliced, grad_dtype);
-      nodechip_embedding_backward_multi_core_basic_cell_patttern_one (
+      nodechip_embedding_backward_multi_core_basic_cell_patttern_one_intracore (
         grad_Y_addr_sliced,
         X_addr_sliced,
         grad_Weight_addr_sliced,
@@ -1282,7 +1392,8 @@ void nodechip_embedding_backward_multi_core (
         grad_W_shape_sliced, //[V, H_sliced]
         H_native,
         1, //set first_loop_flag =1 for pattern 2.1
-        grad_dtype
+        grad_dtype,
+        Index_dtype
         );
     }
   }

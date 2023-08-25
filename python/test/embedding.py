@@ -102,7 +102,7 @@ def case_embedding_backward():
     print('ref',ref)
     compare_model_grad(net, net_tpu)
 
-    def case_embedding_backward_simulate():
+def case_embedding_backward_simulate():
     """
     test case for simulate embedding's behavior
     """
