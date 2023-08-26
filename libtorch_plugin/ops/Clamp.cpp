@@ -11,19 +11,44 @@
 namespace at {
 Tensor & clamp_out_tpu( const at::Tensor & self, const c10::optional<at::Scalar> & min,
                         const c10::optional<at::Scalar> & max, at::Tensor & out) {
-  CHECK_TENSOR_IN_DEVICE ( self );
+  if ( self.dim() > 0 )  { CHECK_TENSOR_IN_DEVICE_NO_CONTIGUOUS ( self ); }
   CHECK_TENSOR_IN_DEVICE ( out );
-#if 1
+  auto self_ = self.contiguous();
+#if 0
     auto out_cpu = clamp ( self.to(torch::kFloat32).cpu(), min, max );
     out = out_cpu.to(out.device()).to(out.dtype());
+#else
+    if (self_.dim() == 0)
+    {
+        auto out_cpu = clamp ( self_.to(torch::kFloat32).cpu(), min, max );
+        tpu::TPUCopyHostToDevice ( out.data_ptr(), out_cpu.contiguous().data_ptr(), out.nbytes() );
+    }
+    else if (IS_TPU_TENSOR(self_)){
+        bm_status_t status = sgdnnClamp(
+            tpu::TPUGetDeviceHandle(),
+            tpu::TPUGenerateSgdnnTensor(self_),
+            min.has_value() ? min.value().to<float>() : -std::numeric_limits<float>::infinity(),
+            max.has_value() ? max.value().to<float>() : std::numeric_limits<float>::infinity(),
+            tpu::TPUGenerateSgdnnTensor(out));
+        TORCH_CHECK(status == BM_SUCCESS);
+    }
+    else
+    {
+        TORCH_CHECK(false, "Input is required in TPU device");
+    }
 #endif
-
     return out;
 }
 
+Tensor clamp_tpu( const at::Tensor & self, const c10::optional<at::Scalar> & min,
+                    const c10::optional<at::Scalar> & max) {
+  auto out = empty(self.sizes(), self.options());
+  return clamp_out_tpu ( self, min, max, out );
+}
 TORCH_LIBRARY_IMPL ( aten, TPU, m )
 {
  m.impl ( "clamp.out",  clamp_out_tpu);
+ m.impl ( "clamp",  clamp_tpu);
 }
 
 } // namespace at

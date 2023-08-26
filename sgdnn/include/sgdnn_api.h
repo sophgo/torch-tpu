@@ -491,6 +491,20 @@ bm_status_t sgdnnConvert ( bm_handle_t handle,
  * 2. The shapes of INPUT and OUTPUT must be the same
  * 3. INPUT and OUTPUT must be contiguous
  */
+
+/*
+ * OUTPUT = CLAMP ( INPUT, MIN, MAX )
+ * Note:
+ * 1. The data types of INPUT and OUTPUT must be the same and one of FP32, FP16 and BF16
+ * 2. The shapes of INPUT and OUTPUT must be the same
+ * 3. INPUT and OUTPUT must be contiguous
+ */
+bm_status_t sgdnnClamp ( bm_handle_t handle,
+                         SgdnnTensor_t input,
+                         float min,
+                         float max,
+                         SgdnnTensor_t output );
+
 bm_status_t sgdnnSqrt ( bm_handle_t handle,
                         SgdnnTensor_t input,
                         SgdnnTensor_t output );

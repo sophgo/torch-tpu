@@ -317,6 +317,7 @@ typedef enum
   ARANGE,
   SILU,
   SIGMOID,
+  CLAMP,
   OP_NUM
 }
 OpType;
@@ -429,9 +430,10 @@ static const char * OpTypeStr[OP_NUM] =
   "NOT_EQUAL_C",
   "FULL",
   "Logical Not",
-  "Arrange"
+  "Arrange",
   "SiLU",
-  "Sigmoid"
+  "Sigmoid",
+  "CLAMP"
 };
 
 struct OpTimer
