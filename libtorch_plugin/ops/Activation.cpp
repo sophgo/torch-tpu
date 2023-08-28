@@ -182,4 +182,21 @@ TORCH_LIBRARY_IMPL ( aten, TPU, m )
   m.impl ( "silu.out", silu_out_tpu );
 }
 
+Tensor & sigmoid_out_tpu(const Tensor & self, Tensor & out) {
+  CHECK_TENSOR_IN_DEVICE ( self );
+  CHECK_TENSOR_IN_DEVICE ( out );
+#if 1
+  LOG( WARNING ) << "sigmoid use cpu impl";
+  auto out_cpu = sigmoid(self.to(torch::kFloat).cpu());
+  out = out_cpu.to(out.device()).to(out.dtype());
+#else
+
+#endif
+  return out;
+}
+TORCH_LIBRARY_IMPL ( aten, TPU, m )
+{
+  m.impl ( "sigmoid.out", silu_out_tpu );
+}
+
 } // namespace at

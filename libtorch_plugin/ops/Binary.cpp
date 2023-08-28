@@ -6,6 +6,8 @@
 #include <TPUTorchUtils.h>
 #include <sgdnn_api.h>
 
+#include <cmath>
+#include <float.h>
 #include "common/config.h"
 
 namespace at
@@ -97,6 +99,13 @@ Tensor & add_out_tpu ( const Tensor & self, const Tensor & other, const Scalar &
   {
     if ( IS_CPU_TENSOR ( other ) )
     {
+      if ( self.dtype() == caffe2::TypeMeta::Make<long>() || 
+            self.dtype() == caffe2::TypeMeta::Make<int>() ){
+        LOG( WARNING ) << "add self's dtype is long or int, use cpu";
+        auto out_cpu = add ( self.to( out.dtype() ).cpu(), other.to( out.dtype() ).cpu(), alpha );
+        out = out_cpu.to(out.device());
+        return out;
+      }
       TORCH_CHECK ( other.dim() == 0, "OTHER must be a scalar" );
       Tensor scalar;
       if ( other.dtype() == caffe2::TypeMeta::Make<double>() )
@@ -1109,7 +1118,10 @@ Tensor & less_than_out_tpu( const Tensor &self, const Tensor &other, Tensor &out
       }
   }
   else {
-    TORCH_CHECK ( false, "unsupported dims" );
+    //TORCH_CHECK ( false, "unsupported dims" );
+    LOG(WARNING) << "less_than_out use cpu impl";
+    auto out_cpu = lt(self.cpu(), other.cpu());
+    tpu::TPUCopyHostToDevice(out.data_ptr(), out_cpu.contiguous().data_ptr(), out.nbytes());
   }
 
   return out;

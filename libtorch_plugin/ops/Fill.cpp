@@ -63,4 +63,25 @@ TORCH_LIBRARY_IMPL ( aten, TPU, m )
 {
   m.impl ( "zero_", zero__tpu );
 }
+
+Tensor & masked_fill_Scalar_tpu ( Tensor & self, const Tensor & mask, const Scalar & value)
+{
+  CHECK_TENSOR_IN_DEVICE ( self );
+  CHECK_TENSOR_IN_DEVICE ( mask );
+#if 1
+  LOG( WARNING ) << "masked_fill_.Scalar use cpu impl";
+  auto self_cpu = self.cpu();
+  self_cpu.masked_fill_(mask.cpu(), value);
+  self = self.to(self.device());
+#else
+  // TODO
+#endif
+  return self;
+}
+
+TORCH_LIBRARY_IMPL ( aten, TPU, m )
+{
+  m.impl ( "masked_fill_.Scalar", masked_fill_Scalar_tpu );
+}
+
 } // namespace at
