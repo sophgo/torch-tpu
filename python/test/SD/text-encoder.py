@@ -1,7 +1,5 @@
 import os
 import sys
-from turtle import forward 
-from typing import Dict, Optional, Tuple, Union
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -15,6 +13,7 @@ torch.ops.load_library(PLUGIN_PATH)
 optimer = Optimer(PLUGIN_PATH)
 device = "privateuseone"
 os.environ["CMODEL_GLOBAL_MEM_SIZE"]="12000000000"
+torch.manual_seed(1000)
 
 pretrained_model_name = "CompVis/stable-diffusion-v1-4"
 B = 1
@@ -29,7 +28,6 @@ def from_diffusers():
     )
     text_encoder.requires_grad_(False)
     text_encoder.to(device)
-    import pdb;pdb.set_trace()
     #TODO DBUG when dtype == torch.int64
     text_input = torch.randint(0, V, (B, S),dtype=torch.int32).to(device)
     encoder_hidden_states = text_encoder(text_input)[0]

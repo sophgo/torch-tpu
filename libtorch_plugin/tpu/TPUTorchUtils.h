@@ -314,6 +314,7 @@ typedef enum
   NOT_EQUAL_C,
   FULL,
   LOGICAL_NOT,
+  ARANGE,
   OP_NUM
 }
 OpType;
@@ -423,9 +424,10 @@ static const char * OpTypeStr[OP_NUM] =
   "LESS_THAN_C",
   "NOT_EQUAL",
   "NOT_EQUAL_BCAST",
-  "NOT_EQUAL_C"
+  "NOT_EQUAL_C",
   "FULL",
-  "Logical Not"
+  "Logical Not",
+  "Arrange"
 };
 
 struct OpTimer

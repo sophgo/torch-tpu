@@ -72,7 +72,7 @@ Tensor & masked_fill_Scalar_tpu ( Tensor & self, const Tensor & mask, const Scal
   LOG( WARNING ) << "masked_fill_.Scalar use cpu impl";
   auto self_cpu = self.cpu();
   self_cpu.masked_fill_(mask.cpu(), value);
-  self = self.to(self.device());
+  tpu::TPUCopyHostToDevice ( self.data_ptr(), self_cpu.contiguous().data_ptr(), self.nbytes() );
 #else
   // TODO
 #endif
