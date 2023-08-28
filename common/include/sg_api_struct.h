@@ -1378,5 +1378,25 @@ typedef struct
   int dtype;
 } WITH_PLATFORM(sg_api_atan2_bcast_t);
 
+typedef struct
+{
+  unsigned long long input_global_addr;
+  unsigned long long buffer_global_addr;
+  unsigned long long batch1_global_addr;
+  unsigned long long batch2_global_addr;
+  unsigned long long output_global_addr;
+  int input_shape[FW_MAX_SHAPE_DIMS];
+  int batch1_shape[FW_MAX_SHAPE_DIMS];
+  int batch2_shape[FW_MAX_SHAPE_DIMS];
+  int output_shape[FW_MAX_SHAPE_DIMS];
+  int input_dim;
+  int batch1_dim;
+  int batch2_dim;
+  int output_dim;
+  int dtype;
+  float alpha;
+  float beta;
+} WITH_PLATFORM(sg_api_baddbmm_t);
+
 #pragma pack(pop)
 #endif  // SG_API_STRUCT_H

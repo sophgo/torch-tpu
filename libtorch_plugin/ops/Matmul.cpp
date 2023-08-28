@@ -155,12 +155,19 @@ Tensor & baddbmm_out_tpu(const at::Tensor & self, const at::Tensor & batch1, con
   CHECK_TENSOR_IN_DEVICE_NO_CONTIGUOUS ( batch1 );
   CHECK_TENSOR_IN_DEVICE_NO_CONTIGUOUS ( batch2 );
   CHECK_TENSOR_IN_DEVICE ( out );
-#if 1
+#if 0
   LOG( WARNING ) << "baddbmm use cpu impl";
   auto out_cpu = baddbmm ( self.to(torch::kFloat).cpu(), batch1.to(torch::kFloat).cpu(), batch2.to(torch::kFloat).cpu(), beta, alpha );
   out = out_cpu.to(out.device()).to(out.dtype());
 #else
-//TODO
+  auto status = sgdnnBaddbmm(
+                tpu::TPUGetDeviceHandle(),
+                tpu::TPUGenerateSgdnnTensor ( self ),
+                tpu::TPUGenerateSgdnnTensor ( batch1 ),
+                tpu::TPUGenerateSgdnnTensor ( batch2 ),
+                tpu::TPUGenerateSgdnnTensor ( out ),
+                alpha.toDouble(),
+                beta.toDouble() );
 #endif
   return out;
 }

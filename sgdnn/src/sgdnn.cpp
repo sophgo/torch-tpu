@@ -5494,3 +5494,81 @@ bm_status_t sgdnnAtan2Bcast (bm_handle_t handle,
 #endif
   return BM_SUCCESS;
 }
+
+bm_status_t sgdnnBaddbmm ( bm_handle_t handle,
+                          SgdnnTensor_t input1,
+                          SgdnnTensor_t batch1,
+                          SgdnnTensor_t batch2,
+                          SgdnnTensor_t out,
+                          double alpha,
+                          double beta)
+{
+  SGDNN_CHECK ( input1.dtype == SGDNN_DTYPE_FP32||
+                input1.dtype == SGDNN_DTYPE_FP16||
+                input1.dtype == SGDNN_DTYPE_BF16 );
+  SGDNN_CHECK ( input1.dtype == batch1.dtype );
+  SGDNN_CHECK ( input1.dtype == batch2.dtype );
+  SGDNN_CHECK ( input1.dtype == out.dtype );
+  // shape check
+  SGDNN_CHECK ( batch1.dim == 3 );
+  SGDNN_CHECK ( batch2.dim == 3 );
+  int batch_out_shape[8] = {0};
+  batch_out_shape[0] = batch1.shape[0];
+  batch_out_shape[1] = batch1.shape[1];
+  batch_out_shape[2] = batch2.shape[2];
+  // check boardcast
+  int min_dim = input1.dim;
+  for ( int i = 0; i < min_dim; ++i )
+  {
+    SGDNN_CHECK ( batch_out_shape[2-i] == input1.shape[min_dim-1-i] );
+  }
+  // input1 must can be broadcast to batch_out_shape
+  SGDNN_CHECK ( sgdnnIsTensorContiguous ( &input1 ) );
+  SGDNN_CHECK ( sgdnnIsTensorContiguous ( &batch1 ) );
+  SGDNN_CHECK ( sgdnnIsTensorContiguous ( &batch2 ) );
+  SGDNN_CHECK ( sgdnnIsTensorContiguous ( &out ) );
+#if defined SGDNN_BACKEND_1684X
+  // need malloc buffer to store input1
+  bm_device_mem_t input1_buffer;
+  SAFE_CALL( bm_malloc_device_byte ( handle, &input1_buffer, sgdnnTensorBytes ( &input1 ) ) );
+  sg_api_baddbmm_t api;
+  api.input_global_addr  = input1.addr;
+  api.buffer_global_addr = input1_buffer.u.device.device_addr;
+  api.batch1_global_addr = batch1.addr;
+  api.batch2_global_addr = batch2.addr;
+  api.output_global_addr = out.addr;
+  api.input_dim = input1.dim;
+  api.batch1_dim = batch1.dim;
+  api.batch2_dim = batch2.dim;
+  api.output_dim = out.dim;
+  for ( int i = 0; i < input1.dim; ++i )
+  {
+    api.input_shape[i] = input1.shape[i];
+  }
+  for ( int i = 0; i < batch1.dim; ++i )
+  {
+    api.batch1_shape[i] = batch1.shape[i];
+  }
+  for ( int i = 0; i < batch2.dim; ++i )
+  {
+    api.batch2_shape[i] = batch2.shape[i];
+  }
+  for ( int i = 0; i < out.dim; ++i )
+  {
+    api.output_shape[i] = out.shape[i];
+  }
+  api.alpha = (float)alpha;
+  api.beta = (float)beta;
+  api.dtype = sgdnnTPUKernelDType ( input1.dtype );
+
+  SAFE_CALL ( sgdnnTPUKernelLaunch ( handle, "tpu_kernel_api_baddbmm", &api, sizeof ( api ) ) );
+
+  bm_free_device(handle, input1_buffer);
+
+#elif defined SGDNN_BACKEND_2260
+  SGDNN_CHECK ( false );
+#else
+  SGDNN_CHECK ( false );
+#endif
+  return BM_SUCCESS;
+}

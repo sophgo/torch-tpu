@@ -1310,6 +1310,20 @@ bm_status_t sgdnnNotEqualC ( bm_handle_t handle,
                              SgdnnTensor_t input,
                              float scalar,
                              SgdnnTensor_t output );
+/*
+ * OUTPUT  = Badddbmm ( INPUT1, BATCH1, BATCH2, OUT, ALPHA, BETA )
+ * Note:
+ * 1. The data types of all the tensors must be the same and one of FP32, FP16 and BF16
+ * 2. The dimensions of BATCH1, BATCH2 and OUT must be 3
+ * 3. The shape of INPUT1 is ( B, M, D2 ), BATCH1 is ( B, M, D1 ), BATCH2 is ( B, D1, D2 ), OUT is ( B, M, D2 )
+*/
+bm_status_t sgdnnBaddbmm ( bm_handle_t handle,
+                          SgdnnTensor_t input1,
+                          SgdnnTensor_t batch1,
+                          SgdnnTensor_t batch2,
+                          SgdnnTensor_t out,
+                          double alpha,
+                          double beta);
 
 #if defined(__cplusplus)
 }
