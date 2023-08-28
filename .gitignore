@@ -45,3 +45,5 @@ Makefile
 libtorch_plugin/common/config.h
 python/setup.py
 python/**/*.so
+python/gen_ins/*
+!python/gen_ins/*.py
