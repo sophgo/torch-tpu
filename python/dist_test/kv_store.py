@@ -5,8 +5,11 @@ from base64 import b64encode, b64decode
 import torch.distributed as dist
 import logging
 from helper import init_logger, is_master, is_slave
+import sccl_collectives
+torch.ops.load_library("../../libtorch_plugin/build/liblibtorch_plugin.so")
+TPU = "privateuseone"
 
-dist.init_process_group(backend="gloo")
+dist.init_process_group(backend="sccl")
 init_logger()
 
 store = dist.TCPStore(
@@ -34,3 +37,5 @@ if is_slave():
     store.get("another_key")
     tensor = pickle.loads(b64decode(store.get("another_key")))
     logging.info(f"slave got object from the same key {tensor}")
+    
+# how to use TPU?

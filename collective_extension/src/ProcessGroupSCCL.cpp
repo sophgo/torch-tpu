@@ -442,8 +442,8 @@ void ProcessGroupSCCL::AsyncWork::execute(c10::intrusive_ptr<AsyncWork> work) {
   // FIXME: We need to call it here since Future completion requires all
   // the work to be synchronized to CUDA.
   work->synchronize();
-  work->finishWorkGloo();
   work->finishWorkSCCL();
+  work->finishWorkGloo();
 }
 
 std::vector<at::Tensor> ProcessGroupSCCL::AsyncWork::result() {
@@ -614,6 +614,48 @@ bool ProcessGroupSCCL::RecvWork::wait(std::chrono::milliseconds timeout) {
 }
 
 void ProcessGroupSCCL::RecvWork::abort() {
+  buffer_->abortWaitRecv();
+}
+
+ProcessGroupSCCL::RecvTPUWork::RecvTPUWork(
+    at::Tensor& tensor,
+    at::Tensor tensor_cpu,
+    std::unique_ptr<::gloo::transport::UnboundBuffer> buffer,
+    const char* profilingTitle)
+    : Work(
+          -1,
+          OpType::UNKNOWN,
+          profilingTitle,
+          c10::optional<std::vector<at::Tensor>>({tensor})),
+      tensor_(tensor),
+      tensor_cpu(tensor_cpu),
+      buffer_(std::move(buffer)),
+      srcRank_(-1) {}
+
+int ProcessGroupSCCL::RecvTPUWork::sourceRank() const {
+  std::lock_guard<std::mutex> lock(mutex_);
+  return srcRank_;
+}
+
+bool ProcessGroupSCCL::RecvTPUWork::wait(std::chrono::milliseconds timeout) {
+  bool recvCompleted = false;
+  std::exception_ptr exception{nullptr};
+  try {
+    if (timeout == kNoTimeout) {
+      recvCompleted = buffer_->waitRecv(&srcRank_);
+    } else {
+      recvCompleted = buffer_->waitRecv(&srcRank_, timeout);
+    }
+  } catch (...) {
+    exception = std::current_exception();
+  }
+  tpu::TPUCopyHostToDevice ( tensor_.data_ptr(), tensor_cpu.data_ptr(), tensor_cpu.nbytes() );
+  // Completes the Work object and throws the exception.
+  finishAndThrow(exception);
+  return recvCompleted;
+}
+
+void ProcessGroupSCCL::RecvTPUWork::abort() {
   buffer_->abortWaitRecv();
 }
 
@@ -924,6 +966,57 @@ class AsyncBroadcastCUDAWork : public AsyncBroadcastWork {
   std::vector<c10::Event> events;
 };
 
+class AsyncBroadcastTPUWork : public ProcessGroupSCCL::AsyncWork {
+ public:
+  AsyncBroadcastTPUWork(
+      const std::shared_ptr<gloo::Context>& context,
+      std::vector<at::Tensor>& inputs,
+      std::vector<at::Tensor> inputs_cpu,
+      int rootRank,
+      int rootTensor,
+      uint32_t tag)
+      : ProcessGroupSCCL::AsyncWork({inputs_cpu}, "gloo:broadcast", inputs_cpu),
+        context(context),
+        inputs(inputs),
+        inputs_cpu(inputs_cpu),
+        rootRank(rootRank),
+        rootTensor(rootTensor),
+        tag(tag) {}
+
+  std::shared_ptr<gloo::Context> context;
+  std::vector<at::Tensor> inputs;
+  std::vector<at::Tensor> inputs_cpu;
+  const int rootRank;
+  const int rootTensor;
+  const uint32_t tag;
+
+  void broadcast(at::Tensor& tensor) {
+    const auto& scalarType = tensor.scalar_type();
+    gloo::BroadcastOptions opts(context);
+    opts.setRoot(rootRank);
+    opts.setTag(tag);
+    GENERATE_ALL_TYPES(scalarType, setOutput, opts, tensor);
+    gloo::broadcast(opts);
+  }
+
+  void run() override {
+    broadcast(inputs_cpu[rootTensor]);
+
+    // Copy to non-root tensors
+    for (const auto i : c10::irange(inputs_cpu.size())) {
+      if (i == static_cast<size_t>(rootTensor)) {
+        continue;
+      }
+      inputs_cpu[i].copy_(inputs_cpu[rootTensor]);
+    }
+  }
+  void finishWorkSCCL() override{
+    for (int i = 0; i < inputs.size(); i++){
+      tpu::TPUCopyHostToDevice ( inputs[i].data_ptr(), inputs_cpu[i].data_ptr(), inputs_cpu[i].nbytes() );
+    }
+  }
+};
+
 } // namespace
 
 c10::intrusive_ptr<Work> ProcessGroupSCCL::broadcast(
@@ -946,11 +1039,13 @@ c10::intrusive_ptr<Work> ProcessGroupSCCL::broadcast(
       // If the user gave us a CUDA tensor then CUDA must be loaded.
       TORCH_INTERNAL_ASSERT(at::hasCUDA());
       break;
+    case at::kPrivateUse1:
+      break;
     default:
       invalidArgument(c10::str("unsupported device type ", device.type()));
   }
 
-  c10::intrusive_ptr<AsyncBroadcastWork> work;
+  c10::intrusive_ptr<AsyncWork> work;
   auto tag = nextTag();
   auto context = getContext(tag);
   if (device.type() == at::kCPU) {
@@ -959,6 +1054,13 @@ c10::intrusive_ptr<Work> ProcessGroupSCCL::broadcast(
   } else if (device.type() == at::kCUDA) {
     work = c10::make_intrusive<AsyncBroadcastCUDAWork>(
         std::move(context), inputs, opts.rootRank, opts.rootTensor, tag);
+  } else if (device.type() == at::kPrivateUse1) {
+    std::vector<at::Tensor> inputs_cpu;
+    for (int i = 0; i < inputs.size(); i++){
+      inputs_cpu.push_back(inputs[i].cpu());
+    }
+    work = c10::make_intrusive<AsyncBroadcastTPUWork>(
+        std::move(context), inputs, inputs_cpu, opts.rootRank, opts.rootTensor, tag);
   } else {
     TORCH_CHECK(false, "Invalid backend");
   }
@@ -1667,6 +1769,68 @@ class AsyncReduceWork : public ProcessGroupSCCL::AsyncWork {
   }
 };
 
+class AsyncReduceTPUWork : public ProcessGroupSCCL::AsyncWork {
+ public:
+  AsyncReduceTPUWork(
+      const std::shared_ptr<gloo::Context>& context,
+      std::vector<at::Tensor>& inputs,
+      std::vector<at::Tensor> inputs_cpu,
+      int rootRank,
+      int rootTensor,
+      ReduceOp reduceOp,
+      uint32_t tag)
+      : ProcessGroupSCCL::AsyncWork({inputs_cpu}, "gloo:reduce", inputs_cpu),
+        context(context),
+        inputs(inputs),
+        inputs_cpu(inputs_cpu),
+        rootRank(rootRank),
+        rootTensor(rootTensor),
+        reduceOp(reduceOp),
+        tag(tag) {}
+
+  std::shared_ptr<gloo::Context> context;
+  std::vector<at::Tensor> inputs;
+  std::vector<at::Tensor> inputs_cpu;
+  const int rootRank;
+  const int rootTensor;
+  const ReduceOp reduceOp;
+  const uint32_t tag;
+
+  void reduce(std::vector<at::Tensor>& tensors) {
+    const auto& scalarType = tensors[0].scalar_type();
+    gloo::ReduceOptions opts(context);
+    opts.setRoot(rootRank);
+    opts.setTag(tag);
+    opts.setReduceFunction(getFunction(scalarType, reduceOp));
+    GENERATE_ALL_TYPES(scalarType, setOutput, opts, tensors[0]);
+    gloo::reduce(opts);
+  }
+
+  void run() override {
+    reduce(inputs_cpu);
+  }
+
+  void finishWorkSCCL() override{
+    for (int i = 0; i < inputs.size(); i++){
+      tpu::TPUCopyHostToDevice ( inputs[i].data_ptr(), inputs_cpu[i].data_ptr(), inputs_cpu[i].nbytes() );
+    }
+  }
+
+ protected:
+  template <typename T>
+  void getFunction(gloo::ReduceOptions::Func& fn, const ReduceOp op) {
+    fn = toFunction<T>(op);
+  }
+
+  gloo::ReduceOptions::Func getFunction(
+      const at::ScalarType& dtype,
+      const ReduceOp op) {
+    gloo::ReduceOptions::Func fn;
+    GENERATE_ALL_TYPES(dtype, getFunction, fn, op);
+    return fn;
+  }
+};
+
 class AsyncReduceCUDAWork : public AsyncReduceWork {
  public:
   AsyncReduceCUDAWork(
@@ -1742,11 +1906,13 @@ c10::intrusive_ptr<Work> ProcessGroupSCCL::reduce(
       // If the user gave us a CUDA tensor then CUDA must be loaded.
       TORCH_INTERNAL_ASSERT(at::hasCUDA());
       break;
+    case at::kPrivateUse1:
+      break;
     default:
       invalidArgument(c10::str("unsupported device type ", device.type()));
   }
 
-  c10::intrusive_ptr<AsyncReduceWork> work;
+  c10::intrusive_ptr<AsyncWork> work;
   auto tag = nextTag();
   auto context = getContext(tag);
   if (device.type() == at::kCPU) {
@@ -1761,6 +1927,19 @@ c10::intrusive_ptr<Work> ProcessGroupSCCL::reduce(
     work = c10::make_intrusive<AsyncReduceCUDAWork>(
         std::move(context),
         inputs,
+        opts.rootRank,
+        opts.rootTensor,
+        opts.reduceOp,
+        tag);
+  } else if (device.type() == at::kPrivateUse1) {
+    std::vector<at::Tensor> inputs_cpu;
+    for (int i = 0; i < inputs.size(); i++){
+      inputs_cpu.push_back(inputs[i].cpu());
+    }
+    work = c10::make_intrusive<AsyncReduceTPUWork>(
+        std::move(context),
+        inputs,
+        inputs_cpu,
         opts.rootRank,
         opts.rootTensor,
         opts.reduceOp,
@@ -1898,6 +2077,70 @@ class AsyncAllgatherCUDAWork : public AsyncAllgatherWork {
   std::vector<c10::Event> outputEvents;
 };
 
+class AsyncAllgatherTPUWork : public ProcessGroupSCCL::AsyncWork {
+ public:
+  AsyncAllgatherTPUWork(
+      const std::shared_ptr<gloo::Context>& context,
+      std::vector<std::vector<at::Tensor>>& outputs,
+      std::vector<std::vector<at::Tensor>> outputs_cpu,
+      std::vector<at::Tensor>& inputs,
+      std::vector<at::Tensor> inputs_cpu,
+      uint32_t tag)
+      : ProcessGroupSCCL::AsyncWork(outputs_cpu, "gloo:all_gather", inputs_cpu),
+        context(context),
+        outputs(outputs),
+        outputs_cpu(outputs_cpu),
+        inputs(inputs),
+        inputs_cpu(inputs_cpu),
+        tag(tag) {}
+
+  std::shared_ptr<gloo::Context> context;
+  std::vector<std::vector<at::Tensor>> outputs;
+  std::vector<std::vector<at::Tensor>> outputs_cpu;
+  std::vector<at::Tensor> inputs;
+  std::vector<at::Tensor> inputs_cpu;
+  const uint32_t tag;
+
+  void allgather(
+      std::vector<std::vector<at::Tensor>>& outputs,
+      std::vector<at::Tensor>& inputs) {
+    const auto& scalarType = inputs[0].scalar_type();
+    gloo::AllgatherOptions opts(context);
+    opts.setTag(tag);
+
+    // Use single flattened input tensor.
+    at::Tensor flatInputTensor = flattenDenseTensors(inputs);
+    GENERATE_ALL_TYPES(scalarType, setInput, opts, flatInputTensor);
+
+    // Use single flat output tensor.
+    // The first dimension corresponds to the index into outputs[N],
+    // so copying into the actual output later is easy.
+    at::Tensor flatOutputTensor = newLikeFlat(outputs[0]);
+    GENERATE_ALL_TYPES(scalarType, setOutput, opts, flatOutputTensor);
+    gloo::allgather(opts);
+
+    // Unflatten into output tensors.
+    for (auto& outputgroup : outputs) {
+      for (const auto j : c10::irange(outputgroup.size())) {
+        outputgroup[j].copy_(flatOutputTensor[j]);
+      }
+    }
+  }
+
+  void run() override {
+    allgather(outputs_cpu, inputs_cpu);
+  }
+  void finishWorkSCCL() override{
+    for (int i = 0; i < inputs.size(); i++){
+      tpu::TPUCopyHostToDevice ( inputs[i].data_ptr(), inputs_cpu[i].data_ptr(), inputs_cpu[i].nbytes() );
+    }
+    for (int i = 0; i < outputs.size(); i++){
+      for (int j = 0; j < outputs[i].size(); j++)
+      tpu::TPUCopyHostToDevice ( outputs[i][j].data_ptr(), outputs_cpu[i][j].data_ptr(), outputs_cpu[i][j].nbytes() );
+    }
+  }
+};
+
 } // namespace
 
 // Note: current CUDA implementation holds the assumption that the
@@ -1948,11 +2191,13 @@ c10::intrusive_ptr<Work> ProcessGroupSCCL::allgather(
       // If the user gave us a CUDA tensor then CUDA must be loaded.
       TORCH_INTERNAL_ASSERT(at::hasCUDA());
       break;
+    case at::kPrivateUse1:
+      break;
     default:
       invalidArgument(c10::str("unsupported device type ", device.type()));
   }
 
-  c10::intrusive_ptr<AsyncAllgatherWork> work;
+  c10::intrusive_ptr<AsyncWork> work;
   auto tag = nextTag();
   auto context = getContext(tag);
   if (device.type() == at::kCPU) {
@@ -1961,6 +2206,21 @@ c10::intrusive_ptr<Work> ProcessGroupSCCL::allgather(
   } else if (device.type() == at::kCUDA) {
     work = c10::make_intrusive<AsyncAllgatherCUDAWork>(
         std::move(context), outputs, inputs, tag);
+  } else if (device.type() == at::kPrivateUse1){
+    std::vector<std::vector<at::Tensor>> outputs_cpu;
+    for (int i = 0; i < outputs.size(); i++){
+      std::vector<at::Tensor> outputs_cpu_;
+      for (int j = 0; j < outputs[i].size(); j++){
+        outputs_cpu_.push_back(outputs[i][j].cpu());
+      }
+      outputs_cpu.push_back(outputs_cpu_);
+    }
+    std::vector<at::Tensor> inputs_cpu;
+    for (int i = 0; i < inputs.size(); i++){
+      inputs_cpu.push_back(inputs[i].cpu());
+    }
+    work = c10::make_intrusive<AsyncAllgatherTPUWork>(
+      std::move(context), outputs, outputs_cpu, inputs, inputs_cpu, tag);
   } else {
     TORCH_CHECK(false, "Invalid backend");
   }
@@ -2236,6 +2496,75 @@ class AsyncGatherCUDAWork : public AsyncGatherWork {
   std::vector<c10::Event> outputEvents;
 };
 
+class AsyncGatherTPUWork : public ProcessGroupSCCL::AsyncWork {
+ public:
+  AsyncGatherTPUWork(
+      const std::shared_ptr<gloo::Context>& context,
+      std::vector<std::vector<at::Tensor>>& outputs,
+      std::vector<std::vector<at::Tensor>> outputs_cpu,
+      std::vector<at::Tensor>& inputs,
+      std::vector<at::Tensor> inputs_cpu,
+      int root,
+      uint32_t tag)
+      : ProcessGroupSCCL::AsyncWork(outputs_cpu, "gloo:gather", inputs_cpu),
+        context(context),
+        outputs(outputs),
+        outputs_cpu(outputs_cpu),
+        inputs(inputs),
+        inputs_cpu(inputs_cpu),
+        root(root),
+        tag(tag) {}
+
+  std::shared_ptr<gloo::Context> context;
+  std::vector<std::vector<at::Tensor>> outputs;
+  std::vector<std::vector<at::Tensor>> outputs_cpu;
+  std::vector<at::Tensor> inputs;
+  std::vector<at::Tensor> inputs_cpu;
+  const int root;
+  const uint32_t tag;
+
+  void gather(
+      std::vector<std::vector<at::Tensor>>& outputs,
+      std::vector<at::Tensor>& inputs) {
+    const auto scalarType = inputs[0].scalar_type();
+    gloo::GatherOptions opts(context);
+    opts.setRoot(root);
+    opts.setTag(tag);
+
+    // Set single temporary tensor on root process.
+    // This is later scattered to the separate output tensors.
+    at::Tensor flatOutputTensor;
+    if (context->rank == root) {
+      flatOutputTensor = newLikeFlat(outputs[0]);
+      GENERATE_ALL_TYPES(scalarType, setOutput, opts, flatOutputTensor);
+    }
+
+    // Set single input tensor on all processes.
+    GENERATE_ALL_TYPES(scalarType, setInput, opts, inputs[0]);
+    gloo::gather(opts);
+
+    // Unflatten into output tensors on root process.
+    if (context->rank == root) {
+      for (const auto i : c10::irange(outputs[0].size())) {
+        outputs[0][i].copy_(flatOutputTensor[i]);
+      }
+    }
+  }
+
+  void run() override {
+    gather(outputs_cpu, inputs_cpu);
+  }
+  void finishWorkSCCL() override{
+    for (int i = 0; i < inputs.size(); i++){
+      tpu::TPUCopyHostToDevice ( inputs[i].data_ptr(), inputs_cpu[i].data_ptr(), inputs_cpu[i].nbytes() );
+    }
+    for (int i = 0; i < outputs.size(); i++){
+      for (int j = 0; j < outputs[i].size(); j++)
+      tpu::TPUCopyHostToDevice ( outputs[i][j].data_ptr(), outputs_cpu[i][j].data_ptr(), outputs_cpu[i][j].nbytes() );
+    }
+  }
+};
+
 } // namespace
 
 c10::intrusive_ptr<Work> ProcessGroupSCCL::gather(
@@ -2281,11 +2610,13 @@ c10::intrusive_ptr<Work> ProcessGroupSCCL::gather(
       // If the user gave us a CUDA tensor then CUDA must be loaded.
       TORCH_INTERNAL_ASSERT(at::hasCUDA());
       break;
+    case at::kPrivateUse1:
+      break;
     default:
       invalidArgument(c10::str("unsupported device type ", device.type()));
   }
 
-  c10::intrusive_ptr<AsyncGatherWork> work;
+  c10::intrusive_ptr<AsyncWork> work;
   auto tag = nextTag();
   auto context = getContext(tag);
   if (device.type() == at::kCPU) {
@@ -2294,6 +2625,21 @@ c10::intrusive_ptr<Work> ProcessGroupSCCL::gather(
   } else if (device.type() == at::kCUDA) {
     work = c10::make_intrusive<AsyncGatherCUDAWork>(
         std::move(context), outputs, inputs, opts.rootRank, tag);
+  } else if (device.type() == at::kPrivateUse1){
+    std::vector<std::vector<at::Tensor>> outputs_cpu;
+    for (int i = 0; i < outputs.size(); i++){
+      std::vector<at::Tensor> outputs_cpu_;
+      for (int j = 0; j < outputs[i].size(); j++){
+        outputs_cpu_.push_back(outputs[i][j].cpu());
+      }
+      outputs_cpu.push_back(outputs_cpu_);
+    }
+    std::vector<at::Tensor> inputs_cpu;
+    for (int i = 0; i < inputs.size(); i++){
+      inputs_cpu.push_back(inputs[i].cpu());
+    }
+    work = c10::make_intrusive<AsyncGatherTPUWork>(
+      std::move(context), outputs, outputs_cpu, inputs, inputs_cpu, opts.rootRank, tag);
   } else {
     TORCH_CHECK(false, "Invalid backend");
   }
@@ -2424,6 +2770,70 @@ class AsyncScatterCUDAWork : public AsyncScatterWork {
   std::vector<c10::Event> inputEvents;
 };
 
+class AsyncScatterTPUWork : public ProcessGroupSCCL::AsyncWork {
+ public:
+  AsyncScatterTPUWork(
+      const std::shared_ptr<gloo::Context>& context,
+      std::vector<at::Tensor>& outputs,
+      std::vector<at::Tensor> outputs_cpu,
+      std::vector<std::vector<at::Tensor>>& inputs,
+      std::vector<std::vector<at::Tensor>> inputs_cpu,
+      int root,
+      uint32_t tag)
+      : ProcessGroupSCCL::AsyncWork(
+            {outputs_cpu},
+            "gloo:scatter",
+            inputs_cpu.size() > 0
+                ? c10::optional<std::vector<at::Tensor>>(inputs_cpu[0])
+                : c10::nullopt),
+        context(context),
+        outputs(outputs),
+        outputs_cpu(outputs_cpu),
+        inputs(inputs),
+        inputs_cpu(inputs_cpu),
+        root(root),
+        tag(tag) {}
+
+  std::shared_ptr<gloo::Context> context;
+  std::vector<at::Tensor> outputs;
+  std::vector<at::Tensor> outputs_cpu;
+  std::vector<std::vector<at::Tensor>> inputs;
+  std::vector<std::vector<at::Tensor>> inputs_cpu;
+  const int root;
+  const uint32_t tag;
+
+  void scatter(
+      std::vector<at::Tensor>& outputs,
+      std::vector<std::vector<at::Tensor>>& inputs) {
+    const auto scalarType = outputs[0].scalar_type();
+    gloo::ScatterOptions opts(context);
+    opts.setRoot(root);
+    opts.setTag(tag);
+
+    // Set list of input tensors on root process
+    if (context->rank == root) {
+      GENERATE_ALL_TYPES(scalarType, setInputs, opts, inputs[0]);
+    }
+
+    // Set single output tensor on all processes
+    GENERATE_ALL_TYPES(scalarType, setOutput, opts, outputs[0]);
+    gloo::scatter(opts);
+  }
+
+  void run() override {
+    scatter(outputs_cpu, inputs_cpu);
+  }
+  void finishWorkSCCL() override{
+    for (int i = 0; i < outputs.size(); i++){
+      tpu::TPUCopyHostToDevice ( outputs[i].data_ptr(), outputs_cpu[i].data_ptr(), outputs_cpu[i].nbytes() );
+    }
+    for (int i = 0; i < inputs.size(); i++){
+      for (int j = 0; j < inputs[i].size(); j++)
+      tpu::TPUCopyHostToDevice ( inputs[i][j].data_ptr(), inputs_cpu[i][j].data_ptr(), inputs_cpu[i][j].nbytes() );
+    }
+  }
+};
+
 } // namespace
 
 c10::intrusive_ptr<Work> ProcessGroupSCCL::scatter(
@@ -2468,11 +2878,13 @@ c10::intrusive_ptr<Work> ProcessGroupSCCL::scatter(
       // If the user gave us a CUDA tensor then CUDA must be loaded.
       TORCH_INTERNAL_ASSERT(at::hasCUDA());
       break;
+    case at::kPrivateUse1:
+      break;
     default:
       invalidArgument(c10::str("unsupported device type ", device.type()));
   }
 
-  c10::intrusive_ptr<AsyncScatterWork> work;
+  c10::intrusive_ptr<AsyncWork> work;
   auto tag = nextTag();
   auto context = getContext(tag);
   if (device.type() == at::kCPU) {
@@ -2481,6 +2893,21 @@ c10::intrusive_ptr<Work> ProcessGroupSCCL::scatter(
   } else if (device.type() == at::kCUDA) {
     work = c10::make_intrusive<AsyncScatterCUDAWork>(
         std::move(context), outputs, inputs, opts.rootRank, tag);
+  } else if (device.type() == at::kPrivateUse1){
+    std::vector<std::vector<at::Tensor>> inputs_cpu;
+    for (int i = 0; i < inputs.size(); i++){
+      std::vector<at::Tensor> inputs_cpu_;
+      for (int j = 0; j < inputs[i].size(); j++){
+        inputs_cpu_.push_back(inputs[i][j].cpu());
+      }
+      inputs_cpu.push_back(inputs_cpu_);
+    }
+    std::vector<at::Tensor> outputs_cpu;
+    for (int i = 0; i < outputs.size(); i++){
+      outputs_cpu.push_back(outputs[i].cpu());
+    }
+    work = c10::make_intrusive<AsyncScatterTPUWork>(
+      std::move(context), outputs, outputs_cpu, inputs, inputs_cpu, opts.rootRank, tag);
   } else {
     TORCH_CHECK(false, "Invalid backend");
   }
@@ -2620,6 +3047,78 @@ class AsyncAlltoallCUDAWork : public AsyncAlltoallWork {
   std::vector<c10::Event> inputEvents;
 };
 
+class AsyncAlltoallTPUWork : public ProcessGroupSCCL::AsyncWork {
+ public:
+  AsyncAlltoallTPUWork(
+      const std::shared_ptr<gloo::Context>& context,
+      at::Tensor& outputTensor,
+      at::Tensor outputTensor_cpu,
+      at::Tensor& inputTensor,
+      at::Tensor inputTensor_cpu,
+      std::vector<int64_t>& outputCounts,
+      std::vector<int64_t>& inputCounts,
+      uint32_t tag)
+      : ProcessGroupSCCL::AsyncWork(
+            {{outputTensor_cpu}},
+            "gloo:all_to_all",
+            c10::optional<std::vector<at::Tensor>>({inputTensor_cpu})),
+        context(context),
+        outputTensor(outputTensor),
+        outputTensor_cpu(outputTensor_cpu),
+        inputTensor(inputTensor),
+        inputTensor_cpu(inputTensor_cpu),
+        outputCounts(std::move(outputCounts)),
+        inputCounts(std::move(inputCounts)),
+        tag(tag) {}
+
+  std::shared_ptr<gloo::Context> context;
+  at::Tensor outputTensor;
+  at::Tensor outputTensor_cpu;
+  at::Tensor inputTensor;
+  at::Tensor inputTensor_cpu;
+  std::vector<int64_t> outputCounts;
+  std::vector<int64_t> inputCounts;
+  const uint32_t tag;
+
+  void alltoall(at::Tensor& outputTensor, at::Tensor& inputTensor) {
+    const auto scalarType = outputTensor.scalar_type();
+    if (outputCounts.size() == 0 && inputCounts.size() == 0) {
+      // Gloo alltoall
+      gloo::AlltoallOptions opts(context);
+      opts.setTag(tag);
+      GENERATE_ALL_TYPES(scalarType, setInput, opts, inputTensor);
+      GENERATE_ALL_TYPES(scalarType, setOutput, opts, outputTensor);
+      gloo::alltoall(opts);
+    } else {
+      // Gloo alltoallv
+      c10d::checkSplitSizes(inputCounts, inputTensor, context->size);
+      c10d::checkSplitSizes(outputCounts, outputTensor, context->size);
+      std::vector<int64_t> sendCounts(context->size);
+      std::vector<int64_t> recvCounts(context->size);
+      std::vector<int64_t> sendOffsets(context->size);
+      std::vector<int64_t> recvOffsets(context->size);
+      c10d::computeLengthsAndOffsets(
+          inputCounts, inputTensor, &sendCounts, &sendOffsets);
+      c10d::computeLengthsAndOffsets(
+          outputCounts, outputTensor, &recvCounts, &recvOffsets);
+      gloo::AlltoallvOptions opts(context);
+      opts.setTag(tag);
+      GENERATE_ALL_TYPES(scalarType, setInput, opts, inputTensor, sendCounts);
+      GENERATE_ALL_TYPES(scalarType, setOutput, opts, outputTensor, recvCounts);
+      gloo::alltoallv(opts);
+    }
+  }
+
+  void run() override {
+    alltoall(outputTensor_cpu, inputTensor_cpu);
+  }
+  void finishWorkSCCL() override{
+    tpu::TPUCopyHostToDevice ( outputTensor.data_ptr(), outputTensor_cpu.data_ptr(), outputTensor_cpu.nbytes() );
+    tpu::TPUCopyHostToDevice ( inputTensor.data_ptr(), inputTensor_cpu.data_ptr(), inputTensor_cpu.nbytes() );
+    
+  }
+};
+
 } // namespace
 
 c10::intrusive_ptr<Work> ProcessGroupSCCL::alltoall_base(
@@ -2639,7 +3138,7 @@ c10::intrusive_ptr<Work> ProcessGroupSCCL::alltoall_base(
   assertDense(invalidArgument, {inputTensor});
 
   const auto& device = outputTensor.device();
-  c10::intrusive_ptr<AsyncAlltoallWork> work;
+  c10::intrusive_ptr<AsyncWork> work;
   auto tag = nextTag();
   auto context = getContext(tag);
 
@@ -2656,6 +3155,16 @@ c10::intrusive_ptr<Work> ProcessGroupSCCL::alltoall_base(
         std::move(context),
         outputTensor,
         inputTensor,
+        outputCounts,
+        inputCounts,
+        tag);
+  } else if (device.type() == at::kPrivateUse1){
+    work = c10::make_intrusive<AsyncAlltoallTPUWork>(
+        std::move(context),
+        outputTensor,
+        outputTensor.cpu(),
+        inputTensor,
+        inputTensor.cpu(),
         outputCounts,
         inputCounts,
         tag);
@@ -2691,8 +3200,9 @@ c10::intrusive_ptr<Work> ProcessGroupSCCL::send(
     int tag) {
   auto& tensor = checkSingleTensor(tensors);
   auto utag = checkTag(tag);
-  auto ptr = tensor.data_ptr();
-  auto size = tensor.numel() * tensor.element_size();
+  auto tensor_cpu = tensor.cpu();
+  auto ptr = tensor_cpu.data_ptr();
+  auto size = tensor_cpu.numel() * tensor_cpu.element_size();
 
   // Construct unbound buffer.
   auto context = getContext(tag);
@@ -2701,7 +3211,7 @@ c10::intrusive_ptr<Work> ProcessGroupSCCL::send(
 
   // The work captures the tensor to prevent it being deallocated and
   // the unbound buffer to synchronize on completion of the send.
-  return c10::make_intrusive<SendWork>(tensor, std::move(buf));
+  return c10::make_intrusive<SendWork>(tensor_cpu, std::move(buf));
 }
 
 c10::intrusive_ptr<Work> ProcessGroupSCCL::recv(
@@ -2710,8 +3220,9 @@ c10::intrusive_ptr<Work> ProcessGroupSCCL::recv(
     int tag) {
   auto& tensor = checkSingleTensor(tensors);
   auto utag = checkTag(tag);
-  auto ptr = tensor.data_ptr();
-  auto size = tensor.numel() * tensor.element_size();
+  auto tensor_cpu = tensor.cpu();
+  auto ptr = tensor_cpu.data_ptr();
+  auto size = tensor_cpu.numel() * tensor_cpu.element_size();
 
   // Construct unbound buffer.
   auto context = getContext(tag);
@@ -2720,7 +3231,12 @@ c10::intrusive_ptr<Work> ProcessGroupSCCL::recv(
 
   // The work captures the tensor to prevent it being deallocated and
   // the unbound buffer to synchronize on completion of the recv.
-  return c10::make_intrusive<RecvWork>(tensor, std::move(buf), "gloo:recv");
+  const auto& device = tensor.device();
+  if (device.type() == at::kPrivateUse1){
+    return c10::make_intrusive<RecvTPUWork>(tensor, tensor_cpu, std::move(buf), "gloo:recv");
+  }
+
+  return c10::make_intrusive<RecvWork>(tensor_cpu, std::move(buf), "gloo:recv");
 }
 
 c10::intrusive_ptr<Work> ProcessGroupSCCL::recvAnysource(
@@ -2728,8 +3244,9 @@ c10::intrusive_ptr<Work> ProcessGroupSCCL::recvAnysource(
     int tag) {
   auto& tensor = checkSingleTensor(tensors);
   auto utag = checkTag(tag);
-  auto ptr = tensor.data_ptr();
-  auto size = tensor.numel() * tensor.element_size();
+  auto tensor_cpu = tensor.cpu();
+  auto ptr = tensor_cpu.data_ptr();
+  auto size = tensor_cpu.numel() * tensor_cpu.element_size();
 
   // Construct unbound buffer.
   auto context = getContext(tag);
@@ -2748,8 +3265,13 @@ c10::intrusive_ptr<Work> ProcessGroupSCCL::recvAnysource(
 
   // The work captures the tensor to prevent it being deallocated and
   // the unbound buffer to synchronize on completion of the recv.
+  const auto& device = tensor.device();
+  if (device.type() == at::kPrivateUse1){
+    return c10::make_intrusive<RecvTPUWork>(tensor, tensor_cpu, std::move(buf), "gloo:recvAnySource");
+  }
+
   return c10::make_intrusive<RecvWork>(
-      tensor, std::move(buf), "gloo:recvAnySource");
+      tensor_cpu, std::move(buf), "gloo:recvAnySource");
 }
 
 namespace {

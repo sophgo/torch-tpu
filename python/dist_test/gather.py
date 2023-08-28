@@ -10,15 +10,17 @@ TPU = "privateuseone"
 dist.init_process_group(backend="sccl")
 init_logger()
 
+if is_master():
+    tensor = torch.tensor([3, 4]).to(TPU)
+
 if is_slave():
-    objects = [None, None, None]
+    tensor = torch.tensor([5, 6]).to(TPU)
+
+tensor_list = [torch.zeros(2, dtype=torch.int64).to(TPU) for _ in range(2)]
 
 if is_master():
-    objects = ["foo", 12, {1: 2}]
+    dist.gather(tensor, tensor_list, dst=0)
+else:
+    dist.gather(tensor, dst=0)
 
-# will get error: int64 is not supported
-dist.broadcast_object_list(objects, src=0, device=TPU)
-
-# time.sleep(1)
-
-logging.info(objects)
+logging.info(f"gathered: {tensor_list}")

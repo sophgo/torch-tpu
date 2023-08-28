@@ -1,3 +1,4 @@
+import time
 import torch
 import torch.distributed as dist
 import logging
@@ -10,13 +11,14 @@ dist.init_process_group(backend="sccl")
 init_logger()
 
 if is_master():
-    tensor = torch.tensor([3, 4]).to(TPU)
+    tensor = torch.tensor([3., 4.]).to(TPU)
 
 if is_slave():
-    tensor = torch.tensor([5, 6]).to(TPU)
+    tensor = torch.tensor([5., 6.]).to(TPU)
 
-tensor_list = [torch.zeros(2, dtype=torch.int64).to(TPU) for _ in range(2)]
+output_tensor = torch.zeros(2).to(TPU)
 
-dist.all_gather(tensor_list, tensor)
+logging.info(f"before alltoall: {tensor.cpu()} {output_tensor.cpu()}")
+dist.all_to_all_single(output_tensor, tensor)
+logging.info(f"after alltoall: {tensor.cpu()} {output_tensor.cpu()}")
 
-logging.info(f"gathered: {tensor_list}")

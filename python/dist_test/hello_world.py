@@ -1,8 +1,11 @@
 import torch
 import logging
 from helper import init_logger, is_master, is_slave
+import sccl_collectives
+torch.ops.load_library("../../libtorch_plugin/build/liblibtorch_plugin.so")
+TPU = "privateuseone"
 
-torch.distributed.init_process_group(backend="gloo")
+torch.distributed.init_process_group(backend="sccl")
 
 init_logger()
 logging.info(f"backend: {torch.distributed.get_backend()}")

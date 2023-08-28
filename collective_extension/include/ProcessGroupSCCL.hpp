@@ -182,6 +182,27 @@ class TORCH_API ProcessGroupSCCL : public ProcessGroup {
     int srcRank_;
   };
 
+  class TORCH_API RecvTPUWork : public Work {
+   public:
+    explicit RecvTPUWork(
+        at::Tensor& tensor,
+        at::Tensor tensor_cpu,
+        std::unique_ptr<::gloo::transport::UnboundBuffer> buffer,
+        const char* profilingTitle = nullptr);
+
+    int sourceRank() const override;
+
+    bool wait(std::chrono::milliseconds timeout = kNoTimeout) override;
+
+    void abort() override;
+
+   protected:
+    at::Tensor tensor_;
+    at::Tensor tensor_cpu;
+    std::unique_ptr<::gloo::transport::UnboundBuffer> buffer_;
+    int srcRank_;
+  };
+
   struct TORCH_API Options : public ProcessGroup::Options {
     explicit Options(
         std::chrono::milliseconds timeout = kProcessGroupDefaultTimeout);
