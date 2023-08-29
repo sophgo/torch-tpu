@@ -521,6 +521,16 @@ bm_status_t sgdnnSqrt ( bm_handle_t handle,
                         SgdnnTensor_t output );
 
 /*
+ * OUTPUT = SIGN ( INPUT )
+ * Note:
+ * 1. The data types of INPUT and OUTPUT must be the same and one of FP32, FP16 and BF16
+ * 2. The shapes of INPUT and OUTPUT must be the same
+ * 3. INPUT and OUTPUT must be contiguous
+ */
+bm_status_t sgdnnSign ( bm_handle_t handle,
+                        SgdnnTensor_t input,
+                        SgdnnTensor_t output );
+/*
  * OUTPUT = SOFTMAX ( INPUT, DIM )
  * Note:
  * 1. The data types of INPUT and OUTPUT must be the same and one of FP32, FP16 and BF16
