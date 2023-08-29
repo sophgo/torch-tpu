@@ -96,4 +96,12 @@ TORCH_LIBRARY_IMPL(aten, TPU, m) {
   m.impl("abs", abs_tpu);
 }
 
+IMP_ACTIVE_OUT(erf, ACTIVE_ERF, tpu::ERF)
+IMP_ACTIVE(erf)
+
+TORCH_LIBRARY_IMPL(aten, TPU, m) {
+  m.impl("erf.out", erf_out_tpu);
+  m.impl("erf", erf_tpu);
+}
+
 } // namespace at

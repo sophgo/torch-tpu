@@ -332,8 +332,8 @@ typedef enum
   SIGMOID,
   CLAMP,
   LN_MM_FORWARD,
-  ERF,
   UPSAMPLING_BILINEAR,
+  ERF,
   OP_NUM
 
 }
@@ -456,6 +456,7 @@ static const char * OpTypeStr[OP_NUM] =
   "Sigmoid",
   "CLAMP",
   "layernorm Matmul"
+  "ERF"
 };
 
 struct OpTimer

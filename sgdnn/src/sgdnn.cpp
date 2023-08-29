@@ -1702,13 +1702,22 @@ bm_status_t sgdnnActive(bm_handle_t handle, SgdnnTensor_t input,
   api.active_type = active_type;
 
 #if defined SGDNN_BACKEND_1684X
-  if (active_type == ACTIVE_RELU || active_type == ACTIVE_ABSVAL ||
+  if (active_type == ACTIVE_ABSVAL) {
+    SGDNN_CHECK(
+        input.dtype == SGDNN_DTYPE_FP32 || input.dtype == SGDNN_DTYPE_FP16 ||
+        input.dtype == SGDNN_DTYPE_BF16);
+
+  } else if (active_type == ACTIVE_RELU  ||
       active_type == ACTIVE_ROUND || active_type == ACTIVE_CEIL ||
       active_type == ACTIVE_FLOOR) {
     SGDNN_CHECK(
         input.dtype == SGDNN_DTYPE_FP32 || input.dtype == SGDNN_DTYPE_FP16 ||
         input.dtype == SGDNN_DTYPE_INT8 || input.dtype == SGDNN_DTYPE_UINT8 ||
         input.dtype == SGDNN_DTYPE_INT16 || input.dtype == SGDNN_DTYPE_UINT16);
+  } else if (active_type == ACTIVE_ERF){
+    SGDNN_CHECK(
+        input.dtype == SGDNN_DTYPE_FP32);
+
   }
   SAFE_CALL(
       sgdnnTPUKernelLaunch(handle, "tpu_kernel_api_active", &api, sizeof(api)));
