@@ -1375,6 +1375,28 @@ bm_status_t sgdnnSiLU ( bm_handle_t handle,
 bm_status_t sgdnnSigmoid ( bm_handle_t handle,
                         SgdnnTensor_t input,
                         SgdnnTensor_t output);
+
+/*
+ * OUTPUT = LAYERNORM_MATMUL ( INPUT, W, B, GAMMA, BETA, EPS, MEAN, RSTD, OUTPUT )
+ * Note:
+ * 1. The data types of INPUT, W, B, GAMMA, BETA, EPS, MEAN, RSTD, OUTPUT must be the same and one of FP32, FP16 and BF16
+ * 2. The dimensions of INPUT OUTPUT must be 2 or 3, W MEAN RSTD must be 2, GAMMA BETA B must be 1
+ * 3. The shape of INPUT is ( B, M, N ) or ( M, N ), W1 is ( N, D ), B is ( D ), OUTPUT is ( B, M, D ) or ( M, N )
+ * 4. INPUT, W, B, GAMMA, BETA, MEAN, RSTD and OUTPUT must be contiguous
+ * 5. GAMMA BETA represents the elementwise affine in LayerNorm, MEAN RSTD represents mean and rstd of LayerNorm
+ * 6. W B represents the weight and bias of first layer
+ */
+bm_status_t sgdnnLnMm ( bm_handle_t handle,
+                          SgdnnTensor_t input,
+                          SgdnnTensor_t w,
+                          SgdnnTensor_t b,
+                          SgdnnTensor_t gamma,
+                          SgdnnTensor_t beta,
+                          float eps,
+                          SgdnnTensor_t mean,
+                          SgdnnTensor_t rstd,
+                          SgdnnTensor_t output );
+
 #if defined(__cplusplus)
 }
 #endif

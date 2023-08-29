@@ -63,4 +63,15 @@ namespace at
 		const c10::optional<Tensor> &grad_b_attn,
 		const c10::optional<Tensor> &grad_b_proj);
 
+	std::tuple<Tensor, Tensor, Tensor> ln_mm_forward(
+		Tensor &input,
+        Tensor &w,
+		const c10::optional<Tensor> &b,
+		Tensor &gamma,
+		Tensor &beta,
+        double eps,
+        Tensor &mean,
+        Tensor &rstd,
+		Tensor &out);
+
 }

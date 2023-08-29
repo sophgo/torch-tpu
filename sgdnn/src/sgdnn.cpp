@@ -5699,3 +5699,103 @@ bm_status_t sgdnnSigmoid (bm_handle_t handle,
 #endif
   return BM_SUCCESS;
 }
+bm_status_t sgdnnLnMm ( bm_handle_t handle,
+                          SgdnnTensor_t input,
+                          SgdnnTensor_t w,
+                          SgdnnTensor_t b,
+                          SgdnnTensor_t gamma,
+                          SgdnnTensor_t beta,
+                          float eps,
+                          SgdnnTensor_t mean,
+                          SgdnnTensor_t rstd,
+                          SgdnnTensor_t output )
+{
+  SGDNN_CHECK ( input.dtype == w.dtype );
+  SGDNN_CHECK ( input.dtype == gamma.dtype );
+  SGDNN_CHECK ( input.dtype == beta.dtype );
+  SGDNN_CHECK ( input.dtype == mean.dtype );
+  SGDNN_CHECK ( input.dtype == rstd.dtype );
+  SGDNN_CHECK ( input.dtype == output.dtype );
+  SGDNN_CHECK ( input.dtype == SGDNN_DTYPE_FP32 ||
+                input.dtype == SGDNN_DTYPE_FP16 ||
+                input.dtype == SGDNN_DTYPE_BF16 );
+  if ( b.addr != 0 )
+  {
+    SGDNN_CHECK ( input.dtype == b.dtype );
+  }
+
+  const auto input_ndim = input.dim;
+  SGDNN_CHECK ( input_ndim == 2 || input_ndim == 3);
+  if ( input_ndim == 2 )
+  {
+    SGDNN_CHECK ( input.shape[1] == w.shape[0] );
+    SGDNN_CHECK ( input.shape[1] == gamma.shape[0] );
+    SGDNN_CHECK ( sgdnnIsSameShape( &gamma, &beta ) );
+    SGDNN_CHECK ( sgdnnIsSameShape( &mean, &rstd ) );
+    SGDNN_CHECK ( input.shape[0] == mean.shape[0] );
+    SGDNN_CHECK ( output.shape[1] == w.shape[1] );
+    SGDNN_CHECK ( input.shape[0] == output.shape[0] );
+  } else {
+    SGDNN_CHECK ( input.shape[2] == w.shape[0] );
+    SGDNN_CHECK ( input.shape[2] == gamma.shape[0] );
+    SGDNN_CHECK ( sgdnnIsSameShape( &gamma, &beta ) );
+    SGDNN_CHECK ( sgdnnIsSameShape( &mean, &rstd ) );
+    SGDNN_CHECK ( input.shape[0] == mean.shape[0] );
+    SGDNN_CHECK ( input.shape[1] == mean.shape[1] );
+    SGDNN_CHECK ( output.shape[2] == w.shape[1] );
+    SGDNN_CHECK ( input.shape[0] == output.shape[0] );
+    SGDNN_CHECK ( input.shape[1] == output.shape[1] );
+  }
+
+  if ( b.addr != 0 )
+  {
+    SGDNN_CHECK ( b.dim == 1 );
+    SGDNN_CHECK ( b.shape[0] == w.shape[1] );
+  }
+
+  SGDNN_CHECK ( sgdnnIsTensorContiguous ( &input ) );
+  SGDNN_CHECK ( sgdnnIsTensorContiguous ( &w ) );
+  SGDNN_CHECK ( sgdnnIsTensorContiguous ( &gamma ) );
+  SGDNN_CHECK ( sgdnnIsTensorContiguous ( &beta ) );
+  SGDNN_CHECK ( sgdnnIsTensorContiguous ( &mean ) );
+  SGDNN_CHECK ( sgdnnIsTensorContiguous ( &rstd ) );
+
+  if ( b.addr != 0 )
+  {
+    SGDNN_CHECK ( sgdnnIsTensorContiguous ( &b ) );
+  }
+
+  SGDNN_CHECK ( sgdnnIsTensorContiguous ( &output ) );
+#if defined SGDNN_BACKEND_1684X
+  SGDNN_CHECK ( false );
+#elif defined SGDNN_BACKEND_2260
+  sg_api_ln_mm_multi_core_t api;
+  api.input_addr    = input.addr;
+  api.weight_addr   = w.addr;
+  api.bias_addr     = b.addr;
+  api.gamma_addr    = gamma.addr;
+  api.beta_addr     = beta.addr;
+  api.mean_addr     = mean.addr;
+  api.rstd_addr     = rstd.addr;
+  api.output_addr   = output.addr;
+  api.in_dims       = input.dim;
+  api.w_dims        = w.dim;
+  api.eps           = eps;
+  api.has_bias      = (int)(b.addr != 0);
+  api.in_dtype      = sgdnnTPUKernelDType ( input.dtype );
+
+  for ( int i = 0; i < input.dim; ++i )
+  {
+    api.in_shape[i] = input.shape[i];
+  }
+  for ( int i = 0; i < w.dim; ++i )
+  {
+    api.w_shape[i] = w.shape[i];
+  }
+
+  SAFE_CALL ( sgdnnTPUKernelLaunch ( handle, "tpu_kernel_ln_mm_multi_core", &api, sizeof ( api ) ) );
+#else
+  SGDNN_CHECK ( false );
+#endif
+  return BM_SUCCESS;
+}

@@ -318,7 +318,9 @@ typedef enum
   SILU,
   SIGMOID,
   CLAMP,
+  LN_MM_FORWARD,
   OP_NUM
+
 }
 OpType;
 
@@ -433,7 +435,8 @@ static const char * OpTypeStr[OP_NUM] =
   "Arrange",
   "SiLU",
   "Sigmoid",
-  "CLAMP"
+  "CLAMP",
+  "layernorm Matmul"
 };
 
 struct OpTimer

@@ -1436,5 +1436,27 @@ typedef struct
   int dtype;
 } WITH_PLATFORM(sg_api_sigmoid_t);
 
+typedef struct {
+  unsigned long long input_addr;
+  unsigned long long gamma_addr;
+  unsigned long long beta_addr;
+  unsigned long long weight_addr;
+  unsigned long long bias_addr;
+  unsigned long long mean_addr;
+  unsigned long long rstd_addr;
+  unsigned long long output_addr;
+  int in_shape[FW_MAX_SHAPE_DIMS];
+  int w_shape[FW_MAX_SHAPE_DIMS];
+  int in_dims;
+  int w_dims;
+  int in_dtype;
+  float eps;
+  int has_bias;
+#ifndef WIN32
+} __attribute__((packed)) sg_api_ln_mm_multi_core_t;
+#else
+} sg_api_ln_mm_multi_core_t;
+#endif
+
 #pragma pack(pop)
 #endif  // SG_API_STRUCT_H
