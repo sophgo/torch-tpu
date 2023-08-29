@@ -5570,5 +5570,39 @@ bm_status_t sgdnnBaddbmm ( bm_handle_t handle,
 #else
   SGDNN_CHECK ( false );
 #endif
+return BM_SUCCESS;
+}
+
+bm_status_t sgdnnMseloss( bm_handle_t handle,
+                                    SgdnnTensor_t self,
+                                    SgdnnTensor_t target,
+                                    SgdnnTensor_t out,
+                                    int reduction ){
+  SGDNN_CHECK ( sgdnnIsSameShape ( &self, &target ) );
+  if ( reduction == 0 )
+  {
+    SGDNN_CHECK ( sgdnnIsSameShape ( &self, &out ) );
+    SGDNN_CHECK ( sgdnnIsTensorContiguous ( &out ) );
+  }
+  SGDNN_CHECK ( sgdnnIsTensorContiguous ( &self ) );
+  SGDNN_CHECK ( sgdnnIsTensorContiguous ( &target ) );
+
+  #if defined SGDNN_BACKEND_1684X
+    sg_api_mse_loss_t api;
+    api.input1_global_addr = self.addr;
+    api.input2_global_addr = target.addr;
+    api.output_global_addr = out.addr;
+    api.reduction = reduction;
+    api.dim = self.dim;
+  for(int i = 0; i < self.dim; ++i) {
+    api.shape[i] = self.shape[i];
+  }
+  api.dtype = sgdnnTPUKernelDType(self.dtype);
+  SAFE_CALL(sgdnnTPUKernelLaunch(handle, "tpu_kernel_api_mse_loss", &api, sizeof(api)));
+  #elif defined SGDNN_BACKEND_2260
+  SGDNN_CHECK ( false );
+  #else
+  SGDNN_CHECK ( false );
+  #endif
   return BM_SUCCESS;
 }

@@ -1325,6 +1325,22 @@ bm_status_t sgdnnBaddbmm ( bm_handle_t handle,
                           double alpha,
                           double beta);
 
+/*
+ *  OUTPUT  = MSE_LOSS ( SELF, TARGET, OUT, REDUCTION )
+ * Note:
+ * 1. The shape of SELF and TARGET must be the same.
+ * 2. The shape of SELF or TARGET can be any shape.
+ * 3. REDUCTION = 0, 'none' model, OUT = ( SELF - TARGET )^2, the shape of OUT the same as SELF.
+ * 4. REDUCTION = 1, 'mean' model, OUT = REDUCE_MEAN( ( SELF - TARGET )^2 ), the shape of OUT is (1,).
+ * 5. REDUCTION = 2, 'sum' model, OUT = REDUCE_SUM( ( SELF - TARGET )^2 ), the shape of OUT is (1,).
+ */
+bm_status_t sgdnnMseloss( bm_handle_t handle,
+                                    SgdnnTensor_t self,
+                                    SgdnnTensor_t target,
+                                    SgdnnTensor_t out,
+                                    int reduction );
+
+
 #if defined(__cplusplus)
 }
 #endif
