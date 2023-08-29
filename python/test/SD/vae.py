@@ -27,7 +27,7 @@ def from_here():
     pass
 
 def from_diffusers():
-    #device = "cpu"
+    device = "cpu"
     vae = AutoencoderKL.from_pretrained(pretrained_model_name, subfolder="vae", revision=None)
     vae.requires_grad_(False)
     vae.to(device)
@@ -35,6 +35,6 @@ def from_diffusers():
     pixel_input = torch.randn((N,C,H,W)).to(device)
     
     latents = vae.encode(pixel_input).latent_dist.sample()
-
+    import pdb;pdb.set_trace()
 if __name__ == "__main__":
     from_diffusers()

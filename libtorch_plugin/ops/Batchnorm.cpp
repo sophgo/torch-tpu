@@ -199,7 +199,8 @@ double eps )
   c10::MaybeOwned<Tensor> weight_maybe_owned = at::borrow_from_optional_tensor ( weight_opt );
   const Tensor & weight = *weight_maybe_owned;
   const Tensor & bias = c10::value_or_else ( bias_opt, [] { return Tensor(); } );
-  CHECK_TENSOR_IN_DEVICE ( input );
+  auto input_ = input.contiguous();
+  CHECK_TENSOR_IN_DEVICE ( input_ );
   if ( weight.defined() )       { CHECK_TENSOR_IN_DEVICE ( weight ); }
   if ( bias.defined() )         { CHECK_TENSOR_IN_DEVICE ( bias ); }
 #if 0
@@ -214,8 +215,8 @@ double eps )
          TENSOR_TO_TPU ( std::get<1> ( outputs_cpu ) ),
          TENSOR_TO_TPU ( std::get<2> ( outputs_cpu ) ) );
 #else
-  const auto input_shape = input.sizes();
-  const auto input_ndim = input.dim();
+  const auto input_shape = input_.sizes();
+  const auto input_ndim = input_.dim();
   const int normalized_ndim = normalized_shape.size();
   const int axis = input_ndim - normalized_ndim;
   // input_shape = stat_shape + normalized_shape
@@ -224,19 +225,19 @@ double eps )
   {
     stat_shape.emplace_back ( input_shape[idx] );
   }
-  for ( const auto idx C10_UNUSED : c10::irange ( axis, input.dim() ) )
+  for ( const auto idx C10_UNUSED : c10::irange ( axis, input_.dim() ) )
   {
     stat_shape.emplace_back ( 1 );
   }
-  auto output = torch::empty ( input_shape, input.options() );
-  auto mean = torch::empty ( stat_shape, input.options() );
-  auto rstd = torch::empty ( stat_shape, input.options() );
+  auto output = torch::empty ( input_shape, input_.options() );
+  auto mean = torch::empty ( stat_shape, input_.options() );
+  auto rstd = torch::empty ( stat_shape, input_.options() );
 #ifdef TPU_OP_TIMING
   auto timer = tpu::Timer().Start();
 #endif
   bm_status_t status = sgdnnLayernorm (
                        tpu::TPUGetDeviceHandle(),
-                       tpu::TPUGenerateSgdnnTensor ( input ),
+                       tpu::TPUGenerateSgdnnTensor ( input_ ),
                        weight.defined() ? tpu::TPUGenerateSgdnnTensor ( weight ) : sgdnnUndefinedTensor(),
                        bias.defined() ? tpu::TPUGenerateSgdnnTensor ( bias ) : sgdnnUndefinedTensor(),
                        axis,

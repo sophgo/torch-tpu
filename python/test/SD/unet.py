@@ -7,6 +7,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 import numpy as np
 from diffusers import UNet2DConditionModel
+from diffusers.models.attention_processor import LoRAAttnProcessor
 
 sys.path.append("..") 
 from utils import compare_model_grad, Optimer
@@ -26,6 +27,7 @@ S = 77
 H = 768
 num_train_timesteps = 2000
 
+RANK = 4
 def from_here():
     pass
 
@@ -35,7 +37,27 @@ def from_diffusers():
         pretrained_model_name, subfolder="unet", revision=None
     )
     unet.requires_grad_(False)
+    lora_attn_procs = {}
+    for name in unet.attn_processors.keys():
+        cross_attention_dim = None if name.endswith("attn1.processor") else unet.config.cross_attention_dim
+        if name.startswith("mid_block"):
+            hidden_size = unet.config.block_out_channels[-1]
+        elif name.startswith("up_blocks"):
+            block_id = int(name[len("up_blocks.")])
+            hidden_size = list(reversed(unet.config.block_out_channels))[block_id]
+        elif name.startswith("down_blocks"):
+            block_id = int(name[len("down_blocks.")])
+            hidden_size = unet.config.block_out_channels[block_id]
+
+        lora_attn_procs[name] = LoRAAttnProcessor(
+            hidden_size=hidden_size,
+            cross_attention_dim=cross_attention_dim,
+            rank=RANK,
+        )
+
+    unet.set_attn_processor(lora_attn_procs)
     unet.to(device)
+    unet.train()
 
     noisy_latents = torch.randn((N,C,H,W)).to(device)
     timesteps = torch.randint(0, num_train_timesteps, (N,)).int().to(device)
