@@ -297,6 +297,12 @@ Tensor & mul_out_tpu ( const Tensor & self, const Tensor & other, Tensor & out )
       tpu::OpTimer::Instance().AddTime ( tpu::MUL_C, timer.ElapsedUS() );
 #endif
     }
+    else if ( self.dim() == other.dim() && ! tpu::TPUIsSameShape(self, other) )
+    {
+      LOG( WARNING ) << "mul broadcast use cpu impl";
+      auto out_cpu = mul ( self.cpu(), other.cpu() );
+      tpu::TPUCopyHostToDevice ( out.data_ptr(), out_cpu.contiguous().data_ptr(), out.nbytes() );
+    }
     else
     {
 #ifdef TPU_OP_TIMING
