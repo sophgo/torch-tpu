@@ -21,12 +21,12 @@ class Global_Regression_Tester():
     # some ops must be skipped
     def filter_skipped_path_utest_new(self):
         self.any_utest_files_list = list(set(self.any_utest_files_list)-set(self.top_python_file_list))
-        self.any_utest_files_list = list(set(self.any_utest_files_list)-set(self.global_skip_utest))
-        assert len(self.any_utest_files_list)>0, "[ERROR]This assert points that global_skip_utest contains any_utest_files_list, ADD some tests do not belong to global_skip_utest!"
+        self.any_utest_files_list = list(set(self.any_utest_files_list)-set(self.global_skip_utest_manifest))
+        assert len(self.any_utest_files_list)>0, "[ERROR]This assert points that global_skip_utest_manifest contains any_utest_files_list, ADD some tests do not belong to global_skip_utest_manifest!"
 
     def filter_skipped_path_old_test(self):
         self.cmp_old_test_files_list = list(set(self.cmp_old_test_files_list )-set(self.skip_old_test))
-        assert  len(self.cmp_old_test_files_list)>0, "[ERROR]This assert points that global_skip_utest contains skip_old_test, or python/test has been abondoned!"
+        assert  len(self.cmp_old_test_files_list)>0, "[ERROR]This assert points that global_skip_utest_manifest contains skip_old_test, or python/test has been abondoned!"
 
 
     def __init__(self):
@@ -37,12 +37,15 @@ class Global_Regression_Tester():
         self.any_utest_files_list =  os.listdir("./")
         self.utest_files_list =[]
         self.top_python_file_list = ['top_utest.py', 'utest_cmd.py']
-        self.global_skip_utest = ['mlp.py','slice.py']
+        self.global_skip_utest_manifest_multi_arch = {"bm1684x":['mlp.py','slice.py','stack.py'], "sg2260":['mlp.py','slice.py','stack.py']}
+        self.global_skip_utest_manifest=self.global_skip_utest_manifest_multi_arch[self.chip]
+        self.global_skip_utest_chip_arch=[]
         self.filter_skipped_path_utest_new()
 
         ###[HELPER]You can test specific utest when changing self.any_utest_files_list
-        #self.global_skip_utest = []
-        #self.any_utest_files_list =["add.py","mul.py"]
+        # self.global_skip_utest_manifest = []
+        # self.any_utest_files_list =["add.py","mul.py"]
+        ###########################################################################
         self.cmp_old_test_files_list = os.listdir("./../test")
         self.skip_old_test = ['utils.py']
         self.filter_skipped_path_old_test()
@@ -70,6 +73,14 @@ class Global_Regression_Tester():
                 self.dict_error_static[dtype] +=[single_utest_name]
     def get_file_name(self, single_utest):
         return single_utest.split(self.control_cmd)[1]
+
+    #this function will gather static info about not-tested arch utest for global_skip_utest_chip_arch
+    def search_skip_utest_chip_arch(self, info, single_utest):
+        if ("[INFO]Test skikped for this arch!" in info):
+            self.global_skip_utest_chip_arch += [self.get_file_name(single_utest)]
+            return 1
+        return 0
+
     #this function will gather static info about not-tested dtype for every utest
     def dtype_check_all_test(self, info, single_utest):
         if ("[INFO]Tested_Dtype includes:" in info):
@@ -109,7 +120,7 @@ class Global_Regression_Tester():
         print("*************CURRENT UTEST SUPPORT INFO LIST ********************")
         print("[WARNING]These files in new utest_ops but not in old test:",files_in_newutest_rather_test )
         print("[MUST-TODO]These files in old test but not tested in new utest_ops:",files_in_test_rather_newutest )
-        print("[MUST-TODO]These files might be not created or skipped in list <global_skip_utest> or one utest_new contains multi-test-old" )
+        print("[MUST-TODO]These files might be not created or skipped in list <global_skip_utest_manifest> or one utest_new contains multi-test-old" )
 
     #gen "python x.py"
     def gen_cmd_utest(self):
@@ -122,7 +133,7 @@ class Global_Regression_Tester():
     def clean_utest_file_list(self):
         assert len(self.any_utest_files_list)>0
         for each_file_path in self.any_utest_files_list:
-            if each_file_path.endswith(".py") and each_file_path not in self.top_python_file_list and each_file_path not in self.global_skip_utest :
+            if each_file_path.endswith(".py") and each_file_path not in self.top_python_file_list and each_file_path not in self.global_skip_utest_manifest :
                 self.utest_files_list +=[each_file_path]
         assert len(self.utest_files_list)>0, "at least test something!"
 
@@ -139,6 +150,8 @@ class Global_Regression_Tester():
             info = runcmd(single_utest)
             #this function will gather static info about not-tested dtype for every utest
             self.dtype_check_all_test(info, single_utest)
+            if self.search_skip_utest_chip_arch(info, single_utest):
+                continue
             single_utest_name = self.get_file_name(single_utest)
             if self.search_failed_info(info):
                 failed_result +=[single_utest_name]
@@ -150,7 +163,10 @@ class Global_Regression_Tester():
         print("*************[CHIP-{}]ALL OUPUTS COMPUTED ********************".format(self.chip))
         print("SUCCESS Cases:", succeed_result)
         print("Failed Cases:", failed_result)
-        print("Skipped Cases:", self.global_skip_utest)
+        print("*************[CHIP-{}]SKIPPED CASES ********************".format(self.chip))
+        print("Skipped Cases Manifest:", self.global_skip_utest_manifest)
+        print("Skipped Cases by Chip Arch:", self.global_skip_utest_chip_arch)
+        print("*************[NOTE] FOLLOWING ALL STATIC INFO DOES NOT CONTAIN SKIPPED CASES ********************")
 
         #This function will print info about what's the files presented in python/test but not in python/utest
         self.cmp_old_test()

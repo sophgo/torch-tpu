@@ -24,7 +24,8 @@ def case1():
          [ torch.randn(batch, sequence, hidden_size)],
     ]
     metric_table = ['max_diff','MAE']
-    epsilon_dict = {'f32':1e-6, 'f16':1e-2}
+    chip_arch_dict = {"bm1684x":1, 'sg2260':1}
+    epsilon_dict = {'bm1684x':{'f32':1e-6,'f16':1e-2},'sg2260':{'f32':1e-6,'f16':1e-2}}
     case_name =  __file__.split('.py')[0]# You can change your name
     dump_flag = True #it will dump alll wrong cases
     device = torch.device("privateuseone:0")
@@ -47,7 +48,7 @@ def case1():
         #tpu-first
         return input_sample_tpu[0].grad, input_sample_cpu[0].grad #Notice [0] because input_data has [],[]
 
-    My_Tester = Tester_Basic(case_name, device, metric_table, epsilon_dict,seed, dump_flag)
+    My_Tester = Tester_Basic(case_name, chip_arch_dict, device, metric_table, epsilon_dict,seed, dump_flag)
     My_Tester.customized_execute_function = customized_execute_function
     return My_Tester.Torch_Test_Execution_Function(Test_Module(), input_data)
 

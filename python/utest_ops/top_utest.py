@@ -127,7 +127,7 @@ class Dumper():
 
 
 class Tester_Basic():
-  def __init__(self, case_name = "None", device_tpu=None, metric_table = ['max_diff','MAE'], epsilon_dict = {'f32':1e-6,'f16':1e-2,'i32':1e-6}, seed = 1000, dump_flag = True):
+  def __init__(self, case_name = "None", chip_arch_dict = {'bm1684x':0, 'sg2260':0}, device_tpu=None, metric_table = ['max_diff','MAE'], epsilon_dict_multi_arch = {"bm1684x":{'f32':1e-6,'f16':1e-2,'i32':1e-6},"sg2260":{'f32':1e-6,'f16':1e-2,'i32':1e-6}}, seed = 1000, dump_flag = True):
       self.device = device_tpu
       self.device_cpu = torch.device('cpu')
       self.dump_flag = dump_flag
@@ -146,19 +146,40 @@ class Tester_Basic():
                       'i32':'i32',
                       'fp16':'f16',
                       'bf16':'bf16'}
+      self.default_chip_arch = {"bm1684x", "sg2260"}
       self.tested_dtype = set() # no_repeated
       self.metric_table = metric_table
-      self.epsilon_dict = epsilon_dict
+
+      self.current_chip_arch = os.getenv("CHIP_ARCH")
+      self.epsilon_dict_multi_arch = epsilon_dict_multi_arch
+      self.epsilon_dict=None
+      self.chip_arch_dict = chip_arch_dict
+      self.flag_is_such_arch_ready_test = 0
+      assert self.chip_arch_dict is not None, (self.case_name)
+      self.epsilon_dict_process()
+      assert isinstance(epsilon_dict_multi_arch, dict)
+      assert isinstance(self.chip_arch_dict, dict)
+      assert isinstance(self.epsilon_dict_multi_arch, dict)
       self.seed = seed
       ######customized
       assert isinstance(self.metric_table, list)
-      assert isinstance(epsilon_dict, dict)
       self.num_metric = len(metric_table)
       self.naive_dtype_list =list(self.epsilon_dict.keys())
       self.dtype_num = len(self.naive_dtype_list)
       assert self.dtype_num >0
       self.num_multi_output = 1
 
+
+  def epsilon_dict_process(self):
+      if self.current_chip_arch not in self.chip_arch_dict:
+         self.flag_is_such_arch_ready_test = 0
+         return
+      if self.current_chip_arch not in self.epsilon_dict_multi_arch:
+         assert 0,("[ERROR]{} epsilon-setting not supported for {}!".format(self.current_chip_arch, self.case_name))
+      self.epsilon_dict = self.epsilon_dict_multi_arch[self.current_chip_arch]
+      self.flag_is_such_arch_ready_test = self.chip_arch_dict[self.current_chip_arch]
+      if self.flag_is_such_arch_ready_test:
+         assert self.epsilon_dict is not None
 
   # the total nums of output for a given model
   # Usually multi_output is a tuple struct
@@ -297,7 +318,7 @@ class Tester_Basic():
   def move_model(self, obj, device, dtype):
     return obj.to(device=device,dtype=dtype)
 
-  #output detach 
+  #output detach
   #case 1； T->T.detach()
   #case 2: (T,T)->(T.detach(), T.detach())
   def output_isolation(self, dict_execute_result):
@@ -476,7 +497,7 @@ class Tester_Basic():
       raise TypeError("Invalid  format of input sample only {tensor, dict,list,int,float} is supported!")
 
 
-  def Torch_Test_Execution_Function(self, module_native, input_sample_collection):
+  def Torch_Test_Execution_Function_flag_allowed(self, module_native, input_sample_collection):
 
       input_sample_processed = self.func_input_sample_process(input_sample_collection)
 
@@ -511,3 +532,9 @@ class Tester_Basic():
             print("[CMD]Case {}: dtype {} exist errors".format(self.case_name, per_dtype))
       print("Case {}: {}/{} Samples is completely corrected".format(self.case_name, current_correct_num, len(input_sample_processed)))
       print(("*****************Test {} Completely End*************************").format(self.case_name))
+
+  def Torch_Test_Execution_Function(self, module_native, input_sample_collection):
+    if(self.flag_is_such_arch_ready_test):
+      self.Torch_Test_Execution_Function_flag_allowed(module_native, input_sample_collection)
+    else:
+      print("[INFO]Test skikped for this arch!")
