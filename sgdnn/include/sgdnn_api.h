@@ -1340,7 +1340,27 @@ bm_status_t sgdnnMseloss( bm_handle_t handle,
                                     SgdnnTensor_t out,
                                     int reduction );
 
+/*
+ * OUTPUT = SiLU ( INPUT )
+ * Note:
+ * 1. The data types of INPUT and OUTPUT must be the same and one of FP32, FP16 and BF16
+ * 2. The shapes of INPUT and OUTPUT must be the same
+ * 3. INPUT and OUTPUT must be contiguous
+ */
+bm_status_t sgdnnSiLU ( bm_handle_t handle,
+                        SgdnnTensor_t input,
+                        SgdnnTensor_t output);
 
+/*
+ * OUTPUT = Sigmoid ( INPUT )
+ * Note:
+ * 1. The data types of INPUT and OUTPUT must be the same and one of FP32, FP16 and BF16
+ * 2. The shapes of INPUT and OUTPUT must be the same
+ * 3. INPUT and OUTPUT must be contiguous
+ */
+bm_status_t sgdnnSigmoid ( bm_handle_t handle,
+                        SgdnnTensor_t input,
+                        SgdnnTensor_t output);
 #if defined(__cplusplus)
 }
 #endif

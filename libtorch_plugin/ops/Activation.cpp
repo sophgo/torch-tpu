@@ -168,12 +168,21 @@ TORCH_LIBRARY_IMPL ( aten, TPU, m )
 Tensor & silu_out_tpu(const Tensor & self, Tensor & out) {
   CHECK_TENSOR_IN_DEVICE ( self );
   CHECK_TENSOR_IN_DEVICE ( out );
-#if 1
+#if 0
   LOG( WARNING ) << "silu use cpu impl";
   auto out_cpu = silu(self.to(torch::kFloat).cpu());
   out = out_cpu.to(out.device()).to(out.dtype());
 #else
-
+#ifdef TPU_OP_TIMING
+  auto timer = tpu::Timer().Start();
+#endif
+  bm_status_t status = sgdnnSiLU (tpu::TPUGetDeviceHandle(),
+                                   tpu::TPUGenerateSgdnnTensor ( self ),
+                                   tpu::TPUGenerateSgdnnTensor ( out ) );
+  TORCH_CHECK ( status == BM_SUCCESS );
+#ifdef TPU_OP_TIMING
+  tpu::OpTimer::Instance().AddTime ( tpu::SILU, timer.ElapsedUS() );
+#endif
 #endif
   return out;
 }
@@ -185,18 +194,27 @@ TORCH_LIBRARY_IMPL ( aten, TPU, m )
 Tensor & sigmoid_out_tpu(const Tensor & self, Tensor & out) {
   CHECK_TENSOR_IN_DEVICE ( self );
   CHECK_TENSOR_IN_DEVICE ( out );
-#if 1
+#if 0
   LOG( WARNING ) << "sigmoid use cpu impl";
   auto out_cpu = sigmoid(self.to(torch::kFloat).cpu());
   out = out_cpu.to(out.device()).to(out.dtype());
 #else
-
+#ifdef TPU_OP_TIMING
+  auto timer = tpu::Timer().Start();
+#endif
+  bm_status_t status = sgdnnSigmoid (tpu::TPUGetDeviceHandle(),
+                                   tpu::TPUGenerateSgdnnTensor ( self ),
+                                   tpu::TPUGenerateSgdnnTensor ( out ) );
+  TORCH_CHECK ( status == BM_SUCCESS );
+#ifdef TPU_OP_TIMING
+  tpu::OpTimer::Instance().AddTime ( tpu::SIGMOID, timer.ElapsedUS() );
+#endif
 #endif
   return out;
 }
 TORCH_LIBRARY_IMPL ( aten, TPU, m )
 {
-  m.impl ( "sigmoid.out", silu_out_tpu );
+  m.impl ( "sigmoid.out", sigmoid_out_tpu );
 }
 
 } // namespace at
