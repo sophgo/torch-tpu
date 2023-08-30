@@ -74,4 +74,18 @@ namespace at
         Tensor &rstd,
 		Tensor &out);
 
+	std::tuple<Tensor, Tensor, Tensor, Tensor> add_ln_mm_forward(
+        Tensor &input0,
+        Tensor &input1,
+        Tensor &w,
+		const c10::optional<Tensor> &b,
+		Tensor &gamma,
+		Tensor &beta,
+        double eps,
+        Tensor &out_add,
+        Tensor &mean,
+        Tensor &rstd,
+		Tensor &out
+    );
+
 }

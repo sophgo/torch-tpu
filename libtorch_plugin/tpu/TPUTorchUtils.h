@@ -350,6 +350,7 @@ typedef enum
   UPSAMPLING_BILINEAR,
   ERF,
   POW_FORWARD,
+  ADD_LN_MM_FORWARD,
   OP_NUM
 }
 OpType;
@@ -485,9 +486,10 @@ static const char * OpTypeStr[OP_NUM] =
   "SiLU",
   "Sigmoid",
   "CLAMP",
-  "layernorm Matmul"
-  "ERF"
-  "Pow Forward"
+  "layernorm Matmul",
+  "ERF",
+  "Pow Forward",
+  "Add Layernorm Matmul"
 };
 
 struct OpTimer

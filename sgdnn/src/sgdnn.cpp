@@ -6832,3 +6832,115 @@ bm_status_t sgdnnFminBcast (bm_handle_t handle,
 #endif
   return BM_SUCCESS;
 }
+
+bm_status_t sgdnnAddLnMm ( bm_handle_t handle,
+                          SgdnnTensor_t input0,
+                          SgdnnTensor_t input1,
+                          SgdnnTensor_t w,
+                          SgdnnTensor_t b,
+                          SgdnnTensor_t gamma,
+                          SgdnnTensor_t beta,
+                          float eps,
+                          SgdnnTensor_t out_add,
+                          SgdnnTensor_t mean,
+                          SgdnnTensor_t rstd,
+                          SgdnnTensor_t output )
+{
+  SGDNN_CHECK ( input0.dtype == input1.dtype );
+  SGDNN_CHECK ( input0.dtype == w.dtype );
+  SGDNN_CHECK ( input0.dtype == gamma.dtype );
+  SGDNN_CHECK ( input0.dtype == beta.dtype );
+  SGDNN_CHECK ( input0.dtype == out_add.dtype );
+  SGDNN_CHECK ( input0.dtype == mean.dtype );
+  SGDNN_CHECK ( input0.dtype == rstd.dtype );
+  SGDNN_CHECK ( input0.dtype == output.dtype );
+  SGDNN_CHECK ( input0.dtype == SGDNN_DTYPE_FP32 ||
+                input0.dtype == SGDNN_DTYPE_FP16 ||
+                input0.dtype == SGDNN_DTYPE_BF16 );
+  if ( b.addr != 0 )
+  {
+    SGDNN_CHECK ( input0.dtype == b.dtype );
+  }
+
+  const auto input_ndim = input0.dim;
+  SGDNN_CHECK ( input_ndim == 2 || input_ndim == 3);
+  SGDNN_CHECK ( sgdnnIsSameShape( &input0, &input1 ) );
+  SGDNN_CHECK ( sgdnnIsSameShape( &input0, &out_add ) );
+  if ( input_ndim == 2 )
+  {
+    SGDNN_CHECK ( input0.shape[1] == w.shape[0] );
+    SGDNN_CHECK ( input0.shape[1] == gamma.shape[0] );
+    SGDNN_CHECK ( sgdnnIsSameShape( &gamma, &beta ) );
+    SGDNN_CHECK ( sgdnnIsSameShape( &mean, &rstd ) );
+    SGDNN_CHECK ( input0.shape[0] == mean.shape[0] );
+    SGDNN_CHECK ( output.shape[1] == w.shape[1] );
+    SGDNN_CHECK ( input0.shape[0] == output.shape[0] );
+  } else {
+    SGDNN_CHECK ( input0.shape[2] == w.shape[0] );
+    SGDNN_CHECK ( input0.shape[2] == gamma.shape[0] );
+    SGDNN_CHECK ( sgdnnIsSameShape( &gamma, &beta ) );
+    SGDNN_CHECK ( sgdnnIsSameShape( &mean, &rstd ) );
+    SGDNN_CHECK ( input0.shape[0] == mean.shape[0] );
+    SGDNN_CHECK ( input0.shape[1] == mean.shape[1] );
+    SGDNN_CHECK ( output.shape[2] == w.shape[1] );
+    SGDNN_CHECK ( input0.shape[0] == output.shape[0] );
+    SGDNN_CHECK ( input0.shape[1] == output.shape[1] );
+  }
+
+  if ( b.addr != 0 )
+  {
+    SGDNN_CHECK ( b.dim == 1 );
+    SGDNN_CHECK ( b.shape[0] == w.shape[1] );
+  }
+
+  SGDNN_CHECK ( sgdnnIsTensorContiguous ( &input0 ) );
+  SGDNN_CHECK ( sgdnnIsTensorContiguous ( &input1 ) );
+  SGDNN_CHECK ( sgdnnIsTensorContiguous ( &w ) );
+  SGDNN_CHECK ( sgdnnIsTensorContiguous ( &gamma ) );
+  SGDNN_CHECK ( sgdnnIsTensorContiguous ( &beta ) );
+  SGDNN_CHECK ( sgdnnIsTensorContiguous ( &out_add ) );
+  SGDNN_CHECK ( sgdnnIsTensorContiguous ( &mean ) );
+  SGDNN_CHECK ( sgdnnIsTensorContiguous ( &rstd ) );
+  SGDNN_CHECK ( sgdnnIsTensorContiguous ( &output ) );
+
+  if ( b.addr != 0 )
+  {
+    SGDNN_CHECK ( sgdnnIsTensorContiguous ( &b ) );
+  }
+
+#if defined SGDNN_BACKEND_1684X
+  SGDNN_CHECK ( false );
+#elif defined SGDNN_BACKEND_2260
+  sg_api_add_ln_mm_multi_core_t api;
+  api.input0_addr   = input0.addr;
+  api.input1_addr   = input1.addr;
+  api.weight_addr   = w.addr;
+  api.bias_addr     = b.addr;
+  api.gamma_addr    = gamma.addr;
+  api.beta_addr     = beta.addr;
+  api.out_add_addr  = out_add.addr;
+  api.mean_addr     = mean.addr;
+  api.rstd_addr     = rstd.addr;
+  api.output_addr   = output.addr;
+  api.in_dims       = input0.dim;
+  api.w_dims        = w.dim;
+  api.in_dtype      = sgdnnTPUKernelDType ( input0.dtype );
+  api.eps           = eps;
+  api.has_bias      = (int)(b.addr != 0);
+  api.use_fast      = 0;
+
+  for ( int i = 0; i < input0.dim; ++i )
+  {
+    api.in_shape[i] = input0.shape[i];
+  }
+  for ( int i = 0; i < w.dim; ++i )
+  {
+    api.w_shape[i] = w.shape[i];
+  }
+
+  SAFE_CALL ( sgdnnTPUKernelLaunch ( handle, "tpu_kernel_add_ln_mm_multi_core", &api, sizeof ( api ) ) );
+#else
+  SGDNN_CHECK ( false );
+#endif
+  return BM_SUCCESS;
+}

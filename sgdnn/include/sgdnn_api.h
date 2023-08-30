@@ -1664,6 +1664,29 @@ bm_status_t sgdnnFminBcast ( bm_handle_t handle,
                         SgdnnTensor_t input,
                         SgdnnTensor_t other,
                         SgdnnTensor_t output );  
+/*
+ * OUTPUT = LAYERNORM_MATMUL ( INPUT0, INPUT1, W, B, GAMMA, BETA, EPS, OUT_ADDR, MEAN, RSTD, OUTPUT )
+ * Note:
+ * 1. The data types of INPUT0, INPUT1, W, B, GAMMA, BETA, EPS, OUT_ADDR, MEAN, RSTD, OUTPUT must be the same and one of FP32, FP16 and BF16
+ * 2. The dimensions of INPUT0 INPUT1 OUT_ADDR OUTPUT must be 2 or 3, W MEAN RSTD must be 2, GAMMA BETA B must be 1
+ * 3. The shape of INPUT0/INPUT1/OUT_ADDR is ( B, M, N ) or ( M, N ), W1 is ( N, D ), B is ( D ), OUTPUT is ( B, M, D ) or ( M, N )
+ * 4. INPUT0, INPUT1, W, B, GAMMA, BETA, OUT_ADDR, MEAN, RSTD and OUTPUT must be contiguous
+ * 5. GAMMA BETA represents the elementwise affine in LayerNorm, MEAN RSTD represents mean and rstd of LayerNorm
+ * 6. W B represents the weight and bias of first layer
+ * 7. OUT_ADDR represents the result of INPUT0 + INPUT1
+ */
+bm_status_t sgdnnAddLnMm ( bm_handle_t handle,
+                          SgdnnTensor_t input0,
+                          SgdnnTensor_t input1,
+                          SgdnnTensor_t w,
+                          SgdnnTensor_t b,
+                          SgdnnTensor_t gamma,
+                          SgdnnTensor_t beta,
+                          float eps,
+                          SgdnnTensor_t out_add,
+                          SgdnnTensor_t mean,
+                          SgdnnTensor_t rstd,
+                          SgdnnTensor_t output );
 
 #if defined(__cplusplus)
 }

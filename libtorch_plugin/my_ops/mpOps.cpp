@@ -18,5 +18,6 @@ namespace at
 		m.def("attn_forward", attn_forward);
 		m.def("attn_backward", attn_backward);
 		m.def("ln_mm_forward", ln_mm_forward);
+		m.def("add_ln_mm_forward", add_ln_mm_forward);
 	}
 }
