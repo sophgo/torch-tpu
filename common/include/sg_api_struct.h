@@ -433,6 +433,22 @@ typedef struct
   unsigned long long tensor1_global_addr;
   unsigned long long tensor2_global_addr;
   unsigned long long output_global_addr;
+  int input_shape[FW_MAX_SHAPE_DIMS];
+  int tensor1_shape[FW_MAX_SHAPE_DIMS];
+  int tensor2_shape[FW_MAX_SHAPE_DIMS];
+  int input_dim;
+  int tensor1_dim;
+  int tensor2_dim;
+  float value;
+  int dtype;
+} WITH_PLATFORM(sg_api_bcast_addcmul_t);
+
+typedef struct
+{
+  unsigned long long input_global_addr;
+  unsigned long long tensor1_global_addr;
+  unsigned long long tensor2_global_addr;
+  unsigned long long output_global_addr;
   int shape[FW_MAX_SHAPE_DIMS];
   int dim;
   float value;

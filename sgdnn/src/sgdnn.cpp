@@ -2908,6 +2908,68 @@ bm_status_t sgdnnSign ( bm_handle_t handle,
   return BM_SUCCESS;
 }
 
+bm_status_t sgdnnAddCMulBcast ( bm_handle_t handle,
+                           SgdnnTensor_t input,
+                           SgdnnTensor_t tensor1,
+                           SgdnnTensor_t tensor2,
+                           float scalar,
+                           SgdnnTensor_t output )
+{
+  SGDNN_CHECK ( input.dtype == tensor1.dtype );
+  SGDNN_CHECK ( input.dtype == tensor2.dtype );
+  SGDNN_CHECK ( input.dtype == output.dtype );
+  SGDNN_CHECK ( input.dtype == SGDNN_DTYPE_FP32 ||
+                input.dtype == SGDNN_DTYPE_FP16 ||
+                input.dtype == SGDNN_DTYPE_BF16 );
+  SGDNN_CHECK ( sgdnnIsTensorContiguous ( &input ) );
+  SGDNN_CHECK ( sgdnnIsTensorContiguous ( &tensor1 ) );
+  SGDNN_CHECK ( sgdnnIsTensorContiguous ( &tensor2 ) );
+  SGDNN_CHECK ( sgdnnIsTensorContiguous ( &output ) );
+#if defined SGDNN_BACKEND_1684X
+  sg_api_bcast_addcmul_t api;
+  api.input_global_addr = input.addr;
+  api.tensor1_global_addr = tensor1.addr;
+  api.tensor2_global_addr = tensor2.addr;
+  api.output_global_addr = output.addr;
+  api.input_dim = input.dim;
+  api.tensor1_dim = tensor1.dim;
+  api.tensor2_dim = tensor2.dim;
+  for ( int i = 0; i < input.dim; ++i )
+  {
+    api.input_shape[i] = input.shape[i];
+  }
+  for ( int i = 0; i < tensor1.dim; ++i )
+  {
+    api.tensor1_shape[i] = tensor1.shape[i];
+  }
+  for ( int i = 0; i < tensor2.dim; ++i )
+  {
+    api.tensor2_shape[i] = tensor2.shape[i];
+  }
+  api.dtype = sgdnnTPUKernelDType ( input.dtype );
+  api.value = scalar;
+  SAFE_CALL ( sgdnnTPUKernelLaunch ( handle, "tpu_kernel_api_addcmul_bcast", &api, sizeof ( api ) ) );
+#elif defined SGDNN_BACKEND_2260
+  //SGDNN_CHECK ( false );
+  sg_api_addcmul_t api;
+  api.input_global_addr = input.addr;
+  api.tensor1_global_addr = tensor1.addr;
+  api.tensor2_global_addr = tensor2.addr;
+  api.output_global_addr = output.addr;
+  api.dim = input.dim;
+  for ( int i = 0; i < input.dim; ++i )
+  {
+    api.shape[i] = input.shape[i];
+  }
+  api.dtype = sgdnnTPUKernelDType ( input.dtype );
+  api.value = scalar;
+  SAFE_CALL ( sgdnnTPUKernelLaunch ( handle, "addcmul_multi_core", &api, sizeof ( api ) ) );
+#else
+  SGDNN_CHECK ( false );
+#endif
+  return BM_SUCCESS;
+}
+
 bm_status_t sgdnnAddCMul ( bm_handle_t handle,
                            SgdnnTensor_t input,
                            SgdnnTensor_t tensor1,

@@ -344,7 +344,7 @@ bm_status_t sgdnnDiv ( bm_handle_t handle,
  * 1. The data types of INPUT, OTHER and OUTPUT must be the same and one of FP32, FP16 and BF16
  * 2. The dimentions of INPUT, OTHER and OUTPUT must be the same
  * 3. INPUT and OTHER are allowed broadcasting
- * 3. INPUT, OTHER and OUTPUT must be contiguous
+ * 4. INPUT, OTHER and OUTPUT must be contiguous
  */
 bm_status_t sgdnnAddBcast ( bm_handle_t handle,
                             SgdnnTensor_t input,
@@ -399,6 +399,21 @@ bm_status_t sgdnnCDiv ( bm_handle_t handle,
                         SgdnnTensor_t input,
                         float scalar,
                         SgdnnTensor_t output );
+
+/*
+ * OUTPUT = INPUT + SCALAR * ( TENSOR1 * TENSOR2 )
+ * Note:
+ * 1. The data types of INPUT, TENSOR1, TENSOR2 and OUTPUT must be the same and one of FP32, FP16 and BF16
+ * 2. Broadcasting is allowed
+ * 3. INPUT, TENSOR1, TENSOR2 and OUTPUT must be contiguous
+ */
+
+bm_status_t sgdnnAddCMulBcast ( bm_handle_t handle,
+                                SgdnnTensor_t input,
+                                SgdnnTensor_t tensor1,
+                                SgdnnTensor_t tensor2,
+                                float scalar,
+                                SgdnnTensor_t output );
 
 /*
  * OUTPUT = INPUT + SCALAR * ( TENSOR1 * TENSOR2 )

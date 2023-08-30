@@ -11,12 +11,17 @@ def case_broadcast():
     W = 64
 
     inp = torch.randn(N, C, 1, 1)
-    t1 = torch.randn(N, C, H, W)
+    t1 = torch.randn(C, H, W)
     t2 = torch.randn(N, C, 1, 1)
-    
+
     inp_tpu = inp.to(device)
     t1_tpu = t1.to(device)
     t2_tpu = t2.to(device)
+
+    #test FP16
+    # inp_tpu = inp.half().to(device)
+    # t1_tpu = t1.half().to(device)
+    # t2_tpu = t2.half().to(device)
 
     res_cpu = torch.addcmul(inp, t1, t2)
     res_tpu = torch.addcmul(inp_tpu, t1_tpu, t2_tpu)
