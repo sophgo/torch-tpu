@@ -1,127 +1,150 @@
 #include "sg_api_struct.h"
 #include "tpu_kernel.h"
 
+inline static void pipeline_move(unsigned long long *array, int num) {
+  for (int i = num - 1; i > 0; i--) {
+    array[i] = array[i - 1];
+  }
+}
+
 /*
  * output = input + value * ( tensor1 * tensor2 )
  */
 
-void nodechip_addcmul (
-global_addr_t input_global_addr,
-global_addr_t tensor1_global_addr,
-global_addr_t tensor2_global_addr,
-global_addr_t output_global_addr,
-scalar_t value,
-int length,
-data_type_t dtype )
-{
-  const int dsize = tpu_data_type_size ( dtype );
-  int wmax = DIV_UP ( length, NPU_NUM );
-  local_addr_t input_local_addrs[2], tensor1_local_addrs[2], tensor2_local_addrs[2], output_local_addrs[2];
-  local_addr_t next = 0;
-  while ( true )
-  {
-    next = 0;
-    int size = tpu_aligned_feature_size ( 1, wmax, dtype );
-    input_local_addrs[0] = next; next += size;
-    input_local_addrs[1] = next; next += size;
-    tensor1_local_addrs[0] = next; next += size;
-    tensor1_local_addrs[1] = next; next += size;
-    tensor2_local_addrs[0] = next; next += size;
-    tensor2_local_addrs[1] = next; next += size;
-    output_local_addrs[0] = next; next += size;
-    output_local_addrs[1] = next; next += size;
-    if ( ( int ) next <= LOCAL_MEM_SIZE )
-    {
-      break;
-    }
-    else
-    {
-      if ( wmax > 1 )
-      {
-        wmax /= 2;
-        continue;
-      }
-      else
-      {
-        TPUKERNEL_ASSERT ( false );
-      }
-    }
+void nodechip_addcmul(global_addr_t input_global_addr,
+                      global_addr_t tensor1_global_addr,
+                      global_addr_t tensor2_global_addr,
+                      global_addr_t output_global_addr, scalar_t value,
+                      unsigned long long length, data_type_t dtype) {
+  if (length == 0) {
+    return;
   }
-  int todo = length;
-  int done = 0;
-  dim4 shape = { .n = 1, .h = 1 };
-  int index = 0;
-  bool l2s = false;
-  dim4 l2s_shape;
-  global_addr_t l2s_global_addr = 0;
-  local_addr_t l2s_local_addr = 0;
-  while ( todo != 0 )
-  {
-    if ( todo > NPU_NUM )
-    {
-      shape.c = NPU_NUM;
-      shape.w = MIN ( todo / NPU_NUM, wmax );
-    }
-    else
-    {
-      shape.c = todo;
-      shape.w = 1;
-    }
-    tpu_gdma_cpy_S2L ( input_local_addrs[index], input_global_addr + done * dsize, &shape, NULL, NULL, dtype );
-    tpu_gdma_cpy_S2L ( tensor1_local_addrs[index], tensor1_global_addr + done * dsize, &shape, NULL, NULL, dtype );
-    tpu_gdma_cpy_S2L ( tensor2_local_addrs[index], tensor2_global_addr + done * dsize, &shape, NULL, NULL, dtype );
-    if ( tpu_is_parallel_state() )
-    {
-      tpu_parallel_end();
-    }
+
+  const unsigned int bank_bsize = tpu_local_mem_size_per_npu() / tpu_bank_num();
+  int dtype_size = tpu_data_type_size(dtype);
+  int tensor_num = 2 + 2 + 2 + 2; // 4 inputs, 4 + 4 input tensor, 4 outputs
+  int tensor_bsize_pnpu = tpu_bank_num() / tensor_num * bank_bsize;
+  TPUKERNEL_ASSERT(tensor_bsize_pnpu > 0);
+
+  // max local memory is tpu_local_mem_size_per_npu() * tpu_npu_num()
+  // for bm1684x, is (16384   *   16)    *   64
+  //                    ↑          ↑          ↑
+  //                bank_size * bank_num * npu_num
+  // (tpu_gdma_shape_limit(TENSOR_C_DIM) + 1) >> 1 = 32768,
+  // when `m_dim` is set to this value, it ensures both n and m dim to not
+  // exceed **shape limit**
+  const unsigned int max_m_dim = (tpu_gdma_shape_limit(TENSOR_C_DIM) + 1) >> 1;
+
+  // w should larger equal than tpu_eu_num(dtype) to make full use of
+  // eu(execution unit)
+  const unsigned int w_dim = tpu_eu_num(dtype);
+  const int n_dim = tensor_bsize_pnpu * tpu_npu_num() / dtype_size / max_m_dim;
+
+  local_addr_t in_local_addr[2] = {0, 1 * tensor_bsize_pnpu};
+  local_addr_t tensor1_local_addr[2] = {2 * tensor_bsize_pnpu,
+                                        3 * tensor_bsize_pnpu};
+  local_addr_t tensor2_local_addr[2] = {4 * tensor_bsize_pnpu,
+                                        5 * tensor_bsize_pnpu};
+  local_addr_t out_local_addr[2] = {6 * tensor_bsize_pnpu,
+                                    7 * tensor_bsize_pnpu};
+
+  unsigned long long cur_idx[3] = {0}, cur_n_dim[3] = {0}, cur_m_dim[3] = {0};
+  int stage_idx = 0, draning_idx = 0;
+  while (cur_idx[2] < length) {
     tpu_parallel_start();
-    if ( l2s )
-    {
-      tpu_gdma_cpy_L2S ( l2s_global_addr, l2s_local_addr, &l2s_shape, NULL, NULL, dtype );
+
+    // update load info
+    if (draning_idx < 1) {
+      unsigned long long cur_len =
+          MIN(length - cur_idx[0], // remained element size
+              n_dim * max_m_dim    // max matrix element size, n_dim * m_dim <
+                                   // tensor_size_pnpu * npu_num
+          );
+
+      // if cur_len is larger than m_dim (for a big matrix), limit `m` to not
+      // exceed max_m_dim, in this case n > 1 else, take cur_len as m, in this
+      // case n = 1 NOTE: n_dim * max_m_dim <= tensor_size_pnpu * npu_num, it's
+      // always a legal size.
+      cur_m_dim[0] = MIN(cur_len, max_m_dim);
+      cur_n_dim[0] = cur_len / cur_m_dim[0]; // cur_len / cur_m_dim[0] >= 1
     }
-    tpu_bdc_fp_mul ( output_local_addrs[index], tensor1_local_addrs[index], tensor2_local_addrs[index], &shape, NULL, NULL, NULL, dtype );
-    tpu_bdc_fp_mul_C ( output_local_addrs[index], output_local_addrs[index], value, &shape, NULL, NULL, dtype );
-    tpu_bdc_fp_add ( output_local_addrs[index], output_local_addrs[index], input_local_addrs[index], &shape, NULL, NULL, NULL, dtype );
-    l2s = true;
-    l2s_global_addr = output_global_addr + done * dsize;
-    l2s_local_addr = output_local_addrs[index];
-    l2s_shape = shape;
-    todo -= shape.c * shape.w;
-    done += shape.c * shape.w;
-    index = 1 - index;
-  }
-  if ( tpu_is_parallel_state() )
-  {
+    // store output
+    if (stage_idx > 1) {
+      tpu_gdma_matrix_L2S(output_global_addr + cur_idx[2] * dtype_size,
+                          out_local_addr[stage_idx & 0x1],
+                          /**rows, cols, cols_per_channel, row_stride*/
+                          cur_n_dim[2], cur_m_dim[2], w_dim, cur_m_dim[2],
+                          dtype);
+    }
+
+    // load input
+    if (draning_idx < 1) {
+      tpu_gdma_matrix_S2L(in_local_addr[stage_idx & 0x1],
+                          input_global_addr + cur_idx[0] * dtype_size,
+                          cur_n_dim[0], cur_m_dim[0], w_dim, cur_m_dim[0],
+                          dtype);
+      tpu_gdma_matrix_S2L(tensor1_local_addr[stage_idx & 0x1],
+                          tensor1_global_addr + cur_idx[0] * dtype_size,
+                          cur_n_dim[0], cur_m_dim[0], w_dim, cur_m_dim[0],
+                          dtype);
+      tpu_gdma_matrix_S2L(tensor2_local_addr[stage_idx & 0x1],
+                          tensor2_global_addr + cur_idx[0] * dtype_size,
+                          cur_n_dim[0], cur_m_dim[0], w_dim, cur_m_dim[0],
+                          dtype);
+    }
+
+    // compute
+    if (stage_idx > 0 && draning_idx < 2) {
+      dim4 cur_shape = {cur_n_dim[1], DIV_UP(cur_m_dim[1], w_dim), 1,
+                        w_dim}; // matrix layout shape (n, c, h, w)
+      tpu_bdc_fp_mul(out_local_addr[(stage_idx - 1) & 0x1],
+                     tensor1_local_addr[(stage_idx - 1) & 0x1],
+                     tensor2_local_addr[(stage_idx - 1) & 0x1], &cur_shape,
+                     NULL, NULL, NULL, dtype);
+      tpu_bdc_fp_mul_C(out_local_addr[(stage_idx - 1) & 0x1],
+                       out_local_addr[(stage_idx - 1) & 0x1], value, &cur_shape,
+                       NULL, NULL, dtype);
+      tpu_bdc_fp_add(out_local_addr[(stage_idx - 1) & 0x1],
+                     out_local_addr[(stage_idx - 1) & 0x1],
+                     in_local_addr[(stage_idx - 1) & 0x1], &cur_shape, NULL,
+                     NULL, NULL, dtype);
+    }
+
     tpu_parallel_end();
-  }
-  if ( l2s )
-  {
-    tpu_gdma_cpy_L2S ( l2s_global_addr, l2s_local_addr, &l2s_shape, NULL, NULL, dtype );
+    pipeline_move(cur_idx, 3);
+    pipeline_move(cur_m_dim, 3);
+    pipeline_move(cur_n_dim, 3);
+    if (draning_idx < 1) {
+      cur_idx[0] += cur_m_dim[0] * cur_n_dim[0];
+      if (cur_idx[0] >= length) {
+        draning_idx++;
+      }
+    } else {
+      draning_idx++;
+    }
+    stage_idx++;
   }
 }
 
-void tpu_kernel_api_addcmul ( const void * args )
-{
-  sg_api_addcmul_t * api = ( sg_api_addcmul_t * ) args;
-  data_type_t dtype = ( data_type_t ) api->dtype;
-  TPUKERNEL_ASSERT ( dtype == DT_FP32 || dtype == DT_FP16 || dtype == DT_BFP16 );
+void tpu_kernel_api_addcmul(const void *args) {
+  sg_api_addcmul_t *api = (sg_api_addcmul_t *)args;
+  data_type_t dtype = (data_type_t)api->dtype;
+  TPUKERNEL_ASSERT(dtype == DT_FP32 || dtype == DT_FP16 || dtype == DT_BFP16);
   scalar_t value;
-  if ( dtype == DT_FP32 )
-  {
+  if (dtype == DT_FP32) {
     value.f32 = api->value;
+  } else {
+    scalar_t value_f32 = {.f32 = api->value};
+    value = tpu_fp_cast(value_f32, dtype, DT_FP32, RM_HALF_TO_EVEN);
   }
-  else
-  {
-    scalar_t value_f32 = { .f32 = api->value };
-    value = tpu_fp_cast ( value_f32, dtype, DT_FP32, RM_HALF_TO_EVEN );
-  }
-  int length = 1;
-  for ( int i = 0; i < api->dim; ++i )
-  {
+  unsigned long long length = 1;
+  for (int i = 0; i < api->dim; ++i) {
     length *= api->shape[i];
   }
   tpu_initialize();
-  nodechip_addcmul ( api->input_global_addr, api->tensor1_global_addr, api->tensor2_global_addr, api->output_global_addr, value, length, dtype );
+  nodechip_addcmul(api->input_global_addr, api->tensor1_global_addr,
+                   api->tensor2_global_addr, api->output_global_addr, value,
+                   length, dtype);
   tpu_poll();
 }
-TPUKERNEL_FUNC_REGISTER ( tpu_kernel_api_addcmul );
+TPUKERNEL_FUNC_REGISTER(tpu_kernel_api_addcmul);
