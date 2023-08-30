@@ -11,18 +11,26 @@ void isNan(
     data_type_t dtype
 );
 
-void replaceWithNan(
+void replaceWithNotNan(
     local_addr_t output_local_addr,
     local_addr_t input_local_addr,
+    local_addr_t other_local_addr,
     local_addr_t mask_local_addr,
     local_addr_t work0_local_addr,
-    local_addr_t work1_local_addr,
     const dim4 *shape,
     const dim4 *stride,
     data_type_t dtype
-);
+){
+    scalar_t  C= {.u8 = 1};
+    tpu_bdc_set_C(work0_local_addr,C,shape,stride,DT_UINT8);
+    variable_t src0 = {.type = TENSOR, .context = {.addr = mask_local_addr}};
+    variable_t src1 = {.type = TENSOR, .context = {.addr = work0_local_addr}};
+    variable_t src2 = {.type = TENSOR, .context = {.addr = other_local_addr}};
+    variable_t src3 = {.type = TENSOR, .context = {.addr = input_local_addr}};
+    tpu_bdc_equal_select(output_local_addr,&src0,&src1, &src2,&src3,shape,DT_UINT8,dtype);
+}
 
-void nodechip_minimumc (
+void nodechip_fmaxc (
 global_addr_t input_global_addr,
 float scalar,
 global_addr_t output_global_addr,
@@ -40,7 +48,6 @@ data_type_t dtype )
 
   local_addr_t input_local_addrs[2]={0, tensor_size};
   local_addr_t output_local_addrs[2]={2*tensor_size, 3*tensor_size};
-
   int dtype_size = tpu_data_type_size(dtype);
   int tensor_w = DIV_UP(MIN(length, tensor_size*npu_num/dtype_size), npu_num);
 
@@ -77,14 +84,14 @@ data_type_t dtype )
     {
       tpu_gdma_cpy_L2S ( l2s_global_addr, l2s_local_addr, &l2s_shape, NULL, NULL, dtype );
     }
-    
     __uint32_t scalar_uint32= *(__uint32_t*) &scalar;
     if (((scalar_uint32 & 0x7f800000) == 0x7f800000) && ((scalar_uint32 & 0x7fffffff) != 0x7f800000)){
-            scalar_t  nan_C= {.f32 = 0.0/0.0};
-            tpu_bdc_set_C(output_local_addrs[index],nan_C,&shape,NULL,dtype);
+        tpu_bdc_cpy(output_local_addrs[index],input_local_addrs[index],&shape,NULL,NULL,dtype);
+            
     } else{
-        tpu_bdc_min_C(output_local_addrs[index],input_local_addrs[index],value,&shape,NULL,NULL,dtype);
+        tpu_bdc_max_C(output_local_addrs[index],input_local_addrs[index],value,&shape,NULL,NULL,dtype);
     }
+    
 
     l2s = true;
     l2s_global_addr = output_global_addr + done * dtype_size;
@@ -106,8 +113,8 @@ data_type_t dtype )
 
 
 
-void tpu_kernel_api_minimumc(const void *args) {
-    sg_api_minimumc_t *api = (sg_api_minimumc_t*)args;
+void tpu_kernel_api_fmaxc(const void *args) {
+    sg_api_fmaxc_t *api = (sg_api_fmaxc_t*)args;
     TPUKERNEL_ASSERT(api->dtype == DT_FP32 || api->dtype == DT_FP16 ||
                      api->dtype == DT_BFP16 || api->dtype == DT_INT32);
 
@@ -117,17 +124,17 @@ void tpu_kernel_api_minimumc(const void *args) {
     }
 
     tpu_initialize();
-    nodechip_minimumc(api->input_global_addr,
+    nodechip_fmaxc(api->input_global_addr,
                          api->scalar,
                          api->output_global_addr,
                          length,
                          (data_type_t)api->dtype);
     tpu_poll();
 }
-TPUKERNEL_FUNC_REGISTER(tpu_kernel_api_minimumc);
+TPUKERNEL_FUNC_REGISTER(tpu_kernel_api_fmaxc);
 
-void tpu_kernel_api_minimumc_multi_core(const void *args) {
-    sg_api_minimumc_t *api = (sg_api_minimumc_t*)args;
+void tpu_kernel_api_fmaxc_multi_core(const void *args) {
+    sg_api_fmaxc_t *api = (sg_api_fmaxc_t*)args;
     TPUKERNEL_ASSERT(api->dtype == DT_FP32 || api->dtype == DT_FP16 ||
                      api->dtype == DT_BFP16 || api->dtype == DT_INT32);
 
@@ -147,17 +154,17 @@ void tpu_kernel_api_minimumc_multi_core(const void *args) {
     if (core_idx == length_secs - 1) {
         cur_length_slice = length - length_slice * (length_secs - 1);
     }
-    nodechip_minimumc(api->input_global_addr + (length_slice * core_idx) * tpu_data_type_size(api->dtype),
+    nodechip_fmaxc(api->input_global_addr + (length_slice * core_idx) * tpu_data_type_size(api->dtype),
                          api->scalar,
                          api->output_global_addr + (length_slice * core_idx) * tpu_data_type_size(api->dtype),
                          cur_length_slice,
                          (data_type_t)api->dtype);
     tpu_poll();
 }
-TPUKERNEL_FUNC_REGISTER(tpu_kernel_api_minimumc_multi_core);
+TPUKERNEL_FUNC_REGISTER(tpu_kernel_api_fmaxc_multi_core);
 
 
-void nodechip_minimum (
+void nodechip_fmax (
     global_addr_t input_global_addr,
     global_addr_t other_global_addr,
     global_addr_t output_global_addr,
@@ -214,12 +221,12 @@ void nodechip_minimum (
         tpu_gdma_cpy_L2S ( l2s_global_addr, l2s_local_addr, &l2s_shape, NULL, NULL, dtype );
         }
         
-        tpu_bdc_min(output_local_addrs[index],input_local_addrs[index],other_local_addrs[index],&shape,NULL,NULL,NULL,dtype);
+        tpu_bdc_max(output_local_addrs[index],input_local_addrs[index],other_local_addrs[index],&shape,NULL,NULL,NULL,dtype);
         isNan(work_local_addrs[0],input_local_addrs[index],work_local_addrs[1],work_local_addrs[2],&shape,NULL,dtype);
-        replaceWithNan(input_local_addrs[index],output_local_addrs[index],work_local_addrs[0],work_local_addrs[1],work_local_addrs[2],&shape,NULL,dtype);
-        isNan(work_local_addrs[0],other_local_addrs[index],work_local_addrs[1],work_local_addrs[2],&shape,NULL,dtype);
-        replaceWithNan(output_local_addrs[index],input_local_addrs[index],work_local_addrs[0],work_local_addrs[1],work_local_addrs[2],&shape,NULL,dtype);
-
+        replaceWithNotNan(work_local_addrs[2],output_local_addrs[index],other_local_addrs[index],work_local_addrs[0],work_local_addrs[1],&shape,NULL,dtype);
+        isNan(work_local_addrs[0],other_local_addrs[index],work_local_addrs[1],output_local_addrs[index],&shape,NULL,dtype);
+        replaceWithNotNan(output_local_addrs[index],work_local_addrs[2],input_local_addrs[index],work_local_addrs[0],work_local_addrs[1],&shape,NULL,dtype);
+        
         l2s = true;
         l2s_global_addr = output_global_addr + done * dtype_size;
         l2s_local_addr = output_local_addrs[index];
@@ -238,8 +245,8 @@ void nodechip_minimum (
     }
 }
 
-void tpu_kernel_api_minimum(const void *args) {
-    sg_api_minimum_t *api = (sg_api_minimum_t*)args;
+void tpu_kernel_api_fmax(const void *args) {
+    sg_api_fmax_t *api = (sg_api_fmax_t*)args;
     TPUKERNEL_ASSERT(api->dtype == DT_FP32 || api->dtype == DT_FP16 ||
                      api->dtype == DT_BFP16 || api->dtype == DT_INT32);
 
@@ -249,17 +256,17 @@ void tpu_kernel_api_minimum(const void *args) {
     }
 
     tpu_initialize();
-    nodechip_minimum(api->input_global_addr,
+    nodechip_fmax(api->input_global_addr,
                          api->other_global_addr,
                          api->output_global_addr,
                          length,
                          (data_type_t)api->dtype);
     tpu_poll();
 }
-TPUKERNEL_FUNC_REGISTER(tpu_kernel_api_minimum);
+TPUKERNEL_FUNC_REGISTER(tpu_kernel_api_fmax);
 
-void tpu_kernel_api_minimum_multi_core(const void *args) {
-    sg_api_minimum_t *api = (sg_api_minimum_t*)args;
+void tpu_kernel_api_fmax_multi_core(const void *args) {
+    sg_api_fmax_t *api = (sg_api_fmax_t*)args;
     TPUKERNEL_ASSERT(api->dtype == DT_FP32 || api->dtype == DT_FP16 ||
                      api->dtype == DT_BFP16 || api->dtype == DT_INT32);
 
@@ -279,16 +286,16 @@ void tpu_kernel_api_minimum_multi_core(const void *args) {
     if (core_idx == length_secs - 1) {
         cur_length_slice = length - length_slice * (length_secs - 1);
     }
-    nodechip_minimum(api->input_global_addr + (length_slice * core_idx) * tpu_data_type_size(api->dtype),
+    nodechip_fmax(api->input_global_addr + (length_slice * core_idx) * tpu_data_type_size(api->dtype),
                          api->other_global_addr + (length_slice * core_idx) * tpu_data_type_size(api->dtype),
                          api->output_global_addr + (length_slice * core_idx) * tpu_data_type_size(api->dtype),
                          cur_length_slice,
                          (data_type_t)api->dtype);
     tpu_poll();
 }
-TPUKERNEL_FUNC_REGISTER(tpu_kernel_api_minimum_multi_core);
+TPUKERNEL_FUNC_REGISTER(tpu_kernel_api_fmax_multi_core);
 
-void nodechip_minimum_bcast(
+void nodechip_fmax_bcast(
 global_addr_t input_global_addr,
 global_addr_t other_global_addr,
 global_addr_t output_global_addr,
@@ -333,7 +340,6 @@ data_type_t   dtype) {
         work1_addr = work0_addr + output_size;
         work2_addr = work1_addr + output_size;
         int total_size = work2_addr + other_size;
-
         if(total_size <= LOCAL_MEM_SIZE) {
             break;
         }
@@ -439,11 +445,11 @@ data_type_t   dtype) {
                 
                 
                 // Select
-                tpu_bdc_min(output_addr, input_addr, other_addr, &shape, NULL, NULL, NULL, dtype);
+                tpu_bdc_max(output_addr, input_addr, other_addr, &shape, NULL, NULL, NULL, dtype);
                 isNan(work0_addr,input_addr,work1_addr,work2_addr,&shape,NULL,dtype);
-                replaceWithNan(input_addr,output_addr,work0_addr,work1_addr,work2_addr,&shape,NULL,dtype);
-                isNan(work0_addr,other_addr,work1_addr,work2_addr,&shape,NULL,dtype);
-                replaceWithNan(output_addr,input_addr,work0_addr,work1_addr,work2_addr,&shape,NULL,dtype);
+                replaceWithNotNan(work2_addr,output_addr,other_addr,work0_addr,work1_addr,&shape,NULL,dtype);
+                isNan(work0_addr,other_addr,work1_addr,output_addr,&shape,NULL,dtype);
+                replaceWithNotNan(output_addr,work2_addr,input_addr,work0_addr,work1_addr,&shape,NULL,dtype);
 
                 // Move out from local memory to global memory
                 global_addr_t output_global_addr_gdma = output_global_addr +
@@ -468,8 +474,8 @@ data_type_t   dtype) {
 }
 
 
-void tpu_kernel_api_minimum_bcast(const void *args) {
-    sg_api_minimum_bcast_t *api = (sg_api_minimum_bcast_t*)args;
+void tpu_kernel_api_fmax_bcast(const void *args) {
+    sg_api_fmax_bcast_t *api = (sg_api_fmax_bcast_t*)args;
     TPUKERNEL_ASSERT(api->output_dim > 0 && api->output_dim <= 4);
 
     TPUKERNEL_ASSERT(api->dtype == DT_FP32 || api->dtype == DT_FP16 ||
@@ -501,7 +507,7 @@ void tpu_kernel_api_minimum_bcast(const void *args) {
     }
 
     tpu_initialize();
-    nodechip_minimum_bcast(api->input_global_addr,
+    nodechip_fmax_bcast(api->input_global_addr,
                          api->other_global_addr,
                          api->output_global_addr,
                          &input_shape,
@@ -510,7 +516,6 @@ void tpu_kernel_api_minimum_bcast(const void *args) {
                          (data_type_t)api->dtype);
     tpu_poll();
 }
-TPUKERNEL_FUNC_REGISTER(tpu_kernel_api_minimum_bcast);
-
+TPUKERNEL_FUNC_REGISTER(tpu_kernel_api_fmax_bcast);
 
 

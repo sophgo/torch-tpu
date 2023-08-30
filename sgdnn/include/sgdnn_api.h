@@ -1397,6 +1397,76 @@ bm_status_t sgdnnLnMm ( bm_handle_t handle,
                           SgdnnTensor_t rstd,
                           SgdnnTensor_t output );
 
+/*
+ * OUTPUT = FMAXC(INPUT,SCALAR)
+ * Note:
+ * 1. The data types of INPUT and OUTPUT must be the same and one of FP32, FP16 and BF16
+ * 2. The shapes of INPUT and OUTPUT must be the same
+ * 3. INPUT and OUTPUT must be contiguous
+ */
+bm_status_t sgdnnFmaxC ( bm_handle_t handle,
+                        SgdnnTensor_t input,
+                        float scalar,
+                        SgdnnTensor_t output );
+
+/*
+ * OUTPUT = FMAX(INPUT,SCALAR)
+ * Note:
+ * 1. The data types of INPUT and OUTPUT must be the same and one of FP32, FP16 and BF16
+ * 2. The shapes of INPUT and OUTPUT must be the same
+ * 3. INPUT and OUTPUT must be contiguous
+ */
+bm_status_t sgdnnFmax ( bm_handle_t handle,
+                        SgdnnTensor_t input,
+                        SgdnnTensor_t other,
+                        SgdnnTensor_t output );
+
+/*
+ * OUTPUT = FMAXBCAST(INPUT,SCALAR)
+ * Note:
+ * 1. The data types of INPUT and OUTPUT must be the same and one of FP32, FP16 and BF16
+ * 2. INPUT and OUTPUT must be contiguous
+ */
+bm_status_t sgdnnFmaxBcast ( bm_handle_t handle,
+                        SgdnnTensor_t input,
+                        SgdnnTensor_t other,
+                        SgdnnTensor_t output );  
+
+/*
+ * OUTPUT = FMINC(INPUT,SCALAR)
+ * Note:
+ * 1. The data types of INPUT and OUTPUT must be the same and one of FP32, FP16 and BF16
+ * 2. The shapes of INPUT and OUTPUT must be the same
+ * 3. INPUT and OUTPUT must be contiguous
+ */
+bm_status_t sgdnnFminC ( bm_handle_t handle,
+                        SgdnnTensor_t input,
+                        float scalar,
+                        SgdnnTensor_t output );
+
+/*
+ * OUTPUT = FMIN(INPUT,SCALAR)
+ * Note:
+ * 1. The data types of INPUT and OUTPUT must be the same and one of FP32, FP16 and BF16
+ * 2. The shapes of INPUT and OUTPUT must be the same
+ * 3. INPUT and OUTPUT must be contiguous
+ */
+bm_status_t sgdnnFmin ( bm_handle_t handle,
+                        SgdnnTensor_t input,
+                        SgdnnTensor_t other,
+                        SgdnnTensor_t output );
+
+/*
+ * OUTPUT = FMINBCAST(INPUT,SCALAR)
+ * Note:
+ * 1. The data types of INPUT and OUTPUT must be the same and one of FP32, FP16 and BF16
+ * 2. INPUT and OUTPUT must be contiguous
+ */
+bm_status_t sgdnnFminBcast ( bm_handle_t handle,
+                        SgdnnTensor_t input,
+                        SgdnnTensor_t other,
+                        SgdnnTensor_t output );  
+
 #if defined(__cplusplus)
 }
 #endif

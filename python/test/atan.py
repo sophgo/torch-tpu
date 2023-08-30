@@ -8,7 +8,7 @@ torch.set_printoptions(precision=6)
 device = "privateuseone:0"
 
 def case1():
-    input_origin=torch.rand(5,5)*200-100
+    input_origin=torch.tensor([-0.0,-0.0])
     
     input_tpu=input_origin.to(device)
     

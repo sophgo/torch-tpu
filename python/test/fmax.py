@@ -13,9 +13,9 @@ def case1():
     input3_origin=torch.tensor(float('nan'))
     input4_origin=torch.tensor([1,0,-0.0,-1,float('inf'),-float('inf'),float('nan'),-float('nan')])
 
-    output_cpu=torch.maximum(input3_origin,input4_origin)
-    output_tpu=torch.maximum(input3_origin.to(device),input4_origin.to(device)).cpu()
-    output_tpu_r=torch.maximum(input4_origin.to(device),input3_origin.to(device)).cpu()
+    output_cpu=torch.fmax(input3_origin,input4_origin)
+    output_tpu=torch.fmax(input3_origin.to(device),input4_origin.to(device)).cpu()
+    output_tpu_r=torch.fmax(input4_origin.to(device),input3_origin.to(device)).cpu()
     print('cpu :',output_cpu)
     print('tpu :',output_tpu)
     print('tpu_r :',output_tpu_r)

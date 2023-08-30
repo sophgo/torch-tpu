@@ -11,12 +11,14 @@ def case1():
     input1_origin=torch.rand(4,1,4,5)
     input2_origin=torch.rand(1,4,1)
     input3_origin=torch.tensor(1.0)
-    input4_origin=torch.tensor(2.0)
+    input4_origin=torch.tensor([1,0,-0.0,-1,float('inf'),-float('inf'),float('nan'),-float('nan')])
 
-    output_cpu=torch.minimum(input0_origin,input2_origin)
-    output_tpu=torch.minimum(input0_origin.to(device),input2_origin.to(device)).cpu()
+    output_cpu=torch.minimum(input3_origin,input4_origin)
+    output_tpu=torch.minimum(input3_origin.to(device),input4_origin.to(device)).cpu()
+    output_tpu_r=torch.minimum(input4_origin.to(device),input3_origin.to(device)).cpu()
     print('cpu :',output_cpu)
     print('tpu :',output_tpu)
+    print('tpu_r :',output_tpu_r)
     print('delta :',(output_cpu-output_tpu)/output_cpu)
 
 

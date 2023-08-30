@@ -1,6 +1,7 @@
 #include "sg_api_struct.h"
 #include "tpu_kernel.h"
 
+#define PI  3.14159265
 
 void nodechip_atan2c (
 float scalar,
@@ -37,8 +38,14 @@ data_type_t dtype )
   dim4 l2s_shape;
   global_addr_t l2s_global_addr = 0;
   local_addr_t l2s_local_addr = 0;
+  __uint32_t scalar_uint32= *(__uint32_t*) &scalar;
   float POW_C=2;
   scalar_t ADD_C = {.f32 = 1.f};
+  scalar_t positive_zero = {.u32 = 0x00000000};
+  scalar_t negtive_zero = {.u32 = 0x80000000};
+  scalar_t true_val = {.u8 = 1};
+  scalar_t PI_C = {.f32 = (scalar > 0 || scalar_uint32 == 0x00000000)  ? PI : -PI};
+  scalar_t half_PI_C = {.f32 = (scalar > 0 || scalar_uint32 == 0x00000000)  ? PI/2 : -PI/2};
   tpu_bdc_load_fp32_exp_coeff(exp_coeff_local_addr);
   tpu_bdc_load_fp32_log_coeff(log_coeff_local_addr);
   tpu_bdc_load_fp32_exp_table(exp_table_local_addr);
@@ -66,15 +73,77 @@ data_type_t dtype )
       tpu_gdma_cpy_L2S ( l2s_global_addr, l2s_local_addr, &l2s_shape, NULL, NULL, dtype );
     }
     
+    // y/x
     tpu_bdc_fp32_C_div(work_local_addrs[3],other_local_addrs[index],scalar,&shape,NULL,NULL);
+
+    // atan
     tpu_bdc_abs(work_local_addrs[2],work_local_addrs[3],&shape,NULL,NULL,dtype);
     tpu_bdc_fp32_pow_C(output_local_addrs[index],work_local_addrs[2],work_local_addrs[0],work_local_addrs[1],
                               exp_coeff_local_addr,log_coeff_local_addr,exp_table_local_addr,POW_C,&shape);
     tpu_bdc_fp_add_C(work_local_addrs[2],output_local_addrs[index], ADD_C, &shape, NULL, NULL, dtype); 
     tpu_bdc_fp32_rsqrt(output_local_addrs[index],work_local_addrs[2],&shape) ;
     tpu_bdc_fp_mul(work_local_addrs[2],output_local_addrs[index],work_local_addrs[3],&shape,NULL,NULL,NULL,dtype);
-    tpu_bdc_fp32_arcsin(output_local_addrs[index],work_local_addrs[2], work_local_addrs[0],arcsin_coeff_local_addr,&shape);
-    
+    tpu_bdc_fp32_arcsin(output_local_addrs[index],work_local_addrs[2], work_local_addrs[1],arcsin_coeff_local_addr,&shape);
+
+    // y/x==-0 atan(y/x)==-0
+    tpu_bdc_equal_C(work_local_addrs[0],work_local_addrs[3],negtive_zero,true_val,&shape,NULL,NULL,DT_UINT8,DT_UINT32);
+    tpu_bdc_set_C(work_local_addrs[1],true_val,&shape,NULL,DT_UINT8);
+    tpu_bdc_set_C(work_local_addrs[2],negtive_zero,&shape,NULL,DT_UINT32);
+    variable_t src0 = {.type = TENSOR, .context = {.addr = work_local_addrs[0]}};
+    variable_t src1 = {.type = TENSOR, .context = {.addr = work_local_addrs[1]}};
+    variable_t src2 = {.type = TENSOR, .context = {.addr = work_local_addrs[2]}};
+    variable_t src3 = {.type = TENSOR, .context = {.addr = output_local_addrs[index]}};
+    tpu_bdc_equal_select(work_local_addrs[3],&src0,&src1, &src2,&src3,&shape,DT_UINT8,dtype);
+
+    // x < 0  
+    tpu_bdc_set_C(work_local_addrs[0], positive_zero, &shape, NULL, dtype);
+    tpu_bdc_fp_add_C(work_local_addrs[1],output_local_addrs[0],PI_C,&shape,NULL,NULL,dtype);
+    src0.context.addr = other_local_addrs[index];
+    src1.context.addr = work_local_addrs[0];
+    src2.context.addr = work_local_addrs[1];
+    src3.context.addr = work_local_addrs[3];
+    tpu_bdc_less_select(work_local_addrs[2],&src0,&src1, &src2,&src3,&shape,dtype,dtype);
+
+    if(scalar == 0){
+      if(scalar_uint32>>31 == 0){
+        //x == +0 y == +0
+        tpu_bdc_equal_C(output_local_addrs[index],other_local_addrs[index],positive_zero,true_val,&shape,NULL,NULL,DT_UINT8,dtype);
+        tpu_bdc_set_C(work_local_addrs[0],true_val,&shape,NULL,DT_UINT8);
+        tpu_bdc_set_C(work_local_addrs[1],positive_zero,&shape,NULL,DT_UINT32);
+        src0.context.addr = output_local_addrs[index];
+        src1.context.addr = work_local_addrs[0];
+        src2.context.addr = work_local_addrs[1];
+        src3.context.addr = work_local_addrs[2];
+        tpu_bdc_equal_select(work_local_addrs[3],&src0,&src1,&src2,&src3,&shape,DT_UINT8,dtype);
+      }else{
+        //x == +0 y == -0
+        tpu_bdc_equal_C(output_local_addrs[index],other_local_addrs[index],positive_zero,true_val,&shape,NULL,NULL,DT_UINT8,dtype);
+        tpu_bdc_set_C(work_local_addrs[0],true_val,&shape,NULL,DT_UINT8);
+        tpu_bdc_set_C(work_local_addrs[1],negtive_zero,&shape,NULL,DT_UINT32);
+        src0.context.addr = output_local_addrs[index];
+        src1.context.addr = work_local_addrs[0];
+        src2.context.addr = work_local_addrs[1];
+        src3.context.addr = work_local_addrs[2];
+        tpu_bdc_equal_select(work_local_addrs[3],&src0,&src1,&src2,&src3,&shape,DT_UINT8,dtype);
+      }
+      //x == -0   y == +0 || y == -0
+      tpu_bdc_equal_C(work_local_addrs[1],other_local_addrs[index],negtive_zero,true_val,&shape,NULL,NULL,DT_UINT8,DT_UINT32);
+      tpu_bdc_set_C(work_local_addrs[2],PI_C,&shape,NULL,dtype);
+      src0.context.addr = work_local_addrs[1];
+      src2.context.addr = work_local_addrs[2];
+      src3.context.addr = work_local_addrs[3];
+      tpu_bdc_equal_select(output_local_addrs[index],&src0,&src1,&src2,&src3,&shape,DT_UINT8,dtype);
+    }else{
+      //x == 0 y > 0 
+      tpu_bdc_set_C(work_local_addrs[0], positive_zero, &shape, NULL, dtype);
+      tpu_bdc_set_C(work_local_addrs[1], half_PI_C, &shape, NULL, dtype);
+      src0.context.addr = other_local_addrs[index];
+      src1.context.addr = work_local_addrs[0];
+      src2.context.addr = work_local_addrs[1];
+      src3.context.addr = work_local_addrs[2];
+      tpu_bdc_equal_select(output_local_addrs[index],&src0,&src1, &src2,&src3,&shape,dtype,dtype);
+    }
+
     l2s = true;
     l2s_global_addr = output_global_addr + done * dtype_size;
     l2s_local_addr = output_local_addrs[index];
@@ -178,8 +247,16 @@ data_type_t dtype )
   dim4 l2s_shape;
   global_addr_t l2s_global_addr = 0;
   local_addr_t l2s_local_addr = 0;
+  __uint32_t scalar_uint32= *(__uint32_t*) &scalar;
   float POW_C=2;
   scalar_t ADD_C = {.f32 = 1.f};
+  scalar_t positive_zero = {.u32 = 0x00000000};
+  scalar_t negtive_zero = {.u32 = 0x80000000};
+  scalar_t true_val = {.u8 = 1};
+  scalar_t PI_C = {.f32 = PI};
+  scalar_t neg_PI_C = {.f32 = - PI};
+  scalar_t half_PI_C = {.f32 = PI/2};
+  scalar_t neg_half_PI_C = {.f32 = -PI/2};
   tpu_bdc_load_fp32_exp_coeff(exp_coeff_local_addr);
   tpu_bdc_load_fp32_log_coeff(log_coeff_local_addr);
   tpu_bdc_load_fp32_exp_table(exp_table_local_addr);
@@ -208,8 +285,10 @@ data_type_t dtype )
     }
     
     
-
+    // y/x
     tpu_bdc_fp32_div_C(work_local_addrs[3],input_local_addrs[index],scalar,&shape,NULL,NULL);
+    
+    // atan
     tpu_bdc_abs(work_local_addrs[2],work_local_addrs[3],&shape,NULL,NULL,dtype);
     tpu_bdc_fp32_pow_C(output_local_addrs[index],work_local_addrs[2],work_local_addrs[0],work_local_addrs[1],
                               exp_coeff_local_addr,log_coeff_local_addr,exp_table_local_addr,POW_C,&shape);
@@ -218,6 +297,75 @@ data_type_t dtype )
     tpu_bdc_fp_mul(work_local_addrs[2],output_local_addrs[index],work_local_addrs[3],&shape,NULL,NULL,NULL,dtype);
     tpu_bdc_fp32_arcsin(output_local_addrs[index],work_local_addrs[2], work_local_addrs[0],arcsin_coeff_local_addr,&shape);
     
+    // y/x==-0 atan(y/x)==-0
+    tpu_bdc_equal_C(work_local_addrs[0],work_local_addrs[3],negtive_zero,true_val,&shape,NULL,NULL,DT_UINT8,DT_UINT32);
+    tpu_bdc_set_C(work_local_addrs[1],true_val,&shape,NULL,DT_UINT8);
+    tpu_bdc_set_C(work_local_addrs[2],negtive_zero,&shape,NULL,DT_UINT32);
+    variable_t src0 = {.type = TENSOR, .context = {.addr = work_local_addrs[0]}};
+    variable_t src1 = {.type = TENSOR, .context = {.addr = work_local_addrs[1]}};
+    variable_t src2 = {.type = TENSOR, .context = {.addr = work_local_addrs[2]}};
+    variable_t src3 = {.type = TENSOR, .context = {.addr = output_local_addrs[index]}};
+    tpu_bdc_equal_select(work_local_addrs[3],&src0,&src1, &src2,&src3,&shape,DT_UINT8,dtype);
+
+    if(scalar == 0){
+      // x==0  y > 0
+      tpu_bdc_set_C(work_local_addrs[0],positive_zero,&shape,NULL,dtype);
+      tpu_bdc_set_C(work_local_addrs[1],half_PI_C,&shape,NULL,dtype);
+      src0.context.addr = input_local_addrs[index];
+      src1.context.addr = work_local_addrs[0];
+      src2.context.addr = work_local_addrs[1];
+      src3.context.addr = work_local_addrs[3];
+      tpu_bdc_greater_select(work_local_addrs[2],&src0,&src1, &src2,&src3,&shape,dtype,dtype);
+      // x==0 y < 0
+      tpu_bdc_set_C(work_local_addrs[1],neg_half_PI_C,&shape,NULL,dtype);
+      src3.context.addr = work_local_addrs[2];
+      tpu_bdc_less_select(work_local_addrs[3],&src0,&src1, &src2,&src3,&shape,dtype,dtype);
+
+      if(scalar_uint32 >> 31 == 0){
+        //x == +0 y==+0
+        tpu_bdc_set_C(work_local_addrs[0],positive_zero,&shape,NULL,DT_UINT32);
+        tpu_bdc_set_C(work_local_addrs[1],positive_zero,&shape,NULL,DT_UINT32);
+        src3.context.addr = work_local_addrs[3];
+        tpu_bdc_equal_select(work_local_addrs[2],&src0,&src1, &src2,&src3,&shape,DT_UINT32,dtype);
+
+        //x == +0 y==-0
+        tpu_bdc_set_C(work_local_addrs[0],negtive_zero,&shape,NULL,DT_UINT32);
+        tpu_bdc_set_C(work_local_addrs[1],negtive_zero,&shape,NULL,DT_UINT32);
+        src3.context.addr = work_local_addrs[2];
+        tpu_bdc_equal_select(work_local_addrs[3],&src0,&src1, &src2,&src3,&shape,DT_UINT32,dtype);
+      }else{
+        //x == -0 y==+0
+        tpu_bdc_set_C(work_local_addrs[0],positive_zero,&shape,NULL,DT_UINT32);
+        tpu_bdc_set_C(work_local_addrs[1],PI_C,&shape,NULL,dtype);
+        src3.context.addr = work_local_addrs[3];
+        tpu_bdc_equal_select(work_local_addrs[2],&src0,&src1, &src2,&src3,&shape,DT_UINT32,dtype);
+
+        //x == -0 y==-0
+        tpu_bdc_set_C(work_local_addrs[0],negtive_zero,&shape,NULL,DT_UINT32);
+        tpu_bdc_set_C(work_local_addrs[1],neg_PI_C,&shape,NULL,dtype);
+        src3.context.addr = work_local_addrs[2];
+        tpu_bdc_equal_select(work_local_addrs[3],&src0,&src1, &src2,&src3,&shape,DT_UINT32,dtype);
+      }
+    }else if(scalar < 0){
+      // x < 0   y >= 0 || y<0 
+      tpu_bdc_set_C(work_local_addrs[0],positive_zero,&shape,NULL,dtype);
+      tpu_bdc_fp_add_C(work_local_addrs[1],work_local_addrs[3],neg_PI_C,&shape,NULL,NULL,dtype);
+      tpu_bdc_fp_add_C(work_local_addrs[2],work_local_addrs[3],PI_C,&shape,NULL,NULL,dtype);
+      src0.context.addr = input_local_addrs[index];
+      src1.context.addr = work_local_addrs[0];
+      src2.context.addr = work_local_addrs[1];
+      src3.context.addr = work_local_addrs[2];
+      tpu_bdc_less_select(output_local_addrs[index],&src0,&src1, &src2,&src3,&shape,dtype,dtype);
+
+      //x < 0 y==-0
+      tpu_bdc_set_C(work_local_addrs[0],negtive_zero,&shape,NULL,DT_UINT32);
+      tpu_bdc_fp_add_C(work_local_addrs[1],work_local_addrs[3],neg_PI_C,&shape,NULL,NULL,dtype);
+      src3.context.addr = output_local_addrs[index];
+      tpu_bdc_equal_select(work_local_addrs[3],&src0,&src1, &src2,&src3,&shape,DT_UINT32,dtype);
+    }
+
+    tpu_bdc_cpy(output_local_addrs[index],work_local_addrs[3],&shape,NULL,NULL,dtype);
+
     l2s = true;
     l2s_global_addr = output_global_addr + done * dtype_size;
     l2s_local_addr = output_local_addrs[index];
@@ -325,6 +473,13 @@ data_type_t dtype )
   local_addr_t l2s_local_addr = 0;
   float POW_C=2;
   scalar_t ADD_C = {.f32 = 1.f};
+  scalar_t positive_zero = {.u32 = 0x00000000};
+  scalar_t negtive_zero = {.u32 = 0x80000000};
+  scalar_t true_val = {.u8 = 1};
+  scalar_t PI_C = {.f32 = PI};
+  scalar_t neg_PI_C = {.f32 = - PI};
+  scalar_t half_PI_C = {.f32 = PI/2};
+  scalar_t neg_half_PI_C = {.f32 = -PI/2};  
   tpu_bdc_load_fp32_exp_coeff(exp_coeff_local_addr);
   tpu_bdc_load_fp32_log_coeff(log_coeff_local_addr);
   tpu_bdc_load_fp32_exp_table(exp_table_local_addr);
@@ -354,8 +509,9 @@ data_type_t dtype )
     }
     
     
-
+    // y/x
     tpu_bdc_fp32_div(work_local_addrs[3],input_local_addrs[index],other_local_addrs[index],&shape,NULL,NULL,NULL);
+    // atan
     tpu_bdc_abs(work_local_addrs[2],work_local_addrs[3],&shape,NULL,NULL,dtype);
     tpu_bdc_fp32_pow_C(output_local_addrs[index],work_local_addrs[2],work_local_addrs[0],work_local_addrs[1],
                               exp_coeff_local_addr,log_coeff_local_addr,exp_table_local_addr,POW_C,&shape);
@@ -364,6 +520,119 @@ data_type_t dtype )
     tpu_bdc_fp_mul(work_local_addrs[2],output_local_addrs[index],work_local_addrs[3],&shape,NULL,NULL,NULL,dtype);
     tpu_bdc_fp32_arcsin(output_local_addrs[index],work_local_addrs[2], work_local_addrs[0],arcsin_coeff_local_addr,&shape);
     
+    // y/x==-0 atan(y/x)==-0
+    tpu_bdc_equal_C(work_local_addrs[0],work_local_addrs[3],negtive_zero,true_val,&shape,NULL,NULL,DT_UINT8,DT_UINT32);
+    tpu_bdc_set_C(work_local_addrs[1],true_val,&shape,NULL,DT_UINT8);
+    tpu_bdc_set_C(work_local_addrs[2],negtive_zero,&shape,NULL,DT_UINT32);
+    variable_t src0 = {.type = TENSOR, .context = {.addr = work_local_addrs[0]}};
+    variable_t src1 = {.type = TENSOR, .context = {.addr = work_local_addrs[1]}};
+    variable_t src2 = {.type = TENSOR, .context = {.addr = work_local_addrs[2]}};
+    variable_t src3 = {.type = TENSOR, .context = {.addr = output_local_addrs[index]}};
+    tpu_bdc_equal_select(work_local_addrs[3],&src0,&src1, &src2,&src3,&shape,DT_UINT8,dtype);
+
+    // x==+0  y==+0 
+    tpu_bdc_equal_C(work_local_addrs[0],other_local_addrs[index],positive_zero,true_val,&shape,NULL,NULL,DT_UINT8,DT_UINT32);
+    tpu_bdc_equal_C(work_local_addrs[1],input_local_addrs[index],positive_zero,true_val,&shape,NULL,NULL,DT_UINT8,DT_UINT32);
+    tpu_bdc_and(work_local_addrs[2],work_local_addrs[0],work_local_addrs[1],&shape,NULL,NULL,NULL,DT_UINT8);
+    tpu_bdc_set_C(work_local_addrs[0],true_val,&shape,NULL,DT_UINT8);
+    tpu_bdc_set_C(work_local_addrs[1],positive_zero,&shape,NULL,DT_UINT32);
+    src0.context.addr = work_local_addrs[2];
+    src1.context.addr = work_local_addrs[0];
+    src2.context.addr = work_local_addrs[1];
+    src3.context.addr = work_local_addrs[3];
+    tpu_bdc_equal_select(output_local_addrs[index],&src0,&src1, &src2,&src3,&shape,DT_UINT8,dtype);
+
+    //x==+0 y==-0 
+    tpu_bdc_equal_C(work_local_addrs[0],other_local_addrs[index],positive_zero,true_val,&shape,NULL,NULL,DT_UINT8,DT_UINT32);
+    tpu_bdc_equal_C(work_local_addrs[1],input_local_addrs[index],negtive_zero,true_val,&shape,NULL,NULL,DT_UINT8,DT_UINT32);
+    tpu_bdc_and(work_local_addrs[2],work_local_addrs[0],work_local_addrs[1],&shape,NULL,NULL,NULL,DT_UINT8);
+    tpu_bdc_set_C(work_local_addrs[0],true_val,&shape,NULL,DT_UINT8);
+    tpu_bdc_set_C(work_local_addrs[1],negtive_zero,&shape,NULL,DT_UINT32);
+    src0.context.addr = work_local_addrs[2];
+    src1.context.addr = work_local_addrs[0];
+    src2.context.addr = work_local_addrs[1];
+    src3.context.addr = output_local_addrs[index];
+    tpu_bdc_equal_select(work_local_addrs[3],&src0,&src1, &src2,&src3,&shape,DT_UINT8,dtype);
+
+    // x==-0 y==+0
+    tpu_bdc_equal_C(work_local_addrs[0],other_local_addrs[index],negtive_zero,true_val,&shape,NULL,NULL,DT_UINT8,DT_UINT32);
+    tpu_bdc_equal_C(work_local_addrs[1],input_local_addrs[index],positive_zero,true_val,&shape,NULL,NULL,DT_UINT8,DT_UINT32);
+    tpu_bdc_and(work_local_addrs[2],work_local_addrs[0],work_local_addrs[1],&shape,NULL,NULL,NULL,DT_UINT8);
+    tpu_bdc_set_C(work_local_addrs[0],true_val,&shape,NULL,DT_UINT8);
+    tpu_bdc_set_C(work_local_addrs[1],PI_C,&shape,NULL,dtype);
+    src0.context.addr = work_local_addrs[2];
+    src1.context.addr = work_local_addrs[0];
+    src2.context.addr = work_local_addrs[1];
+    src3.context.addr = work_local_addrs[3];
+    tpu_bdc_equal_select(output_local_addrs[index],&src0,&src1, &src2,&src3,&shape,DT_UINT8,dtype);
+
+    // x==-0 y==-0
+    tpu_bdc_equal_C(work_local_addrs[0],other_local_addrs[index],negtive_zero,true_val,&shape,NULL,NULL,DT_UINT8,DT_UINT32);
+    tpu_bdc_equal_C(work_local_addrs[1],input_local_addrs[index],negtive_zero,true_val,&shape,NULL,NULL,DT_UINT8,DT_UINT32);
+    tpu_bdc_and(work_local_addrs[2],work_local_addrs[0],work_local_addrs[1],&shape,NULL,NULL,NULL,DT_UINT8);
+    tpu_bdc_set_C(work_local_addrs[0],true_val,&shape,NULL,DT_UINT8);
+    tpu_bdc_set_C(work_local_addrs[1],neg_PI_C,&shape,NULL,dtype);
+    src0.context.addr = work_local_addrs[2];
+    src1.context.addr = work_local_addrs[0];
+    src2.context.addr = work_local_addrs[1];
+    src3.context.addr = output_local_addrs[index];
+    tpu_bdc_equal_select(work_local_addrs[3],&src0,&src1, &src2,&src3,&shape,DT_UINT8,dtype);
+
+    //x==0 y>0
+    tpu_bdc_equal_C(work_local_addrs[0],other_local_addrs[index],positive_zero,true_val,&shape,NULL,NULL,DT_UINT8,dtype);
+    tpu_bdc_greater_C(work_local_addrs[1],input_local_addrs[index],positive_zero,true_val,&shape,NULL,NULL,DT_UINT8,dtype);
+    tpu_bdc_and(work_local_addrs[2],work_local_addrs[0],work_local_addrs[1],&shape,NULL,NULL,NULL,DT_UINT8);
+    tpu_bdc_set_C(work_local_addrs[0],true_val,&shape,NULL,DT_UINT8);
+    tpu_bdc_set_C(work_local_addrs[1],half_PI_C,&shape,NULL,dtype);
+    src0.context.addr = work_local_addrs[2];
+    src1.context.addr = work_local_addrs[0];
+    src2.context.addr = work_local_addrs[1];
+    src3.context.addr = work_local_addrs[3];
+    tpu_bdc_equal_select(output_local_addrs[index],&src0,&src1, &src2,&src3,&shape,DT_UINT8,dtype);
+
+    //x==0 y<0
+    tpu_bdc_equal_C(work_local_addrs[0],other_local_addrs[index],positive_zero,true_val,&shape,NULL,NULL,DT_UINT8,dtype);
+    tpu_bdc_less_C(work_local_addrs[1],input_local_addrs[index],positive_zero,true_val,&shape,NULL,NULL,DT_UINT8,dtype);
+    tpu_bdc_and(work_local_addrs[2],work_local_addrs[0],work_local_addrs[1],&shape,NULL,NULL,NULL,DT_UINT8);
+    tpu_bdc_set_C(work_local_addrs[0],true_val,&shape,NULL,DT_UINT8);
+    tpu_bdc_set_C(work_local_addrs[1],neg_half_PI_C,&shape,NULL,dtype);
+    src0.context.addr = work_local_addrs[2];
+    src1.context.addr = work_local_addrs[0];
+    src2.context.addr = work_local_addrs[1];
+    src3.context.addr = output_local_addrs[index];
+    tpu_bdc_equal_select(work_local_addrs[3],&src0,&src1, &src2,&src3,&shape,DT_UINT8,dtype);
+
+    // x<0 y>0 || y == +0
+    tpu_bdc_greater_C(work_local_addrs[1],input_local_addrs[index],positive_zero,true_val,&shape,NULL,NULL,DT_UINT8,dtype);
+    tpu_bdc_equal_C(work_local_addrs[2],input_local_addrs[index],positive_zero,true_val,&shape,NULL,NULL,DT_UINT8,DT_UINT32);
+    tpu_bdc_or(work_local_addrs[0],work_local_addrs[1],work_local_addrs[2],&shape,NULL,NULL,NULL,DT_UINT8);
+    tpu_bdc_less_C(work_local_addrs[1],other_local_addrs[index],positive_zero,true_val,&shape,NULL,NULL,DT_UINT8,dtype);
+    tpu_bdc_and(work_local_addrs[2],work_local_addrs[0],work_local_addrs[1],&shape,NULL,NULL,NULL,DT_UINT8);
+    tpu_bdc_set_C(work_local_addrs[0],true_val,&shape,NULL,DT_UINT8);
+    tpu_bdc_fp_add_C(work_local_addrs[1],work_local_addrs[3],PI_C,&shape,NULL,NULL,dtype);
+    src0.context.addr = work_local_addrs[2];
+    src1.context.addr = work_local_addrs[0];
+    src2.context.addr = work_local_addrs[1];
+    src3.context.addr = work_local_addrs[3];
+    tpu_bdc_equal_select(output_local_addrs[index],&src0,&src1, &src2,&src3,&shape,DT_UINT8,dtype);
+
+    // x<0 y<0 || y==-0
+    tpu_bdc_less_C(work_local_addrs[1],input_local_addrs[index],positive_zero,true_val,&shape,NULL,NULL,DT_UINT8,dtype);
+    tpu_bdc_equal_C(work_local_addrs[2],input_local_addrs[index],negtive_zero,true_val,&shape,NULL,NULL,DT_UINT8,DT_UINT32);
+    tpu_bdc_or(work_local_addrs[0],work_local_addrs[1],work_local_addrs[2],&shape,NULL,NULL,NULL,DT_UINT8);
+    tpu_bdc_less_C(work_local_addrs[1],other_local_addrs[index],positive_zero,true_val,&shape,NULL,NULL,DT_UINT8,dtype);
+    tpu_bdc_and(work_local_addrs[2],work_local_addrs[0],work_local_addrs[1],&shape,NULL,NULL,NULL,DT_UINT8);
+    tpu_bdc_set_C(work_local_addrs[0],true_val,&shape,NULL,DT_UINT8);
+    tpu_bdc_fp_add_C(work_local_addrs[1],work_local_addrs[3],neg_PI_C,&shape,NULL,NULL,dtype);
+    src0.context.addr = work_local_addrs[2];
+    src1.context.addr = work_local_addrs[0];
+    src2.context.addr = work_local_addrs[1];
+    src3.context.addr = output_local_addrs[index];
+    tpu_bdc_equal_select(work_local_addrs[3],&src0,&src1, &src2,&src3,&shape,DT_UINT8,dtype);
+
+
+    tpu_bdc_cpy(output_local_addrs[index],work_local_addrs[3],&shape,NULL,NULL,dtype);
+
     l2s = true;
     l2s_global_addr = output_global_addr + done * dtype_size;
     l2s_local_addr = output_local_addrs[index];
@@ -515,6 +784,13 @@ data_type_t   dtype) {
     int ctodo = output_shape->c, cdone = 0;
     float POW_C=2;
     scalar_t ADD_C = {.f32 = 1.f};
+    scalar_t positive_zero = {.u32 = 0x00000000};
+    scalar_t negtive_zero = {.u32 = 0x80000000};
+    scalar_t true_val = {.u8 = 1};
+    scalar_t PI_C = {.f32 = PI};
+    scalar_t neg_PI_C = {.f32 = - PI};
+    scalar_t half_PI_C = {.f32 = PI/2};
+    scalar_t neg_half_PI_C = {.f32 = -PI/2}; 
     tpu_bdc_load_fp32_exp_coeff(exp_coeff_addr);
     tpu_bdc_load_fp32_log_coeff(log_coeff_addr);
     tpu_bdc_load_fp32_exp_table(exp_table_addr);
@@ -595,7 +871,9 @@ data_type_t   dtype) {
                 
                 
                 // Select
+                // y/x
                 tpu_bdc_fp32_div(work3_addr,input_addr,other_addr,&shape,NULL,NULL,NULL);
+                // atan
                 tpu_bdc_abs(work2_addr,work3_addr,&shape,NULL,NULL,dtype);
                 tpu_bdc_fp32_pow_C(output_addr,work2_addr,work0_addr,work1_addr,
                                         exp_coeff_addr,log_coeff_addr,exp_table_addr,POW_C,&shape);
@@ -603,6 +881,119 @@ data_type_t   dtype) {
                 tpu_bdc_fp32_rsqrt(output_addr,work2_addr,&shape) ;
                 tpu_bdc_fp_mul(work2_addr,output_addr,work3_addr,&shape,NULL,NULL,NULL,dtype);
                 tpu_bdc_fp32_arcsin(output_addr,work2_addr, work0_addr,arcsin_coeff_addr,&shape);
+
+                // y/x==-0 atan(y/x)==-0
+                tpu_bdc_equal_C(work0_addr,work3_addr,negtive_zero,true_val,&shape,NULL,NULL,DT_UINT8,DT_UINT32);
+                tpu_bdc_set_C(work1_addr,true_val,&shape,NULL,DT_UINT8);
+                tpu_bdc_set_C(work2_addr,negtive_zero,&shape,NULL,DT_UINT32);
+                variable_t src0 = {.type = TENSOR, .context = {.addr = work0_addr}};
+                variable_t src1 = {.type = TENSOR, .context = {.addr = work1_addr}};
+                variable_t src2 = {.type = TENSOR, .context = {.addr = work2_addr}};
+                variable_t src3 = {.type = TENSOR, .context = {.addr = output_addr}};
+                tpu_bdc_equal_select(work3_addr,&src0,&src1, &src2,&src3,&shape,DT_UINT8,dtype);
+
+                // x==+0  y==+0 
+                tpu_bdc_equal_C(work0_addr,other_addr,positive_zero,true_val,&shape,NULL,NULL,DT_UINT8,DT_UINT32);
+                tpu_bdc_equal_C(work1_addr,input_addr,positive_zero,true_val,&shape,NULL,NULL,DT_UINT8,DT_UINT32);
+                tpu_bdc_and(work2_addr,work0_addr,work1_addr,&shape,NULL,NULL,NULL,DT_UINT8);
+                tpu_bdc_set_C(work0_addr,true_val,&shape,NULL,DT_UINT8);
+                tpu_bdc_set_C(work1_addr,positive_zero,&shape,NULL,DT_UINT32);
+                src0.context.addr = work2_addr;
+                src1.context.addr = work0_addr;
+                src2.context.addr = work1_addr;
+                src3.context.addr = work3_addr;
+                tpu_bdc_equal_select(output_addr,&src0,&src1, &src2,&src3,&shape,DT_UINT8,dtype);
+
+                //x==+0 y==-0 
+                tpu_bdc_equal_C(work0_addr,other_addr,positive_zero,true_val,&shape,NULL,NULL,DT_UINT8,DT_UINT32);
+                tpu_bdc_equal_C(work1_addr,input_addr,negtive_zero,true_val,&shape,NULL,NULL,DT_UINT8,DT_UINT32);
+                tpu_bdc_and(work2_addr,work0_addr,work1_addr,&shape,NULL,NULL,NULL,DT_UINT8);
+                tpu_bdc_set_C(work0_addr,true_val,&shape,NULL,DT_UINT8);
+                tpu_bdc_set_C(work1_addr,negtive_zero,&shape,NULL,DT_UINT32);
+                src0.context.addr = work2_addr;
+                src1.context.addr = work0_addr;
+                src2.context.addr = work1_addr;
+                src3.context.addr = output_addr;
+                tpu_bdc_equal_select(work3_addr,&src0,&src1, &src2,&src3,&shape,DT_UINT8,dtype);
+
+                // x==-0 y==+0
+                tpu_bdc_equal_C(work0_addr,other_addr,negtive_zero,true_val,&shape,NULL,NULL,DT_UINT8,DT_UINT32);
+                tpu_bdc_equal_C(work1_addr,input_addr,positive_zero,true_val,&shape,NULL,NULL,DT_UINT8,DT_UINT32);
+                tpu_bdc_and(work2_addr,work0_addr,work1_addr,&shape,NULL,NULL,NULL,DT_UINT8);
+                tpu_bdc_set_C(work0_addr,true_val,&shape,NULL,DT_UINT8);
+                tpu_bdc_set_C(work1_addr,PI_C,&shape,NULL,dtype);
+                src0.context.addr = work2_addr;
+                src1.context.addr = work0_addr;
+                src2.context.addr = work1_addr;
+                src3.context.addr = work3_addr;
+                tpu_bdc_equal_select(output_addr,&src0,&src1, &src2,&src3,&shape,DT_UINT8,dtype);
+
+                // x==-0 y==-0
+                tpu_bdc_equal_C(work0_addr,other_addr,negtive_zero,true_val,&shape,NULL,NULL,DT_UINT8,DT_UINT32);
+                tpu_bdc_equal_C(work1_addr,input_addr,negtive_zero,true_val,&shape,NULL,NULL,DT_UINT8,DT_UINT32);
+                tpu_bdc_and(work2_addr,work0_addr,work1_addr,&shape,NULL,NULL,NULL,DT_UINT8);
+                tpu_bdc_set_C(work0_addr,true_val,&shape,NULL,DT_UINT8);
+                tpu_bdc_set_C(work1_addr,neg_PI_C,&shape,NULL,dtype);
+                src0.context.addr = work2_addr;
+                src1.context.addr = work0_addr;
+                src2.context.addr = work1_addr;
+                src3.context.addr = output_addr;
+                tpu_bdc_equal_select(work3_addr,&src0,&src1, &src2,&src3,&shape,DT_UINT8,dtype);
+
+                //x==0 y>0
+                tpu_bdc_equal_C(work0_addr,other_addr,positive_zero,true_val,&shape,NULL,NULL,DT_UINT8,dtype);
+                tpu_bdc_greater_C(work1_addr,input_addr,positive_zero,true_val,&shape,NULL,NULL,DT_UINT8,dtype);
+                tpu_bdc_and(work2_addr,work0_addr,work1_addr,&shape,NULL,NULL,NULL,DT_UINT8);
+                tpu_bdc_set_C(work0_addr,true_val,&shape,NULL,DT_UINT8);
+                tpu_bdc_set_C(work1_addr,half_PI_C,&shape,NULL,dtype);
+                src0.context.addr = work2_addr;
+                src1.context.addr = work0_addr;
+                src2.context.addr = work1_addr;
+                src3.context.addr = work3_addr;
+                tpu_bdc_equal_select(output_addr,&src0,&src1, &src2,&src3,&shape,DT_UINT8,dtype);
+
+                //x==0 y<0
+                tpu_bdc_equal_C(work0_addr,other_addr,positive_zero,true_val,&shape,NULL,NULL,DT_UINT8,dtype);
+                tpu_bdc_less_C(work1_addr,input_addr,positive_zero,true_val,&shape,NULL,NULL,DT_UINT8,dtype);
+                tpu_bdc_and(work2_addr,work0_addr,work1_addr,&shape,NULL,NULL,NULL,DT_UINT8);
+                tpu_bdc_set_C(work0_addr,true_val,&shape,NULL,DT_UINT8);
+                tpu_bdc_set_C(work1_addr,neg_half_PI_C,&shape,NULL,dtype);
+                src0.context.addr = work2_addr;
+                src1.context.addr = work0_addr;
+                src2.context.addr = work1_addr;
+                src3.context.addr = output_addr;
+                tpu_bdc_equal_select(work3_addr,&src0,&src1, &src2,&src3,&shape,DT_UINT8,dtype);
+
+                // x<0 y>0 || y == +0
+                tpu_bdc_greater_C(work1_addr,input_addr,positive_zero,true_val,&shape,NULL,NULL,DT_UINT8,dtype);
+                tpu_bdc_equal_C(work2_addr,input_addr,positive_zero,true_val,&shape,NULL,NULL,DT_UINT8,DT_UINT32);
+                tpu_bdc_or(work0_addr,work1_addr,work2_addr,&shape,NULL,NULL,NULL,DT_UINT8);
+                tpu_bdc_less_C(work1_addr,other_addr,positive_zero,true_val,&shape,NULL,NULL,DT_UINT8,dtype);
+                tpu_bdc_and(work2_addr,work0_addr,work1_addr,&shape,NULL,NULL,NULL,DT_UINT8);
+                tpu_bdc_set_C(work0_addr,true_val,&shape,NULL,DT_UINT8);
+                tpu_bdc_fp_add_C(work1_addr,work3_addr,PI_C,&shape,NULL,NULL,dtype);
+                src0.context.addr = work2_addr;
+                src1.context.addr = work0_addr;
+                src2.context.addr = work1_addr;
+                src3.context.addr = work3_addr;
+                tpu_bdc_equal_select(output_addr,&src0,&src1, &src2,&src3,&shape,DT_UINT8,dtype);
+
+                // x<0 y<0 || y==-0
+                tpu_bdc_less_C(work1_addr,input_addr,positive_zero,true_val,&shape,NULL,NULL,DT_UINT8,dtype);
+                tpu_bdc_equal_C(work2_addr,input_addr,negtive_zero,true_val,&shape,NULL,NULL,DT_UINT8,DT_UINT32);
+                tpu_bdc_or(work0_addr,work1_addr,work2_addr,&shape,NULL,NULL,NULL,DT_UINT8);
+                tpu_bdc_less_C(work1_addr,other_addr,positive_zero,true_val,&shape,NULL,NULL,DT_UINT8,dtype);
+                tpu_bdc_and(work2_addr,work0_addr,work1_addr,&shape,NULL,NULL,NULL,DT_UINT8);
+                tpu_bdc_set_C(work0_addr,true_val,&shape,NULL,DT_UINT8);
+                tpu_bdc_fp_add_C(work1_addr,work3_addr,neg_PI_C,&shape,NULL,NULL,dtype);
+                src0.context.addr = work2_addr;
+                src1.context.addr = work0_addr;
+                src2.context.addr = work1_addr;
+                src3.context.addr = output_addr;
+                tpu_bdc_equal_select(work3_addr,&src0,&src1, &src2,&src3,&shape,DT_UINT8,dtype);
+
+
+                tpu_bdc_cpy(output_addr,work3_addr,&shape,NULL,NULL,dtype);
 
 
                 // Move out from local memory to global memory

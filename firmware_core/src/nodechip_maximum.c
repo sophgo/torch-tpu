@@ -1,6 +1,46 @@
 #include "sg_api_struct.h"
 #include "tpu_kernel.h"
 
+void isNan(
+    local_addr_t output_local_addr,
+    local_addr_t input_local_addr,
+    local_addr_t work0_local_addr,
+    local_addr_t work1_local_addr,
+    const dim4 *shape,
+    const dim4 *stride,
+    data_type_t dtype
+){
+    scalar_t inf_C = {.u32 = (dtype == DT_FP32 ? 0x7f800000 : (dtype == DT_FP16 ? 0x7c00 : 0x7f80))};
+    scalar_t neg_C= {.u32 = (dtype == DT_FP32 ? 0x7fffffff : (dtype == DT_FP16 ? 0x7fff : 0x7fff))};
+    scalar_t  C= {.u8 = 1};
+    tpu_bdc_and_C(work1_local_addr, input_local_addr, inf_C, shape, stride, stride, dtype);
+    tpu_bdc_equal_C(output_local_addr, work1_local_addr, inf_C, C, shape, stride, stride, DT_UINT8, dtype);
+    tpu_bdc_and_C(work1_local_addr, input_local_addr, neg_C, shape, stride, stride, dtype);
+    tpu_bdc_not_equal_C(work0_local_addr, work1_local_addr, inf_C, C, shape, stride, stride, DT_UINT8, dtype);
+    tpu_bdc_and(work1_local_addr,output_local_addr,work0_local_addr,shape,stride,stride,stride,DT_UINT8);
+    tpu_bdc_equal_C(output_local_addr, work1_local_addr, C, C, shape, stride, stride, DT_UINT8, DT_UINT8);
+}
+
+void replaceWithNan(
+    local_addr_t output_local_addr,
+    local_addr_t input_local_addr,
+    local_addr_t mask_local_addr,
+    local_addr_t work0_local_addr,
+    local_addr_t work1_local_addr,
+    const dim4 *shape,
+    const dim4 *stride,
+    data_type_t dtype
+){
+    scalar_t  C= {.u8 = 1};
+    scalar_t  nan_C= {.f32 = 0.0/0.0};
+    tpu_bdc_set_C(work0_local_addr,C,shape,stride,DT_UINT8);
+    tpu_bdc_set_C(work1_local_addr,nan_C,shape,stride,dtype);
+    variable_t src0 = {.type = TENSOR, .context = {.addr = mask_local_addr}};
+    variable_t src1 = {.type = TENSOR, .context = {.addr = work0_local_addr}};
+    variable_t src2 = {.type = TENSOR, .context = {.addr = work1_local_addr}};
+    variable_t src3 = {.type = TENSOR, .context = {.addr = input_local_addr}};
+    tpu_bdc_equal_select(output_local_addr,&src0,&src1, &src2,&src3,shape,DT_UINT8,dtype);
+}
 
 void nodechip_maximumc (
 global_addr_t input_global_addr,
@@ -13,14 +53,14 @@ data_type_t dtype )
   int npu_num=tpu_npu_num();
   int bank_num=tpu_bank_num();
   int bank_size = tpu_local_mem_size_per_npu()/bank_num;
-  int tensor_num=2+2; // 2 inputs, 2 outputs
+  int tensor_num=2+2+3; // 2 inputs, 2 outputs, 3 buffer
   int coeff_bank_num=0; // 0 coeff
   int tensor_size = (bank_num-coeff_bank_num)/tensor_num * bank_size;
   TPUKERNEL_ASSERT(tensor_size>0);
 
   local_addr_t input_local_addrs[2]={0, tensor_size};
   local_addr_t output_local_addrs[2]={2*tensor_size, 3*tensor_size};
-
+  local_addr_t work_local_addrs[3]={4*tensor_size, 5*tensor_size,6* tensor_size};
   int dtype_size = tpu_data_type_size(dtype);
   int tensor_w = DIV_UP(MIN(length, tensor_size*npu_num/dtype_size), npu_num);
 
@@ -59,7 +99,9 @@ data_type_t dtype )
     }
     
     tpu_bdc_max_C(output_local_addrs[index],input_local_addrs[index],value,&shape,NULL,NULL,dtype);
-    
+    isNan(work_local_addrs[0],input_local_addrs[index],work_local_addrs[1],work_local_addrs[2],&shape,NULL,DT_UINT8);
+    tpu_bdc_cpy(input_local_addrs[index],output_local_addrs[index],&shape,NULL,NULL,dtype);
+    replaceWithNan(output_local_addrs[index],input_local_addrs[index],work_local_addrs[0],work_local_addrs[1],work_local_addrs[2],&shape,NULL,dtype);
     l2s = true;
     l2s_global_addr = output_global_addr + done * dtype_size;
     l2s_local_addr = output_local_addrs[index];
@@ -142,7 +184,7 @@ void nodechip_maximum (
     int npu_num=tpu_npu_num();
     int bank_num=tpu_bank_num();
     int bank_size = tpu_local_mem_size_per_npu()/bank_num;
-    int tensor_num=2+2+2; // 2 inputs, 2 other, 2 outputs 
+    int tensor_num=2+2+2+3; // 2 inputs, 2 other, 2 outputs, 3 buffers
     int coeff_bank_num=0; // 0 coeff
     int tensor_size = (bank_num-coeff_bank_num)/tensor_num * bank_size;
     TPUKERNEL_ASSERT(tensor_size>0);
@@ -150,6 +192,7 @@ void nodechip_maximum (
     local_addr_t input_local_addrs[2]={0, tensor_size};
     local_addr_t other_local_addrs[2]={2*tensor_size, 3*tensor_size};
     local_addr_t output_local_addrs[2]={4*tensor_size, 5*tensor_size};
+    local_addr_t work_local_addrs[3]={6*tensor_size,7*tensor_size,8*tensor_size};
 
     int dtype_size = tpu_data_type_size(dtype);
     int tensor_w = DIV_UP(MIN(length, tensor_size*npu_num/dtype_size), npu_num);
@@ -188,7 +231,10 @@ void nodechip_maximum (
         }
         
         tpu_bdc_max(output_local_addrs[index],input_local_addrs[index],other_local_addrs[index],&shape,NULL,NULL,NULL,dtype);
-
+        isNan(work_local_addrs[0],input_local_addrs[index],work_local_addrs[1],work_local_addrs[2],&shape,NULL,dtype);
+        replaceWithNan(input_local_addrs[index],output_local_addrs[index],work_local_addrs[0],work_local_addrs[1],work_local_addrs[2],&shape,NULL,dtype);
+        isNan(work_local_addrs[0],other_local_addrs[index],work_local_addrs[1],work_local_addrs[2],&shape,NULL,dtype);
+        replaceWithNan(output_local_addrs[index],input_local_addrs[index],work_local_addrs[0],work_local_addrs[1],work_local_addrs[2],&shape,NULL,dtype);
         l2s = true;
         l2s_global_addr = output_global_addr + done * dtype_size;
         l2s_local_addr = output_local_addrs[index];
@@ -290,7 +336,7 @@ data_type_t   dtype) {
 
     const int c_per_npu = DIV_UP ( output_shape->c, NPU_NUM );
     int hmax = output_shape->h, nmax = output_shape->n, cmax = c_per_npu * NPU_NUM;
-    local_addr_t output_addr, input_addr, other_addr;
+    local_addr_t output_addr, input_addr, other_addr,work0_addr,work1_addr,work2_addr;
     while(true) {
         output_addr = 0;
         int output_size = tpu_aligned_feature_size(hmax, output_shape->w, dtype) * DIV_UP(cmax, NPU_NUM) * nmax;
@@ -298,7 +344,10 @@ data_type_t   dtype) {
         int input_size = output_size;
         other_addr = input_addr + input_size;
         int other_size = output_size;
-        int total_size = other_addr + other_size;
+        work0_addr = other_addr + output_size;
+        work1_addr = work0_addr + output_size;
+        work2_addr = work1_addr + output_size;
+        int total_size = work2_addr + other_size;
         if(total_size <= LOCAL_MEM_SIZE) {
             break;
         }
@@ -405,6 +454,11 @@ data_type_t   dtype) {
                 
                 // Select
                 tpu_bdc_max(output_addr, input_addr, other_addr, &shape, NULL, NULL, NULL, dtype);
+                isNan(work0_addr,input_addr,work1_addr,work2_addr,&shape,NULL,dtype);
+                replaceWithNan(input_addr,output_addr,work0_addr,work1_addr,work2_addr,&shape,NULL,dtype);
+                isNan(work0_addr,other_addr,work1_addr,work2_addr,&shape,NULL,dtype);
+                replaceWithNan(output_addr,input_addr,work0_addr,work1_addr,work2_addr,&shape,NULL,dtype);
+
                 // Move out from local memory to global memory
                 global_addr_t output_global_addr_gdma = output_global_addr +
                                 (ndone * output_global_stride.n +
