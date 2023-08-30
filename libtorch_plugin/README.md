@@ -1,4 +1,4 @@
-1. Download libtorch cpu version 1.13
+1. Download libtorch cpu version 2.0.1 compatiable with ubuntu22.04 or sophgo/tpuc_dev:latest
 
 wget https://download.pytorch.org/libtorch/cpu/libtorch-shared-with-deps-2.0.1%2Bcpu.zip
 
@@ -12,4 +12,4 @@ mkdir build && cd build
 
 cmake ..
 
-make -j
+make -j$(($(nproc)-2)) -DCMAKE_BUILD_TYPE=Debug

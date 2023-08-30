@@ -10,7 +10,7 @@ set(TPU_OP_TIMING 1)
 #set(SHOW_OP_INFO 1)
 #set(SHOW_MALLOC_INFO 1)
 
-configure_file( 
+configure_file(
     "${PROJECT_SOURCE_DIR}/common/config.h.in"
     "${PROJECT_SOURCE_DIR}/common/config.h" )
 

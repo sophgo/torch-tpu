@@ -78,7 +78,7 @@ function build_libtorch_plugin() {
   popd
   pushd $LIBTORCH_PLUGIN_PATH/build
   cmake .. -DCMAKE_BUILD_TYPE=Debug
-  make -j && cd ..
+  make -j$(($(nproc)-2))&& cd ..
   popd
 }
 
@@ -121,7 +121,7 @@ function run_online_regression_test() {
         mkdir build && cd build
         cmake .. -DCMAKE_BUILD_TYPE=Debug -DUSING_CMODEL=OFF -DPCIE_MODE=ON
         make kernel_module
-        make -j
+        make -j$(($(nproc)-2))
         popd
       fi
 
