@@ -21,6 +21,14 @@ def case1():
     print("cpu : ", inp )
     print("tpu : ", inp_tpu.cpu())
 
+    cst = 2
+    inp = torch.tensor((2,2),dtype=torch.int)
+    inp_tpu = inp.to(device)
+    inp.mul_(cst)
+    inp_tpu.mul_(cst)
+    print("cpu : ", inp )
+    print("tpu : ", inp_tpu.cpu())
+
 def case2():
     B = 6
     S = 1024
@@ -42,3 +50,4 @@ def case2():
 
 if __name__ == "__main__":
     case2()
+    case1()

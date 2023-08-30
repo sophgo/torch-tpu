@@ -74,11 +74,25 @@ int op ) // 0: add, 1: mul
     }
     if ( op == 0 )
     {
-      tpu_bdc_fp_add_C ( output_local_addrs[index], input_local_addrs[index], value, &shape, NULL, NULL, dtype );
+      if ( dtype == DT_FP32 || dtype == DT_FP16 || dtype == DT_BFP16 )
+      {
+        tpu_bdc_fp_add_C ( output_local_addrs[index], input_local_addrs[index], value, &shape, NULL, NULL, dtype );
+      }
+      else
+      {
+        tpu_bdc_int_add_C ( output_local_addrs[index], input_local_addrs[index], value, &shape, NULL, NULL, dtype, dtype, dtype, 0, NO_USE, false );
+      }
     }
     else if ( op == 1 )
     {
-      tpu_bdc_fp_mul_C ( output_local_addrs[index], input_local_addrs[index], value, &shape, NULL, NULL, dtype );
+      if ( dtype == DT_FP32 || dtype == DT_FP16 || dtype == DT_BFP16 )
+      {
+        tpu_bdc_fp_mul_C ( output_local_addrs[index], input_local_addrs[index], value, &shape, NULL, NULL, dtype );
+      }
+      else
+      {
+        tpu_bdc_int_mul_C ( output_local_addrs[index], input_local_addrs[index], value, &shape, NULL, NULL, dtype, dtype, dtype, 0, NO_USE, false );
+      }
     }
     l2s = true;
     l2s_global_addr = output_global_addr + done * dsize;
@@ -101,11 +115,15 @@ int op ) // 0: add, 1: mul
 void tpu_kernel_api_mulc ( const void * args )
 {
   sg_api_mulc_t * api = ( sg_api_mulc_t * ) args;
-  TPUKERNEL_ASSERT ( api->dtype == DT_FP32 || api->dtype == DT_FP16 || api->dtype == DT_BFP16 );
+  TPUKERNEL_ASSERT ( api->dtype == DT_FP32 || api->dtype == DT_FP16 || api->dtype == DT_BFP16 || api->dtype == DT_INT32 );
   scalar_t value;
   if ( api->dtype == DT_FP32 )
   {
     value.f32 = api->value;
+  }
+  else if (api->dtype == DT_INT32) {
+    scalar_t value_f32 = { .f32 = api->value };
+    value = tpu_fp_to_int_cast ( value_f32, ( data_type_t ) api->dtype, DT_FP32, RM_HALF_TO_EVEN );
   }
   else
   {
@@ -126,11 +144,15 @@ TPUKERNEL_FUNC_REGISTER ( tpu_kernel_api_mulc );
 void tpu_kernel_api_addc ( const void * args )
 {
   sg_api_addc_t * api = ( sg_api_addc_t * ) args;
-  TPUKERNEL_ASSERT ( api->dtype == DT_FP32 || api->dtype == DT_FP16 || api->dtype == DT_BFP16 );
+  TPUKERNEL_ASSERT ( api->dtype == DT_FP32 || api->dtype == DT_FP16 || api->dtype == DT_BFP16 || api->dtype == DT_INT32);
   scalar_t value;
   if ( api->dtype == DT_FP32 )
   {
     value.f32 = api->value;
+  }
+  else if (api->dtype == DT_INT32) {
+    scalar_t value_f32 = { .f32 = api->value };
+    value = tpu_fp_to_int_cast ( value_f32, ( data_type_t ) api->dtype, DT_FP32, RM_HALF_TO_EVEN );
   }
   else
   {
@@ -223,7 +245,14 @@ int op ) // 0: sub, 1: div
     }
     if ( op == 0 )
     {
-      tpu_bdc_fp_C_sub ( output_local_addrs[index], input_local_addrs[index], value, &shape, NULL, NULL, dtype );
+      if ( dtype == DT_FP32 || dtype == DT_FP16 || dtype == DT_BFP16 )
+      {
+        tpu_bdc_fp_C_sub ( output_local_addrs[index], input_local_addrs[index], value, &shape, NULL, NULL, dtype );
+      }
+      else
+      {
+        tpu_bdc_int_C_sub ( output_local_addrs[index], input_local_addrs[index], value, &shape, NULL, NULL, dtype, dtype, dtype, 0, NO_USE, false );
+      }
     }
     else if ( op == 1 )
     {
@@ -259,11 +288,15 @@ int op ) // 0: sub, 1: div
 void tpu_kernel_api_cdiv ( const void * args )
 {
   sg_api_cdiv_t * api = ( sg_api_cdiv_t * ) args;
-  TPUKERNEL_ASSERT ( api->dtype == DT_FP32 || api->dtype == DT_FP16 || api->dtype == DT_BFP16 );
+  TPUKERNEL_ASSERT ( api->dtype == DT_FP32 || api->dtype == DT_FP16 || api->dtype == DT_BFP16 || api->dtype == DT_INT32 );
   scalar_t value;
   if ( api->dtype == DT_FP32 )
   {
     value.f32 = api->value;
+  }
+  else if (api->dtype == DT_INT32) {
+    scalar_t value_f32 = { .f32 = api->value };
+    value = tpu_fp_to_int_cast ( value_f32, ( data_type_t ) api->dtype, DT_FP32, RM_HALF_TO_EVEN );
   }
   else
   {
@@ -284,11 +317,15 @@ TPUKERNEL_FUNC_REGISTER ( tpu_kernel_api_cdiv );
 void tpu_kernel_api_csub ( const void * args )
 {
   sg_api_csub_t * api = ( sg_api_csub_t * ) args;
-  TPUKERNEL_ASSERT ( api->dtype == DT_FP32 || api->dtype == DT_FP16 || api->dtype == DT_BFP16 );
+  TPUKERNEL_ASSERT ( api->dtype == DT_FP32 || api->dtype == DT_FP16 || api->dtype == DT_BFP16 || api->dtype == DT_INT32 );
   scalar_t value;
   if ( api->dtype == DT_FP32 )
   {
     value.f32 = api->value;
+  }
+  else if (api->dtype == DT_INT32) {
+    scalar_t value_f32 = { .f32 = api->value };
+    value = tpu_fp_to_int_cast ( value_f32, ( data_type_t ) api->dtype, DT_FP32, RM_HALF_TO_EVEN );
   }
   else
   {

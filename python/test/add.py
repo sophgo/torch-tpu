@@ -14,7 +14,8 @@ def case1():
     a2_tpu = a2.to(device)
     a3 = 1
     a4 = torch.tensor(1, dtype=torch.int)
-
+    a5 = torch.tensor((1.,2.,3.), dtype=torch.int)
+    a5_tpu = a5.to(device)
 
     # tensor add tensor
     # a2.add_(a1)
@@ -29,6 +30,11 @@ def case1():
     # print("origin: ",a1)
     # print("cpu : ", a2 )
     # print("tpu : ", a2_tpu.cpu())
+
+    a5.add_(a3)
+    print('cpu', a5)
+    a5_tpu.add_(a3)
+    print('tpu', a5_tpu.cpu())
 
     # broadcast add
     a2.add_(a4)
@@ -54,5 +60,5 @@ def case_addbcast():
 
 
 if __name__ == "__main__":
-    #case1()
+    case1()
     case_addbcast()

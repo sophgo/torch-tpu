@@ -2160,7 +2160,8 @@ bm_status_t sgdnnAddC ( bm_handle_t handle,
   SGDNN_CHECK ( input.dtype == output.dtype );
   SGDNN_CHECK ( input.dtype == SGDNN_DTYPE_FP32 ||
                 input.dtype == SGDNN_DTYPE_FP16 ||
-                input.dtype == SGDNN_DTYPE_BF16 );
+                input.dtype == SGDNN_DTYPE_BF16 || 
+                input.dtype == SGDNN_DTYPE_INT32 );
   SGDNN_CHECK ( sgdnnIsSameShape ( &input, &output ) );
   SGDNN_CHECK ( sgdnnIsTensorContiguous ( &input ) );
   SGDNN_CHECK ( sgdnnIsTensorContiguous ( &output ) );
@@ -2204,7 +2205,8 @@ bm_status_t sgdnnMulC ( bm_handle_t handle,
   SGDNN_CHECK ( input.dtype == output.dtype );
   SGDNN_CHECK ( input.dtype == SGDNN_DTYPE_FP32 ||
                 input.dtype == SGDNN_DTYPE_FP16 ||
-                input.dtype == SGDNN_DTYPE_BF16 );
+                input.dtype == SGDNN_DTYPE_BF16 ||
+                input.dtype == SGDNN_DTYPE_INT32 );
   SGDNN_CHECK ( sgdnnIsSameShape ( &input, &output ) );
   SGDNN_CHECK ( sgdnnIsTensorContiguous ( &input ) );
   SGDNN_CHECK ( sgdnnIsTensorContiguous ( &output ) );
@@ -2248,7 +2250,8 @@ bm_status_t sgdnnCSub ( bm_handle_t handle,
   SGDNN_CHECK ( input.dtype == output.dtype );
   SGDNN_CHECK ( input.dtype == SGDNN_DTYPE_FP32 ||
                 input.dtype == SGDNN_DTYPE_FP16 ||
-                input.dtype == SGDNN_DTYPE_BF16 );
+                input.dtype == SGDNN_DTYPE_BF16 ||
+                input.dtype == SGDNN_DTYPE_INT32 );
   SGDNN_CHECK ( sgdnnIsSameShape ( &input, &output ) );
   SGDNN_CHECK ( sgdnnIsTensorContiguous ( &input ) );
   SGDNN_CHECK ( sgdnnIsTensorContiguous ( &output ) );
@@ -2292,7 +2295,8 @@ bm_status_t sgdnnCDiv ( bm_handle_t handle,
   SGDNN_CHECK ( input.dtype == output.dtype );
   SGDNN_CHECK ( input.dtype == SGDNN_DTYPE_FP32 ||
                 input.dtype == SGDNN_DTYPE_FP16 ||
-                input.dtype == SGDNN_DTYPE_BF16 );
+                input.dtype == SGDNN_DTYPE_BF16 ||
+                input.dtype == SGDNN_DTYPE_INT32 );
   SGDNN_CHECK ( sgdnnIsSameShape ( &input, &output ) );
   SGDNN_CHECK ( sgdnnIsTensorContiguous ( &input ) );
   SGDNN_CHECK ( sgdnnIsTensorContiguous ( &output ) );

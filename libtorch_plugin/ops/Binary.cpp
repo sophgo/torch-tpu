@@ -119,12 +119,21 @@ Tensor & add_out_tpu ( const Tensor & self, const Tensor & other, const Scalar &
 #ifdef TPU_OP_TIMING
       auto timer = tpu::Timer().Start();
 #endif
-      bm_status_t status = sgdnnAddC (
-                           tpu::TPUGetDeviceHandle(),
-                           tpu:: TPUGenerateSgdnnTensor ( self ),
-                           alpha.toDouble() * ( *scalar.data_ptr<float>() ),
-                           tpu:: TPUGenerateSgdnnTensor ( out ) );
-      TORCH_CHECK ( status == BM_SUCCESS );
+      if (scalar.dtype() == torch::kLong) {
+            bm_status_t status = sgdnnAddC (
+                              tpu::TPUGetDeviceHandle(),
+                              tpu:: TPUGenerateSgdnnTensor ( self ),
+                              alpha.toDouble() * ( *scalar.data_ptr<long>() ),
+                              tpu:: TPUGenerateSgdnnTensor ( out ) );
+            TORCH_CHECK ( status == BM_SUCCESS );
+      } else {
+            bm_status_t status = sgdnnAddC (
+                              tpu::TPUGetDeviceHandle(),
+                              tpu:: TPUGenerateSgdnnTensor ( self ),
+                              alpha.toDouble() * ( *scalar.data_ptr<float>() ),
+                              tpu:: TPUGenerateSgdnnTensor ( out ) );
+            TORCH_CHECK ( status == BM_SUCCESS );
+      }
 #ifdef TPU_OP_TIMING
       tpu::OpTimer::Instance().AddTime ( tpu::ADD_C, timer.ElapsedUS() );
 #endif
@@ -145,12 +154,21 @@ Tensor & add_out_tpu ( const Tensor & self, const Tensor & other, const Scalar &
 #ifdef TPU_OP_TIMING
       auto timer = tpu::Timer().Start();
 #endif
-      bm_status_t status = sgdnnAddC (
+      if (scalar.dtype() == torch::kLong) {
+            bm_status_t status = sgdnnAddC (
+                           tpu::TPUGetDeviceHandle(),
+                           tpu:: TPUGenerateSgdnnTensor ( other ),
+                           *scalar.data_ptr<long>(),
+                           tpu:: TPUGenerateSgdnnTensor ( out ) );
+            TORCH_CHECK ( status == BM_SUCCESS );
+      } else {
+            bm_status_t status = sgdnnAddC (
                            tpu::TPUGetDeviceHandle(),
                            tpu:: TPUGenerateSgdnnTensor ( other ),
                            *scalar.data_ptr<float>(),
                            tpu:: TPUGenerateSgdnnTensor ( out ) );
-      TORCH_CHECK ( status == BM_SUCCESS );
+            TORCH_CHECK ( status == BM_SUCCESS );
+      }
 #ifdef TPU_OP_TIMING
       tpu::OpTimer::Instance().AddTime ( tpu::ADD_C, timer.ElapsedUS() );
 #endif
@@ -216,12 +234,21 @@ Tensor & sub_out_tpu ( const Tensor & self, const Tensor & other, const Scalar &
 #ifdef TPU_OP_TIMING
       auto timer = tpu::Timer().Start();
 #endif
-      bm_status_t status = sgdnnAddC (
+      if (scalar.dtype() == torch::kLong) {
+            bm_status_t status = sgdnnAddC (
+                           tpu::TPUGetDeviceHandle(),
+                           tpu:: TPUGenerateSgdnnTensor ( self ),
+                           - alpha.toDouble() * ( *scalar.data_ptr<long>() ),
+                           tpu:: TPUGenerateSgdnnTensor ( out ) );
+            TORCH_CHECK ( status == BM_SUCCESS );
+      } else {
+            bm_status_t status = sgdnnAddC (
                            tpu::TPUGetDeviceHandle(),
                            tpu:: TPUGenerateSgdnnTensor ( self ),
                            - alpha.toDouble() * ( *scalar.data_ptr<float>() ),
                            tpu:: TPUGenerateSgdnnTensor ( out ) );
-      TORCH_CHECK ( status == BM_SUCCESS );
+            TORCH_CHECK ( status == BM_SUCCESS );
+      }
 #ifdef TPU_OP_TIMING
       tpu::OpTimer::Instance().AddTime ( tpu::ADD_C, timer.ElapsedUS() );
 #endif
