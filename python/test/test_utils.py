@@ -118,17 +118,19 @@ class Evaluator:
                 return
 
             mask = eps > thr
+
             index = torch.where(mask)[0]
-            failed_input = [i[mask] for i in ipts]
+
+            # failed_input = [i[mask] for i in ipts]
             failed_output = t_data[mask]
             failed_ref = c_data[mask]
             return AssertionError(
-                f"max_eps = {max_eps}, {index[:10]}, Failed input: {failed_input[:10]},  Failed output: {failed_output[:10]}, Reference: {failed_ref[:10]}"
+                f"max_eps = {max_eps}, {index[:10]}, Failed output: {failed_output[:10]}, Reference: {failed_ref[:10]}"
             )
 
         return self.add_metric(abs_evalute)
 
-    def evavlute(self, funcs: Union[List[nn.Module], nn.Module], *iters):
+    def evavlute(self, funcs: Union[List[nn.Module], nn.Module], *iters, mem=None):
         if isinstance(funcs, nn.Module):
             funcs = [funcs]
 
@@ -142,7 +144,6 @@ class Evaluator:
                     continue
 
                 tpu_data = func(*[i.to(device) for i in ipts])
-
                 if isinstance(cpu_data, torch.Tensor):
                     cpu_data = [cpu_data]
                     tpu_data = [tpu_data]
@@ -153,6 +154,8 @@ class Evaluator:
                         ret = fn(c_data, t_data, *ipts)
                         if isinstance(ret, AssertionError):
                             message.append([ret, func, index])
+                            if isinstance(mem, list):
+                                mem.append({"cpu": c_data, "tpu": t_data})
 
         if any(message):
             raise AssertionError(

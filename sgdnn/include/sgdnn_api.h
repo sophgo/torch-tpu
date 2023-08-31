@@ -660,6 +660,18 @@ bm_status_t sgdnnConcat ( bm_handle_t handle,
                           int input_num,
                           int dim,
                           SgdnnTensor_t output );
+/*
+ * OUTPUT = Upsampling ( INPUTS, align_corners, output_size)
+ * Note:
+ * 1. The data types of INPUT and OUTPUT must be the same
+ * 2. The shape of INPUT0 is ( D0, D1, ..., D(A-1), DA0, D(A+1), ... ), INPUT1 is ( D0, D1, ..., D(A-1), DA1, D(A+1), ... ),
+ *    where DA0, DA1, ... are the "DIM" dimension of the corresponding tensors, the shape of OUTPUT is ( D0, D1, ..., D(A-1), ( DA0 + DA1 + ... ), D(A+1), ... )
+ * 3. INPUTS and OUTPUT must be contiguous
+ */
+bm_status_t sgdnnUpsampling(bm_handle_t handle, SgdnnTensor_t input,
+                            SgdnnTensor_t output,
+                            bool align_corners,
+                            sg_resize_mode_t upsampling_type);
 
 /*
  * OUTPUT = WHERE ( COND, SELF, OTHER ) = COND ? SELF : OTHER

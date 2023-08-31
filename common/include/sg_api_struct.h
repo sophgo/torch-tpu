@@ -1,3 +1,6 @@
+#include <stdbool.h>
+#
+
 #ifndef SG_API_STRUCT_H
 #define SG_API_STRUCT_H
 
@@ -62,6 +65,46 @@ typedef enum {
   LOG_2 = 2,
   LOG_10 = 10,
 } sg_log_type_t;
+
+/**
+ * TPU1686/common/include/common_def.h
+ * used by upsampling
+ */
+typedef enum {
+  CAFFE_SUPPORT = 0,
+  TENSORFLOW_SUPPORT = 1,
+  CAFFE_NEAREST = 2,
+  TENSORFLOW_NEAREST = 3,
+  PYTORCH_SUPPORT = 4,
+  PYTORCH_NEAREST = 5,
+  OPENCV_BILINEAR = 6,
+  ONNX_NEAREST = 7,
+} PLATFORM_SUPPORT;
+
+
+typedef enum {
+  UPSAMPLING_NEAREST = 0,
+  UPSAMPLING_BILINEAR = 1,
+} sg_resize_mode_t;
+
+
+typedef struct {
+  unsigned long long input_global_addr;
+  unsigned long long output_global_addr;
+  unsigned long long buffer_addr;
+  int dim;
+  int shape[FW_MAX_SHAPE_DIMS];
+  int out_shape[FW_MAX_SHAPE_DIMS];
+  int pad_bag;
+  int pad_end;
+  bool half_pixel_centers;
+  bool align_corners;
+  bool if_getting_buffer_size;
+  int dtype;
+  unsigned long long* buffer_size_ptr;
+  // PYTORCH_SUPPORT for **bilinear**; PYTORCH_NEAREST for nearest
+  PLATFORM_SUPPORT platform_sp; 
+} WITH_PLATFORM(sg_api_upsampling2d_t);
 
 typedef struct {
   unsigned long long input_global_addr;

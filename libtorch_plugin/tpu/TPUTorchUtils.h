@@ -12,6 +12,15 @@
 #include <fstream>
 #include <vector>
 
+#ifdef TPU_OP_TIMING
+#define TIMING_START auto timer = tpu::Timer().Start();
+#define TIMING_END(TIMING_NAME)                                                \
+  tpu::OpTimer::Instance().AddTime(TIMING_NAME, timer.ElapsedUS());
+#else
+#define TIMING_START
+#define TIMING_END(OP)
+#endif
+
 #define CHECK_TENSOR_IN_DEVICE(t) \
 do \
 { \
@@ -323,6 +332,8 @@ typedef enum
   SIGMOID,
   CLAMP,
   LN_MM_FORWARD,
+  ERF,
+  UPSAMPLING_BILINEAR,
   OP_NUM
 
 }

@@ -1621,6 +1621,60 @@ bm_status_t sgdnnFill ( bm_handle_t handle,
   return BM_SUCCESS;
 }
 
+bm_status_t sgdnnUpsampling(bm_handle_t handle, SgdnnTensor_t input,
+                            SgdnnTensor_t output,
+                            bool align_corners,
+                            sg_resize_mode_t upsampling_type) {
+  SGDNN_CHECK(sgdnnIsTensorContiguous(&output));
+
+#if defined SGDNN_BACKEND_1684X
+  int coord = 0; // tpu::ResizeCoordMode::half_pixel
+  sg_api_upsampling2d_t api;
+  api.input_global_addr = input.addr;
+  api.output_global_addr = output.addr;
+
+  bm_device_mem_t buffer_mem;
+  SAFE_CALL( bm_malloc_device_byte ( handle, &buffer_mem, sgdnnTensorBytes ( &output ) ) );
+  api.buffer_addr = buffer_mem.u.device.device_addr;
+  
+  api.if_getting_buffer_size = false;
+  api.platform_sp = upsampling_type == UPSAMPLING_BILINEAR ? PYTORCH_SUPPORT : PYTORCH_NEAREST;
+
+  // api.if_getting_buffer_size = true;
+  // u64 buffer_size = 0;
+  // api.buffer_size_ptr = &buffer_size;
+  
+  api.dim = output.dim;
+  api.dtype = sgdnnTPUKernelDType(output.dtype);
+  
+  for (int i = 0; i < input.dim; ++i) {
+    api.shape[i] = input.shape[i];
+  }
+  
+  for (int i = 0; i < output.dim; ++i) {
+    api.out_shape[i] = output.shape[i];
+  }
+  api.pad_bag = 0;
+  api.pad_end = 0;
+  if (upsampling_type == UPSAMPLING_BILINEAR){
+    api.half_pixel_centers = (coord == 0 || coord == 1) ? 1 : 0;
+    api.align_corners = (coord == 2) ? true : false;;
+  }else{
+    api.half_pixel_centers = false;
+    api.align_corners = true;
+  }
+  
+  SAFE_CALL(sgdnnTPUKernelLaunch(handle, "tpu_kernel_api_interp", &api,
+                                 sizeof(api)));
+  bm_free_device(handle, buffer_mem);
+#elif defined SGDNN_BACKEND_2260
+  SGDNN_CHECK(false);
+#else
+  SGDNN_CHECK(false);
+#endif
+  return BM_SUCCESS;
+}
+
 
 bm_status_t sgdnnActive(bm_handle_t handle, SgdnnTensor_t input,
                         SgdnnTensor_t output, sg_active_type_t active_type) {
