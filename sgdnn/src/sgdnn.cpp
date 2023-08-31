@@ -1646,7 +1646,7 @@ bm_status_t sgdnnActive(bm_handle_t handle, SgdnnTensor_t input,
   api.dim = input.dim;
   api.dtype = sgdnnTPUKernelDType(input.dtype);
   api.active_type = active_type;
-  
+
 #if defined SGDNN_BACKEND_1684X
   if (active_type == ACTIVE_RELU || active_type == ACTIVE_ABSVAL ||
       active_type == ACTIVE_ROUND || active_type == ACTIVE_CEIL ||
@@ -1816,7 +1816,42 @@ bm_status_t sgdnnExp ( bm_handle_t handle,
 #endif
   return BM_SUCCESS;
 }
-  
+
+bm_status_t sgdnnExpm1 ( bm_handle_t handle,
+                         SgdnnTensor_t input,
+                         SgdnnTensor_t output )
+{
+  SGDNN_CHECK ( input.dtype == SGDNN_DTYPE_FP32 ||
+                input.dtype == SGDNN_DTYPE_FP16 ||
+                input.dtype == SGDNN_DTYPE_BF16 );
+  SGDNN_CHECK ( sgdnnIsTensorContiguous ( &input ) );
+#if defined SGDNN_BACKEND_1684X
+  sg_api_expm1_t api;
+  api.input_global_addr = input.addr;
+  api.output_global_addr = output.addr;
+  api.dim = input.dim;
+  for ( int i = 0; i < input.dim; ++i )
+  {
+    api.shape[i] = input.shape[i];
+  }
+  api.dtype = sgdnnTPUKernelDType ( input.dtype );
+  SAFE_CALL ( sgdnnTPUKernelLaunch ( handle, "tpu_kernel_api_expm1", &api, sizeof ( api ) ) );
+#elif defined SGDNN_BACKEND_2260
+  sg_api_expm1_t api;
+  api.input_global_addr = input.addr;
+  api.output_global_addr = output.addr;
+  api.dim = input.dim;
+  for ( int i = 0; i < input.dim; ++i )
+  {
+    api.shape[i] = input.shape[i];
+  }
+  api.dtype = sgdnnTPUKernelDType ( input.dtype );
+  SAFE_CALL ( sgdnnTPUKernelLaunch ( handle, "tpu_kernel_api_expm1_multi_core", &api, sizeof ( api ) ) );
+#else
+  SGDNN_CHECK ( false );
+#endif
+  return BM_SUCCESS;
+}
 
 bm_status_t sgdnnLogicalAnd ( bm_handle_t handle,
                               SgdnnTensor_t input,
@@ -3438,7 +3473,7 @@ bm_status_t sgdnnBitwiseXor ( bm_handle_t handle,
 #else
   SGDNN_CHECK ( false );
 #endif
-  
+
   return BM_SUCCESS;
 }
 
@@ -3928,7 +3963,7 @@ bm_status_t sgdnnBitwiseAnd ( bm_handle_t handle,
 #else
   SGDNN_CHECK ( false );
 #endif
-  
+
   return BM_SUCCESS;
 }
 
@@ -4073,7 +4108,7 @@ bm_status_t sgdnnBitwiseOr ( bm_handle_t handle,
 #else
   SGDNN_CHECK ( false );
 #endif
-  
+
   return BM_SUCCESS;
 }
 
@@ -5639,7 +5674,7 @@ bm_status_t sgdnnMseloss( bm_handle_t handle,
   return BM_SUCCESS;
 }
 
-bm_status_t sgdnnSiLU (bm_handle_t handle, 
+bm_status_t sgdnnSiLU (bm_handle_t handle,
                     SgdnnTensor_t input,
                     SgdnnTensor_t output)
 {
@@ -5669,7 +5704,7 @@ bm_status_t sgdnnSiLU (bm_handle_t handle,
   return BM_SUCCESS;
 }
 
-bm_status_t sgdnnSigmoid (bm_handle_t handle, 
+bm_status_t sgdnnSigmoid (bm_handle_t handle,
                     SgdnnTensor_t input,
                     SgdnnTensor_t output)
 {

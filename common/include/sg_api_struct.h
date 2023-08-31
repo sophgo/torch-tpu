@@ -99,6 +99,16 @@ typedef struct
   int shape[FW_MAX_SHAPE_DIMS];
   int dim;
   int dtype;
+} WITH_PLATFORM(sg_api_expm1_t);
+
+typedef struct
+{
+  unsigned long long input_global_addr;
+  unsigned long long other_global_addr;
+  unsigned long long output_global_addr;
+  int shape[FW_MAX_SHAPE_DIMS];
+  int dim;
+  int dtype;
 } WITH_PLATFORM(sg_api_logical_and_t);
 
 typedef struct

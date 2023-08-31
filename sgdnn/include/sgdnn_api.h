@@ -226,8 +226,8 @@ bm_status_t sgdnnActive(bm_handle_t handle, SgdnnTensor_t input,
  * 2. INPUT must be contiguous
  */
 bm_status_t sgdnnLog ( bm_handle_t handle,
-                       SgdnnTensor_t input, 
-                       SgdnnTensor_t output, 
+                       SgdnnTensor_t input,
+                       SgdnnTensor_t output,
                        sg_log_type_t log_type);
 
 
@@ -275,6 +275,17 @@ bm_status_t sgdnnAdd ( bm_handle_t handle,
  */
 
 bm_status_t sgdnnExp ( bm_handle_t handle,
+                       SgdnnTensor_t input,
+                       SgdnnTensor_t output );
+
+/*
+ * OUTPUT = math.expm1(INPUT)
+ * Note:
+ * 1. The data types of INPUT must be the same and one of FP32, FP16 and BF16
+ * 2. INPUT must be contiguous
+ */
+
+bm_status_t sgdnnExpm1 ( bm_handle_t handle,
                        SgdnnTensor_t input,
                        SgdnnTensor_t output );
 
@@ -724,7 +735,7 @@ bm_status_t sgdnnMlpBackward ( bm_handle_t handle,
  * Note:
  * 1. The data types of all the tensors must be the same and one of FP32, FP16 and BF16
  * 2. The dimensions of INPUT Q K V and OUT must be 3, W_ATTN W_PROJ must be 2, B_ATTN B_PROJ must be 1, SOFTMAX_OUT SOFT_V must be 4
- * 3. The shape of INPUT is ( B, M, N ), W_PROJ is ( N, D_attn ), B1 is ( D_attn ), W_PROJ is ( D_attn/3, N ), B2 is ( N ), 
+ * 3. The shape of INPUT is ( B, M, N ), W_PROJ is ( N, D_attn ), B1 is ( D_attn ), W_PROJ is ( D_attn/3, N ), B2 is ( N ),
  *    Q K V is ( B, M, D_attn/3 ), SOFTMAX_OUT is ( B, H, M, M ), SOFT_V is ( B, H, M, D_attn/3 ), OUTPUT is ( B, M, N )
  * 4. All the tensors must be contiguous
  * 5. W_ATTN B_ATTN represents the weight and bias of attention layer (which generates Q K V), W_PROJ B_PROJ represents the weight and bias of projection layer
@@ -747,13 +758,13 @@ bm_status_t sgdnnAttn ( bm_handle_t handle,
  * [ GRAD_INPUT, GRAD_W_ATTN, GRAD_W_PROJ, GRAD_B_ATTN, GRAD_B_PROJ ] = ATTENTION BACKWARD ( GRAD_OUTPUT, INPUT, W_ATTN, W_PROJ, Q, K, V, SOFTMAX_OUT, SOFT_V, BIAS )
  * Note:
  * 1. The data types of all the tensors must be the same and one of FP32, FP16 and BF16
- * 2. The dimensions of INPUT, GRAD_OUTPUT, Q, K, V and GRAD_INPUT must be 3; W_ATTN, W_PROJ, GRAD_W_ATTN and GRAD_W_PROJ must be 2; GRAD_B_ATTN, GRAD_B_PROJ must be 1, 
+ * 2. The dimensions of INPUT, GRAD_OUTPUT, Q, K, V and GRAD_INPUT must be 3; W_ATTN, W_PROJ, GRAD_W_ATTN and GRAD_W_PROJ must be 2; GRAD_B_ATTN, GRAD_B_PROJ must be 1,
  *    SOFTMAX_OUT, SOFT_V and BIAS must be 4
- * 3. The shape of INPUT and GRAD_INPUT is ( B, M, N ); W_ATTN and GRAD_W_ATTN is ( N, D_attn ); W_PROJ and GRAD_W_PROJ is ( D_attn/3, N ); 
+ * 3. The shape of INPUT and GRAD_INPUT is ( B, M, N ); W_ATTN and GRAD_W_ATTN is ( N, D_attn ); W_PROJ and GRAD_W_PROJ is ( D_attn/3, N );
  *    Q K V is ( B, M, D_attn/3 ); SOFTMAX_OUT is ( B, H, M, M ); SOFT_V is ( B, H, M, D_attn/3 );  BIAS is ( 1, 1, M, M );
  *    GRAD_B_ATTN is ( D_attn ); GRAD_B_PROJ is ( N ); GRAD_OUTPUT is ( B, M, N )
  * 4. All the tensors must be contiguous
- * 5. W_ATTN B_ATTN represents the weight and bias of attention layer (which generates Q K V), W_PROJ B_PROJ represents the weight and bias of projection layer, 
+ * 5. W_ATTN B_ATTN represents the weight and bias of attention layer (which generates Q K V), W_PROJ B_PROJ represents the weight and bias of projection layer,
  *    GRAD_x means the gradient of tensor x, BIAS represents triangular matrix (mask).
  */
 bm_status_t sgdnnAttnBackward ( bm_handle_t handle,
@@ -817,7 +828,7 @@ bm_status_t sgdnnBitwiseXorBcast ( bm_handle_t handle,
 bm_status_t sgdnnBitwiseXorC ( bm_handle_t handle,
                                SgdnnTensor_t input,
                                int scalar,
-                               SgdnnTensor_t output ); 
+                               SgdnnTensor_t output );
 
 /*
  * OUTPUT = ASIN(INPUT)
@@ -916,7 +927,7 @@ bm_status_t sgdnnBitwiseNot (bm_handle_t handle,
  */
 bm_status_t sgdnnIsfinite(bm_handle_t handle,
                        SgdnnTensor_t input,
-                       SgdnnTensor_t output );                       
+                       SgdnnTensor_t output );
 
 /*
  * OUTPUT = ISINF(INPUT)
@@ -938,8 +949,8 @@ bm_status_t sgdnnIsinf(bm_handle_t handle,
  */
 bm_status_t sgdnnIsnan(bm_handle_t handle,
                        SgdnnTensor_t input,
-                       SgdnnTensor_t output );  
-                       
+                       SgdnnTensor_t output );
+
 /*
  *  OUTPUT  = BITWISE_AND ( input, other, output )
  *  Note:
@@ -971,7 +982,7 @@ bm_status_t sgdnnBitwiseAndBcast ( bm_handle_t handle,
 bm_status_t sgdnnBitwiseAndC ( bm_handle_t handle,
                                SgdnnTensor_t input,
                                int scalar,
-                               SgdnnTensor_t output ); 
+                               SgdnnTensor_t output );
 
 /*
  *  OUTPUT  = BITWISE_OR ( input, other, output )
@@ -1004,7 +1015,7 @@ bm_status_t sgdnnBitwiseOrBcast ( bm_handle_t handle,
 bm_status_t sgdnnBitwiseOrC ( bm_handle_t handle,
                                SgdnnTensor_t input,
                                int scalar,
-                               SgdnnTensor_t output );  
+                               SgdnnTensor_t output );
 
 /*
  *  OUTPUT  = EQUAL ( input, other, output )
@@ -1106,7 +1117,7 @@ bm_status_t sgdnnGtC ( bm_handle_t handle,
                        SgdnnTensor_t input,
                        float scalar,
                        SgdnnTensor_t output );
-                     
+
 /*
  * OUTPUT = MINIMUMC(INPUT,SCALAR)
  * Note:
@@ -1140,7 +1151,7 @@ bm_status_t sgdnnMinimum ( bm_handle_t handle,
 bm_status_t sgdnnMinimumBcast ( bm_handle_t handle,
                         SgdnnTensor_t input,
                         SgdnnTensor_t other,
-                        SgdnnTensor_t output );      
+                        SgdnnTensor_t output );
 /*
  * OUTPUT = MAXIMUMC(INPUT,SCALAR)
  * Note:
@@ -1174,7 +1185,7 @@ bm_status_t sgdnnMaximum ( bm_handle_t handle,
 bm_status_t sgdnnMaximumBcast ( bm_handle_t handle,
                         SgdnnTensor_t input,
                         SgdnnTensor_t other,
-                        SgdnnTensor_t output );                   
+                        SgdnnTensor_t output );
 
 /*
  * OUTPUT = ATAN2C(SCALAR,OTHER)
