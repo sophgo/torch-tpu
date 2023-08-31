@@ -88,6 +88,23 @@ TORCH_LIBRARY_IMPL(aten, TPU, m) {
   m.impl("asinh", asinh_tpu);
 }
 
+IMP_ACTIVE_OUT(sinh, ACTIVE_SINH, tpu::SINH_FORWARD)
+IMP_ACTIVE(sinh)
+IMP_ACTIVE_OUT(cosh, ACTIVE_COSH, tpu::COSH_FORWARD)
+IMP_ACTIVE(cosh)
+IMP_ACTIVE_OUT(tanh, ACTIVE_TANH, tpu::TANH_FORWARD)
+IMP_ACTIVE(tanh)
+
+TORCH_LIBRARY_IMPL(aten, TPU, m) {
+  m.impl("tanh.out", tanh_out_tpu);
+  m.impl("tanh", tanh_tpu);
+  m.impl("cosh.out", cosh_out_tpu);
+  m.impl("cosh", cosh_tpu);
+  m.impl("sinh.out", sinh_out_tpu);
+  m.impl("sinh", sinh_tpu);
+}
+
+
 IMP_ACTIVE_OUT(abs, ACTIVE_ABSVAL, tpu::ABS_FORWARD)
 IMP_ACTIVE(abs)
 

@@ -927,6 +927,36 @@ bm_status_t sgdnnAtan (bm_handle_t handle,
                        SgdnnTensor_t output );
 
 /*
+ * OUTPUT = SINH(INPUT)
+ * Note:
+ * 1. The data types of INPUT and OUTPUT must be the same and FP32
+ * 2. The shapes of INPUT and OUTPUT must be the same
+ * 3. INPUT and OUTPUT must be contiguous
+ */
+bm_status_t sgdnnSinh (bm_handle_t handle,
+                       SgdnnTensor_t input,
+                       SgdnnTensor_t output );
+ /*
+ * OUTPUT = COSH(INPUT)
+ * Note:
+ * 1. The data types of INPUT and OUTPUT must be the same and FP32
+ * 2. The shapes of INPUT and OUTPUT must be the same
+ * 3. INPUT and OUTPUT must be contiguous
+ */
+bm_status_t sgdnnCosh (bm_handle_t handle,
+                       SgdnnTensor_t input,
+                       SgdnnTensor_t output );     
+  /*
+ * OUTPUT = TANH(INPUT)
+ * Note:
+ * 1. The data types of INPUT and OUTPUT must be the same and FP32
+ * 2. The shapes of INPUT and OUTPUT must be the same
+ * 3. INPUT and OUTPUT must be contiguous
+ */
+bm_status_t sgdnnTanh (bm_handle_t handle,
+                       SgdnnTensor_t input,
+                       SgdnnTensor_t output );                                          
+/*
  * OUTPUT = CEIL(INPUT)
  * Note:
  * 1. The data types of INPUT and OUTPUT must be the same and one of FP32, FP16 and BF16
