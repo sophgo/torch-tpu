@@ -1216,6 +1216,79 @@ bm_status_t sgdnnReduce ( bm_handle_t handle,
   return BM_SUCCESS;
 }
 
+bm_status_t sgdnnReduceProd ( bm_handle_t handle,
+                              SgdnnTensor_t input,
+                              int axis,
+                              int keepdim,
+                              SgdnnTensor_t output )
+{
+  SGDNN_CHECK ( input.dtype == output.dtype );
+  SGDNN_CHECK ( input.dtype == SGDNN_DTYPE_FP32 ||
+                input.dtype == SGDNN_DTYPE_FP16 ||
+                input.dtype == SGDNN_DTYPE_BF16 );
+  SGDNN_CHECK ( axis >= 0 );
+  SGDNN_CHECK ( axis < input.dim );
+
+#if defined SGDNN_BACKEND_1684X
+  sg_api_reduce_prod_t api;
+  api.input_global_addr = input.addr;
+  api.output_global_addr = output.addr;
+  unsigned int size = 1; 
+  for ( int i = 0; i < input.dim; ++i )
+  {
+    api.shape[i] = input.shape[i];
+    size *= input.shape[i];
+  }
+  if(input.dtype == SGDNN_DTYPE_FP32) {
+    size *= sizeof(float);
+  }
+  else {
+    size *= sizeof(float16);
+  }
+  bm_device_mem_t dev_mem;
+  bm_status_t status = bm_malloc_device_byte(handle, &dev_mem, size);
+  if(BM_SUCCESS != status){
+    printf("malloc device error \r\n");
+    return status;
+  }
+  api.buffer_global_addr = bm_mem_get_device_addr(dev_mem);
+  api.dim = input.dim;
+  api.axis = axis;
+  api.dtype = sgdnnTPUKernelDType ( input.dtype );
+  SAFE_CALL ( sgdnnTPUKernelLaunch ( handle, "tpu_kernel_api_reduce_prod", &api, sizeof ( api ) ) );
+#elif defined SGDNN_BACKEND_2260
+  sg_api_reduce_prod_t api;
+  api.input_global_addr = input.addr;
+  api.output_global_addr = output.addr;
+  unsigned int size = 1; 
+  for ( int i = 0; i < input.dim; ++i )
+  {
+    api.shape[i] = input.shape[i];
+    size *= input.shape[i];
+  }
+  if(input.dtype == SGDNN_DTYPE_FP32) {
+    size *= sizeof(float);
+  }
+  else {
+    size *= sizeof(float16);
+  }
+  bm_device_mem_t dev_mem;
+  bm_status_t err = bm_malloc_device_byte(handle, &dev_mem, size);
+  if(BM_SUCCESS != err){
+    printf("malloc device error \r\n");
+    return err;
+  }
+  api.buffer_global_addr = bm_mem_get_device_addr(dev_mem);
+  api.dim = input.dim;
+  api.axis = axis;
+  api.dtype = sgdnnTPUKernelDType ( input.dtype );
+  SAFE_CALL ( sgdnnTPUKernelLaunch ( handle, "tpu_kernel_api_reduce_prod", &api, sizeof ( api ) ) );
+#else
+  SGDNN_CHECK ( false );
+#endif
+  return BM_SUCCESS;
+}
+
 bm_status_t sgdnnStridedCopy ( bm_handle_t handle,
                                SgdnnTensor_t input,
                                SgdnnTensor_t output )

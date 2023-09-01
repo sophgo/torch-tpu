@@ -112,4 +112,32 @@ TORCH_LIBRARY_IMPL ( aten, TPU, m )
 {
   m.impl ( "sum.IntList_out", sum_IntList_out_tpu );
 }
+
+Tensor & prod_int_out_tpu ( const Tensor &self, long dim, bool keepdim,
+                            c10::optional<ScalarType> dtype_opt, Tensor &out ) {
+  CHECK_TENSOR_IN_DEVICE(self);
+  CHECK_TENSOR_IN_DEVICE(out);
+
+#ifdef TPU_OP_TIMING
+  auto timer = tpu::Timer().Start();
+#endif
+
+  bm_status_t status = sgdnnReduceProd(tpu::TPUGetDeviceHandle(),
+                                       tpu::TPUGenerateSgdnnTensor(self),
+                                       dim,
+                                       keepdim,
+                                       tpu::TPUGenerateSgdnnTensor(out));
+  TORCH_CHECK(BM_SUCCESS == status);
+
+#ifdef TPU_OP_TIMING
+  tpu::OpTimer::Instance().AddTime(tpu::REDUCE_PROD, timer.ElapsedUS());
+#endif
+
+  return out;
+}
+TORCH_LIBRARY_IMPL ( aten, TPU, m )
+{
+  m.impl ( "prod.int_out", prod_int_out_tpu );
+}
+
 } // namespace at

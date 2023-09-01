@@ -648,6 +648,21 @@ bm_status_t sgdnnReduce ( bm_handle_t handle,
                           SgdnnTensor_t output );
 
 /*
+ * OUTPUT = REDUCE_PROD ( INPUT, START_DIM, END_DIM, KEEPDIM, MODE )
+ * Note:
+ * 1. The data types of INPUT and OUTPUT must be the same and one of FP32, FP16 and BF16
+ * 2. The shape of INPUT is ( D0, D1, ..., D(S-1), DS, ..., D(E-1), DE, D(E+1), ... ), where DS is START_DIM and DE is END_DIM,
+ *    if keepdim is TRUE, OUTPUT is ( D0, D1, ..., D(S-1), 1, ..., 1, DE, D(E+1), ... ), otherwise, ( D0, D1, ..., D(S-1), DE, D(E+1), ... )
+ * 3. INPUT and OUTPUT must be contiguous
+ * 4. MODE must be 0 ( prod ) or 1 ( sum )
+ */
+bm_status_t sgdnnReduceProd ( bm_handle_t handle,
+                              SgdnnTensor_t input,
+                              int axis,
+                              int keepdim,
+                              SgdnnTensor_t output );
+
+/*
  * OUTPUT = CONCAT ( INPUTS, DIM )
  * Note:
  * 1. The data types of INPUT and OUTPUT must be the same
