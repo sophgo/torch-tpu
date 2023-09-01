@@ -1,5 +1,6 @@
 #include "sg_api_struct.h"
 #include "tpu_kernel.h"
+#include <string.h>
 
 #define PI  3.14159265
 
@@ -38,7 +39,8 @@ data_type_t dtype )
   dim4 l2s_shape;
   global_addr_t l2s_global_addr = 0;
   local_addr_t l2s_local_addr = 0;
-  __uint32_t scalar_uint32= *(__uint32_t*) &scalar;
+  __uint32_t scalar_uint32;
+  memcpy(&scalar_uint32,&scalar,sizeof(float));
   float POW_C=2;
   scalar_t ADD_C = {.f32 = 1.f};
   scalar_t positive_zero = {.u32 = 0x00000000};
@@ -247,7 +249,8 @@ data_type_t dtype )
   dim4 l2s_shape;
   global_addr_t l2s_global_addr = 0;
   local_addr_t l2s_local_addr = 0;
-  __uint32_t scalar_uint32= *(__uint32_t*) &scalar;
+  __uint32_t scalar_uint32;
+  memcpy(&scalar_uint32,&scalar,sizeof(float));
   float POW_C=2;
   scalar_t ADD_C = {.f32 = 1.f};
   scalar_t positive_zero = {.u32 = 0x00000000};

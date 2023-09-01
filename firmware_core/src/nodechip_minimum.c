@@ -1,5 +1,6 @@
 #include "sg_api_struct.h"
 #include "tpu_kernel.h"
+#include "string.h"
 
 void isNan(
     local_addr_t output_local_addr,
@@ -78,7 +79,8 @@ data_type_t dtype )
       tpu_gdma_cpy_L2S ( l2s_global_addr, l2s_local_addr, &l2s_shape, NULL, NULL, dtype );
     }
     
-    __uint32_t scalar_uint32= *(__uint32_t*) &scalar;
+    __uint32_t scalar_uint32;
+    memcpy(&scalar_uint32,&scalar,sizeof(float));
     if (((scalar_uint32 & 0x7f800000) == 0x7f800000) && ((scalar_uint32 & 0x7fffffff) != 0x7f800000)){
             scalar_t  nan_C= {.f32 = 0.0/0.0};
             tpu_bdc_set_C(output_local_addrs[index],nan_C,&shape,NULL,dtype);

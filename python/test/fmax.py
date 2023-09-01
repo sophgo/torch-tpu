@@ -10,7 +10,7 @@ def case1():
     input0_origin=torch.rand(4,1,4,5)
     input1_origin=torch.rand(4,1,4,5)
     input2_origin=torch.rand(1,4,1)
-    input3_origin=torch.tensor(float('nan'))
+    input3_origin=torch.tensor(-0.0)
     input4_origin=torch.tensor([1,0,-0.0,-1,float('inf'),-float('inf'),float('nan'),-float('nan')])
 
     output_cpu=torch.fmax(input3_origin,input4_origin)
