@@ -586,6 +586,15 @@ typedef struct
   int shape[FW_MAX_SHAPE_DIMS];
   int dim;
   int dtype;
+} WITH_PLATFORM(sg_api_neg_t);
+
+typedef struct
+{
+  unsigned long long input_global_addr;
+  unsigned long long output_global_addr;
+  int shape[FW_MAX_SHAPE_DIMS];
+  int dim;
+  int dtype;
   sg_active_type_t active_type;
 } WITH_PLATFORM(sg_api_active_t);
 

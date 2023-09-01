@@ -1087,6 +1087,18 @@ bm_status_t sgdnnFloor (bm_handle_t handle,
 bm_status_t sgdnnRound (bm_handle_t handle,
                        SgdnnTensor_t input,
                        SgdnnTensor_t output );
+                       
+/*
+ * OUTPUT = NEG(INPUT)
+ * Note:
+ * 1. The data types of INPUT and OUTPUT must be the same and one of FP32, FP16 and BF16
+ * 2. The shapes of INPUT and OUTPUT must be the same
+ * 3. INPUT and OUTPUT must be contiguous
+ */
+ 
+bm_status_t sgdnnNeg (bm_handle_t handle,
+                       SgdnnTensor_t input,
+                       SgdnnTensor_t output );
 
 /*
  * OUTPUT = EXP2(INPUT)
