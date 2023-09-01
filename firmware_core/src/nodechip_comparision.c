@@ -1,11 +1,12 @@
 #include "sg_api_struct.h"
 #include "tpu_kernel.h"
 
-void nodechip_greater(
+void nodechip_comparision(
 global_addr_t input_global_addr,
 global_addr_t other_global_addr,
 global_addr_t output_global_addr,
 int length,
+int mode,
 data_type_t dtype) {
     if(0 == length) return;
     const int bank_size = LOCAL_MEM_SIZE / LOCAL_MEM_BANKS;
@@ -37,13 +38,13 @@ data_type_t dtype) {
             shape.w = 1;
         }
         tpu_gdma_cpy_S2L(input_local_addrs[index],
-                         input_global_addr + done * tensor_size,
+                         input_global_addr + done * dtype_size,
                          &shape,
                          NULL,
                          NULL,
                          dtype);
         tpu_gdma_cpy_S2L(other_local_addrs[index],
-                         other_global_addr + done * tensor_size,
+                         other_global_addr + done * dtype_size,
                          &shape,
                          NULL,
                          NULL,
@@ -60,16 +61,88 @@ data_type_t dtype) {
                              NULL,
                              DT_UINT8);
         }
-        tpu_bdc_greater(output_local_addrs[index],
-                        input_local_addrs[index],
-                        other_local_addrs[index],
-                        one_u8,
-                        &shape,
-                        NULL,
-                        NULL,
-                        NULL,
-                        DT_UINT8,
-                        dtype);
+        tpu_bdc_equal(output_local_addrs[index],
+                      input_local_addrs[index],
+                      other_local_addrs[index],
+                      one_u8,
+                      &shape,
+                      NULL,
+                      NULL,
+                      NULL,
+                      DT_UINT8,
+                      dtype);
+        if(mode == EQUAL) {
+            tpu_bdc_equal(output_local_addrs[index],
+                          input_local_addrs[index],
+                          other_local_addrs[index],
+                          one_u8,
+                          &shape,
+                          NULL,
+                          NULL,
+                          NULL,
+                          DT_UINT8,
+                          dtype);
+        }
+        else if(mode == NOT_EQUAL) {
+            tpu_bdc_not_equal(output_local_addrs[index],
+                              input_local_addrs[index],
+                              other_local_addrs[index],
+                              one_u8,
+                              &shape,
+                              NULL,
+                              NULL,
+                              NULL,
+                              DT_UINT8,
+                              dtype);
+        }
+        else if(mode == GREATER) {
+            tpu_bdc_greater(output_local_addrs[index],
+                            input_local_addrs[index],
+                            other_local_addrs[index],
+                            one_u8,
+                            &shape,
+                            NULL,
+                            NULL,
+                            NULL,
+                            DT_UINT8,
+                            dtype);
+        }
+        else if(mode == GREATER_OR_EQUAL) {
+            tpu_bdc_greater_equal(output_local_addrs[index],
+                                  input_local_addrs[index],
+                                  other_local_addrs[index],
+                                  one_u8,
+                                  &shape,
+                                  NULL,
+                                  NULL,
+                                  NULL,
+                                  DT_UINT8,
+                                  dtype);
+        }
+        else if(mode == LESS_THAN) {
+            tpu_bdc_less(output_local_addrs[index],
+                         input_local_addrs[index],
+                         other_local_addrs[index],
+                         one_u8,
+                         &shape,
+                         NULL,
+                         NULL,
+                         NULL,
+                         DT_UINT8,
+                         dtype);
+        }
+        else if(mode == LESS_THAN_OR_EQUAL) {
+            tpu_bdc_less_equal(output_local_addrs[index],
+                               input_local_addrs[index],
+                               other_local_addrs[index],
+                               one_u8,
+                               &shape,
+                               NULL,
+                               NULL,
+                               NULL,
+                               DT_UINT8,
+                               dtype);
+        }
         l2s = true;
         l2s_global_addr = output_global_addr + done * tpu_data_type_size(DT_UINT8);
         l2s_local_addr = output_local_addrs[index];
@@ -90,8 +163,8 @@ data_type_t dtype) {
                          DT_UINT8);
     }
 }
-void tpu_kernel_api_greater(const void *args) {
-    sg_api_gt_t *api = (sg_api_gt_t*) args;
+void tpu_kernel_api_comparision(const void *args) {
+    sg_api_comparision_t *api = (sg_api_comparision_t*) args;
     int length = 1;
     for(int i = 0; i < api->dim; ++i) {
         length *= api->shape[i];
@@ -99,25 +172,26 @@ void tpu_kernel_api_greater(const void *args) {
 
     tpu_initialize();
 
-    nodechip_greater(api->input_global_addr,
-                              api->other_global_addr,
-                              api->output_global_addr,
-                              length,
-                              (data_type_t)api->dtype);
+    nodechip_comparision(api->input_global_addr,
+                         api->other_global_addr,
+                         api->output_global_addr,
+                         length,
+                         api->mode,
+                         (data_type_t)api->dtype);
 
     tpu_poll();
 }
-TPUKERNEL_FUNC_REGISTER(tpu_kernel_api_greater);
+TPUKERNEL_FUNC_REGISTER(tpu_kernel_api_comparision);
 
-void nodechip_greater_bcast(
+void nodechip_comparision_bcast(
 global_addr_t input_global_addr,
 global_addr_t other_global_addr,
 global_addr_t output_global_addr,
 const dim4 *input_shape,
 const dim4 *other_shape,
 const dim4 *output_shape,
-data_type_t dtype 
-) {
+int mode,
+data_type_t dtype) {
     dim4 input_global_stride, other_global_stride, output_global_stride;
     tpu_continuous_stride(&input_global_stride,  input_shape);
     tpu_continuous_stride(&other_global_stride,  other_shape);
@@ -257,16 +331,78 @@ data_type_t dtype
                 }
                 
                 // Select
-                tpu_bdc_greater(output_addr,
-                                input_addr,
-                                other_addr,
-                                one_u8,
-                                &shape,
-                                NULL,
-                                NULL,
-                                NULL,
-                                DT_UINT8,
-                                dtype);
+                if(mode == EQUAL) {
+                    tpu_bdc_equal(output_addr,
+                                  input_addr,
+                                  other_addr,
+                                  one_u8,
+                                  &shape,
+                                  NULL,
+                                  NULL,
+                                  NULL,
+                                  DT_UINT8,
+                                  dtype);
+                }
+                else if(mode == NOT_EQUAL) {
+                    tpu_bdc_not_equal(output_addr,
+                                      input_addr,
+                                      other_addr,
+                                      one_u8,
+                                      &shape,
+                                      NULL,
+                                      NULL,
+                                      NULL,
+                                      DT_UINT8,
+                                      dtype);
+                }
+                else if(mode == GREATER) {
+                    tpu_bdc_greater(output_addr,
+                                    input_addr,
+                                    other_addr,
+                                    one_u8,
+                                    &shape,
+                                    NULL,
+                                    NULL,
+                                    NULL,
+                                    DT_UINT8,
+                                    dtype);
+                }
+                else if(mode == GREATER_OR_EQUAL) {
+                    tpu_bdc_greater_equal(output_addr,
+                                          input_addr,
+                                          other_addr,
+                                          one_u8,
+                                          &shape,
+                                          NULL,
+                                          NULL,
+                                          NULL,
+                                          DT_UINT8,
+                                          dtype);
+                }
+                else if(mode == LESS_THAN) {
+                    tpu_bdc_less(output_addr,
+                                 input_addr,
+                                 other_addr,
+                                 one_u8,
+                                 &shape,
+                                 NULL,
+                                 NULL,
+                                 NULL,
+                                 DT_UINT8,
+                                 dtype);
+                }
+                else if(mode == LESS_THAN_OR_EQUAL) {
+                    tpu_bdc_less_equal(output_addr,
+                                       input_addr,
+                                       other_addr,
+                                       one_u8,
+                                       &shape,
+                                       NULL,
+                                       NULL,
+                                       NULL,
+                                       DT_UINT8,
+                                       dtype);
+                }
                 // Move out from local memory to global memory
                 global_addr_t output_global_addr_gdma = output_global_addr +
                                                         (ndone * output_global_stride.n +
@@ -288,8 +424,8 @@ data_type_t dtype
         cdone += shape.c;
     }    
 }
-void tpu_kernel_api_greater_bcast(const void *args) {
-    sg_api_ge_bcast_t *api = (sg_api_ge_bcast_t*) args;
+void tpu_kernel_api_comparision_bcast(const void *args) {
+    sg_api_comparision_bcast_t *api = (sg_api_comparision_bcast_t*) args;
     TPUKERNEL_ASSERT(api->dim > 0 && api->dim <= 4);
 
     dim4 input_shape = { .n = 1, .c = 1, .h = 1, .w = 1 };
@@ -317,22 +453,24 @@ void tpu_kernel_api_greater_bcast(const void *args) {
     }
 
     tpu_initialize();
-    nodechip_greater_bcast(api->input_global_addr,
-                           api->other_global_addr,
-                           api->output_global_addr,
-                           &input_shape,
-                           &other_shape,
-                           &output_shape,
-                           api->dtype);
+    nodechip_comparision_bcast(api->input_global_addr,
+                               api->other_global_addr,
+                               api->output_global_addr,
+                               &input_shape,
+                               &other_shape,
+                               &output_shape,
+                               api->mode,
+                               api->dtype);
     tpu_poll();
 }
-TPUKERNEL_FUNC_REGISTER(tpu_kernel_api_greater_bcast);
+TPUKERNEL_FUNC_REGISTER(tpu_kernel_api_comparision_bcast);
 
-void nodechip_greater_c(
+void nodechip_comparision_c(
 global_addr_t input_global_addr,
 global_addr_t output_global_addr,
 scalar_t value,
 int length,
+int mode,
 data_type_t dtype) {
     if(0 == length) return;
     const int bank_size = LOCAL_MEM_SIZE / LOCAL_MEM_BANKS;
@@ -363,7 +501,7 @@ data_type_t dtype) {
             shape.w = 1;
         }
         tpu_gdma_cpy_S2L(input_local_addrs[index],
-                         input_global_addr + done * tensor_size,
+                         input_global_addr + done * dtype_size,
                          &shape,
                          NULL,
                          NULL,
@@ -381,7 +519,19 @@ data_type_t dtype) {
                           DT_UINT8);
         }
         scalar_t one_u8 = {.u8 = 1};
-        tpu_bdc_greater_C(output_local_addrs[index],
+        if(mode == EQUAL) {
+            tpu_bdc_equal_C(output_local_addrs[index],
+                            input_local_addrs[index],
+                            value,
+                            one_u8,
+                            &shape,
+                            NULL,
+                            NULL,
+                            DT_UINT8,
+                            dtype);
+        }
+        else if(mode == NOT_EQUAL) {
+            tpu_bdc_not_equal_C(output_local_addrs[index],
                                 input_local_addrs[index],
                                 value,
                                 one_u8,
@@ -390,6 +540,51 @@ data_type_t dtype) {
                                 NULL,
                                 DT_UINT8,
                                 dtype);
+        }
+        else if(mode == GREATER) {
+            tpu_bdc_greater_C(output_local_addrs[index],
+                              input_local_addrs[index],
+                              value,
+                              one_u8,
+                              &shape,
+                              NULL,
+                              NULL,
+                              DT_UINT8,
+                              dtype);
+        }
+        else if(mode == GREATER_OR_EQUAL) {
+            tpu_bdc_greater_equal_C(output_local_addrs[index],
+                                    input_local_addrs[index],
+                                    value,
+                                    one_u8,
+                                    &shape,
+                                    NULL,
+                                    NULL,
+                                    DT_UINT8,
+                                    dtype);
+        }
+        else if(mode == LESS_THAN) {
+            tpu_bdc_less_C(output_local_addrs[index],
+                           input_local_addrs[index],
+                           value,
+                           one_u8,
+                           &shape,
+                           NULL,
+                           NULL,
+                           DT_UINT8,
+                           dtype);
+        }
+        else if(mode == LESS_THAN_OR_EQUAL) {
+            tpu_bdc_less_equal_C(output_local_addrs[index],
+                                 input_local_addrs[index],
+                                 value,
+                                 one_u8,
+                                 &shape,
+                                 NULL,
+                                 NULL,
+                                 DT_UINT8,
+                                 dtype);
+        }
         l2s = true;
         l2s_global_addr = output_global_addr + done * tpu_data_type_size(DT_UINT8);
         l2s_local_addr = output_local_addrs[index];
@@ -410,8 +605,8 @@ data_type_t dtype) {
                          DT_UINT8);
     }
 }
-void tpu_kernel_api_greater_c(const void *args) {
-    sg_api_gt_c_t *api = (sg_api_gt_c_t*)args;
+void tpu_kernel_api_comparision_c(const void *args) {
+    sg_api_comparision_c_t *api = (sg_api_comparision_c_t*)args;
     scalar_t value;
     if(api->dtype == DT_FP32) {
         value.f32 = api->const_value;
@@ -427,12 +622,13 @@ void tpu_kernel_api_greater_c(const void *args) {
     }
     tpu_initialize();
 
-    nodechip_greater_c(api->input_global_addr,
-                                api->output_global_addr,
-                                value,
-                                length,
-                                api->dtype);
+    nodechip_comparision_c(api->input_global_addr,
+                           api->output_global_addr,
+                           value,
+                           length,
+                           api->mode,
+                           api->dtype);
 
     tpu_poll();
 }
-TPUKERNEL_FUNC_REGISTER(tpu_kernel_api_greater_c);
+TPUKERNEL_FUNC_REGISTER(tpu_kernel_api_comparision_c);

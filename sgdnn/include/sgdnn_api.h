@@ -1164,106 +1164,45 @@ bm_status_t sgdnnIsnan(bm_handle_t handle,
                        SgdnnTensor_t input,
                        SgdnnTensor_t output );
 
+
 /*
- *  OUTPUT  = EQUAL ( input, other, output )
+ *  OUTPUT  = COMPARISION ( input, other, output )
  *  Note:
  *  1. input, other and output only support in dtype.
  *  2. input, other and output must be the same shape.
+ *  3. 0 equal, 1 not equal, 2 greater, 3 greater or equal, 4 less than, 5 less than or equal
  */
-bm_status_t sgdnnEqual ( bm_handle_t handle,
-                         SgdnnTensor_t input,
-                         SgdnnTensor_t other,
-                         SgdnnTensor_t output );
+bm_status_t sgdnnComparision ( bm_handle_t handle,
+                               SgdnnTensor_t input,
+                               SgdnnTensor_t other,
+                               int mode,
+                               SgdnnTensor_t output );
 /*
- *  OUTPUT  = Equal ( input, other, output )
+ *  OUTPUT  = COMPARISION ( input, other, output )
  *  Note:
  *  1. input, other and output only support in dtype.
  *  2. input and output must be the same shape.
  *  3. input and other must be the same dim.
+ *  4. 0 equal, 1 not equal, 2 greater, 3 greater or equal, 4 less than, 5 less than or equal
  */
-bm_status_t sgdnnEqualBcast ( bm_handle_t handle,
-                              SgdnnTensor_t input,
-                              SgdnnTensor_t other,
-                              SgdnnTensor_t output );
+bm_status_t sgdnnComparisionBcast ( bm_handle_t handle,
+                                    SgdnnTensor_t input,
+                                    SgdnnTensor_t other,
+                                    int mode,
+                                    SgdnnTensor_t output );
 /*
- *  OUTPUT  = EQUAL ( input, other, output )
+ *  OUTPUT  = COMPARISION ( input, other, output )
  *  Note:
  *  1. input, other and output only support in dtype.
  *  2. one of input and other must be a scalar.
  *  3. input and output must be in the same shape.
+ *  4. 0 equal, 1 not equal, 2 greater, 3 greater or equal, 4 less than, 5 less than or equal
  */
-bm_status_t sgdnnEqualC ( bm_handle_t handle,
-                          SgdnnTensor_t input,
-                          float scalar,
-                          SgdnnTensor_t output );
-
-
-/*
- *  OUTPUT  = GREATER_OR_EQUAL ( input, other, output )
- *  Note:
- *  1. input, other and output only support in dtype.
- *  2. input, other and output must be the same shape.
- */
-bm_status_t sgdnnGe ( bm_handle_t handle,
-                      SgdnnTensor_t input,
-                      SgdnnTensor_t other,
-                      SgdnnTensor_t output );
-/*
- *  OUTPUT  = GREATER_OR_EQUAL ( input, other, output )
- *  Note:
- *  1. input, other and output only support in dtype.
- *  2. input and output must be the same shape.
- *  3. input and other must be the same dim.
- */
-bm_status_t sgdnnGeBcast ( bm_handle_t handle,
-                           SgdnnTensor_t input,
-                           SgdnnTensor_t other,
-                           SgdnnTensor_t output );
-/*
- *  OUTPUT  = GREATER_OR_EQUAL ( input, other, output )
- *  Note:
- *  1. input, other and output only support in dtype.
- *  2. one of input and other must be a scalar.
- *  3. input and output must be in the same shape.
- */
-bm_status_t sgdnnGeC ( bm_handle_t handle,
-                       SgdnnTensor_t input,
-                       float scalar,
-                       SgdnnTensor_t output );
-
-
-/*
- *  OUTPUT  = GREATER ( input, other, output )
- *  Note:
- *  1. input, other and output only support in dtype.
- *  2. input, other and output must be the same shape.
- */
-bm_status_t sgdnnGt ( bm_handle_t handle,
-                      SgdnnTensor_t input,
-                      SgdnnTensor_t other,
-                      SgdnnTensor_t output );
-/*
- *  OUTPUT  = GREATER ( input, other, output )
- *  Note:
- *  1. input, other and output only support in dtype.
- *  2. input and output must be the same shape.
- *  3. input and other must be the same dim.
- */
-bm_status_t sgdnnGtBcast ( bm_handle_t handle,
-                           SgdnnTensor_t input,
-                           SgdnnTensor_t other,
-                           SgdnnTensor_t output );
-/*
- *  OUTPUT  = GREATER ( input, other, output )
- *  Note:
- *  1. input, other and output only support in dtype.
- *  2. one of input and other must be a scalar.
- *  3. input and output must be in the same shape.
- */
-bm_status_t sgdnnGtC ( bm_handle_t handle,
-                       SgdnnTensor_t input,
-                       float scalar,
-                       SgdnnTensor_t output );
+bm_status_t sgdnnComparisionC ( bm_handle_t handle,
+                                SgdnnTensor_t input,
+                                float scalar,
+                                int mode,
+                                SgdnnTensor_t output );
 
 /*
  * OUTPUT = MINIMUMC(INPUT,SCALAR)
@@ -1382,106 +1321,6 @@ bm_status_t sgdnnAtan2Bcast ( bm_handle_t handle,
                         SgdnnTensor_t other,
                         SgdnnTensor_t output );
 
-
-/*
- *  OUTPUT  = LESS_THAN_OR_EQUAL ( input, other, output )
- *  Note:
- *  1. input, other and output only support in dtype.
- *  2. input, other and output must be the same shape.
- */
-bm_status_t sgdnnLe ( bm_handle_t handle,
-                      SgdnnTensor_t input,
-                      SgdnnTensor_t other,
-                      SgdnnTensor_t output );
-/*
- *  OUTPUT  = LESS_THAN_OR_EQUAL ( input, other, output )
- *  Note:
- *  1. input, other and output only support in dtype.
- *  2. input and output must be the same shape.
- *  3. input and other must be the same dim.
- */
-bm_status_t sgdnnLeBcast ( bm_handle_t handle,
-                           SgdnnTensor_t input,
-                           SgdnnTensor_t other,
-                           SgdnnTensor_t output );
-/*
- *  OUTPUT  = LESS_THAN_OR_EQUAL ( input, other, output )
- *  Note:
- *  1. input, other and output only support in dtype.
- *  2. one of input and other must be a scalar.
- *  3. input and output must be in the same shape.
- */
-bm_status_t sgdnnLeC ( bm_handle_t handle,
-                       SgdnnTensor_t input,
-                       float scalar,
-                       SgdnnTensor_t output );
-
-
-/*
- *  OUTPUT  = LESS_THAN ( input, other, output )
- *  Note:
- *  1. input, other and output only support in dtype.
- *  2. input, other and output must be the same shape.
- */
-bm_status_t sgdnnLt ( bm_handle_t handle,
-                      SgdnnTensor_t input,
-                      SgdnnTensor_t other,
-                      SgdnnTensor_t output );
-/*
- *  OUTPUT  = LESS_THAN ( input, other, output )
- *  Note:
- *  1. input, other and output only support in dtype.
- *  2. input and output must be the same shape.
- *  3. input and other must be the same dim.
- */
-bm_status_t sgdnnLtBcast ( bm_handle_t handle,
-                           SgdnnTensor_t input,
-                           SgdnnTensor_t other,
-                           SgdnnTensor_t output );
-/*
- *  OUTPUT  = LESS_THAN ( input, other, output )
- *  Note:
- *  1. input, other and output only support in dtype.
- *  2. one of input and other must be a scalar.
- *  3. input and output must be in the same shape.
- */
-bm_status_t sgdnnLtC ( bm_handle_t handle,
-                       SgdnnTensor_t input,
-                       float scalar,
-                       SgdnnTensor_t output );
-
-/*
- *  OUTPUT  = NOT_EQUAL ( input, other, output )
- *  Note:
- *  1. input, other and output only support in dtype.
- *  2. input, other and output must be the same shape.
- */
-bm_status_t sgdnnNotEqual ( bm_handle_t handle,
-                            SgdnnTensor_t input,
-                            SgdnnTensor_t other,
-                            SgdnnTensor_t output );
-/*
- *  OUTPUT  = NOT_EQUAL ( input, other, output )
- *  Note:
- *  1. input, other and output only support in dtype.
- *  2. input and output must be the same shape.
- *  3. input and other must be the same dim.
- */
-bm_status_t sgdnnNotEqualBcast ( bm_handle_t handle,
-                                 SgdnnTensor_t input,
-                                 SgdnnTensor_t other,
-                                 SgdnnTensor_t output );
-/*
- *  OUTPUT  = NOT_EQUAL ( input, other, output )
- *  Note:
- *  1. input, other and output only support in dtype.
- *  2. one of input and other must be a scalar.
- *  3. input and output must be in the same shape.
- */
-bm_status_t sgdnnNotEqualC ( bm_handle_t handle,
-                             SgdnnTensor_t input,
-                             float scalar,
-                             SgdnnTensor_t output );
 /*
  * OUTPUT  = Badddbmm ( INPUT1, BATCH1, BATCH2, OUT, ALPHA, BETA )
  * Note:
