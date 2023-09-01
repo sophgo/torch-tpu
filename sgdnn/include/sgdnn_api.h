@@ -48,12 +48,6 @@ typedef struct
 }
 SgdnnTensor_t;
 
-typedef enum
-{
-  SHIFT_LEFT_LOGICAL = 0,
-  SHIFT_RIGHT_ARITHMETIC = 1
-}
-SHIFT_TYPE;
 static inline SgdnnTensor_t sgdnnUndefinedTensor()
 {
   SgdnnTensor_t tensor = { .addr = 0 };
