@@ -953,39 +953,44 @@ bm_status_t sgdnnArange ( bm_handle_t handle,
                                 int step,
                                 SgdnnTensor_t out);
 
-
 /*
- *  OUTPUT  = BITWISE_XOR ( input, other, output )
+ *  OUTPUT  = ELEMENT_BITWISE ( input, other, output )
  *  Note:
  *  1. input, other and output only support int32 uint32 int8 uint8.
  *  2. input, other and output must be the same shape.
+ *  3. mode : 0 for xor, 1 for and, 2 for or
  */
-bm_status_t sgdnnBitwiseXor ( bm_handle_t handle,
-                              SgdnnTensor_t input,
-                              SgdnnTensor_t other,
-                              SgdnnTensor_t output );
+bm_status_t sgdnnElementBitwise ( bm_handle_t handle,
+                                  SgdnnTensor_t input,
+                                  SgdnnTensor_t other,
+                                  int mode,
+                                  SgdnnTensor_t output );
 
 /*
- *  OUTPUT  = BITWISE_XOR ( input, other, output )
+ *  OUTPUT  = ELEMENT_BITWISE ( input, other, output )
  *  Note:
  *  1. input, other and output only support int32 uint32 int8 uint8.
  *  2. input and output must be the same shape.
  *  3. input and other must be the same dim.
+ *  4. mode : 0 for xor, 1 for and, 2 for or
  */
-bm_status_t sgdnnBitwiseXorBcast ( bm_handle_t handle,
-                                   SgdnnTensor_t input,
-                                   SgdnnTensor_t other,
-                                   SgdnnTensor_t output );
+bm_status_t sgdnnElementBitwiseBcast ( bm_handle_t handle,
+                                       SgdnnTensor_t input,
+                                       SgdnnTensor_t other,
+                                       int mode,
+                                       SgdnnTensor_t output );
 /*
- *  OUTPUT  = BITWISE_XOR ( input, other, output )
+ *  OUTPUT  = ELEMENT_BITWISE ( input, other, output )
  *  Note:
  *  1. input, other and output only support int32 uint32 int8 uint8.
  *  2. input and output must be the same shape.
+ *  3. mode : 0 for xor, 1 for and, 2 for or
  */
-bm_status_t sgdnnBitwiseXorC ( bm_handle_t handle,
-                               SgdnnTensor_t input,
-                               int scalar,
-                               SgdnnTensor_t output );
+bm_status_t sgdnnElementBitwiseC ( bm_handle_t handle,
+                                   SgdnnTensor_t input,
+                                   int scalar,
+                                   int mode,
+                                   SgdnnTensor_t output );
 
 /*
  * OUTPUT = ASIN(INPUT)
@@ -1137,72 +1142,6 @@ bm_status_t sgdnnIsinf(bm_handle_t handle,
 bm_status_t sgdnnIsnan(bm_handle_t handle,
                        SgdnnTensor_t input,
                        SgdnnTensor_t output );
-
-/*
- *  OUTPUT  = BITWISE_AND ( input, other, output )
- *  Note:
- *  1. input, other and output only support int32 uint32 int8 uint8.
- *  2. input, other and output must be the same shape.
- */
-bm_status_t sgdnnBitwiseAnd ( bm_handle_t handle,
-                              SgdnnTensor_t input,
-                              SgdnnTensor_t other,
-                              SgdnnTensor_t output );
-
-/*
- *  OUTPUT  = BITWISE_AND ( input, other, output )
- *  Note:
- *  1. input, other and output only support int32 uint32 int8 uint8.
- *  2. input and output must be the same shape.
- *  3. input and other must be the same dim.
- */
-bm_status_t sgdnnBitwiseAndBcast ( bm_handle_t handle,
-                                   SgdnnTensor_t input,
-                                   SgdnnTensor_t other,
-                                   SgdnnTensor_t output );
-/*
- *  OUTPUT  = BITWISE_AND ( input, other, output )
- *  Note:
- *  1. input, scalar and output only support int32 uint32 int8 uint8.
- *  2. input and output must be the same shape.
- */
-bm_status_t sgdnnBitwiseAndC ( bm_handle_t handle,
-                               SgdnnTensor_t input,
-                               int scalar,
-                               SgdnnTensor_t output );
-
-/*
- *  OUTPUT  = BITWISE_OR ( input, other, output )
- *  Note:
- *  1. input, other and output only support int32 uint32 int8 uint8.
- *  2. input, other and output must be the same shape.
- */
-bm_status_t sgdnnBitwiseOr ( bm_handle_t handle,
-                              SgdnnTensor_t input,
-                              SgdnnTensor_t other,
-                              SgdnnTensor_t output );
-
-/*
- *  OUTPUT  = BITWISE_OR ( input, other, output )
- *  Note:
- *  1. input, other and output only support int32 uint32 int8 uint8.
- *  2. input and output must be the same shape.
- *  3. input and other must be the same dim.
- */
-bm_status_t sgdnnBitwiseOrBcast ( bm_handle_t handle,
-                                   SgdnnTensor_t input,
-                                   SgdnnTensor_t other,
-                                   SgdnnTensor_t output );
-/*
- *  OUTPUT  = BITWISE_OR ( input, other, output )
- *  Note:
- *  1. input, scalar and output only support int32 uint32 int8 uint8.
- *  2. input and output must be the same shape.
- */
-bm_status_t sgdnnBitwiseOrC ( bm_handle_t handle,
-                               SgdnnTensor_t input,
-                               int scalar,
-                               SgdnnTensor_t output );
 
 /*
  *  OUTPUT  = EQUAL ( input, other, output )

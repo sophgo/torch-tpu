@@ -487,10 +487,12 @@ Tensor &bitwise_xor_out_tpu(const Tensor &self, const Tensor &other,
 #ifdef TPU_OP_TIMING
     auto timer = tpu::Timer().Start();
 #endif
-    bm_status_t status = sgdnnBitwiseXorC(
-        tpu::TPUGetDeviceHandle(), tpu::TPUGenerateSgdnnTensor(other),
-        self.item().toInt(), tpu::TPUGenerateSgdnnTensor(out));
-    TORCH_CHECK(status == BM_SUCCESS);
+    bm_status_t status = sgdnnElementBitwiseC(tpu::TPUGetDeviceHandle(),
+                                              tpu:: TPUGenerateSgdnnTensor ( other ),
+                                              self.item().toInt(),
+                                              0,      // 0 for xor, 1 for and, 2 for or
+                                              tpu:: TPUGenerateSgdnnTensor ( out ) );
+    TORCH_CHECK ( status == BM_SUCCESS );
 #ifdef TPU_OP_TIMING
     tpu::OpTimer::Instance().AddTime(tpu::BITWISE_XOR_C, timer.ElapsedUS());
 #endif
@@ -500,10 +502,12 @@ Tensor &bitwise_xor_out_tpu(const Tensor &self, const Tensor &other,
 #ifdef TPU_OP_TIMING
     auto timer = tpu::Timer().Start();
 #endif
-    bm_status_t status = sgdnnBitwiseXorC(
-        tpu::TPUGetDeviceHandle(), tpu::TPUGenerateSgdnnTensor(self),
-        other.item().toInt(), tpu::TPUGenerateSgdnnTensor(out));
-    TORCH_CHECK(status == BM_SUCCESS);
+    bm_status_t status = sgdnnElementBitwiseC(tpu::TPUGetDeviceHandle(),
+                                              tpu:: TPUGenerateSgdnnTensor ( self ),
+                                              other.item().toInt(),
+                                              0,      // 0 for xor, 1 for and, 2 for or
+                                              tpu:: TPUGenerateSgdnnTensor ( out ) );
+    TORCH_CHECK ( status == BM_SUCCESS );
 #ifdef TPU_OP_TIMING
     tpu::OpTimer::Instance().AddTime(tpu::BITWISE_XOR_C, timer.ElapsedUS());
 #endif
@@ -514,10 +518,12 @@ Tensor &bitwise_xor_out_tpu(const Tensor &self, const Tensor &other,
 #ifdef TPU_OP_TIMING
       auto timer = tpu::Timer().Start();
 #endif
-      bm_status_t status = sgdnnBitwiseXor(
-          tpu::TPUGetDeviceHandle(), tpu::TPUGenerateSgdnnTensor(self),
-          tpu::TPUGenerateSgdnnTensor(other), tpu::TPUGenerateSgdnnTensor(out));
-      TORCH_CHECK(status == BM_SUCCESS);
+      bm_status_t status = sgdnnElementBitwise(tpu::TPUGetDeviceHandle(),
+                                               tpu:: TPUGenerateSgdnnTensor ( self ),
+                                               tpu:: TPUGenerateSgdnnTensor ( other ),
+                                               0,      // 0 for xor, 1 for and, 2 for or
+                                               tpu:: TPUGenerateSgdnnTensor ( out ) );
+      TORCH_CHECK ( status == BM_SUCCESS );
 #ifdef TPU_OP_TIMING
       tpu::OpTimer::Instance().AddTime(tpu::BITWISE_XOR, timer.ElapsedUS());
 #endif
@@ -527,10 +533,12 @@ Tensor &bitwise_xor_out_tpu(const Tensor &self, const Tensor &other,
 #ifdef TPU_OP_TIMING
       auto timer = tpu::Timer().Start();
 #endif
-      bm_status_t status = sgdnnBitwiseXorBcast(
-          tpu::TPUGetDeviceHandle(), tpu::TPUGenerateSgdnnTensor(self),
-          tpu::TPUGenerateSgdnnTensor(other), tpu::TPUGenerateSgdnnTensor(out));
-      TORCH_CHECK(status == BM_SUCCESS);
+      bm_status_t status = sgdnnElementBitwiseBcast(tpu::TPUGetDeviceHandle(),
+                                                    tpu:: TPUGenerateSgdnnTensor ( self ),
+                                                    tpu:: TPUGenerateSgdnnTensor ( other ),                                              
+                                                    0,      // 0 for xor, 1 for and, 2 for or
+                                                    tpu:: TPUGenerateSgdnnTensor ( out ) );
+      TORCH_CHECK ( status == BM_SUCCESS );
 #ifdef TPU_OP_TIMING
       tpu::OpTimer::Instance().AddTime(tpu::BITWISE_XOR_BCAST,
                                        timer.ElapsedUS());
@@ -565,10 +573,12 @@ Tensor &bitwise_and_out_tpu(const Tensor &self, const Tensor &other,
 #ifdef TPU_OP_TIMING
     auto timer = tpu::Timer().Start();
 #endif
-    bm_status_t status = sgdnnBitwiseAndC(
-        tpu::TPUGetDeviceHandle(), tpu::TPUGenerateSgdnnTensor(other),
-        self.item().toInt(), tpu::TPUGenerateSgdnnTensor(out));
-    TORCH_CHECK(status == BM_SUCCESS);
+    bm_status_t status = sgdnnElementBitwiseC(tpu::TPUGetDeviceHandle(),
+                                              tpu:: TPUGenerateSgdnnTensor ( other ),
+                                              self.item().toInt(),
+                                              1,      // 0 for xor, 1 for and, 2 for or
+                                              tpu:: TPUGenerateSgdnnTensor ( out ) );
+    TORCH_CHECK ( status == BM_SUCCESS );
 #ifdef TPU_OP_TIMING
     tpu::OpTimer::Instance().AddTime(tpu::BITWISE_AND_C, timer.ElapsedUS());
 #endif
@@ -578,10 +588,12 @@ Tensor &bitwise_and_out_tpu(const Tensor &self, const Tensor &other,
 #ifdef TPU_OP_TIMING
     auto timer = tpu::Timer().Start();
 #endif
-    bm_status_t status = sgdnnBitwiseAndC(
-        tpu::TPUGetDeviceHandle(), tpu::TPUGenerateSgdnnTensor(self),
-        other.item().toInt(), tpu::TPUGenerateSgdnnTensor(out));
-    TORCH_CHECK(status == BM_SUCCESS);
+    bm_status_t status = sgdnnElementBitwiseC(tpu::TPUGetDeviceHandle(),
+                                              tpu:: TPUGenerateSgdnnTensor ( self ),
+                                              other.item().toInt(),
+                                              1,      // 0 for xor, 1 for and, 2 for or
+                                              tpu:: TPUGenerateSgdnnTensor ( out ) );
+    TORCH_CHECK ( status == BM_SUCCESS );
 #ifdef TPU_OP_TIMING
     tpu::OpTimer::Instance().AddTime(tpu::BITWISE_AND_C, timer.ElapsedUS());
 #endif
@@ -592,10 +604,12 @@ Tensor &bitwise_and_out_tpu(const Tensor &self, const Tensor &other,
 #ifdef TPU_OP_TIMING
       auto timer = tpu::Timer().Start();
 #endif
-      bm_status_t status = sgdnnBitwiseAnd(
-          tpu::TPUGetDeviceHandle(), tpu::TPUGenerateSgdnnTensor(self),
-          tpu::TPUGenerateSgdnnTensor(other), tpu::TPUGenerateSgdnnTensor(out));
-      TORCH_CHECK(status == BM_SUCCESS);
+      bm_status_t status = sgdnnElementBitwise(tpu::TPUGetDeviceHandle(),
+                                               tpu:: TPUGenerateSgdnnTensor ( self ),
+                                               tpu:: TPUGenerateSgdnnTensor ( other ),
+                                               1,      // 0 for xor, 1 for and, 2 for or
+                                               tpu:: TPUGenerateSgdnnTensor ( out ) );
+      TORCH_CHECK ( status == BM_SUCCESS );
 #ifdef TPU_OP_TIMING
       tpu::OpTimer::Instance().AddTime(tpu::BITWISE_AND, timer.ElapsedUS());
 #endif
@@ -605,10 +619,12 @@ Tensor &bitwise_and_out_tpu(const Tensor &self, const Tensor &other,
 #ifdef TPU_OP_TIMING
       auto timer = tpu::Timer().Start();
 #endif
-      bm_status_t status = sgdnnBitwiseAndBcast(
-          tpu::TPUGetDeviceHandle(), tpu::TPUGenerateSgdnnTensor(self),
-          tpu::TPUGenerateSgdnnTensor(other), tpu::TPUGenerateSgdnnTensor(out));
-      TORCH_CHECK(status == BM_SUCCESS);
+      bm_status_t status = sgdnnElementBitwiseBcast(tpu::TPUGetDeviceHandle(),
+                                                    tpu:: TPUGenerateSgdnnTensor ( self ),
+                                                    tpu:: TPUGenerateSgdnnTensor ( other ),                                              
+                                                    1,      // 0 for xor, 1 for and, 2 for or
+                                                    tpu:: TPUGenerateSgdnnTensor ( out ) );
+      TORCH_CHECK ( status == BM_SUCCESS );
 #ifdef TPU_OP_TIMING
       tpu::OpTimer::Instance().AddTime(tpu::BITWISE_AND_BCAST,
                                        timer.ElapsedUS());
@@ -643,10 +659,12 @@ Tensor &bitwise_or_out_tpu(const Tensor &self, const Tensor &other,
 #ifdef TPU_OP_TIMING
     auto timer = tpu::Timer().Start();
 #endif
-    bm_status_t status = sgdnnBitwiseOrC(
-        tpu::TPUGetDeviceHandle(), tpu::TPUGenerateSgdnnTensor(other),
-        self.item().toInt(), tpu::TPUGenerateSgdnnTensor(out));
-    TORCH_CHECK(status == BM_SUCCESS);
+    bm_status_t status = sgdnnElementBitwiseC(tpu::TPUGetDeviceHandle(),
+                                              tpu:: TPUGenerateSgdnnTensor ( other ),
+                                              self.item().toInt(),
+                                              2,      // 0 for xor, 1 for and, 2 for or
+                                              tpu:: TPUGenerateSgdnnTensor ( out ) );
+    TORCH_CHECK ( status == BM_SUCCESS );
 #ifdef TPU_OP_TIMING
     tpu::OpTimer::Instance().AddTime(tpu::BITWISE_OR_C, timer.ElapsedUS());
 #endif
@@ -656,10 +674,12 @@ Tensor &bitwise_or_out_tpu(const Tensor &self, const Tensor &other,
 #ifdef TPU_OP_TIMING
     auto timer = tpu::Timer().Start();
 #endif
-    bm_status_t status = sgdnnBitwiseOrC(
-        tpu::TPUGetDeviceHandle(), tpu::TPUGenerateSgdnnTensor(self),
-        other.item().toInt(), tpu::TPUGenerateSgdnnTensor(out));
-    TORCH_CHECK(status == BM_SUCCESS);
+    bm_status_t status = sgdnnElementBitwiseC(tpu::TPUGetDeviceHandle(),
+                                              tpu:: TPUGenerateSgdnnTensor ( self ),
+                                              other.item().toInt(),
+                                              2,      // 0 for xor, 1 for and, 2 for or
+                                              tpu:: TPUGenerateSgdnnTensor ( out ) );
+    TORCH_CHECK ( status == BM_SUCCESS );
 #ifdef TPU_OP_TIMING
     tpu::OpTimer::Instance().AddTime(tpu::BITWISE_OR_C, timer.ElapsedUS());
 #endif
@@ -670,10 +690,12 @@ Tensor &bitwise_or_out_tpu(const Tensor &self, const Tensor &other,
 #ifdef TPU_OP_TIMING
       auto timer = tpu::Timer().Start();
 #endif
-      bm_status_t status = sgdnnBitwiseOr(
-          tpu::TPUGetDeviceHandle(), tpu::TPUGenerateSgdnnTensor(self),
-          tpu::TPUGenerateSgdnnTensor(other), tpu::TPUGenerateSgdnnTensor(out));
-      TORCH_CHECK(status == BM_SUCCESS);
+      bm_status_t status = sgdnnElementBitwise(tpu::TPUGetDeviceHandle(),
+                                               tpu:: TPUGenerateSgdnnTensor ( self ),
+                                               tpu:: TPUGenerateSgdnnTensor ( other ),
+                                               2,      // 0 for xor, 1 for and, 2 for or
+                                               tpu:: TPUGenerateSgdnnTensor ( out ) );
+      TORCH_CHECK ( status == BM_SUCCESS );
 #ifdef TPU_OP_TIMING
       tpu::OpTimer::Instance().AddTime(tpu::BITWISE_OR, timer.ElapsedUS());
 #endif
@@ -683,10 +705,12 @@ Tensor &bitwise_or_out_tpu(const Tensor &self, const Tensor &other,
 #ifdef TPU_OP_TIMING
       auto timer = tpu::Timer().Start();
 #endif
-      bm_status_t status = sgdnnBitwiseOrBcast(
-          tpu::TPUGetDeviceHandle(), tpu::TPUGenerateSgdnnTensor(self),
-          tpu::TPUGenerateSgdnnTensor(other), tpu::TPUGenerateSgdnnTensor(out));
-      TORCH_CHECK(status == BM_SUCCESS);
+      bm_status_t status = sgdnnElementBitwiseBcast(tpu::TPUGetDeviceHandle(),
+                                                    tpu:: TPUGenerateSgdnnTensor ( self ),
+                                                    tpu:: TPUGenerateSgdnnTensor ( other ),                                              
+                                                    2,      // 0 for xor, 1 for and, 2 for or
+                                                    tpu:: TPUGenerateSgdnnTensor ( out ) );
+      TORCH_CHECK ( status == BM_SUCCESS );
 #ifdef TPU_OP_TIMING
       tpu::OpTimer::Instance().AddTime(tpu::BITWISE_OR_BCAST,
                                        timer.ElapsedUS());

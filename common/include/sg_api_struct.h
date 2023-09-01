@@ -87,6 +87,11 @@ typedef enum {
   UPSAMPLING_BILINEAR = 1,
 } sg_resize_mode_t;
 
+typedef enum {
+  BITWISE_XOR,
+  BITWISE_AND,
+  BITWISE_OR,
+} sg_element_bitwise_mode_t;
 
 typedef struct {
   unsigned long long input_global_addr;
@@ -974,6 +979,41 @@ typedef struct
 
 } WITH_PLATFORM(sg_api_arange_t);
 
+typedef struct
+{
+  unsigned long long input_global_addr;
+  unsigned long long other_global_addr;
+  unsigned long long output_global_addr;
+  int shape[FW_MAX_SHAPE_DIMS];
+  int dim;
+  float value;
+  int dtype;
+  int mode;
+} WITH_PLATFORM(sg_api_element_bitwise_t);
+
+typedef struct
+{
+  unsigned long long input_global_addr;
+  unsigned long long other_global_addr;
+  unsigned long long output_global_addr;
+  int input_shape[FW_MAX_SHAPE_DIMS];
+  int other_shape[FW_MAX_SHAPE_DIMS];
+  int dim;
+  float value;
+  int dtype;
+  int mode;
+} WITH_PLATFORM(sg_api_element_bitwise_bcast_t);
+
+typedef struct
+{
+  unsigned long long input_global_addr;
+  unsigned long long output_global_addr;
+  int shape[FW_MAX_SHAPE_DIMS];
+  int dim;
+  int value;
+  int dtype;
+  int mode;
+} WITH_PLATFORM(sg_api_element_bitwise_c_t);
 
 typedef struct
 {
