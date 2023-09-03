@@ -713,6 +713,16 @@ typedef struct
   sg_log_type_t log_type; // 0 for log, 1 for log1p, 2 for log2, 10 for log10
 } WITH_PLATFORM(sg_api_log_t);
 
+typedef struct {
+  unsigned long long input_global_addr;
+  unsigned long long output_global_addr;
+  int shape[FW_MAX_SHAPE_DIMS];
+  int dim;
+  int tile_axis;
+  int tile_num;
+  int dtype;
+} WITH_PLATFORM(sg_api_squeeze_t);
+
 typedef struct
 {
   unsigned long long input_global_addr;

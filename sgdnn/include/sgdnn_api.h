@@ -230,6 +230,15 @@ bm_status_t sgdnnLog ( bm_handle_t handle,
                        SgdnnTensor_t output,
                        sg_log_type_t log_type);
 
+/*
+ * OUTPUT = squeeze(INPUT)
+ * Note:
+ * 1. The data types of INPUT must be the same and one of FP32, FP16 and BF16
+ * 2. INPUT must be contiguous
+ */
+bm_status_t sgdnnSqueeze ( bm_handle_t handle,
+                       SgdnnTensor_t input,
+                       SgdnnTensor_t output);
 
 /*
  * OUTPUT = INPUT || OTHER
@@ -624,7 +633,7 @@ bm_status_t sgdnnClamp ( bm_handle_t handle,
                          float min,
                          float max,
                          SgdnnTensor_t output );
-                      
+
 bm_status_t sgdnnSqrt ( bm_handle_t handle,
                         SgdnnTensor_t input,
                         SgdnnTensor_t output );
@@ -634,7 +643,7 @@ bm_status_t sgdnnSqrt ( bm_handle_t handle,
  * 1. The data types of INPUT and OUTPUT must be the same and one of FP32, FP16 and BF16
  * 2. The shapes of INPUT and OUTPUT must be the same
  * 3. INPUT and OUTPUT must be contiguous
- */   
+ */
 bm_status_t sgdnnRsqrt ( bm_handle_t handle,
                         SgdnnTensor_t input,
                         SgdnnTensor_t output );
@@ -1044,7 +1053,7 @@ bm_status_t sgdnnSinh (bm_handle_t handle,
  */
 bm_status_t sgdnnCosh (bm_handle_t handle,
                        SgdnnTensor_t input,
-                       SgdnnTensor_t output );     
+                       SgdnnTensor_t output );
   /*
  * OUTPUT = TANH(INPUT)
  * Note:
@@ -1054,7 +1063,7 @@ bm_status_t sgdnnCosh (bm_handle_t handle,
  */
 bm_status_t sgdnnTanh (bm_handle_t handle,
                        SgdnnTensor_t input,
-                       SgdnnTensor_t output );                                          
+                       SgdnnTensor_t output );
 /*
  * OUTPUT = CEIL(INPUT)
  * Note:
@@ -1579,7 +1588,7 @@ bm_status_t sgdnnFmax ( bm_handle_t handle,
 bm_status_t sgdnnFmaxBcast ( bm_handle_t handle,
                         SgdnnTensor_t input,
                         SgdnnTensor_t other,
-                        SgdnnTensor_t output );  
+                        SgdnnTensor_t output );
 
 /*
  * OUTPUT = FMINC(INPUT,SCALAR)
@@ -1614,7 +1623,8 @@ bm_status_t sgdnnFmin ( bm_handle_t handle,
 bm_status_t sgdnnFminBcast ( bm_handle_t handle,
                         SgdnnTensor_t input,
                         SgdnnTensor_t other,
-                        SgdnnTensor_t output );  
+                        SgdnnTensor_t output );
+
 /*
  * OUTPUT = LAYERNORM_MATMUL ( INPUT0, INPUT1, W, B, GAMMA, BETA, EPS, OUT_ADDR, MEAN, RSTD, OUTPUT )
  * Note:
