@@ -105,4 +105,15 @@ TORCH_LIBRARY_IMPL ( aten, TPU, m )
   m.impl ( "as_strided", as_strided_tpu );
 }
 
+Tensor reshape_tpu (const Tensor &self, IntArrayRef proposed_shape)
+{
+  at::DimVector shape = at::infer_size_dv(proposed_shape, self.numel());
+  auto stride = at::detail::computeStride ( self.sizes(), self.strides(), shape );
+  return alias_with_sizes_and_strides(self, shape, *stride);
+}
+TORCH_LIBRARY_IMPL( aten, TPU, m)
+{
+  m.impl("reshape_symint", reshape_tpu);
+}
+
 } // namespace at
