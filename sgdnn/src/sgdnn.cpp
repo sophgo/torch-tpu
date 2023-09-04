@@ -1773,7 +1773,7 @@ bm_status_t sgdnnActive(bm_handle_t handle, SgdnnTensor_t input,
   api.dim = input.dim;
   api.dtype = sgdnnTPUKernelDType(input.dtype);
   api.active_type = active_type;
-
+  
 #if defined SGDNN_BACKEND_1684X
   if (active_type == ACTIVE_ABSVAL) {
     SGDNN_CHECK(
@@ -1977,7 +1977,7 @@ bm_status_t sgdnnExp ( bm_handle_t handle,
   return BM_SUCCESS;
 }
 
-bm_status_t sgdnnExpm1 ( bm_handle_t handle,
+  bm_status_t sgdnnExpm1 ( bm_handle_t handle,
                          SgdnnTensor_t input,
                          SgdnnTensor_t output )
 {
@@ -3157,8 +3157,8 @@ bm_status_t sgdnnSign ( bm_handle_t handle,
 }
 
 bm_status_t sgdnnRsqrt ( bm_handle_t handle,
-                       SgdnnTensor_t input,
-                       SgdnnTensor_t output )
+                        SgdnnTensor_t input,
+                        SgdnnTensor_t output )
 {
   SGDNN_CHECK ( input.dtype == output.dtype );
   SGDNN_CHECK ( input.dtype == SGDNN_DTYPE_FP32);
@@ -3187,7 +3187,7 @@ bm_status_t sgdnnRsqrt ( bm_handle_t handle,
     api.shape[i] = input.shape[i];
   }
   api.dtype = sgdnnTPUKernelDType ( input.dtype );
-  SAFE_CALL ( sgdnnTPUKernelLaunch ( handle, "tpu_kernel_api_rsqrt_multi_core", &api, sizeof ( api ) ) );
+   SAFE_CALL ( sgdnnTPUKernelLaunch ( handle, "tpu_kernel_api_rsqrt_multi_core", &api, sizeof ( api ) ) );
 #else
   SGDNN_CHECK ( false );
 #endif
@@ -3820,10 +3820,10 @@ bm_status_t sgdnnArange ( bm_handle_t handle,
 }
 
 bm_status_t sgdnnElementBitwise ( bm_handle_t handle,
-                                  SgdnnTensor_t input,
-                                  SgdnnTensor_t other,
-                                  int mode,
-                                  SgdnnTensor_t output ) {
+                              SgdnnTensor_t input,
+                              SgdnnTensor_t other,    
+                              int mode,
+                              SgdnnTensor_t output ) {
   SGDNN_CHECK ( input.dtype == other.dtype );
   SGDNN_CHECK ( input.dtype == output.dtype );
   SGDNN_CHECK ( input.dtype == SGDNN_DTYPE_INT32 ||
@@ -3844,10 +3844,10 @@ bm_status_t sgdnnElementBitwise ( bm_handle_t handle,
   api.dim = input.dim;
   for ( int i = 0; i < input.dim; ++i ) {
     api.shape[i] = input.shape[i];
-  }
+  } 
   api.mode = mode;
   api.dtype = sgdnnTPUKernelDType ( input.dtype );
-  SAFE_CALL ( sgdnnTPUKernelLaunch ( handle, "tpu_kernel_api_element_bitwise", &api, sizeof ( api ) ) );
+   SAFE_CALL ( sgdnnTPUKernelLaunch ( handle, "tpu_kernel_api_element_bitwise", &api, sizeof ( api ) ) );
 #elif defined SGDNN_BACKEND_2260
   sg_api_element_bitwise_t api;
   api.input_global_addr = input.addr;
@@ -3863,15 +3863,15 @@ bm_status_t sgdnnElementBitwise ( bm_handle_t handle,
 #else
   SGDNN_CHECK ( false );
 #endif
-
+  
   return BM_SUCCESS;
 }
 
 bm_status_t sgdnnElementBitwiseBcast ( bm_handle_t handle,
-                                       SgdnnTensor_t input,
-                                       SgdnnTensor_t other,
-                                       int mode,
-                                       SgdnnTensor_t output ) {
+                                   SgdnnTensor_t input,
+                                   SgdnnTensor_t other,     
+                                   int mode,
+                                   SgdnnTensor_t output ) {
   SGDNN_CHECK ( input.dtype == other.dtype );
   SGDNN_CHECK ( input.dtype == output.dtype );
   SGDNN_CHECK ( input.dtype == SGDNN_DTYPE_INT32 ||
@@ -3901,7 +3901,7 @@ bm_status_t sgdnnElementBitwiseBcast ( bm_handle_t handle,
   }
   for ( int i = 0; i < other.dim; ++i ) {
     api.other_shape[i] = other.shape[i];
-  }
+  }  
   api.mode = mode;
   api.dtype = sgdnnTPUKernelDType ( input.dtype );
   SAFE_CALL ( sgdnnTPUKernelLaunch ( handle, "tpu_kernel_api_element_bitwise_bcast", &api, sizeof ( api ) ) );
@@ -3916,7 +3916,7 @@ bm_status_t sgdnnElementBitwiseBcast ( bm_handle_t handle,
   }
   for ( int i = 0; i < other.dim; ++i ) {
     api.other_shape[i] = other.shape[i];
-  }
+  }  
   api.mode = mode;
   api.dtype = sgdnnTPUKernelDType ( input.dtype );
   SAFE_CALL ( sgdnnTPUKernelLaunch ( handle, "tpu_kernel_api_element_bitwise_bcast", &api, sizeof ( api ) ) );
@@ -3928,10 +3928,10 @@ bm_status_t sgdnnElementBitwiseBcast ( bm_handle_t handle,
 }
 
 bm_status_t sgdnnElementBitwiseC ( bm_handle_t handle,
-                                   SgdnnTensor_t input,
-                                   int scalar,
-                                   int mode,
-                                   SgdnnTensor_t output ) {
+                              SgdnnTensor_t input,
+                              int scalar,   
+                              int mode,
+                              SgdnnTensor_t output ) {
   SGDNN_CHECK ( input.dtype == output.dtype );
   SGDNN_CHECK ( input.dtype == SGDNN_DTYPE_INT32 ||
                 input.dtype == SGDNN_DTYPE_UINT32 ||
@@ -4199,7 +4199,7 @@ bm_status_t sgdnnTanh ( bm_handle_t handle,
   SGDNN_CHECK ( false );
 #endif
   return BM_SUCCESS;
-  
+
 }
 bm_status_t sgdnnCeil ( bm_handle_t handle,
                        SgdnnTensor_t input,
@@ -4308,7 +4308,7 @@ bm_status_t sgdnnRound ( bm_handle_t handle,
     api.shape[i] = input.shape[i];
   }
   api.dtype = sgdnnTPUKernelDType ( input.dtype );
-  SAFE_CALL ( sgdnnTPUKernelLaunch ( handle, "tpu_kernel_api_round_multi_core", &api, sizeof ( api ) ) );
+   SAFE_CALL ( sgdnnTPUKernelLaunch ( handle, "tpu_kernel_api_round_multi_core", &api, sizeof ( api ) ) );
 #else
   SGDNN_CHECK ( false );
 #endif
@@ -4335,7 +4335,7 @@ bm_status_t sgdnnNeg ( bm_handle_t handle,
     api.shape[i] = input.shape[i];
   }
   api.dtype = sgdnnTPUKernelDType ( input.dtype );
-  SAFE_CALL ( sgdnnTPUKernelLaunch ( handle, "tpu_kernel_api_neg", &api, sizeof ( api ) ) );
+   SAFE_CALL ( sgdnnTPUKernelLaunch ( handle, "tpu_kernel_api_neg", &api, sizeof ( api ) ) );
 #elif defined SGDNN_BACKEND_2260
   sg_api_neg_t api;
   api.input_global_addr = input.addr;
@@ -4346,7 +4346,7 @@ bm_status_t sgdnnNeg ( bm_handle_t handle,
     api.shape[i] = input.shape[i];
   }
   api.dtype = sgdnnTPUKernelDType ( input.dtype );
-  SAFE_CALL ( sgdnnTPUKernelLaunch ( handle, "tpu_kernel_api_neg_multi_core", &api, sizeof ( api ) ) );
+   SAFE_CALL ( sgdnnTPUKernelLaunch ( handle, "tpu_kernel_api_neg_multi_core", &api, sizeof ( api ) ) );
 #else
   SGDNN_CHECK ( false );
 #endif
@@ -6110,5 +6110,44 @@ bm_status_t sgdnnReciprocal ( bm_handle_t handle,
   SGDNN_CHECK( false );
 #endif
 
+  return BM_SUCCESS;
+}
+
+bm_status_t sgdnnSignbit ( bm_handle_t handle,
+                       SgdnnTensor_t input,
+                       SgdnnTensor_t output )
+{
+  SGDNN_CHECK ( input.dtype == SGDNN_DTYPE_FP32||
+                input.dtype == SGDNN_DTYPE_FP16||
+                input.dtype == SGDNN_DTYPE_BF16 );
+
+  SGDNN_CHECK ( sgdnnIsSameShape ( &input, &output ) );
+  SGDNN_CHECK ( sgdnnIsTensorContiguous ( &input ) );
+  SGDNN_CHECK ( sgdnnIsTensorContiguous ( &output ) );
+#if defined SGDNN_BACKEND_1684X
+  sg_api_signbit_t api;
+  api.input_global_addr = input.addr;
+  api.output_global_addr = output.addr;
+  api.dim = input.dim;
+  for ( int i = 0; i < input.dim; ++i )
+  {
+    api.shape[i] = input.shape[i];
+  }
+  api.dtype = sgdnnTPUKernelDType ( input.dtype );
+  SAFE_CALL ( sgdnnTPUKernelLaunch ( handle, "tpu_kernel_api_signbit", &api, sizeof ( api ) ) );
+#elif defined SGDNN_BACKEND_2260
+  sg_api_signbit_t api;
+  api.input_global_addr = input.addr;
+  api.output_global_addr = output.addr;
+  api.dim = input.dim;
+  for ( int i = 0; i < input.dim; ++i )
+  {
+    api.shape[i] = input.shape[i];
+  }
+  api.dtype = sgdnnTPUKernelDType ( input.dtype );
+  SAFE_CALL ( sgdnnTPUKernelLaunch ( handle, "tpu_kernel_api_signbit_multi_core", &api, sizeof ( api ) ) );
+#else
+  SGDNN_CHECK ( false );
+#endif
   return BM_SUCCESS;
 }
