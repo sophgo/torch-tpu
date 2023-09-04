@@ -36,18 +36,16 @@ def test_squeeze():
 
 def test_squeeze_dim():
 
-    num_dims = random.randint(1, 4)  # random dimension number
-    dim_sizes = [random.randint(1, 3) for _ in range(num_dims)] # random dimension size
-    a1 = torch.rand(*dim_sizes)
-
+    a1 = torch.randn(3, 3, 1, 3)
     a2 = a1.clone()
+    dim_random = random.randint(-a1.dim(), a1.dim() - 1) # get a random dim
 
     print("test_squeeze_dim, origin ======")
     print(a1,"\n",a1.shape,"\n")
-    res_cpu=torch.ops.aten.squeeze.dim(a1, 0)
+    res_cpu=torch.ops.aten.squeeze.dim(a1, dim_random)
 
     a2_tpu = a2.to(device)
-    res_tpu = torch.ops.aten.squeeze.dim(a2_tpu, 0)
+    res_tpu = torch.ops.aten.squeeze.dim(a2_tpu, dim_random)
 
     print("cpu ======")
     print(res_cpu,"\n",res_cpu.shape,"\n")

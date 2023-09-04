@@ -37,18 +37,20 @@ def test_squeeze_dim():
     #step0:set seed
     seed=1000
     set_bacis_info(seed)
+    num_dims = random.randint(1, 4)  # random dimension number
+    dim_sizes = [random.randint(1, 5) for _ in range(num_dims)] # random dimension size
+    dim_random = random.randint(-num_dims, num_dims - 1) # random dimension
 
     #step1: define test model
     class Test_Module(nn.Module):
             def __init__(self):
                 super(Test_Module, self).__init__()
             def forward(self, a1):
-                return torch.ops.aten.squeeze.dim(a1, 0)
+                return torch.ops.aten.squeeze.dim(a1, dim_random)
 
     #step2: prepare input data, Notice that the input data will be adopted not only their shapes
     #list is also acceptable
-    num_dims = random.randint(1, 4)  # random dimension number
-    dim_sizes = [random.randint(1, 5) for _ in range(num_dims)] # random dimension size
+
     input_data = [
         [torch.rand(*dim_sizes)],
     ]
@@ -66,18 +68,19 @@ def test_squeeze_dims():
     #step0:set seed
     seed=1000
     set_bacis_info(seed)
+    num_dims = random.randint(2, 4)  # random dimension number
+    dim_sizes = [random.randint(1, 5) for _ in range(num_dims)] # random dimension size
+    dim_random = random.randint(-num_dims, num_dims - 1) # random dimension
 
     #step1: define test model
     class Test_Module(nn.Module):
             def __init__(self):
                 super(Test_Module, self).__init__()
             def forward(self, a1):
-                return torch.ops.aten.squeeze.dims(a1, [0, 1])
+                return torch.ops.aten.squeeze.dims(a1, [dim_random])
 
     #step2: prepare input data, Notice that the input data will be adopted not only their shapes
     #list is also acceptable
-    num_dims = random.randint(2, 4)  # random dimension number
-    dim_sizes = [random.randint(1, 5) for _ in range(num_dims)] # random dimension size
     input_data = [
         [torch.rand(*dim_sizes)],
     ]

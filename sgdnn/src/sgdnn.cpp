@@ -1233,7 +1233,7 @@ bm_status_t sgdnnReduceProd ( bm_handle_t handle,
   sg_api_reduce_prod_t api;
   api.input_global_addr = input.addr;
   api.output_global_addr = output.addr;
-  unsigned int size = 1; 
+  unsigned int size = 1;
   for ( int i = 0; i < input.dim; ++i )
   {
     api.shape[i] = input.shape[i];
@@ -1260,7 +1260,7 @@ bm_status_t sgdnnReduceProd ( bm_handle_t handle,
   sg_api_reduce_prod_t api;
   api.input_global_addr = input.addr;
   api.output_global_addr = output.addr;
-  unsigned int size = 1; 
+  unsigned int size = 1;
   for ( int i = 0; i < input.dim; ++i )
   {
     api.shape[i] = input.shape[i];
@@ -1709,21 +1709,21 @@ bm_status_t sgdnnUpsampling(bm_handle_t handle, SgdnnTensor_t input,
   bm_device_mem_t buffer_mem;
   SAFE_CALL( bm_malloc_device_byte ( handle, &buffer_mem, sgdnnTensorBytes ( &output ) ) );
   api.buffer_addr = buffer_mem.u.device.device_addr;
-  
+
   api.if_getting_buffer_size = false;
   api.platform_sp = upsampling_type == UPSAMPLING_BILINEAR ? PYTORCH_SUPPORT : PYTORCH_NEAREST;
 
   // api.if_getting_buffer_size = true;
   // u64 buffer_size = 0;
   // api.buffer_size_ptr = &buffer_size;
-  
+
   api.dim = output.dim;
   api.dtype = sgdnnTPUKernelDType(output.dtype);
-  
+
   for (int i = 0; i < input.dim; ++i) {
     api.shape[i] = input.shape[i];
   }
-  
+
   for (int i = 0; i < output.dim; ++i) {
     api.out_shape[i] = output.shape[i];
   }
@@ -1736,7 +1736,7 @@ bm_status_t sgdnnUpsampling(bm_handle_t handle, SgdnnTensor_t input,
     api.half_pixel_centers = false;
     api.align_corners = true;
   }
-  
+
   SAFE_CALL(sgdnnTPUKernelLaunch(handle, "tpu_kernel_api_interp", &api,
                                  sizeof(api)));
   bm_free_device(handle, buffer_mem);
@@ -1837,6 +1837,9 @@ bm_status_t sgdnnLog(bm_handle_t handle, SgdnnTensor_t input,
 
 bm_status_t sgdnnSqueeze(bm_handle_t handle, SgdnnTensor_t input,
                      SgdnnTensor_t output) {
+  SGDNN_CHECK(input.dtype == SGDNN_DTYPE_FP32 ||
+              input.dtype == SGDNN_DTYPE_FP16 ||
+              input.dtype == SGDNN_DTYPE_BF16);
 
   SGDNN_CHECK(sgdnnIsTensorContiguous(&input));
   sg_api_squeeze_t api;
@@ -2055,7 +2058,7 @@ bm_status_t sgdnnPow ( bm_handle_t handle,
 #else
   SGDNN_CHECK ( false );
 #endif
-  return BM_SUCCESS;  
+  return BM_SUCCESS;
 }
 
 bm_status_t sgdnnLogicalAnd ( bm_handle_t handle,
@@ -2302,7 +2305,7 @@ bm_status_t sgdnnAddC ( bm_handle_t handle,
   SGDNN_CHECK ( input.dtype == output.dtype );
   SGDNN_CHECK ( input.dtype == SGDNN_DTYPE_FP32 ||
                 input.dtype == SGDNN_DTYPE_FP16 ||
-                input.dtype == SGDNN_DTYPE_BF16 || 
+                input.dtype == SGDNN_DTYPE_BF16 ||
                 input.dtype == SGDNN_DTYPE_INT32 );
   SGDNN_CHECK ( sgdnnIsSameShape ( &input, &output ) );
   SGDNN_CHECK ( sgdnnIsTensorContiguous ( &input ) );
