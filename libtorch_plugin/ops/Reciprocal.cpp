@@ -13,10 +13,32 @@ Tensor & reciprocal_out_tpu ( const at::Tensor & self, at::Tensor & out )
 {
   CHECK_TENSOR_IN_DEVICE ( self );
   CHECK_TENSOR_IN_DEVICE ( out );
-#if 1
+#if 0
   auto out_cpu = reciprocal ( self.cpu() );
   tpu::TPUCopyHostToDevice ( out.data_ptr(), out_cpu.contiguous().data_ptr(), out.nbytes() );
 #endif
+
+  if(self.dim() == 0) {
+    auto out_cpu = reciprocal(self.cpu());
+    tpu::TPUCopyHostToDevice(out.data_ptr(), out_cpu.contiguous().data_ptr(), out.nbytes());
+  }
+  else {
+
+#ifdef TPU_OP_TIMING
+    auto timer = tpu::Timer().Start();
+#endif
+
+    bm_status_t status = sgdnnReciprocal(tpu::TPUGetDeviceHandle(),
+                                         tpu::TPUGenerateSgdnnTensor(self),
+                                         tpu::TPUGenerateSgdnnTensor(out));
+    TORCH_CHECK(status == BM_SUCCESS);
+
+#ifdef TPU_OP_TIMING
+    tpu::OpTimer::Instance().AddTime(tpu::RECIPROCAL, timer.ElapsedUS());
+#endif
+
+  }
+
   return out;
 }
 

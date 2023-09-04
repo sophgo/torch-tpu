@@ -353,6 +353,7 @@ typedef enum
   ERF,
   POW_FORWARD,
   ADD_LN_MM_FORWARD,
+  RECIPROCAL,
   OP_NUM
 }
 OpType;
@@ -493,7 +494,8 @@ static const char * OpTypeStr[OP_NUM] =
   "layernorm Matmul",
   "ERF",
   "Pow Forward",
-  "Add Layernorm Matmul"
+  "Add Layernorm Matmul",
+  "RECIPROCAL"
 };
 
 struct OpTimer

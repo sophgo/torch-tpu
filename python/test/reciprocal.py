@@ -5,16 +5,17 @@ import torch.nn.functional as F
 torch.ops.load_library("../../libtorch_plugin/build/liblibtorch_plugin.so")
 device = "privateuseone"
 def case1():
-    aa = torch.ones((5,5))
-    a = torch.norm(aa, 2.0)
-    a_tpu = a.to(device)
-    b = 1.0
 
-    o_cpu = b / (a + 1e-6)
-    o_tpu = b / (a_tpu + 1e-6)
+    # ori = torch.rand(125, 235, 355)
+    ori = torch.randint(1, 10, (125, 235, 355), dtype = torch.int8)
+    ori_tpu = ori.to(device)
+    res_cpu = torch.reciprocal(ori)
+    res_tpu = torch.reciprocal(ori_tpu).cpu()
 
-    print("cpu: ", o_cpu)
-    print("tpu: ", o_tpu.cpu())
+    print("ori : ", ori)
+    print("cpu res : ", res_cpu)
+    print("tpu res : ", res_tpu)
+    print("diff : ", torch.max(torch.div(torch.abs(res_cpu - res_tpu), res_cpu)))
 
 if __name__ == "__main__":
     case1()
