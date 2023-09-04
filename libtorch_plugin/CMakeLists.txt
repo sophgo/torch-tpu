@@ -1,5 +1,6 @@
 project(LIBTORCH_PLUGIN CXX)
 
+option(JIT_TRAIN_ENABLE "option for enable jit train" OFF)
 add_compile_options(-std=c++14 -Wno-attributes)
 add_definitions("-D_GLIBCXX_USE_CXX11_ABI=0")
 
@@ -30,16 +31,28 @@ include_directories(${CMAKE_CURRENT_SOURCE_DIR})
 link_directories($ENV{TPUTRAIN_TOP}/libtorch/lib)
 link_directories($ENV{TPUTRAIN_TOP}/build/sgdnn)
 
-file(GLOB_RECURSE SRCS
-  tpu/TPUGuardImpl.cpp
-  tpu/TPUAllocator.cpp
-  tpu/TPUDeviceManager.cpp
-  tpu/TPUTorchUtils.cpp
-  tpu/TPUCtypeApi.cpp
-  ops/*.cpp
-  my_ops/*.cpp
-  distOps/*.cpp
-)
+if(JIT_TRAIN_ENABLE)
+  message(STATUS "JIT_TRAIN_ENABLE")
+  file(GLOB_RECURSE SRCS
+    tpu/TPUGuardImpl.cpp
+    tpu/TPUAllocator.cpp
+    tpu/TPUDeviceManager.cpp
+    tpu/TPUTorchUtils.cpp
+    tpu/TPUCtypeApi.cpp
+    jit/*.cpp
+  )
+else()
+  file(GLOB_RECURSE SRCS
+    tpu/TPUGuardImpl.cpp
+    tpu/TPUAllocator.cpp
+    tpu/TPUDeviceManager.cpp
+    tpu/TPUTorchUtils.cpp
+    tpu/TPUCtypeApi.cpp
+    ops/*.cpp
+    my_ops/*.cpp
+    distOps/*.cpp
+  )
+endif()
 
 add_library(libtorch_plugin SHARED ${SRCS})
 target_link_libraries(libtorch_plugin c10 torch_cpu)
