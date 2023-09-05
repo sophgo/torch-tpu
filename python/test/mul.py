@@ -11,8 +11,9 @@ def case1():
     H = 386
     W = 256
     aa = torch.ones((5,5))
-    
+
     a = torch.norm(aa, 2.0)
+    print
     inp = torch.randn((H, W))
     inp_tpu = inp.to(device)
 
@@ -35,12 +36,16 @@ def case2():
     H = 768
 
     a = torch.randn((B,S,H))
-    b = torch.randn((B,S,H))
+    b = torch.randn((S,1))
 
     a_tpu = a.to(device)
     b_tpu = b.to(device)
 
-    o = a * b
+    #test fp16
+    # a_tpu = a.half().to(device)
+    # b_tpu = b.half().to(device)
+
+    o = b*a
     o_tpu = a_tpu * b_tpu
 
     diff = o - o_tpu.cpu()
@@ -50,4 +55,4 @@ def case2():
 
 if __name__ == "__main__":
     case2()
-    case1()
+    # case1()

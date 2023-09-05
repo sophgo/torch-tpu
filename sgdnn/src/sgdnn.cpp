@@ -2227,8 +2227,6 @@ bm_status_t sgdnnMul ( bm_handle_t handle,
   SGDNN_CHECK ( input.dtype == SGDNN_DTYPE_FP32 ||
                 input.dtype == SGDNN_DTYPE_FP16 ||
                 input.dtype == SGDNN_DTYPE_BF16 );
-  SGDNN_CHECK ( sgdnnIsSameShape ( &input, &other ) );
-  SGDNN_CHECK ( sgdnnIsSameShape ( &input, &output ) );
   SGDNN_CHECK ( sgdnnIsTensorContiguous ( &input ) );
   SGDNN_CHECK ( sgdnnIsTensorContiguous ( &other ) );
   SGDNN_CHECK ( sgdnnIsTensorContiguous ( &output ) );
@@ -2237,10 +2235,15 @@ bm_status_t sgdnnMul ( bm_handle_t handle,
   api.input_global_addr = input.addr;
   api.other_global_addr = other.addr;
   api.output_global_addr = output.addr;
-  api.dim = input.dim;
+  api.input_dim = input.dim;
+  api.other_dim = other.dim;
   for ( int i = 0; i < input.dim; ++i )
   {
-    api.shape[i] = input.shape[i];
+    api.input_shape[i] = input.shape[i];
+  }
+  for ( int i = 0; i < other.dim; ++i )
+  {
+    api.other_shape[i] = other.shape[i];
   }
   api.dtype = sgdnnTPUKernelDType ( input.dtype );
   SAFE_CALL ( sgdnnTPUKernelLaunch ( handle, "tpu_kernel_api_mul_eltwise", &api, sizeof ( api ) ) );

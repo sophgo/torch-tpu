@@ -261,20 +261,45 @@ Tensor &mul_out_tpu(const Tensor &self, const Tensor &other, Tensor &out) {
       tpu::OpTimer::Instance().AddTime(tpu::MUL_C, timer.ElapsedUS());
 #endif
     }
-    else if ( self.dim() == other.dim() && ! tpu::TPUIsSameShape(self, other) )
-    {
-      LOG( WARNING ) << "mul broadcast use cpu impl";
-      auto out_cpu = mul ( self.cpu(), other.cpu() );
-      tpu::TPUCopyHostToDevice ( out.data_ptr(), out_cpu.contiguous().data_ptr(), out.nbytes() );
-    }
     else
     {
+      auto self_t  = tpu::TPUGenerateSgdnnTensor ( self );
+      auto other_t  = tpu::TPUGenerateSgdnnTensor ( other );
+      int maxdim = self_t.dim > other_t.dim ? self_t.dim : other_t.dim;
+      if ( self_t.dim != maxdim )
+      {
+        int stride = 1;
+        for ( int i = 0; i < maxdim; i++ )
+        {
+          if (i < self_t.dim ) { self_t.shape[ maxdim-i-1 ] = self_t.shape[ self_t.dim-i-1 ];
+                                self_t.stride[ maxdim-i-1 ] = stride; }
+          else { self_t.shape[ maxdim-i-1 ] = 1;
+                self_t.stride[ maxdim-i-1 ] =  stride;}
+          stride *= self_t.shape[ maxdim-i-1 ];
+        }
+        self_t.dim = maxdim;
+      }
+      if ( other_t.dim != maxdim )
+      {
+        int stride = 1;
+        for ( int i = 0; i < maxdim; i++ )
+        {
+          if (i < other_t.dim ) { other_t.shape[ maxdim-i-1 ] = other_t.shape[ other_t.dim-i-1 ];
+                                other_t.stride[ maxdim-i-1 ] = stride; }
+          else { other_t.shape[ maxdim-i-1 ] = 1;
+                other_t.stride[ maxdim-i-1 ] =  stride;}
+          stride *= other_t.shape[ maxdim-i-1 ];
+        }
+        other_t.dim = maxdim;
+      }
 #ifdef TPU_OP_TIMING
       auto timer = tpu::Timer().Start();
 #endif
       bm_status_t status = sgdnnMul(
-          tpu::TPUGetDeviceHandle(), tpu::TPUGenerateSgdnnTensor(self),
-          tpu::TPUGenerateSgdnnTensor(other), tpu::TPUGenerateSgdnnTensor(out));
+          tpu::TPUGetDeviceHandle(),
+          self_t,
+          other_t,
+          tpu::TPUGenerateSgdnnTensor(out));
       TORCH_CHECK(status == BM_SUCCESS);
 #ifdef TPU_OP_TIMING
       tpu::OpTimer::Instance().AddTime(tpu::MUL, timer.ElapsedUS());
