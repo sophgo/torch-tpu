@@ -1681,6 +1681,35 @@ TORCH_LIBRARY_IMPL(aten, TPU, m)
       m.impl("pow.Tensor_Tensor_out", pow_out_tpu);
 }
 
+Tensor & pow_c_out_tpu( const Tensor & self, const Scalar & exponent, Tensor & out){
+  CHECK_TENSOR_IN_DEVICE ( self );
+  CHECK_TENSOR_IN_DEVICE ( out );
+#if 0
+  LOG( WARNING ) << "pow_out_tpu use cpu impl";
+  auto out_cpu = pow( self.cpu(), exponent );
+  out = out_cpu.to(out.device());
+#else
+#ifdef TPU_OP_TIMING
+  auto timer = tpu::Timer().Start();
+#endif
+bm_status_t status = sgdnnPowC (
+                            tpu::TPUGetDeviceHandle(),
+                           tpu:: TPUGenerateSgdnnTensor ( self ),
+                           exponent.toDouble(),
+                           tpu:: TPUGenerateSgdnnTensor ( out ) 
+);
+  TORCH_CHECK ( status == BM_SUCCESS );
+#ifdef TPU_OP_TIMING
+  tpu::OpTimer::Instance().AddTime ( tpu::POWC, timer.ElapsedUS() );
+#endif
+#endif
+  return out;
+}
+TORCH_LIBRARY_IMPL ( aten, TPU, m )
+{
+  m.impl ( "pow.Tensor_Scalar_out", pow_c_out_tpu );
+}
+
 Tensor &fmax_out_tpu (const Tensor &self, const Tensor &other, Tensor &out){
     if (self.dim()>0) {CHECK_TENSOR_IN_DEVICE(self);}
     if (other.dim()>0) {CHECK_TENSOR_IN_DEVICE(other);}

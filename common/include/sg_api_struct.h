@@ -1502,5 +1502,15 @@ typedef struct
   int dtype;
 } WITH_PLATFORM(sg_api_trunc_t);
 
+typedef struct 
+{
+  unsigned long long self_global_addr;
+  unsigned long long out_global_addr;
+  int shape[FW_MAX_SHAPE_DIMS];
+  int dim;
+  float value;
+  int dtype;
+} WITH_PLATFORM(sg_api_pow_tensor_scalar_t);
+
 #pragma pack(pop)
 #endif  // SG_API_STRUCT_H

@@ -1522,6 +1522,17 @@ bm_status_t sgdnnTrunc ( bm_handle_t handle,
                          SgdnnTensor_t output );
 
 
+/*
+ * OUTPUT = POWC(INPUT, EXPONENT)
+ * 1. The data types of INPUT and OUTPUT must be the same and one of FP32, FP16 and BF16
+ * 2. The shapes of INPUT and OUTPUT must be the same
+ * 3. INPUT and OUTPUT must be contiguous
+ * 4. EXPONENT is a single float number.
+*/
+bm_status_t sgdnnPowC ( bm_handle_t handle,
+                      SgdnnTensor_t self,
+                      float scalar,
+                      SgdnnTensor_t out );
 #if defined(__cplusplus)
 }
 #endif

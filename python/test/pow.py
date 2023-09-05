@@ -1,6 +1,7 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+import time
 
 torch.ops.load_library("../../libtorch_plugin/build/liblibtorch_plugin.so")
 torch.manual_seed(1000)
@@ -35,7 +36,38 @@ def case2():
     print("tpu : ", a2_tpu.cpu())
     print("max diff: ", abs(a1 - a2_tpu.to("cpu")).max().item())
 
+def case3():
+    """
+    test y = x^2, x^3, x^4. Implement Pow using multiplication
+    
+    dtype: fp32 & fp16 & bfp16
+    """
+    N = 4
+    C = 4
+    H = 64
+    W = 500
+    exponent = 4
+    inp = torch.rand((N, C, H, W))
+    out_cpu = inp ** exponent
+    inp_tpu = inp.to(device)
+    out_tpu = inp_tpu ** exponent
+    out = out_tpu.cpu()
+    diff = out_cpu - out
+    print("max diff(fp32): ", torch.max(torch.abs(diff)))
+
+    inp_tpu0 = inp.to(device).to(torch.float16)
+    out_tpu0 = inp_tpu0 ** exponent
+    out0 = out_tpu0.cpu()
+    diff = out_cpu - out0
+    print("max diff(fp16): ", torch.max(torch.abs(diff)))
+
+    inp_tpu1 = inp.to(device).to(torch.bfloat16)
+    out_tpu1 = inp_tpu1 ** exponent
+    out1 = out_tpu1.cpu()
+    diff = out_cpu - out1
+    print("max diff(bfp16): ", torch.max(torch.abs(diff)))
 
 if __name__ == "__main__":
-    case1()
-    case2()
+    # case1()
+    # case2()
+    case3()
