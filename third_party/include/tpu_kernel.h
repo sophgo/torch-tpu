@@ -696,6 +696,32 @@ void tpu_gdma_h_scatter_L2S(
     const dim4    *index_stride,
     data_type_t    dtype);
 
+void tpu_gdma_h_scatter_S2L_with_inplace_add(
+    local_addr_t   output_addr,
+    system_addr_t  param_addr,
+    addr_t         index_addr,
+    bool           index_is_local,
+    const dim4    *shape,
+    int            param_h,
+    const dim4    *output_stride,
+    const dim4    *param_stride,
+    const dim4    *index_stride,
+    const int     inplace_add,
+    data_type_t    dtype);
+
+void tpu_gdma_h_scatter_L2S_with_inplace_add(
+    system_addr_t  output_addr,
+    local_addr_t   param_addr,
+    addr_t         index_addr,
+    bool           index_is_local,
+    const dim4    *shape,
+    int            param_h,
+    const dim4    *output_stride,
+    const dim4    *param_stride,
+    const dim4    *index_stride,
+    const int     inplace_add,
+    data_type_t    dtype);
+
 void tpu_gdma_h_scatter_L2L(
     local_addr_t  output_addr,
     local_addr_t  param_addr,

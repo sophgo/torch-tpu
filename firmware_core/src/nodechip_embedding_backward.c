@@ -20,6 +20,10 @@
 #define SUPER_SET 0  //only support for grad_Y==ones
 #define L2_PATTERN 1
 #define AVG_SIM 2    //default
+
+//Whether using MCU
+#define IS_USING_MCU  1
+
 typedef struct List_Node {
   int         index;
   struct List_Node    *prv;
@@ -703,7 +707,7 @@ static inline void Function_Recollect_Index(
 // j - S
 // v - V
 // h - H
-// grad_W[v, h] = SUM_{i,j}[grad_Y[X[i,j], h]
+// grad_W[v, h] = SUM_{i,j}[grad_Y[(i,j)|X[i,j]==v, h]
 //**********************************************************//
 
 //Chip Arch
@@ -748,7 +752,7 @@ void nodechip_embedding_backward_multi_core_basic_cell_patttern_one_intercore(
   TPUKERNEL_ASSERT_INFO(local_offset_1 <= bank_2_size, "BS is too large!");
   TPUKERNEL_ASSERT_INFO(local_offset_2 <= bank_2_size, "V is too large or not sparse enough!");
   TPUKERNEL_ASSERT_INFO(partial_sum_local_addr+local_offset_2 <= (u32)tpu_local_mem_size_per_npu(), "BS_Loop is too large");
-  TPUKERNEL_ASSERT_INFO(partial_sum_local_addr+local_offset_1 <= (u32)tpu_local_mem_size_per_npu(), "BS_Loop is too large");
+  TPUKERNEL_ASSERT_INFO(grad_Y_scatter_local_addr+local_offset_1 <= (u32)tpu_local_mem_size_per_npu(), "BS_Loop is too large");
 // const dim4 grad_W_stride = {.n = 0, .c = H_native, .h = H_native, .w = 1};
   // if (first_loop_flag) {
     // tpu_gdma_set_C_system (
@@ -993,8 +997,83 @@ void nodechip_embedding_backward_multi_core_basic_cell_patttern_one_intercore(
   //Note: H(.w-dim) is sliced, so each core operates sliced shape but strides in native shape.
   tpu_gdma_cpy_L2S(grad_Weight_global_addr, grad_Y_scatter_local_addr, &shape_scatter_L2_to_L1, &stride_scatter_L2_to_L1, NULL, grad_dtype);
 }
-   
-//Function: MEM From Large-- <=L1 --slice
+
+//[Notice] This FUnction is purely using TPU inst and no slicing operation.
+void nodechip_embedding_backward_multi_core_basic_cell_patttern_one_intercore_no_MCU(
+  global_addr_t grad_Y_global_addr,
+  global_addr_t X_global_addr,
+  global_addr_t grad_Weight_global_addr,
+  const dim4    grad_Y_shape, //[B*S, H_sliced]
+  const dim4    X_shape,      //[B, S], each value in [0,V)
+  const dim4    grad_W_shape, //[V, H_sliced]
+  const int     H_native,
+  const int     first_loop_flag,
+  const data_type_t   grad_dtype) {
+  //Step 0: check and initalize
+  // TPUKERNEL_ASSERT(USING_L2);
+  // TPUKERNEL_ASSERT(IN_L2_SRAM(grad_Weight_global_addr));
+  const scalar_t zero_ = {.u32 = 0};
+  const int len_grad_dtype = tpu_data_type_size(grad_dtype);
+  const int NUM_full_Index = count_numel_dim4(X_shape);
+  const int H_sliced = grad_Y_shape.w;
+  const int V = grad_W_shape.h; //different from NUM_V_used
+  const int BS = grad_Y_shape.h;
+  TPUKERNEL_ASSERT_INFO(BS == NUM_full_Index, "[ERROR] BS CHECK FAILED");
+  const int local_offset_1 = BS * H_sliced * len_grad_dtype; //tpu_aligned_feature_size (1, H_sliced, grad_dtype );
+  const int local_offset_2 = V  * H_sliced * len_grad_dtype; // tpu_aligned_feature_size (1, H_sliced, grad_dtype ); //sum_num_per_v<=V
+  const int bank_2_size = gen_bank_sizes_split_2_per_npu(); //using all LMEM of per NPU
+  const local_addr_t grad_Y_scatter_local_addr    = 0;
+  const local_addr_t partial_sum_local_addr        = 1 * bank_2_size;
+  TPUKERNEL_ASSERT_INFO(local_offset_1 <= bank_2_size, "BS is too large!");
+  TPUKERNEL_ASSERT_INFO(local_offset_2 <= bank_2_size, "V is too large or not sparse enough!");
+  TPUKERNEL_ASSERT_INFO(partial_sum_local_addr+local_offset_2 <= (u32)tpu_local_mem_size_per_npu(), "BS_Loop is too large");
+  //Shape Checker
+  TPUKERNEL_ASSERT(grad_Y_shape.w == grad_W_shape.w);
+  const dim4 shape_gather_L2_to_L1 = {.n = 1, .c = 1, .h = BS, .w = H_sliced};
+  TENSOR_MEM_ISOLATED_PRECHECK_L1_dim4(shape_gather_L2_to_L1, grad_dtype);
+  //[Funny Simplified]
+  //Target: grad_W[v, h] = SUM_{i,j}[grad_Y[(i,j)|X[i,j]==v, h]
+  //Without MCU, simplified procedures as follows:
+  //0) regroup x[i,j]==v  => HAU(3) =>regroup(2.1) =>Reduce(4) =>scatter(2.2)
+  //1) MEM simplify 4 global buffer (hau_index; hau_value; scatter_index; index_for_duplicated_v_projection)
+  //2) Simplify 2 MCU; 1st NPU_Utils_Pattern; 2nd scatter_index_global_flush_64b_aligned_addr
+  //                2.1)NPU_Utils_Pattern: regroup v into #k|x[i,j]==v_k, i.e., NUM_V_used, so that each group computes 1,rather than #(i,j)
+  //                2.2)scatter_index_global_flush_64b_aligned_addr exists because sort-trans; 2.1)regroup need to sort 3)Index and so thus v_sorted need to reflush as x[i,j] <-> v.
+  //3) simplify 1 HAU
+  //4) simplify Reduce because scatter_inplace_add
+  //5) TransLine Pattern changed:
+  //   5.1)With MCU : 3)HAU-Gather: {GMEM-L1-GMEM} - 2.1:{GMEM-MCU-GMEM} - 4)Reduce:{GMEM-AVG-GMEM} - 2.2:{GMEM-MCU-GMEM} -  Scatter - Add_BS_loop
+  //   5.2)No MCU   : Scatter - Add_BS_loop
+  //6) TransLine Pattern changed:
+  //   0) started with [BS_loop,H_sliced_loop, V], as they use same slice-loop pattern; H, is ignored as it's intracore parallel.
+  //   Usually BS >> V, so as BS_loop >> |v| >>#k = NUM_V_used
+  //   6.1)With MCU : T_{others} + T_Scatter{#k times, where {k|x[i,j]==v_k}} + Add_BS_loop(1 time)
+  //   6.2)No MCU   : T_Scatter(BS_loop times) + Add_BS_loop(1 time)
+  //   Expect T_{others} >  (BS_loop - #k) T_scatter(1 times), which means 6.2) is better, ususally it's true
+
+  //Step 1: Scatter
+  //Function: grad_W [v, h] = temp_reduce_value
+  // Input: [v,h] ~[V,H_sliced];
+  // Output: grad_W~[V',H_sliced] V'~NUM_V_used<=V;  V-NUM_V_used is preset as 0
+  const dim4 shape_scatter_L2_to_L1 = {.n = 1, .c = 1, .h = V, .w = H_sliced};
+  TENSOR_MEM_ISOLATED_PRECHECK_L1_dim4(shape_scatter_L2_to_L1, grad_dtype);
+  const dim4 stride_scatter_L2_to_L1 = {.n = 0, .c =0, .h = H_native, .w = 1};
+
+  //Step_1.1 Scatter
+  //Step_Arch: GMEM-<GDMA>-L1-<GDMA>-GDMA
+  //necessary, preset V-NUM_V_used as 0
+  tpu_gdma_set_C_local(grad_Y_scatter_local_addr, zero_, &shape_scatter_L2_to_L1, NULL, grad_dtype);
+  tpu_gdma_set_C_local(partial_sum_local_addr,     zero_, &shape_scatter_L2_to_L1, NULL, grad_dtype);
+  tpu_gdma_h_scatter_S2L_with_inplace_add(grad_Y_scatter_local_addr, grad_Y_global_addr, X_global_addr, false, &shape_scatter_L2_to_L1,
+      BS, NULL, &stride_scatter_L2_to_L1, NULL, 1, grad_dtype );
+  //Note: H(.w-dim) is sliced, so each core operates sliced shape but strides in native shape.
+  tpu_gdma_cpy_S2L(partial_sum_local_addr,  grad_Weight_global_addr, &shape_scatter_L2_to_L1,   NULL, &stride_scatter_L2_to_L1, grad_dtype);
+  tpu_bdc_fp_add(grad_Y_scatter_local_addr, partial_sum_local_addr, grad_Y_scatter_local_addr, &shape_scatter_L2_to_L1, NULL,NULL,NULL, grad_dtype);
+  //Note: H(.w-dim) is sliced, so each core operates sliced shape but strides in native shape.
+  tpu_gdma_cpy_L2S(grad_Weight_global_addr, grad_Y_scatter_local_addr, &shape_scatter_L2_to_L1, &stride_scatter_L2_to_L1, NULL, grad_dtype);
+}
+
+//Slicing MEM: Total LMEM  ->    LMEM of per NPU
 //Slice Info [BS_loop, H_sliced_loop, V] rebase on [NPU_NUM, EU_NUM] style
 void nodechip_embedding_backward_multi_core_basic_cell_patttern_one_intracore(
   global_addr_t grad_Y_global_addr,
@@ -1010,7 +1089,8 @@ void nodechip_embedding_backward_multi_core_basic_cell_patttern_one_intracore(
   const int     H_native,
   const int     first_loop_flag,
   const data_type_t   grad_dtype,
-  const data_type_t Index_dtype) {
+  const data_type_t Index_dtype,
+  const int     using_MCU_flag) {
   const int len_grad_dtype = tpu_data_type_size(grad_dtype);
   const int NUM_full_Index = count_numel_dim4(X_shape);
   const int H_sliced = grad_Y_shape.w;
@@ -1085,21 +1165,35 @@ void nodechip_embedding_backward_multi_core_basic_cell_patttern_one_intracore(
       //All slices are done before entering into pattern_one
       TENSOR_MEM_ISOLATED_PRECHECK_L1_dim4(grad_Y_shape_sliced, grad_dtype);
       TENSOR_MEM_ISOLATED_PRECHECK_L1_dim4(grad_W_shape_sliced, grad_dtype);
-      nodechip_embedding_backward_multi_core_basic_cell_patttern_one_intercore(
-              grad_Y_addr_sliced,
-              X_addr_sliced,
-              grad_Weight_addr_sliced,
-              sorted_index_value_global_addr_sliced,
-              sorted_index_index_global_addr_sliced,
-              scatter_index_global_addr_sliced,
-              recollected_global_addr_sliced,
-              grad_Y_shape_sliced, //[BS_loop, H_sliced_loop]
-              X_shape_sliced,      //[BS_loop]
-              grad_W_shape_sliced, //[V, H_sliced_loop]
-              H_native,
-              1,
-              grad_dtype
-              );
+      if (!using_MCU_flag) {
+        nodechip_embedding_backward_multi_core_basic_cell_patttern_one_intercore_no_MCU(
+                grad_Y_addr_sliced,
+                X_addr_sliced,
+                grad_Weight_addr_sliced,
+                grad_Y_shape_sliced, //[BS_loop, H_sliced_loop]
+                X_shape_sliced,      //[BS_loop]
+                grad_W_shape_sliced, //[V, H_sliced_loop]
+                H_native,
+                1,
+                grad_dtype
+                );
+      } else {
+        nodechip_embedding_backward_multi_core_basic_cell_patttern_one_intercore(
+                grad_Y_addr_sliced,
+                X_addr_sliced,
+                grad_Weight_addr_sliced,
+                sorted_index_value_global_addr_sliced,
+                sorted_index_index_global_addr_sliced,
+                scatter_index_global_addr_sliced,
+                recollected_global_addr_sliced,
+                grad_Y_shape_sliced, //[BS_loop, H_sliced_loop]
+                X_shape_sliced,      //[BS_loop]
+                grad_W_shape_sliced, //[V, H_sliced_loop]
+                H_native,
+                1,
+                grad_dtype
+                );
+      }
     }
    }
 }
@@ -1115,6 +1209,7 @@ void nodechip_embedding_backward_multi_core_basic_cell_patttern_one_intracore(
 // Function:
 //    Input: Index={x{i,j}; |x|<V; i <B; j<S}, grad_W[v, h]=sum(W[X[i,j]]); Every |x[i,j]|==|v|
 //    Projection represents one |v| correspondings to Groups of |x[i,j]|
+//Slicing Mem: Total GMEM  ->   Total LMEM
 // Key Q: how to reduce x(i,j,loop) from different G_loop to same |v|?
 // Solution: BS_loop <-> Groups_loop, |v| <-> {|x[i_0,j_0]|}, ...,{|x[i_p,j_q]|} = {G1,G2,..G'}
 //Strategy: AS usually BS > V for LLM,   adopt (a) as (b)-(4) need to reloop B for larger slice-shape
@@ -1136,7 +1231,8 @@ void nodechip_embedding_backward_multi_core_basic_cell_pattern_two (
   const dim4    X_shape,      //[B, S]
   const dim4    grad_W_shape, //[V, H_sliced]
   const data_type_t   grad_dtype,
-  const data_type_t   Index_dtype
+  const data_type_t   Index_dtype,
+  const int using_MCU_flag
 ) {
    TPUKERNEL_ASSERT_INFO(Index_dtype == DT_INT32, "You are trying to align index_addr to 64bits, but Only INT32 is supported!");
    const int core_idx = tpu_core_index();
@@ -1230,7 +1326,8 @@ void nodechip_embedding_backward_multi_core_basic_cell_pattern_two (
               H_native,
               idx_BS_loop,//==0 ? 1: 0,  //first_loop, grad_W is preset to 0 & no fp_add applied
               grad_dtype,
-              Index_dtype
+              Index_dtype,
+              using_MCU_flag
               );
           }
         }
@@ -1300,7 +1397,8 @@ void nodechip_embedding_backward_multi_core (
   int           idx_dim,
   int           grad_input_dim,
   data_type_t   grad_dtype,
-  bool is_index_int64 ) {
+  bool is_index_int64,
+  const int using_MCU_flag ) {
   const data_type_t Index_dtype = DT_INT32;
 
   //Prepare multi_core Info:
@@ -1393,7 +1491,8 @@ void nodechip_embedding_backward_multi_core (
         H_native,
         1, //set first_loop_flag =1 for pattern 2.1
         grad_dtype,
-        Index_dtype
+        Index_dtype,
+        using_MCU_flag
         );
     }
   }
@@ -1411,7 +1510,8 @@ void nodechip_embedding_backward_multi_core (
         X_shape,      //[B, S]
         grad_W_shape, //[V, H]
         grad_dtype,
-        Index_dtype
+        Index_dtype,
+        using_MCU_flag
     );
   }  else {
     //Never slice V;
@@ -1421,6 +1521,7 @@ void nodechip_embedding_backward_multi_core (
 
 void tpu_kernel_api_embedding_backward_multi_core ( const void* args ) {
   sg_api_embedding_backward_t *api = ( sg_api_embedding_backward_t * ) args;
+  const int using_MCU_flag = IS_USING_MCU;
   tpu_initialize();
   nodechip_embedding_backward_multi_core (
   api->grad_output_global_addr,
@@ -1437,7 +1538,8 @@ void tpu_kernel_api_embedding_backward_multi_core ( const void* args ) {
   api->index_dim,
   api->grad_input_dim,
   ( data_type_t ) api->grad_output_dtype,
-  api->is_index_int64 );
+  api->is_index_int64,
+  using_MCU_flag);
   tpu_poll();
 }
 
