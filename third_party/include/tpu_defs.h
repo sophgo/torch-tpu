@@ -28,7 +28,9 @@ typedef enum {
     DT_FP32   = (2 << 1) | 1,
     DT_INT4   = (6 << 1) | 1,
     DT_UINT4  = (6 << 1) | 0,
-    DT_FP20   = (7 << 1) | 1,
+    DT_FP8E5M2 = (0 << 5) | (7 << 1) | 1,
+    DT_FP8E4M3 = (1 << 5) | (7 << 1) | 1,
+    DT_FP20   = (8 << 1) | 1,
 } data_type_t;
 typedef enum {
     RM_HALF_TO_EVEN        = 0,
@@ -65,6 +67,25 @@ typedef struct {
 typedef struct {
     int start, end;
 } range_t;
+
+typedef union {
+    unsigned short bits;
+    struct {
+        unsigned short frac : 2; // mantissa
+        unsigned short exp  : 5;  // exponent
+        unsigned short sign : 1;  // sign
+    };
+} float8e5m2;
+
+typedef union {
+    unsigned short bits;
+    struct {
+        unsigned short frac : 3; // mantissa
+        unsigned short exp  : 4;  // exponent
+        unsigned short sign : 1;  // sign
+    } format;
+} float8e4m3;
+
 typedef union {
     unsigned short bits;
     struct {
@@ -94,6 +115,8 @@ typedef union {
     unsigned char  u4;
     char           s8;
     unsigned char  u8;
+    float8e5m2     f8e5m2;
+    float8e4m3     f8e3m4;
     short          s16;
     unsigned short u16;
     float16        f16;

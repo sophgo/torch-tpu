@@ -3,6 +3,8 @@
 #ifdef __cplusplus
 extern "C" {
 #endif
+#include <stdio.h>
+#include <stdint.h>
 #include <stdbool.h>
 #include "tpu_defs.h"
 typedef void (*tpu_kernel_func_t)(const void *);
@@ -14,7 +16,6 @@ __attribute__((constructor)) void tpu_kernel_register_##func() {   \
 }
 
 #if defined(USING_CMODEL)
-  #include <stdio.h>
   #include <stdlib.h>
   extern void __print_trace();
   extern int get_atomic_cmodel_assert_enable();
@@ -35,9 +36,8 @@ __attribute__((constructor)) void tpu_kernel_register_##func() {   \
         }                                                                    \
     } while (0)
 #elif defined(USING_FW_DEBUG)
-  #include <stdio.h>
-  #include <stdlib.h>
-  #define TPUKERNEL_LOG(format, ...) printf(format, ##__VA_ARGS__)
+  void fw_log(const char *fmt, ...);
+  #define TPUKERNEL_LOG(format, ...) fw_log(format, ##__VA_ARGS__)
 #define TPUKERNEL_ASSERT_INFO(assertion, fmt, args...)                   \
     do                                                                   \
     {                                                                    \
@@ -51,7 +51,6 @@ __attribute__((constructor)) void tpu_kernel_register_##func() {   \
         }                                                                \
     } while (0)
 #else
-  #include <stdio.h>
   #define TPUKERNEL_LOG(format, ...)
 #define TPUKERNEL_ASSERT_INFO(assertion, fmt, args...)                   \
     do                                                                   \
@@ -215,6 +214,8 @@ void tpu_poll();
 
 void tpu_hau_poll();
 
+void tpu_cdma_initialize();
+
 void tpu_cdma_poll();
 
 void tpu_parallel_start();
@@ -237,7 +238,7 @@ unsigned long long tpu_l2_sram_get_start_addr();
 
 unsigned long long tpu_global_mem_get_start_addr();
 
-unsigned int tpu_local_mem_get_start_addr();
+unsigned long long tpu_local_mem_get_start_addr();
 
 void *tpu_global_mem_addr(global_addr_t addr);
 
@@ -857,6 +858,16 @@ void tpu_sdma_cpy_S2S(
     const dim4    *src_stride,
     data_type_t    dtype);
 
+/*This function just for test, remove soon*/
+void tpu_sdma_cpy_S2S_with_thread(
+    system_addr_t  dst_addr,
+    system_addr_t  src_addr,
+    const dim4    *shape,
+    const dim4    *dst_stride,
+    const dim4    *src_stride,
+    data_type_t    dtype,
+    int            thread_id);
+
 void tpu_sdma_cpy_nc_trans_S2S(
     system_addr_t  dst_addr,
     system_addr_t  src_addr,
@@ -975,6 +986,34 @@ void tpu_cdma_recv(
     system_addr_t  input_addr,
     int            opcode,
     data_type_t    dtype);
+
+#if defined(__sg2260__) && defined(USING_CMODEL)
+void tpu_cdma_fake_all_reduce(
+    int            dst_chipid,
+    system_addr_t  src_addr,
+    int            dst_n,
+    int            dst_c,
+    int            dst_h,
+    int            dst_w,
+    int            dst_n_stride,
+    int            dst_c_stride,
+    int            dst_h_stride,
+    int            opcode,
+    data_type_t    dtype);
+
+void tpu_cdma_fake_p2p(
+    int            dst_chipid,
+    system_addr_t  src_addr,
+    int            dst_n,
+    int            dst_c,
+    int            dst_h,
+    int            dst_w,
+    int            dst_n_stride,
+    int            dst_c_stride,
+    int            dst_h_stride,
+    int            opcode,
+    data_type_t    dtype);
+#endif
 
 ////////////////////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////////////
@@ -1171,6 +1210,7 @@ void tpu_bdc_fp_mm_with_bias(
     int           right_cols,
     data_type_t   output_dtype,
     data_type_t   left_right_dtype,
+    data_type_t   bias_dtype,
     bool          result_add,
     bool          bias_is_const,
     var_context_t bias_data,  // addr or fp32 const value
@@ -1186,6 +1226,7 @@ void tpu_bdc_fp_mm_R_trans_with_bias(
     int           right_rows,
     data_type_t   output_dtype,
     data_type_t   left_right_dtype,
+    data_type_t   bias_dtype,
     bool          add_result,
     bool          bias_is_const,
     var_context_t bias_data,  // addr or fp32 const value
@@ -1200,6 +1241,7 @@ void tpu_bdc_fp_mm_all_trans_with_bias(
     int           right_rows,
     data_type_t   output_dtype,
     data_type_t   left_right_dtype,
+    data_type_t   bias_dtype,
     bool          result_add,
     bool          bias_is_const,
     var_context_t bias_data,  // addr or fp32 const value
@@ -1214,6 +1256,7 @@ void tpu_bdc_fp_mm_L_const_with_bias(
     int           right_cols,
     data_type_t   output_dtype,
     data_type_t   right_C_dtype,
+    data_type_t   bias_dtype,
     bool          result_add,
     bool          bias_is_const,
     var_context_t bias_data,  // addr or fp32 const value
@@ -1228,6 +1271,7 @@ void tpu_bdc_fp_mm_R_const_with_bias(
     int           right_cols,
     data_type_t   output_dtype,
     data_type_t   left_C_dtype,
+    data_type_t   bias_dtype,
     bool          result_add,
     bool          bias_is_const,
     var_context_t bias_data,  // addr or fp32 const value
@@ -1242,6 +1286,7 @@ void tpu_bdc_fp_mm_L_const_R_trans_with_bias(
     int           right_rows,
     data_type_t   output_dtype,
     data_type_t   right_C_dtype,
+    data_type_t   bias_dtype,
     bool          result_add,
     bool          bias_is_const,
     var_context_t bias_data,  // addr or fp32 const value
@@ -1256,6 +1301,7 @@ void tpu_bdc_fp_mm_L_const_all_trans_with_bias(
     int           right_rows,
     data_type_t   output_dtype,
     data_type_t   right_C_dtype,
+    data_type_t   bias_dtype,
     bool          result_add,
     bool          bias_is_const,
     var_context_t bias_data,  // addr or fp32 const value
@@ -1270,6 +1316,7 @@ void tpu_bdc_fp_mm_R_const_all_trans_with_bias(
     int           right_rows,
     data_type_t   output_dtype,
     data_type_t   left_C_dtype,
+    data_type_t   bias_dtype,
     bool          result_add,
     bool          bias_is_const,
     var_context_t bias_data,  // addr or fp32 const value
@@ -4300,6 +4347,18 @@ void tpu_bdc_fp32_log_sigmoid(
     local_addr_t  ln_coeff_addr,
     const dim4   *shape);
 
+void tpu_bdc_random_gen_init(uint64_t seed);
+
+void tpu_bdc_random_gen(
+    local_addr_t    addr,
+    const dim4     *shape,
+    const dim4     *stride,
+    data_type_t     dtype);
+
+void tpu_bdc_random_gen_load_state(local_addr_t state_addr);
+
+void tpu_bdc_random_gen_store_state(local_addr_t state_addr);
+
 ////////////////////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////////////
 // HAU FUNCTIONS
@@ -4417,8 +4476,8 @@ void tpu_hau_send_msg(int msg_id, int wait_cnt);
 void tpu_hau_wait_msg(int msg_id, int send_cnt);
 void tpu_sdma_send_msg(int msg_id, int wait_cnt);
 void tpu_sdma_wait_msg(int msg_id, int send_cnt);
-void tpu_cdma_send_msg(int msg_id, int wait_cnt);
-void tpu_cdma_wait_msg(int msg_id, int send_cnt);
+void tpu_cdma_send_msg(int port, int msg_id, int wait_cnt);
+void tpu_cdma_wait_msg(int port, int msg_id, int send_cnt);
 
 // chip id in one pod
 int tpu_chip_id();

@@ -1,6 +1,5 @@
 #include "sg_api_struct.h"
 #include "tpu_kernel.h"
-#define INT32_MAX 2147483647
 
 extern void nodechip_concat_nd (
 global_addr_t* input_global_addrs,

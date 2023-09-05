@@ -1,6 +1,5 @@
 #include "sg_api_struct.h"
 #include "tpu_kernel.h"
-#define INT32_MAX (2147483647)
 
 inline static void pipeline_move(unsigned long long *array, int num) {
   for (int i = num - 1; i > 0; i--) {

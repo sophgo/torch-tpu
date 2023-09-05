@@ -1,9 +1,9 @@
 # tpu_kernel
 ### include
-    commit 2f18e869d9662fcaaadb20d6b7937a2ae94b3bd5
+    commit 1c4644118773ed8294afb37310c654805d12a3d2
     tpu_defs.h tpu_kernel.h
 ### bm1684x
-    commit 3286e255ec3377a9ccc00cf8b0cfde31cb5fb4c0
+    commit 1c4644118773ed8294afb37310c654805d12a3d2
     libbm1684x.a libbmlib_cmodel.so libcmodel_fireware.so
 ### sg2260
     commit 6e7f0b86cd77496d7bcbfd81e04be6b89a18dc71
