@@ -22,6 +22,12 @@ Tensor & mean_out_tpu ( const Tensor & self, OptionalIntArrayRef dim_opt, bool k
 #ifdef TPU_OP_TIMING
   auto timer = tpu::Timer().Start();
 #endif
+  
+  if(self.dim() == 0){
+    tpu::TPUCopyDeviceToDevice ( out.data_ptr(), self.data_ptr(), out.nbytes() );
+    return out;
+  }
+
   auto reduce_dim = dim_opt.value_or ( IntArrayRef {} );
   std::vector<int> reduction_dim_vec;
   if ( reduce_dim.size() > 0 )
