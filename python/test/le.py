@@ -59,5 +59,19 @@ def case1():
     print("tpu result : ", tpu_res)
     print("diff : ", (cpu_res == tpu_res.cpu()))
 
+def case2():
+    a1 = torch.arange(5, dtype=torch.int)
+    a2 = (a1 + 1).view(5, 1)
+    print(a1)
+    print(a2)
+    cpu_res = a1 < a2
+    a1_tpu = a1.to(device)
+    a2_tpu = a2.to(device)
+    tpu_res = a1_tpu < a2_tpu
+    print(a1_tpu)
+    print(a2_tpu)
+    print(cpu_res)
+    print(tpu_res.cpu())
+
 if __name__ == "__main__":
-    case1()
+    case2()

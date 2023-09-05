@@ -1116,10 +1116,25 @@ Tensor & less_than_out_tpu( const Tensor &self, const Tensor &other, Tensor &out
       }
   }
   else {
-    //TORCH_CHECK ( false, "unsupported dims" );
-    LOG(WARNING) << "less_than_out use cpu impl";
-    auto out_cpu = lt(self.cpu(), other.cpu());
-    tpu::TPUCopyHostToDevice(out.data_ptr(), out_cpu.contiguous().data_ptr(), out.nbytes());
+//     TORCH_CHECK ( false, "unsupported dims" );
+//     LOG(WARNING) << "less_than_out use cpu impl";
+//     auto out_cpu = lt(self.cpu(), other.cpu());
+//     tpu::TPUCopyHostToDevice(out.data_ptr(), out_cpu.contiguous().data_ptr(), out.nbytes());
+      int s_dims = self.dim();
+      int o_dims = other.dim();
+      at::Tensor t = other.clone();
+      t = const_cast<at::Tensor &>(t);
+      at::Tensor &t_s = t;
+      bm_status_t status2 = sgdnnSqueeze(tpu::TPUGetDeviceHandle(),
+                                        tpu::TPUGenerateSgdnnTensor(self),
+                                        tpu::TPUGenerateSgdnnTensor(t_s));
+      TORCH_CHECK ( status2 == BM_SUCCESS );
+      bm_status_t status = sgdnnComparisionBcast(tpu::TPUGetDeviceHandle(),
+                                              tpu:: TPUGenerateSgdnnTensor ( t_s.transpose(-1,0) ),
+                                              tpu:: TPUGenerateSgdnnTensor ( other ),
+                                              4,                                              
+                                              tpu:: TPUGenerateSgdnnTensor ( out ) );
+      TORCH_CHECK ( status == BM_SUCCESS );
   }
 
   return out;

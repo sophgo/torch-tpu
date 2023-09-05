@@ -1839,7 +1839,9 @@ bm_status_t sgdnnSqueeze(bm_handle_t handle, SgdnnTensor_t input,
                      SgdnnTensor_t output) {
   SGDNN_CHECK(input.dtype == SGDNN_DTYPE_FP32 ||
               input.dtype == SGDNN_DTYPE_FP16 ||
-              input.dtype == SGDNN_DTYPE_BF16);
+              input.dtype == SGDNN_DTYPE_BF16 ||
+              input.dtype == SGDNN_DTYPE_INT32 ||
+              input.dtype == SGDNN_DTYPE_INT64 );
 
   SGDNN_CHECK(sgdnnIsTensorContiguous(&input));
   sg_api_squeeze_t api;
