@@ -1491,7 +1491,6 @@ bm_status_t sgdnnAddLnMm ( bm_handle_t handle,
 /*
  * OUTPUT = RECIPROCAL ( INPUT, OUTPUT )
  * Note:
- * 1. The data type of INPUT must be the tpu dtype
  * 1. The data type of out must be FP32
  * 2. The shape of INPUT and OUTPUT must be the same
  * 3. INPUT and OUTPUT must be contiguous
@@ -1510,6 +1509,17 @@ bm_status_t sgdnnReciprocal ( bm_handle_t handle,
 bm_status_t sgdnnSignbit(bm_handle_t handle,
                        SgdnnTensor_t input,
                        SgdnnTensor_t output );
+
+/*
+ * OUTPUT = TRUNC ( INPUT, OUTPUT )
+ * Note:
+ * 1. the data type of input and output must be FP32 or FP16 or BFP16
+ * 2. the shape of input and output must be the same
+ * 3. input and output must be contiguous
+ */
+bm_status_t sgdnnTrunc ( bm_handle_t handle,
+                         SgdnnTensor_t input,
+                         SgdnnTensor_t output );
 
 
 #if defined(__cplusplus)

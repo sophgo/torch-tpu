@@ -7,7 +7,8 @@ device = "privateuseone"
 def case1():
 
     # ori = torch.rand(125, 235, 355)
-    ori = torch.randint(1, 10, (125, 235, 355), dtype = torch.int8)
+    # ori = torch.randint(1, 10, (125, 235, 355), dtype = torch.int8)
+    ori = torch.tensor([0., float('inf'), float('nan')])
     ori_tpu = ori.to(device)
     res_cpu = torch.reciprocal(ori)
     res_tpu = torch.reciprocal(ori_tpu).cpu()
