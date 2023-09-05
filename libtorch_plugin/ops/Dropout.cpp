@@ -18,13 +18,13 @@ public:
   CHECK_TENSOR_IN_DEVICE ( self );
   ctx->saved_data["p"] = p;
   ctx->saved_data["train"] = train;
-  if ( p == 0 ) {
+  if ( p == 0 || !train ) {
     return self;
   } else {
 #if 1
-    TensorOptions option = TensorOptions( ).dtype ( torch::kFloat );
-    at::Tensor mask_cpu = torch::empty( self.sizes(), option );
-    at::Tensor mask = torch::bernoulli(mask_cpu, p).to(self.device()).to(self.dtype());
+    TensorOptions option = TensorOptions( ).device("cpu").dtype ( self.dtype() );
+    at::Tensor mask_cpu = torch::rand_like(self, option) > p;
+    at::Tensor mask = mask_cpu.to(self.device()).to(self.dtype());
 #endif
     ctx->save_for_backward( {mask} );
     auto out = mask * self * (1/(1-p));
@@ -36,12 +36,12 @@ public:
   {
     auto p = ctx->saved_data["p"].toDouble();
     auto train = ctx->saved_data["train"].toBool();
-    if (p == 0) {
+    if (p == 0 || !train) {
       return {gradout[0], at::Tensor(), at::Tensor(), at::Tensor(), at::Tensor(), at::Tensor() };
     }else{
       auto saved = ctx->get_saved_variables();
       auto mask = saved[0];
-      auto gradinp = mask * gradout[0];
+      auto gradinp = mask * gradout[0] * (1/(1-p));
       return {gradinp, at::Tensor(), at::Tensor(), at::Tensor(), at::Tensor(), at::Tensor() };
     }
   }
