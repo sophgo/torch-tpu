@@ -1585,6 +1585,67 @@ bm_status_t sgdnnConcat ( bm_handle_t handle,
   return BM_SUCCESS;
 }
 
+bm_status_t sgdnnPoolingForward ( bm_handle_t handle,
+                               SgdnnTensor_t input,
+                               SgdnnTensor_t output,
+                               PoolingDescriptor_t pooling_desc)
+{
+  //constrainst need to to checked
+  SGDNN_CHECK ( sgdnnIsTensorContiguous ( &input ) );
+  SGDNN_CHECK ( sgdnnIsTensorContiguous ( &output ) );
+#if defined SGDNN_BACKEND_1684X
+  sg_api_pooling_t api;
+  api.input_global_addr = input.addr;
+  api.output_global_addr = output.addr;
+  for ( int i = 0; i < input.dim; ++i )
+  {
+    api.input_shape[i] = input.shape[i];
+    api.output_shape[i] = output.shape[i];
+  }
+  api.pooling_desc = pooling_desc;
+  api.dtype = sgdnnTPUKernelDType ( input.dtype );
+  if(pooling_desc.mode == POOLING_AVG ){
+    SAFE_CALL ( sgdnnTPUKernelLaunch ( handle, "tpu_kernel_api_avg_pooling", &api, sizeof ( api ) ) );
+  }
+  // to be implemented
+  // else if(pooling_desc.mode == POOLING_MIN ){
+  //   SAFE_CALL ( sgdnnTPUKernelLaunch ( handle, "tpu_kernel_api_min_pooling", &api, sizeof ( api ) ) );
+  // }
+  // else if(pooling_desc.mode == POOLING_MAX){
+  //   SAFE_CALL ( sgdnnTPUKernelLaunch ( handle, "tpu_kernel_api_max_pooling", &api, sizeof ( api ) ) );
+  //}
+  else{
+    SGDNN_CHECK ( false );
+  }
+#elif defined SGDNN_BACKEND_2260
+  //constrainst need to to checked
+  sg_api_pooling_t api;
+  api.input_global_addr = input.addr;
+  api.output_global_addr = output.addr;
+  for ( int i = 0; i < input.dim; ++i )
+  {
+    api.input_shape[i] = input.shape[i];
+    api.output_shape[i] = output.shape[i];
+  }
+  api.pooling_desc = pooling_desc;
+  api.dtype = sgdnnTPUKernelDType ( input.dtype );
+  if(pooling_desc.mode == POOLING_AVG ){
+    SAFE_CALL ( sgdnnTPUKernelLaunch ( handle, "tpu_kernel_api_avg_pooling_multi_core", &api, sizeof ( api ) ) );
+  }
+  // to be implemented
+  // else if(pooling_desc.mode == POOLING_MIN ){
+  //   SAFE_CALL ( sgdnnTPUKernelLaunch ( handle, "tpu_kernel_api_min_pooling_multi_core", &api, sizeof ( api ) ) );
+  // }
+  // else if(pooling_desc.mode == POOLING_MAX){
+  //   SAFE_CALL ( sgdnnTPUKernelLaunch ( handle, "tpu_kernel_api_max_pooling_multi_core", &api, sizeof ( api ) ) );
+  // }
+  else{
+    SGDNN_CHECK ( false );
+  }
+#endif
+  return BM_SUCCESS;
+}
+
 bm_status_t sgdnnIndexSelect ( bm_handle_t handle,
                                SgdnnTensor_t input,
                                SgdnnTensor_t indices,

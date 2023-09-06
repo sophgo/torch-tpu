@@ -179,6 +179,16 @@ bm_status_t sgdnnLayernormBackward ( bm_handle_t handle,
                                      SgdnnTensor_t grad_bias );
 
 /*
+ * OUTPUT = POOLING ( INPUT, POOLING_DESC )
+ * Note:
+ * 
+ */
+bm_status_t sgdnnPoolingForward ( bm_handle_t handle,
+                               SgdnnTensor_t input,
+                               SgdnnTensor_t output,
+                               PoolingDescriptor_t pooling_desc);
+
+/*
  * OUTPUT = LEFT * RIGHT + BIAS, where " * " is matrix multiplication
  * Note:
  * 1. The data types of LEFT, RIGHT, BIAS and OUTPUT must be the same and one of FP32, FP16 and BF16
@@ -190,6 +200,7 @@ bm_status_t sgdnnLayernormBackward ( bm_handle_t handle,
  *    BIAS must be contiguous
  * 5. BIAS is optional
  */
+
 bm_status_t sgdnnMatmul ( bm_handle_t handle,
                           SgdnnTensor_t left,
                           SgdnnTensor_t right,

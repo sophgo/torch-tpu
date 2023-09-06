@@ -11,7 +11,6 @@
 
 namespace at
 {
-
 std::tuple<Tensor, Tensor> max_pool2d_with_indices_tpu (
 const Tensor & self,
 IntArrayRef kernel_size,
@@ -45,7 +44,7 @@ bool ceil_mode )
   int output_h = at::native::pooling_output_shape ( self.size ( 2 ), kernel_size[0], padding[0], stride[0], dilation[0], ceil_mode );
   int output_w = at::native::pooling_output_shape ( self.size ( 3 ), kernel_size[1], padding[1], stride[1], dilation[1], ceil_mode );
   auto output = empty ( { self.size ( 0 ), self.size ( 1 ), output_h, output_w }, self.options() );
-  bm_status_t status = sgdnn_pooling_forward (
+  bm_status_t status = sgdnnPoolingForward (
                        tpu::TPUGetDeviceHandle(),
                        pooling_desc,
                        &alpha,
@@ -130,5 +129,111 @@ const Tensor & indices )
 TORCH_LIBRARY_IMPL ( aten, TPU, m )
 {
   m.impl ( "max_pool2d_with_indices_backward", max_pool2d_with_indices_backward_tpu );
+}
+
+Tensor& avg_pool2d_out_tpu (
+const Tensor & self,
+IntArrayRef kernel_size,
+IntArrayRef stride,
+IntArrayRef padding,
+bool ceil_mode,
+bool count_include_pad,
+c10::optional<int64_t> divisor_override,
+Tensor & output ){
+  CHECK_TENSOR_IN_DEVICE ( self );
+  CHECK_TENSOR_IN_DEVICE ( output );
+#if 0
+  auto output_cpu = avg_pool2d ( self.to ( torch::kFloat32 ).cpu(), kernel_size, stride, padding, ceil_mode, count_include_pad );
+  output = output_cpu.to(output.device()).to(output.dtype());
+#else
+  TORCH_CHECK ( ceil_mode == false );
+  int output_h = at::native::pooling_output_shape ( self.size ( 2 ), kernel_size[0], padding[0], stride[0], (long int)1/*dilation.h*/, ceil_mode );
+  int output_w = at::native::pooling_output_shape ( self.size ( 3 ), kernel_size[1], padding[1], stride[1], (long int)1/*dilation.w*/, ceil_mode );
+  PoolingDescriptor_t pooling_desc =
+  {
+    .kh = ( int ) kernel_size[0],
+    .kw = ( int ) kernel_size[1],
+    .pad_h = ( int ) padding[0],
+    .pad_w = ( int ) padding[1],
+    .stride_h = ( int ) stride[0],
+    .stride_w = ( int ) stride[1],
+    .output_h = output_h,
+    .output_w = output_w,
+    .mode = POOLING_AVG
+  };
+#ifdef TPU_OP_TIMING
+  auto timer = tpu::Timer().Start();
+#endif
+
+  bm_status_t status = sgdnnPoolingForward (
+                       tpu::TPUGetDeviceHandle(),
+                       tpu::TPUGenerateSgdnnTensor ( self ),
+                       tpu::TPUGenerateSgdnnTensor ( output ),
+                       pooling_desc);
+  TORCH_CHECK ( status == BM_SUCCESS );
+#ifdef TPU_OP_TIMING
+  tpu::OpTimer::Instance().AddTime(tpu::AVG_POOLING, timer.ElapsedUS());
+#endif
+#endif
+  return output;
+}
+TORCH_LIBRARY_IMPL ( aten, TPU, m )
+{
+  m.impl ( "avg_pool2d.out", avg_pool2d_out_tpu );
+}
+
+Tensor adaptive_avg_pool2d_out_tpu (
+const Tensor & self,
+IntArrayRef output_size){
+  CHECK_TENSOR_IN_DEVICE ( self );
+  auto output = empty ( { self.size ( 0 ), self.size ( 1 ), output_size[0], output_size[1]}, self.options() );
+#if 0
+  auto output_cpu = adaptive_avg_pool2d ( self.to ( torch::kFloat32 ).cpu(), output_size );
+  output = output_cpu.to(output.device()).to(output.dtype());
+#else
+  //padding need to be checked
+  auto input_shape = self.sizes();
+  std::vector<int32_t> strides(2, 0);
+  std::vector<int32_t> kernel_shape(2, 0);
+  std::vector<int32_t> pads(2, 0);
+  std::vector<int32_t> paddings(2, 0);
+
+  for (int i = 0; i < 2; i++) {
+    strides[i] = std::floor(self.size(i+2) / output_size[i]);
+    kernel_shape[i] = self.size(i+2) - (output_size[i] - 1) * strides[i];
+    strides[i] = output_size[i] == 1 ? 1 : strides[i];
+  }
+
+  PoolingDescriptor_t pooling_desc =
+  {
+    .kh = kernel_shape[0],
+    .kw = kernel_shape[1],
+    .pad_h = paddings[0],
+    .pad_w = paddings[1],
+    .stride_h = strides[0],
+    .stride_w = strides[1],
+    .output_h = (int)output_size[0],
+    .output_w = (int)output_size[1],
+    .mode = POOLING_AVG
+  };
+#ifdef TPU_OP_TIMING
+  auto timer = tpu::Timer().Start();
+#endif
+
+  bm_status_t status = sgdnnPoolingForward (
+                       tpu::TPUGetDeviceHandle(),
+                       tpu::TPUGenerateSgdnnTensor ( self ),
+                       tpu::TPUGenerateSgdnnTensor ( output ),
+                       pooling_desc);
+  TORCH_CHECK ( status == BM_SUCCESS );
+#ifdef TPU_OP_TIMING
+  tpu::OpTimer::Instance().AddTime(tpu::AVG_POOLING, timer.ElapsedUS());
+#endif
+#endif
+  return output;
+}
+TORCH_LIBRARY_IMPL ( aten, TPU, m )
+{
+  m.impl ( "_adaptive_avg_pool2d", adaptive_avg_pool2d_out_tpu );
 }
 } // namespace at

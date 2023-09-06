@@ -83,6 +83,23 @@ typedef enum {
   ONNX_NEAREST = 7,
 } PLATFORM_SUPPORT;
 
+typedef enum {
+  POOLING_MAX = 0,
+  POOLING_MIN = 1,
+  POOLING_AVG = 2,
+} sg_pooling_mode_t;
+
+typedef struct {
+  int kh;
+  int kw;
+  int pad_h;
+  int pad_w;
+  int stride_h;
+  int stride_w;
+  int output_h;
+  int output_w;
+  sg_pooling_mode_t mode;
+} PoolingDescriptor_t;
 
 typedef enum {
   UPSAMPLING_NEAREST = 0,
@@ -265,6 +282,17 @@ typedef struct
   int axis;
   int dtype;
 } WITH_PLATFORM(sg_api_layernorm_backward_t);
+
+typedef struct
+{
+  unsigned long long input_global_addr;
+  unsigned long long output_global_addr;
+  int input_shape[FW_MAX_SHAPE_DIMS];
+  int output_shape[FW_MAX_SHAPE_DIMS];
+  int dtype;
+  int do_relu;
+  PoolingDescriptor_t pooling_desc;
+} WITH_PLATFORM(sg_api_pooling_t);
 
 typedef struct
 {

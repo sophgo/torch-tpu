@@ -241,6 +241,7 @@ typedef enum
   BATCHNORM_BACKWARD,
   LAYERNORM,
   LAYERNORM_BACKWARD,
+  AVG_POOLING,
   RELU,
   RELU_BACKWARD,
   GELU,
@@ -396,6 +397,7 @@ static const char * OpTypeStr[OP_NUM] =
   "BatchNorm Backward",
   "LayerNorm",
   "LayerNorm Backward",
+  "Avg Pooling"
   "ReLU",
   "ReLU Backward",
   "GeLU",
