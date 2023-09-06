@@ -82,6 +82,37 @@ function build_libtorch_plugin() {
   popd
 }
 
+function make_kernel_module() {
+  test_CHIP_ARCH=${1:-bm1684x}
+  CURRENT_DIR=$(dirname ${BASH_SOURCE})
+  if [ "${test_CHIP_ARCH}" = "sg2260" ]; then
+      echo "chip 2260 kernel_module building is 'invalid'"
+  else
+    dumpinstall="apt-get install bsdmainutils"
+    $dumpinstall
+    pushd $CURRENT_DIR/..
+    rm -rf build
+    mkdir build && cd build
+    cmake_cmd_kerenl="cmake .. -DCMAKE_BUILD_TYPE=Debug -DUSING_CMODEL=OFF -DPCIE_MODE=ON -DSOC_MODE=OFF"
+    echo "[CMD-INFO] $cmake_cmd_kerenl"
+    $cmake_cmd_kerenl        
+    make kernel_module
+    make -j$(($(nproc)-2))
+    popd
+  fi
+}
+
+function build_kernel_module() {
+  export CROSS_TOOLCHAINS="$CURRENT_DIR/../../bm_prebuilt_toolchains/"
+  test_CHIP_ARCH=${1:-bm1684x}
+  CURRENT_DIR=$(dirname ${BASH_SOURCE})
+  if [ ! -d $CROSS_TOOLCHAINS ]; then
+    echo "[bm_prebuilt_toolchains]:$CROSS_TOOLCHAINS is not found !"
+  else
+    make_kernel_module $test_CHIP_ARCH
+  fi
+}
+
 function run_online_regression_test() {
   echo "[INFO]Ubuntu version"
   version_cmd="cat /etc/os-release"
@@ -110,21 +141,7 @@ function run_online_regression_test() {
   else
     if [ $LIBSOPHON_LINK_PATTERN = 'stable' ];then
       echo "[INFO]test_CHIP_ARCH:$test_CHIP_ARCH"
-      export CROSS_TOOLCHAINS="$CURRENT_DIR/../../bm_prebuilt_toolchains/"
-      if [ ! -d $CROSS_TOOLCHAINS ]; then
-        echo "[bm_prebuilt_toolchains]:$CROSS_TOOLCHAINS is not found !"
-      else
-        dumpinstall="apt-get install bsdmainutils"
-        $dumpinstall
-        pushd $CURRENT_DIR/..
-        rm -rf build
-        mkdir build && cd build
-        cmake .. -DCMAKE_BUILD_TYPE=Debug -DUSING_CMODEL=OFF -DPCIE_MODE=ON
-        make kernel_module
-        make -j$(($(nproc)-2))
-        popd
-      fi
-
+      build_kernel_module $test_CHIP_ARCH
     elif [ $LIBSOPHON_LINK_PATTERN = 'latest' ];then
       echo "************** $LIBSOPHON_LINK_PATTERN-LIBSOPHON IS REAEDY *********"
       source  $CURRENT_DIR/envsetup.sh $test_CHIP_ARCH

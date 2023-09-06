@@ -15,7 +15,7 @@ function build_all()
   fi
   pushd $TPUTRAIN_TOP/${TRAIN_BUILD_FOLDER}/
   cores=$(($(nproc)-2))
-  cmake .. -DCMAKE_BUILD_TYPE=Debug
+  cmake .. -DCMAKE_BUILD_TYPE=Debug -DUSING_CMODEL=ON -DPCIE_MODE=OFF -DSOC_MODE=OFF
   make -j$cores
   ret=$?
   popd
