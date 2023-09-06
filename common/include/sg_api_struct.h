@@ -57,6 +57,8 @@ typedef enum {
   ACTIVE_LOG_SIGMOID = 32,
   ACTIVE_SOFT_PLUS = 33,
   ACTIVE_SOFT_SIGN = 34,
+  // only implemented in tpu-train
+  ACTIVE_ERFC = 35, 
 } sg_active_type_t;
 
 typedef enum {

@@ -14,9 +14,9 @@ extern void nodechip_active_local(local_addr_t in_addr, local_addr_t out_addr,
                                   int if_local_layer, float *coef);
 
 static void nodechip_active(global_addr_t in_global_addr,
-                     global_addr_t out_global_addr, const int *shape,
-                     int shape_dim, data_type_t dtype,
-                     sg_active_type_t active_type, float *coef) {
+                            global_addr_t out_global_addr, const int *shape,
+                            int shape_dim, data_type_t dtype,
+                            sg_active_type_t active_type, float *coef) {
   unsigned long long length = 1;
   for (int i = 0; i < shape_dim; i++) {
     length *= (unsigned long long)shape[i];
@@ -29,7 +29,10 @@ static void nodechip_active(global_addr_t in_global_addr,
   const unsigned int bank_bsize = tpu_local_mem_size_per_npu() / tpu_bank_num();
   int dtype_size = tpu_data_type_size(dtype);
   int tensor_num =
-      2 + 2 + 1 + 1; // 4 inputs, 4 outputs, 1 buffer, 1 coeff_buffer
+      2 + 2 + 1 + 1; // 2 inputs, 2 outputs, 1 buffer, 1 coeff_buffer
+  if (active_type == ACTIVE_ERFC) {
+    tensor_num = 2 + 2 + 3 + 2; // 2 inputs, 2 outputs, 3 buffer, 2 coeff_buffer
+  }
   int tensor_bsize_pnpu = tpu_bank_num() / tensor_num * bank_bsize;
   TPUKERNEL_ASSERT(tensor_bsize_pnpu > 0);
 
@@ -51,6 +54,16 @@ static void nodechip_active(global_addr_t in_global_addr,
   local_addr_t out_local_addr[2] = {2 * tensor_bsize_pnpu,
                                     3 * tensor_bsize_pnpu};
   local_addr_t buffer_addr = 4 * tensor_bsize_pnpu;
+
+  // for erfc, which need 3 buffer and 2 coeff
+  local_addr_t buffer2_addr = 5 * tensor_bsize_pnpu;
+  local_addr_t buffer3_addr = 6 * tensor_bsize_pnpu;
+  local_addr_t exp_coeff_addr = 7 * tensor_bsize_pnpu;
+  local_addr_t erf_coeff_addr = 8 * tensor_bsize_pnpu;
+  if (active_type == ACTIVE_ERFC) {
+    tpu_bdc_load_fp32_exp_coeff(exp_coeff_addr);
+    tpu_bdc_load_fp32_erf_coeff(erf_coeff_addr);
+  }
 
   unsigned long long cur_idx[3] = {0}, cur_n_dim[3] = {0}, cur_m_dim[3] = {0};
   int stage_idx = 0, draning_idx = 0;
@@ -92,11 +105,23 @@ static void nodechip_active(global_addr_t in_global_addr,
 
     // compute
     if (stage_idx > 0 && draning_idx < 2) {
-      int cur_shape[4] = {cur_n_dim[1], DIV_UP(cur_m_dim[1], w_dim), 1,
+
+      if (active_type == ACTIVE_ERFC) {
+        dim4 cur_shape = {cur_n_dim[1], DIV_UP(cur_m_dim[1], w_dim), 1,
                           w_dim}; // matrix layout shape (n, c, h, w)
-      nodechip_active_local(in_local_addr[(stage_idx - 1) & 0x1],
-                            out_local_addr[(stage_idx - 1) & 0x1], buffer_addr,
-                            cur_shape, dtype, active_type, 0, coef);
+        tpu_bdc_fp_erfc(out_local_addr[(stage_idx - 1) & 0x1],
+                        in_local_addr[(stage_idx - 1) & 0x1], buffer_addr,
+                        buffer2_addr, buffer3_addr, exp_coeff_addr,
+                        erf_coeff_addr, &cur_shape, dtype);
+      } else {
+
+        int cur_shape[4] = {cur_n_dim[1], DIV_UP(cur_m_dim[1], w_dim), 1,
+                            w_dim}; // matrix layout shape (n, c, h, w)
+        nodechip_active_local(in_local_addr[(stage_idx - 1) & 0x1],
+                              out_local_addr[(stage_idx - 1) & 0x1],
+                              buffer_addr, cur_shape, dtype, active_type, 0,
+                              coef);
+      }
     }
 
     tpu_parallel_end();

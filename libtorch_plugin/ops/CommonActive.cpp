@@ -115,10 +115,17 @@ TORCH_LIBRARY_IMPL(aten, TPU, m) {
 
 IMP_ACTIVE_OUT(erf, ACTIVE_ERF, tpu::ERF)
 IMP_ACTIVE(erf)
+IMP_ACTIVE_OUT(erfc, ACTIVE_ERFC, tpu::ERFC)
+IMP_ACTIVE(erfc)
 
 TORCH_LIBRARY_IMPL(aten, TPU, m) {
   m.impl("erf.out", erf_out_tpu);
   m.impl("erf", erf_tpu);
+  m.impl("erfc.out", erfc_out_tpu);
+  m.impl("erfc", erfc_tpu);
 }
+
+
+
 
 } // namespace at

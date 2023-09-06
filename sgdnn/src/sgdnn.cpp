@@ -1782,10 +1782,10 @@ bm_status_t sgdnnActive(bm_handle_t handle, SgdnnTensor_t input,
         input.dtype == SGDNN_DTYPE_FP32 || input.dtype == SGDNN_DTYPE_FP16 ||
         input.dtype == SGDNN_DTYPE_INT8 || input.dtype == SGDNN_DTYPE_UINT8 ||
         input.dtype == SGDNN_DTYPE_INT16 || input.dtype == SGDNN_DTYPE_UINT16);
-  } else if (active_type == ACTIVE_ERF){
+  } else if (active_type == ACTIVE_ERF || active_type == ACTIVE_ERFC || 
+      active_type == ACTIVE_COSH || active_type == ACTIVE_SINH || active_type == ACTIVE_TANH) {
     SGDNN_CHECK(
         input.dtype == SGDNN_DTYPE_FP32);
-
   }
   SAFE_CALL(
       sgdnnTPUKernelLaunch(handle, "tpu_kernel_api_active", &api, sizeof(api)));
