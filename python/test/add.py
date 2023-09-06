@@ -7,14 +7,14 @@ torch.manual_seed(1000)
 torch.set_printoptions(precision=6)
 device = "privateuseone:0"
 
-def case1():
 
+def case1():
     a1 = torch.tensor(1, dtype=torch.int)
     a2 = torch.tensor(1.0, dtype=torch.float)
     a2_tpu = a2.to(device)
     a3 = 1
     a4 = torch.tensor(1, dtype=torch.int)
-    a5 = torch.tensor((1.,2.,3.), dtype=torch.int)
+    a5 = torch.tensor((1.0, 2.0, 3.0), dtype=torch.int)
     a5_tpu = a5.to(device)
 
     # tensor add tensor
@@ -32,16 +32,17 @@ def case1():
     # print("tpu : ", a2_tpu.cpu())
 
     a5.add_(a3)
-    print('cpu', a5)
+    print("cpu", a5)
     a5_tpu.add_(a3)
-    print('tpu', a5_tpu.cpu())
+    print("tpu", a5_tpu.cpu())
 
     # broadcast add
     a2.add_(a4)
     a2_tpu.add_(a4.to(device))
-    print("origin: ",a1)
-    print("cpu : ", a2 )
+    print("origin: ", a1)
+    print("cpu : ", a2)
     print("tpu : ", a2_tpu.cpu())
+
 
 def case_addbcast():
     N = 1
@@ -59,6 +60,23 @@ def case_addbcast():
     print(torch.max(torch.abs(diff)))
 
 
+def case_addbcast_rev():
+    N = 1
+    C = 4096
+    H = 512
+    a = torch.randn(N, C, H)
+    b = torch.randn(H)
+    a_tpu = a.to(device)
+    b_tpu = b.to(device)
+
+    o_t = b_tpu + a_tpu
+    o = b + a
+
+    diff = o - o_t.cpu()
+    print(torch.max(torch.abs(diff)))
+
+
 if __name__ == "__main__":
     case1()
     case_addbcast()
+    case_addbcast_rev()
