@@ -1701,7 +1701,6 @@ bm_status_t sgdnnUpsampling(bm_handle_t handle, SgdnnTensor_t input,
   SGDNN_CHECK(sgdnnIsTensorContiguous(&output));
 
 #if defined SGDNN_BACKEND_1684X
-  int coord = 0; // tpu::ResizeCoordMode::half_pixel
   sg_api_upsampling2d_t api;
   api.input_global_addr = input.addr;
   api.output_global_addr = output.addr;
@@ -1712,10 +1711,6 @@ bm_status_t sgdnnUpsampling(bm_handle_t handle, SgdnnTensor_t input,
 
   api.if_getting_buffer_size = false;
   api.platform_sp = upsampling_type == UPSAMPLING_BILINEAR ? PYTORCH_SUPPORT : PYTORCH_NEAREST;
-
-  // api.if_getting_buffer_size = true;
-  // u64 buffer_size = 0;
-  // api.buffer_size_ptr = &buffer_size;
 
   api.dim = output.dim;
   api.dtype = sgdnnTPUKernelDType(output.dtype);
@@ -1730,8 +1725,8 @@ bm_status_t sgdnnUpsampling(bm_handle_t handle, SgdnnTensor_t input,
   api.pad_bag = 0;
   api.pad_end = 0;
   if (upsampling_type == UPSAMPLING_BILINEAR){
-    api.half_pixel_centers = (coord == 0 || coord == 1) ? 1 : 0;
-    api.align_corners = (coord == 2) ? true : false;;
+    api.half_pixel_centers = 1;
+    api.align_corners = align_corners;
   }else{
     api.half_pixel_centers = false;
     api.align_corners = true;

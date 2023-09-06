@@ -14,11 +14,11 @@ input_tensor = torch.tensor([[1, 2], [3, 4]], dtype=torch.float32).reshape(
 )  # (batch_size, channels, height, width)
 
 # 指定目标上采样尺寸
-target_size = (4, 4)  # (target_height, target_width)
+target_size = (5,5)  # (target_height, target_width)
 
 # 使用F.upsample_bilinear进行双线性上采样，使用align_corners参数为True
 upsampled_tensor_true_corners = torch.ops.aten.upsample_bilinear2d(
-    input_tensor, output_size=target_size, align_corners=True
+    input_tensor, output_size=target_size, align_corners=False
 )
 print(upsampled_tensor_true_corners.shape)
 
@@ -31,11 +31,34 @@ print(upsampled_tensor_true_corners.shape)
 
 class TestUpsampling(nn.Module):
     def forward(self, x):
-        return [
+        res = [
             torch.ops.aten.upsample_bilinear2d(
                 x, target_size, align_corners=False
+            ),
+            torch.ops.aten.upsample_bilinear2d(
+                x, target_size, align_corners=True
+            ),
+            torch.ops.aten.upsample_bilinear2d(
+                x, target_size, align_corners=False, scales_w=3, scales_h=3
+            ),
+            torch.ops.aten.upsample_bilinear2d(
+                x, target_size, align_corners=True, scales_w=5, scales_h=5
+            ),
+            torch.ops.aten.upsample_nearest2d(
+                x, target_size
+            ),
+            torch.ops.aten.upsample_nearest2d(
+                x, target_size
+            ),
+            torch.ops.aten.upsample_nearest2d(
+                x, target_size, 3, 3
+            ),
+            torch.ops.aten.upsample_nearest2d(
+                x, target_size, 3, 3
             )
         ]
+        # print([i.cpu() for i in res])
+        return res
 
 
 def case1():
@@ -43,7 +66,9 @@ def case1():
     mem = []
     # print(TestUpsampling()(input_tensor))
     Evaluator().add_abs_evalute().evavlute([TestUpsampling()], ipts, mem=mem)
-    # print("pass")
+    # try:
+    # except:
+    #     print(mem)
 
 
 if __name__ == "__main__":
