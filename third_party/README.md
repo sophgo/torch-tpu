@@ -1,3 +1,6 @@
+#libsophon -latest currently support verion-id:
+   commit f5e30d4e32e5accef7de39a7e21f66292f3417d9
+
 # tpu_kernel
 ### include
     commit 1c4644118773ed8294afb37310c654805d12a3d2

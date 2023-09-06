@@ -1,5 +1,6 @@
 [1]PrePare:
 1) Link host device to your docker:
+    sudo docker pull  sophgo/tpuc_dev:latest
     sudo docker run --restart always --privileged -v /dev:/dev -td -v $PWD:/workspace --name <YOUR_NAME> sophgo/tpuc_dev:latest bash
     sudo docker exec -it <YOUR_NAME>  bash
 2) We offer two ways for libsophon
@@ -37,12 +38,23 @@ Or More detailed:
     2.d) source scripts/envsetup.sh sg2260 stable
         #CHIP_ARCH is sg2260,  and libsophon is using  /opt/sophon/libsophon-current (.deb)
 
+[3]fast_build:
+    3.a)bm1684x cmodel only:
+        fast_build_bm1684x_latest
+    3.b)bm1684x cmodel+ libtorch_plugin
+        fast_build_bm1684x_latest_and_libtorch_plugin
+    3.c)sg2260 cmodel only:
+        fast_build_sg2260_latest
+    3.d)sg2260 cmodel+ libtorch_plugin
+        fast_build_sg2260_latest_and_libtorch_plugin
+    3.e) redownload libtorch
+        build_libtorch_plugin
 
-[3]cmodel mode:
+[4]cmodel mode:
 1. mkdir build && (re)build_all
 2. set_cmodel_firmware ./build/firmware_core/libcmodel.so
 
-[4]pcie_mode or soc_mode:
+[5]pcie_mode or soc_mode:
 firstly make USING_CMODEL OFF && PCIE_MODE or SOC_MODE ON in config_common.cmake, (or directly set -D in cmake)
 if you use SOC_MODE or need pybind, make ENABLE_PYBIND ON
 1. if you have bm_prebuilt_toolchains, first set:
@@ -53,6 +65,8 @@ if you use SOC_MODE or need pybind, make ENABLE_PYBIND ON
 )
 4. make kernel_module
 5. make -j
+   5.1) quick build stable
+      fast_build_bm1684x_stable   /workspace/libtorch_xxx   0.4.8
 
 Note:
     apt-get install bsdmainutils
