@@ -10,7 +10,7 @@ inline static void pipeline_move(unsigned long long *array, int num) {
 /**
  * output = squeeze(input, dim)
  */
-void nodechip_tile_1d(global_addr_t input_global_addr,
+void nodechip_tile_1d_simulate(global_addr_t input_global_addr,
                       global_addr_t output_global_addr, const int *input_shape,
                       int input_dims, int tile_axis, int tile_num, int type,
                       data_type_t dtype) {
@@ -45,7 +45,7 @@ void tpu_kernel_api_squeeze(const void *args) {
     length *= api->shape[i];
   }
   tpu_initialize();
-  nodechip_tile_1d(api->output_global_addr, api->input_global_addr, api->shape,
+  nodechip_tile_1d_simulate(api->output_global_addr, api->input_global_addr, api->shape,
                    api->dim, 0, 1, 0, (data_type_t)api->dtype);
   tpu_poll();
 }

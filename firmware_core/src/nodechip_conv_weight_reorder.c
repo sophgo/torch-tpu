@@ -9,7 +9,7 @@
  * [oc, kh * kw, 1, ic] => [oc, kh * kw, DIV_UP(ic, 32), 32]
  *
 */
-void nodechip_conv_weight_to_32ic (
+void nodechip_conv_weight_to_32ic_simluate (
 global_addr_t    input_global_addr,
 global_addr_t    output_global_addr,
 const dim4      *shape
@@ -141,7 +141,7 @@ const dim4      *shape
  * [ic, kh * kw, 1, oc] => [ic, kh * kw, DIV_UP(oc, 32), 32]
  *
 */
-void nodechip_conv_weight_to_32oc (
+void nodechip_conv_weight_to_32oc_simluate (
 global_addr_t    input_global_addr,
 global_addr_t    output_global_addr,
 const dim4      *shape
@@ -270,12 +270,12 @@ void tpu_kernel_api_conv_weight_reorder ( const void* args ) {
   dim4 shape = {api->shape[0], api->shape[1], api->shape[2], api->shape[3]};
   tpu_initialize();
   if ( api->mode == 0 ) {
-    nodechip_conv_weight_to_32ic (
+    nodechip_conv_weight_to_32ic_simluate (
     api->input_global_addr,
     api->output_global_addr,
     &shape );
   } else if ( api->mode == 1 ) {
-    nodechip_conv_weight_to_32oc (
+    nodechip_conv_weight_to_32oc_simluate (
     api->input_global_addr,
     api->output_global_addr,
     &shape );
