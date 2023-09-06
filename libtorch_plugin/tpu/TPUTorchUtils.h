@@ -115,6 +115,20 @@ static inline SgdnnTensor_t TPUGenerateSgdnnTensor ( const at::Tensor & Tensor )
   return t;
 }
 
+static inline SgdnnTensor_t TPUGenerateSgdnnTensorforComplex64 ( const at::Tensor & Tensor )
+{
+  SgdnnTensor_t t = { 0 };
+  t.addr = ( unsigned long long ) Tensor.data_ptr();
+  t.dtype = TPUConvertDType ( caffe2::TypeMeta::Make<float>() );
+  t.dim = Tensor.dim();
+  for ( auto i = 0; i < Tensor.dim(); ++i )
+  {
+    t.shape[i] = Tensor.size ( i );
+    t.stride[i] = Tensor.stride ( i ) * 2;
+  }
+  return t;
+}
+
 static inline bool TPUIsSameShape ( const at::Tensor & Tensor1, const at::Tensor & Tensor2 )
 {
   if ( Tensor1.dim() == Tensor2.dim() )

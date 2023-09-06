@@ -1533,6 +1533,16 @@ bm_status_t sgdnnPowC ( bm_handle_t handle,
                       SgdnnTensor_t self,
                       float scalar,
                       SgdnnTensor_t out );
+
+/*
+ * OUTPUT = Real(INPUT)
+ * Note:
+ * 1. The data types of INPUT must be the same and one of FP32, FP16 and BF16
+ * 2. INPUT must be contiguous
+ */
+bm_status_t sgdnnReal ( bm_handle_t handle,
+                       SgdnnTensor_t input, 
+                       SgdnnTensor_t output);
 #if defined(__cplusplus)
 }
 #endif
