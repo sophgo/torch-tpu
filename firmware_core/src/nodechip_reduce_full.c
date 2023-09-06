@@ -56,21 +56,20 @@ local_addr_t output_local_addr,
 const dim4 *ishape,
 int method,
 bool is_reduce_h, // true: reduce h, false: reduce w
-local_addr_t cast_buff, //used when reduce_l2 & dtype isn't fp32
 data_type_t dtype) {
     const int eu_num = tpu_eu_num(dtype);
 
     if (method == REDUCE_PROD) {
         int c_per_npu = DIV_UP(ishape->c, tpu_npu_num());
         dim4 cpy_dim = {ishape->n, ishape->c, 1, ishape->w};
-        dim4 src_str = {ALIGN(ishape->h * ishape->w, eu_num) * c_per_npu,
-                        ALIGN(ishape->h,ishape->w),
-                        ishape->w,
-                        1};
-        dim4 dst_str = {ALIGN(ishape->w, eu_num) * c_per_npu,
-                        ALIGN(ishape->w, eu_num),
-                        ishape->w,
-                        1};
+        dim4 src_str = {.n = ALIGN(ishape->h * ishape->w, eu_num) * c_per_npu,
+                        .c = ALIGN(ishape->h, ishape->w),
+                        .h = ishape->w,
+                        .w = 1};
+        dim4 dst_str = {.n = ALIGN(ishape->w, eu_num) * c_per_npu,
+                        .c = ALIGN(ishape->w, eu_num),
+                        .h = ishape->w,
+                        .w = 1};
         if (is_reduce_h) {
             for(int i = 0; i<ishape->h;++i) {
                 if (i == 0) {
@@ -94,63 +93,64 @@ data_type_t dtype) {
             }
         }
         else {
-        int head = pow(2, (int)log2(ishape->w));
-        int tail = ishape->w - head;
-        TPUKERNEL_ASSERT(head > tail);
-        if (tail > 0) {
+            // 确保reduce两两相乘，缩短一半
+            int head = pow(2, (int)log2(ishape->w)); // 将w向下取整至距离最近的2的某个幂次方
+            int tail = ishape->w - head;             // 减去2的幂次方后，额外需要处理的部分
+            TPUKERNEL_ASSERT(head > tail);
+            if (tail > 0) {     // 存在额外需要处理的部分
+                cpy_dim.h = ishape->h;
+                cpy_dim.w = tail;
+                dst_str.h = ishape->w;
+                dst_str.c = ALIGN(dst_str.h * cpy_dim.h, eu_num);
+                dst_str.n = c_per_npu * dst_str.c;
+                tpu_bdc_fp_mul(buffer_local_addr,
+                               input_local_addr,
+                               input_local_addr + head * tpu_data_type_size(dtype),
+                               &cpy_dim,
+                               &dst_str,
+                               &src_str,
+                               &src_str,
+                               dtype);
+                cpy_dim.w = head - tail;
+                tpu_bdc_cpy(buffer_local_addr + tail * tpu_data_type_size(dtype),
+                            input_local_addr + tail * tpu_data_type_size(dtype),
+                            &cpy_dim,
+                            &dst_str,
+                            &src_str,
+                            dtype);
+                input_local_addr = buffer_local_addr;
+            }
+
+            // process head, and we keep dst stride == src stride, and then copy to output addr
+            src_str.h = ishape->w;
+            src_str.c = ALIGN(src_str.h * ishape->h, eu_num);
+            src_str.n = c_per_npu * src_str.c;
+            int left = head;
+            while(left > 1) {
+                dim4 prod_dim = { ishape->n, ishape->c, ishape->h, left >> 1 };
+                tpu_bdc_fp_mul(buffer_local_addr,
+                            head == left ? input_local_addr : buffer_local_addr,
+                            (head == left ? input_local_addr : buffer_local_addr) + (left >> 1) * tpu_data_type_size(dtype),
+                            &prod_dim,
+                            &src_str,
+                            &src_str,
+                            &src_str,
+                            dtype);
+                left = left >> 1;
+            }
+            // copy data from buffer to output
             cpy_dim.h = ishape->h;
-            cpy_dim.w = tail;
-            dst_str.h = head;
-            dst_str.c = ALIGN(dst_str.h * cpy_dim.h, eu_num);
+            cpy_dim.w = 1;
+            dst_str.w = 1;
+            dst_str.h = 1;
+            dst_str.c = ALIGN(cpy_dim.h * dst_str.h, eu_num);
             dst_str.n = c_per_npu * dst_str.c;
-            tpu_bdc_fp_mul(buffer_local_addr,
-                           input_local_addr,
-                           input_local_addr + head * tpu_data_type_size(dtype),
-                           &cpy_dim,
-                           &dst_str,
-                           &src_str,
-                           &src_str,
-                           dtype);
-            cpy_dim.w = head - tail;
-            tpu_bdc_cpy(buffer_local_addr + tail * tpu_data_type_size(dtype),
-                        input_local_addr + tail * tpu_data_type_size(dtype),
+            tpu_bdc_cpy(output_local_addr,
+                        head == 1 ? input_local_addr : buffer_local_addr,
                         &cpy_dim,
                         &dst_str,
                         &src_str,
                         dtype);
-            input_local_addr = buffer_local_addr;
-        }
-
-        // process head, and we keep dst stride == src stride, and then copy to output addr
-        src_str.h = head;
-        src_str.c = ALIGN(src_str.h * ishape->h, eu_num);
-        src_str.n = c_per_npu * src_str.c;
-        int left = head;
-        while(left > 1) {
-            dim4 prod_dim = { ishape->n, ishape->c, ishape->h, left >> 1 };
-            tpu_bdc_fp_mul(buffer_local_addr,
-                           head == left ? input_local_addr : buffer_local_addr,
-                           (head == left ? input_local_addr : buffer_local_addr) + (left >> 1) * tpu_data_type_size(dtype),
-                           &prod_dim,
-                           &src_str,
-                           &src_str,
-                           &src_str,
-                           dtype);
-            left = left >> 1;
-        }
-        // copy data from buffer to output
-        cpy_dim.h = ishape->h;
-        cpy_dim.w = 1;
-        dst_str.w = 1;
-        dst_str.h = 1;
-        dst_str.c = ALIGN(cpy_dim.h * dst_str.h, eu_num);
-        dst_str.n = c_per_npu * dst_str.c;
-        tpu_bdc_cpy(output_local_addr,
-                    head == 1 ? input_local_addr : buffer_local_addr,
-                    &cpy_dim,
-                    &dst_str,
-                    &src_str,
-                    dtype);
         }
     }
 }
@@ -272,7 +272,6 @@ int shape_dim_orig) {
 static void split_cw_align_bank(
 const int *input_shape,
 int shape_dims,
-int method,
 data_type_t dtype,
 secs_info_t *secs_info) {
     const int bank_size = LOCAL_MEM_SIZE / LOCAL_MEM_BANKS;
@@ -281,20 +280,15 @@ secs_info_t *secs_info) {
     int input_tensor_size = input_shape[0] * c_per_npu * feature_size;
     int output_tensor_size = input_shape[0] * c_per_npu * 
                              tpu_aligned_feature_size(1, input_shape[3], dtype);  // reduce h(h=1)
-    // reserve some buffer some cast when reduceL2 and dtype isn't fp32
-    int cast_buffer_size = ((method == REDUCE_L2) && (dtype != DT_FP32)) ?
-            (input_shape[0] * c_per_npu * tpu_aligned_feature_size(1, input_shape[3], DT_FP32)) : 0;
     int total_tensor_size = ALIGN(input_tensor_size, bank_size) * 2
-                          + ALIGN(output_tensor_size, bank_size) * 2
-                          + ALIGN(cast_buffer_size, bank_size);
+                          + ALIGN(output_tensor_size, bank_size) * 2;
     // if can compute all data at once, return
     if (total_tensor_size <= LOCAL_MEM_SIZE) return;
     
     // else batch, split untill total_tensor_size <= LOCAL_MEM_SIZE
     secs_info->csecs = c_per_npu;
     total_tensor_size = ALIGN(input_tensor_size / c_per_npu, bank_size) * 2
-                      + ALIGN(output_tensor_size / c_per_npu, bank_size) * 2
-                      + ALIGN(cast_buffer_size / c_per_npu, bank_size);
+                      + ALIGN(output_tensor_size / c_per_npu, bank_size) * 2;
     int wsecs = DIV_UP(total_tensor_size, LOCAL_MEM_SIZE);
     while (total_tensor_size > LOCAL_MEM_SIZE) {
         if (wsecs++ > input_shape[3]) break;
@@ -302,11 +296,8 @@ secs_info_t *secs_info) {
         int wslice = DIV_UP(input_shape[3], wsecs);
         input_tensor_size = input_shape[0] * tpu_aligned_feature_size(input_shape[2], wslice, dtype);
         output_tensor_size = input_shape[0] * tpu_aligned_feature_size(1, wslice, dtype);
-        cast_buffer_size = ((method == REDUCE_L2) && (dtype != DT_FP32)) ?
-            (input_shape[0] * tpu_aligned_feature_size(1, wslice, DT_FP32)) : 0;
         total_tensor_size = ALIGN(input_tensor_size, bank_size) * 2
-                          + ALIGN(output_tensor_size, bank_size) * 2
-                          + ALIGN(cast_buffer_size / c_per_npu, bank_size);
+                          + ALIGN(output_tensor_size, bank_size) * 2;
     }
     TPUKERNEL_ASSERT(wsecs <= input_shape[3]);
 
@@ -316,69 +307,41 @@ secs_info_t *secs_info) {
 static void split_ch_align_bank(
 const int *input_shape,
 int shape_dims,
-int method,
 data_type_t dtype,
-bool is_reduce_hw,
 secs_info_t *secs_info) {
     // buffer1: store reduce w res with the whole h, only needed when hsecs > 1
     // buffer2: for REDUCE_MIN, store 0-input(here share with input local addr).
     // buffer3: store reduce w res with hslice
     const int bank_size = LOCAL_MEM_SIZE / LOCAL_MEM_BANKS;
-    const int eu_num = tpu_eu_num(dtype);
     const int c_per_npu = DIV_UP(input_shape[1], NPU_NUM);
 
-    bool use_w_optimize = !is_reduce_hw && input_shape[3] > eu_num && input_shape[3] % eu_num == 0;
     int input_tensor_size = input_shape[0] * c_per_npu * 
                             tpu_aligned_feature_size(input_shape[2], input_shape[3], dtype);
-    if (use_w_optimize && method == REDUCE_MIN) {
-        input_tensor_size += input_shape[0] * c_per_npu *
-                             tpu_aligned_feature_size(input_shape[2], eu_num, dtype);
-    }
-    int output_tensor_size = input_shape[0] * c_per_npu *
-                             tpu_aligned_feature_size(is_reduce_hw ? 1 : input_shape[2], 1, dtype);
-    int buffer3_size = is_reduce_hw ? (input_shape[0] * c_per_npu *
-                                       tpu_aligned_feature_size(eu_num, 1, dtype)) : 0;
-    //reserve some buffer some cast when reduceL2 and dtype isn't fp32
-    int cast_buffer_size = ((method == REDUCE_L2) && (dtype != DT_FP32)) ?
-            (input_shape[0] * c_per_npu * tpu_aligned_feature_size(is_reduce_hw ? 1 : input_shape[2], 1, DT_FP32))
-                                : 0;
+    int output_tensor_size = input_shape[0] * c_per_npu * 
+                             tpu_aligned_feature_size(input_shape[2], 1, dtype);
     int total_tensor_size = ALIGN(input_tensor_size, bank_size) * 2
-                          + ALIGN(output_tensor_size, bank_size) * 2
-                          + ALIGN(buffer3_size, bank_size)
-                          + ALIGN(cast_buffer_size, bank_size);
+                          + ALIGN(output_tensor_size, bank_size) * 2;
     if (total_tensor_size <= LOCAL_MEM_SIZE) return;
 
     // update csecs
     int csecs = 1;
     int input_csize = input_tensor_size;
     int output_csize = output_tensor_size;
-    int buffer3_csize = buffer3_size;
-    int cast_buffer_csize = cast_buffer_size;
     int cslice_per_npu = DIV_UP(c_per_npu, csecs);
     while ((total_tensor_size > LOCAL_MEM_SIZE && csecs < c_per_npu) || (cslice_per_npu * NPU_NUM > CW_LIMIT)) {
         csecs++;
         cslice_per_npu = DIV_UP(c_per_npu, csecs);
         input_csize = input_tensor_size/c_per_npu*cslice_per_npu;
         output_csize = output_tensor_size/c_per_npu*cslice_per_npu;
-        buffer3_csize = buffer3_size/c_per_npu*cslice_per_npu;
-        cast_buffer_csize = cast_buffer_size/c_per_npu*cslice_per_npu;
         total_tensor_size = ALIGN(input_csize, bank_size) * 2
-                          + ALIGN(output_csize, bank_size) * 2
-                          + ALIGN(buffer3_csize, bank_size)
-                          + ALIGN(cast_buffer_csize, bank_size);
+                          + ALIGN(output_csize, bank_size) * 2;
     }
     secs_info->csecs = csecs;
     if (total_tensor_size <= LOCAL_MEM_SIZE) return;
 
     // update hsecs
-    buffer3_csize = is_reduce_hw ? (input_shape[0] * cslice_per_npu *
-        tpu_aligned_feature_size(input_shape[2], 1, dtype)) : 0;
-    int buffer1_csize = buffer3_csize;
     total_tensor_size = ALIGN(input_csize, bank_size) * 2
-                      + ALIGN(output_csize, bank_size) * 2
-                      + ALIGN(buffer1_csize, bank_size)
-                      + ALIGN(buffer3_csize, bank_size)
-                      + ALIGN(cast_buffer_csize, bank_size);
+                      + ALIGN(output_csize, bank_size) * 2;
     int hsecs = DIV_UP(total_tensor_size, LOCAL_MEM_SIZE);
     int hslice = DIV_UP(input_shape[2], hsecs);
     while (total_tensor_size > LOCAL_MEM_SIZE) {
@@ -391,22 +354,10 @@ secs_info_t *secs_info) {
 
         input_csize = input_shape[0] * cslice_per_npu *
             tpu_aligned_feature_size(hslice, input_shape[3], dtype);
-        if (use_w_optimize && method == REDUCE_MIN) {
-            input_csize += input_shape[0] * cslice_per_npu *
-                           tpu_aligned_feature_size(hslice, eu_num, dtype);
-        }
         output_csize = input_shape[0] * cslice_per_npu *
-                       tpu_aligned_feature_size(is_reduce_hw ? 1 : hslice, 1, dtype);
-        buffer3_csize = is_reduce_hw ? (input_shape[0] * cslice_per_npu *
-                                        tpu_aligned_feature_size(hslice, 1, dtype)) : 0;
-        cast_buffer_csize = ((method == REDUCE_L2) && (dtype != DT_FP32)) ?
-                (input_shape[0] * cslice_per_npu * tpu_aligned_feature_size(is_reduce_hw ? 1 : hslice, 1, DT_FP32))
-                                : 0;
+                       tpu_aligned_feature_size(hslice, 1, dtype);
         total_tensor_size = ALIGN(input_csize, bank_size) * 2
-                          + ALIGN(output_csize, bank_size) * 2
-                          + ALIGN(buffer1_csize, bank_size)
-                          + ALIGN(buffer3_csize, bank_size)
-                          + ALIGN(cast_buffer_csize, bank_size);
+                          + ALIGN(output_csize, bank_size) * 2;
     }
     TPUKERNEL_ASSERT(hslice > 0);
 
@@ -426,18 +377,15 @@ data_type_t dtype) {
     int input_shape[4] = {0};
     memcpy(input_shape, shape, sizeof(int) * 4);
     if(input_shape[0] * input_shape[1] <= CW_LIMIT) {
-        input_shape[1] = input_shape[0] * input_shape[1];
+        input_shape[1] = input_shape[0] * input_shape[1];   // merge n c dims
         input_shape[0] = 1;
     }
 
     secs_info_t secs_info = {1, 1, 1, 1};
-    split_cw_align_bank(input_shape,
-                        shape_dims,
-                        method,
-                        dtype,
-                        &secs_info);
+    split_cw_align_bank(input_shape, shape_dims, dtype, &secs_info);
     int csecs = secs_info.csecs;    // secs indicates how many slice
     int wsecs = secs_info.wsecs;
+
     int c_per_npu = DIV_UP(input_shape[1], NPU_NUM);
     int c_slice_per_npu = DIV_UP(c_per_npu, csecs);
     int w_slice = DIV_UP(input_shape[3], wsecs);    // slice indicates size of per slice
@@ -448,8 +396,7 @@ data_type_t dtype) {
     local_addr_t output_local_addrs[2] = {0};
     output_local_addrs[0] = input_local_addrs[1] + ALIGN(isize, bank_size);
     output_local_addrs[1] = output_local_addrs[0] + ALIGN(osize, bank_size);
-    local_addr_t cast_buffer = ((method == REDUCE_L2) && (dtype != DT_FP32)) ?
-                            output_local_addrs[1] + ALIGN(osize, bank_size) : 0;
+
     const int cslice_per_npu = c_per_npu / csecs;       // compute times of per npu
     const int c_residue_per_npu = c_per_npu % csecs;    // 
     const int wslice = input_shape[3] / wsecs;
@@ -498,7 +445,6 @@ data_type_t dtype) {
                                          &real_local_shape,
                                          method,
                                          true, // is_reduce_h
-                                         cast_buffer,
                                          dtype);
         }
 
@@ -552,11 +498,13 @@ data_type_t dtype) {
 
     int input_shape[4] = {0};
     memcpy(input_shape, shape, sizeof(int) * 4);
-    input_shape[1] = input_shape[0] * input_shape[1];
-    input_shape[0] = 1;
+    if(input_shape[0] * input_shape[1] <= CW_LIMIT) {
+        input_shape[1] = input_shape[0] * input_shape[1];   // merge n c dims
+        input_shape[0] = 1;
+    }
 
     secs_info_t secs_info = {1, 1, 1, 1};
-    split_ch_align_bank(input_shape, shape_dims, method, dtype, false, &secs_info);
+    split_ch_align_bank(input_shape, shape_dims, dtype, &secs_info);
     int csecs = secs_info.csecs;
     int hsecs = secs_info.hsecs;
 
@@ -570,16 +518,15 @@ data_type_t dtype) {
     local_addr_t output_local_addrs[2] = {0};
     output_local_addrs[0] = input_local_addrs[1] + ALIGN(isize, bank_size);
     output_local_addrs[1] = output_local_addrs[0] + ALIGN(osize, bank_size);
-    local_addr_t cast_buff = (method == REDUCE_L2) && (dtype != DT_FP32) ?
-                        output_local_addrs[1] + ALIGN(osize, bank_size): 0;
+
     const int cslice_per_npu    = c_per_npu / csecs;
     const int c_residue_per_npu = c_per_npu % csecs;
     const int hslice    = input_shape[2] / hsecs;
     const int h_residue = input_shape[2] % hsecs;
 
     dim4 input_global_stride, output_global_stride;
-    dim4 output_global_shape = {input_shape[0], input_shape[1], input_shape[2], 1};
     dim4 input_global_shape = {input_shape[0], input_shape[1], input_shape[2], input_shape[3]};
+    dim4 output_global_shape = {input_shape[0], input_shape[1], input_shape[2], 1};
     tpu_continuous_stride(&input_global_stride, &input_global_shape);
     tpu_continuous_stride(&output_global_stride, &output_global_shape);
 
@@ -592,7 +539,7 @@ data_type_t dtype) {
             int hsec_idx = stage_idx % hsecs;
             int csec_idx = stage_idx / hsecs;
             int real_cslice_per_npu = cslice_per_npu + (csec_idx < c_residue_per_npu);
-            real_cslice[0] = MIN(NPU_NUM*real_cslice_per_npu, input_shape[1]-cidx[0]);
+            real_cslice[0] = MIN(NPU_NUM * real_cslice_per_npu, input_shape[1] - cidx[0]);
             real_hslice[0] = hslice + (hsec_idx < h_residue);
         }
 
@@ -621,7 +568,6 @@ data_type_t dtype) {
                                          &real_local_shape,
                                          method,
                                          false, // is_reduce_h
-                                         cast_buff,
                                          dtype);
         }
 
