@@ -119,7 +119,7 @@ typedef struct {
   int dtype;
   unsigned long long* buffer_size_ptr;
   // PYTORCH_SUPPORT for **bilinear**; PYTORCH_NEAREST for nearest
-  PLATFORM_SUPPORT platform_sp; 
+  PLATFORM_SUPPORT platform_sp;
 } WITH_PLATFORM(sg_api_upsampling2d_t);
 
 typedef struct {
@@ -733,6 +733,22 @@ typedef struct {
   int tile_num;
   int dtype;
 } WITH_PLATFORM(sg_api_squeeze_t);
+
+typedef struct {
+  unsigned long long input_global_addr;
+  unsigned long long weight_global_addr;
+  unsigned long long bias_global_addr;
+  unsigned long long output_global_addr;
+  unsigned long long mean_global_addr;
+  unsigned long long rstd_global_addr;
+  int shape[FW_MAX_SHAPE_DIMS];
+  int dim;
+  int axis;
+  int group_num;
+  float eps;
+  int affine;
+  int dtype;
+} WITH_PLATFORM(sg_api_native_group_norm_t);
 
 typedef struct
 {
@@ -1488,7 +1504,7 @@ typedef struct
   int dtype;
 } WITH_PLATFORM(sg_api_reciprocal_t);
 
-typedef struct 
+typedef struct
 {
   unsigned long long input_global_addr;
   unsigned long long output_global_addr;
@@ -1497,7 +1513,7 @@ typedef struct
   int dtype;
 } WITH_PLATFORM(sg_api_signbit_t);
 
-typedef struct 
+typedef struct
 {
   unsigned long long input_global_addr;
   unsigned long long output_global_addr;
@@ -1506,7 +1522,7 @@ typedef struct
   int dtype;
 } WITH_PLATFORM(sg_api_trunc_t);
 
-typedef struct 
+typedef struct
 {
   unsigned long long self_global_addr;
   unsigned long long out_global_addr;
