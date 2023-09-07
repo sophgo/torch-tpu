@@ -376,6 +376,7 @@ typedef enum
   RECIPROCAL,
   TRUNC,
   POWC,
+  LN_MM_BACKWARD,
   OP_NUM
 }
 OpType;
@@ -526,7 +527,8 @@ static const char * OpTypeStr[OP_NUM] =
   "Add Layernorm Matmul",
   "RECIPROCAL",
   "TRUNC",
-  "POW SCALAR"
+  "POW SCALAR",
+  "layernorm Matmul Backward"
 };
 
 struct OpTimer

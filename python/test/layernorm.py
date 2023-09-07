@@ -18,9 +18,6 @@ def test(use_half = False, test_backward = False):
     grad_cpu = torch.rand(batch, sequence, hidden_size)
     grad_tpu = grad_cpu.to(device)
 
-    inp_cpu.require_grad = True
-    inp_tpu.require_grad = True
-
     ln_cpu = nn.LayerNorm(hidden_size, eps=layer_norm_epsilon)
     ln_tpu = copy.deepcopy(ln_cpu)
     ln_tpu = ln_tpu.to(device)
@@ -29,6 +26,9 @@ def test(use_half = False, test_backward = False):
         inp_tpu = inp_tpu.half()
         grad_tpu = grad_tpu.half()
         ln_tpu = ln_tpu.half()
+
+    inp_cpu.requires_grad = True
+    inp_tpu.requires_grad = True
 
     out_cpu = ln_cpu(inp_cpu)
     out_tpu = ln_tpu(inp_tpu)

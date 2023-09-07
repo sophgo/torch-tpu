@@ -74,6 +74,16 @@ namespace at
         Tensor &rstd,
 		Tensor &out);
 
+	std::tuple<Tensor, Tensor, Tensor> ln_mm_backward(
+        Tensor &grad_out_ln,
+        Tensor &input,
+		Tensor &mean,
+		Tensor &rstd,
+		Tensor &gamma,
+		Tensor &grad_input,
+        Tensor &grad_gamma,
+        Tensor &grad_beta);
+
 	std::tuple<Tensor, Tensor, Tensor, Tensor> add_ln_mm_forward(
         Tensor &input0,
         Tensor &input1,
@@ -85,7 +95,6 @@ namespace at
         Tensor &out_add,
         Tensor &mean,
         Tensor &rstd,
-		Tensor &out
-    );
+		Tensor &out);
 
 }

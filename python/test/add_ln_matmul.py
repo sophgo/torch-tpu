@@ -112,7 +112,7 @@ def check_add_ln_matmul():
     out_add_cpu, out_cpu = net_cpu(x1, x2)
 
     mean_cpu = out_add_cpu.mean(-1)
-    rstd_cpu = 1/(out_add_cpu.var(-1) + eps).sqrt()
+    rstd_cpu = 1 / (out_add_cpu.var(-1, unbiased=False) + eps).sqrt()
 
     add_diff = out_add_cpu - out_add_tpu.float().to("cpu")
     mean_diff = mean_cpu - mean_tpu.float().to("cpu")

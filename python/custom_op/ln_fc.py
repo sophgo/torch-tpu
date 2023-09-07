@@ -40,9 +40,42 @@ class lnMatmulFunc(torch.autograd.Function):
                                      rstd,
                                      out)
 
-        ctx.save_for_backward(x, w, mean, rstd)
+        ctx.save_for_backward(x, w, mean, rstd, gamma, beta)
 
-        return mean, rstd, out 
+        return out 
+    
+    @staticmethod
+    def backward(ctx, grad_output):
+        x, w, mean, rstd, gamma, beta = ctx.saved_tensors
+        D = w.shape[1]
+        if x.dim() == 3:
+            B, M, N = x.shape
+            out_ln_cpu = ((x.cpu() - mean.unsqueeze(-1).cpu()) * rstd.unsqueeze(-1).cpu()) * gamma.unsqueeze(0).unsqueeze(1).cpu() + beta.unsqueeze(0).unsqueeze(1).cpu()
+            grad_out_ln = torch.matmul(grad_output, w.unsqueeze(0).transpose(-1,-2))
+        else:
+            M, N = x.shape
+            out_ln_cpu = ((x.cpu() - mean.unsqueeze(-1).cpu()) * rstd.unsqueeze(-1).cpu()) * gamma.unsqueeze(0).cpu() + beta.unsqueeze(0).cpu()
+            grad_out_ln = torch.matmul(grad_output, w.transpose(-1,-2))
+
+        out_ln = out_ln_cpu.to(device)
+
+        grad_x = torch.ones(x.shape, dtype = x.dtype, device = grad_output.device)
+        grad_gamma = torch.ones((N,), dtype = x.dtype, device = grad_output.device)
+        grad_beta = torch.ones((N,), dtype = x.dtype, device = grad_output.device)
+
+        grad_w = torch.matmul(out_ln.transpose(-1,-2), grad_output)
+        grad_b = grad_output.reshape(-1, D).sum(0)
+        
+        torch.ops.my_ops.ln_mm_backward(grad_out_ln,
+                                        x,
+                                        mean.unsqueeze(-1),
+                                        rstd.unsqueeze(-1),
+                                        gamma,
+                                        grad_x,
+                                        grad_gamma,
+                                        grad_beta)
+        
+        return grad_x, grad_w, grad_b, grad_gamma, grad_beta
 
 
 class lnMatmulBlock(nn.Module):
