@@ -19,12 +19,49 @@ def case1():
 
     a1.div_(a2)
     a1_tpu.div_(a2_tpu)
+    print("***************test_div_normal begin*****************")
     print("a1: ",a1_clone)
     print("a2 : ", a2_clone)
     print("cpu : ", a1)
     print("tpu : ", a1_tpu.cpu())
+    print("***************test_div_normal end*****************")
+def case2():
+
+    a1 = torch.randint(0, 5, (5, 5), dtype=torch.float32)
+    a1_clone = a1.clone()
+    a1_tpu = a1.clone().to(device)
+    a2 = torch.randint(1 ,5, (1, 5), dtype=torch.float32)
+    a2_clone = a2.clone()
+    a2_tpu = a2.clone().to(device)
 
 
+    a1.div_(a2)
+    a1_tpu.div_(a2_tpu)
+    print("***************test_div_broadcast begin*****************")
+    print("a1: ",a1_clone)
+    print("a2 : ", a2_clone)
+    print("cpu : ", a1)
+    print("tpu : ", a1_tpu.cpu())
+    print("***************test_div_broadcast end*****************")
+
+def case3():
+
+    a1 = torch.randint(0, 5, (5, 5), dtype=torch.float32)
+    a1_clone = a1.clone()
+    a1_tpu = a1_clone.to(device)
+    a2 = torch.tensor(1,dtype=torch.float32)
+
+
+    a1.div_(a2)
+    a1_tpu.div_(a2)
+    print("***************test_div_const begin*****************")
+    print("a1: ",a1_clone)
+    print("a2 : ", a2)
+    print("cpu : ", a1)
+    print("tpu : ", a1_tpu.cpu())
+    print("***************test_div_const end*****************")
 
 if __name__ == "__main__":
     case1()
+    case2()
+    case3()

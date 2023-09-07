@@ -5,6 +5,7 @@ void nodechip_bcast_add (
 global_addr_t output_global_addr,
 global_addr_t input_global_addr,
 global_addr_t other_global_addr,
+scalar_t value,
 const dim4  * output_shape,
 const dim4  * input_shape,
 const dim4  * other_shape,
@@ -150,6 +151,7 @@ data_type_t   dtype )
           tpu_bdc_cpy ( other_addr, other_addr, &shape, NULL, &other_bcast_stride, dtype );
         }
         // Select
+        tpu_bdc_fp_mul_C ( other_addr, other_addr, value, &shape, NULL, NULL, dtype );
         tpu_bdc_fp_add ( output_addr, input_addr, other_addr, &shape, NULL, NULL, NULL, dtype );
         // Move out from local memory to global memory
         global_addr_t output_global_addr_gdma =
@@ -176,6 +178,7 @@ void tpu_kernel_api_bcast_add ( const void * args )
   dim4 output_shape = { .n = 1, .c = 1, .h = 1, .w = 1 };
   dim4 input_shape = { .n = 1, .c = 1, .h = 1, .w = 1 };
   dim4 other_shape = { .n = 1, .c = 1, .h = 1, .w = 1 };
+
   if ( api->dim >= 1 )
   {
     input_shape.n = api->input_shape[0];
@@ -200,15 +203,22 @@ void tpu_kernel_api_bcast_add ( const void * args )
     other_shape.w = api->other_shape[3];
     output_shape.w = input_shape.w > other_shape.w ? input_shape.w : other_shape.w;
   }
+  scalar_t value = {.f32 = api->value};
+  data_type_t dtype = ( data_type_t ) api->dtype;
+  if (dtype != DT_FP32) {
+    value = tpu_fp_cast ( value, dtype, DT_FP32, RM_HALF_TO_EVEN );
+  }
+
   tpu_initialize();
   nodechip_bcast_add (
   api->output_global_addr,
   api->input_global_addr,
   api->other_global_addr,
+  value,
   &output_shape,
   &input_shape,
   &other_shape,
-  ( data_type_t ) api->dtype );
+  dtype );
   tpu_poll();
 }
 TPUKERNEL_FUNC_REGISTER ( tpu_kernel_api_bcast_add );

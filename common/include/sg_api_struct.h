@@ -816,18 +816,8 @@ typedef struct
   int other_dim;
   float value;
   int dtype;
-} WITH_PLATFORM(sg_api_mul_eltwise_t);
-
-typedef struct
-{
-  unsigned long long input_global_addr;
-  unsigned long long other_global_addr;
-  unsigned long long output_global_addr;
-  int shape[FW_MAX_SHAPE_DIMS];
-  int dim;
-  float value;
-  int dtype;
-} WITH_PLATFORM(sg_api_div_eltwise_t);
+  int binary_type;
+} WITH_PLATFORM(sg_api_arithmetic_eltwise_t);
 
 typedef struct
 {
