@@ -62,14 +62,30 @@ Tensor &masked_fill_Scalar_tpu(Tensor &self, const Tensor &mask,
                                const Scalar &value) {
   CHECK_TENSOR_IN_DEVICE(self);
   CHECK_TENSOR_IN_DEVICE(mask);
-#if 1
+#if 0
   LOG(WARNING) << "masked_fill_.Scalar use cpu impl";
   auto self_cpu = self.cpu();
   self_cpu.masked_fill_(mask.cpu(), value);
   tpu::TPUCopyHostToDevice(self.data_ptr(), self_cpu.contiguous().data_ptr(),
                            self.nbytes());
 #else
-  // TODO
+#ifdef TPU_OP_TIMING
+  auto timer = tpu::Timer().Start();
+#endif
+  Tensor o = self.clone();
+  Tensor &out = o;
+  Tensor maski = mask.clone().to(torch::kF32);
+  Tensor &mask_int = maski;
+  bm_status_t status = sgdnnMaskedFill ( tpu::TPUGetDeviceHandle(),
+                                         tpu:: TPUGenerateSgdnnTensor ( self ),
+                                         tpu:: TPUGenerateSgdnnTensor ( mask_int ),
+                                         value.toDouble(),
+                                         tpu:: TPUGenerateSgdnnTensor(out) );
+  TORCH_CHECK( status == BM_SUCCESS );
+  self = out.clone();
+#ifdef TPU_OP_TIMING
+  tpu::OpTimer::Instance().AddTime(tpu::MASKED_FILL, timer.ElapsedUS());
+#endif
 #endif
   return self;
 }

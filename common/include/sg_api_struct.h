@@ -983,6 +983,19 @@ typedef struct
 typedef struct
 {
   unsigned long long input_global_addr;
+  unsigned long long mask_global_addr;
+  unsigned long long out_global_addr;
+  int input_shape[FW_MAX_SHAPE_DIMS];
+  int mask_shape[FW_MAX_SHAPE_DIMS];
+  int input_dims;
+  int mask_dims;
+  float value;
+  int dtype;
+} WITH_PLATFORM(sg_api_masked_fill_t);
+
+typedef struct
+{
+  unsigned long long input_global_addr;
   unsigned long long output_global_addr;
   unsigned long long mask_global_addr;
   int shape[FW_MAX_SHAPE_DIMS];

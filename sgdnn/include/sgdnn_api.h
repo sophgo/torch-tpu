@@ -844,6 +844,15 @@ bm_status_t sgdnnEmbeddingBackward ( bm_handle_t handle,
                                      SgdnnTensor_t grad_input );
 
 /*
+  OUTPUT = MASKE_FILL ( INPUT, MASK, VALUE )
+*/
+bm_status_t sgdnnMaskedFill ( bm_handle_t handle,
+                              SgdnnTensor_t input,
+                              SgdnnTensor_t mask,
+                              float value,
+                              SgdnnTensor_t out );
+
+/*
  * [ OUTPUT, MASK ] = DROPOUT ( INPUT, SEED, THRESHOLD )
  * MASK = RANDOM ( SEED ) > THRESHOLD ? 1 : 0
  * OUTPUT = INPUT * MASK

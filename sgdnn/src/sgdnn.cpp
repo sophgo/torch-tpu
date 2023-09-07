@@ -3404,6 +3404,40 @@ bm_status_t sgdnnAddCDiv ( bm_handle_t handle,
   return BM_SUCCESS;
 }
 
+bm_status_t sgdnnMaskedFill ( bm_handle_t handle,
+                              SgdnnTensor_t input,
+                              SgdnnTensor_t mask,
+                              float value,
+                              SgdnnTensor_t out )
+{
+  SGDNN_CHECK ( input.dim == mask.dim );
+  for ( int i = 0; i < input.dim; i++ )
+  {
+    SGDNN_CHECK ( input.shape[i] == mask.shape[i] );
+  }
+#if defined SGDNN_BACKEND_1684X
+  sg_api_masked_fill_t api;
+  api.input_global_addr = input.addr;
+  api.mask_global_addr = mask.addr;
+  api.out_global_addr = out.addr;
+  api.input_dims = input.dim;
+  api.mask_dims = mask.dim;
+  for ( int i = 0; i < input.dim; i++ )
+  {
+    api.input_shape[i] = input.shape[i];
+    api.mask_shape[i] = mask.shape[i];
+  }
+  api.value = value;
+  api.dtype = DT_FP32;
+  SAFE_CALL ( sgdnnTPUKernelLaunch ( handle, "tpu_kernel_api_masked_fill", &api, sizeof ( api ) ) );
+#elif defined SGDNN_BACKEND_2260
+
+#else
+  SGDNN_CHECK(false);
+#endif
+  return BM_SUCCESS;
+}
+
 bm_status_t sgdnnDropout ( bm_handle_t handle,
                            SgdnnTensor_t input,
                            unsigned long long seed,
