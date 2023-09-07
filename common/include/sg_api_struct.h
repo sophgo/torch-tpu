@@ -1543,5 +1543,18 @@ typedef struct
   int dtype;
 } WITH_PLATFORM(sg_api_real_t);
 
+typedef struct 
+{
+  unsigned long long input_global_addr;
+  unsigned long long trans_buffer_global_addr;
+  unsigned long long copy_buffer_global_addr;
+  unsigned long long output_global_addr;
+  int shape[FW_MAX_SHAPE_DIMS];
+  int stride[FW_MAX_SHAPE_DIMS];
+  int dim_order[FW_MAX_SHAPE_DIMS];
+  int dim;
+  int dtype;
+} WITH_PLATFORM(sg_api_permute_t);
+
 #pragma pack(pop)
 #endif  // SG_API_STRUCT_H

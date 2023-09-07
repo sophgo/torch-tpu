@@ -6299,3 +6299,65 @@ bm_status_t sgdnnReal ( bm_handle_t handle,
 #endif
   return BM_SUCCESS;
 }
+
+bm_status_t sgdnnPermute ( bm_handle_t handle,
+                           SgdnnTensor_t input,
+                           int *dim_order,
+                           SgdnnTensor_t output ) {
+  SGDNN_CHECK ( input.dim == output.dim );
+  SGDNN_CHECK ( input.dtype == output.dtype );
+  // SGDNN_CHECK ( sgdnnIsTensorContiguous ( &input ) );
+  // SGDNN_CHECK ( sgdnnIsTensorContiguous ( &output ) );
+
+#if defined SGDNN_BACKEND_1684X
+  sg_api_permute_t api;
+  api.dim = input.dim;
+  int size = 1;
+  for(int i = 0; i < input.dim; ++i) {
+    api.shape[i] = input.shape[i];
+    api.dim_order[i] = dim_order[i];
+    size *= input.shape[i];
+    api.stride[i] = input.stride[i];
+  }
+  size *= sizeof(float);
+  bm_device_mem_t dev_mem;
+  bm_status_t status = bm_malloc_device_byte(handle, &dev_mem, size);
+  if(BM_SUCCESS != status){
+    printf("malloc device error \r\n");
+    return status;
+  }
+  api.trans_buffer_global_addr = bm_mem_get_device_addr(dev_mem);
+  api.copy_buffer_global_addr = bm_mem_get_device_addr(dev_mem);
+  api.dtype = sgdnnTPUKernelDType( input.dtype );
+  api.input_global_addr = input.addr;
+  api.output_global_addr = output.addr;
+  SAFE_CALL ( sgdnnTPUKernelLaunch ( handle, "tpu_kernel_api_permute", &api, sizeof( api ) ) );
+#elif defined SGDNN_BACKEND_2260
+  sg_api_permute_t api;
+  api.dim = input.dim;
+  int size = 1;
+  for(int i = 0; i < input.dim; ++i) {
+    api.shape[i] = input.shape[i];
+    api.dim_order[i] = dim_order[i];
+    size *= input.shape[i];
+    api.stride[i] = input.stride[i];
+  }
+  size *= sizeof(float);
+  bm_device_mem_t dev_mem;
+  bm_status_t status = bm_malloc_device_byte(handle, &dev_mem, size);
+  if(BM_SUCCESS != status){
+    printf("malloc device error \r\n");
+    return status;
+  }
+  api.trans_buffer_global_addr = bm_mem_get_device_addr(dev_mem);
+  api.copy_buffer_global_addr = bm_mem_get_device_addr(dev_mem);
+  api.dtype = sgdnnTPUKernelDType( input.dtype );
+  api.input_global_addr = input.addr;
+  api.output_global_addr = output.addr;
+  SAFE_CALL ( sgdnnTPUKernelLaunch ( handle, "tpu_kernel_api_permute", &api, sizeof( api ) ) );
+#else
+  SGDNN_CHECK( false );
+#endif
+
+  return BM_SUCCESS;
+}

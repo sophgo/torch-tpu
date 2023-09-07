@@ -1551,6 +1551,21 @@ bm_status_t sgdnnPowC ( bm_handle_t handle,
 bm_status_t sgdnnReal ( bm_handle_t handle,
                        SgdnnTensor_t input,
                        SgdnnTensor_t output);
+
+/*
+ * OUTPUT = PERMUTE ( INPUT, DIM_ORDER )
+ * Node:
+ * 1. the dim of self and out must be the same
+ * 2. the data type of self and out must be the same
+ * 3. the number of dim_order must be the same with self's dim
+ * 4. input and output must be contiguous
+ */
+bm_status_t sgdnnPermute ( bm_handle_t handle,
+                           SgdnnTensor_t input,
+                           int *dim_order,
+                           SgdnnTensor_t output );
+
+
 #if defined(__cplusplus)
 }
 #endif
