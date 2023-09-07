@@ -26,7 +26,7 @@ def test_unsqueeze():
         [torch.rand(*dim_sizes)],
     ]
     metric_table = ['max_diff','MAE']
-    chip_arch_dict = {"bm1684x":1, 'sg2260':0}
+    chip_arch_dict = {"bm1684x":1, 'sg2260':1}
     epsilon_dict = {'bm1684x':{'f32':1e-6,'f16':1e-2},'sg2260':{'f32':1e-6,'f16':1e-2}}
     case_name =  __file__.split('.py')[0]# You can change your name
     dump_flag = True #it will dump alll wrong cases
