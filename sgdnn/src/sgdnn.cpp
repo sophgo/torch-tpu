@@ -1593,15 +1593,15 @@ bm_status_t sgdnnIndexSelect ( bm_handle_t handle,
 {
   SGDNN_CHECK ( indices.dtype == SGDNN_DTYPE_INT32 ||
                 indices.dtype == SGDNN_DTYPE_INT64 );
-  SGDNN_CHECK ( input.dim + indices.dim - 1 == output.dim );
+  // SGDNN_CHECK ( input.dim + indices.dim - 1 == output.dim );
   for ( int i = 0; i < dim; ++i )
   {
     SGDNN_CHECK ( input.shape[i] == output.shape[i] );
   }
-  for ( int i = dim; i < dim + indices.dim; ++i )
-  {
-    SGDNN_CHECK ( indices.shape[i - dim] == output.shape[i] );
-  }
+  // for ( int i = dim; i < dim + indices.dim; ++i )
+  // {
+  //   SGDNN_CHECK ( indices.shape[i - dim] == output.shape[i] );
+  // }
   for ( int i = dim + indices.dim; i < output.dim; ++i )
   {
     SGDNN_CHECK ( input.shape[i - indices.dim + 1] == output.shape[i] );

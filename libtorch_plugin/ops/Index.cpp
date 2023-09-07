@@ -14,7 +14,7 @@ Tensor & index_out_tpu( const Tensor & self, const c10::List<c10::optional<Tenso
 {
     CHECK_TENSOR_IN_DEVICE ( out );
     CHECK_TENSOR_IN_DEVICE ( self );
-#if 1
+#if 0
     LOG( WARNING ) << "index use cpu impl";
     c10::List<c10::optional<Tensor>> indices_cpu;
     for (int i = 0; i < indices.size(); i++)
@@ -26,7 +26,12 @@ Tensor & index_out_tpu( const Tensor & self, const c10::List<c10::optional<Tenso
     auto out_cpu = index( self.cpu(), indices_cpu );
     out = out_cpu.to(out.device());
 #else
-    //TODO
+    bm_status_t status = sgdnnIndexSelect(tpu::TPUGetDeviceHandle(),
+                                    tpu::TPUGenerateSgdnnTensor(self),
+                                    tpu::TPUGenerateSgdnnTensor(indices[1].value()),
+                                    1,
+                                    tpu::TPUGenerateSgdnnTensor(out));
+    TORCH_CHECK ( status == BM_SUCCESS );
 #endif
     return out;
 }
