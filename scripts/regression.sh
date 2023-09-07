@@ -52,11 +52,9 @@ function link_libsophon() {
     echo "********************************************"
 }
 
-function build_libtorch_plugin() {
-  LIBTORCH_DOWNLOAD_FLAG=${1:-normal}
-  CURRENT_DIR=$(dirname ${BASH_SOURCE})
-  echo "[INFO]LIBTORCH_DOWNLOAD_FLAG:$LIBTORCH_DOWNLOAD_FLAG"
-  if [ $LIBTORCH_DOWNLOAD_FLAG = 'normal' ];then
+function libtorch_zip_prepare() {
+  LIBTORCH_DOWNLOAD_FLAG=${1:-online} #online,local, or fast
+  if [ $LIBTORCH_DOWNLOAD_FLAG = "online" ] || [ $LIBTORCH_DOWNLOAD_FLAG = 'local' ];then
     pushd  $CURRENT_DIR/..
     cmd_rm="rm -rf libtorch"
     $cmd_rm
@@ -65,6 +63,15 @@ function build_libtorch_plugin() {
     unzip_code="unzip libtorch-shared-with-deps-2.0.1+cpu.zip"
     $unzip_code
     popd
+  fi
+}
+
+function build_libtorch_plugin() {
+  LIBTORCH_DOWNLOAD_FLAG=${1:-online} #online,local, or fast
+  CURRENT_DIR=$(dirname ${BASH_SOURCE})
+  echo "[INFO]LIBTORCH_DOWNLOAD_FLAG:$LIBTORCH_DOWNLOAD_FLAG"
+  if [ $LIBTORCH_DOWNLOAD_FLAG = 'online' ] || [ $LIBTORCH_DOWNLOAD_FLAG = 'local' ];then
+    libtorch_zip_prepare $LIBTORCH_DOWNLOAD_FLAG
   fi
   LIBTORCH_PLUGIN_PATH=$CURRENT_DIR/../libtorch_plugin
   echo "[INFO]LIBTORCH_PLUGIN_PATH:$LIBTORCH_PLUGIN_PATH"
@@ -95,17 +102,43 @@ function make_kernel_module() {
     mkdir build && cd build
     cmake_cmd_kerenl="cmake .. -DCMAKE_BUILD_TYPE=Debug -DUSING_CMODEL=OFF -DPCIE_MODE=ON -DSOC_MODE=OFF"
     echo "[CMD-INFO] $cmake_cmd_kerenl"
-    $cmake_cmd_kerenl        
+    $cmake_cmd_kerenl
     make kernel_module
     make -j$(($(nproc)-2))
     popd
   fi
 }
 
+#this function is fake  as make -j exists error
 function build_kernel_module() {
+  CURRENT_DIR=$(dirname ${BASH_SOURCE})
   export CROSS_TOOLCHAINS="$CURRENT_DIR/../../bm_prebuilt_toolchains/"
   test_CHIP_ARCH=${1:-bm1684x}
+  if [ ! -d $CROSS_TOOLCHAINS ]; then
+    echo "[bm_prebuilt_toolchains]:$CROSS_TOOLCHAINS is not found !"
+  else
+ if [ "${test_CHIP_ARCH}" = "sg2260" ]; then
+      echo "chip 2260 kernel_module building is 'invalid'"
+  else
+    dumpinstall="apt-get install bsdmainutils"
+    $dumpinstall
+    pushd $CURRENT_DIR/..
+    rm -rf build
+    mkdir build && cd build
+    cmake_cmd_kerenl="cmake .. -DCMAKE_BUILD_TYPE=Debug -DUSING_CMODEL=OFF -DPCIE_MODE=ON -DSOC_MODE=OFF"
+    echo "[CMD-INFO] $cmake_cmd_kerenl"
+    $cmake_cmd_kerenl
+    make kernel_module
+    #make -j$(($(nproc)-2)) #the only difference!!!!!!!!!!!!!
+    popd
+  fi
+  fi
+}
+
+function build_kernel_module_real() {
   CURRENT_DIR=$(dirname ${BASH_SOURCE})
+  export CROSS_TOOLCHAINS="$CURRENT_DIR/../../bm_prebuilt_toolchains/"
+  test_CHIP_ARCH=${1:-bm1684x}
   if [ ! -d $CROSS_TOOLCHAINS ]; then
     echo "[bm_prebuilt_toolchains]:$CROSS_TOOLCHAINS is not found !"
   else
@@ -128,20 +161,20 @@ function run_online_regression_test() {
   # fi
   test_CHIP_ARCH=${1:-bm1684x}
   LIBSOPHON_LINK_PATTERN=${2:-latest} #latest or stable
-  TEST_PATTERN=${3:-normal} #normal or fast
+  TEST_PATTERN=${3:-online} #online,local, or fast
   DEB_PATH_STABLE=${4:-none} #none or given path
   VERSION_PATH_STABLE=${5:-0.4.8}
 
   echo "[INFO]test_CHIP_ARCH:$test_CHIP_ARCH"
   echo "[INFO]LIBSOPHON_LINK_PATTERN=$LIBSOPHON_LINK_PATTERN"
-
+  echo "[INFO]TEST_PATTERN=$TEST_PATTERN"
   link_libsophon $LIBSOPHON_LINK_PATTERN $DEB_PATH_STABLE $VERSION_PATH_STABLE; ret_libsophon=$?
   if [ $ret_libsophon -eq 255 ]; then
     echo "[INFO]test_CHIP_ARCH:$test_CHIP_ARCH libsophon setting failed!"
   else
     if [ $LIBSOPHON_LINK_PATTERN = 'stable' ];then
       echo "[INFO]test_CHIP_ARCH:$test_CHIP_ARCH"
-      build_kernel_module $test_CHIP_ARCH
+      build_kernel_module_real $test_CHIP_ARCH
     elif [ $LIBSOPHON_LINK_PATTERN = 'latest' ];then
       echo "************** $LIBSOPHON_LINK_PATTERN-LIBSOPHON IS REAEDY *********"
       source  $CURRENT_DIR/envsetup.sh $test_CHIP_ARCH
@@ -151,8 +184,8 @@ function run_online_regression_test() {
       set_cmodel_firmware $TPU_TRAIN_CMODEL_PATH
       echo "*************** CMODEL IS SET *************"
     fi
-    if [ $TEST_PATTERN = "normal" ];then
-      build_libtorch_plugin
+    if [ $TEST_PATTERN = "online" ] || [ $TEST_PATTERN = "local" ];then
+      build_libtorch_plugin $TEST_PATTERN
       echo "*************** LIBTORCH_PLUGIN IS BUILT *************"
       ops_utest; ret_ops_utest=$?
       echo "[INFO]ret_ops_utest:$ret_ops_utest"
@@ -187,5 +220,12 @@ function fast_build_sg2260_latest() {
 function fast_build_sg2260_latest_and_libtorch_plugin() {
   run_online_regression_test sg2260 latest fast
   build_libtorch_plugin fast
+}
 
+function fast_download_and_rebuild_libtorch_plugin() {
+  build_libtorch_plugin local
+}
+
+function fast_only_rebuild_libtorch_plugin() {
+  build_libtorch_plugin fast
 }
