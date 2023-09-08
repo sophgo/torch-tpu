@@ -256,6 +256,7 @@ typedef enum {
   BINARY_FLOOR_DIV = 10009
 } sg_binary_type_t;
 
+static
 void software_pipeline_3stage(const swpl_load_func_t load_func,
                               const swpl_compute_func_t compute_func,
                               const swpl_store_func_t store_func,
@@ -305,6 +306,7 @@ void software_pipeline_3stage(const swpl_load_func_t load_func,
   SWPL_END
 }
 
+static
 void plain_loop_3stage(const swpl_load_func_t load_func,
                        const swpl_compute_func_t compute_func,
                        const swpl_store_func_t store_func,
@@ -329,7 +331,8 @@ void plain_loop_3stage(const swpl_load_func_t load_func,
   }
 }
 
-static inline int sign(int x) { return x > 0 ? +1 : -1; }
+static inline int _sign(int x) { return x > 0 ? +1 : -1; }
+static inline int _abs(int x) { return x >= 0 ? x : -x; }
 
 static inline void fp_sum2d(local_addr_t dst_addr, local_addr_t src_addr,
                             const dim4 *shape, const dim2 *kernel,
@@ -470,7 +473,7 @@ static inline void auto_partition(local_addr_t *local_addrs, int *mem_sizes,
   for (int i = 0; i < num; ++i) {
     if ((int)local_addrs[i] == i) {
       invar[real_rank] = i;
-      int weight = abs(mem_sizes[i]);
+      int weight = _abs(mem_sizes[i]);
       if (mem_sizes[i] > 0) {
         weight *= 2;
       }
@@ -520,7 +523,7 @@ static inline void auto_partition(local_addr_t *local_addrs, int *mem_sizes,
   for (int i = 0; i < real_rank; ++i) {
     const int j = invar[i];
     local_addrs[j] = running_addr;
-    mem_sizes[j] = sign(mem_sizes[j]);
+    mem_sizes[j] = _sign(mem_sizes[j]);
     mem_sizes[j] *= mem_sizes_[i];
     running_addr += mem_sizes_[i];
   }
@@ -528,8 +531,8 @@ static inline void auto_partition(local_addr_t *local_addrs, int *mem_sizes,
     const int j = invar[i];
     const int idx = local_addrs[j];
     local_addrs[j] = local_addrs[idx];
-    mem_sizes[j] = sign(mem_sizes[j]);
-    mem_sizes[j] *= abs(mem_sizes[idx]);
+    mem_sizes[j] = _sign(mem_sizes[j]);
+    mem_sizes[j] *= _abs(mem_sizes[idx]);
   }
   if (use_swpl) {
     for (int i = 0; i < num; ++i) {
@@ -1198,6 +1201,7 @@ gn_store_optional__ch_split(const system_addr_t *system_addrs,
   }
 }
 
+static
 void swpl_do_nothing(const system_addr_t *system_addrs,
                      const local_addr_t *local_addrs, const uint32_t *idxs,
                      const swpl_split_info_t *slice_info,
@@ -1301,6 +1305,7 @@ static void group_norm__ch_split(const global_addr_t *global_addrs,
   }
 }
 
+static
 void _group_norm(global_addr_t input_global_addr,
                  global_addr_t weight_global_addr,
                  global_addr_t bias_global_addr,
