@@ -130,9 +130,43 @@ class AddlnMatmulFunc(torch.autograd.Function):
                                      rstd,
                                      out)
 
-        ctx.save_for_backward(x1, x2, w, mean, rstd)
+        ctx.save_for_backward(out_add, w, mean, rstd, gamma, beta)
 
-        return out_add, mean, rstd, out 
+        return out_add, out
+    
+    @staticmethod
+    def backward(ctx, grad_add, grad_output):
+        out_add, w, mean, rstd, gamma, beta = ctx.saved_tensors
+
+        D = w.shape[1]
+        if out_add.dim() == 3:
+            B, M, N = out_add.shape
+            out_ln_cpu = ((out_add.cpu() - mean.unsqueeze(-1).cpu()) * rstd.unsqueeze(-1).cpu()) * gamma.unsqueeze(0).unsqueeze(1).cpu() + beta.unsqueeze(0).unsqueeze(1).cpu()
+            grad_out_ln = torch.matmul(grad_output, w.unsqueeze(0).transpose(-1,-2))
+        else:
+            M, N = out_add.shape
+            out_ln_cpu = ((out_add.cpu() - mean.unsqueeze(-1).cpu()) * rstd.unsqueeze(-1).cpu()) * gamma.unsqueeze(0).cpu() + beta.unsqueeze(0).cpu()
+            grad_out_ln = torch.matmul(grad_output, w.transpose(-1,-2))
+
+        out_ln = out_ln_cpu.to(device)
+
+        grad_out_add = torch.ones(out_add.shape, dtype = out_add.dtype, device = grad_output.device)
+        grad_gamma = torch.ones((N,), dtype = out_add.dtype, device = grad_output.device)
+        grad_beta = torch.ones((N,), dtype = out_add.dtype, device = grad_output.device)
+
+        grad_w = torch.matmul(out_ln.transpose(-1,-2), grad_output)
+        grad_b = grad_output.reshape(-1, D).sum(0)
+        
+        torch.ops.my_ops.add_ln_mm_backward(grad_out_ln,
+                                        out_add,
+                                        mean.unsqueeze(-1),
+                                        rstd.unsqueeze(-1),
+                                        gamma,
+                                        grad_out_add,
+                                        grad_gamma,
+                                        grad_beta)
+        
+        return grad_out_add, grad_out_add, grad_w, grad_b, grad_gamma, grad_beta
 
 
 class AddlnMatmulBlock(nn.Module):
@@ -366,7 +400,7 @@ class GPT2Block(nn.Module):
         attn_output = attn_outputs[0]  # output_attn: a, present, (attentions)
         outputs = attn_outputs[1:]
 
-        residual, _, _, hidden_states = self.add_ln_fc(attn_output, residual)
+        residual, hidden_states = self.add_ln_fc(attn_output, residual)
 
         # hidden_states = attn_output + residual
         # residual = hidden_states
@@ -405,10 +439,11 @@ if __name__ == "__main__":
     inp = torch.rand(batch, sequence, configure.hidden_size).to(device).half()
     ref = torch.ones((batch, sequence, configure.hidden_size)).to(device).half()
 
+    inp.requires_grad = True
+
     net = GPT2Block(configure).to(device).half()
 
     out_cpu = net(inp)
 
-    # out_cpu[0].backward(ref)
-
+    out_cpu[0].backward(ref)
     

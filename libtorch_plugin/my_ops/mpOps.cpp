@@ -20,5 +20,6 @@ namespace at
 		m.def("ln_mm_forward", ln_mm_forward);
 		m.def("ln_mm_backward", ln_mm_backward);
 		m.def("add_ln_mm_forward", add_ln_mm_forward);
+		m.def("add_ln_mm_backward", add_ln_mm_backward);
 	}
 }

@@ -377,6 +377,7 @@ typedef enum
   TRUNC,
   POWC,
   LN_MM_BACKWARD,
+  ADD_LN_MM_BACKWARD,
   OP_NUM
 }
 OpType;
@@ -528,7 +529,8 @@ static const char * OpTypeStr[OP_NUM] =
   "RECIPROCAL",
   "TRUNC",
   "POW SCALAR",
-  "layernorm Matmul Backward"
+  "layernorm Matmul Backward",
+  "Add layernorm Matmul Backward",
 };
 
 struct OpTimer

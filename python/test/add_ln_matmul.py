@@ -66,9 +66,44 @@ class AddlnMatmulFunc(torch.autograd.Function):
                                      rstd,
                                      out)
 
-        ctx.save_for_backward(x1, x2, w, mean, rstd)
+        ctx.save_for_backward(out_add, w, mean, rstd, gamma, beta)
 
-        return out_add, mean, rstd, out 
+        return out_add, out
+    
+    @staticmethod
+    def backward(ctx, grad_add, grad_output):
+        out_add, w, mean, rstd, gamma, beta = ctx.saved_tensors
+
+        D = w.shape[1]
+        if out_add.dim() == 3:
+            B, M, N = out_add.shape
+            out_ln_cpu = ((out_add.cpu() - mean.unsqueeze(-1).cpu()) * rstd.unsqueeze(-1).cpu()) * gamma.unsqueeze(0).unsqueeze(1).cpu() + beta.unsqueeze(0).unsqueeze(1).cpu()
+            grad_out_ln = torch.matmul(grad_output, w.unsqueeze(0).transpose(-1,-2))
+        else:
+            M, N = out_add.shape
+            out_ln_cpu = ((out_add.cpu() - mean.unsqueeze(-1).cpu()) * rstd.unsqueeze(-1).cpu()) * gamma.unsqueeze(0).cpu() + beta.unsqueeze(0).cpu()
+            grad_out_ln = torch.matmul(grad_output, w.transpose(-1,-2))
+
+        out_ln = out_ln_cpu.to(device)
+
+        grad_out_add = torch.ones(out_add.shape, dtype = out_add.dtype, device = grad_output.device)
+        grad_gamma = torch.ones((N,), dtype = out_add.dtype, device = grad_output.device)
+        grad_beta = torch.ones((N,), dtype = out_add.dtype, device = grad_output.device)
+
+        grad_w = torch.matmul(out_ln.transpose(-1,-2), grad_output)
+        grad_b = grad_output.reshape(-1, D).sum(0)
+        
+        torch.ops.my_ops.add_ln_mm_backward(grad_out_ln,
+                                        out_add,
+                                        mean.unsqueeze(-1),
+                                        rstd.unsqueeze(-1),
+                                        gamma,
+                                        grad_out_add,
+                                        grad_gamma,
+                                        grad_beta)
+        
+        return grad_out_add, grad_out_add, grad_w, grad_b, grad_gamma, grad_beta
+
 
 
 class AddlnMatmulBlock(nn.Module):
@@ -78,6 +113,11 @@ class AddlnMatmulBlock(nn.Module):
         self.b = b
         self.gamma = gamma
         self.beta = beta
+
+        self.w.retain_grad()
+        self.b.retain_grad()
+        self.gamma.retain_grad()
+        self.beta.retain_grad()
 
     def forward(self, x1, x2):
         return AddlnMatmulFunc.apply(x1, x2, self.w, self.b, self.gamma, self.beta)
@@ -99,31 +139,57 @@ def check_add_ln_matmul():
     
     net_tpu = AddlnMatmulBlock(w, b, gamma, beta)
 
-    print("=====forward======")
+    print("===============forward===============")
     if input_dim == 3:
-        x1 = torch.randn(batch_size, length, embed_dim, requires_grad=True)
-        x2 = torch.randn(batch_size, length, embed_dim, requires_grad=True)
+        x1 = torch.randn(batch_size, length, embed_dim)
+        x2 = torch.randn(batch_size, length, embed_dim)
     else:
-        x1 = torch.randn(length, embed_dim, requires_grad=True)
-        x2 = torch.randn(length, embed_dim, requires_grad=True)
+        x1 = torch.randn(length, embed_dim)
+        x2 = torch.randn(length, embed_dim)
     x1_tpu = x1.to(device).half()
     x2_tpu = x2.to(device).half()
-    out_add_tpu, mean_tpu, rstd_tpu, out_tpu = net_tpu(x1_tpu, x2_tpu)
+
+    x1.requires_grad = True
+    x2.requires_grad = True
+    x1_tpu.requires_grad = True    # HACK
+    x2_tpu.requires_grad = True
+
+    out_add_tpu, out_tpu = net_tpu(x1_tpu, x2_tpu)
     out_add_cpu, out_cpu = net_cpu(x1, x2)
 
-    mean_cpu = out_add_cpu.mean(-1)
-    rstd_cpu = 1 / (out_add_cpu.var(-1, unbiased=False) + eps).sqrt()
+    # mean_cpu = out_add_cpu.mean(-1)
+    # rstd_cpu = 1 / (out_add_cpu.var(-1, unbiased=False) + eps).sqrt()
 
     add_diff = out_add_cpu - out_add_tpu.float().to("cpu")
-    mean_diff = mean_cpu - mean_tpu.float().to("cpu")
-    rstd_diff = rstd_cpu - rstd_tpu.float().to("cpu")
     out_diff = out_cpu - out_tpu.float().to("cpu")
+
+
+    print("===============backward================")
+    if input_dim == 3:
+        ref_cpu = torch.ones(batch_size, length, b.shape[0])
+    else:
+        ref_cpu = torch.ones(length, b.shape[0])
+    ref_tpu = ref_cpu.to(device)
+
+    out_cpu.backward(ref_cpu)
+    out_tpu.backward(ref_tpu)
+
+    grad_x1_diff = x1.grad - x1_tpu.grad.float().to("cpu")
+    grad_x2_diff = x2.grad - x2_tpu.grad.float().to("cpu")
+    grad_w_diff = net_cpu.fc.weight.grad.transpose(-1,-2) - net_tpu.w.grad.float().to("cpu")
+    grad_b_diff = net_cpu.fc.bias.grad - net_tpu.b.grad.float().to("cpu")
+    grad_gamma_diff = net_cpu.ln.weight.grad - net_tpu.gamma.grad.float().to("cpu")
+    grad_beta_diff = net_cpu.ln.bias.grad - net_tpu.beta.grad.float().to("cpu")
 
     import pdb;pdb.set_trace()
     print("add_diff:", torch.max(abs(add_diff)))
-    print("mean_diff:", torch.max(abs(mean_diff)))
-    print("rstd_diff:", torch.max(abs(rstd_diff)))
     print("out_diff:", torch.max(abs(out_diff)))
+    print("grad_x1_diff:", torch.max(abs(grad_x1_diff)))
+    print("grad_x2_diff:", torch.max(abs(grad_x2_diff)))
+    print("grad_w_diff:", torch.max(abs(grad_w_diff)))
+    print("grad_b_diff:", torch.max(abs(grad_b_diff)))
+    print("grad_gamma_diff:", torch.max(abs(grad_gamma_diff)))
+    print("grad_beta_diff:", torch.max(abs(grad_beta_diff)))
 
     return
 
