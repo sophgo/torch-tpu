@@ -42,6 +42,7 @@ std::tuple<Tensor, Tensor, Tensor> native_group_norm_tpu(
     const c10::optional<Tensor> &beta_opt /* optional */, int64_t N, int64_t C,
     int64_t HxW, int64_t group, double eps) {
   CHECK_TENSOR_IN_DEVICE(X);
+  const Tensor X_32 = X.to(caffe2::TypeMeta::Make<float>());
   // See [Note: hacky wrapper removal for optional tensor]
   c10::MaybeOwned<Tensor> gamma_maybe_owned =
       at::borrow_from_optional_tensor(gamma_opt);
@@ -52,34 +53,17 @@ std::tuple<Tensor, Tensor, Tensor> native_group_norm_tpu(
   if (eps <= 0)
     eps = 2.22507e-32;
 
-  // repeated check so expanded weights can call native_group_norm directly but
-  // save mean and variance from forward
-  check_group_norm_inputs(X, gamma, beta, C, group);
-  auto memory_format = X.device().is_cpu() ? X.suggest_memory_format()
-                                           : at::MemoryFormat::Contiguous;
+  Tensor Y = empty_like(X_32);
+  Tensor mean = at::empty({N, group}, X_32.options());
+  Tensor rstd = at::empty({N, group}, X_32.options());
 
-  TORCH_CHECK(X.is_contiguous(memory_format));
-
-  bool mixed_type = at::native::is_mixed_type(X, gamma, beta);
-  if (mixed_type) {
-    at::native::check_mixed_data_type(X, gamma, beta);
-  }
-
-  Tensor Y = empty_like(X, c10::nullopt /* dtype */, c10::nullopt /* layout */,
-                        c10::nullopt /* device */,
-                        c10::nullopt /* pin_memory */, memory_format);
-
-  const auto dtype = at::native::param_scalar_type(X, mixed_type);
-  Tensor mean = at::empty({N, group}, X.options().dtype(dtype));
-  Tensor rstd = at::empty({N, group}, X.options().dtype(dtype));
-
-  auto weight = at::empty(gamma.sizes(), X.options().dtype(dtype));
+  auto weight = at::empty(gamma.sizes(), X_32.options());
   if (gamma_opt.has_value()) {
     // if gamma_opt has value, copy gamma_opt value to weight
     weight = weight.copy_(gamma_opt.value());
   }
 
-  auto bias = at::empty(beta.sizes(), X.options().dtype(dtype));
+  auto bias = at::empty(beta.sizes(), X_32.options());
   if (beta_opt.has_value()) {
     // if beta_opt has value, copy beta_opt value to bias
     bias = bias.copy_(beta_opt.value());
@@ -108,7 +92,7 @@ std::tuple<Tensor, Tensor, Tensor> native_group_norm_tpu(
   auto timer = tpu::Timer().Start();
 #endif
   bm_status_t status = sgdnnNativeGroupNorm(
-      tpu::TPUGetDeviceHandle(), tpu::TPUGenerateSgdnnTensor(X),
+      tpu::TPUGetDeviceHandle(), tpu::TPUGenerateSgdnnTensor(X_32),
       tpu::TPUGenerateSgdnnTensor(weight), tpu::TPUGenerateSgdnnTensor(bias),
       group, affine, eps, tpu::TPUGenerateSgdnnTensor(Y),
       tpu::TPUGenerateSgdnnTensor(mean), tpu::TPUGenerateSgdnnTensor(rstd));
