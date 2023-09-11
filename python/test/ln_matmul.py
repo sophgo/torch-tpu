@@ -81,7 +81,7 @@ class lnMatmulFunc(torch.autograd.Function):
             out_ln_cpu = ((x.cpu() - mean.unsqueeze(-1).cpu()) * rstd.unsqueeze(-1).cpu()) * gamma.unsqueeze(0).cpu() + beta.unsqueeze(0).cpu()
             grad_out_ln = torch.matmul(grad_output, w.transpose(-1,-2))
 
-        out_ln = out_ln_cpu.to(device)
+        out_ln = out_ln_cpu.to(grad_output.device)
 
         grad_x = torch.ones(x.shape, dtype = x.dtype, device = grad_output.device)
         grad_gamma = torch.ones((N,), dtype = x.dtype, device = grad_output.device)
