@@ -59,6 +59,12 @@ typedef enum {
   ACTIVE_SOFT_SIGN = 34,
   // only implemented in tpu-train
   ACTIVE_ERFC = 35, 
+  ACTIVE_ISINF = 36, 
+  ACTIVE_ISNAN = 37, 
+  ACTIVE_EXPM1 = 38, 
+  ACTIVE_RECIPROCAL = 39, 
+  ACTIVE_EXP2 = 40, 
+  ACTIVE_TRUNC = 41, 
 } sg_active_type_t;
 
 typedef enum {
@@ -1128,94 +1134,6 @@ typedef struct
   int mode;
 } WITH_PLATFORM(sg_api_comparision_c_t);
 
-typedef struct
-{
-  unsigned long long input_global_addr;
-  unsigned long long output_global_addr;
-  int shape[FW_MAX_SHAPE_DIMS];
-  int dim;
-  int dtype;
-} WITH_PLATFORM(sg_api_asin_t);
-
-typedef struct
-{
-  unsigned long long input_global_addr;
-  unsigned long long output_global_addr;
-  int shape[FW_MAX_SHAPE_DIMS];
-  int dim;
-  int dtype;
-} WITH_PLATFORM(sg_api_acos_t);
-
-typedef struct
-{
-  unsigned long long input_global_addr;
-  unsigned long long output_global_addr;
-  int shape[FW_MAX_SHAPE_DIMS];
-  int dim;
-  int dtype;
-} WITH_PLATFORM(sg_api_atan_t);
-
-typedef struct
-{
-  unsigned long long input_global_addr;
-  unsigned long long output_global_addr;
-  int shape[FW_MAX_SHAPE_DIMS];
-  int dim;
-  int dtype;
-} WITH_PLATFORM(sg_api_sinh_t);
-
-typedef struct
-{
-  unsigned long long input_global_addr;
-  unsigned long long output_global_addr;
-  int shape[FW_MAX_SHAPE_DIMS];
-  int dim;
-  int dtype;
-} WITH_PLATFORM(sg_api_cosh_t);
-
-typedef struct
-{
-  unsigned long long input_global_addr;
-  unsigned long long output_global_addr;
-  int shape[FW_MAX_SHAPE_DIMS];
-  int dim;
-  int dtype;
-} WITH_PLATFORM(sg_api_tanh_t);
-
-typedef struct
-{
-  unsigned long long input_global_addr;
-  unsigned long long output_global_addr;
-  int shape[FW_MAX_SHAPE_DIMS];
-  int dim;
-  int dtype;
-} WITH_PLATFORM(sg_api_ceil_t);
-
-typedef struct
-{
-  unsigned long long input_global_addr;
-  unsigned long long output_global_addr;
-  int shape[FW_MAX_SHAPE_DIMS];
-  int dim;
-  int dtype;
-} WITH_PLATFORM(sg_api_floor_t);
-
-typedef struct
-{
-  unsigned long long input_global_addr;
-  unsigned long long output_global_addr;
-  int shape[FW_MAX_SHAPE_DIMS];
-  int dim;
-  int dtype;
-} WITH_PLATFORM(sg_api_round_t);
-typedef struct
-{
-  unsigned long long input_global_addr;
-  unsigned long long output_global_addr;
-  int shape[FW_MAX_SHAPE_DIMS];
-  int dim;
-  int dtype;
-} WITH_PLATFORM(sg_api_exp2_t);
 
 typedef struct
 {
@@ -1226,32 +1144,6 @@ typedef struct
   int dtype;
 } WITH_PLATFORM(sg_api_bitwise_not_t);
 
-typedef struct
-{
-  unsigned long long input_global_addr;
-  unsigned long long output_global_addr;
-  int shape[FW_MAX_SHAPE_DIMS];
-  int dim;
-  int dtype;
-} WITH_PLATFORM(sg_api_isfinite_t);
-
-typedef struct
-{
-  unsigned long long input_global_addr;
-  unsigned long long output_global_addr;
-  int shape[FW_MAX_SHAPE_DIMS];
-  int dim;
-  int dtype;
-} WITH_PLATFORM(sg_api_isinf_t);
-
-typedef struct
-{
-  unsigned long long input_global_addr;
-  unsigned long long output_global_addr;
-  int shape[FW_MAX_SHAPE_DIMS];
-  int dim;
-  int dtype;
-} WITH_PLATFORM(sg_api_isnan_t);
 
 typedef struct
 {
@@ -1403,15 +1295,6 @@ typedef struct{
   int dtype;
 } WITH_PLATFORM(sg_api_silu_t);
 
-typedef struct
-{
-  unsigned long long input_global_addr;
-  unsigned long long output_global_addr;
-  int shape[FW_MAX_SHAPE_DIMS];
-  int dim;
-  int dtype;
-} WITH_PLATFORM(sg_api_sigmoid_t);
-
 typedef struct {
   unsigned long long input_addr;
   unsigned long long gamma_addr;
@@ -1533,25 +1416,7 @@ typedef struct
   int shape[FW_MAX_SHAPE_DIMS];
   int dim;
   int dtype;
-} WITH_PLATFORM(sg_api_reciprocal_t);
-
-typedef struct
-{
-  unsigned long long input_global_addr;
-  unsigned long long output_global_addr;
-  int shape[FW_MAX_SHAPE_DIMS];
-  int dim;
-  int dtype;
 } WITH_PLATFORM(sg_api_signbit_t);
-
-typedef struct
-{
-  unsigned long long input_global_addr;
-  unsigned long long output_global_addr;
-  int shape[FW_MAX_SHAPE_DIMS];
-  int dim;
-  int dtype;
-} WITH_PLATFORM(sg_api_trunc_t);
 
 typedef struct
 {

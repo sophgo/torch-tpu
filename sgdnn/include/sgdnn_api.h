@@ -365,27 +365,6 @@ bm_status_t sgdnnAdd ( bm_handle_t handle,
                        float scalar,
                        SgdnnTensor_t output );
 
-/*
- * OUTPUT = math.exp(INPUT)
- * Note:
- * 1. The data types of INPUT must be the same and one of FP32, FP16 and BF16
- * 2. INPUT must be contiguous
- */
-
-bm_status_t sgdnnExp ( bm_handle_t handle,
-                       SgdnnTensor_t input,
-                       SgdnnTensor_t output );
-
-/*
- * OUTPUT = math.expm1(INPUT)
- * Note:
- * 1. The data types of INPUT must be the same and one of FP32, FP16 and BF16
- * 2. INPUT must be contiguous
- */
-
-bm_status_t sgdnnExpm1 ( bm_handle_t handle,
-                       SgdnnTensor_t input,
-                       SgdnnTensor_t output );
 
 /*
  * OUTPUT = INPUT && OTHER
@@ -552,16 +531,7 @@ bm_status_t sgdnnAddCDiv ( bm_handle_t handle,
                            float scalar,
                            SgdnnTensor_t output );
 
-/*
- * OUTPUT = ReLU ( INPUT )
- * Note:
- * 1. The data types of INPUT and OUTPUT must be the same and one of FP32, FP16 and BF16
- * 2. The shapes of INPUT and OUTPUT must be the same
- * 3. INPUT and OUTPUT must be contiguous
- */
-bm_status_t sgdnnReLU ( bm_handle_t handle,
-                        SgdnnTensor_t input,
-                        SgdnnTensor_t output );
+
 
 /*
  * GRAD_INPUT = ReLU Backward ( GRAD_OUTPUT, INPUT )
@@ -652,21 +622,6 @@ bm_status_t sgdnnClamp ( bm_handle_t handle,
                          float min,
                          float max,
                          SgdnnTensor_t output );
-
- bm_status_t sgdnnSqrt ( bm_handle_t handle,
-                        SgdnnTensor_t input,
-                        SgdnnTensor_t output );
-/*
- * OUTPUT = RSQRT( INPUT, MIN, MAX )
- * Note:
- * 1. The data types of INPUT and OUTPUT must be the same and one of FP32, FP16 and BF16
- * 2. The shapes of INPUT and OUTPUT must be the same
- * 3. INPUT and OUTPUT must be contiguous
- */
-bm_status_t sgdnnRsqrt ( bm_handle_t handle,
-                        SgdnnTensor_t input,
-                        SgdnnTensor_t output );
-
 
 /*
  * OUTPUT = SIGN ( INPUT )
@@ -1030,91 +985,6 @@ bm_status_t sgdnnElementBitwiseC ( bm_handle_t handle,
                                    SgdnnTensor_t output );
 
 /*
- * OUTPUT = ASIN(INPUT)
- * Note:
- * 1. The data types of INPUT and OUTPUT must be the same and FP32
- * 2. The shapes of INPUT and OUTPUT must be the same
- * 3. INPUT and OUTPUT must be contiguous
- */
-bm_status_t sgdnnAsin (bm_handle_t handle,
-                       SgdnnTensor_t input,
-                       SgdnnTensor_t output );
-
-/*
- * OUTPUT = ACOS(INPUT)
- * Note:
- * 1. The data types of INPUT and OUTPUT must be the same and FP32
- * 2. The shapes of INPUT and OUTPUT must be the same
- * 3. INPUT and OUTPUT must be contiguous
- */
-bm_status_t sgdnnAcos (bm_handle_t handle,
-                       SgdnnTensor_t input,
-                       SgdnnTensor_t output );
-
-/*
- * OUTPUT = ATAN(INPUT)
- * Note:
- * 1. The data types of INPUT and OUTPUT must be the same and FP32
- * 2. The shapes of INPUT and OUTPUT must be the same
- * 3. INPUT and OUTPUT must be contiguous
- */
-bm_status_t sgdnnAtan (bm_handle_t handle,
-                       SgdnnTensor_t input,
-                       SgdnnTensor_t output );
-
-/*
- * OUTPUT = SINH(INPUT)
- * Note:
- * 1. The data types of INPUT and OUTPUT must be the same and FP32
- * 2. The shapes of INPUT and OUTPUT must be the same
- * 3. INPUT and OUTPUT must be contiguous
- */
-bm_status_t sgdnnSinh (bm_handle_t handle,
-                       SgdnnTensor_t input,
-                       SgdnnTensor_t output );
-/*
- * OUTPUT = COSH(INPUT)
- * Note:
- * 1. The data types of INPUT and OUTPUT must be the same and FP32
- * 2. The shapes of INPUT and OUTPUT must be the same
- * 3. INPUT and OUTPUT must be contiguous
- */
-bm_status_t sgdnnCosh (bm_handle_t handle,
-                       SgdnnTensor_t input,
-                       SgdnnTensor_t output );
-  /*
- * OUTPUT = TANH(INPUT)
- * Note:
- * 1. The data types of INPUT and OUTPUT must be the same and FP32
- * 2. The shapes of INPUT and OUTPUT must be the same
- * 3. INPUT and OUTPUT must be contiguous
- */
- bm_status_t sgdnnTanh (bm_handle_t handle,
-                       SgdnnTensor_t input,
-                       SgdnnTensor_t output );
-/*
- * OUTPUT = CEIL(INPUT)
- * Note:
- * 1. The data types of INPUT and OUTPUT must be the same and one of FP32, FP16 and BF16
- * 2. The shapes of INPUT and OUTPUT must be the same
- * 3. INPUT and OUTPUT must be contiguous
- */
-bm_status_t sgdnnCeil (bm_handle_t handle,
-                       SgdnnTensor_t input,
-                       SgdnnTensor_t output );
-
-/*
- * OUTPUT = FLOOR(INPUT)
- * Note:
- * 1. The data types of INPUT and OUTPUT must be the same and one of FP32, FP16 and BF16
- * 2. The shapes of INPUT and OUTPUT must be the same
- * 3. INPUT and OUTPUT must be contiguous
- */
-bm_status_t sgdnnFloor (bm_handle_t handle,
-                       SgdnnTensor_t input,
-                       SgdnnTensor_t output );
-
-/*
  * OUTPUT = ROUND(INPUT)
  * Note:
  * 1. The data types of INPUT and OUTPUT must be the same and one of FP32, FP16 and BF16
@@ -1138,17 +1008,6 @@ bm_status_t sgdnnNeg (bm_handle_t handle,
                        SgdnnTensor_t output );
 
 /*
- * OUTPUT = EXP2(INPUT)
- * Note:
- * 1. The data types of INPUT and OUTPUT must be the same and FP32
- * 2. The shapes of INPUT and OUTPUT must be the same
- * 3. INPUT and OUTPUT must be contiguous
- */
-bm_status_t sgdnnExp2 (bm_handle_t handle,
-                       SgdnnTensor_t input,
-                       SgdnnTensor_t output );
-
-/*
  * OUTPUT = BITWISE_NOT(INPUT)
  * Note:
  * 1. The data types of INPUT and OUTPUT must be the same and FP32
@@ -1156,39 +1015,6 @@ bm_status_t sgdnnExp2 (bm_handle_t handle,
  * 3. INPUT and OUTPUT must be contiguous
  */
 bm_status_t sgdnnBitwiseNot (bm_handle_t handle,
-                       SgdnnTensor_t input,
-                       SgdnnTensor_t output );
-
-/*
- * OUTPUT = ISFINITE(INPUT)
- * Note:
- * 1. The data types of INPUT and OUTPUT must be the same and one of FP32, FP16 and BF16
- * 2. The shapes of INPUT and OUTPUT must be the same
- * 3. INPUT and OUTPUT must be contiguous
- */
-bm_status_t sgdnnIsfinite(bm_handle_t handle,
-                       SgdnnTensor_t input,
-                       SgdnnTensor_t output );
-
-/*
- * OUTPUT = ISINF(INPUT)
- * Note:
- * 1. The data types of INPUT and OUTPUT must be the same and one of FP32, FP16 and BF16
- * 2. The shapes of INPUT and OUTPUT must be the same
- * 3. INPUT and OUTPUT must be contiguous
- */
-bm_status_t sgdnnIsinf(bm_handle_t handle,
-                       SgdnnTensor_t input,
-                       SgdnnTensor_t output );
-
-/*
- * OUTPUT = ISNAN(INPUT)
- * Note:
- * 1. The data types of INPUT and OUTPUT must be the same and one of FP32, FP16 and BF16
- * 2. The shapes of INPUT and OUTPUT must be the same
- * 3. INPUT and OUTPUT must be contiguous
- */
-bm_status_t sgdnnIsnan(bm_handle_t handle,
                        SgdnnTensor_t input,
                        SgdnnTensor_t output );
 
@@ -1390,16 +1216,6 @@ bm_status_t sgdnnSiLU ( bm_handle_t handle,
                         SgdnnTensor_t input,
                         SgdnnTensor_t output);
 
-/*
- * OUTPUT = Sigmoid ( INPUT )
- * Note:
- * 1. The data types of INPUT and OUTPUT must be the same and one of FP32, FP16 and BF16
- * 2. The shapes of INPUT and OUTPUT must be the same
- * 3. INPUT and OUTPUT must be contiguous
- */
-bm_status_t sgdnnSigmoid ( bm_handle_t handle,
-                        SgdnnTensor_t input,
-                        SgdnnTensor_t output);
 
 /*
  * OUTPUT = LAYERNORM_MATMUL ( INPUT, W, B, GAMMA, BETA, EPS, MEAN, RSTD, OUTPUT )
@@ -1517,17 +1333,6 @@ bm_status_t sgdnnAddLnMm ( bm_handle_t handle,
                           SgdnnTensor_t output );
 
 /*
- * OUTPUT = RECIPROCAL ( INPUT, OUTPUT )
- * Note:
- * 1. The data type of out must be FP32
- * 2. The shape of INPUT and OUTPUT must be the same
- * 3. INPUT and OUTPUT must be contiguous
- */
-bm_status_t sgdnnReciprocal ( bm_handle_t handle,
-                              SgdnnTensor_t input,
-                              SgdnnTensor_t output );
-
-/*
  * OUTPUT = SIGNBIT(INPUT)
  * Note:
  * 1. The data types of INPUT and OUTPUT must be the same and one of FP32, FP16 and BF16
@@ -1537,17 +1342,6 @@ bm_status_t sgdnnReciprocal ( bm_handle_t handle,
 bm_status_t sgdnnSignbit(bm_handle_t handle,
                        SgdnnTensor_t input,
                        SgdnnTensor_t output );
-
-/*
- * OUTPUT = TRUNC ( INPUT, OUTPUT )
- * Note:
- * 1. the data type of input and output must be FP32 or FP16 or BFP16
- * 2. the shape of input and output must be the same
- * 3. input and output must be contiguous
- */
-bm_status_t sgdnnTrunc ( bm_handle_t handle,
-                         SgdnnTensor_t input,
-                         SgdnnTensor_t output );
 
 
 /*

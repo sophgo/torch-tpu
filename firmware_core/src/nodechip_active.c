@@ -1,10 +1,136 @@
 #include "sg_api_struct.h"
 #include "tpu_kernel.h"
 
+#define BOFFSET(index) buffer_addr + index *tensor_bsize_pnpu
+
 inline static void pipeline_move(unsigned long long *array, int num) {
   for (int i = num - 1; i > 0; i--) {
     array[i] = array[i - 1];
   }
+}
+
+void tpu_bdc_fp_trunc(local_addr_t dst_addr, local_addr_t src_addr,
+                      const dim4 *shape, data_type_t dtype) {
+  tpu_bdc_fp_round(dst_addr, src_addr, shape, NULL, NULL, dtype,
+                   RM_TOWARDS_ZERO);
+}
+
+void tpu_bdc_fp_exp2(local_addr_t dst_addr, local_addr_t src_addr,
+                     local_addr_t work0_addr, local_addr_t work1_addr,
+                     local_addr_t coeff_addr, local_addr_t table_addr,
+                     const dim4 *shape, data_type_t dtype) {
+  tpu_bdc_fp32_C_pow(dst_addr, src_addr, work0_addr, work1_addr, coeff_addr,
+                     table_addr, /*float C*/ 2., shape);
+}
+
+void tpu_bdc_fp_reciprocal_v2(local_addr_t dst_addr, local_addr_t src_addr,
+                              local_addr_t dst_fp32_addr,
+                              local_addr_t src_fp32_addr, const dim4 *shape,
+                              data_type_t dtype) {
+  if (dtype != DT_FP32) {
+    tpu_bdc_cast(src_fp32_addr, src_addr, shape, NULL, NULL, DT_FP32, dtype,
+                 RM_HALF_TO_EVEN);
+    tpu_bdc_fp32_tunable_reciprocal(dst_fp32_addr, src_fp32_addr, shape, NULL,
+                                    NULL, 3);
+    tpu_bdc_cast(dst_addr, dst_fp32_addr, shape, NULL, NULL, dtype, DT_FP32,
+                 RM_HALF_TO_EVEN);
+    return;
+  }
+  if (dtype == DT_FP32) {
+    tpu_bdc_fp32_tunable_reciprocal(dst_addr, src_addr, shape, NULL, NULL, 3);
+    return;
+  }
+}
+
+void tpu_bdc_fp_sigmoid(local_addr_t dst_addr, local_addr_t src_addr,
+                        local_addr_t dst_fp32_addr, local_addr_t src_fp32_addr,
+                        local_addr_t work0_addr, local_addr_t work1_addr,
+                        local_addr_t coeff_addr, local_addr_t table_addr,
+                        const dim4 *shape, data_type_t dtype) {
+
+  if (dtype != DT_FP32) {
+    tpu_bdc_cast(src_fp32_addr, src_addr, shape, NULL, NULL, DT_FP32, dtype,
+                 RM_HALF_TO_EVEN);
+    tpu_bdc_fp32_sigmoid(dst_fp32_addr, src_fp32_addr, work0_addr, work1_addr,
+                         coeff_addr, table_addr, shape);
+    tpu_bdc_cast(dst_addr, dst_fp32_addr, shape, NULL, NULL, dtype, DT_FP32,
+                 RM_HALF_TO_EVEN);
+    return;
+  }
+  if (dtype == DT_FP32) {
+    tpu_bdc_fp32_sigmoid(dst_addr, src_addr, work0_addr, work1_addr, coeff_addr,
+                         table_addr, shape);
+    return;
+  }
+  TPUKERNEL_ASSERT(false);
+}
+
+/**
+ * tpu_bdc_fp_sqrt only support DT_FP32
+ */
+void tpu_bdc_fp_sqrt_v2(local_addr_t dst_addr, local_addr_t src_addr,
+                        local_addr_t dst_fp32_addr, local_addr_t src_fp32_addr,
+                        const dim4 *shape, data_type_t dtype) {
+  if (dtype != DT_FP32) {
+    tpu_bdc_cast(src_fp32_addr, src_addr, shape, NULL, NULL, DT_FP32, dtype,
+                 RM_HALF_TO_EVEN);
+    tpu_bdc_fp32_rsqrt(dst_fp32_addr, src_fp32_addr, shape);
+    tpu_bdc_fp_mul(dst_fp32_addr, dst_fp32_addr, src_fp32_addr, shape, NULL,
+                   NULL, NULL, DT_FP32);
+    tpu_bdc_cast(dst_addr, dst_fp32_addr, shape, NULL, NULL, dtype, DT_FP32,
+                 RM_HALF_TO_EVEN);
+    return;
+  }
+
+  if (dtype == DT_FP32) {
+    tpu_bdc_fp32_rsqrt(dst_addr, src_addr, shape);
+    tpu_bdc_fp_mul(dst_addr, dst_addr, src_addr, shape, NULL, NULL, NULL,
+                   DT_FP32);
+    return;
+  }
+  TPUKERNEL_ASSERT(false);
+}
+
+void tpu_bdc_fp_isinf(local_addr_t dst_addr, local_addr_t src_addr,
+                      local_addr_t work0_addr, const dim4 *shape,
+                      data_type_t dtype) {
+  scalar_t inf_C = {.u32 = (dtype == DT_FP32
+                                ? 0x7f800000
+                                : (dtype == DT_FP16 ? 0x7c00 : 0x7f80))};
+  scalar_t neg_C = {.u32 = (dtype == DT_FP32
+                                ? 0x7fffffff
+                                : (dtype == DT_FP16 ? 0x7fff : 0x7fff))};
+  scalar_t C = {.u8 = 1};
+
+  tpu_bdc_and_C(work0_addr, src_addr, neg_C, shape, NULL, NULL, dtype);
+  tpu_bdc_equal_C(dst_addr, work0_addr, inf_C, C, shape, NULL, NULL, DT_UINT8,
+                  dtype);
+}
+
+void tpu_bdc_fp_isnan(local_addr_t dst_addr, local_addr_t src_addr,
+                      local_addr_t work0_addr, local_addr_t work1_addr,
+                      local_addr_t work2_addr, const dim4 *shape,
+                      data_type_t dtype) {
+  scalar_t inf_C = {.u32 = (dtype == DT_FP32
+                                ? 0x7f800000
+                                : (dtype == DT_FP16 ? 0x7c00 : 0x7f80))};
+  scalar_t neg_C = {.u32 = (dtype == DT_FP32
+                                ? 0x7fffffff
+                                : (dtype == DT_FP16 ? 0x7fff : 0x7fff))};
+  scalar_t C = {.u8 = 1};
+
+  tpu_bdc_and_C(work2_addr, src_addr, inf_C, shape, NULL, NULL, dtype);
+  tpu_bdc_equal_C(work0_addr, work2_addr, inf_C, C, shape, NULL, NULL, DT_UINT8,
+                  dtype);
+
+  tpu_bdc_and_C(work2_addr, src_addr, neg_C, shape, NULL, NULL, dtype);
+  tpu_bdc_not_equal_C(work1_addr, work2_addr, inf_C, C, shape, NULL, NULL,
+                      DT_UINT8, dtype);
+
+  tpu_bdc_and(work2_addr, work0_addr, work1_addr, shape, NULL, NULL, NULL,
+              DT_UINT8);
+  tpu_bdc_equal_C(dst_addr, work2_addr, C, C, shape, NULL, NULL, DT_UINT8,
+                  DT_UINT8);
 }
 
 extern void nodechip_active_local(local_addr_t in_addr, local_addr_t out_addr,
@@ -13,14 +139,10 @@ extern void nodechip_active_local(local_addr_t in_addr, local_addr_t out_addr,
                                   sg_active_type_t active_type,
                                   int if_local_layer, float *coef);
 
-static void nodechip_active(global_addr_t in_global_addr,
-                            global_addr_t out_global_addr, const int *shape,
-                            int shape_dim, data_type_t dtype,
-                            sg_active_type_t active_type, float *coef) {
-  unsigned long long length = 1;
-  for (int i = 0; i < shape_dim; i++) {
-    length *= (unsigned long long)shape[i];
-  }
+void nodechip_active_v2(global_addr_t in_global_addr,
+                        global_addr_t out_global_addr,
+                        unsigned long long length, data_type_t dtype,
+                        sg_active_type_t active_type, float *coef) {
 
   if (length == 0) {
     return;
@@ -28,10 +150,27 @@ static void nodechip_active(global_addr_t in_global_addr,
 
   const unsigned int bank_bsize = tpu_local_mem_size_per_npu() / tpu_bank_num();
   int dtype_size = tpu_data_type_size(dtype);
-  int tensor_num =
-      2 + 2 + 1 + 1; // 2 inputs, 2 outputs, 1 buffer, 1 coeff_buffer
+  int tensor_num = 2 + 2; //  2 inputs, 2 outputs
+
   if (active_type == ACTIVE_ERFC) {
-    tensor_num = 2 + 2 + 3 + 2; // 2 inputs, 2 outputs, 3 buffer, 2 coeff_buffer
+    // erfc need 3 buffer and 2 coeff
+    tensor_num += 3 + 2;
+  } else if (active_type == ACTIVE_EXPM1) {
+    // extra 2 input fp 32 buf, 2 output fp32 buf, 1 coeff
+    tensor_num += 2 + 2 + 1;
+  } else if (active_type == ACTIVE_SIGMOID ||
+             active_type == ACTIVE_RECIPROCAL) {
+    if (dtype == DT_FP16 || dtype == DT_BFP16) {
+      // extra 2 input fp32 buf, 2 output fp32 buf
+      // 4 fp32 work addr, 2 coeff_buffer
+      tensor_num += 2 + 2 + 4 + 2;
+    } else {
+      tensor_num += 2 + 2; // extra 2 buffer, 2 coeff_buffer
+    }
+
+  } else {
+    // extra 1 buffer, 1 coeff_buffer (common active imp)
+    tensor_num += 1 + 1;
   }
   int tensor_bsize_pnpu = tpu_bank_num() / tensor_num * bank_bsize;
   TPUKERNEL_ASSERT(tensor_bsize_pnpu > 0);
@@ -55,14 +194,17 @@ static void nodechip_active(global_addr_t in_global_addr,
                                     3 * tensor_bsize_pnpu};
   local_addr_t buffer_addr = 4 * tensor_bsize_pnpu;
 
-  // for erfc, which need 3 buffer and 2 coeff
-  local_addr_t buffer2_addr = 5 * tensor_bsize_pnpu;
-  local_addr_t buffer3_addr = 6 * tensor_bsize_pnpu;
-  local_addr_t exp_coeff_addr = 7 * tensor_bsize_pnpu;
-  local_addr_t erf_coeff_addr = 8 * tensor_bsize_pnpu;
   if (active_type == ACTIVE_ERFC) {
-    tpu_bdc_load_fp32_exp_coeff(exp_coeff_addr);
-    tpu_bdc_load_fp32_erf_coeff(erf_coeff_addr);
+    tpu_bdc_load_fp_exp_coeff(BOFFSET(3), dtype);
+    tpu_bdc_load_fp32_erf_coeff(BOFFSET(4));
+  } else if (active_type == ACTIVE_EXPM1) {
+    tpu_bdc_load_fp_exp_coeff(BOFFSET(4), dtype);
+  } else if (active_type == ACTIVE_SIGMOID) {
+    tpu_bdc_load_fp32_exp_coeff(BOFFSET(8));
+    tpu_bdc_load_fp32_exp_table(BOFFSET(9));
+  } else if (active_type == ACTIVE_EXP2) {
+    tpu_bdc_load_fp32_exp_coeff(BOFFSET(2));
+    tpu_bdc_load_fp32_exp_table(BOFFSET(3));
   }
 
   unsigned long long cur_idx[3] = {0}, cur_n_dim[3] = {0}, cur_m_dim[3] = {0};
@@ -106,21 +248,59 @@ static void nodechip_active(global_addr_t in_global_addr,
     // compute
     if (stage_idx > 0 && draning_idx < 2) {
 
+      dim4 cur_shape = {cur_n_dim[1], DIV_UP(cur_m_dim[1], w_dim), 1,
+                        w_dim}; // matrix layout shape (n, c, h, w)
       if (active_type == ACTIVE_ERFC) {
-        dim4 cur_shape = {cur_n_dim[1], DIV_UP(cur_m_dim[1], w_dim), 1,
-                          w_dim}; // matrix layout shape (n, c, h, w)
         tpu_bdc_fp_erfc(out_local_addr[(stage_idx - 1) & 0x1],
-                        in_local_addr[(stage_idx - 1) & 0x1], buffer_addr,
-                        buffer2_addr, buffer3_addr, exp_coeff_addr,
-                        erf_coeff_addr, &cur_shape, dtype);
-      } else {
+                        in_local_addr[(stage_idx - 1) & 0x1], BOFFSET(0),
+                        BOFFSET(1), BOFFSET(2), /* exp coeff */ BOFFSET(3),
+                        /* erf coeff */ BOFFSET(4), &cur_shape, dtype);
+      } else if (active_type == ACTIVE_SQRT) {
+        tpu_bdc_fp_sqrt_v2(out_local_addr[(stage_idx - 1) & 0x1],
+                           in_local_addr[(stage_idx - 1) & 0x1], BOFFSET(0),
+                           BOFFSET(2), &cur_shape, dtype);
+      } else if (active_type == ACTIVE_EXPM1) {
+        tpu_bdc_fp_expm1(out_local_addr[(stage_idx - 1) & 0x1],
+                         in_local_addr[(stage_idx - 1) & 0x1], BOFFSET(0),
+                         BOFFSET(2), BOFFSET(4), &cur_shape, dtype);
+      } else if (active_type == ACTIVE_RECIPROCAL) {
+        tpu_bdc_fp_reciprocal_v2(out_local_addr[(stage_idx - 1) & 0x1],
+                                 in_local_addr[(stage_idx - 1) & 0x1],
+                                 BOFFSET(0), BOFFSET(2), &cur_shape, dtype);
+      } else if (active_type == ACTIVE_SIGMOID) {
+        tpu_bdc_fp_sigmoid(out_local_addr[(stage_idx - 1) & 0x1],
+                           in_local_addr[(stage_idx - 1) & 0x1], BOFFSET(0),
+                           BOFFSET(2), BOFFSET(4), BOFFSET(6),
+                           /*coeff = */ BOFFSET(8), /*table = */ BOFFSET(9),
+                           &cur_shape, dtype);
+      } else if (active_type == ACTIVE_ISINF) {
+        tpu_bdc_fp_isinf(out_local_addr[(stage_idx - 1) & 0x1],
+                         in_local_addr[(stage_idx - 1) & 0x1], BOFFSET(0),
+                         &cur_shape, dtype);
+      } else if (active_type == ACTIVE_ISNAN) {
+        tpu_bdc_fp_isnan(out_local_addr[(stage_idx - 1) & 0x1],
+                         in_local_addr[(stage_idx - 1) & 0x1], BOFFSET(0),
+                         BOFFSET(1), BOFFSET(2), &cur_shape, dtype);
+      } else if (active_type == ACTIVE_RELU) {
+        tpu_bdc_relu(out_local_addr[(stage_idx - 1) & 0x1],
+                     in_local_addr[(stage_idx - 1) & 0x1], &cur_shape, NULL,
+                     NULL, dtype);
+      } else if (active_type == ACTIVE_EXP2) {
+        tpu_bdc_fp_exp2(out_local_addr[(stage_idx - 1) & 0x1],
+                        in_local_addr[(stage_idx - 1) & 0x1], BOFFSET(0),
+                        BOFFSET(1), BOFFSET(2), BOFFSET(3), &cur_shape, dtype);
+      } else if (active_type == ACTIVE_TRUNC) {
+        tpu_bdc_fp_trunc(out_local_addr[(stage_idx - 1) & 0x1],
+                         in_local_addr[(stage_idx - 1) & 0x1], &cur_shape,
+                         dtype);
+      }
 
-        int cur_shape[4] = {cur_n_dim[1], DIV_UP(cur_m_dim[1], w_dim), 1,
-                            w_dim}; // matrix layout shape (n, c, h, w)
+      else {
+        int _cur_shape[4] = {cur_n_dim[1], DIV_UP(cur_m_dim[1], w_dim), 1,
+                             w_dim}; // matrix layout shape (n, c, h, w)
         nodechip_active_local(in_local_addr[(stage_idx - 1) & 0x1],
-                              out_local_addr[(stage_idx - 1) & 0x1],
-                              buffer_addr, cur_shape, dtype, active_type, 0,
-                              coef);
+                              out_local_addr[(stage_idx - 1) & 0x1], BOFFSET(0),
+                              _cur_shape, dtype, active_type, 0, coef);
       }
     }
 
@@ -140,19 +320,18 @@ static void nodechip_active(global_addr_t in_global_addr,
   }
 }
 
-extern void nodechip_active_multi_core(global_addr_t input_global_addr,
-                                       global_addr_t output_global_addr,
-                                       const int *shape, int dims,
-                                       sg_active_type_t active_type,
-                                       float *coeff, data_type_t dtype);
-
 void tpu_kernel_api_active(const void *args) {
   sg_api_active_t *api = (sg_api_active_t *)args;
   data_type_t dtype = (data_type_t)api->dtype;
   TPUKERNEL_ASSERT(dtype == DT_FP32 || dtype == DT_FP16 || dtype == DT_BFP16);
   tpu_initialize();
-  nodechip_active(api->input_global_addr, api->output_global_addr, api->shape,
-                  api->dim, dtype, api->active_type, NULL);
+  unsigned long long length = 1;
+  for (int i = 0; i < api->dim; i++) {
+    length *= (unsigned long long)api->shape[i];
+  }
+
+  nodechip_active_v2(api->input_global_addr, api->output_global_addr, length,
+                     dtype, api->active_type, NULL);
   tpu_poll();
 }
 TPUKERNEL_FUNC_REGISTER(tpu_kernel_api_active);
@@ -162,9 +341,28 @@ void tpu_kernel_api_active_multi_core(const void *args) {
   data_type_t dtype = (data_type_t)api->dtype;
   TPUKERNEL_ASSERT(dtype == DT_FP32 || dtype == DT_FP16 || dtype == DT_BFP16);
   tpu_initialize();
-  nodechip_active_multi_core(api->input_global_addr, api->output_global_addr,
-                             api->shape, api->dim, api->active_type, NULL,
-                             dtype);
+  unsigned int slice_num = tpu_core_num();
+  unsigned int slice_idx = tpu_core_index();
+  TPUKERNEL_ASSERT(slice_num > 0);
+  TPUKERNEL_ASSERT(0 <= slice_idx && slice_idx < slice_num);
+  unsigned long long length = 1;
+  for (int i = 0; i < api->dim; i++) {
+    length *= (unsigned long long)api->shape[i];
+  }
+
+  unsigned long long slice = DIV_UP(length, slice_num);
+  if (length < slice_num) {
+    slice = 1;
+  }
+  unsigned int offset = slice_idx * slice;
+  unsigned long long real_slice = MIN(slice, length - offset);
+  if (real_slice <= 0)
+    return;
+  const int dsize = tpu_data_type_size(dtype);
+
+  nodechip_active_v2(api->input_global_addr + offset * dsize,
+                     api->output_global_addr + offset * dsize, real_slice,
+                     dtype, api->active_type, NULL);
   tpu_poll();
 }
 TPUKERNEL_FUNC_REGISTER(tpu_kernel_api_active_multi_core);
