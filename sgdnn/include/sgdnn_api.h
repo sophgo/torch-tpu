@@ -1380,9 +1380,9 @@ bm_status_t sgdnnReal ( bm_handle_t handle,
 /*
  * OUTPUT = PERMUTE ( INPUT, DIM_ORDER )
  * Node:
- * 1. the dim of self and out must be the same
- * 2. the data type of self and out must be the same
- * 3. the number of dim_order must be the same with self's dim
+ * 1. the dim of input and out must be the same
+ * 2. the data type of input and out must be the same
+ * 3. the number of dim_order must be the same with input's dim
  * 4. input and output must be contiguous
  */
 bm_status_t sgdnnPermute ( bm_handle_t handle,
@@ -1390,6 +1390,21 @@ bm_status_t sgdnnPermute ( bm_handle_t handle,
                            int *dim_order,
                            SgdnnTensor_t output );
 
+/*
+ * OUTPUT = TOPK ( INPUT,  )
+ * Node:
+ * 1. the data type of input, value must be the same
+ * 2. only support in FP32, INT32, UINT32
+ * 3. input, value and index must be contiguous
+ */
+bm_status_t sgdnnTopk ( bm_handle_t handle,
+                        SgdnnTensor_t input,
+                        int k,
+                        int dim,
+                        bool largest,
+                        bool sorted,
+                        SgdnnTensor_t value,
+                        SgdnnTensor_t index );
 
 #if defined(__cplusplus)
 }

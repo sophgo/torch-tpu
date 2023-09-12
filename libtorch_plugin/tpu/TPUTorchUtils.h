@@ -382,6 +382,7 @@ typedef enum
   POWC,
   LN_MM_BACKWARD,
   ADD_LN_MM_BACKWARD,
+  TOPK,
   OP_NUM
 }
 OpType;
@@ -539,6 +540,7 @@ static const char * OpTypeStr[OP_NUM] =
   "POW SCALAR",
   "layernorm Matmul Backward",
   "Add layernorm Matmul Backward",
+  "TOPK"
 };
 
 struct OpTimer

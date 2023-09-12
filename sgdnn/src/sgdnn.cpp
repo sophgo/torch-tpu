@@ -5730,3 +5730,63 @@ bm_status_t sgdnnPermute ( bm_handle_t handle,
 
   return BM_SUCCESS;
 }
+
+bm_status_t sgdnnTopk ( bm_handle_t handle,
+                        SgdnnTensor_t input,
+                        int k,
+                        int dim,
+                        bool largest,
+                        bool sorted,
+                        SgdnnTensor_t value,
+                        SgdnnTensor_t index ) {
+  SGDNN_CHECK ( input.dtype == value.dtype );
+  SGDNN_CHECK ( input.dtype == SGDNN_DTYPE_FP32 ||
+                input.dtype == SGDNN_DTYPE_INT32 ||
+                input.dtype == SGDNN_DTYPE_UINT32 );
+  SGDNN_CHECK ( sgdnnIsTensorContiguous ( &input ) );
+  SGDNN_CHECK ( sgdnnIsTensorContiguous ( &value ) );
+  SGDNN_CHECK ( sgdnnIsTensorContiguous ( &index ) );
+
+#if defined SGDNN_BACKEND_1684X
+  sg_api_topk_t api;
+  api.dim = input.dim;
+  int64_t index_size = 1, trans_size = 1;
+  for(int i = 0; i < input.dim; ++i) {
+    api.shape[i] = input.shape[i];
+    if(i != dim && i != (dim + input.dim)) {
+      index_size *= input.shape[i];
+    }
+    trans_size *= input.shape[i];
+  }
+  index_size *= (sizeof(int) * 2);
+  bm_device_mem_t dev_mem_index, dev_mem_trans;
+  bm_status_t status = bm_malloc_device_byte(handle, &dev_mem_index, index_size);
+  if(BM_SUCCESS != status){
+    printf("malloc device error \r\n");
+    return status;
+  }
+  trans_size *= sizeof(int);
+  api.index_buffer_global_addr = bm_mem_get_device_addr(dev_mem_index);
+  status = bm_malloc_device_byte(handle, &dev_mem_trans, trans_size);
+  if(BM_SUCCESS != status){
+    printf("malloc device error \r\n");
+    return status;
+  }
+  api.trans_buffer_global_addr = bm_mem_get_device_addr(dev_mem_trans);
+  api.k = k;
+  api.dim_order = dim;
+  api.largest = largest;
+  api.sorted = sorted;
+  api.input_global_addr = input.addr;
+  api.value_global_addr = value.addr;
+  api.index_global_addr = index.addr;
+  api.dtype = sgdnnTPUKernelDType( input.dtype );
+  SAFE_CALL ( sgdnnTPUKernelLaunch ( handle, "tpu_kernel_api_topk", &api, sizeof( api ) ) );
+#elif defined SGDNN_BACKEND_2260
+  SGDNN_CHECK ( false );
+#else
+  SGDNN_CHECK ( false );
+#endif
+
+  return BM_SUCCESS;
+}
