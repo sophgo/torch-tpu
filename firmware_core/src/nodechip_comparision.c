@@ -61,16 +61,6 @@ data_type_t dtype) {
                              NULL,
                              DT_UINT8);
         }
-        tpu_bdc_equal(output_local_addrs[index],
-                      input_local_addrs[index],
-                      other_local_addrs[index],
-                      one_u8,
-                      &shape,
-                      NULL,
-                      NULL,
-                      NULL,
-                      DT_UINT8,
-                      dtype);
         if(mode == EQUAL) {
             tpu_bdc_equal(output_local_addrs[index],
                           input_local_addrs[index],
@@ -491,6 +481,7 @@ data_type_t dtype) {
     dim4 l2s_shape;
     global_addr_t l2s_global_addr = 0;
     local_addr_t l2s_local_addr = 0;
+    scalar_t one_u8 = {.u8 = 1};
     while(todo != 0) {
         if(todo > NPU_NUM) {
             shape.c = NPU_NUM;
@@ -518,7 +509,6 @@ data_type_t dtype) {
                           NULL,
                           DT_UINT8);
         }
-        scalar_t one_u8 = {.u8 = 1};
         if(mode == EQUAL) {
             tpu_bdc_equal_C(output_local_addrs[index],
                             input_local_addrs[index],
