@@ -181,7 +181,7 @@ bm_status_t sgdnnLayernormBackward ( bm_handle_t handle,
 /*
  * OUTPUT = POOLING ( INPUT, POOLING_DESC )
  * Note:
- * 
+ *
  */
 bm_status_t sgdnnPoolingForward ( bm_handle_t handle,
                                SgdnnTensor_t input,
@@ -366,6 +366,17 @@ bm_status_t sgdnnAdd ( bm_handle_t handle,
                        SgdnnTensor_t output );
 
 
+/*
+ * OUTPUT = math.flip(INPUT, DIMS)
+ * Note:
+ * 1. The data types of INPUT must be the same and one of FP32, FP16 and BF16
+ * 2. INPUT must be contiguous
+ */
+
+bm_status_t sgdnnFlip ( bm_handle_t handle,
+                        SgdnnTensor_t input,
+                        int axis,
+                        SgdnnTensor_t output );
 /*
  * OUTPUT = INPUT && OTHER
  * Note:

@@ -1,0 +1,28 @@
+#include "sg_api_struct.h"
+#include "tpu_kernel.h"
+
+extern void nodechip_reverse(global_addr_t bottom_global_offset,
+                             global_addr_t top_global_offset,
+                             int *input_tensor_shape, int dims, int axis,
+                             data_type_t dtype);
+
+void tpu_kernel_api_flip(const void *args) {
+  sg_api_flip_t *api = (sg_api_flip_t *)args;
+  TPUKERNEL_ASSERT(api->dtype == DT_FP32 || api->dtype == DT_FP16 ||
+                   api->dtype == DT_BFP16);
+
+  unsigned long long length = 1;
+  for (int i = 0; i < api->dim; ++i) {
+    length *= api->shape[i];
+  }
+  tpu_initialize();
+  nodechip_reverse(api->input_global_addr, api->output_global_addr, api->shape,
+                   api->dim, api->axis, api->dtype);
+  tpu_poll();
+}
+TPUKERNEL_FUNC_REGISTER(tpu_kernel_api_flip);
+
+void tpu_kernel_api_flip_multi_core(const void *args) {
+  TPUKERNEL_ASSERT_INFO(false, "not implementated");
+}
+TPUKERNEL_FUNC_REGISTER(tpu_kernel_api_flip_multi_core);

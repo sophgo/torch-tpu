@@ -58,13 +58,13 @@ typedef enum {
   ACTIVE_SOFT_PLUS = 33,
   ACTIVE_SOFT_SIGN = 34,
   // only implemented in tpu-train
-  ACTIVE_ERFC = 35, 
-  ACTIVE_ISINF = 36, 
-  ACTIVE_ISNAN = 37, 
-  ACTIVE_EXPM1 = 38, 
-  ACTIVE_RECIPROCAL = 39, 
-  ACTIVE_EXP2 = 40, 
-  ACTIVE_TRUNC = 41, 
+  ACTIVE_ERFC = 35,
+  ACTIVE_ISINF = 36,
+  ACTIVE_ISNAN = 37,
+  ACTIVE_EXPM1 = 38,
+  ACTIVE_RECIPROCAL = 39,
+  ACTIVE_EXP2 = 40,
+  ACTIVE_TRUNC = 41,
 } sg_active_type_t;
 
 typedef enum {
@@ -182,6 +182,17 @@ typedef struct
   int dim;
   int dtype;
 } WITH_PLATFORM(sg_api_expm1_t);
+
+typedef struct
+{
+  unsigned long long input_global_addr;
+  unsigned long long other_global_addr;
+  unsigned long long output_global_addr;
+  int shape[FW_MAX_SHAPE_DIMS];
+  int axis;
+  int dim;
+  int dtype;
+} WITH_PLATFORM(sg_api_flip_t);
 
 typedef struct
 {
@@ -1439,7 +1450,7 @@ typedef struct
   int dtype;
 } WITH_PLATFORM(sg_api_real_t);
 
-typedef struct 
+typedef struct
 {
   unsigned long long input_global_addr;
   unsigned long long trans_buffer_global_addr;
