@@ -146,4 +146,86 @@ TORCH_LIBRARY_IMPL ( aten, TPU, m )
   m.impl ( "prod.int_out", prod_int_out_tpu );
 }
 
+Tensor &amax_out_tpu(const Tensor &self, IntArrayRef dim_opt, bool keepdim,
+                     Tensor &out) {
+  CHECK_TENSOR_IN_DEVICE(self);
+  CHECK_TENSOR_IN_DEVICE(out);
+#if 0
+
+#else
+  if (self.dim() == 0) {
+    tpu::TPUCopyDeviceToDevice(out.data_ptr(), self.data_ptr(), out.nbytes());
+    return out;
+  }
+  std::vector<int> reduce_dim(dim_opt.begin(), dim_opt.end());
+  std::vector<int> reduction_dim_vec;
+  if (reduce_dim.size() > 0) {
+    for (auto it : reduce_dim) {
+      reduction_dim_vec.push_back(it < 0 ? it + self.dim() : it);
+    }
+    std::sort(reduction_dim_vec.begin(), reduction_dim_vec.end());
+  } else {
+    for (auto i = 0; i < self.dim(); ++i) {
+      reduction_dim_vec.push_back(i);
+    }
+  }
+  TIMING_START;
+  bm_status_t status = sgdnnReduceMaxOrMin( tpu::TPUGetDeviceHandle(), 
+                                            tpu::TPUGenerateSgdnnTensor(self),
+                                            reduction_dim_vec.data(), 
+                                            reduction_dim_vec.size(), 
+                                            keepdim, 
+                                            0,
+                                            tpu::TPUGenerateSgdnnTensor(out));
+  TORCH_CHECK(status == BM_SUCCESS);
+  TIMING_END(tpu::REDUCE_MAX);
+#endif
+  return out;
+}
+TORCH_LIBRARY_IMPL(aten, TPU, m) 
+{ 
+  m.impl("amax.out", amax_out_tpu); 
+}
+
+Tensor &amin_out_tpu(const Tensor &self, IntArrayRef dim_opt, bool keepdim,
+                     Tensor &out) {
+  CHECK_TENSOR_IN_DEVICE(self);
+  CHECK_TENSOR_IN_DEVICE(out);
+#if 0
+
+#else
+  if (self.dim() == 0) {
+    tpu::TPUCopyDeviceToDevice(out.data_ptr(), self.data_ptr(), out.nbytes());
+    return out;
+  }
+  std::vector<int> reduce_dim(dim_opt.begin(), dim_opt.end());
+  std::vector<int> reduction_dim_vec;
+  if (reduce_dim.size() > 0) {
+    for (auto it : reduce_dim) {
+      reduction_dim_vec.push_back(it < 0 ? it + self.dim() : it);
+    }
+    std::sort(reduction_dim_vec.begin(), reduction_dim_vec.end());
+  } else {
+    for (auto i = 0; i < self.dim(); ++i) {
+      reduction_dim_vec.push_back(i);
+    }
+  }
+  TIMING_START;
+  bm_status_t status = sgdnnReduceMaxOrMin( tpu::TPUGetDeviceHandle(), 
+                                            tpu::TPUGenerateSgdnnTensor(self),
+                                            reduction_dim_vec.data(), 
+                                            reduction_dim_vec.size(), 
+                                            keepdim, 
+                                            1,
+                                            tpu::TPUGenerateSgdnnTensor(out));
+  TORCH_CHECK(status == BM_SUCCESS);
+  TIMING_END(tpu::REDUCE_MIN);
+#endif
+  return out;
+}
+TORCH_LIBRARY_IMPL(aten, TPU, m) 
+{ 
+  m.impl("amin.out", amin_out_tpu); 
+}
+
 } // namespace at

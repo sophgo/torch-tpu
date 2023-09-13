@@ -5728,7 +5728,6 @@ bm_status_t sgdnnPermute ( bm_handle_t handle,
 #else
   SGDNN_CHECK( false );
 #endif
-
   return BM_SUCCESS;
 }
 
@@ -5788,7 +5787,68 @@ bm_status_t sgdnnTopk ( bm_handle_t handle,
 #else
   SGDNN_CHECK ( false );
 #endif
+  return BM_SUCCESS;
+}
 
+bm_status_t sgdnnReduceMaxOrMin(bm_handle_t handle, SgdnnTensor_t input,
+                                int *reduction_dim, int reduction_dim_length,
+                                int keepdim, int mode, SgdnnTensor_t output) {
+  SGDNN_CHECK(input.dtype == output.dtype);
+  SGDNN_CHECK(input.dtype == SGDNN_DTYPE_FP32 ||
+              input.dtype == SGDNN_DTYPE_FP16 ||
+              input.dtype == SGDNN_DTYPE_BF16);
+  SGDNN_CHECK(reduction_dim_length > 0 || reduction_dim_length <= input.dim);
+  SGDNN_CHECK(mode == 0 || mode == 1);
+
+#if defined SGDNN_BACKEND_1684X
+  sg_api_reduce_max_or_min_t api;
+  api.input_global_addr = input.addr;
+  api.output_global_addr = output.addr;
+  for (int i = 0; i < input.dim; ++i) {
+    api.shape[i] = input.shape[i];
+  }
+  bm_device_mem_t dev_mem;
+  SAFE_CALL(bm_malloc_device_byte(handle, &dev_mem, sgdnnTensorBytes(&input)));
+  api.buffer_global_addr = bm_mem_get_device_addr(dev_mem);
+  for (int i = 0; i < reduction_dim_length; i++) {
+    api.reduction_dim[i] = reduction_dim[i];
+  }
+  api.reduction_dim_length = reduction_dim_length;
+  api.dim = input.dim;
+  api.mode = mode;
+  api.dtype = sgdnnTPUKernelDType(input.dtype);
+  SAFE_CALL(sgdnnTPUKernelLaunch(handle, "tpu_kernel_api_reduce_max_or_min",
+                                 &api, sizeof(api)));
+#elif defined SGDNN_BACKEND_2260
+  sg_api_reduce_max_or_min_t api;
+  api.input_global_addr = input.addr;
+  api.output_global_addr = output.addr;
+  unsigned int size = 1;
+  for (int i = 0; i < input.dim; ++i) {
+    api.shape[i] = input.shape[i];
+    size *= input.shape[i];
+  }
+  if (input.dtype == SGDNN_DTYPE_FP32) {
+    size *= sizeof(float);
+  } else {
+    size *= sizeof(float16);
+  }
+  bm_device_mem_t dev_mem;
+  SAFE_CALL(bm_malloc_device_byte(handle, &dev_mem, sgdnnTensorBytes(&input)));
+  api.buffer_global_addr = bm_mem_get_device_addr(dev_mem);
+  for (int i = 0; i < reduction_dim_length;) {
+    api.reduction_dim[i] = reduction_dim[i];
+  }
+  api.reduction_dim_length = reduction_dim_length;
+  api.dim = input.dim;
+  api.mode = mode;
+  api.dtype = sgdnnTPUKernelDType(input.dtype);
+  SAFE_CALL(sgdnnTPUKernelLaunch(handle,
+                                 "tpu_kernel_api_reduce_max_or_min_multi_core",
+                                 &api, sizeof(api)));
+#else
+  SGDNN_CHECK(false);
+#endif
   return BM_SUCCESS;
 }
 
