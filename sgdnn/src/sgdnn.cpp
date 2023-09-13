@@ -5691,6 +5691,7 @@ bm_status_t sgdnnPermute ( bm_handle_t handle,
   size *= sizeof(float);
   bm_device_mem_t dev_mem;
   bm_status_t status = bm_malloc_device_byte(handle, &dev_mem, size);
+
   if(BM_SUCCESS != status){
     printf("malloc device error \r\n");
     return status;
@@ -5788,5 +5789,47 @@ bm_status_t sgdnnTopk ( bm_handle_t handle,
   SGDNN_CHECK ( false );
 #endif
 
+  return BM_SUCCESS;
+}
+
+bm_status_t sgdnnNonzero ( bm_handle_t handle,
+                           SgdnnTensor_t self,
+                           SgdnnTensor_t out,
+                           SgdnnTensor_t num )
+{
+  SGDNN_CHECK ( self.dtype == SGDNN_DTYPE_INT8  ||
+                self.dtype == SGDNN_DTYPE_UINT8 ||
+                self.dtype == SGDNN_DTYPE_INT32);
+  SGDNN_CHECK ( sgdnnIsTensorContiguous ( &self ) );
+  SGDNN_CHECK ( sgdnnIsTensorContiguous ( &out ) );
+
+  #if defined SGDNN_BACKEND_1684X
+  sg_api_nonzero_t api;
+  api.input_global_addr = self.addr;
+  api.output_global_addr = out.addr;
+  api.num_global_addr = num.addr;
+  api.dim = self.dim;
+  int size = 1;
+  for ( int i = 0; i < self.dim; ++i )
+  {
+    api.shape[i] = self.shape[i];
+    size *= self.shape[i];
+  }
+  api.dtype = sgdnnTPUKernelDType ( self.dtype );
+  size *= sizeof(int);
+  bm_device_mem_t index_dev_mem;
+  bm_status_t status = bm_malloc_device_byte(handle, &index_dev_mem, size);
+  if(BM_SUCCESS != status){
+    printf("malloc device error \r\n");
+    return status;
+  }
+  api.index_global_addr = bm_mem_get_device_addr(index_dev_mem);
+
+  SAFE_CALL ( sgdnnTPUKernelLaunch ( handle, "tpu_kernel_api_nonzero", &api, sizeof ( api ) ) );
+#elif defined SGDNN_BACKEND_2260
+  SGDNN_CHECK ( false );
+#else
+  SGDNN_CHECK ( false );
+#endif
   return BM_SUCCESS;
 }

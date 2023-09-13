@@ -1406,6 +1406,18 @@ bm_status_t sgdnnTopk ( bm_handle_t handle,
                         SgdnnTensor_t value,
                         SgdnnTensor_t index );
 
+/*
+ * OUTPUT = NONZERO (INPUT)
+ * Node:
+ * 1.input must be contiguous
+ * 2.only support in UINT8, INT8, INT32
+ * 3.the dtype of output is INT32
+*/
+bm_status_t sgdnnNonzero ( bm_handle_t handle,
+                      SgdnnTensor_t self,
+                      SgdnnTensor_t out,
+                      SgdnnTensor_t num);
+
 #if defined(__cplusplus)
 }
 #endif

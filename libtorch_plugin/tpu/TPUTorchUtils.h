@@ -383,6 +383,7 @@ typedef enum
   LN_MM_BACKWARD,
   ADD_LN_MM_BACKWARD,
   TOPK,
+  NONZERO,
   OP_NUM
 }
 OpType;
@@ -540,7 +541,8 @@ static const char * OpTypeStr[OP_NUM] =
   "POW SCALAR",
   "layernorm Matmul Backward",
   "Add layernorm Matmul Backward",
-  "TOPK"
+  "TOPK",
+  "NONZERO"
 };
 
 struct OpTimer
