@@ -1,0 +1,41 @@
+/**
+ * Copyright (c) 2017-present, Facebook, Inc.
+ * All rights reserved.
+ *
+ * This source code is licensed under the BSD-style license found in the
+ * LICENSE file in the root directory of this source tree.
+ */
+
+#pragma once
+
+#define SOPHON_VERSION_MAJOR @SOPHON_VERSION_MAJOR@
+#define SOPHON_VERSION_MINOR @SOPHON_VERSION_MINOR@
+#define SOPHON_VERSION_PATCH @SOPHON_VERSION_PATCH@
+
+static_assert(
+    SOPHON_VERSION_MINOR < 100,
+    "Programming error: you set a minor version that is too big.");
+static_assert(
+    SOPHON_VERSION_PATCH < 100,
+    "Programming error: you set a patch version that is too big.");
+
+#define SOPHON_VERSION                                         \
+  (SOPHON_VERSION_MAJOR * 10000 + SOPHON_VERSION_MINOR * 100 +   \
+   SOPHON_VERSION_PATCH)
+
+#cmakedefine01 SOPHON_USE_CUDA
+#cmakedefine01 SOPHON_USE_NCCL
+#cmakedefine01 SOPHON_USE_ROCM
+#cmakedefine01 SOPHON_USE_RCCL
+#cmakedefine01 SOPHON_USE_REDIS
+#cmakedefine01 SOPHON_USE_IBVERBS
+#cmakedefine01 SOPHON_USE_MPI
+#cmakedefine01 SOPHON_USE_AVX
+#cmakedefine01 SOPHON_USE_LIBUV
+#cmakedefine01 SOPHON_USE_SOPHGO
+
+#cmakedefine01 SOPHON_HAVE_TRANSPORT_TCP
+#cmakedefine01 SOPHON_HAVE_TRANSPORT_TCP_TLS
+#cmakedefine01 SOPHON_HAVE_TRANSPORT_IBVERBS
+#cmakedefine01 SOPHON_HAVE_TRANSPORT_UV
+#cmakedefine01 SOPHON_HAVE_TRANSPORT_SOPHGO

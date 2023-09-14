@@ -39,10 +39,10 @@ libtorch
 *.egg-info/
 *.zip
 Makefile
-*.cmake
+# *.cmake
 *.marks
 *.a
-libtorch_plugin/common/config.h
+# libtorch_plugin/common/config.h
 python/setup.py
 python/**/*.so
 python/gen_ins/*
