@@ -1391,7 +1391,7 @@ bm_status_t sgdnnPermute ( bm_handle_t handle,
                            SgdnnTensor_t output );
 
 /*
- * OUTPUT = TOPK ( INPUT,  )
+ * value, index = TOPK ( input, k, dim, largest, sorted )
  * Node:
  * 1. the data type of input, value must be the same
  * 2. only support in FP32, INT32, UINT32
@@ -1434,6 +1434,19 @@ bm_status_t sgdnnReduceMaxOrMin ( bm_handle_t handle,
                               int keepdim,
                               int mode,
                               SgdnnTensor_t output );
+
+/*
+ * out = REPEAT ( input, repeat_times, repeat_dim )
+ * Node:
+ * 1. the data type of input and output must be the same
+ * 2. dim <= 4 && dim <= repeat_dim
+ * 3. input and output must be contiguous
+ */
+bm_status_t sgdnnRepeat ( bm_handle_t handle,
+                          SgdnnTensor_t input,
+                          int *repeat_times,
+                          int repeat_dim,
+                          SgdnnTensor_t output );
 
 #if defined(__cplusplus)
 }

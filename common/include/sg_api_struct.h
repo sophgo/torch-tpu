@@ -1503,5 +1503,16 @@ typedef struct
   int dtype;
 } WITH_PLATFORM(sg_api_reduce_max_or_min_t);
 
+typedef struct 
+{
+  unsigned long long input_global_addr;
+  unsigned long long output_global_addr;
+  int shape[FW_MAX_SHAPE_DIMS];
+  int repeat_times[FW_MAX_SHAPE_DIMS];
+  int dim;
+  int repeat_dim;
+  int dtype;
+} WITH_PLATFORM(sg_api_repeat_t);
+
 #pragma pack(pop)
 #endif  // SG_API_STRUCT_H
