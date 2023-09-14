@@ -22,7 +22,10 @@
 #define AVG_SIM 2    //default
 
 //Whether using MCU
-#define IS_USING_MCU  1
+#define IS_USING_MCU  0
+
+//whether using inplace_scatter on GMEM (if not addtional add is adopted and LMEM split into two)
+#define USING_SCATTER_INPLACE_ON_GMEM 1
 
 typedef struct List_Node {
   int         index;
@@ -521,10 +524,12 @@ void TENSOR_MEM_ISOLATED_PRECHECK_L1_dim4(const dim4 object,const  data_type_t  
 
 //Function: get 4* banksize
 //Strategy: If bank_size is not enough, DIV_DOWN
+//If scatter_inplace_GMEM, only 1 buffer.
+//If scatter_inplace_LMEM, 2 buffers ,as inplace_LMEM is invalid, addtional add_ is adopted
 static inline int gen_bank_sizes_split_2_per_npu() {
    const int bank_num = tpu_bank_num();
    const int bank_size_per =  tpu_local_mem_size_per_npu() / tpu_bank_num();
-   const int num_used_local_addr = 2;
+   const int num_used_local_addr = USING_SCATTER_INPLACE_ON_GMEM ? 1: 2;
    //Expect: 16/4= 4; 16/5=3;
    int num_bank_per = DIV_UP(bank_num, num_used_local_addr);
    while (num_bank_per * num_used_local_addr > bank_num) {
@@ -1020,13 +1025,6 @@ void nodechip_embedding_backward_multi_core_basic_cell_patttern_one_intercore_no
   const int BS = grad_Y_shape.h;
   TPUKERNEL_ASSERT_INFO(BS == NUM_full_Index, "[ERROR] BS CHECK FAILED");
   const int local_offset_1 = BS * H_sliced * len_grad_dtype; //tpu_aligned_feature_size (1, H_sliced, grad_dtype );
-  const int local_offset_2 = V  * H_sliced * len_grad_dtype; // tpu_aligned_feature_size (1, H_sliced, grad_dtype ); //sum_num_per_v<=V
-  const int bank_2_size = gen_bank_sizes_split_2_per_npu(); //using all LMEM of per NPU
-  const local_addr_t grad_Y_scatter_local_addr    = 0;
-  const local_addr_t partial_sum_local_addr        = 1 * bank_2_size;
-  TPUKERNEL_ASSERT_INFO(local_offset_1 <= bank_2_size, "BS is too large!");
-  TPUKERNEL_ASSERT_INFO(local_offset_2 <= bank_2_size, "V is too large or not sparse enough!");
-  TPUKERNEL_ASSERT_INFO(partial_sum_local_addr+local_offset_2 <= (u32)tpu_local_mem_size_per_npu(), "BS_Loop is too large");
   //Shape Checker
   TPUKERNEL_ASSERT(grad_Y_shape.w == grad_W_shape.w);
   const dim4 shape_gather_L2_to_L1 = {.n = 1, .c = 1, .h = BS, .w = H_sliced};
@@ -1055,22 +1053,40 @@ void nodechip_embedding_backward_multi_core_basic_cell_patttern_one_intercore_no
   //Function: grad_W [v, h] = temp_reduce_value
   // Input: [v,h] ~[V,H_sliced];
   // Output: grad_W~[V',H_sliced] V'~NUM_V_used<=V;  V-NUM_V_used is preset as 0
-  const dim4 shape_scatter_L2_to_L1 = {.n = 1, .c = 1, .h = V, .w = H_sliced};
-  TENSOR_MEM_ISOLATED_PRECHECK_L1_dim4(shape_scatter_L2_to_L1, grad_dtype);
   const dim4 stride_scatter_L2_to_L1 = {.n = 0, .c =0, .h = H_native, .w = 1};
-
+  const local_addr_t grad_Y_scatter_local_addr    = 0;
   //Step_1.1 Scatter
   //Step_Arch: GMEM-<GDMA>-L1-<GDMA>-GDMA
   //necessary, preset V-NUM_V_used as 0
-  tpu_gdma_set_C_local(grad_Y_scatter_local_addr, zero_, &shape_scatter_L2_to_L1, NULL, grad_dtype);
-  tpu_gdma_set_C_local(partial_sum_local_addr,     zero_, &shape_scatter_L2_to_L1, NULL, grad_dtype);
-  tpu_gdma_h_scatter_S2L_with_inplace_add(grad_Y_scatter_local_addr, grad_Y_global_addr, X_global_addr, false, &shape_scatter_L2_to_L1,
-      BS, NULL, &stride_scatter_L2_to_L1, NULL, 1, grad_dtype );
-  //Note: H(.w-dim) is sliced, so each core operates sliced shape but strides in native shape.
-  tpu_gdma_cpy_S2L(partial_sum_local_addr,  grad_Weight_global_addr, &shape_scatter_L2_to_L1,   NULL, &stride_scatter_L2_to_L1, grad_dtype);
-  tpu_bdc_fp_add(grad_Y_scatter_local_addr, partial_sum_local_addr, grad_Y_scatter_local_addr, &shape_scatter_L2_to_L1, NULL,NULL,NULL, grad_dtype);
-  //Note: H(.w-dim) is sliced, so each core operates sliced shape but strides in native shape.
-  tpu_gdma_cpy_L2S(grad_Weight_global_addr, grad_Y_scatter_local_addr, &shape_scatter_L2_to_L1, &stride_scatter_L2_to_L1, NULL, grad_dtype);
+  if(! USING_SCATTER_INPLACE_ON_GMEM) {
+    const int local_offset_2 = V  * H_sliced * len_grad_dtype; // tpu_aligned_feature_size (1, H_sliced, grad_dtype ); //sum_num_per_v<=V
+    const int bank_2_size = gen_bank_sizes_split_2_per_npu(); //using all LMEM of per NPU
+    const local_addr_t partial_sum_local_addr        = 1 * bank_2_size;
+    TPUKERNEL_ASSERT_INFO(local_offset_1 <= bank_2_size, "BS is too large!");
+    TPUKERNEL_ASSERT_INFO(local_offset_2 <= bank_2_size, "V is too large or not sparse enough!");
+    TPUKERNEL_ASSERT_INFO(partial_sum_local_addr+local_offset_2 <= (u32)tpu_local_mem_size_per_npu(), "BS_Loop is too large");
+    const dim4 shape_scatter_L2_to_L1 = {.n = 1, .c = 1, .h = V, .w = H_sliced};
+    TENSOR_MEM_ISOLATED_PRECHECK_L1_dim4(shape_scatter_L2_to_L1, grad_dtype);
+    tpu_gdma_set_C_local(grad_Y_scatter_local_addr, zero_, &shape_scatter_L2_to_L1, NULL, grad_dtype);
+    tpu_gdma_set_C_local(partial_sum_local_addr,     zero_, &shape_scatter_L2_to_L1, NULL, grad_dtype);
+    tpu_gdma_h_scatter_S2L_with_inplace_add(grad_Y_scatter_local_addr, grad_Y_global_addr, X_global_addr, false, &shape_scatter_L2_to_L1,
+        BS, NULL, &stride_scatter_L2_to_L1, NULL, 1, grad_dtype );
+    // Note: H(.w-dim) is sliced, so each core operates sliced shape but strides in native shape.
+    //[NOTE]scatter_S2L expects y[x] = W,  but scatter_L2S or scatter_S2S expects y[x] +=W
+    //inplace_add only valid on GMEM ,i.e., S2L valid &&L2S not valid!
+    //So that S2L scatter needs additional adder.
+    tpu_gdma_cpy_S2L(partial_sum_local_addr,  grad_Weight_global_addr, &shape_scatter_L2_to_L1,   NULL, &stride_scatter_L2_to_L1, grad_dtype);
+    tpu_bdc_fp_add(grad_Y_scatter_local_addr, partial_sum_local_addr, grad_Y_scatter_local_addr, &shape_scatter_L2_to_L1, NULL,NULL,NULL, grad_dtype);
+    // Note: H(.w-dim) is sliced, so each core operates sliced shape but strides in native shape.
+    tpu_gdma_cpy_L2S(grad_Weight_global_addr, grad_Y_scatter_local_addr, &shape_scatter_L2_to_L1, &stride_scatter_L2_to_L1, NULL, grad_dtype);
+  } else {
+    tpu_gdma_set_C_local(grad_Y_scatter_local_addr, zero_, &shape_gather_L2_to_L1, NULL, grad_dtype);
+    //[NOTE]scatter_S2L expects y[x] = W,  but scatter_L2S or scatter_S2S expects y[x] +=W
+    //inplace_add only valid on GMEM ,i.e., S2L valid &&L2S not valid!
+    tpu_gdma_cpy_S2L(grad_Y_scatter_local_addr, grad_Y_global_addr, &shape_gather_L2_to_L1, NULL, &stride_scatter_L2_to_L1, grad_dtype);
+    tpu_gdma_h_scatter_L2S_with_inplace_add(grad_Weight_global_addr, grad_Y_scatter_local_addr, X_global_addr, false, &shape_gather_L2_to_L1,
+          BS, &stride_scatter_L2_to_L1, NULL, NULL, 1, grad_dtype );
+  }
 }
 
 //Slicing MEM: Total LMEM  ->    LMEM of per NPU
