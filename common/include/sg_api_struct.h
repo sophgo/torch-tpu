@@ -1527,5 +1527,16 @@ typedef struct
   int dtype;
 } WITH_PLATFORM(sg_api_reduce_arg_t);
 
+typedef struct 
+{
+  unsigned long long input_global_addr;
+  unsigned long long output_global_addr;
+  int shape[FW_MAX_SHAPE_DIMS];
+  int dim;
+  int dtype;
+  float min_value;
+  float max_value;
+} WITH_PLATFORM(sg_api_hardtanh_t);
+
 #pragma pack(pop)
 #endif  // SG_API_STRUCT_H

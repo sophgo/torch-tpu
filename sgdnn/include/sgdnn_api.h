@@ -1460,6 +1460,20 @@ bm_status_t sgdnnRepeat ( bm_handle_t handle,
                           int repeat_dim,
                           SgdnnTensor_t output );
 
+/*
+ * out = HARDTANH ( input, output )
+ * Node:
+ * 1. the data type of input and output must be the same
+ * 2. the shape of input and output must be the same
+ * 3. input and output must be contiguous
+ * 4. dim <= 4
+ */
+bm_status_t sgdnnHardtanh ( bm_handle_t handle,
+                            SgdnnTensor_t input,
+                            float min_value,
+                            float max_value,
+                            SgdnnTensor_t output );
+
 #if defined(__cplusplus)
 }
 #endif

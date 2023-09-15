@@ -172,4 +172,40 @@ Tensor &leakyrelu_tpu(const Tensor &self, const Scalar &negative_slope,
 #endif
 }
 TORCH_LIBRARY_IMPL(aten, TPU, m) { m.impl("leaky_relu.out", leakyrelu_tpu); }
+
+Tensor & hardtanh_out_tpu(const Tensor &self, const Scalar &min_value,
+                          const Scalar &max_value, Tensor &out) {
+  if(self.dim() > 0) {
+    CHECK_TENSOR_IN_DEVICE(self);
+  }
+  CHECK_TENSOR_IN_DEVICE(out);
+
+  if(self.dim() == 0) {
+    Tensor out_cpu = torch::nn::functional::detail::hardtanh(
+                            self.cpu(), min_value.toDouble(), max_value.toDouble(), false);
+    tpu::TPUCopyHostToDevice(out.data_ptr(), out_cpu.contiguous().data_ptr(), out.nbytes());
+  }
+  else {
+
+TIMING_START
+    bm_status_t status = sgdnnHardtanh(
+                            tpu::TPUGetDeviceHandle(), tpu::TPUGenerateSgdnnTensor(self),
+                            min_value.toFloat(), max_value.toFloat(), tpu::TPUGenerateSgdnnTensor(out));
+    TORCH_CHECK(status == BM_SUCCESS);
+TIMING_END(tpu::REPEAT)
+
+  }
+
+  return out;
+}
+Tensor hardtanh_tpu(const Tensor &self, const Scalar &min_value,
+                      const Scalar &max_value) {
+  auto out = empty_like(self);
+  return hardtanh_out_tpu(self, min_value, max_value, out);
+}
+TORCH_LIBRARY_IMPL(aten, TPU, m) {
+  m.impl("hardtanh", hardtanh_tpu);
+  m.impl("hardtanh.out", hardtanh_out_tpu);
+}
+
 } // namespace at

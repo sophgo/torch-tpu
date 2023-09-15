@@ -391,6 +391,7 @@ typedef enum
   ARGMIN,
   MAX_DIM,
   MIN_DIM,
+  HARDTANH,
   OP_NUM
 }
 OpType;
@@ -557,6 +558,7 @@ static const char * OpTypeStr[OP_NUM] =
   "Argmin",
   "Max_dim",
   "Min_dim",
+  "HARDTANH"
 };
 
 struct OpTimer

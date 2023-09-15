@@ -6001,3 +6001,35 @@ bm_status_t sgdnnArg( bm_handle_t handle,
 #endif
   return BM_SUCCESS;
 }
+
+bm_status_t sgdnnHardtanh ( bm_handle_t handle,
+                            SgdnnTensor_t input,
+                            float min_value,
+                            float max_value,
+                            SgdnnTensor_t output ) {
+  SGDNN_CHECK ( input.dim == output.dim );
+  SGDNN_CHECK ( input.dtype == output.dtype );
+  SGDNN_CHECK ( sgdnnIsSameShape ( &input, &output ) );
+  SGDNN_CHECK ( sgdnnIsTensorContiguous ( &input ) );
+  SGDNN_CHECK ( sgdnnIsTensorContiguous ( &output ) );
+
+#if defined SGDNN_BACKEND_1684X
+  sg_api_hardtanh_t api;
+  api.dim = input.dim;
+  api.min_value = min_value;
+  api.max_value = max_value;
+  for(int i = 0; i < input.dim; ++i) {
+    api.shape[i] = input.shape[i];
+  }
+  api.input_global_addr = input.addr;
+  api.output_global_addr = output.addr;
+  api.dtype = sgdnnTPUKernelDType( input.dtype );
+  SAFE_CALL ( sgdnnTPUKernelLaunch ( handle, "tpu_kernel_api_hardtanh", &api, sizeof( api ) ) );
+#elif defined SGDNN_BACKEND_2260
+  SGDNN_CHECK ( false );
+#else
+  SGDNN_CHECK ( false );
+#endif
+
+  return BM_SUCCESS;
+}
