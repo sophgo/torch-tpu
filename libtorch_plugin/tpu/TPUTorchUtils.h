@@ -387,6 +387,10 @@ typedef enum
   TOPK,
   NONZERO,
   REPEAT,
+  ARGMAX,
+  ARGMIN,
+  MAX_DIM,
+  MIN_DIM,
   OP_NUM
 }
 OpType;
@@ -427,8 +431,8 @@ static const char * OpTypeStr[OP_NUM] =
   "Reduce Mean",
   "Reduce Sum",
   "REDUCE_PROD",
-  "REDUCE_MAX",
-  "REDUCE_MIN",
+  "Reduce Max",
+  "Reduce Min",
   "Where",
   "Strided Copy",
   "Concat",
@@ -548,7 +552,11 @@ static const char * OpTypeStr[OP_NUM] =
   "Add layernorm Matmul Backward",
   "TOPK",
   "NonZero",
-  "REPEAT"
+  "REPEAT",
+  "Argmax",
+  "Argmin",
+  "Max_dim",
+  "Min_dim",
 };
 
 struct OpTimer

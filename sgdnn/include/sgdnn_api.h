@@ -1422,10 +1422,8 @@ bm_status_t sgdnnNonzero ( bm_handle_t handle,
  * OUTPUT = REDUCE_MAX_OR_MIN ( INPUT, REDUCTION_DIM, REDUCTION_DIM_LENGTH, KEEPDIM, MODE )
  * Note:
  * 1. The data types of INPUT and OUTPUT must be the same and one of FP32, FP16 and BF16
- * 2. The shape of INPUT is ( D0, D1, ..., D(S-1), DS, ..., D(E-1), DE, D(E+1), ... ), where DS is START_DIM and DE is END_DIM,
- *    if keepdim is TRUE, OUTPUT is ( D0, D1, ..., D(S-1), 1, ..., 1, DE, D(E+1), ... ), otherwise, ( D0, D1, ..., D(S-1), DE, D(E+1), ... )
- * 3. INPUT and OUTPUT must be contiguous
- * 4. MODE must be 0 ( max ) or 1 ( min )
+ * 2. INPUT and OUTPUT must be contiguous
+ * 3. MODE must be 0 ( max ) or 1 ( min )
  */
 bm_status_t sgdnnReduceMaxOrMin ( bm_handle_t handle,
                               SgdnnTensor_t input,
@@ -1434,6 +1432,20 @@ bm_status_t sgdnnReduceMaxOrMin ( bm_handle_t handle,
                               int keepdim,
                               int mode,
                               SgdnnTensor_t output );
+/*
+ * OUTPUT = ARG ( INPUT, AXIS, MODE )
+ * Note:
+ * 1. The data types of INPUT and OUTPUT must be the same and one of FP32, FP16 and BF16
+ * 2. INPUT and OUTPUT must be contiguous
+ * 3. MODE must be 0 ( argmax ) or 1 ( argmin ) or 2 ( max.dim ) or 3 ( min.dim )
+ */
+bm_status_t sgdnnArg( bm_handle_t handle,
+                              SgdnnTensor_t input,
+                              int axis,
+                              int mode,
+                              SgdnnTensor_t values,
+                              SgdnnTensor_t indices);
+
 
 /*
  * out = REPEAT ( input, repeat_times, repeat_dim )

@@ -5790,9 +5790,12 @@ bm_status_t sgdnnTopk ( bm_handle_t handle,
   return BM_SUCCESS;
 }
 
-bm_status_t sgdnnReduceMaxOrMin(bm_handle_t handle, SgdnnTensor_t input,
-                                int *reduction_dim, int reduction_dim_length,
-                                int keepdim, int mode, SgdnnTensor_t output) {
+bm_status_t sgdnnReduceMaxOrMin(bm_handle_t handle, 
+                                SgdnnTensor_t input,
+                                int *reduction_dim, 
+                                int reduction_dim_length,
+                                int keepdim, int mode, 
+                                SgdnnTensor_t output) {
   SGDNN_CHECK(input.dtype == output.dtype);
   SGDNN_CHECK(input.dtype == SGDNN_DTYPE_FP32 ||
               input.dtype == SGDNN_DTYPE_FP16 ||
@@ -5922,6 +5925,79 @@ bm_status_t sgdnnRepeat ( bm_handle_t handle,
   SGDNN_CHECK ( false );
 #else
   SGDNN_CHECK ( false );
+#endif
+  return BM_SUCCESS;
+}
+
+bm_status_t sgdnnArg( bm_handle_t handle, 
+                            SgdnnTensor_t input,
+                            int axis,
+                            int mode,
+                            SgdnnTensor_t values,
+                            SgdnnTensor_t indices) {
+  SGDNN_CHECK(input.dtype == SGDNN_DTYPE_FP32 ||
+              input.dtype == SGDNN_DTYPE_FP16 ||
+              input.dtype == SGDNN_DTYPE_BF16);
+  SGDNN_CHECK(mode == 0 || mode == 1 || mode == 2 || mode == 3);
+
+#if defined SGDNN_BACKEND_1684X
+  sg_api_reduce_arg_t api;
+  api.input_global_addr = input.addr;
+  api.values_global_addr = values.addr;
+  api.indices_global_addr = indices.addr;
+  bm_device_mem_t dev_mem;
+  SAFE_CALL(bm_malloc_device_byte(handle, &dev_mem, sgdnnTensorBytes(&input)));
+  api.buffer_global_addr = bm_mem_get_device_addr(dev_mem);
+  if (axis == input.dim){
+    api.shape[0] = 1;
+    api.shape[1] = 1;
+    api.shape[2] = 1;
+    api.shape[3] = 1;
+    for (int i = 0; i < input.dim; ++i) {
+      api.shape[3] *= input.shape[i];
+    }
+    api.dim = 4;
+    api.axis = 3;
+  }else{
+    for (int i = 0; i < input.dim; ++i) {
+      api.shape[i] = input.shape[i];
+    }
+    api.dim = input.dim;
+    api.axis = axis;
+  }
+  api.mode = mode;
+  api.dtype = sgdnnTPUKernelDType(input.dtype);
+  SAFE_CALL(sgdnnTPUKernelLaunch(handle, "tpu_kernel_api_arg",&api, sizeof(api)));
+#elif defined SGDNN_BACKEND_2260
+  sg_api_reduce_arg_t api;
+  api.input_global_addr = input.addr;
+  api.values_global_addr = values.addr;
+  api.indices_global_addr = indices.addr;
+  bm_device_mem_t dev_mem;
+  SAFE_CALL(bm_malloc_device_byte(handle, &dev_mem, sgdnnTensorBytes(&input)));
+  api.buffer_global_addr = bm_mem_get_device_addr(dev_mem);
+  if (axis == input.dim){
+    api.shape[0] = 1;
+    api.shape[1] = 1;
+    api.shape[2] = 1;
+    api.shape[3] = 1;
+    for (int i = 0; i < input.dim; ++i) {
+      api.shape[3] *= input.shape[i];
+    }
+    api.dim = 4;
+    api.axis = 3;
+  }else{
+    for (int i = 0; i < input.dim; ++i) {
+      api.shape[i] = input.shape[i];
+    }
+    api.dim = input.dim;
+    api.axis = axis;
+  }
+  api.mode = mode;
+  api.dtype = sgdnnTPUKernelDType(input.dtype);
+  SAFE_CALL(sgdnnTPUKernelLaunch(handle, "tpu_kernel_api_arg_muti_core",&api, sizeof(api)));
+#else
+  SGDNN_CHECK(false);
 #endif
   return BM_SUCCESS;
 }
