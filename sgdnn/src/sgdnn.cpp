@@ -5922,7 +5922,19 @@ bm_status_t sgdnnRepeat ( bm_handle_t handle,
   api.dtype = sgdnnTPUKernelDType( input.dtype );
   SAFE_CALL ( sgdnnTPUKernelLaunch ( handle, "tpu_kernel_api_repeat", &api, sizeof( api ) ) );
 #elif defined SGDNN_BACKEND_2260
-  SGDNN_CHECK ( false );
+  sg_api_repeat_t api;
+  api.dim = input.dim;
+  api.repeat_dim = repeat_dim;
+  for(int i = 0; i < input.dim; ++i) {
+    api.shape[i] = input.shape[i];
+  }
+  for(int i = 0 ; i < repeat_dim; ++i) {
+    api.repeat_times[i] = repeat_times[i];
+  }
+  api.input_global_addr = input.addr;
+  api.output_global_addr = output.addr;
+  api.dtype = sgdnnTPUKernelDType( input.dtype );
+  SAFE_CALL ( sgdnnTPUKernelLaunch ( handle, "tpu_kernel_api_repeat_multi_core", &api, sizeof( api ) ) );
 #else
   SGDNN_CHECK ( false );
 #endif

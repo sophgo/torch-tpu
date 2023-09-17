@@ -102,7 +102,7 @@ Tensor as_strided_tpu(const Tensor &self, IntArrayRef size, IntArrayRef stride,
 TORCH_LIBRARY_IMPL(aten, TPU, m) { m.impl("as_strided", as_strided_tpu); }
 
 Tensor reshape_tpu(const Tensor &self, IntArrayRef proposed_shape) {
-  CHECK_TENSOR_IN_DEVICE (self);
+  CHECK_TENSOR_IN_DEVICE(self);
   at::DimVector shape = at::infer_size_dv(proposed_shape, self.numel());
   auto stride = at::detail::computeStride(self.sizes(), self.strides(), shape);
   return alias_with_sizes_and_strides(self, shape, *stride);
@@ -121,9 +121,6 @@ Tensor &expand_out_tpu(const Tensor &self, const IntArrayRef output_size,
       ") must be greater or equal to the number of dimensions in the tensor (",
       self.dim(), ").");
 
-#ifdef TPU_OP_TIMING
-  auto timer = tpu::Timer().Start();
-#endif
   std::vector<int64_t> repeat_size = std::vector<int64_t>(output_size.size());
   std::vector<int64_t> input_size = self.sizes().vec();
   int in_idx = input_size.size() - 1;
@@ -150,16 +147,15 @@ Tensor &expand_out_tpu(const Tensor &self, const IntArrayRef output_size,
     }
   }
 
-#if 1
+#if 0
   // repeat not implemented in TPU now, use cpu
   auto self_cpu = self.cpu().repeat(repeat_size);
   tpu::TPUCopyHostToDevice(out.data_ptr(), self_cpu.contiguous().data_ptr(),
                            out.nbytes());
 #else
-#endif
-
-#ifdef TPU_OP_TIMING
-  tpu::OpTimer::Instance().AddTime(tpu::EXPAND, timer.ElapsedUS());
+  TIMING_START
+  out = self.repeat(repeat_size);
+  TIMING_END(tpu::EXPAND)
 #endif
   return out;
 }
