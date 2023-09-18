@@ -1939,4 +1939,93 @@ TORCH_LIBRARY_IMPL( aten, TPU, m ){
   m.impl("fmin.out", fmin_out_tpu);
 }
 
+Tensor & hypot_out_tpu(const Tensor &self, const Tensor &other, Tensor &out) {
+  if(self.dim() >> 0) {
+    CHECK_TENSOR_IN_DEVICE(self);
+  }
+  if(other.dim() > 0) {
+    CHECK_TENSOR_IN_DEVICE(other);
+  }
+  CHECK_TENSOR_IN_DEVICE(out);
+
+#ifdef TPU_OP_TIMING
+  auto timer = tpu::Timer().Start();
+#endif
+
+  if(self.dim() == 0 && other.dim() == 0) {
+    auto out_cpu = hypot(self.cpu(), other.cpu());
+    tpu::TPUCopyHostToDevice(out.data_ptr(), out_cpu.contiguous().data_ptr(), out.nbytes());
+  }
+  else if(self.dim() == 0) {
+    bm_status_t status = sgdnnHypotC(tpu::TPUGetDeviceHandle(), tpu::TPUGenerateSgdnnTensor(other),
+                                     self.item().toFloat(), tpu::TPUGenerateSgdnnTensor(out));
+    TORCH_CHECK ( status == BM_SUCCESS );
+  }
+  else if(other.dim() == 0) {
+    bm_status_t status = sgdnnHypotC(tpu::TPUGetDeviceHandle(), tpu::TPUGenerateSgdnnTensor(self),
+                                     other.item().toFloat(), tpu::TPUGenerateSgdnnTensor(out));
+    TORCH_CHECK ( status == BM_SUCCESS );
+  }
+  else if(self.dim() == other.dim()) {
+    if(tpu::TPUIsSameShape(self, other)) {
+      bm_status_t status = sgdnnHypot(
+                              tpu::TPUGetDeviceHandle(), tpu::TPUGenerateSgdnnTensor(self),
+                              tpu::TPUGenerateSgdnnTensor(other), tpu::TPUGenerateSgdnnTensor(out ));
+      TORCH_CHECK ( status == BM_SUCCESS );
+    }
+    else {
+      bm_status_t status = sgdnnHypotBcast(
+                              tpu::TPUGetDeviceHandle(), tpu::TPUGenerateSgdnnTensor(self),
+                              tpu::TPUGenerateSgdnnTensor(other), tpu::TPUGenerateSgdnnTensor(out ));
+      TORCH_CHECK ( status == BM_SUCCESS );
+    }
+  }
+  else {
+    TORCH_CHECK(false, "unsupported dims");
+  }
+
+#ifdef TPU_OP_TIMING
+  tpu::OpTimer::Instance().AddTime(tpu::HYPOT, timer.ElapsedUS());
+#endif
+
+  return out;
+}
+Tensor hypot_tpu(const Tensor &self, const Tensor &other) {
+  Tensor out;
+  if((self.dim() == 0 && other.dim() == 0)) {
+    out = empty_like(self);
+  }
+  else if(self.dim() == 0) {
+    out = empty_like(other);
+  }
+  else if(other.dim() == 0) {
+    out = empty_like(self);
+  }
+  else if(self.dim() == other.dim()) {
+    if(tpu::TPUIsSameShape(self, other)) {
+      out = empty_like(self);
+    }
+    else {
+      for(int i = 0 ; i < self.dim(); ++i) {
+        if(self.size(i) == 1) {
+          out = empty_like(other);
+          break;
+        }
+        else if(other.size(i) == 1) {
+          out = empty_like(self);
+          break;
+        }
+      }
+    }
+  }
+  else {
+    TORCH_CHECK(false, "unsupported dims");
+  }
+  return hypot_out_tpu(self, other, out);
+}
+TORCH_LIBRARY_IMPL(aten, TPU, m) {
+  m.impl("hypot", hypot_tpu);
+  m.impl("hypot.out", hypot_out_tpu);
+}
+
 } // namespace at

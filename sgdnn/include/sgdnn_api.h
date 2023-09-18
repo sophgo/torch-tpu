@@ -1474,6 +1474,41 @@ bm_status_t sgdnnHardtanh ( bm_handle_t handle,
                             float max_value,
                             SgdnnTensor_t output );
 
+/*
+ *  OUTPUT  = HYPOT ( input, other )
+ *  Note:
+ *  1. input, other and output only support float32.
+ *  2. input, other and output must be the same shape.
+ *  3. input, other and output must be contiguous
+ */
+bm_status_t sgdnnHypot ( bm_handle_t handle,
+                         SgdnnTensor_t input,
+                         SgdnnTensor_t other,
+                         SgdnnTensor_t output );
+
+/*
+ *  OUTPUT  = HYPOT ( input, other )
+ *  Note:
+ *  1. input, other and output only support float32.
+ *  2. input and other must be the same dim.
+ *  3. input, other and output must be contiguous
+ */
+bm_status_t sgdnnHypotBcast ( bm_handle_t handle,
+                              SgdnnTensor_t input,
+                              SgdnnTensor_t other,
+                              SgdnnTensor_t output );
+/*
+ *  OUTPUT  = HYPOT ( input, other )
+ *  Note:
+ *  1. input, other and output only support float32.
+ *  2. input and output must be the same shape.
+ *  3. input and output must be contiguous
+ */
+bm_status_t sgdnnHypotC ( bm_handle_t handle,
+                          SgdnnTensor_t input,
+                          float scalar,
+                          SgdnnTensor_t output );
+
 #if defined(__cplusplus)
 }
 #endif
