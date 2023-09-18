@@ -104,7 +104,7 @@ std::tuple<Tensor, Tensor, Tensor> native_group_norm_tpu(
   return std::make_tuple(Y, mean, rstd);
 }
 
-TORCH_LIBRARY_IMPL(aten, TPU, m) {
-  m.impl("native_group_norm", native_group_norm_tpu);
-}
+// TORCH_LIBRARY_IMPL(aten, TPU, m) {
+//   m.impl("native_group_norm", native_group_norm_tpu);
+// }
 } // namespace at

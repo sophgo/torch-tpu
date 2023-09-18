@@ -60,6 +60,7 @@ data_type_t dtype) {
                          &index_shape, &index_stride, NULL, DT_INT32);
         tpu_hau_poll();
     }
+    free(batch_nums);
 }
 void tpu_kernel_api_topk(const void *args) {
     sg_api_topk_t *api = (sg_api_topk_t*)args;

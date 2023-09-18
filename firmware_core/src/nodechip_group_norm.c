@@ -1,7 +1,7 @@
 #include "sg_api_struct.h"
 #include "tpu_kernel.h"
-#include <math.h>
 
+#if 0
 #define USE_PIPELINE
 
 #define POOL_MAX_KSIZE (1 << 16)
@@ -512,7 +512,7 @@ static inline void auto_partition(local_addr_t *local_addrs, int *mem_sizes,
   }
   ng -= real_rank;
   for (int i = 0; i < real_rank; ++i) {
-    mem_sizes_[i] += (int)floorf(ng * weights_[i] / sum_w);
+    //mem_sizes_[i] += (int)floorf(ng * weights_[i] / sum_w);
   }
   const int mem_unit = BANK_SIZE / scale;
   for (int i = 0; i < real_rank; ++i) {
@@ -1470,19 +1470,19 @@ void nodechip_native_group_norm(
               dims, axis, group_num, eps, affine, true, true, dtype,
               GROUP_NORM_MODE);
 }
-
+#endif
 void tpu_kernel_api_native_group_norm(const void *args) {
   sg_api_native_group_norm_t *api = (sg_api_native_group_norm_t *)args;
   TPUKERNEL_ASSERT(api->dtype == DT_FP32 || api->dtype == DT_FP16 ||
                    api->dtype == DT_BFP16);
 
-  tpu_initialize();
-  nodechip_native_group_norm(api->input_global_addr, api->weight_global_addr,
-                             api->bias_global_addr, api->output_global_addr,
-                             api->mean_global_addr, api->rstd_global_addr,
-                             api->shape, api->dim, api->axis, api->group_num,
-                             api->eps, api->affine, (data_type_t)api->dtype);
-  tpu_poll();
+  // tpu_initialize();
+  // nodechip_native_group_norm(api->input_global_addr, api->weight_global_addr,
+  //                            api->bias_global_addr, api->output_global_addr,
+  //                            api->mean_global_addr, api->rstd_global_addr,
+  //                            api->shape, api->dim, api->axis, api->group_num,
+  //                            api->eps, api->affine, (data_type_t)api->dtype);
+  // tpu_poll();
 }
 TPUKERNEL_FUNC_REGISTER(tpu_kernel_api_native_group_norm);
 

@@ -280,7 +280,7 @@ void tpu_kernel_api_embedding_backward ( const void* args ) {
 TPUKERNEL_FUNC_REGISTER ( tpu_kernel_api_embedding_backward );
 
 
-
+#if 0
 static inline int get_L1_TOTAL_MEM() {
   int a1 = tpu_npu_num();
   int a2 = tpu_local_mem_size_per_npu();
@@ -1560,3 +1560,4 @@ void tpu_kernel_api_embedding_backward_multi_core ( const void* args ) {
 }
 
 TPUKERNEL_FUNC_REGISTER ( tpu_kernel_api_embedding_backward_multi_core );
+#endif
