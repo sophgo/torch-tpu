@@ -1569,5 +1569,49 @@ typedef struct
   int dtype;
 } WITH_PLATFORM(sg_api_hypot_c_t);
 
+typedef struct
+{
+  unsigned long long other_global_addr;
+  unsigned long long output_global_addr;
+  int shape[FW_MAX_SHAPE_DIMS];
+  int dim;
+  int dtype;
+  float scalar;
+} WITH_PLATFORM(sg_api_nextafterc_t);
+
+typedef struct
+{
+  unsigned long long input_global_addr;
+  unsigned long long output_global_addr;
+  int shape[FW_MAX_SHAPE_DIMS];
+  int dim;
+  int dtype;
+  float scalar;
+} WITH_PLATFORM(sg_api_nextafter_c_t);
+
+typedef struct
+{
+  unsigned long long input_global_addr;
+  unsigned long long other_global_addr;
+  unsigned long long output_global_addr;
+  int shape[FW_MAX_SHAPE_DIMS];
+  int dim;
+  int dtype;
+} WITH_PLATFORM(sg_api_nextafter_t);
+
+typedef struct
+{
+  unsigned long long input_global_addr;
+  unsigned long long other_global_addr;
+  unsigned long long output_global_addr;
+  int input_shape[FW_MAX_SHAPE_DIMS];
+  int other_shape[FW_MAX_SHAPE_DIMS];
+  int output_shape[FW_MAX_SHAPE_DIMS];
+  int input_dim;
+  int other_dim;
+  int output_dim;
+  int dtype;
+} WITH_PLATFORM(sg_api_nextafter_bcast_t);
+
 #pragma pack(pop)
 #endif  // SG_API_STRUCT_H

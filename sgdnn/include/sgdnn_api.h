@@ -1509,6 +1509,54 @@ bm_status_t sgdnnHypotC ( bm_handle_t handle,
                           float scalar,
                           SgdnnTensor_t output );
 
+/*
+ * OUTPUT = NEXTAFTERC(SCALAR,OTHER)
+ * Note:
+ * 1. The data types of INPUT and OUTPUT must be the same and one of FP32, FP16 and BF16
+ * 2. The shapes of INPUT and OUTPUT must be the same
+ * 3. OUTPUT must be contiguous
+ */
+bm_status_t sgdnnNextafterC ( bm_handle_t handle,
+                        float scalar,
+                        SgdnnTensor_t other,
+                        SgdnnTensor_t output );
+
+/*
+ * OUTPUT = NEXTAFTER_C(INPUT,SCALAR)
+ * Note:
+ * 1. The data types of INPUT and OUTPUT must be the same and one of FP32, FP16 and BF16
+ * 2. The shapes of INPUT and OUTPUT must be the same
+ * 3. OUTPUT must be contiguous
+ */
+bm_status_t sgdnnNextafter_C ( bm_handle_t handle,
+                        SgdnnTensor_t input,
+                        float scalar,
+                        SgdnnTensor_t output );
+
+/*
+ * OUTPUT = NEXTAFTER(INPUT,OTHER)
+ * Note:
+ * 1. The data types of INPUT and OUTPUT must be the same and one of FP32, FP16 and BF16
+ * 2. The shapes of INPUT and OUTPUT must be the same
+ * 3. OUTPUT must be contiguous
+ */
+bm_status_t sgdnnNextafter ( bm_handle_t handle,
+                        SgdnnTensor_t input,
+                        SgdnnTensor_t other,
+                        SgdnnTensor_t output );
+
+/*
+ * OUTPUT = NEXTAFTERBCAST(INPUT,OTHER)
+ * Note:
+ * 1. The data types of INPUT and OUTPUT must be the same and one of FP32, FP16 and BF16
+ * 2. The shapes of INPUT and OUTPUT must be the same
+ * 3. OUTPUT must be contiguous
+ */
+bm_status_t sgdnnNextafterBcast ( bm_handle_t handle,
+                        SgdnnTensor_t input,
+                        SgdnnTensor_t other,
+                        SgdnnTensor_t output );
+
 #if defined(__cplusplus)
 }
 #endif

@@ -393,6 +393,7 @@ typedef enum
   MIN_DIM,
   HARDTANH,
   HYPOT,
+  NEXTAFTER,
   OP_NUM
 }
 OpType;
@@ -561,6 +562,7 @@ static const char * OpTypeStr[OP_NUM] =
   "Min_dim",
   "HARDTANH",
   "HYPOT"
+  "Nextafter",
 };
 
 struct OpTimer
