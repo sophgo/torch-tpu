@@ -1,227 +1,228 @@
 #include "sg_api_struct.h"
 #include "tpu_kernel.h"
 
-static inline void nodechip_pow_c_parallel ( global_addr_t XGlobalAddr, global_addr_t YGlobalAddr, int Len, float C, data_type_t dtype)
-{
-  const int DSize = tpu_data_type_size ( dtype );
-  local_addr_t EXPCoeffAddr = 0;
-  int EXPCoeffSize = tpu_aligned_feature_size ( 1, 32, DT_FP32 );
-  local_addr_t LOGCoeffAddr = EXPCoeffAddr + EXPCoeffSize;
-  int LOGCoeffSize = tpu_aligned_feature_size ( 1, 32, DT_FP32 );
-  local_addr_t EXPTableAddr = LOGCoeffAddr + LOGCoeffSize;
-  int EXPTableSize = tpu_aligned_feature_size ( 1, 192, DT_FP32 );
-  local_addr_t X0Addr = EXPTableAddr + EXPTableSize;
-  local_addr_t X1Addr, Y0Addr, Y1Addr, W0Addr, W1Addr;
-  local_addr_t X0CastAddr, X1CastAddr, Y0CastAddr, Y1CastAddr;
-  int WMax = DIV_UP ( Len, NPU_NUM );
-  while ( true )
-  {
-    int InSize = tpu_aligned_feature_size ( 1, WMax, dtype );
-    int Size = tpu_aligned_feature_size ( 1, WMax, DT_FP32 );
-    X1Addr = X0Addr + InSize;
-    Y0Addr = X1Addr + InSize;
-    Y1Addr = Y0Addr + InSize;
-    X0CastAddr = Y1Addr + InSize;
-    X1CastAddr = X0CastAddr + Size;
-    Y0CastAddr = X1CastAddr + Size;
-    Y1CastAddr = Y0CastAddr + Size;
-    W0Addr = Y1CastAddr + Size;
-    W1Addr = W0Addr + Size;
-    if ( ( int ) W1Addr + Size <= LOCAL_MEM_SIZE )
-    {
-      break;
-    }
-    else
-    {
-      if ( WMax > 1 )
-      {
-        WMax /= 2;
-        continue;
-      }
-      else
-      {
-        TPUKERNEL_ASSERT ( false );
-      }
-    }
-  }
-  tpu_bdc_load_fp32_exp_coeff ( EXPCoeffAddr );
-  tpu_bdc_load_fp32_log_coeff ( LOGCoeffAddr );
-  tpu_bdc_load_fp32_exp_table ( EXPTableAddr );
-  local_addr_t XAddrs[2] = { X0Addr, X1Addr };
-  local_addr_t YAddrs[2] = { Y0Addr, Y1Addr };
-  local_addr_t XCastAddrs[2] = { X0CastAddr, X1CastAddr };
-  local_addr_t YCastAddrs[2] = { Y0CastAddr, Y1CastAddr };
-  dim4 Shape = { .n = 1, .h = 1 };
-  dim4 LastShape;
-  int Todo = Len, Done = 0;
-  int Index = 0;
-  int LastDone = 0;
-  int Count = 0;
-  while ( Todo > 0 )
-  {
-    if ( Todo > NPU_NUM )
-    {
-      Shape.c = NPU_NUM;
-      Shape.w = MIN ( Todo / NPU_NUM, WMax );
-    }
-    else
-    {
-      Shape.c = Todo;
-      Shape.w = 1;
-    }
-    tpu_gdma_cpy_S2L ( XAddrs[Index], XGlobalAddr + Done * DSize, &Shape, NULL, NULL, dtype );
-    if ( Count > 0 && tpu_is_parallel_state() )
-    {
-      tpu_parallel_end();
-    }
-    tpu_parallel_start();
-    if ( Count > 0 )
-    {
-      tpu_gdma_cpy_L2S ( YGlobalAddr + LastDone * DSize, YAddrs[1 - Index], &LastShape, NULL, NULL, dtype );
-    }
-    if ( dtype != DT_FP32 )
-    {
-      tpu_bdc_cast ( XCastAddrs[Index], XAddrs[Index], &Shape, NULL, NULL, DT_FP32, dtype, RM_HALF_AWAY_FROM_ZERO );
-      tpu_bdc_fp32_pow_C ( YCastAddrs[Index], XCastAddrs[Index], W0Addr, W1Addr, EXPCoeffAddr, LOGCoeffAddr, EXPTableAddr, C, &Shape );
-      tpu_bdc_cast ( YAddrs[Index], YCastAddrs[Index], &Shape, NULL, NULL, dtype, DT_FP32, RM_HALF_AWAY_FROM_ZERO );
-    }
-    else
-    {
-    tpu_bdc_fp32_pow_C ( YAddrs[Index], XAddrs[Index], W0Addr, W1Addr, EXPCoeffAddr, LOGCoeffAddr, EXPTableAddr, C, &Shape );
-    }
+#define BOFFSET(index) buffer_addr + index *tensor_bsize_pnpu
 
-    LastDone = Done;
-    LastShape = Shape;
-    Todo -= Shape.c * Shape.w;
-    Done += Shape.c * Shape.w;
-    Index = 1 - Index;
-    ++Count;
+inline static void pipeline_move(unsigned long long *array, int num) {
+  for (int i = num - 1; i > 0; i--) {
+    array[i] = array[i - 1];
   }
-  if ( Count > 0 )
-  {
-    tpu_parallel_end();
-  }
-  tpu_gdma_cpy_L2S ( YGlobalAddr + LastDone * DSize, YAddrs[1 - Index], &LastShape, NULL, NULL, dtype );
 }
 
-static inline void pow_c_base_mul ( global_addr_t XGlobalAddr, global_addr_t YGlobalAddr, int Len, float C, data_type_t dtype )
-{
-  const int DSize = tpu_data_type_size ( dtype );
-  local_addr_t X0Addr = 0;
-  local_addr_t X1Addr, Y0Addr, Y1Addr, Y2Addr, Y3Addr;
-  int WMax = DIV_UP ( Len, NPU_NUM );
-  while ( true )
-  {
-    int InSize = tpu_aligned_feature_size ( 1, WMax, dtype );
-    X1Addr = X0Addr + InSize;
-    Y0Addr = X1Addr + InSize;
-    Y1Addr = Y0Addr + InSize;
-    Y2Addr = Y1Addr + InSize;
-    Y3Addr = Y2Addr + InSize;
-    if ( ( int ) Y3Addr + InSize <= LOCAL_MEM_SIZE )
-    {
-      break;
-    }
-    else
-    {
-      if ( WMax > 1 )
-      {
-        WMax /= 2;
-        continue;
-      }
-      else
-      {
-        TPUKERNEL_ASSERT ( false );
-      }
-    }
+// 2+2 + 1 = 5
+void tpu_bdc_fp_pow_234(local_addr_t dst_addr, local_addr_t src_addr,
+                        local_addr_t buffer_addr, const dim4 *shape, float C,
+                        data_type_t dtype) {
+  if (C == 2) {
+    buffer_addr = dst_addr;
   }
-  local_addr_t XAddrs[2] = { X0Addr, X1Addr };
-  local_addr_t YAddrs[2] = { Y0Addr, Y1Addr };
-  local_addr_t YAddrs0[2] = { Y2Addr, Y3Addr };
-  dim4 Shape = { .n = 1, .h = 1 };
-  dim4 LastShape;
-  int Todo = Len, Done = 0;
-  int Index = 0;
-  int LastDone = 0;
-  int Count = 0;
-  while ( Todo > 0 )
-  {
-    if ( Todo > NPU_NUM )
-    {
-      Shape.c = NPU_NUM;
-      Shape.w = MIN ( Todo / NPU_NUM, WMax );
-    }
-    else
-    {
-      Shape.c = Todo;
-      Shape.w = 1;
-    }
-    tpu_gdma_cpy_S2L ( XAddrs[Index], XGlobalAddr + Done * DSize, &Shape, NULL, NULL, dtype );
-    if ( Count > 0 && tpu_is_parallel_state() )
-    {
-      tpu_parallel_end();
-    }
+  tpu_bdc_fp_mul(buffer_addr, src_addr, src_addr, shape, NULL, NULL, NULL,
+                 dtype);
+
+  if (C == 4.0) {
+    tpu_bdc_fp_mul(dst_addr, buffer_addr, buffer_addr, shape, NULL, NULL, NULL,
+                   dtype);
+  } else if (C == 3.0) {
+    tpu_bdc_fp_mul(dst_addr, buffer_addr, src_addr, shape, NULL, NULL, NULL,
+                   dtype);
+  }
+}
+// (2+2) + 2 + 3 = 9
+// (2+2) + 2 + 2 + 2 + 2 + 3 = 15
+void tpu_bdc_fp_pow_C(local_addr_t dst_addr, local_addr_t src_addr,
+                      local_addr_t dst_fp32_addr, local_addr_t src_fp32_addr,
+                      local_addr_t work0_addr, local_addr_t work1_addr,
+                      local_addr_t exp_coeff_addr, local_addr_t log_coeff_addr,
+                      local_addr_t exp_table_addr, float C, const dim4 *shape,
+                      data_type_t dtype) {
+  if (dtype == DT_FP32) {
+    tpu_bdc_fp32_pow_C(dst_addr, src_addr, work0_addr, work1_addr,
+                       exp_coeff_addr, log_coeff_addr, exp_table_addr, C,
+                       shape);
+  } else {
+    tpu_bdc_cast(src_fp32_addr, src_addr, shape, NULL, NULL, DT_FP32, dtype,
+                 RM_HALF_AWAY_FROM_ZERO);
+    tpu_bdc_fp32_pow_C(dst_fp32_addr, src_fp32_addr, work0_addr, work1_addr,
+                       exp_coeff_addr, log_coeff_addr, exp_table_addr, C,
+                       shape);
+    tpu_bdc_cast(dst_addr, dst_fp32_addr, shape, NULL, NULL, dtype, DT_FP32,
+                 RM_HALF_AWAY_FROM_ZERO);
+  }
+}
+
+static inline void nodechip_pow_c_parallel(global_addr_t in_global_addr,
+                                           global_addr_t out_global_addr,
+                                           unsigned long long length, float C,
+                                           data_type_t dtype) {
+
+  if (length == 0) {
+    return;
+  }
+
+  const unsigned int bank_bsize = tpu_local_mem_size_per_npu() / tpu_bank_num();
+  int dtype_size = tpu_data_type_size(dtype);
+  int tensor_num = 2 + 2; //  2 inputs, 2 outputs
+  bool pow_234 = false;
+  if (C == 2 || C == 3 || C == 4) {
+    tensor_num += 1;
+    pow_234 = true;
+  } else if (dtype == DT_FP32) {
+    tensor_num += (2 + 3);
+  } else if (dtype == DT_FP16 || dtype == DT_BFP16) {
+    // dst_fp32, src_fp32, f32_work0, f32_work1, 3 coeff
+    tensor_num += (2 + 2 + 2 + 2 + 3);
+  } else {
+    TPUKERNEL_ASSERT(false);
+  }
+
+  int tensor_bsize_pnpu = tpu_bank_num() / tensor_num * bank_bsize;
+  TPUKERNEL_ASSERT(tensor_bsize_pnpu > 0);
+
+  // max local memory is tpu_local_mem_size_per_npu() * tpu_npu_num()
+  // for bm1684x, is (16384   *   16)    *   64
+  //                    ↑          ↑          ↑
+  //                bank_size * bank_num * npu_num
+  // (tpu_gdma_shape_limit(TENSOR_C_DIM) + 1) >> 1 = 32768,
+  // when `m_dim` is set to this value, it ensures both n and m dim to not
+  // exceed **shape limit**
+  const unsigned int max_m_dim = (tpu_gdma_shape_limit(TENSOR_C_DIM) + 1) >> 1;
+
+  // w should larger equal than tpu_eu_num(dtype) to make full use of
+  // eu(execution unit)
+  const unsigned int w_dim = tpu_eu_num(dtype);
+  const int n_dim = tensor_bsize_pnpu * tpu_npu_num() / dtype_size / max_m_dim;
+
+  local_addr_t in_local_addr[2] = {0, 1 * tensor_bsize_pnpu};
+  local_addr_t out_local_addr[2] = {2 * tensor_bsize_pnpu,
+                                    3 * tensor_bsize_pnpu};
+  local_addr_t buffer_addr = 4 * tensor_bsize_pnpu;
+
+  if (!pow_234) {
+    tpu_bdc_load_fp32_exp_coeff(BOFFSET(0));
+    tpu_bdc_load_fp32_log_coeff(BOFFSET(1));
+    tpu_bdc_load_fp32_exp_table(BOFFSET(2));
+  }
+
+  unsigned long long cur_idx[3] = {0}, cur_n_dim[3] = {0}, cur_m_dim[3] = {0};
+  int stage_idx = 0, draning_idx = 0;
+  while (cur_idx[2] < length) {
     tpu_parallel_start();
-    if ( Count > 0 )
-    {
-      tpu_gdma_cpy_L2S ( YGlobalAddr + LastDone * DSize, YAddrs[1 - Index], &LastShape, NULL, NULL, dtype );
+
+    // update load info
+    if (draning_idx < 1) {
+      unsigned long long cur_len =
+          MIN(length - cur_idx[0], // remained element size
+              n_dim * max_m_dim    // max matrix element size, n_dim * m_dim <
+                                   // tensor_size_pnpu * npu_num
+          );
+
+      // if cur_len is larger than m_dim (for a big matrix), limit `m` to not
+      // exceed max_m_dim, in this case n > 1 else, take cur_len as m, in this
+      // case n = 1 NOTE: n_dim * max_m_dim <= tensor_size_pnpu * npu_num, it's
+      // always a legal size.
+      cur_m_dim[0] = MIN(cur_len, max_m_dim);
+      cur_n_dim[0] = cur_len / cur_m_dim[0]; // cur_len / cur_m_dim[0] >= 1
     }
 
-    tpu_bdc_fp_mul ( YAddrs[Index], XAddrs[Index], XAddrs[Index], &Shape, NULL, NULL, NULL, dtype );
-    if (C == 4.0)
-    {
-      tpu_bdc_fp_mul (YAddrs0[Index], YAddrs[Index], YAddrs[Index], &Shape, NULL, NULL, NULL, dtype);
-    }
-    else if (C == 3.0)
-    {
-      tpu_bdc_fp_mul (YAddrs0[Index], YAddrs[Index], XAddrs[Index], &Shape, NULL, NULL, NULL, dtype);
+    // store output
+    if (stage_idx > 1) {
+      tpu_gdma_matrix_L2S(out_global_addr + cur_idx[2] * dtype_size,
+                          out_local_addr[stage_idx & 0x1],
+                          /**rows, cols, cols_per_channel, row_stride*/
+                          cur_n_dim[2], cur_m_dim[2], w_dim, cur_m_dim[2],
+                          dtype);
     }
 
-    LastDone = Done;
-    LastShape = Shape;
-    Todo -= Shape.c * Shape.w;
-    Done += Shape.c * Shape.w;
-    Index = 1 - Index;
-    ++Count;
-  }
-  if ( Count > 0 )
-  {
+    // load input
+    if (draning_idx < 1) {
+      tpu_gdma_matrix_S2L(in_local_addr[stage_idx & 0x1],
+                          in_global_addr + cur_idx[0] * dtype_size,
+                          cur_n_dim[0], cur_m_dim[0], w_dim, cur_m_dim[0],
+                          dtype);
+    }
+
+    // compute
+    if (stage_idx > 0 && draning_idx < 2) {
+
+      dim4 cur_shape = {cur_n_dim[1], DIV_UP(cur_m_dim[1], w_dim), 1,
+                        w_dim}; // matrix layout shape (n, c, h, w)
+
+      if (pow_234) {
+        tpu_bdc_fp_pow_234(out_local_addr[(stage_idx - 1) & 0x1],
+                           in_local_addr[(stage_idx - 1) & 0x1], BOFFSET(0),
+                           &cur_shape, C, dtype);
+      } else if (dtype == DT_FP32) {
+        tpu_bdc_fp_pow_C(out_local_addr[(stage_idx - 1) & 0x1],
+                         in_local_addr[(stage_idx - 1) & 0x1], 0, 0, BOFFSET(3),
+                         BOFFSET(4), BOFFSET(0), BOFFSET(1), BOFFSET(2), C,
+                         &cur_shape, dtype);
+      } else if (dtype == DT_FP16 || dtype == DT_BFP16) {
+        tpu_bdc_fp_pow_C(out_local_addr[(stage_idx - 1) & 0x1],
+                         in_local_addr[(stage_idx - 1) & 0x1], BOFFSET(3),
+                         BOFFSET(5), BOFFSET(7), BOFFSET(9), BOFFSET(0),
+                         BOFFSET(1), BOFFSET(2), C, &cur_shape, dtype);
+      }
+    }
+
     tpu_parallel_end();
+    pipeline_move(cur_idx, 3);
+    pipeline_move(cur_m_dim, 3);
+    pipeline_move(cur_n_dim, 3);
+    if (draning_idx < 1) {
+      cur_idx[0] += cur_m_dim[0] * cur_n_dim[0];
+      if (cur_idx[0] >= length) {
+        draning_idx++;
+      }
+    } else {
+      draning_idx++;
+    }
+    stage_idx++;
   }
-  if (C == 2.0 && C == 4.0) 
-  { 
-    tpu_gdma_cpy_L2S ( YGlobalAddr + LastDone * DSize, YAddrs[1 - Index], &LastShape, NULL, NULL, dtype );
-  }
-  else
-  {
-    tpu_gdma_cpy_L2S ( YGlobalAddr + LastDone * DSize, YAddrs0[1 - Index], &LastShape, NULL, NULL, dtype );
-  }
-  
 }
 
 void tpu_kernel_api_pow_c(const void *args) {
-  sg_api_pow_tensor_scalar_t *api = (sg_api_pow_tensor_scalar_t *) args;
+  sg_api_pow_tensor_scalar_t *api = (sg_api_pow_tensor_scalar_t *)args;
   TPUKERNEL_ASSERT(api->dtype == DT_FP32 || api->dtype == DT_FP16 ||
                    api->dtype == DT_BFP16);
 
-  int Len = 1;
-  for ( int i = 0; i < api->dim; ++i )
-  {
-    Len *= api->shape[i];
+  int length = 1;
+  for (int i = 0; i < api->dim; ++i) {
+    length *= api->shape[i];
   }
   tpu_initialize();
-  if (api->value == 2.0 || api->value == 3.0 || api->value == 4.0)
-  {
-    pow_c_base_mul(api->self_global_addr, api->out_global_addr, Len, api->value, api->dtype);
-  }
-  else{
-    nodechip_pow_c_parallel ( api->self_global_addr, api->out_global_addr, Len, api->value, api->dtype);
-  }
+  nodechip_pow_c_parallel(api->self_global_addr, api->out_global_addr, length,
+                          api->value, api->dtype);
   tpu_poll();
 }
 TPUKERNEL_FUNC_REGISTER(tpu_kernel_api_pow_c);
 
 void tpu_kernel_api_pow_c_multi_core(const void *args) {
-  TPUKERNEL_ASSERT_INFO(false, "not implementated");
+  sg_api_pow_tensor_scalar_t *api = (sg_api_pow_tensor_scalar_t *)args;
+  data_type_t dtype = (data_type_t)api->dtype;
+  TPUKERNEL_ASSERT(api->dtype == DT_FP32 || api->dtype == DT_FP16 ||
+                   api->dtype == DT_BFP16);
+  unsigned int slice_num = tpu_core_num();
+  unsigned int slice_idx = tpu_core_index();
+  TPUKERNEL_ASSERT(slice_num > 0);
+  TPUKERNEL_ASSERT(0 <= slice_idx && slice_idx < slice_num);
+  unsigned long long length = 1;
+  for (int i = 0; i < api->dim; i++) {
+    length *= (unsigned long long)api->shape[i];
+  }
+
+  unsigned long long slice = DIV_UP(length, slice_num);
+  if (length < slice_num) {
+    slice = 1;
+  }
+  unsigned int offset = slice_idx * slice;
+  unsigned long long real_slice = MIN(slice, length - offset);
+  if (real_slice <= 0)
+    return;
+  const int dsize = tpu_data_type_size(dtype);
+  tpu_initialize();
+  nodechip_pow_c_parallel(api->self_global_addr + offset * dsize,
+                          api->out_global_addr + offset * dsize, real_slice,
+                          api->value, api->dtype);
+  tpu_poll();
 }
 TPUKERNEL_FUNC_REGISTER(tpu_kernel_api_pow_c_multi_core);
