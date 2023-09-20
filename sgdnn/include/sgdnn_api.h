@@ -1067,6 +1067,7 @@ bm_status_t sgdnnComparisionC ( bm_handle_t handle,
                                 SgdnnTensor_t input,
                                 float scalar,
                                 int mode,
+                                int scalar_pos,
                                 SgdnnTensor_t output );
 
 /*

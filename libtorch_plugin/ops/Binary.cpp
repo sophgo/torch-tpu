@@ -788,10 +788,11 @@ Tensor &equal_out_tpu(const Tensor &self, const Tensor &other, Tensor &out) {
 #ifdef TPU_OP_TIMING
     auto timer = tpu::Timer().Start();
 #endif
-    // 0 equal, 1 not equal, 2 greater, 3 greater or equal, 4 less than, 5 less than or equal
+    // mode : 0 equal, 1 not equal, 2 greater, 3 greater or equal, 4 less than, 5 less than or equal
+    // pos : 0 for self is scalar, 1 for other is scalar
     bm_status_t status = sgdnnComparisionC(
         tpu::TPUGetDeviceHandle(), tpu::TPUGenerateSgdnnTensor(other),
-        self.item().toFloat(), 0, tpu::TPUGenerateSgdnnTensor(out));
+        self.item().toFloat(), 0, 0, tpu::TPUGenerateSgdnnTensor(out));
     TORCH_CHECK(status == BM_SUCCESS);
 #ifdef TPU_OP_TIMING
     tpu::OpTimer::Instance().AddTime(tpu::EQUAL_C, timer.ElapsedUS());
@@ -804,7 +805,7 @@ Tensor &equal_out_tpu(const Tensor &self, const Tensor &other, Tensor &out) {
 #endif
     bm_status_t status = sgdnnComparisionC(
         tpu::TPUGetDeviceHandle(), tpu::TPUGenerateSgdnnTensor(self),
-        other.item().toFloat(), 0, tpu::TPUGenerateSgdnnTensor(out));
+        other.item().toFloat(), 0, 1, tpu::TPUGenerateSgdnnTensor(out));
     TORCH_CHECK(status == BM_SUCCESS);
 #ifdef TPU_OP_TIMING
     tpu::OpTimer::Instance().AddTime(tpu::EQUAL_C, timer.ElapsedUS());
@@ -864,10 +865,11 @@ Tensor &greater_or_equal_out_tpu(const Tensor &self, const Tensor &other,
 #ifdef TPU_OP_TIMING
     auto timer = tpu::Timer().Start();
 #endif
-    // 0 equal, 1 not equal, 2 greater, 3 greater or equal, 4 less than, 5 less than or equal
+    // mode : 0 equal, 1 not equal, 2 greater, 3 greater or equal, 4 less than, 5 less than or equal
+    // pos : 0 for self is scalar, 1 for other is scalar
     bm_status_t status =
         sgdnnComparisionC(tpu::TPUGetDeviceHandle(), tpu::TPUGenerateSgdnnTensor(other),
-                 self.item().toFloat(), 3, tpu::TPUGenerateSgdnnTensor(out));
+                 self.item().toFloat(), 3, 0, tpu::TPUGenerateSgdnnTensor(out));
     TORCH_CHECK(status == BM_SUCCESS);
 #ifdef TPU_OP_TIMING
     tpu::OpTimer::Instance().AddTime(tpu::GREATER_OR_EQUAL_C,
@@ -881,7 +883,7 @@ Tensor &greater_or_equal_out_tpu(const Tensor &self, const Tensor &other,
 #endif
     bm_status_t status =
         sgdnnComparisionC(tpu::TPUGetDeviceHandle(), tpu::TPUGenerateSgdnnTensor(self),
-                 other.item().toFloat(), 3, tpu::TPUGenerateSgdnnTensor(out));
+                 other.item().toFloat(), 3, 1, tpu::TPUGenerateSgdnnTensor(out));
     TORCH_CHECK(status == BM_SUCCESS);
 #ifdef TPU_OP_TIMING
     tpu::OpTimer::Instance().AddTime(tpu::GREATER_OR_EQUAL_C,
@@ -944,10 +946,11 @@ Tensor &greater_out_tpu(const Tensor &self, const Tensor &other, Tensor &out) {
 #ifdef TPU_OP_TIMING
     auto timer = tpu::Timer().Start();
 #endif
-    // 0 equal, 1 not equal, 2 greater, 3 greater or equal, 4 less than, 5 less than or equal
+    // mode : 0 equal, 1 not equal, 2 greater, 3 greater or equal, 4 less than, 5 less than or equal
+    // pos : 0 for self is scalar, 1 for other is scalar
     bm_status_t status =
         sgdnnComparisionC(tpu::TPUGetDeviceHandle(), tpu::TPUGenerateSgdnnTensor(other),
-                 self.item().toFloat(), 2, tpu::TPUGenerateSgdnnTensor(out));
+                 self.item().toFloat(), 2, 0, tpu::TPUGenerateSgdnnTensor(out));
     TORCH_CHECK(status == BM_SUCCESS);
 #ifdef TPU_OP_TIMING
     tpu::OpTimer::Instance().AddTime(tpu::GREATER_C, timer.ElapsedUS());
@@ -960,7 +963,7 @@ Tensor &greater_out_tpu(const Tensor &self, const Tensor &other, Tensor &out) {
 #endif
     bm_status_t status =
         sgdnnComparisionC(tpu::TPUGetDeviceHandle(), tpu::TPUGenerateSgdnnTensor(self),
-                 other.item().toFloat(), 2, tpu::TPUGenerateSgdnnTensor(out));
+                 other.item().toFloat(), 2, 1, tpu::TPUGenerateSgdnnTensor(out));
     TORCH_CHECK(status == BM_SUCCESS);
 #ifdef TPU_OP_TIMING
     tpu::OpTimer::Instance().AddTime(tpu::GREATER_C, timer.ElapsedUS());
@@ -1020,10 +1023,11 @@ Tensor &less_than_or_equal_out_tpu(const Tensor &self, const Tensor &other,
 #ifdef TPU_OP_TIMING
     auto timer = tpu::Timer().Start();
 #endif
-    // 0 equal, 1 not equal, 2 greater, 3 greater or equal, 4 less than, 5 less than or equal
+    // mode : 0 equal, 1 not equal, 2 greater, 3 greater or equal, 4 less than, 5 less than or equal
+    // pos : 0 for self is scalar, 1 for other is scalar
     bm_status_t status =
         sgdnnComparisionC(tpu::TPUGetDeviceHandle(), tpu::TPUGenerateSgdnnTensor(other),
-                 self.item().toFloat(), 5, tpu::TPUGenerateSgdnnTensor(out));
+                 self.item().toFloat(), 5, 0, tpu::TPUGenerateSgdnnTensor(out));
     TORCH_CHECK(status == BM_SUCCESS);
 #ifdef TPU_OP_TIMING
     tpu::OpTimer::Instance().AddTime(tpu::LESS_THAN_OR_EQUAL_C,
@@ -1037,7 +1041,7 @@ Tensor &less_than_or_equal_out_tpu(const Tensor &self, const Tensor &other,
 #endif
     bm_status_t status =
         sgdnnComparisionC(tpu::TPUGetDeviceHandle(), tpu::TPUGenerateSgdnnTensor(self),
-                 other.item().toFloat(), 5, tpu::TPUGenerateSgdnnTensor(out));
+                 other.item().toFloat(), 5, 1, tpu::TPUGenerateSgdnnTensor(out));
     TORCH_CHECK(status == BM_SUCCESS);
 #ifdef TPU_OP_TIMING
     tpu::OpTimer::Instance().AddTime(tpu::LESS_THAN_OR_EQUAL_C,
@@ -1097,11 +1101,13 @@ Tensor & less_than_out_tpu( const Tensor &self, const Tensor &other, Tensor &out
 #ifdef TPU_OP_TIMING
       auto timer = tpu::Timer().Start();
 #endif
-      // 0 equal, 1 not equal, 2 greater, 3 greater or equal, 4 less than, 5 less than or equal
+    // mode : 0 equal, 1 not equal, 2 greater, 3 greater or equal, 4 less than, 5 less than or equal
+    // pos : 0 for self is scalar, 1 for other is scalar
       bm_status_t status = sgdnnComparisionC(tpu::TPUGetDeviceHandle(),
                                              tpu:: TPUGenerateSgdnnTensor ( other ),
                                              self.item().toFloat(),
                                              4,
+                                             0,
                                              tpu:: TPUGenerateSgdnnTensor ( out ) );
       TORCH_CHECK ( status == BM_SUCCESS );
 #ifdef TPU_OP_TIMING
@@ -1118,6 +1124,7 @@ Tensor & less_than_out_tpu( const Tensor &self, const Tensor &other, Tensor &out
                                              tpu:: TPUGenerateSgdnnTensor ( self ),
                                              other.item().toFloat(),
                                              4,
+                                             1,
                                              tpu:: TPUGenerateSgdnnTensor ( out ) );
       TORCH_CHECK ( status == BM_SUCCESS );
 #ifdef TPU_OP_TIMING
@@ -1206,10 +1213,11 @@ Tensor &not_equal_out_tpu(const Tensor &self, const Tensor &other,
 #ifdef TPU_OP_TIMING
     auto timer = tpu::Timer().Start();
 #endif
-    // 0 equal, 1 not equal, 2 greater, 3 greater or equal, 4 less than, 5 less than or equal
+    // mode : 0 equal, 1 not equal, 2 greater, 3 greater or equal, 4 less than, 5 less than or equal
+    // pos : 0 for self is scalar, 1 for other is scalar
     bm_status_t status = sgdnnComparisionC(
         tpu::TPUGetDeviceHandle(), tpu::TPUGenerateSgdnnTensor(other),
-        self.item().toFloat(), 1, tpu::TPUGenerateSgdnnTensor(out));
+        self.item().toFloat(), 1, 0, tpu::TPUGenerateSgdnnTensor(out));
     TORCH_CHECK(status == BM_SUCCESS);
 #ifdef TPU_OP_TIMING
     tpu::OpTimer::Instance().AddTime(tpu::NOT_EQUAL_C, timer.ElapsedUS());
@@ -1222,7 +1230,7 @@ Tensor &not_equal_out_tpu(const Tensor &self, const Tensor &other,
 #endif
     bm_status_t status = sgdnnComparisionC(
         tpu::TPUGetDeviceHandle(), tpu::TPUGenerateSgdnnTensor(self),
-        other.item().toFloat(), 1, tpu::TPUGenerateSgdnnTensor(out));
+        other.item().toFloat(), 1, 1, tpu::TPUGenerateSgdnnTensor(out));
     TORCH_CHECK(status == BM_SUCCESS);
 #ifdef TPU_OP_TIMING
     tpu::OpTimer::Instance().AddTime(tpu::NOT_EQUAL_C, timer.ElapsedUS());

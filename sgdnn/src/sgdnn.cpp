@@ -4077,19 +4077,9 @@ bm_status_t sgdnnComparision ( bm_handle_t handle,
   api.dtype = sgdnnTPUKernelDType(input.dtype);
   SAFE_CALL(sgdnnTPUKernelLaunch(handle, "tpu_kernel_api_comparision", &api, sizeof(api)));
 #elif defined SGDNN_BACKEND_2260
-  sg_api_comparision_t api;
-  api.input_global_addr = input.addr;
-  api.other_global_addr = other.addr;
-  api.output_global_addr = output.addr;
-  api.dim = input.dim;
-  for(int i = 0; i < input.dim; ++i) {
-    api.shape[i] = input.shape[i];
-  }
-  api.mode = mode;
-  api.dtype = sgdnnTPUKernelDType(input.dtype);
-  SAFE_CALL(sgdnnTPUKernelLaunch(handle, "tpu_kernel_api_comparision", &api, sizeof(api)));
+  SGDNN_CHECK ( false );
 #else
- SGDNN_CHECK ( false );
+  SGDNN_CHECK ( false );
 #endif
 
   return BM_SUCCESS;
@@ -4132,20 +4122,7 @@ bm_status_t sgdnnComparisionBcast ( bm_handle_t handle,
   api.dtype = sgdnnTPUKernelDType ( input.dtype );
   SAFE_CALL ( sgdnnTPUKernelLaunch ( handle, "tpu_kernel_api_comparision_bcast", &api, sizeof ( api ) ) );
 #elif defined SGDNN_BACKEND_2260
-  sg_api_comparision_bcast_t api;
-  api.input_global_addr = input.addr;
-  api.other_global_addr = other.addr;
-  api.output_global_addr = output.addr;
-  api.dim = input.dim;
-  for ( int i = 0; i < input.dim; ++i ) {
-    api.input_shape[i] = input.shape[i];
-  }
-  for ( int i = 0; i < other.dim; ++i ) {
-    api.other_shape[i] = other.shape[i];
-  }
-  api.mode = mode;
-  api.dtype = sgdnnTPUKernelDType ( input.dtype );
-  SAFE_CALL ( sgdnnTPUKernelLaunch ( handle, "tpu_kernel_api_comparision_bcast", &api, sizeof ( api ) ) );
+  SGDNN_CHECK ( false );
 #else
   SGDNN_CHECK ( false );
 #endif
@@ -4157,6 +4134,7 @@ bm_status_t sgdnnComparisionC ( bm_handle_t handle,
                                 SgdnnTensor_t input,
                                 float scalar,
                                 int mode,
+                                int scalar_pos,
                                 SgdnnTensor_t output ) {
   SGDNN_CHECK ( sgdnnIsSameShape ( &input, &output ) );
   SGDNN_CHECK ( sgdnnIsTensorContiguous ( &input ) );
@@ -4172,21 +4150,13 @@ bm_status_t sgdnnComparisionC ( bm_handle_t handle,
   }
   api.const_value = scalar;
   api.mode = mode;
+  api.scalar_pos = scalar_pos;
   api.dtype = sgdnnTPUKernelDType(input.dtype);
   SAFE_CALL(sgdnnTPUKernelLaunch(handle, "tpu_kernel_api_comparision_c", &api, sizeof(api)));
 #elif defined SGDNN_BACKEND_2260
-  sg_api_comparision_c_t api;
-  api.input_global_addr = input.addr;
-  api.output_global_addr = output.addr;
-  api.dim = input.dim;
-  for(int i = 0; i < input.dim; ++i) {
-    api.shape[i] = input.shape[i];
-  }
-  api.const_value = scalar;
-  api.dtype = sgdnnTPUKernelDType(input.dtype);
-  SAFE_CALL(sgdnnTPUKernelLaunch(handle, "tpu_kernel_api_comparision_c", &api, sizeof(api)));
+  SGDNN_CHECK ( false );
 #else
- SGDNN_CHECK ( false );
+  SGDNN_CHECK ( false );
 #endif
 
   return BM_SUCCESS;

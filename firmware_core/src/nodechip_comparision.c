@@ -461,6 +461,7 @@ global_addr_t output_global_addr,
 scalar_t value,
 int length,
 int mode,
+int scalar_pos,
 data_type_t dtype) {
     if(0 == length) return;
     const int bank_size = LOCAL_MEM_SIZE / LOCAL_MEM_BANKS;
@@ -532,48 +533,100 @@ data_type_t dtype) {
                                 dtype);
         }
         else if(mode == GREATER) {
-            tpu_bdc_greater_C(output_local_addrs[index],
-                              input_local_addrs[index],
-                              value,
-                              one_u8,
-                              &shape,
-                              NULL,
-                              NULL,
-                              DT_UINT8,
-                              dtype);
+            if(scalar_pos) {
+                tpu_bdc_greater_C(output_local_addrs[index],
+                                  input_local_addrs[index],
+                                  value,
+                                  one_u8,
+                                  &shape,
+                                  NULL,
+                                  NULL,
+                                  DT_UINT8,
+                                  dtype);
+            }
+            else {
+                tpu_bdc_less_C(output_local_addrs[index],
+                               input_local_addrs[index],
+                               value,
+                               one_u8,
+                               &shape,
+                               NULL,
+                               NULL,
+                               DT_UINT8,
+                               dtype);
+            }
         }
         else if(mode == GREATER_OR_EQUAL) {
-            tpu_bdc_greater_equal_C(output_local_addrs[index],
-                                    input_local_addrs[index],
-                                    value,
-                                    one_u8,
-                                    &shape,
-                                    NULL,
-                                    NULL,
-                                    DT_UINT8,
-                                    dtype);
+            if(scalar_pos) {
+                tpu_bdc_greater_equal_C(output_local_addrs[index],
+                                        input_local_addrs[index],
+                                        value,
+                                        one_u8,
+                                        &shape,
+                                        NULL,
+                                        NULL,
+                                        DT_UINT8,
+                                        dtype);
+            }
+            else {
+                tpu_bdc_less_equal_C(output_local_addrs[index],
+                                     input_local_addrs[index],
+                                     value,
+                                     one_u8,
+                                     &shape,
+                                     NULL,
+                                     NULL,
+                                     DT_UINT8,
+                                     dtype);
+            }
         }
         else if(mode == LESS_THAN) {
-            tpu_bdc_less_C(output_local_addrs[index],
-                           input_local_addrs[index],
-                           value,
-                           one_u8,
-                           &shape,
-                           NULL,
-                           NULL,
-                           DT_UINT8,
-                           dtype);
+            if(scalar_pos) {
+                tpu_bdc_less_C(output_local_addrs[index],
+                               input_local_addrs[index],
+                               value,
+                               one_u8,
+                               &shape,
+                               NULL,
+                               NULL,
+                               DT_UINT8,
+                               dtype);
+            }
+            else {
+                tpu_bdc_greater_C(output_local_addrs[index],
+                                  input_local_addrs[index],
+                                  value,
+                                  one_u8,
+                                  &shape,
+                                  NULL,
+                                  NULL,
+                                  DT_UINT8,
+                                  dtype);
+            }
         }
         else if(mode == LESS_THAN_OR_EQUAL) {
-            tpu_bdc_less_equal_C(output_local_addrs[index],
-                                 input_local_addrs[index],
-                                 value,
-                                 one_u8,
-                                 &shape,
-                                 NULL,
-                                 NULL,
-                                 DT_UINT8,
-                                 dtype);
+            if(scalar_pos) {
+                tpu_bdc_less_equal_C(output_local_addrs[index],
+                                     input_local_addrs[index],
+                                     value,
+                                     one_u8,
+                                     &shape,
+                                     NULL,
+                                     NULL,
+                                     DT_UINT8,
+                                     dtype);
+            }
+            else {
+                tpu_bdc_greater_equal_C(output_local_addrs[index],
+                                        input_local_addrs[index],
+                                        value,
+                                        one_u8,
+                                        &shape,
+                                        NULL,
+                                        NULL,
+                                        DT_UINT8,
+                                        dtype);
+            }
         }
         l2s = true;
         l2s_global_addr = output_global_addr + done * tpu_data_type_size(DT_UINT8);
@@ -617,6 +670,7 @@ void tpu_kernel_api_comparision_c(const void *args) {
                            value,
                            length,
                            api->mode,
+                           api->scalar_pos,
                            api->dtype);
 
     tpu_poll();

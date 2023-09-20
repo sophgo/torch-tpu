@@ -1143,6 +1143,7 @@ typedef struct
   int dtype;
   float const_value;
   int mode;
+  int scalar_pos;
 } WITH_PLATFORM(sg_api_comparision_c_t);
 
 
