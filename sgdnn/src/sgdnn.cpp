@@ -6342,3 +6342,127 @@ bm_status_t sgdnnNextafterBcast (bm_handle_t handle,
 #endif
   return BM_SUCCESS;
 }
+
+bm_status_t sgdnnReduceVar ( bm_handle_t handle,
+                             SgdnnTensor_t input,
+                             int *reduce_list,
+                             int reduce_dim,
+                             int correction,
+                             bool keepdim,
+                             SgdnnTensor_t output ) {
+  SGDNN_CHECK ( input.dtype == output.dtype );
+  SGDNN_CHECK ( input.dtype == SGDNN_DTYPE_FP32 );
+  SGDNN_CHECK ( reduce_dim <= input.dim );
+  SGDNN_CHECK ( sgdnnIsTensorContiguous ( &input ) );
+  SGDNN_CHECK ( sgdnnIsTensorContiguous ( &output ) );
+
+#if defined SGDNN_BACKEND_1684X
+  sg_api_reduce_var_t api;
+  api.input_global_addr = input.addr;
+  api.output_global_addr = output.addr;
+  api.input_dim = input.dim;
+  api.output_dim = output.dim;
+  api.reduce_dim = reduce_dim;
+
+  int size = 1;
+  for ( int i = 0; i < input.dim; ++i ) {
+    api.input_shape[i] = input.shape[i];
+    size *= input.shape[i];
+  }
+  size *= sizeof ( float );
+  bm_device_mem_t buffer_mem, mul_mem, sum_mem;
+  bm_status_t status = bm_malloc_device_byte ( handle, &buffer_mem, size );
+  if ( BM_SUCCESS != status ) {
+    printf ( "malloc device error \r\n" );
+    return status;
+  }
+  api.buffer_global_addr = bm_mem_get_device_addr ( buffer_mem );
+
+  status = bm_malloc_device_byte ( handle, &mul_mem, size );
+  if ( BM_SUCCESS != status ) {
+    printf ( "malloc device error \r\n" );
+    return status;
+  }
+  api.mul_global_addr = bm_mem_get_device_addr ( mul_mem );
+
+  status = bm_malloc_device_byte ( handle, &sum_mem, size );
+  if ( BM_SUCCESS != status ){
+    printf ( "malloc device error \r\n" );
+    return status;
+  }
+  api.sum_global_addr = bm_mem_get_device_addr ( sum_mem );
+
+  std::map<int, int> reduce_map;
+  for ( int i = 0 ; i < reduce_dim; ++i ) {
+    api.reduce_list[i] = reduce_list[i];
+    reduce_map[reduce_list[i]] = 1;
+  }
+  for ( int i = 0 ; i < input.dim; ++i ) {
+    if ( reduce_map.find(i) == reduce_map.end() ) {
+      api.output_shape[i] = input.shape[i];
+    }
+    else {
+      api.output_shape[i] = 1;
+    }
+  }
+  api.correction = correction;
+  api.keepdim = keepdim;
+  api.dtype = sgdnnTPUKernelDType ( input.dtype );
+  SAFE_CALL( sgdnnTPUKernelLaunch ( handle, "tpu_kernel_api_reduce_var", &api, sizeof( api ) ) );
+#elif defined SGDNN_BACKEND_2260
+  SGDNN_CHECK ( false );
+#else
+  SGDNN_CHECK ( false );
+#endif
+
+  return BM_SUCCESS;
+}
+
+bm_status_t sgdnnReduceVarAll ( bm_handle_t handle,
+                                SgdnnTensor_t input,
+                                int correction,
+                                bool keepdim,
+                                SgdnnTensor_t output ) {
+  SGDNN_CHECK ( input.dtype == output.dtype );
+  SGDNN_CHECK ( input.dtype == SGDNN_DTYPE_FP32 );
+  SGDNN_CHECK ( sgdnnIsTensorContiguous ( &input ) );
+  SGDNN_CHECK ( sgdnnIsTensorContiguous ( &output ) );
+
+#if defined SGDNN_BACKEND_1684X
+  sg_api_reduce_var_t api;
+  api.input_global_addr = input.addr;
+  api.output_global_addr = output.addr;
+  api.input_dim = input.dim;
+  int size = 1;
+  for ( int i = 0; i < input.dim; ++i ) {
+    api.input_shape[i] = input.shape[i];
+    size *= input.shape[i];
+  }
+  size *= sizeof ( float );
+  bm_device_mem_t buffer_mem, mul_mem;
+  bm_status_t status = bm_malloc_device_byte ( handle, &buffer_mem, size );
+  if ( BM_SUCCESS != status ) {
+    printf ( "malloc device error \r\n" );
+    return status;
+  }
+  api.buffer_global_addr = bm_mem_get_device_addr ( buffer_mem );
+
+  status = bm_malloc_device_byte ( handle, &mul_mem, size );
+  if ( BM_SUCCESS != status ) {
+    printf ( "malloc device error \r\n" );
+    return status;
+  }
+  api.mul_global_addr = bm_mem_get_device_addr ( mul_mem );
+
+  api.correction = correction;
+  api.keepdim = keepdim;
+  api.dtype = sgdnnTPUKernelDType ( input.dtype );
+  SAFE_CALL( sgdnnTPUKernelLaunch ( handle, "tpu_kernel_api_reduce_var_all", &api, sizeof( api ) ) );
+#elif defined SGDNN_BACKEND_2260
+  SGDNN_CHECK ( false );
+#else
+  SGDNN_CHECK ( false );
+#endif
+
+  return BM_SUCCESS;
+}

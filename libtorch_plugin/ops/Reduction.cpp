@@ -228,4 +228,53 @@ TORCH_LIBRARY_IMPL(aten, TPU, m)
   m.impl("amin.out", amin_out_tpu); 
 }
 
+Tensor var_correction_tpu(const Tensor &self, OptionalIntArrayRef dims,
+                          optional<long> conrrection, bool keepdim) {
+  if(self.dim() > 0) {
+    CHECK_TENSOR_IN_DEVICE(self);
+  }
+  auto reduce_list = dims.value_or(IntArrayRef{});
+  TORCH_CHECK(reduce_list.size() <= self.dim());
+
+TIMING_START;
+
+  Tensor out;
+  torch::Device device(torch::kPrivateUse1);
+  std::vector<int> reduce_vec;
+  if(reduce_list.empty()) {
+    out = torch::tensor(0.).to(device);
+
+    bm_status_t status = sgdnnReduceVarAll(tpu::TPUGetDeviceHandle(), tpu::TPUGenerateSgdnnTensor(self),
+                                           conrrection.value(), keepdim, tpu::TPUGenerateSgdnnTensor(out));
+    TORCH_CHECK(status == BM_SUCCESS);
+  }
+  else {
+    std::map<int, int> reduce_map;
+    std::vector<int64_t> size_vec;
+    for(auto it : reduce_list) {
+      reduce_map[it] = 1;
+      reduce_vec.push_back(it);
+    }
+    for(int i = 0 ; i < self.dim(); ++i) {
+      if(reduce_map.find(i) == reduce_map.end()) {
+        size_vec.push_back(self.size(i));
+      }
+    }
+    IntArrayRef size(size_vec);
+    out = torch::empty(size, self.dtype()).to(device);
+
+    bm_status_t status = sgdnnReduceVar(tpu::TPUGetDeviceHandle(), tpu::TPUGenerateSgdnnTensor(self),
+                                        reduce_vec.data(), reduce_vec.size(), conrrection.value(),
+                                        keepdim, tpu::TPUGenerateSgdnnTensor(out));
+    TORCH_CHECK(status == BM_SUCCESS);
+  }
+
+TIMING_END(tpu::REDUCE_VAR);
+
+  return out;
+}
+TORCH_LIBRARY_IMPL(aten, TPU, m) {
+  m.impl("var.correction", var_correction_tpu);
+}
+
 } // namespace at

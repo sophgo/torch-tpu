@@ -160,7 +160,7 @@ data_type_t   dtype) {
         int work1_size = output_size;
         work2_addr = work1_addr + work1_size;
         int work2_size = output_size;
-        int total_size = other_addr + work2_size;
+        int total_size = work2_addr + work2_size;
         if(total_size <= LOCAL_MEM_SIZE) {
             break;
         }

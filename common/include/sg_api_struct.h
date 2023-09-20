@@ -1613,5 +1613,23 @@ typedef struct
   int dtype;
 } WITH_PLATFORM(sg_api_nextafter_bcast_t);
 
+typedef struct
+{
+  unsigned long long input_global_addr;
+  unsigned long long buffer_global_addr;
+  unsigned long long mul_global_addr;
+  unsigned long long sum_global_addr;
+  unsigned long long output_global_addr;
+  int input_shape[FW_MAX_SHAPE_DIMS];
+  int output_shape[FW_MAX_SHAPE_DIMS];
+  int reduce_list[FW_MAX_SHAPE_DIMS];
+  int input_dim;
+  int output_dim;
+  int reduce_dim;
+  int correction;
+  bool keepdim;
+  int dtype;
+} WITH_PLATFORM(sg_api_reduce_var_t);
+
 #pragma pack(pop)
 #endif  // SG_API_STRUCT_H

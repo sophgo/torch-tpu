@@ -1557,6 +1557,34 @@ bm_status_t sgdnnNextafterBcast ( bm_handle_t handle,
                         SgdnnTensor_t other,
                         SgdnnTensor_t output );
 
+/*
+ *  OUTPUT  = VAR ( input, reduce_list, correction, keepdim )
+ *  Note:
+ *  1. input and output only support float32.
+ *  2. input and output must be contiguous
+ *  3. reduce_dims less than or equal to dim of input
+ */
+bm_status_t sgdnnReduceVar ( bm_handle_t handle,
+                             SgdnnTensor_t input,
+                             int *reduce_list,
+                             int reduce_dim,
+                             int correction,
+                             bool keepdim,
+                             SgdnnTensor_t output );
+
+/*
+ *  OUTPUT  = VAR ( input, correction, keepdim )
+ *  Note:
+ *  1. input and output only support float32.
+ *  2. input and output must be contiguous
+ *  3. reduce_dims less than or equal to dim of input
+ */
+bm_status_t sgdnnReduceVarAll ( bm_handle_t handle,
+                                SgdnnTensor_t input,
+                                int correction,
+                                bool keepdim,
+                                SgdnnTensor_t output );
+
 #if defined(__cplusplus)
 }
 #endif
