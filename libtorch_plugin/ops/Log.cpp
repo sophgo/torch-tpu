@@ -16,14 +16,14 @@ Tensor &logx_out_tpu(const Tensor &self, Tensor &out, sg_log_type_t log_type) {
   }
   CHECK_TENSOR_IN_DEVICE(out);
 #if 0
- 
-  auto self_cpu = log ( self.cpu());
-  tpu::TPUCopyHostToDevice ( self.data_ptr(),self.contiguous().data_ptr(), self.nbytes() );
+  auto out_cpu = log(self.cpu());
+  tpu::TPUCopyHostToDevice(out.data_ptr(), out_cpu.contiguous().data_ptr(),
+                           out.nbytes());
 #else
   if (self.dim() == 0) {
-    auto self_cpu = log(self.cpu());
-    tpu::TPUCopyHostToDevice(self.data_ptr(), self.contiguous().data_ptr(),
-                             self.nbytes());
+    auto out_cpu = log(self.cpu());
+    tpu::TPUCopyHostToDevice(out.data_ptr(), out_cpu.contiguous().data_ptr(),
+                             out.nbytes());
   } else if (IS_TPU_TENSOR(self)) {
 
     TIMING_START
