@@ -6313,6 +6313,7 @@ bm_status_t sgdnnNextafterBcast (bm_handle_t handle,
   return BM_SUCCESS;
 }
 
+
 bm_status_t sgdnnReduceVar ( bm_handle_t handle,
                              SgdnnTensor_t input,
                              int *reduce_list,
@@ -6436,3 +6437,38 @@ bm_status_t sgdnnReduceVarAll ( bm_handle_t handle,
 
   return BM_SUCCESS;
 }
+
+bm_status_t sgdnnTriangularize ( bm_handle_t handle,
+                      SgdnnTensor_t self,
+                      int is_upper,
+                      int diagonal,
+                      SgdnnTensor_t out )
+                      {
+  SGDNN_CHECK ( self.dtype == out.dtype );
+  SGDNN_CHECK ( self.dtype == SGDNN_DTYPE_FP32 ||
+                self.dtype == SGDNN_DTYPE_FP16 ||
+                self.dtype == SGDNN_DTYPE_BF16 );
+  SGDNN_CHECK ( sgdnnIsSameShape ( &self, &out ) );
+  SGDNN_CHECK ( sgdnnIsTensorContiguous ( &self ) );
+  SGDNN_CHECK ( sgdnnIsTensorContiguous ( &out ) );
+  sg_api_triangularize_t api;
+  api.input_global_addr = self.addr;
+  api.output_global_addr = out.addr;
+  api.dims = self.dim;
+  for ( int i = 0; i < self.dim; ++i )
+  {
+    api.shape[i] = self.shape[i];
+  }
+  api.diagonal = diagonal;
+  api.is_upper = is_upper;
+  api.dtype = sgdnnTPUKernelDType ( self.dtype );
+#if defined SGDNN_BACKEND_1684X
+  SAFE_CALL ( sgdnnTPUKernelLaunch ( handle, "tpu_kernel_api_triangularize", &api, sizeof ( api ) ) );
+#elif defined SGDNN_BACKEND_2260
+  SAFE_CALL ( sgdnnTPUKernelLaunch ( handle, "tpu_kernel_api_triangularize_multi_core", &api, sizeof ( api ) ) );
+#else
+  SGDNN_CHECK ( false );
+#endif
+  return BM_SUCCESS;
+}
+

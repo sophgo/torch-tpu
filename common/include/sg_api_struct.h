@@ -1632,5 +1632,19 @@ typedef struct
   int dtype;
 } WITH_PLATFORM(sg_api_reduce_var_t);
 
+typedef struct {
+  unsigned long long input_global_addr;
+  unsigned long long output_global_addr;
+  int shape[FW_MAX_SHAPE_DIMS];
+  int dims;
+  int is_upper;
+  int diagonal;
+  int dtype;
+#ifndef WIN32
+} __attribute__((packed)) sg_api_triangularize_t;
+#else
+} sg_api_triangularize_t;
+#endif
+
 #pragma pack(pop)
 #endif  // SG_API_STRUCT_H

@@ -1585,6 +1585,18 @@ bm_status_t sgdnnReduceVarAll ( bm_handle_t handle,
                                 int correction,
                                 bool keepdim,
                                 SgdnnTensor_t output );
+/*
+ *  OUTPUT = TRIANGULARIZE(SELF, IS_UPPER, DIAGONAL)
+ *  NOTE:
+ *  1. SELF and OUT must be contiguous
+ *  2. The data types of SELF and OUT must be the same and one of FP32, FP16 and BF16
+ *  3. The shapes of SELF and OUT must be the same
+*/
+bm_status_t sgdnnTriangularize ( bm_handle_t handle,
+                      SgdnnTensor_t self,
+                      int is_upper,
+                      int diagonal,
+                      SgdnnTensor_t out );
 
 #if defined(__cplusplus)
 }
