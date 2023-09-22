@@ -253,6 +253,22 @@ Tensor &sub_out_tpu(const Tensor &self, const Tensor &other,
 TORCH_LIBRARY_IMPL(aten, TPU, m) { m.impl("sub.out", sub_out_tpu); }
 
 Tensor &mul_out_tpu(const Tensor &self, const Tensor &other, Tensor &out) {
+  if (!self.is_contiguous() || !other.is_contiguous() || !out.is_contiguous()) {
+    LOG(WARNING) << "mul_out not contiguous, use stride copy"
+                 << " self.is_contiguous : " << self.is_contiguous()
+                 << " other.is_contiguous : " << other.is_contiguous()
+                 << " out.is_contiguous : " << out.is_contiguous()
+                 << " [TODO]  no use strided copy";
+    if (out.is_contiguous()) {
+      out = mul(self.contiguous(), other.contiguous());
+    } else {
+      auto out_ = mul(self.contiguous(), other.contiguous());
+      sgdnnStridedCopy(tpu::TPUGetDeviceHandle(),
+                       tpu::TPUGenerateSgdnnTensor(out_),
+                       tpu::TPUGenerateSgdnnTensor(out));
+    }
+    return out;
+  }
   if (self.dim() > 0) {
     CHECK_TENSOR_IN_DEVICE(self);
   }

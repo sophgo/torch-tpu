@@ -412,7 +412,7 @@ static const char * OpTypeStr[OP_NUM] =
   "BatchNorm Backward",
   "LayerNorm",
   "LayerNorm Backward",
-  "Avg Pooling"
+  "Avg Pooling",
   "ReLU",
   "ReLU Backward",
   "GeLU",
@@ -564,7 +564,7 @@ static const char * OpTypeStr[OP_NUM] =
   "Max_dim",
   "Min_dim",
   "HARDTANH",
-  "HYPOT"
+  "HYPOT",
   "Nextafter",
   "Triu"
 };

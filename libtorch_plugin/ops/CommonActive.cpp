@@ -56,16 +56,6 @@
 
 namespace at {
 #define HACK_CPU_IMP 0
-#define TPU_OP_TIMING_START
-
-#ifdef TPU_OP_TIMING
-#define TIMING_START auto timer = tpu::Timer().Start();
-#define TIMING_END(TIMING_NAME)                                                \
-  tpu::OpTimer::Instance().AddTime(TIMING_NAME, timer.ElapsedUS());
-#else
-#define TIMING_START
-#define TIMING_END(OP)
-#endif
 
 #define IMP_ACTIVE(OP)                                                         \
   Tensor OP##_tpu(const Tensor &self) {                                        \

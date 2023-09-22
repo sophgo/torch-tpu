@@ -208,4 +208,21 @@ TORCH_LIBRARY_IMPL(aten, TPU, m) {
   m.impl("hardtanh.out", hardtanh_out_tpu);
 }
 
+Tensor & sigmoid_backward_out_tpu(const Tensor & grad_output, const Tensor & output, Tensor & grad_input){
+  CHECK_TENSOR_IN_DEVICE(grad_output);
+  CHECK_TENSOR_IN_DEVICE(output);
+  CHECK_TENSOR_IN_DEVICE(grad_input);
+#if 1
+  LOG( WARNING ) << "Sigmoid backward use cpu impl";
+  auto grad_input_cpu = sigmoid_backward ( grad_output.cpu(), output.cpu() );
+  tpu::TPUCopyHostToDevice ( grad_input.data_ptr(), grad_input_cpu.contiguous().data_ptr(), grad_input.nbytes() );
+#else
+#endif
+  return grad_input;
+}
+
+TORCH_LIBRARY_IMPL(aten, TPU, m) {
+  m.impl("sigmoid_backward.grad_input", sigmoid_backward_out_tpu);
+}
+
 } // namespace at

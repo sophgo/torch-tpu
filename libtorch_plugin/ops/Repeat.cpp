@@ -62,9 +62,9 @@ Tensor repeat_tpu(const Tensor &self, const IntArrayRef repeats) {
   repeat_out_tpu(self, repeats, out);
   return out;
 }
-TORCH_LIBRARY_IMPL(aten, TPU, m) {
-  m.impl("repeat.out", repeat_out_tpu);
-  m.impl("repeat", repeat_tpu);
-}
+// TORCH_LIBRARY_IMPL(aten, TPU, m) {
+//   m.impl("repeat.out", repeat_out_tpu);
+//   m.impl("repeat", repeat_tpu);
+// }
 
 } // namespace at

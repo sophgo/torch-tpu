@@ -53,8 +53,8 @@ Tensor permute_tpu(const Tensor &self, IntArrayRef dim_order) {
 
     return out;
 }
-TORCH_LIBRARY_IMPL(aten, TPU, m) {
-    m.impl("permute", permute_tpu);
-}
+// TORCH_LIBRARY_IMPL(aten, TPU, m) {
+//     m.impl("permute", permute_tpu);
+// }
 
 }   // namespace at

@@ -166,6 +166,6 @@ Tensor expand_tpu(const Tensor &self, const IntArrayRef output_size,
   return expand_out_tpu(self, output_size, out);
 }
 
-TORCH_LIBRARY_IMPL(aten, TPU, m) { m.impl("expand", expand_tpu); }
+//TORCH_LIBRARY_IMPL(aten, TPU, m) { m.impl("expand", expand_tpu); }
 
 } // namespace at
