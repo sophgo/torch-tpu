@@ -178,11 +178,11 @@ Tensor unsqueeze_tpu(const Tensor &self, int64_t dim) {
   return unsqueeze_out_tpu(self, out, dim);
 }
 
-TORCH_LIBRARY_IMPL(aten, TPU, m) {
-  m.impl("squeeze", squeeze_tpu);
-  m.impl("squeeze.dim", squeeze_dim_tpu);
-  m.impl("squeeze.dims", squeeze_dims_tpu);
-  m.impl("unsqueeze", unsqueeze_tpu);
-}
+// TORCH_LIBRARY_IMPL(aten, TPU, m) {
+//   m.impl("squeeze", squeeze_tpu);
+//   m.impl("squeeze.dim", squeeze_dim_tpu);
+//   m.impl("squeeze.dims", squeeze_dims_tpu);
+//   m.impl("unsqueeze", unsqueeze_tpu);
+// }
 
 } // namespace at

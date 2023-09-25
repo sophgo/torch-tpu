@@ -1,6 +1,3 @@
-#include <stdbool.h>
-#
-
 #ifndef SG_API_STRUCT_H
 #define SG_API_STRUCT_H
 
@@ -136,9 +133,9 @@ typedef struct {
   int out_shape[FW_MAX_SHAPE_DIMS];
   int pad_bag;
   int pad_end;
-  bool half_pixel_centers;
-  bool align_corners;
-  bool if_getting_buffer_size;
+  int half_pixel_centers;
+  int align_corners;
+  int if_getting_buffer_size;
   int dtype;
   unsigned long long* buffer_size_ptr;
   // PYTORCH_SUPPORT for **bilinear**; PYTORCH_NEAREST for nearest
@@ -1475,8 +1472,8 @@ typedef struct
   int dim;
   int k;
   int dim_order;
-  bool largest;
-  bool sorted;
+  int largest;
+  int sorted;
   int dtype;
 } WITH_PLATFORM(sg_api_topk_t);
 
@@ -1628,7 +1625,7 @@ typedef struct
   int output_dim;
   int reduce_dim;
   int correction;
-  bool keepdim;
+  int keepdim;
   int dtype;
 } WITH_PLATFORM(sg_api_reduce_var_t);
 
