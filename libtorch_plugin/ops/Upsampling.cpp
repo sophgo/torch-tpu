@@ -110,5 +110,29 @@ Tensor upsample_nearest2d_tpu(const at::Tensor &self,
 TORCH_LIBRARY_IMPL(aten, TPU, m) {
   m.impl("upsample_nearest2d", upsample_nearest2d_tpu);
 }
+auto input = at::zeros(2);
+Tensor &upsample_nearest2d_backward_out_tpu(
+    const at::Tensor &grad_output, at::IntArrayRef output_size,
+    at::IntArrayRef input_size, c10::optional<double> scales_h = c10::nullopt,
+    c10::optional<double> scales_w = c10::nullopt,
+    at::Tensor &grad_input = input) {
+  CHECK_TENSOR_IN_DEVICE(grad_input);
+  CHECK_TENSOR_IN_DEVICE(grad_output);
+  LOG(WARNING) << "upsample_nearest2d_backward use cpu impl";
+  auto T_input = grad_input.cpu().contiguous();
+  auto input_r = upsample_nearest2d_backward_outf(
+      grad_output.cpu(), output_size, input_size, c10::nullopt, c10::nullopt,
+      T_input);
+  tpu::TPUCopyHostToDevice(grad_input.data_ptr(),
+                           grad_input.cpu().contiguous().data_ptr(),
+                           grad_input.nbytes());
+  grad_input = grad_input.contiguous();
+  return grad_input;
+}
+
+TORCH_LIBRARY_IMPL(aten, TPU, m) {
+  m.impl("upsample_nearest2d_backward.grad_input",
+         upsample_nearest2d_backward_out_tpu);
+}
 
 } // namespace at
