@@ -9,7 +9,7 @@ device = "privateuseone:0"
 
 
 def case1():
-    a1 = torch.randn((5,5))
+    a1 = torch.randn(5)
     a2 = a1.clone()
     a2_tpu = a2.to(device)
     a3 = 1
@@ -18,6 +18,7 @@ def case1():
     a2.neg_()
     a2_tpu = a2_tpu.neg()
     print(abs(a2 - a2_tpu.to("cpu")).max().item())
+    print(a2.size(),a2.dim())
   #  assert (a2 - a2_tpu.to("cpu") < 1e-5).all()
     print("origin: ",a1)
     print("cpu : ", a2 )

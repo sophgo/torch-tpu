@@ -1377,7 +1377,9 @@ bm_status_t sgdnnPowC ( bm_handle_t handle,
 bm_status_t sgdnnReal ( bm_handle_t handle,
                        SgdnnTensor_t input,
                        SgdnnTensor_t output);
-
+bm_status_t sgdnnConj ( bm_handle_t handle,
+                       SgdnnTensor_t input, 
+                       SgdnnTensor_t output);
 /*
  * OUTPUT = PERMUTE ( INPUT, DIM_ORDER )
  * Node:
