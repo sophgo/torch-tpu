@@ -246,7 +246,10 @@ int TPUGetDeviceIndex ( void )
 
 void TPUSetDeviceIndex ( int Index )
 {
-  kIndex = Index;
+  if (Index == -1)
+    kIndex = 0;
+  else
+    kIndex = Index;
 }
 
 bm_handle_t TPUGetDeviceHandle()
