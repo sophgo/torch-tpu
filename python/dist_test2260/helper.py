@@ -13,7 +13,7 @@ def init_logger():
                         datefmt='%H:%M:%S',
                         level=logging.DEBUG)
 
-    
+
 def is_master():
     return dist.get_rank() == 0
 

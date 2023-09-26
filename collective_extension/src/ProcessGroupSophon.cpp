@@ -769,9 +769,7 @@ public:
       inputs[i].copy_(inputs[rootTensor]);
     }
   }
-  void finishWorkSophon() override {
-    finish();
-  }
+  void finishWorkSophon() override { finish(); }
 };
 } // namespace
 
@@ -860,11 +858,10 @@ public:
 class AsyncAllreduceTPUWork : public ProcessGroupSophon::AsyncWork {
 public:
   AsyncAllreduceTPUWork(const std::shared_ptr<sophon::Context> &context,
-                        std::vector<at::Tensor> &tensors, ReduceOp reduceOp,
+                        std::vector<at::Tensor> &inputs, ReduceOp reduceOp,
                         uint32_t tag)
       : ProcessGroupSophon::AsyncWork({inputs}, "sophon:all_reduce", inputs),
         context(context), inputs(inputs), reduceOp(reduceOp), tag(tag) {}
-
   std::shared_ptr<sophon::Context> context;
   std::vector<at::Tensor> inputs;
   const ReduceOp reduceOp;
@@ -876,13 +873,71 @@ public:
     opts.setReduceFunction(getFunction(scalarType, reduceOp));
     opts.setTag(tag);
     GENERATE_ALL_TYPES(scalarType, setOutputs, opts, tensors);
-    sophon::allreduce(opts);
+
+    bm_handle_t handle_ = tpu::TPUGetDeviceHandle();
+    size_t bytes_ = tensors[0].nbytes();
+    bm_device_mem_t buff =
+        bm_mem_from_device((unsigned long long)tensors[0].data_ptr(), bytes_);
+    sg_reduce_method_t reduce_method = SG_REDUCE_SUM;
+
+    switch (reduceOp) {
+    case ReduceOp::SUM:
+      reduce_method = SG_REDUCE_SUM;
+      break;
+    case ReduceOp::PRODUCT:
+      reduce_method = SG_REDUCE_PROD;
+      break;
+    case ReduceOp::MIN:
+      reduce_method = SG_REDUCE_MIN;
+      break;
+    case ReduceOp::MAX:
+      reduce_method = SG_REDUCE_MAX;
+      break;
+    case ReduceOp::BAND:
+      TORCH_CHECK(false, "Cannot use ReduceOp.BAND with Sophon");
+      break;
+    case ReduceOp::BOR:
+      TORCH_CHECK(false, "Cannot use ReduceOp.BOR with Sophon");
+      break;
+    case ReduceOp::BXOR:
+      TORCH_CHECK(false, "Cannot use ReduceOp.BXOR with Sophon");
+      break;
+    case ReduceOp::PREMUL_SUM:
+      TORCH_CHECK(false, "Cannot use ReduceOp.PREMUL_SUM with Sophon");
+      break;
+    case ReduceOp::UNUSED:
+      break;
+    }
+
+    // for dev mem
+    switch (scalarType) {
+    case ::at::ScalarType::Float:
+      opts.setOutputSophon(SG_DTYPE_FP32, handle_, bytes_, buff, reduce_method);
+      break;
+    case ::at::ScalarType::Half:
+      opts.setOutputSophon(SG_DTYPE_FP16, handle_, bytes_, buff, reduce_method);
+      break;
+    case ::at::ScalarType::Char:
+      opts.setOutputSophon(SG_DTYPE_INT8, handle_, bytes_, buff, reduce_method);
+      break;
+    case ::at::ScalarType::Byte:
+      opts.setOutputSophon(SG_DTYPE_UINT8, handle_, bytes_, buff,
+                           reduce_method);
+      break;
+    case ::at::ScalarType::Int:
+      opts.setOutputSophon(SG_DTYPE_INT32, handle_, bytes_, buff,
+                           reduce_method);
+      break;
+    default:
+      TORCH_CHECK(false, "Invalid scalar type");
+    }
+
+    sophon::allreduce2260(opts);
   }
 
   void run() override { allreduce(inputs); }
 
-  void finishWorkSophon() override {
-  }
+  void finishWorkSophon() override { finish(); }
 
   template <typename T>
   void getFunction(sophon::AllreduceOptions::Func &fn, const ReduceOp op) {
@@ -1024,13 +1079,75 @@ public:
     opts.setTag(tag);
     opts.setReduceFunction(getFunction(scalarType, reduceOp));
     GENERATE_ALL_TYPES(scalarType, setOutput, opts, tensors[0]);
-    sophon::reduce(opts);
+
+    bm_handle_t handle_ = tpu::TPUGetDeviceHandle();
+    size_t bytes_ = tensors[0].nbytes();
+    bm_device_mem_t send_buff =
+        bm_mem_from_device((unsigned long long)tensors[0].data_ptr(), bytes_);
+    bm_device_mem_t rec_buff =
+        bm_mem_from_device((unsigned long long)tensors[0].data_ptr(), bytes_);
+    sg_reduce_method_t reduce_method = SG_REDUCE_SUM;
+
+    switch (reduceOp) {
+    case ReduceOp::SUM:
+      reduce_method = SG_REDUCE_SUM;
+      break;
+    case ReduceOp::PRODUCT:
+      reduce_method = SG_REDUCE_PROD;
+      break;
+    case ReduceOp::MIN:
+      reduce_method = SG_REDUCE_MIN;
+      break;
+    case ReduceOp::MAX:
+      reduce_method = SG_REDUCE_MAX;
+      break;
+    case ReduceOp::BAND:
+      TORCH_CHECK(false, "Cannot use ReduceOp.BAND with Sophon");
+      break;
+    case ReduceOp::BOR:
+      TORCH_CHECK(false, "Cannot use ReduceOp.BOR with Sophon");
+      break;
+    case ReduceOp::BXOR:
+      TORCH_CHECK(false, "Cannot use ReduceOp.BXOR with Sophon");
+      break;
+    case ReduceOp::PREMUL_SUM:
+      TORCH_CHECK(false, "Cannot use ReduceOp.PREMUL_SUM with Sophon");
+      break;
+    case ReduceOp::UNUSED:
+      break;
+    }
+
+    // for dev mem
+    switch (scalarType) {
+    case ::at::ScalarType::Float:
+      opts.setOutputSophon(SG_DTYPE_FP32, handle_, bytes_, send_buff, rec_buff,
+                           reduce_method);
+      break;
+    case ::at::ScalarType::Half:
+      opts.setOutputSophon(SG_DTYPE_FP16, handle_, bytes_, send_buff, rec_buff,
+                           reduce_method);
+      break;
+    case ::at::ScalarType::Char:
+      opts.setOutputSophon(SG_DTYPE_INT8, handle_, bytes_, send_buff, rec_buff,
+                           reduce_method);
+      break;
+    case ::at::ScalarType::Byte:
+      opts.setOutputSophon(SG_DTYPE_UINT8, handle_, bytes_, send_buff, rec_buff,
+                           reduce_method);
+      break;
+    case ::at::ScalarType::Int:
+      opts.setOutputSophon(SG_DTYPE_INT32, handle_, bytes_, send_buff, rec_buff,
+                           reduce_method);
+      break;
+    default:
+      TORCH_CHECK(false, "Invalid scalar type");
+    }
+
+    sophon::reduce2260(opts); // 2260 interface
   }
 
   void run() override { reduce(inputs); }
-  void finishWorkSophon() override {
-    // TODO
-  }
+  void finishWorkSophon() override { finish(); }
 
 protected:
   template <typename T>
@@ -1086,9 +1203,9 @@ ProcessGroupSophon::reduce(std::vector<at::Tensor> &inputs,
       invalidArgument("unsupported layout");
     }
   } else if (device.type() == at::kPrivateUse1) {
-    work = c10::make_intrusive<AsyncReduceWork>(std::move(context), inputs,
-                                                opts.rootRank, opts.rootTensor,
-                                                opts.reduceOp, tag);
+    work = c10::make_intrusive<AsyncReduceTPUWork>(
+        std::move(context), inputs, opts.rootRank, opts.rootTensor,
+        opts.reduceOp, tag);
   } else {
     TORCH_CHECK(false, "Invalid backend");
   }

@@ -16,6 +16,8 @@
 #include "sophon/math.h"
 #include "sophon/types.h"
 
+#include "sgdnn_api.h"
+
 namespace sophon {
 
 namespace {
@@ -26,44 +28,39 @@ using ReduceRangeFunction = std::function<void(size_t, size_t)>;
 using BroadcastRangeFunction = std::function<void(size_t, size_t)>;
 
 // Forward declaration of ring algorithm implementation.
-void ring(
-    const detail::AllreduceOptionsImpl& opts,
-    ReduceRangeFunction reduceInputs,
-    BroadcastRangeFunction broadcastOutputs);
+void ring(const detail::AllreduceOptionsImpl &opts,
+          ReduceRangeFunction reduceInputs,
+          BroadcastRangeFunction broadcastOutputs);
 
 // Forward declaration of bcube algorithm implementation.
-void bcube(
-    const detail::AllreduceOptionsImpl& opts,
-    ReduceRangeFunction reduceInputs,
-    BroadcastRangeFunction broadcastOutputs);
+void bcube(const detail::AllreduceOptionsImpl &opts,
+           ReduceRangeFunction reduceInputs,
+           BroadcastRangeFunction broadcastOutputs);
 
 // Returns function that computes local reduction over inputs and
 // stores it in the output for a given range in those buffers.
 // This is done prior to either sending a region to a neighbor, or
 // reducing a region received from a neighbor.
-ReduceRangeFunction genLocalReduceFunction(
-    const BufferVector& in,
-    const BufferVector& out,
-    size_t elementSize,
-    ReductionFunction fn) {
+ReduceRangeFunction genLocalReduceFunction(const BufferVector &in,
+                                           const BufferVector &out,
+                                           size_t elementSize,
+                                           ReductionFunction fn) {
   if (in.size() > 0) {
     if (in.size() == 1) {
       return [&in, &out](size_t offset, size_t length) {
-        memcpy(
-            static_cast<uint8_t*>(out[0]->ptr) + offset,
-            static_cast<const uint8_t*>(in[0]->ptr) + offset,
-            length);
+        memcpy(static_cast<uint8_t *>(out[0]->ptr) + offset,
+               static_cast<const uint8_t *>(in[0]->ptr) + offset, length);
       };
     } else {
       return [&in, &out, elementSize, fn](size_t offset, size_t length) {
-        fn(static_cast<uint8_t*>(out[0]->ptr) + offset,
-           static_cast<const uint8_t*>(in[0]->ptr) + offset,
-           static_cast<const uint8_t*>(in[1]->ptr) + offset,
+        fn(static_cast<uint8_t *>(out[0]->ptr) + offset,
+           static_cast<const uint8_t *>(in[0]->ptr) + offset,
+           static_cast<const uint8_t *>(in[1]->ptr) + offset,
            length / elementSize);
         for (size_t i = 2; i < in.size(); i++) {
-          fn(static_cast<uint8_t*>(out[0]->ptr) + offset,
-             static_cast<const uint8_t*>(out[0]->ptr) + offset,
-             static_cast<const uint8_t*>(in[i]->ptr) + offset,
+          fn(static_cast<uint8_t *>(out[0]->ptr) + offset,
+             static_cast<const uint8_t *>(out[0]->ptr) + offset,
+             static_cast<const uint8_t *>(in[i]->ptr) + offset,
              length / elementSize);
         }
       };
@@ -71,9 +68,9 @@ ReduceRangeFunction genLocalReduceFunction(
   } else {
     return [&out, elementSize, fn](size_t offset, size_t length) {
       for (size_t i = 1; i < out.size(); i++) {
-        fn(static_cast<uint8_t*>(out[0]->ptr) + offset,
-           static_cast<const uint8_t*>(out[0]->ptr) + offset,
-           static_cast<const uint8_t*>(out[i]->ptr) + offset,
+        fn(static_cast<uint8_t *>(out[0]->ptr) + offset,
+           static_cast<const uint8_t *>(out[0]->ptr) + offset,
+           static_cast<const uint8_t *>(out[i]->ptr) + offset,
            length / elementSize);
       }
     };
@@ -83,25 +80,23 @@ ReduceRangeFunction genLocalReduceFunction(
 // Returns function that performs a local broadcast over outputs for a
 // given range in the buffers. This is executed after receiving every
 // globally reduced chunk.
-BroadcastRangeFunction genLocalBroadcastFunction(const BufferVector& out) {
+BroadcastRangeFunction genLocalBroadcastFunction(const BufferVector &out) {
   return [&out](size_t offset, size_t length) {
     for (size_t i = 1; i < out.size(); i++) {
-      memcpy(
-          static_cast<uint8_t*>(out[i]->ptr) + offset,
-          static_cast<const uint8_t*>(out[0]->ptr) + offset,
-          length);
+      memcpy(static_cast<uint8_t *>(out[i]->ptr) + offset,
+             static_cast<const uint8_t *>(out[0]->ptr) + offset, length);
     }
   };
 }
 
-void allreduce(const detail::AllreduceOptionsImpl& opts) {
+void allreduce(const detail::AllreduceOptionsImpl &opts) {
   if (opts.elements == 0) {
     return;
   }
 
-  const auto& context = opts.context;
-  const std::vector<std::unique_ptr<transport::UnboundBuffer>>& in = opts.in;
-  const std::vector<std::unique_ptr<transport::UnboundBuffer>>& out = opts.out;
+  const auto &context = opts.context;
+  const std::vector<std::unique_ptr<transport::UnboundBuffer>> &in = opts.in;
+  const std::vector<std::unique_ptr<transport::UnboundBuffer>> &out = opts.out;
   const auto slot = Slot::build(kAllreduceSlotPrefix, opts.tag);
 
   // Sanity checks
@@ -133,38 +128,37 @@ void allreduce(const detail::AllreduceOptionsImpl& opts) {
   }
 
   switch (opts.algorithm) {
-    case detail::AllreduceOptionsImpl::UNSPECIFIED:
-    case detail::AllreduceOptionsImpl::RING:
-      ring(opts, reduceInputs, broadcastOutputs);
-      break;
-    case detail::AllreduceOptionsImpl::BCUBE:
-      bcube(opts, reduceInputs, broadcastOutputs);
-      break;
-    default:
-      SOPHON_ENFORCE(false, "Algorithm not handled.");
+  case detail::AllreduceOptionsImpl::UNSPECIFIED:
+  case detail::AllreduceOptionsImpl::RING:
+    ring(opts, reduceInputs, broadcastOutputs);
+    break;
+  case detail::AllreduceOptionsImpl::BCUBE:
+    bcube(opts, reduceInputs, broadcastOutputs);
+    break;
+  default:
+    SOPHON_ENFORCE(false, "Algorithm not handled.");
   }
 }
 
-void ring(
-    const detail::AllreduceOptionsImpl& opts,
-    ReduceRangeFunction reduceInputs,
-    BroadcastRangeFunction broadcastOutputs) {
-  const auto& context = opts.context;
-  const std::vector<std::unique_ptr<transport::UnboundBuffer>>& out = opts.out;
+void ring(const detail::AllreduceOptionsImpl &opts,
+          ReduceRangeFunction reduceInputs,
+          BroadcastRangeFunction broadcastOutputs) {
+  const auto &context = opts.context;
+  const std::vector<std::unique_ptr<transport::UnboundBuffer>> &out = opts.out;
   const auto slot = Slot::build(kAllreduceSlotPrefix, opts.tag);
   const size_t totalBytes = opts.elements * opts.elementSize;
 
   // Note: context->size > 1
   const auto recvRank = (context->size + context->rank + 1) % context->size;
   const auto sendRank = (context->size + context->rank - 1) % context->size;
-  SOPHON_ENFORCE(
-      context->getPair(recvRank),
-      "missing connection between rank " + std::to_string(context->rank) +
-          " (this process) and rank " + std::to_string(recvRank));
-  SOPHON_ENFORCE(
-      context->getPair(sendRank),
-      "missing connection between rank " + std::to_string(context->rank) +
-          " (this process) and rank " + std::to_string(sendRank));
+  SOPHON_ENFORCE(context->getPair(recvRank),
+                 "missing connection between rank " +
+                     std::to_string(context->rank) +
+                     " (this process) and rank " + std::to_string(recvRank));
+  SOPHON_ENFORCE(context->getPair(sendRank),
+                 "missing connection between rank " +
+                     std::to_string(context->rank) +
+                     " (this process) and rank " + std::to_string(sendRank));
 
   // The ring algorithm works as follows.
   //
@@ -194,7 +188,8 @@ void ring(
   // rounding it up to the nearest multiple of the element size.
   // For example, if maxSegmentSize = 10, and elementSize = 4,
   // then after rounding up: segmentSize = 12;
-  const size_t maxSegmentBytes = opts.elementSize *
+  const size_t maxSegmentBytes =
+      opts.elementSize *
       std::max((size_t)1, opts.maxSegmentSize / opts.elementSize);
 
   // Compute how many segments make up the input buffer.
@@ -207,11 +202,10 @@ void ring(
   // below overlaps sending/receiving a segment with computing the
   // reduction of the another segment.
   //
-  const size_t numSegments = roundUp(
-      std::max(
-          (totalBytes + (maxSegmentBytes - 1)) / maxSegmentBytes,
-          (size_t)context->size * 2),
-      (size_t)context->size);
+  const size_t numSegments =
+      roundUp(std::max((totalBytes + (maxSegmentBytes - 1)) / maxSegmentBytes,
+                       (size_t)context->size * 2),
+              (size_t)context->size);
   SOPHON_ENFORCE_EQ(numSegments % context->size, 0);
   SOPHON_ENFORCE_GE(numSegments, context->size * 2);
   const size_t numSegmentsPerRank = numSegments / context->size;
@@ -222,7 +216,7 @@ void ring(
   std::unique_ptr<uint8_t[]> tmpAllocation(new uint8_t[segmentBytes * 2]);
   std::unique_ptr<transport::UnboundBuffer> tmpBuffer =
       context->createUnboundBuffer(tmpAllocation.get(), segmentBytes * 2);
-  transport::UnboundBuffer* tmp = tmpBuffer.get();
+  transport::UnboundBuffer *tmp = tmpBuffer.get();
 
   // Use dynamic lookup for chunk offset in the temporary buffer.
   // With two operations in flight we need two offsets.
@@ -256,12 +250,12 @@ void ring(
     // If the segment is entirely in range, the following statement is
     // equal to segmentBytes. If it isn't, it will be less, or even
     // negative. This is why the ssize_t typecasts are needed.
-    result.sendLength = std::min(
-        (ssize_t)segmentBytes,
-        (ssize_t)totalBytes - (ssize_t)result.sendOffset);
-    result.recvLength = std::min(
-        (ssize_t)segmentBytes,
-        (ssize_t)totalBytes - (ssize_t)result.recvOffset);
+    result.sendLength =
+        std::min((ssize_t)segmentBytes,
+                 (ssize_t)totalBytes - (ssize_t)result.sendOffset);
+    result.recvLength =
+        std::min((ssize_t)segmentBytes,
+                 (ssize_t)totalBytes - (ssize_t)result.recvOffset);
 
     return result;
   };
@@ -289,11 +283,11 @@ void ring(
         // Wait for segment from neighbor.
         tmp->waitRecv(opts.timeout);
         // Reduce segment from neighbor into out->ptr.
-        opts.reduce(
-            static_cast<uint8_t*>(out[0]->ptr) + prev.recvOffset,
-            static_cast<const uint8_t*>(out[0]->ptr) + prev.recvOffset,
-            static_cast<const uint8_t*>(tmp->ptr) + segmentOffset[i & 0x1],
-            prev.recvLength / opts.elementSize);
+        opts.reduce(static_cast<uint8_t *>(out[0]->ptr) + prev.recvOffset,
+                    static_cast<const uint8_t *>(out[0]->ptr) + prev.recvOffset,
+                    static_cast<const uint8_t *>(tmp->ptr) +
+                        segmentOffset[i & 0x1],
+                    prev.recvLength / opts.elementSize);
       }
       if (prev.sendLength > 0) {
         out[0]->waitSend(opts.timeout);
@@ -340,12 +334,12 @@ void ring(
     // If the segment is entirely in range, the following statement is
     // equal to segmentBytes. If it isn't, it will be less, or even
     // negative. This is why the ssize_t typecasts are needed.
-    result.sendLength = std::min(
-        (ssize_t)segmentBytes,
-        (ssize_t)totalBytes - (ssize_t)result.sendOffset);
-    result.recvLength = std::min(
-        (ssize_t)segmentBytes,
-        (ssize_t)totalBytes - (ssize_t)result.recvOffset);
+    result.sendLength =
+        std::min((ssize_t)segmentBytes,
+                 (ssize_t)totalBytes - (ssize_t)result.sendOffset);
+    result.recvLength =
+        std::min((ssize_t)segmentBytes,
+                 (ssize_t)totalBytes - (ssize_t)result.recvOffset);
 
     return result;
   };
@@ -426,14 +420,13 @@ std::vector<size_t> computeGroupSizePerStep(size_t size, const size_t n) {
 // all processes have 1/8th of the result. Then, the same factorization is
 // followed in reverse to perform an allgather.
 //
-void bcube(
-    const detail::AllreduceOptionsImpl& opts,
-    ReduceRangeFunction reduceInputs,
-    BroadcastRangeFunction broadcastOutputs) {
-  const auto& context = opts.context;
+void bcube(const detail::AllreduceOptionsImpl &opts,
+           ReduceRangeFunction reduceInputs,
+           BroadcastRangeFunction broadcastOutputs) {
+  const auto &context = opts.context;
   const auto slot = Slot::build(kAllreduceSlotPrefix, opts.tag);
   const auto elementSize = opts.elementSize;
-  auto& out = opts.out[0];
+  auto &out = opts.out[0];
 
   constexpr auto n = 2;
 
@@ -486,10 +479,9 @@ void bcube(
           group.bufferOffset + (groupRank * group.chunkLength);
       group.myChunkLength = std::min(
           size_t(group.chunkLength),
-          size_t(std::max(
-              int64_t(0),
-              int64_t(group.bufferLength) -
-                  int64_t(groupRank * group.chunkLength))));
+          size_t(std::max(int64_t(0),
+                          int64_t(group.bufferLength) -
+                              int64_t(groupRank * group.chunkLength))));
 
       // Store a const copy of this group in the vector.
       groups.push_back(group);
@@ -506,7 +498,7 @@ void bcube(
   // The chunk length is rounded up, so the maximum scratch space we need
   // might be larger than the size of the output buffer. Compute the maximum
   size_t bufferLength = opts.elements;
-  for (const auto& group : groups) {
+  for (const auto &group : groups) {
     bufferLength =
         std::max(bufferLength, group.ranks.size() * group.chunkLength);
   }
@@ -519,7 +511,7 @@ void bcube(
 
   // Reduce/scatter.
   for (size_t step = 0; step < groups.size(); step++) {
-    const auto& group = groups[step];
+    const auto &group = groups[step];
 
     // Issue receive operations for chunks from peers.
     for (size_t i = 0; i < group.ranks.size(); i++) {
@@ -527,11 +519,8 @@ void bcube(
       if (src == context->rank) {
         continue;
       }
-      tmp->recv(
-          src,
-          slot,
-          i * group.chunkLength * elementSize,
-          group.myChunkLength * elementSize);
+      tmp->recv(src, slot, i * group.chunkLength * elementSize,
+                group.myChunkLength * elementSize);
     }
 
     // Issue send operations for local chunks to peers.
@@ -544,20 +533,16 @@ void bcube(
           group.bufferOffset + i * group.chunkLength;
       const size_t currentChunkLength = std::min(
           size_t(group.chunkLength),
-          size_t(std::max(
-              int64_t(0),
-              int64_t(group.bufferLength) - int64_t(i * group.chunkLength))));
+          size_t(std::max(int64_t(0), int64_t(group.bufferLength) -
+                                          int64_t(i * group.chunkLength))));
       // Compute the local reduction only in the first step of the algorithm.
       // In subsequent steps, we already have a partially reduced result.
       if (step == 0) {
-        reduceInputs(
-            currentChunkOffset * elementSize, currentChunkLength * elementSize);
+        reduceInputs(currentChunkOffset * elementSize,
+                     currentChunkLength * elementSize);
       }
-      out->send(
-          dst,
-          slot,
-          currentChunkOffset * elementSize,
-          currentChunkLength * elementSize);
+      out->send(dst, slot, currentChunkOffset * elementSize,
+                currentChunkLength * elementSize);
     }
 
     // Wait for send and receive operations to complete.
@@ -573,8 +558,8 @@ void bcube(
     // In the first step, prepare the chunk this process is responsible for
     // with the reduced version of its inputs (if multiple are specified).
     if (step == 0) {
-      reduceInputs(
-          group.myChunkOffset * elementSize, group.myChunkLength * elementSize);
+      reduceInputs(group.myChunkOffset * elementSize,
+                   group.myChunkLength * elementSize);
     }
 
     // Reduce chunks from peers.
@@ -583,13 +568,13 @@ void bcube(
       if (src == context->rank) {
         continue;
       }
-      opts.reduce(
-          static_cast<uint8_t*>(out->ptr) + (group.myChunkOffset * elementSize),
-          static_cast<const uint8_t*>(out->ptr) +
-              (group.myChunkOffset * elementSize),
-          static_cast<const uint8_t*>(tmp->ptr) +
-              (i * group.chunkLength * elementSize),
-          group.myChunkLength);
+      opts.reduce(static_cast<uint8_t *>(out->ptr) +
+                      (group.myChunkOffset * elementSize),
+                  static_cast<const uint8_t *>(out->ptr) +
+                      (group.myChunkOffset * elementSize),
+                  static_cast<const uint8_t *>(tmp->ptr) +
+                      (i * group.chunkLength * elementSize),
+                  group.myChunkLength);
     }
   }
 
@@ -598,14 +583,14 @@ void bcube(
   // Doing so means we only have to broadcast locally to out[1..N] all
   // chunks as we receive them from our peers during the allgather phase.
   {
-    const auto& group = groups.back();
-    broadcastOutputs(
-        group.myChunkOffset * elementSize, group.myChunkLength * elementSize);
+    const auto &group = groups.back();
+    broadcastOutputs(group.myChunkOffset * elementSize,
+                     group.myChunkLength * elementSize);
   }
 
   // Allgather.
   for (auto it = groups.rbegin(); it != groups.rend(); it++) {
-    const auto& group = *it;
+    const auto &group = *it;
 
     // Issue receive operations for reduced chunks from peers.
     for (size_t i = 0; i < group.ranks.size(); i++) {
@@ -617,14 +602,10 @@ void bcube(
           group.bufferOffset + i * group.chunkLength;
       const size_t currentChunkLength = std::min(
           size_t(group.chunkLength),
-          size_t(std::max(
-              int64_t(0),
-              int64_t(group.bufferLength) - int64_t(i * group.chunkLength))));
-      out->recv(
-          src,
-          slot,
-          currentChunkOffset * elementSize,
-          currentChunkLength * elementSize);
+          size_t(std::max(int64_t(0), int64_t(group.bufferLength) -
+                                          int64_t(i * group.chunkLength))));
+      out->recv(src, slot, currentChunkOffset * elementSize,
+                currentChunkLength * elementSize);
     }
 
     // Issue send operations for reduced chunk to peers.
@@ -633,11 +614,8 @@ void bcube(
       if (dst == context->rank) {
         continue;
       }
-      out->send(
-          dst,
-          slot,
-          group.myChunkOffset * elementSize,
-          group.myChunkLength * elementSize);
+      out->send(dst, slot, group.myChunkOffset * elementSize,
+                group.myChunkLength * elementSize);
     }
 
     // Wait for operations to complete.
@@ -660,19 +638,24 @@ void bcube(
           group.bufferOffset + i * group.chunkLength;
       const size_t currentChunkLength = std::min(
           size_t(group.chunkLength),
-          size_t(std::max(
-              int64_t(0),
-              int64_t(group.bufferLength) - int64_t(i * group.chunkLength))));
-      broadcastOutputs(
-          currentChunkOffset * elementSize, currentChunkLength * elementSize);
+          size_t(std::max(int64_t(0), int64_t(group.bufferLength) -
+                                          int64_t(i * group.chunkLength))));
+      broadcastOutputs(currentChunkOffset * elementSize,
+                       currentChunkLength * elementSize);
     }
   }
 }
 
 } // namespace
 
-void allreduce(const AllreduceOptions& opts) {
-  allreduce(opts.impl_);
+void allreduce2260(const AllreduceOptions &opts) {
+  // call sgdnn_c2c_all_reduce
+  bm_status_t ret =
+      sgdnn_c2c_all_reduce(opts.handle_, opts.buff_, opts.impl_.elements,
+                           opts.dtype_, opts.reduce_method_);
+  return;
 }
+
+void allreduce(const AllreduceOptions &opts) { allreduce(opts.impl_); }
 
 } // namespace sophon

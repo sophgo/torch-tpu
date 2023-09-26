@@ -13,14 +13,15 @@
 
 #include "sophon/context.h"
 #include "sophon/transport/unbound_buffer.h"
+#include "sophon_defines_2260.h"
 
 namespace sophon {
 
 class ReduceOptions {
- public:
-  using Func = std::function<void(void*, const void*, const void*, size_t)>;
+public:
+  using Func = std::function<void(void *, const void *, const void *, size_t)>;
 
-  explicit ReduceOptions(const std::shared_ptr<Context>& context)
+  explicit ReduceOptions(const std::shared_ptr<Context> &context)
       : context(context), timeout(context->getTimeout()) {}
 
   template <typename T>
@@ -31,7 +32,7 @@ class ReduceOptions {
   }
 
   template <typename T>
-  void setInput(T* ptr, size_t elements) {
+  void setInput(T *ptr, size_t elements) {
     this->elements = elements;
     this->elementSize = sizeof(T);
     this->in = context->createUnboundBuffer(ptr, elements * sizeof(T));
@@ -44,8 +45,19 @@ class ReduceOptions {
     this->out = std::move(buf);
   }
 
+  void setOutputSophon(sg_data_type_t sg_type, bm_handle_t handle, size_t bytes,
+                       bm_device_mem_t send_buff, bm_device_mem_t rec_buff,
+                       sg_reduce_method_t reduce_method) {
+    this->handle_ = handle;
+    this->bytes_ = bytes;
+    this->dtype_ = sg_type;
+    this->send_buff_ = send_buff;
+    this->rec_buff_ = rec_buff;
+    this->reduce_method_ = reduce_method;
+  }
+
   template <typename T>
-  void setOutput(T* ptr, size_t elements) {
+  void setOutput(T *ptr, size_t elements) {
     this->elements = elements;
     this->elementSize = sizeof(T);
     this->out = context->createUnboundBuffer(ptr, elements * sizeof(T));
@@ -65,8 +77,16 @@ class ReduceOptions {
     this->timeout = timeout;
   }
 
- protected:
+protected:
   std::shared_ptr<Context> context;
+
+  bm_handle_t handle_;
+  bm_device_mem_t send_buff_;
+  bm_device_mem_t rec_buff_;
+  sg_reduce_method_t reduce_method_;
+  size_t bytes_;
+  sg_data_type_t dtype_;
+
   std::unique_ptr<transport::UnboundBuffer> in;
   std::unique_ptr<transport::UnboundBuffer> out;
 
@@ -100,9 +120,12 @@ class ReduceOptions {
   // End-to-end timeout for this operation.
   std::chrono::milliseconds timeout;
 
-  friend void reduce(ReduceOptions&);
+  friend void reduce(ReduceOptions &);
+
+  friend void reduce2260(ReduceOptions &);
 };
 
-void reduce(ReduceOptions& opts);
+void reduce(ReduceOptions &opts);
 
-}  // namespace sophon
+void reduce2260(ReduceOptions &opts);
+} // namespace sophon

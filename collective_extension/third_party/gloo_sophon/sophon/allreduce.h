@@ -14,6 +14,7 @@
 
 #include "sophon/context.h"
 #include "sophon/transport/unbound_buffer.h"
+#include "sophon_defines_2260.h"
 
 namespace sophon {
 
@@ -33,7 +34,7 @@ struct AllreduceOptionsImpl {
   // and templated algorithm implementations. We found this adds very little
   // value for the increase in compilation time and code size.
   //
-  using Func = std::function<void(void*, const void*, const void*, size_t)>;
+  using Func = std::function<void(void *, const void *, const void *, size_t)>;
 
   enum Algorithm {
     UNSPECIFIED = 0,
@@ -41,9 +42,8 @@ struct AllreduceOptionsImpl {
     BCUBE = 2,
   };
 
-  explicit AllreduceOptionsImpl(const std::shared_ptr<Context>& context)
-      : context(context),
-        timeout(context->getTimeout()),
+  explicit AllreduceOptionsImpl(const std::shared_ptr<Context> &context)
+      : context(context), timeout(context->getTimeout()),
         algorithm(UNSPECIFIED) {}
 
   std::shared_ptr<Context> context;
@@ -87,16 +87,14 @@ struct AllreduceOptionsImpl {
 } // namespace detail
 
 class AllreduceOptions {
- public:
+public:
   using Func = detail::AllreduceOptionsImpl::Func;
   using Algorithm = detail::AllreduceOptionsImpl::Algorithm;
 
-  explicit AllreduceOptions(const std::shared_ptr<Context>& context)
+  explicit AllreduceOptions(const std::shared_ptr<Context> &context)
       : impl_(context) {}
 
-  void setAlgorithm(Algorithm algorithm) {
-    impl_.algorithm = algorithm;
-  }
+  void setAlgorithm(Algorithm algorithm) { impl_.algorithm = algorithm; }
 
   template <typename T>
   void setInput(std::unique_ptr<transport::UnboundBuffer> buf) {
@@ -113,17 +111,17 @@ class AllreduceOptions {
   }
 
   template <typename T>
-  void setInput(T* ptr, size_t elements) {
+  void setInput(T *ptr, size_t elements) {
     setInputs(&ptr, 1, elements);
   }
 
   template <typename T>
-  void setInputs(std::vector<T*> ptrs, size_t elements) {
+  void setInputs(std::vector<T *> ptrs, size_t elements) {
     setInputs(ptrs.data(), ptrs.size(), elements);
   }
 
   template <typename T>
-  void setInputs(T** ptrs, size_t len, size_t elements) {
+  void setInputs(T **ptrs, size_t len, size_t elements) {
     impl_.elements = elements;
     impl_.elementSize = sizeof(T);
     impl_.in.reserve(len);
@@ -131,6 +129,15 @@ class AllreduceOptions {
       impl_.in.push_back(
           impl_.context->createUnboundBuffer(ptrs[i], elements * sizeof(T)));
     }
+  }
+
+  void setOutputSophon(sg_data_type_t sg_type, bm_handle_t handle, size_t bytes,
+                       bm_device_mem_t buff, sg_reduce_method_t reduce_method) {
+    this->handle_ = handle;
+    this->bytes_ = bytes;
+    this->dtype_ = sg_type;
+    this->buff_ = buff;
+    this->reduce_method_ = reduce_method;
   }
 
   template <typename T>
@@ -148,17 +155,17 @@ class AllreduceOptions {
   }
 
   template <typename T>
-  void setOutput(T* ptr, size_t elements) {
+  void setOutput(T *ptr, size_t elements) {
     setOutputs(&ptr, 1, elements);
   }
 
   template <typename T>
-  void setOutputs(std::vector<T*> ptrs, size_t elements) {
+  void setOutputs(std::vector<T *> ptrs, size_t elements) {
     setOutputs(ptrs.data(), ptrs.size(), elements);
   }
 
   template <typename T>
-  void setOutputs(T** ptrs, size_t len, size_t elements) {
+  void setOutputs(T **ptrs, size_t len, size_t elements) {
     impl_.elements = elements;
     impl_.elementSize = sizeof(T);
     impl_.out.reserve(len);
@@ -168,13 +175,9 @@ class AllreduceOptions {
     }
   }
 
-  void setReduceFunction(Func fn) {
-    impl_.reduce = fn;
-  }
+  void setReduceFunction(Func fn) { impl_.reduce = fn; }
 
-  void setTag(uint32_t tag) {
-    impl_.tag = tag;
-  }
+  void setTag(uint32_t tag) { impl_.tag = tag; }
 
   void setMaxSegmentSize(size_t maxSegmentSize) {
     impl_.maxSegmentSize = maxSegmentSize;
@@ -184,12 +187,22 @@ class AllreduceOptions {
     impl_.timeout = timeout;
   }
 
- protected:
+protected:
   detail::AllreduceOptionsImpl impl_;
 
-  friend void allreduce(const AllreduceOptions&);
+  bm_handle_t handle_;
+  bm_device_mem_t buff_;
+  sg_reduce_method_t reduce_method_;
+  size_t bytes_;
+  sg_data_type_t dtype_;
+
+  friend void allreduce(const AllreduceOptions &);
+
+  friend void allreduce2260(const AllreduceOptions &);
 };
 
-void allreduce(const AllreduceOptions& opts);
+void allreduce(const AllreduceOptions &opts);
+
+void allreduce2260(const AllreduceOptions &opts);
 
 } // namespace sophon
