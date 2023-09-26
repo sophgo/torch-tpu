@@ -1643,5 +1643,14 @@ typedef struct {
 } sg_api_triangularize_t;
 #endif
 
+typedef struct
+{
+  unsigned long long input_global_addr;
+  unsigned long long output_global_addr;
+  int shape[FW_MAX_SHAPE_DIMS];
+  int dim;
+  int dtype;
+} WITH_PLATFORM(sg_api_cbrt_t);
+
 #pragma pack(pop)
 #endif  // SG_API_STRUCT_H

@@ -1600,6 +1600,16 @@ bm_status_t sgdnnTriangularize ( bm_handle_t handle,
                       int diagonal,
                       SgdnnTensor_t out );
 
+/*
+ *  OUTPUT  = CBRT ( input )
+ *  Note:
+ *  1. input and output must be the same shape.
+ *  2. input and output must be contiguous
+ */
+bm_status_t sgdnnCbrt ( bm_handle_t handle,
+                        SgdnnTensor_t input,
+                        SgdnnTensor_t output );
+
 #if defined(__cplusplus)
 }
 #endif
