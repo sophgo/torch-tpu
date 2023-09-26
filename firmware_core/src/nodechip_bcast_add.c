@@ -238,6 +238,11 @@ extern void nodechip_binary_multi_core(
 
 void tpu_kernel_api_binary_multi_core(const void* api_buf) {
     sg_api_binary_multi_core_t *api = (sg_api_binary_multi_core_t *)api_buf;
+    if(api->binary_type == 0 && api->in0_scale < 0) {
+        //convert add to sub if in0_scale < 0
+        api->binary_type = 1;
+        api->in0_scale = -api->in0_scale;
+    }
     TPUKERNEL_ASSERT(api->in0_scale == 1.f && api->in1_scale == 1.f);
     int ashape[FW_MAX_SHAPE_DIMS], bshape[FW_MAX_SHAPE_DIMS];
     for (int i = 0; i < api->in0_dims; ++i) {
