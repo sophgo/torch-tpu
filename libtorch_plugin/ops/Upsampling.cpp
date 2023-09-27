@@ -119,14 +119,17 @@ Tensor &upsample_nearest2d_backward_out_tpu(
   CHECK_TENSOR_IN_DEVICE(grad_input);
   CHECK_TENSOR_IN_DEVICE(grad_output);
   LOG(WARNING) << "upsample_nearest2d_backward use cpu impl";
-  auto T_input = grad_input.cpu().contiguous();
+  auto input_type = grad_input.dtype();
+  auto T_input = grad_input.cpu().to(torch::kFloat32).contiguous();
   auto input_r = upsample_nearest2d_backward_outf(
-      grad_output.cpu(), output_size, input_size, c10::nullopt, c10::nullopt,
-      T_input);
+      grad_output.cpu().to(torch::kFloat32), output_size, input_size,
+      scales_h, scales_w, T_input);
+  LOG(WARNING) << "upsample_nearest2d_backward use cpu impl end1";
   tpu::TPUCopyHostToDevice(grad_input.data_ptr(),
-                           grad_input.cpu().contiguous().data_ptr(),
+                           grad_input.cpu().to(input_type).contiguous().data_ptr(),
                            grad_input.nbytes());
   grad_input = grad_input.contiguous();
+  LOG(WARNING) << "upsample_nearest2d_backward use cpu impl end2";
   return grad_input;
 }
 

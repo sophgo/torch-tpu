@@ -15,7 +15,16 @@ namespace at
 Tensor & cat_out_tpu ( const ITensorListRef & tensors, int64_t dim, Tensor & out )
 {
   CHECK_TENSOR_IN_DEVICE ( out );
-  if ( tensors.size() > TPU_MAX_CONCAT_NUM )
+  // if input.dtype != output.dtype , use cpu to convert.
+  int flag = 0;
+  for (auto tensor : tensors) {
+    if (tensor.cpu().scalar_type() != out.cpu().scalar_type()) {
+      flag = 1;
+      break;
+    }
+  }
+  if(flag) LOG(WARNING) << "concat use cpu impl";
+  if ( tensors.size() > TPU_MAX_CONCAT_NUM || flag )
   {
     std::vector<Tensor> tensors_cpu;
     for ( auto tensor : tensors )

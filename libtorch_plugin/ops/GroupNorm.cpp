@@ -118,16 +118,20 @@ std::tuple<at::Tensor, at::Tensor, at::Tensor> native_group_norm_backward_tpu(
   c10::MaybeOwned<Tensor> weight_maybe_owned =
       at::borrow_from_optional_tensor(weight);
   const Tensor &weight_c = *weight_maybe_owned;
+  auto input_type = grad_out.dtype();
   auto result = native_group_norm_backward(
-      grad_out.cpu(), X.cpu(), mean.cpu(), rstd.cpu(),
-      c10::optional<Tensor>(weight_c.cpu()), N, C, HxW, group, output_mask);
+      grad_out.cpu().to(torch::kFloat32), X.cpu().to(torch::kFloat32),
+      mean.cpu().to(torch::kFloat32), rstd.cpu().to(torch::kFloat32),
+      c10::optional<Tensor>(weight_c.cpu().to(torch::kFloat)), N, C, HxW,
+      group, output_mask);
+  LOG(WARNING) << "group_norm_backward use cpu impl end";
   CHECK_TENSOR_IN_DEVICE(X);
   return std::tuple<Tensor, Tensor, Tensor>(
-      output_mask[0] ? TENSOR_TO_TPU(std::get<0>(result).contiguous())
+      output_mask[0] ? TENSOR_TO_TPU(std::get<0>(result).to(input_type).contiguous())
                      : Tensor(),
-      output_mask[1] ? TENSOR_TO_TPU(std::get<1>(result).contiguous())
+      output_mask[1] ? TENSOR_TO_TPU(std::get<1>(result).to(input_type).contiguous())
                      : Tensor(),
-      output_mask[2] ? TENSOR_TO_TPU(std::get<2>(result).contiguous())
+      output_mask[2] ? TENSOR_TO_TPU(std::get<2>(result).to(input_type).contiguous())
                      : Tensor());
 }
 
