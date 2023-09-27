@@ -40,15 +40,34 @@ while ( 0 )
 
 #define TENSOR_TO_TPU(t) ( ( t ).to ( tpu::TPUGetCurrentDevice() ) )
 
-#define ADDR_IN_DEVICE(t) (t).data_ptr()
+#define ADDR_IN_DEVICE(t) GetAddrByUnifiedAddr((unsigned long long)(t).data_ptr())
 
 #define TPU_ERROR_CODE(Err) " ( TPU error code: " << Err << ")"
 
 #define IS_TPU_TENSOR(t)  ( ( t ).device().type() == DeviceType::TPU )
 #define IS_CPU_TENSOR(t)  ( ( t ).device().type() == DeviceType::CPU )
 
+#define TPU_DEVICE_INDEX_BITS 6
+#define TPU_GLOBAL_ADDR_BITS (64 - TPU_DEVICE_INDEX_BITS)
+
 namespace tpu
 {
+
+static inline unsigned long long UnifiedAddr( unsigned long long Addr, int Index)
+{
+  TORCH_CHECK ( Addr < ( 1UL << TPU_GLOBAL_ADDR_BITS ) );
+  return ( ( ( unsigned long long ) Index ) << TPU_GLOBAL_ADDR_BITS ) | Addr;
+}
+
+static inline unsigned long long GetDeviceIndexByUnifiedAddr ( unsigned long long Addr )
+{
+  return Addr >> TPU_GLOBAL_ADDR_BITS;
+}
+
+static inline unsigned long long GetAddrByUnifiedAddr ( unsigned long long Addr )
+{
+  return ( Addr << TPU_DEVICE_INDEX_BITS ) >> TPU_DEVICE_INDEX_BITS;
+}
 
 static inline at::Device TPUGetCurrentDevice()
 {
@@ -118,7 +137,7 @@ static inline SgdnnTensor_t TPUGenerateSgdnnTensor ( const at::Tensor & Tensor )
 static inline SgdnnTensor_t TPUGenerateSgdnnTensorforComplex64 ( const at::Tensor & Tensor )
 {
   SgdnnTensor_t t = { 0 };
-  t.addr = ( unsigned long long ) Tensor.data_ptr();
+  t.addr = GetAddrByUnifiedAddr(( unsigned long long ) Tensor.data_ptr());
   t.dtype = TPUConvertDType ( caffe2::TypeMeta::Make<float>() );
   t.dim = Tensor.dim();
   for ( auto i = 0; i < Tensor.dim(); ++i )

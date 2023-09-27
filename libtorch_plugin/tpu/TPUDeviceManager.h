@@ -35,7 +35,6 @@ void * TPUAlloc ( size_t Size, int Index );
  * Free memory allocted on arbitrary TPU device.
  */
 void TPUFree ( void * Ptr );
-void TPUFree ( void * Ptr, int Index );
 
 /**
  * Copy data from host to TPU device.

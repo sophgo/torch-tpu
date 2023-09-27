@@ -31,9 +31,6 @@ C10_API ProfiledTPUMemoryReporter & profiledTPUMemoryReporter();
 // Get the TPU Allocator.
 C10_API at::Allocator * GetTPUAllocator();
 
-// Sets the TPU allocator to the given allocator: the caller gives away the
-// ownership of the pointer.
-C10_API void SetTPUAllocator ( at::Allocator * alloc, uint8_t priority = 0 );
 
 // Get the Default TPU Allocator
 C10_API at::Allocator * GetDefaultTPUAllocator();

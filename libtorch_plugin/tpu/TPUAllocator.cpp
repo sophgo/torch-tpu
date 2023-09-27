@@ -33,6 +33,10 @@ struct C10_API DefaultTPUAllocator final : at::Allocator
     profiledTPUMemoryReporter().Delete ( ptr );
     tpu::TPUFree ( ptr );
   }
+
+  at::DeleterFnPtr raw_deleter() const override {
+    return &ReportAndDelete;
+  }
 };
 
 ProfiledTPUMemoryReporter & profiledTPUMemoryReporter()
@@ -46,10 +50,6 @@ at::Allocator * GetTPUAllocator()
   return GetAllocator ( DeviceType::TPU );
 }
 
-void SetTPUAllocator ( at::Allocator * alloc, uint8_t priority )
-{
-  SetAllocator ( DeviceType::TPU, alloc, priority );
-}
 
 // Global default TPU Allocator
 static DefaultTPUAllocator g_tpu_alloc;

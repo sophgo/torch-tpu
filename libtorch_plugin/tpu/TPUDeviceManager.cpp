@@ -2,6 +2,7 @@
 #include <unordered_map>
 #include <mutex>
 #include <c10/util/Logging.h>
+#include <c10/core/DeviceType.h>
 #include <TPUDeviceManager.h>
 #include <sgdnn_api.h>
 #include <TPUTorchUtils.h>
@@ -35,13 +36,6 @@ private:
     if ( DeviceCount > 0 )
     {
       Handles_.resize ( DeviceCount, nullptr );
-      for ( int i = 0; i < DeviceCount; ++i )
-      {
-        Status = bm_dev_request ( &Handles_[i], i );
-        TORCH_CHECK ( Status == BM_SUCCESS, "Failed to request tpu device #", i );
-        Status = sgdnnInitialize ( Handles_[i] );
-        TORCH_CHECK ( Status == BM_SUCCESS, "Failed to initialize SGDNN on tpu device #", i );
-      }
       Mutexes_ = std::vector<std::mutex> ( DeviceCount );
       AddrMemMaps_ = std::vector<std::unordered_map<unsigned long long, bm_device_mem_t>> ( DeviceCount );
     }
@@ -51,8 +45,10 @@ private:
   {
     for ( auto it : Handles_ )
     {
-      sgdnnDeinitialize ( it );
-      bm_dev_free ( it );
+      if (it != nullptr){
+        sgdnnDeinitialize ( it );
+        bm_dev_free ( it );
+      }
     }
   }
 
@@ -94,6 +90,15 @@ public:
       Mutexes_[Index].unlock();
       return nullptr;
     }
+
+#ifdef SHOW_MALLOC_INFO
+    static int malloc_num = 0;
+    malloc_num++;
+    mem_in_use += ( unsigned int ) Size;
+    std::cout << "[Malloc] id = " << malloc_num << ", size = " << Size  << " bytes"
+              << ", Current Mem = " << ( mem_in_use >> 20 ) << "MB" << std::endl;
+#endif
+
     TORCH_CHECK ( Size < ( 1UL << 32 ), "TPU only allows to allocate memory with size smaller than (2^32) bytes" );
     bm_handle_t Handle = GetDeviceHandle ( Index );
     TORCH_CHECK ( Handle != nullptr, "TPU handle of device #", Index, " is null" );
@@ -108,13 +113,7 @@ public:
     TORCH_CHECK ( Status == BM_SUCCESS, "Failed to allocate memory on TPU device #", Index, " size = ", Size, "bytes" );
     unsigned long long Addr = bm_mem_get_device_addr ( Mem );
     AddrMemMaps_[Index].emplace ( Addr, Mem );
-#ifdef SHOW_MALLOC_INFO
-    static int malloc_num = 0;
-    malloc_num++;
-    mem_in_use += ( unsigned int ) Size;
-    std::cout << "[Malloc] id = " << malloc_num << ", size = " << Size  << " bytes"
-              << ", Current Mem = " << ( mem_in_use >> 20 ) << "MB" << std::endl;
-#endif
+
 #ifdef SHOW_INFO
     std::cout << "Alloc addr = " << ( void * ) Addr << " size = " << Size << std::endl;
     std::cout << "====================================" << std::endl;
@@ -126,7 +125,7 @@ public:
     std::cout << "====================================" << std::endl;
 #endif
     Mutexes_[Index].unlock();
-    return ( void * ) Addr;
+    return ( void * ) UnifiedAddr(Addr, Index);
   }
 
   void Free ( void * Ptr, int Index )
@@ -224,6 +223,10 @@ public:
 #endif
   }
 
+  bm_handle_t& get_device_handle(int i){ return Handles_[i];}
+  std::mutex& get_handle_mutex(int i) { return Mutexes_[i]; }
+  std::unordered_map<unsigned long long, bm_device_mem_t>& getAddrMems(int i) { return AddrMemMaps_[i]; }
+
 private:
   std::vector<bm_handle_t> Handles_;
   std::vector<std::mutex> Mutexes_;
@@ -244,12 +247,24 @@ int TPUGetDeviceIndex ( void )
   return kIndex;
 }
 
+
 void TPUSetDeviceIndex ( int Index )
 {
-  if (Index == -1)
-    kIndex = 0;
-  else
-    kIndex = Index;
+  kIndex = Index;
+  if (kIndex == -1) kIndex = 0;
+
+  TPUDeviceManager::GetInstance().get_handle_mutex(kIndex).lock();
+  if ( kIndex >= TPUGetDeviceCount() || kIndex < 0){
+    TORCH_CHECK ( false, "Failed to request tpu device #", kIndex );
+  }
+  bm_handle_t& handle = TPUDeviceManager::GetInstance().get_device_handle(kIndex);
+  if (handle == nullptr){
+    auto Status = bm_dev_request ( &handle, kIndex );
+    TORCH_CHECK ( Status == BM_SUCCESS, "Failed to request tpu device #", kIndex );
+    Status = sgdnnInitialize ( handle );
+    TORCH_CHECK ( Status == BM_SUCCESS, "Failed to initialize SGDNN on tpu device #", kIndex );
+  }
+  TPUDeviceManager::GetInstance().get_handle_mutex(kIndex).unlock();
 }
 
 bm_handle_t TPUGetDeviceHandle()
@@ -269,27 +284,34 @@ void * TPUAlloc ( size_t Size, int Index )
 
 void TPUFree ( void * Ptr )
 {
-  TPUDeviceManager::GetInstance().Free ( Ptr, kIndex );
+  unsigned long long dev_index = GetDeviceIndexByUnifiedAddr((unsigned long long)Ptr);
+  unsigned long long data_ptr = GetAddrByUnifiedAddr((unsigned long long)Ptr);
+  TPUDeviceManager::GetInstance().Free ( (void *)data_ptr, dev_index );
 }
 
-void TPUFree ( void * Ptr, int Index )
-{
-  TPUDeviceManager::GetInstance().Free ( Ptr, Index );
-}
 
 void TPUCopyHostToDevice ( void * Dst, const void * Src, size_t Size )
 {
-  TPUDeviceManager::GetInstance().CopyHostToDevice ( Dst, Src, Size, kIndex );
+  unsigned long long dev_index = GetDeviceIndexByUnifiedAddr((unsigned long long)Dst);
+  unsigned long long dst_ptr = GetAddrByUnifiedAddr((unsigned long long)Dst);
+  TPUDeviceManager::GetInstance().CopyHostToDevice ( (void*)dst_ptr, Src, Size, dev_index );
 }
 
 void TPUCopyDeviceToHost ( void * Dst, const void * Src, size_t Size )
 {
-  TPUDeviceManager::GetInstance().CopyDeviceToHost ( Dst, Src, Size, kIndex );
+  unsigned long long dev_index = GetDeviceIndexByUnifiedAddr((unsigned long long)Src);
+  unsigned long long src_ptr = GetAddrByUnifiedAddr((unsigned long long)Src);
+  TPUDeviceManager::GetInstance().CopyDeviceToHost ( Dst, (void*)src_ptr, Size, dev_index );
 }
 
 void TPUCopyDeviceToDevice ( void * Dst, const void * Src, size_t Size )
 {
-  TPUDeviceManager::GetInstance().CopyDeviceToDevice ( Dst, Src, Size, kIndex );
+  unsigned long long src_index = GetDeviceIndexByUnifiedAddr((unsigned long long)Src);
+  unsigned long long src_ptr = GetAddrByUnifiedAddr((unsigned long long)Src);
+  unsigned long long dst_index = GetDeviceIndexByUnifiedAddr((unsigned long long)Dst);
+  unsigned long long dst_ptr = GetAddrByUnifiedAddr((unsigned long long)Dst);
+  TORCH_CHECK ( dst_index == src_index, "D2D copy must in same device");
+  TPUDeviceManager::GetInstance().CopyDeviceToDevice ( (void*)dst_ptr, (void*)src_ptr, Size, dst_index );
 }
 
 } // namespace tpu
