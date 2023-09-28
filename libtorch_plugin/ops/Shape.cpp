@@ -168,4 +168,47 @@ Tensor expand_tpu(const Tensor &self, const IntArrayRef output_size,
 
 //TORCH_LIBRARY_IMPL(aten, TPU, m) { m.impl("expand", expand_tpu); }
 
+Tensor constant_pad_nd_tpu(const Tensor &self, const IntArrayRef pad, const Scalar value) {
+  if(self.dim() > 0) {
+    CHECK_TENSOR_IN_DEVICE(self);
+  }
+  TORCH_CHECK_MSG((pad.size() % 2) == 0, "Length of pad must be even.");
+  TORCH_CHECK_MSG(self.dim() >= (pad.size() / 2), "Length of pad should be no more than twice the number of dimensions of the input.");
+
+TIMING_START
+  Tensor out;
+  if(self.dim() == 0) {
+    out = Tensor(self);
+  }
+  else {
+    std::vector<int64_t> size_vec(self.dim());
+    std::vector<int> pad_vec(pad.size());
+    int pad_idx = 0, pad_vec_idx = pad.size() / 2 - 1;
+    for(int i = self.dim() - 1; i >= 0; --i) {
+      int cur_shape = self.size(i);
+      std::vector<int> pad_tmp_vec;
+      for(int j = 0; j < 2; ++j) {
+        if(pad_idx >= pad.size()) break;
+        pad_vec[pad_vec_idx * 2 + j] = pad[pad_idx];
+        cur_shape += pad[pad_idx++];
+      }
+      --pad_vec_idx;
+      size_vec[i] = cur_shape;
+    }
+    IntArrayRef size(size_vec);
+    out = empty(size, self.options());
+
+    // 0 for constant pad
+    bm_status_t status = sgdnnPad(tpu::TPUGetDeviceHandle(), tpu::TPUGenerateSgdnnTensor(self),
+                                  pad_vec.data(), pad.size(), value.toFloat(), 0, tpu::TPUGenerateSgdnnTensor(out));
+    TORCH_CHECK(status == BM_SUCCESS);
+  }
+TIMING_END(tpu::PAD)
+
+  return out;
+}
+TORCH_LIBRARY_IMPL(aten, TPU, m) {
+  m.impl("constant_pad_nd", constant_pad_nd_tpu);
+}
+
 } // namespace at

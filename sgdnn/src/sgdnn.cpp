@@ -6537,3 +6537,41 @@ bm_status_t sgdnnCbrt ( bm_handle_t handle,
 #endif
   return BM_SUCCESS;
 }
+
+bm_status_t sgdnnPad ( bm_handle_t handle,
+                       SgdnnTensor_t input,
+                       int *pad,
+                       int pad_size,
+                       float value,
+                       int mode,
+                       SgdnnTensor_t output ) {
+  SGDNN_CHECK ( 2 * input.dim >= pad_size );
+  SGDNN_CHECK ( pad_size % 2 == 0 );
+  SGDNN_CHECK ( input.dim == output.dim );
+  SGDNN_CHECK ( input.dtype == output.dtype );
+  SGDNN_CHECK ( sgdnnIsTensorContiguous ( &input ) );
+  SGDNN_CHECK ( sgdnnIsTensorContiguous ( &output ) );
+
+#if defined SGDNN_BACKEND_1684X
+  sg_api_pad_t api;
+  api.input_global_addr = input.addr;
+  api.output_global_addr = output.addr;
+  api.dim = input.dim;
+  api.pad_size = pad_size;
+  for ( int i = 0; i < input.dim; ++i ) {
+    api.shape[i] = input.shape[i];
+  }
+  for(int i = 0; i < pad_size; ++i) {
+    api.pad[i] = pad[i];
+  }
+  api.value = value;
+  api.mode = mode;
+  api.dtype = sgdnnTPUKernelDType ( input.dtype );
+  SAFE_CALL ( sgdnnTPUKernelLaunch ( handle, "tpu_kernel_api_pad", &api, sizeof ( api ) ) );
+#elif defined SGDNN_BACKEND_2260
+  SGDNN_CHECK ( false );
+#else
+  SGDNN_CHECK ( false );
+#endif
+  return BM_SUCCESS;
+}

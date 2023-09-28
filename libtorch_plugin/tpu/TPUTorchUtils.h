@@ -416,6 +416,7 @@ typedef enum
   NEXTAFTER,
   TRIU,
   CBRT,
+  PAD,
   OP_NUM
 }
 OpType;
@@ -587,7 +588,8 @@ static const char * OpTypeStr[OP_NUM] =
   "HYPOT",
   "Nextafter",
   "Triu",
-  "Cbrt"
+  "Cbrt",
+  "Pad"
 };
 
 struct OpTimer

@@ -1601,7 +1601,7 @@ bm_status_t sgdnnTriangularize ( bm_handle_t handle,
                       SgdnnTensor_t out );
 
 /*
- *  OUTPUT  = CBRT ( input )
+ *  output  = CBRT ( input )
  *  Note:
  *  1. input and output must be the same shape.
  *  2. input and output must be contiguous
@@ -1609,6 +1609,22 @@ bm_status_t sgdnnTriangularize ( bm_handle_t handle,
 bm_status_t sgdnnCbrt ( bm_handle_t handle,
                         SgdnnTensor_t input,
                         SgdnnTensor_t output );
+
+/*
+ *  OUTPUT  = PAD ( INPUT, PAD, VALUE )
+ *  Note:
+ *  1. input and output must be the same dim.
+ *  2. input and output must be the same dtype.
+ *  3. input and output must be contiguous
+ *  4. pad size must less than or equal to twice the number of the input dimensions
+ */
+bm_status_t sgdnnPad ( bm_handle_t handle,
+                       SgdnnTensor_t input,
+                       int *pad,
+                       int pad_size,
+                       float value,
+                       int mode,
+                       SgdnnTensor_t output );
 
 #if defined(__cplusplus)
 }
