@@ -340,7 +340,8 @@ data_type_t   dtype) {
 void tpu_kernel_api_element_bitwise_bcast(const void *args) {
     sg_api_element_bitwise_bcast_t *api = (sg_api_element_bitwise_bcast_t*) args;
     TPUKERNEL_ASSERT(api->dim > 0 && api->dim <= 4);
-    TPUKERNEL_ASSERT(api->dtype == DT_INT32 || api->dtype == DT_UINT32);
+    TPUKERNEL_ASSERT(api->dtype == DT_INT32 || api->dtype == DT_UINT32 ||
+                     api->dtype == DT_INT8 || api->dtype == DT_UINT8);
 
     dim4 input_shape = { .n = 1, .c = 1, .h = 1, .w = 1 };
     dim4 other_shape = { .n = 1, .c = 1, .h = 1, .w = 1 };
