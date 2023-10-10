@@ -6538,40 +6538,49 @@ bm_status_t sgdnnCbrt ( bm_handle_t handle,
   return BM_SUCCESS;
 }
 
-bm_status_t sgdnnPad ( bm_handle_t handle,
-                       SgdnnTensor_t input,
-                       int *pad,
-                       int pad_size,
-                       float value,
-                       int mode,
-                       SgdnnTensor_t output ) {
-  SGDNN_CHECK ( 2 * input.dim >= pad_size );
-  SGDNN_CHECK ( pad_size % 2 == 0 );
-  SGDNN_CHECK ( input.dim == output.dim );
-  SGDNN_CHECK ( input.dtype == output.dtype );
-  SGDNN_CHECK ( sgdnnIsTensorContiguous ( &input ) );
-  SGDNN_CHECK ( sgdnnIsTensorContiguous ( &output ) );
+bm_status_t sgdnnPad(bm_handle_t handle, SgdnnTensor_t input, int *pad,
+                     int pad_size, float value, int mode,
+                     SgdnnTensor_t output) {
+  SGDNN_CHECK(2 * input.dim >= pad_size);
+  SGDNN_CHECK(pad_size % 2 == 0);
+  SGDNN_CHECK(input.dim == output.dim);
+  SGDNN_CHECK(input.dtype == output.dtype);
+  SGDNN_CHECK(sgdnnIsTensorContiguous(&input));
+  SGDNN_CHECK(sgdnnIsTensorContiguous(&output));
 
 #if defined SGDNN_BACKEND_1684X
   sg_api_pad_t api;
   api.input_global_addr = input.addr;
   api.output_global_addr = output.addr;
-  api.dim = input.dim;
+  api.dim = 4;
   api.pad_size = pad_size;
-  for ( int i = 0; i < input.dim; ++i ) {
-    api.shape[i] = input.shape[i];
+  if (input.dim < api.dim) {
+    for(int i = 0; i < api.dim; ++i){
+      if(i < api.dim - input.dim){
+        api.shape[i] = 1;
+      }else{
+        api.shape[i] = input.shape[i - (api.dim - input.dim)];
+      }
+    }
+  } else {
+    for (int i = 0; i < input.dim; ++i) {
+      api.shape[i] = input.shape[i];
+    }
   }
-  for(int i = 0; i < pad_size; ++i) {
-    api.pad[i] = pad[i];
+
+  for (int i = pad_size/2 - 1, j = 0; i >= 0; --i, j += 2) {
+      api.pad[2 * i] = pad[j];
+      api.pad[2 * i + 1] = pad[j+1];
   }
   api.value = value;
   api.mode = mode;
-  api.dtype = sgdnnTPUKernelDType ( input.dtype );
-  SAFE_CALL ( sgdnnTPUKernelLaunch ( handle, "tpu_kernel_api_pad", &api, sizeof ( api ) ) );
+  api.dtype = sgdnnTPUKernelDType(input.dtype);
+  SAFE_CALL(
+      sgdnnTPUKernelLaunch(handle, "tpu_kernel_api_pad", &api, sizeof(api)));
 #elif defined SGDNN_BACKEND_2260
-  SGDNN_CHECK ( false );
+  SGDNN_CHECK(false);
 #else
-  SGDNN_CHECK ( false );
+  SGDNN_CHECK(false);
 #endif
   return BM_SUCCESS;
 }

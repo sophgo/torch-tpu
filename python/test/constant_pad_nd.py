@@ -9,12 +9,12 @@ torch.set_printoptions(precision=8)
 def case1():
     left = -100.
     right = 100.
-    shape = (3, 4, 3, 2)
+    shape = (3,2,4)
     ori = left + (right - left) * torch.rand(*shape).float()
     # ori = torch.tensor(10)
     ori_tpu = ori.to(device)
-    res_cpu = torch.constant_pad_nd(ori, [1,2,3,2,1,2,3,4], 1)
-    res_tpu = torch.constant_pad_nd(ori_tpu, [1,2,3,2,1,2,3,4], 1).cpu()
+    res_cpu = torch.constant_pad_nd(ori, [1,0,0,2,0,3], 1)
+    res_tpu = torch.constant_pad_nd(ori_tpu, [1,0,0,2,0,3], 1).cpu()
 
     print("ori : ", ori)
     print("cpu res : ", res_cpu)

@@ -36,10 +36,9 @@ void tpu_kernel_api_pad(const void *args) {
     int pad[4][2] = {0};
     int offset = api->dim - api->pad_size / 2;
     memcpy(pad + offset, api->pad, api->pad_size * sizeof(int));
-    dim4 out_shape;
-    parse_NCHW(api->shape, api->dim, &out_shape);
+
     TPUKERNEL_ASSERT(api->pad_size <= 8);
-    nodechip_pad(api->input_global_addr, api->output_global_addr, out_shape.n,
-                 out_shape.c, out_shape.h, out_shape.w, pad, api->mode, api->value, api->dtype);
+    nodechip_pad(api->input_global_addr, api->output_global_addr, api->shape[0],
+                 api->shape[1], api->shape[2], api->shape[3], pad, api->mode, api->value, api->dtype);
 }
 TPUKERNEL_FUNC_REGISTER(tpu_kernel_api_pad);
