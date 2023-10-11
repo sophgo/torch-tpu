@@ -1648,6 +1648,7 @@ bm_status_t sgdnnPad ( bm_handle_t handle,
                        int pad_size,
                        float value,
                        int mode,
+                       bool pad3d,
                        SgdnnTensor_t output );
 
 #if defined(__cplusplus)

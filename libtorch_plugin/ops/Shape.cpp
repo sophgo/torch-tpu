@@ -31,6 +31,12 @@
 
 #include "common/config.h"
 
+#define CONSTANT (0)
+#define REFLECT (1)
+#define SYMMETRIC (2)
+#define REPLICATE (3)
+#define CIRCULAR (4)
+
 namespace at {
 //
 // templated for ArrayRef<int64_t> and SmallVector<int64_t> use cases
@@ -168,47 +174,46 @@ Tensor expand_tpu(const Tensor &self, const IntArrayRef output_size,
 
 // TORCH_LIBRARY_IMPL(aten, TPU, m) { m.impl("expand", expand_tpu); }
 
-Tensor constant_pad_nd_tpu(const Tensor &self, const IntArrayRef pad,
+Tensor constant_pad_nd_tpu(const Tensor &self, const IntArrayRef padding,
                            const Scalar value) {
   if (self.dim() > 0) {
     CHECK_TENSOR_IN_DEVICE(self);
   }
 
-  TORCH_CHECK((pad.size() % 2) == 0, "Length of pad must be even.");
-  TORCH_CHECK(self.dim() >= (pad.size() / 2),
-                  "Length of pad should be no more than twice the number of "
-                  "dimensions of the input.");
+  TORCH_CHECK((padding.size() % 2) == 0, "Length of pad must be even.");
+  TORCH_CHECK(self.dim() >= (padding.size() / 2),
+              "Length of pad should be no more than twice the number of "
+              "dimensions of the input.");
   TORCH_CHECK(self.dim() <= 4,
-                  "The dim of the tensor should be less than or equal to 4");    
+              "The dim of the tensor should be less than or equal to 4");
 
-  
   Tensor out;
   if (self.dim() == 0) {
     out = Tensor(self);
     return out;
-  } 
-  
-    std::vector<int64_t> size_vec(self.dim());
-    std::vector<int> pad_vec(pad.begin(),pad.end());
-    int cur_shape, pad_size = pad.size();
-    for(int i = self.dim() - 1, j = 0; i >= 0; i--, j += 2){
-      cur_shape = self.size(i);
-      if(j < pad_size){
-        cur_shape += pad[j] + pad[j+1];
-      }
-      size_vec[i] = cur_shape;
-    }
+  }
 
-    IntArrayRef size(size_vec);
-    out = empty(size, self.options());
-    TIMING_START  
-    // 0 for constant pad
-    bm_status_t status =
-        sgdnnPad(tpu::TPUGetDeviceHandle(), tpu::TPUGenerateSgdnnTensor(self),
-                 pad_vec.data(), pad.size(), value.toFloat(), 0,
-                 tpu::TPUGenerateSgdnnTensor(out));
-    TORCH_CHECK(status == BM_SUCCESS);
-    TIMING_END(tpu::CONSTANT_PAD)
+  std::vector<int64_t> size_vec(self.dim());
+  std::vector<int> pad_vec(padding.begin(), padding.end());
+  int cur_shape, pad_size = padding.size();
+  for (int i = self.dim() - 1, j = 0; i >= 0; i--, j += 2) {
+    cur_shape = self.size(i);
+    if (j < pad_size) {
+      cur_shape += padding[j] + padding[j + 1];
+    }
+    size_vec[i] = cur_shape;
+  }
+
+  IntArrayRef size(size_vec);
+  out = empty(size, self.options());
+  TIMING_START
+  // 0 for constant pad
+  bm_status_t status =
+      sgdnnPad(tpu::TPUGetDeviceHandle(), tpu::TPUGenerateSgdnnTensor(self),
+               pad_vec.data(), pad_vec.size(), value.toFloat(), CONSTANT, false,
+               tpu::TPUGenerateSgdnnTensor(out));
+  TORCH_CHECK(status == BM_SUCCESS);
+  TIMING_END(tpu::CONSTANT_PAD)
 
   return out;
 }
@@ -231,12 +236,12 @@ Tensor &reflection_pad2d_out_tpu(const Tensor &self, IntArrayRef padding,
                                out.nbytes());
     return out;
   }
-  std::vector<int> pad(padding.begin(),padding.end());
-  
+  std::vector<int> pad(padding.begin(), padding.end());
+
   TIMING_START;
-  bm_status_t status =
-      sgdnnPad(tpu::TPUGetDeviceHandle(), tpu::TPUGenerateSgdnnTensor(self),
-               pad.data(), pad.size(), 0, 1, tpu::TPUGenerateSgdnnTensor(out));
+  bm_status_t status = sgdnnPad(
+      tpu::TPUGetDeviceHandle(), tpu::TPUGenerateSgdnnTensor(self), pad.data(),
+      pad.size(), 0, REFLECT, false, tpu::TPUGenerateSgdnnTensor(out));
   TORCH_CHECK(status == BM_SUCCESS);
   TIMING_END(tpu::REFLECTION_PAD2D);
 #endif
@@ -274,12 +279,12 @@ Tensor &replication_pad2d_out_tpu(const Tensor &self, IntArrayRef padding,
                                out.nbytes());
     return out;
   }
- std::vector<int> pad(padding.begin(),padding.end());
-  
+  std::vector<int> pad(padding.begin(), padding.end());
+
   TIMING_START;
-  bm_status_t status =
-      sgdnnPad(tpu::TPUGetDeviceHandle(), tpu::TPUGenerateSgdnnTensor(self),
-               pad.data(), pad.size(), 0, 3, tpu::TPUGenerateSgdnnTensor(out));
+  bm_status_t status = sgdnnPad(
+      tpu::TPUGetDeviceHandle(), tpu::TPUGenerateSgdnnTensor(self), pad.data(),
+      pad.size(), 0, REPLICATE, false, tpu::TPUGenerateSgdnnTensor(out));
   TORCH_CHECK(status == BM_SUCCESS);
   TIMING_END(tpu::REPLICATION_PAD2D);
 #endif
@@ -289,5 +294,36 @@ Tensor &replication_pad2d_out_tpu(const Tensor &self, IntArrayRef padding,
 // TORCH_LIBRARY_IMPL(aten, TPU, m) {
 //   m.impl("replication_pad2d.out", replication_pad2d_out_tpu);
 // }
+
+Tensor &replication_pad3d_out_tpu(const Tensor &self, IntArrayRef padding,
+                                  Tensor &out) {
+  if (self.dim() > 0) {
+    CHECK_TENSOR_IN_DEVICE(self);
+  }
+  CHECK_TENSOR_IN_DEVICE(out);
+#if 0
+
+#else
+  if (self.dim() == 0) {
+    auto out_cpu = replication_pad3d(self.cpu(), padding);
+    tpu::TPUCopyDeviceToDevice(out.data_ptr(), out_cpu.data_ptr(),
+                               out.nbytes());
+    return out;
+  }
+  std::vector<int> pad(padding.begin(), padding.end());
+
+  TIMING_START;
+  bm_status_t status = sgdnnPad(
+      tpu::TPUGetDeviceHandle(), tpu::TPUGenerateSgdnnTensor(self), pad.data(),
+      pad.size(), 0, REPLICATE, true, tpu::TPUGenerateSgdnnTensor(out));
+  TORCH_CHECK(status == BM_SUCCESS);
+  TIMING_END(tpu::REPLICATION_PAD3D);
+#endif
+  return out;
+}
+
+TORCH_LIBRARY_IMPL(aten, TPU, m) {
+  m.impl("replication_pad3d.out", replication_pad3d_out_tpu);
+}
 
 }  // namespace at

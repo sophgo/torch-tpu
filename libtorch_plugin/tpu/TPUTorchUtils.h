@@ -419,6 +419,7 @@ typedef enum
   CONSTANT_PAD,
   REFLECTION_PAD2D,
   REPLICATION_PAD2D,
+  REPLICATION_PAD3D,
   GATHER,
   BADDBMM,
   OP_NUM
@@ -596,6 +597,7 @@ static const char * OpTypeStr[OP_NUM] =
   "Constant_pad",
   "Reflection_pad2d",
   "Replication_pad2d",
+  "Replication_pad3d",
   "GATHER",
   "BADDBMM"
 };

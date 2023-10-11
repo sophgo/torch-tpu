@@ -6652,7 +6652,7 @@ bm_status_t sgdnnCbrt ( bm_handle_t handle,
 }
 
 bm_status_t sgdnnPad(bm_handle_t handle, SgdnnTensor_t input, int *pad,
-                     int pad_size, float value, int mode,
+                     int pad_size, float value, int mode, bool pad3d,
                      SgdnnTensor_t output) {
   SGDNN_CHECK(2 * input.dim >= pad_size);
   SGDNN_CHECK(pad_size % 2 == 0);
@@ -6665,25 +6665,26 @@ bm_status_t sgdnnPad(bm_handle_t handle, SgdnnTensor_t input, int *pad,
   sg_api_pad_t api;
   api.input_global_addr = input.addr;
   api.output_global_addr = output.addr;
-  api.dim = 4;
+  api.buffer_global_addr = 0;
+  api.pad3d = pad3d;
+  api.dim = pad3d ? 5 : 4;
   api.pad_size = pad_size;
-  if (input.dim < api.dim) {
-    for(int i = 0; i < api.dim; ++i){
-      if(i < api.dim - input.dim){
-        api.shape[i] = 1;
-      }else{
-        api.shape[i] = input.shape[i - (api.dim - input.dim)];
-      }
-    }
-  } else {
-    for (int i = 0; i < input.dim; ++i) {
-      api.shape[i] = input.shape[i];
+  if (pad3d) {
+    bm_device_mem_t dev_mem;
+    SAFE_CALL(
+        bm_malloc_device_byte(handle, &dev_mem, sgdnnTensorBytes(&output)));
+    api.buffer_global_addr = bm_mem_get_device_addr(dev_mem);
+  }
+  for (int i = 0; i < api.dim; ++i) {
+    if (i < api.dim - input.dim) {
+      api.shape[i] = 1;
+    } else {
+      api.shape[i] = input.shape[i - (api.dim - input.dim)];
     }
   }
-
-  for (int i = pad_size/2 - 1, j = 0; i >= 0; --i, j += 2) {
-      api.pad[2 * i] = pad[j];
-      api.pad[2 * i + 1] = pad[j+1];
+  for (int i = pad_size / 2 - 1, j = 0; i >= 0; --i, j += 2) {
+    api.pad[2 * i] = pad[j];
+    api.pad[2 * i + 1] = pad[j + 1];
   }
   api.value = value;
   api.mode = mode;

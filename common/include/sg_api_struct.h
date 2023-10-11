@@ -1671,6 +1671,7 @@ typedef struct
 {
   unsigned long long input_global_addr;
   unsigned long long output_global_addr;
+  unsigned long long buffer_global_addr;
   int shape[FW_MAX_SHAPE_DIMS];
   int pad[FW_MAX_SHAPE_DIMS];
   int dim;
@@ -1678,6 +1679,7 @@ typedef struct
   float value;
   int mode;
   int dtype;
+  int pad3d;
 } WITH_PLATFORM(sg_api_pad_t);
 
 #pragma pack(pop)
