@@ -71,24 +71,23 @@ void tpu_bdc_fp_sigmoid(local_addr_t dst_addr, local_addr_t src_addr,
 void tpu_bdc_fp_sqrt_v2(local_addr_t dst_addr, local_addr_t src_addr,
                         local_addr_t dst_fp32_addr, local_addr_t src_fp32_addr,
                         const dim4 *shape, data_type_t dtype) {
+
+#ifdef SGDNN_BACKEND_2260
+  tpu_bdc_fp_sqrt(dst_addr, src_addr, shape, DT_FP32);
+#else
   if (dtype != DT_FP32) {
     tpu_bdc_cast(src_fp32_addr, src_addr, shape, NULL, NULL, DT_FP32, dtype,
                  RM_HALF_TO_EVEN);
-    tpu_bdc_fp32_rsqrt(dst_fp32_addr, src_fp32_addr, shape);
-    tpu_bdc_fp_mul(dst_fp32_addr, dst_fp32_addr, src_fp32_addr, shape, NULL,
-                   NULL, NULL, DT_FP32);
+    tpu_bdc_fp_sqrt(dst_fp32_addr, src_fp32_addr, shape, DT_FP32);
     tpu_bdc_cast(dst_addr, dst_fp32_addr, shape, NULL, NULL, dtype, DT_FP32,
                  RM_HALF_TO_EVEN);
     return;
   }
-
   if (dtype == DT_FP32) {
-    tpu_bdc_fp32_rsqrt(dst_addr, src_addr, shape);
-    tpu_bdc_fp_mul(dst_addr, dst_addr, src_addr, shape, NULL, NULL, NULL,
-                   DT_FP32);
+    tpu_bdc_fp_sqrt(dst_addr, src_addr, shape, DT_FP32);
     return;
   }
-  TPUKERNEL_ASSERT(false);
+#endif
 }
 
 void tpu_bdc_fp_isinf(local_addr_t dst_addr, local_addr_t src_addr,
