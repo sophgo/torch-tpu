@@ -4943,17 +4943,29 @@ bm_status_t sgdnnBaddbmm ( bm_handle_t handle,
   }
   // input1 must can be broadcast to batch_out_shape
   SGDNN_CHECK ( sgdnnIsTensorContiguous ( &input1 ) );
-  SGDNN_CHECK ( sgdnnIsTensorContiguous ( &batch1 ) );
-  SGDNN_CHECK ( sgdnnIsTensorContiguous ( &batch2 ) );
   SGDNN_CHECK ( sgdnnIsTensorContiguous ( &out ) );
 #if defined SGDNN_BACKEND_1684X
   // need malloc buffer to store input1
-  bm_device_mem_t input1_buffer;
+  bm_device_mem_t input1_buffer, left_contiguous_mem;
+  SgdnnTensor_t left_contiguous;
   SAFE_CALL( bm_malloc_device_byte ( handle, &input1_buffer, sgdnnTensorBytes ( &input1 ) ) );
+  if ( sgdnnIsTensorTransposed (&batch1) ){
+    left_contiguous.dim = 3;
+    left_contiguous.shape[0] = batch1.shape[0];
+    left_contiguous.shape[1] = batch1.shape[1];
+    left_contiguous.shape[2] = batch1.shape[2];
+    left_contiguous.stride[0] = batch1.stride[0];
+    left_contiguous.stride[1] = batch1.stride[2];
+    left_contiguous.stride[2] = batch1.stride[1];
+    left_contiguous.dtype = batch1.dtype;
+    SAFE_CALL ( bm_malloc_device_byte ( handle, &left_contiguous_mem, sgdnnTensorBytes ( &left_contiguous ) ) );
+    left_contiguous.addr = bm_mem_get_device_addr ( left_contiguous_mem );
+    SAFE_CALL ( sgdnnStridedCopy ( handle, batch1, left_contiguous) );
+  }
   sg_api_baddbmm_t api;
   api.input_global_addr  = input1.addr;
   api.buffer_global_addr = input1_buffer.u.device.device_addr;
-  api.batch1_global_addr = batch1.addr;
+  api.batch1_global_addr = sgdnnIsTensorTransposed (&batch1) ? left_contiguous.addr : batch1.addr ;
   api.batch2_global_addr = batch2.addr;
   api.output_global_addr = out.addr;
   api.input_dim = input1.dim;
@@ -4979,10 +4991,16 @@ bm_status_t sgdnnBaddbmm ( bm_handle_t handle,
   api.alpha = (float)alpha;
   api.beta = (float)beta;
   api.dtype = sgdnnTPUKernelDType ( input1.dtype );
+  api.is_left_transpose = 0;
+  api.is_right_transpose = sgdnnIsTensorTransposed( &batch2 );
 
   SAFE_CALL ( sgdnnTPUKernelLaunch ( handle, "tpu_kernel_api_baddbmm", &api, sizeof ( api ) ) );
 
   bm_free_device(handle, input1_buffer);
+  if ( sgdnnIsTensorTransposed (&batch1) )
+  {
+    bm_free_device ( handle, left_contiguous_mem );
+  }
 
 #elif defined SGDNN_BACKEND_2260
   SGDNN_CHECK ( false );

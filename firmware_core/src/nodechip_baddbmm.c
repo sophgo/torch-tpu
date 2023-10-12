@@ -62,7 +62,9 @@ void nodechip_baddbmm (
     int batch2_dims,
     int output_dims,
     float alpha,
-    float beta){
+    float beta,
+    int is_left_transpose,
+    int is_right_transpose){
     // beta*input1 + alpha(batch1*batch2)
     nodechip_const_binary_fp(input1_global_addr, input1_buffer_global_addr, input1_shape, input1_dims, beta, 0, 2, dtype, 0, 0);
     nodechip_batch_matmul_float(batch1_global_addr,
@@ -76,7 +78,9 @@ void nodechip_baddbmm (
                                 batch2_dims,
                                 output_shape,
                                 &output_dims,
-                                0, 0, 0, 0, 0, 0);
+                                is_left_transpose,
+                                is_right_transpose,
+                                0, 0, 0, 0);
     nodechip_const_binary_fp(output_global_addr, output_global_addr, output_shape, output_dims, alpha, 0, 2, dtype, 0, 0);
     nodechip_bcbinary_fp(input1_buffer_global_addr, output_global_addr, output_global_addr, input1_shape, output_shape, input1_dims, output_dims, 0, dtype, 0, 0);
 }
@@ -84,6 +88,12 @@ void nodechip_baddbmm (
 void tpu_kernel_api_baddbmm (const void* args){
     sg_api_baddbmm_t* op_args = (sg_api_baddbmm_t*)args;
     tpu_initialize();
+    int batch2_shape [] =
+    {
+        op_args->batch2_shape[0],
+        op_args->is_right_transpose ? op_args->batch2_shape[2] : op_args->batch2_shape[1],
+        op_args->is_right_transpose ? op_args->batch2_shape[1] : op_args->batch2_shape[2]
+    };
     nodechip_baddbmm(
         op_args->input_global_addr,
         op_args->buffer_global_addr,
@@ -93,14 +103,16 @@ void tpu_kernel_api_baddbmm (const void* args){
         (data_type_t)op_args->dtype,
         op_args->input_shape,
         op_args->batch1_shape,
-        op_args->batch2_shape,
+        batch2_shape,
         op_args->output_shape,
         op_args->input_dim,
         op_args->batch1_dim,
         op_args->batch2_dim,
         op_args->output_dim,
         op_args->alpha,
-        op_args->beta);
+        op_args->beta,
+        op_args->is_left_transpose,
+        op_args->is_right_transpose);
     tpu_poll();
 }
 

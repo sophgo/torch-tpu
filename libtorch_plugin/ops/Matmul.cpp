@@ -160,11 +160,15 @@ Tensor & baddbmm_out_tpu(const at::Tensor & self, const at::Tensor & batch1, con
   auto out_cpu = baddbmm ( self.to(torch::kFloat).cpu(), batch1.to(torch::kFloat).cpu(), batch2.to(torch::kFloat).cpu(), beta, alpha );
   out = out_cpu.to(out.device()).to(out.dtype());
 #else
+  auto self_ = self.is_contiguous() ? self : self.contiguous();
+  auto batch1_ = batch1.is_contiguous() == false && is_transposed ( batch1 ) == false ? batch1.contiguous() : batch1;
+  auto batch2_ = batch2.is_contiguous() == false && is_transposed ( batch2 ) == false ? batch2.contiguous() : batch2;
+
   auto status = sgdnnBaddbmm(
                 tpu::TPUGetDeviceHandle(),
-                tpu::TPUGenerateSgdnnTensor ( self ),
-                tpu::TPUGenerateSgdnnTensor ( batch1 ),
-                tpu::TPUGenerateSgdnnTensor ( batch2 ),
+                tpu::TPUGenerateSgdnnTensor ( self_ ),
+                tpu::TPUGenerateSgdnnTensor ( batch1_ ),
+                tpu::TPUGenerateSgdnnTensor ( batch2_ ),
                 tpu::TPUGenerateSgdnnTensor ( out ),
                 alpha.toDouble(),
                 beta.toDouble() );

@@ -36,16 +36,12 @@ Tensor _copy_from_tpu(const Tensor &self, const Tensor &dst,
         tpu::TPUCopyDeviceToDevice(dst.data_ptr(), self.data_ptr(),
                                    dst.nbytes());
       } else {
-#ifdef TPU_OP_TIMING
-        auto timer = tpu::Timer().Start();
-#endif
+        TIMING_START;
         bm_status_t status = sgdnnStridedCopy(tpu::TPUGetDeviceHandle(),
                                               tpu::TPUGenerateSgdnnTensor(self),
                                               tpu::TPUGenerateSgdnnTensor(dst));
         TORCH_CHECK(status == BM_SUCCESS);
-#ifdef TPU_OP_TIMING
-        tpu::OpTimer::Instance().AddTime(tpu::STRIDED_COPY, timer.ElapsedUS());
-#endif
+        TIMING_END(tpu::STRIDED_COPY);
       }
     } else {
       TORCH_CHECK(false, "Unsupported copy from device ", self.device(),
@@ -61,21 +57,27 @@ Tensor _copy_from_tpu(const Tensor &self, const Tensor &dst,
       auto dst_cpu = self.cpu().to ( dst.dtype() );
       tpu::TPUCopyHostToDevice ( dst.data_ptr(), dst_cpu.contiguous().data_ptr(), dst.nbytes() );
 #else
-      auto self_ = self.contiguous();
-      if (dst.is_contiguous()) {
-#ifdef TPU_OP_TIMING
-        auto timer = tpu::Timer().Start();
-#endif
-        auto status = sgdnnConvert(tpu::TPUGetDeviceHandle(),
-                                   tpu::TPUGenerateSgdnnTensor(self_),
-                                   tpu::TPUGenerateSgdnnTensor(dst));
-        TORCH_CHECK(status == BM_SUCCESS);
-#ifdef TPU_OP_TIMING
-        tpu::OpTimer::Instance().AddTime(tpu::DTYPE_CONVERT, timer.ElapsedUS());
-#endif
-      } else {
-        dst.copy_(self_.to(dst.dtype()), non_blocking);
+      if (self.dtype() == caffe2::TypeMeta::Make<long>() || dst.dtype() == caffe2::TypeMeta::Make<long>() )
+      {
+        LOG( WARNING ) << "dtypeconvert use cpu impl";
+        auto dst_cpu = self.cpu().to ( dst.dtype() );
+        tpu::TPUCopyHostToDevice ( dst.data_ptr(), dst_cpu.contiguous().data_ptr(), dst.nbytes() );
       }
+      else
+      {
+        auto self_ = self.contiguous();
+        if (dst.is_contiguous()) {
+          TIMING_START;
+          auto status = sgdnnConvert(tpu::TPUGetDeviceHandle(),
+                                    tpu::TPUGenerateSgdnnTensor(self_),
+                                    tpu::TPUGenerateSgdnnTensor(dst));
+          TORCH_CHECK(status == BM_SUCCESS);
+          TIMING_END(tpu::DTYPE_CONVERT);
+        } else {
+          dst.copy_(self_.to(dst.dtype()), non_blocking);
+        }        
+      }
+
 #endif
     } else {
       TORCH_CHECK(false, "Unsupported copy from device ", self.device(),

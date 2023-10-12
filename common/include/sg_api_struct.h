@@ -1297,6 +1297,8 @@ typedef struct
   int dtype;
   float alpha;
   float beta;
+  int is_left_transpose;
+  int is_right_transpose;
 } WITH_PLATFORM(sg_api_baddbmm_t);
 typedef struct
 {
