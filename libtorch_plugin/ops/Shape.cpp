@@ -212,9 +212,9 @@ Tensor constant_pad_nd_tpu(const Tensor &self, const IntArrayRef pad,
 
   return out;
 }
-TORCH_LIBRARY_IMPL(aten, TPU, m) {
-  m.impl("constant_pad_nd", constant_pad_nd_tpu);
-}
+// TORCH_LIBRARY_IMPL(aten, TPU, m) {
+//   m.impl("constant_pad_nd", constant_pad_nd_tpu);
+// }
 
 Tensor &reflection_pad2d_out_tpu(const Tensor &self, IntArrayRef padding,
                                  Tensor &out) {
@@ -254,10 +254,10 @@ Tensor reflection_pad2d_tpu(const Tensor &self, IntArrayRef padding) {
   return reflection_pad2d_out_tpu(self, padding, out);
 }
 
-TORCH_LIBRARY_IMPL(aten, TPU, m) {
-  m.impl("reflection_pad2d", reflection_pad2d_tpu);
-  m.impl("reflection_pad2d.out", reflection_pad2d_out_tpu);
-}
+// TORCH_LIBRARY_IMPL(aten, TPU, m) {
+//   m.impl("reflection_pad2d", reflection_pad2d_tpu);
+//   m.impl("reflection_pad2d.out", reflection_pad2d_out_tpu);
+// }
 
 Tensor &replication_pad2d_out_tpu(const Tensor &self, IntArrayRef padding,
                                   Tensor &out) {
@@ -286,8 +286,8 @@ Tensor &replication_pad2d_out_tpu(const Tensor &self, IntArrayRef padding,
   return out;
 }
 
-TORCH_LIBRARY_IMPL(aten, TPU, m) {
-  m.impl("replication_pad2d.out", replication_pad2d_out_tpu);
-}
+// TORCH_LIBRARY_IMPL(aten, TPU, m) {
+//   m.impl("replication_pad2d.out", replication_pad2d_out_tpu);
+// }
 
 }  // namespace at
