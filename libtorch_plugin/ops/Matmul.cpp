@@ -47,9 +47,8 @@ Tensor & addmm_out_tpu ( const Tensor & self, const Tensor & mat1, const Tensor 
   {
     auto mat1_ = mat1.is_contiguous() == false && is_transposed ( mat1 ) == false ? mat1.contiguous() : mat1;
     auto mat2_ = mat2.is_contiguous() == false && is_transposed ( mat2 ) == false ? mat2.contiguous() : mat2;
-#ifdef TPU_OP_TIMING
-    auto timer = tpu::Timer().Start();
-#endif
+
+    TIMING_START;
     auto status = sgdnnMatmul (
                   tpu::TPUGetDeviceHandle(),
                   tpu::TPUGenerateSgdnnTensor ( mat1_ ),
@@ -57,10 +56,7 @@ Tensor & addmm_out_tpu ( const Tensor & self, const Tensor & mat1, const Tensor 
                   tpu::TPUGenerateSgdnnTensor ( self ),
                   tpu::TPUGenerateSgdnnTensor ( out ) );
     TORCH_CHECK ( status == BM_SUCCESS );
-#ifdef TPU_OP_TIMING
-    tpu::OpTimer::Instance().AddTime ( tpu::MM, timer.ElapsedUS() );
-#endif
-    TORCH_CHECK ( status == BM_SUCCESS );
+    TIMING_END( tpu::MM );
   }
   else
   {
@@ -90,9 +86,8 @@ Tensor & mm_out_tpu ( const Tensor & self, const Tensor & mat2, Tensor & out )
 #else
   auto self_ = self.is_contiguous() == false && is_transposed ( self ) == false ? self.contiguous() : self;
   auto mat2_ = mat2.is_contiguous() == false && is_transposed ( mat2 ) == false ? mat2.contiguous() : mat2;
-#ifdef TPU_OP_TIMING
-  auto timer = tpu::Timer().Start();
-#endif
+
+  TIMING_START;
   auto status = sgdnnMatmul (
                 tpu::TPUGetDeviceHandle(),
                 tpu::TPUGenerateSgdnnTensor ( self_ ),
@@ -100,10 +95,7 @@ Tensor & mm_out_tpu ( const Tensor & self, const Tensor & mat2, Tensor & out )
                 sgdnnUndefinedTensor(),
                 tpu::TPUGenerateSgdnnTensor ( out ) );
   TORCH_CHECK ( status == BM_SUCCESS );
-#ifdef TPU_OP_TIMING
-  tpu::OpTimer::Instance().AddTime ( tpu::MM, timer.ElapsedUS() );
-#endif
-  TORCH_CHECK ( status == BM_SUCCESS );
+  TIMING_END( tpu::MM );
 #endif
   return out;
 }
@@ -128,18 +120,16 @@ Tensor & bmm_out_tpu ( const Tensor & self, const Tensor & mat2, Tensor & out )
 #else
   auto self_ = self.is_contiguous() == false && is_transposed ( self ) == false ? self.contiguous() : self;
   auto mat2_ = mat2.is_contiguous() == false && is_transposed ( mat2 ) == false ? mat2.contiguous() : mat2;
-#ifdef TPU_OP_TIMING
-  auto timer = tpu::Timer().Start();
-#endif
+
+  TIMING_START;
   auto status = sgdnnBatchMatmul (
                 tpu::TPUGetDeviceHandle(),
                 tpu::TPUGenerateSgdnnTensor ( self_ ),
                 tpu::TPUGenerateSgdnnTensor ( mat2_ ),
                 tpu::TPUGenerateSgdnnTensor ( out ) );
   TORCH_CHECK ( status == BM_SUCCESS );
-#ifdef TPU_OP_TIMING
-  tpu::OpTimer::Instance().AddTime ( tpu::BMM, timer.ElapsedUS() );
-#endif
+  TIMING_END( tpu::BMM );
+
 #endif
   return out;
 }
@@ -163,7 +153,7 @@ Tensor & baddbmm_out_tpu(const at::Tensor & self, const at::Tensor & batch1, con
   auto self_ = self.is_contiguous() ? self : self.contiguous();
   auto batch1_ = batch1.is_contiguous() == false && is_transposed ( batch1 ) == false ? batch1.contiguous() : batch1;
   auto batch2_ = batch2.is_contiguous() == false && is_transposed ( batch2 ) == false ? batch2.contiguous() : batch2;
-
+  TIMING_START;
   auto status = sgdnnBaddbmm(
                 tpu::TPUGetDeviceHandle(),
                 tpu::TPUGenerateSgdnnTensor ( self_ ),
@@ -172,6 +162,7 @@ Tensor & baddbmm_out_tpu(const at::Tensor & self, const at::Tensor & batch1, con
                 tpu::TPUGenerateSgdnnTensor ( out ),
                 alpha.toDouble(),
                 beta.toDouble() );
+  TIMING_END( tpu::BADDBMM );
 #endif
   return out;
 }

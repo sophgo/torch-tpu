@@ -9,22 +9,25 @@ torch.set_printoptions(precision=6)
 device = "privateuseone:0"
 
 def case1():
-    B = 1 
-    S = 77
-    H = 768
+    B = 10
+    S = 34
+    H = 34
     inp = torch.randn((B,S,H))
-    B_ind = torch.LongTensor([0])
-    S_ind = torch.randint(0, S, [1])
-    import pdb;pdb.set_trace()
+    B_ind = torch.LongTensor([1, 2])
+    S_ind = torch.randint(0, S, [1,34,4])
     inp_tpu = copy.deepcopy(inp).to(device)
     B_ind_tpu = copy.deepcopy(B_ind).to(device)
     S_ind_tpu = copy.deepcopy(S_ind).to(device)
     
-    o_cpu = inp[B_ind, S_ind,]
-    o_tpu = inp_tpu[B_ind_tpu, S_ind_tpu,]
+    o_cpu = inp[B_ind]
+    o_tpu = inp_tpu[B_ind_tpu]
 
     diff = o_cpu - o_tpu.cpu()
-    print(diff)
+    print("input : ", inp)
+    print("cpu : ", o_cpu)
+    print("tpu : ", o_tpu.cpu())
+    print(f"max diff : {torch.max(abs(diff))}")
+    import pdb;pdb.set_trace()
 
 
 if __name__ == "__main__":

@@ -3,6 +3,7 @@
 
 #include "bmlib_runtime.h"
 #include "sg_api_struct.h"
+#include <vector>
 
 #if defined(__cplusplus)
 extern "C" {
@@ -819,7 +820,7 @@ bm_status_t sgdnnWhere ( bm_handle_t handle,
  * Note:
  * 1. The data types of INPUT and OUTPUT must be the same, INDICES must be INT32 or INT64, but used as INT32
  * 2. The shape of INPUT is ( D0, ..., D(D-1), DD, D(D+1), ... ), where DD is the DIM, INDICES is ( I0, ..., IX ),
- *    then OUTPUT is ( D0, ..., D(D-1), I0, ..., IX, D(D+1), ...  )
+ *    then OUTPUT is ( D0, ..., D(D-1), [X+1], D(D+1), ...  )
  * 3. INPUT, INDICES and OUTPUT must be contiguous
  */
 bm_status_t sgdnnIndexSelect ( bm_handle_t handle,
@@ -832,6 +833,16 @@ bm_status_t sgdnnEmbeddingBackward ( bm_handle_t handle,
                                      SgdnnTensor_t grad_output,
                                      SgdnnTensor_t indices,
                                      SgdnnTensor_t grad_input );
+/*  
+ * OUPUT = INPUT[indices]
+ *   indices's size <= INPUT.dim
+ *   OUTPUT[0] = INPUT[indices[0]] and so on ...
+*/
+bm_status_t sgdnnMulIndexSelect ( bm_handle_t handle,
+                                  SgdnnTensor_t input,
+                                  SgdnnTensor_t output,
+                                  std::vector<SgdnnTensor_t>& indices);
+
 
 /*
   OUTPUT = MASKE_FILL ( INPUT, MASK, VALUE )

@@ -26,12 +26,17 @@ Tensor & index_out_tpu( const Tensor & self, const c10::List<c10::optional<Tenso
     auto out_cpu = index( self.cpu(), indices_cpu );
     out = out_cpu.to(out.device());
 #else
-    bm_status_t status = sgdnnIndexSelect(tpu::TPUGetDeviceHandle(),
+    std::vector< SgdnnTensor_t> Inds;
+    for (int i = 0; i < indices.size(); i++){
+        Inds.push_back( tpu::TPUGenerateSgdnnTensor(indices[i].value()) );
+    }
+    TIMING_START;    
+    bm_status_t status = sgdnnMulIndexSelect(tpu::TPUGetDeviceHandle(),
                                     tpu::TPUGenerateSgdnnTensor(self),
-                                    tpu::TPUGenerateSgdnnTensor(indices[1].value()),
-                                    1,
-                                    tpu::TPUGenerateSgdnnTensor(out));
+                                    tpu::TPUGenerateSgdnnTensor(out),
+                                    Inds);
     TORCH_CHECK ( status == BM_SUCCESS );
+    TIMING_END ( tpu::INDEX_SELECT );
 #endif
     return out;
 }

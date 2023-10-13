@@ -123,7 +123,7 @@ static inline SgdnnDataType_t TPUConvertDType ( caffe2::TypeMeta dtype )
 static inline SgdnnTensor_t TPUGenerateSgdnnTensor ( const at::Tensor & Tensor )
 {
   SgdnnTensor_t t = { 0 };
-  t.addr = ( unsigned long long ) Tensor.data_ptr();
+  t.addr = GetAddrByUnifiedAddr(( unsigned long long ) Tensor.data_ptr());
   t.dtype = TPUConvertDType ( Tensor.dtype() );
   t.dim = Tensor.dim();
   for ( auto i = 0; i < Tensor.dim(); ++i )
@@ -420,6 +420,7 @@ typedef enum
   REFLECTION_PAD2D,
   REPLICATION_PAD2D,
   GATHER,
+  BADDBMM,
   OP_NUM
 }
 OpType;
@@ -594,8 +595,9 @@ static const char * OpTypeStr[OP_NUM] =
   "Cbrt",
   "Constant_pad",
   "Reflection_pad2d",
-  "Replication_pad2d"
-  "GATHER"
+  "Replication_pad2d",
+  "GATHER",
+  "BADDBMM"
 };
 
 struct OpTimer

@@ -1693,15 +1693,16 @@ bm_status_t sgdnnIndexSelect ( bm_handle_t handle,
 {
   SGDNN_CHECK ( indices.dtype == SGDNN_DTYPE_INT32 ||
                 indices.dtype == SGDNN_DTYPE_INT64 );
-  // SGDNN_CHECK ( input.dim + indices.dim - 1 == output.dim );
+  SGDNN_CHECK ( input.dim + indices.dim - 1 == output.dim );
+
   for ( int i = 0; i < dim; ++i )
   {
     SGDNN_CHECK ( input.shape[i] == output.shape[i] );
   }
-  // for ( int i = dim; i < dim + indices.dim; ++i )
-  // {
-  //   SGDNN_CHECK ( indices.shape[i - dim] == output.shape[i] );
-  // }
+  for ( int i = dim; i < dim + indices.dim; ++i )
+  {
+    SGDNN_CHECK ( indices.shape[i - dim] == output.shape[i] );
+  }
   for ( int i = dim + indices.dim; i < output.dim; ++i )
   {
     SGDNN_CHECK ( input.shape[i - indices.dim + 1] == output.shape[i] );
@@ -1750,6 +1751,61 @@ bm_status_t sgdnnIndexSelect ( bm_handle_t handle,
 #else
   SGDNN_CHECK ( false );
 #endif
+  return BM_SUCCESS;
+}
+bm_status_t sgdnnMulIndexSelect (bm_handle_t handle,
+                                SgdnnTensor_t input,
+                                SgdnnTensor_t output,
+                                std::vector<SgdnnTensor_t>& indices)
+{
+  typedef struct{
+    bm_device_mem_t bm_dev_mem;
+    SgdnnTensor_t tensor;
+  } Tensor_t;
+  bm_status_t status;
+  if ( indices.size() == 1 ){
+     status = sgdnnIndexSelect( handle, input, indices[0], 0, output );
+    return status;
+  }
+  else
+  {
+    Tensor_t cur_input, cur_output;
+    cur_input.tensor = input;
+    for ( int axis = 0; axis < static_cast<int>(indices.size()); axis++ ){
+      // 1. make buffer output
+      cur_output.tensor.dim = input.dim;
+      cur_output.tensor.dtype = output.dtype;
+      for (int i = 0; i < axis; i++ ){
+        cur_output.tensor.shape[i] = cur_input.tensor.shape[i]; 
+      }
+      cur_output.tensor.shape[axis] = indices[axis].shape[0];
+      for (int i = axis + 1; i < input.dim; i++){
+        cur_output.tensor.shape[i] = cur_input.tensor.shape[i];
+      }
+      cur_output.tensor.stride[cur_output.tensor.dim - 1] = 1; 
+      for (int i = cur_output.tensor.dim - 2; i >=0; i-- )
+      {
+        cur_output.tensor.stride[i] = cur_output.tensor.shape[i+1] * cur_output.tensor.stride[i+1];
+      }
+      if (axis == static_cast<int>(indices.size() - 1) )
+      {
+        cur_output.tensor.addr = output.addr;
+      }
+      else
+      {
+        SAFE_CALL( bm_malloc_device_byte ( handle, &cur_output.bm_dev_mem, sgdnnTensorBytes ( &cur_output.tensor ) ) );
+        cur_output.tensor.addr = cur_output.bm_dev_mem.u.device.device_addr;
+      }
+      // 2.cal
+      status = sgdnnIndexSelect( handle, cur_input.tensor, indices[axis], axis, cur_output.tensor);
+      SGDNN_CHECK(status == BM_SUCCESS);
+      // 3. free buffer
+      if (axis != 0)
+        bm_free_device( handle, cur_input.bm_dev_mem );
+      cur_input = cur_output;
+    }
+  }
+
   return BM_SUCCESS;
 }
 
