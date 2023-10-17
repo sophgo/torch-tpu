@@ -6698,3 +6698,39 @@ bm_status_t sgdnnPad(bm_handle_t handle, SgdnnTensor_t input, int *pad,
 #endif
   return BM_SUCCESS;
 }
+
+bm_status_t sgdnnSliceScatter ( bm_handle_t handle,
+                       SgdnnTensor_t input,
+                       SgdnnTensor_t src,
+                       SgdnnTensor_t indices,
+                       int dim,
+                       SgdnnTensor_t output ) {
+  SGDNN_CHECK(input.dim == output.dim);
+  SGDNN_CHECK(input.dtype == src.dtype);
+  SGDNN_CHECK(input.dtype == output.dtype);
+
+#if defined SGDNN_BACKEND_1684X
+  sg_api_slice_scatter_t api;
+  api.input_global_addr = input.addr;
+  api.src_global_addr = src.addr;
+  api.output_global_addr = output.addr;
+  api.indices_global_addr = indices.addr; 
+
+  api.input_dim = input.dim;
+
+  for (int i = 0; i < input.dim; i++){
+    api.input_shape[i] = input.shape[i];
+    api.src_shape[i] = src.shape[i];
+  }
+  api.dim = dim;
+  api.dtype = sgdnnTPUKernelDType(input.dtype);
+  SAFE_CALL(
+      sgdnnTPUKernelLaunch(handle, "tpu_kernel_api_slice_scatter", &api, sizeof(api)));
+#elif defined SGDNN_BACKEND_2260
+  SGDNN_CHECK(false);
+#else
+  SGDNN_CHECK(false);
+#endif
+  return BM_SUCCESS;
+}
+

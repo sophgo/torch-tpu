@@ -1682,5 +1682,18 @@ typedef struct
   int pad3d;
 } WITH_PLATFORM(sg_api_pad_t);
 
+typedef struct
+{
+  unsigned long long input_global_addr;
+  unsigned long long src_global_addr;
+  unsigned long long indices_global_addr;
+  unsigned long long output_global_addr;
+  int input_shape[FW_MAX_SHAPE_DIMS];
+  int input_dim;
+  int src_shape[FW_MAX_SHAPE_DIMS];
+  int dim;
+  int dtype;
+} WITH_PLATFORM(sg_api_slice_scatter_t);
+
 #pragma pack(pop)
 #endif  // SG_API_STRUCT_H

@@ -1651,6 +1651,20 @@ bm_status_t sgdnnPad ( bm_handle_t handle,
                        bool pad3d,
                        SgdnnTensor_t output );
 
+/*
+ *  OUTPUT  = SLICE_SCATTER ( INPUT, SRC ,INDICES,dim)
+ *  Note:
+ *  1. input and output must be the same dim.
+ *  2. input and output must be the same dtype.
+ *  3. input and output must be contiguous
+ */
+bm_status_t sgdnnSliceScatter ( bm_handle_t handle,
+                       SgdnnTensor_t input,
+                       SgdnnTensor_t src,
+                       SgdnnTensor_t indices,
+                       int dim,
+                       SgdnnTensor_t output );
+
 #if defined(__cplusplus)
 }
 #endif

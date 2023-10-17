@@ -424,6 +424,7 @@ typedef enum
   BADDBMM,
   MSE_LOSS,
   MSE_LOSS_BACKWARD,
+  SLICE_SCATTER,
   OP_NUM
 }
 OpType;
@@ -604,6 +605,7 @@ static const char * OpTypeStr[OP_NUM] =
   "BADDBMM",
   "MSE Loss",
   "MSE Loss Backward"
+  "Slice_scatter"
 };
 
 struct OpTimer
