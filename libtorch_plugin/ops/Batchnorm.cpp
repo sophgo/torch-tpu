@@ -276,7 +276,7 @@ std::array<bool, 3> output_mask )
   const Tensor & weight = *weight_maybe_owned;
   const Tensor & bias = c10::value_or_else ( bias_opt, [] { return Tensor(); } );
   CHECK_TENSOR_IN_DEVICE ( grad_out );
-  CHECK_TENSOR_IN_DEVICE ( input );
+  CHECK_TENSOR_IN_DEVICE_NO_CONTIGUOUS ( input ); //TODO: why not contiguous
   CHECK_TENSOR_IN_DEVICE ( mean );
   CHECK_TENSOR_IN_DEVICE ( rstd );
   if ( weight.defined() ) { CHECK_TENSOR_IN_DEVICE ( weight ); }
@@ -319,7 +319,7 @@ std::array<bool, 3> output_mask )
   bm_status_t status = sgdnnLayernormBackward (
                        tpu::TPUGetDeviceHandle(),
                        tpu::TPUGenerateSgdnnTensor ( grad_out ),
-                       tpu::TPUGenerateSgdnnTensor ( input ),
+                       tpu::TPUGenerateSgdnnTensor ( input.contiguous() ),
                        weight.defined() ? tpu::TPUGenerateSgdnnTensor ( weight ) : sgdnnUndefinedTensor(),
                        tpu::TPUGenerateSgdnnTensor ( mean ),
                        tpu::TPUGenerateSgdnnTensor ( rstd ),

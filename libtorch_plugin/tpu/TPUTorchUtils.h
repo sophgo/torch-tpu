@@ -422,6 +422,8 @@ typedef enum
   REPLICATION_PAD3D,
   GATHER,
   BADDBMM,
+  MSE_LOSS,
+  MSE_LOSS_BACKWARD,
   OP_NUM
 }
 OpType;
@@ -599,7 +601,9 @@ static const char * OpTypeStr[OP_NUM] =
   "Replication_pad2d",
   "Replication_pad3d",
   "GATHER",
-  "BADDBMM"
+  "BADDBMM",
+  "MSE Loss",
+  "MSE Loss Backward"
 };
 
 struct OpTimer
