@@ -9,7 +9,7 @@
     commit 1c4644118773ed8294afb37310c654805d12a3d2
     libbm1684x.a libbmlib_cmodel.so libcmodel_fireware.so
 ### sg2260
-    commit 6e7f0b86cd77496d7bcbfd81e04be6b89a18dc71
+    commit 46688732ec55605bbde5e78fa28cf0375608e0cd
     libbmlib.so.0 libcmodel_fireware.so
 
 

@@ -1,4 +1,6 @@
 How to gen dependency files for bm1684x?
+0) cd nntoolchain/TPU1686&&git fetch&&git reset --hard origin/master
+   #As nntc:master has not continued to merge latest TPU1686, please directly update 1686
 1) Inside docker for nntoolchain:
 	cd /workspace/nntoolchain/net_compiler
 
