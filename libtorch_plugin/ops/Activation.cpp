@@ -105,8 +105,8 @@ Tensor &silu_out_tpu(const Tensor &self, Tensor &out) {
   auto timer = tpu::Timer().Start();
 #endif
   bm_status_t status =
-      sgdnnSiLU(tpu::TPUGetDeviceHandle(), tpu::TPUGenerateSgdnnTensor(self),
-                tpu::TPUGenerateSgdnnTensor(out));
+      sgdnnActive(tpu::TPUGetDeviceHandle(), tpu::TPUGenerateSgdnnTensor(self),
+                  tpu::TPUGenerateSgdnnTensor(out), ACTIVE_SILU);
   TORCH_CHECK(status == BM_SUCCESS);
 #ifdef TPU_OP_TIMING
   tpu::OpTimer::Instance().AddTime(tpu::SILU, timer.ElapsedUS());

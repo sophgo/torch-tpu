@@ -114,7 +114,7 @@ if ( api->dtype != DT_FP32 )
     {
         Len *= api->shape[i];
     }
-nodechip_silu_forward_parallel ( api->input_global_addr, api->output_global_addr, Len, api->dtype );
+    nodechip_silu_forward_parallel ( api->input_global_addr, api->output_global_addr, Len, api->dtype );
 }
 else
 {
