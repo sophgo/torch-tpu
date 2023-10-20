@@ -326,4 +326,31 @@ TORCH_LIBRARY_IMPL(aten, TPU, m) {
   m.impl("replication_pad3d.out", replication_pad3d_out_tpu);
 }
 
+Tensor clone_preserve_strides(const at::Tensor& self) {
+  TORCH_INTERNAL_ASSERT(self.has_storage());
+  if (at::has_internal_overlap(self) == at::MemOverlap::Yes) {
+    return self.clone();
+  }
+  auto dtype_size = self.dtype().itemsize();
+  auto nbytes = self.storage().sym_nbytes();
+  TORCH_INTERNAL_ASSERT(nbytes % dtype_size == 0);
+  auto numel = nbytes / dtype_size;
+  auto self_full_size = self.as_strided_symint({std::move(numel)}, {1}, 0);
+  auto clone = self_full_size.clone();
+  auto out = clone.as_strided_symint(self.sym_sizes(), self.sym_strides(), self.sym_storage_offset());
+  return out;
+}
+
+Tensor as_strided_scatter_tpu(const Tensor &self, const Tensor &src, IntArrayRef size, IntArrayRef stride,
+                      c10::optional<int64_t> storage_offset) {
+  CHECK_TENSOR_IN_DEVICE(self);
+  CHECK_TENSOR_IN_DEVICE(src);
+  Tensor out = clone_preserve_strides(self);
+  Tensor slice = as_strided(out, size, stride, std::move(storage_offset));
+  TORCH_CHECK(slice.sym_sizes() == src.sym_sizes(), "expected src to have a size equal to the slice of self. src size = ", src.sym_sizes(), "slice size = ", slice.sym_sizes());
+  slice.copy_(src);
+  return out;
+}
+TORCH_LIBRARY_IMPL(aten, TPU, m) { m.impl("as_strided_scatter", as_strided_scatter_tpu); }
+
 }  // namespace at
