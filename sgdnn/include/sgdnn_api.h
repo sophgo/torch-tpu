@@ -1654,6 +1654,17 @@ bm_status_t sgdnnSliceScatter ( bm_handle_t handle,
                        int dim,
                        SgdnnTensor_t output );
 
+/*
+*  Found_inf = inf in input ? 1 : 0; 
+*  Input     = inv_scale * Input;
+*  Note:
+*  1. the dim of found_inf = 1
+*/
+bm_status_t sgdnnInfCheckAndUnscale( bm_handle_t handle,
+                                    std::vector<SgdnnTensor_t>& input,
+                                    SgdnnTensor_t found_inf,
+                                    float inv_scale );
+
 #if defined(__cplusplus)
 }
 #endif

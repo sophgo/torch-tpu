@@ -22,6 +22,21 @@ def get_version_from_tag():
     else:
         return ver
 
+def update_lib():
+    import shutil
+    python_root = os.path.dirname(os.path.abspath(__file__))
+    project_root = os.path.dirname(python_root)
+    lib_path = os.path.join(python_root, "tpu_plugin/lib")
+    shutil.rmtree(lib_path)
+    os.makedirs(lib_path)
+    shutil.copy(os.path.join(project_root, "libtorch_plugin/build/liblibtorch_plugin.so"), lib_path)
+    shutil.copy(os.path.join(project_root, "build/sgdnn/libsgdnn.so"),lib_path)
+    shutil.copy(os.path.join(project_root, "build/firmware_core/libbm1684x_kernel_module.so"), lib_path)
+    shutil.copy(os.path.join(project_root, "third_party/bm1684x/libbm1684x.a"), lib_path)
+    print("==== update tpu_plugin lib success!!!")
+
+update_lib()
+
 def iter_shared_objects():
     cur_dir = os.path.abspath(os.path.dirname(sys.argv[0]) or '.')
     root_path = os.path.abspath(os.path.dirname(sys.argv[0]))
@@ -44,7 +59,7 @@ setup(
     license='Apache',
     name='tpu_plugin',
     url='https://www.sophgo.com/',
-    install_requires=[ "numpy","torch==1.13.1" ],
+    install_requires=[ "numpy","torch==2.0.1" ],
     dependency_links=['https://download.pytorch.org/whl/cpu/'], 
     packages=find_packages(),
     include_package_data=True,

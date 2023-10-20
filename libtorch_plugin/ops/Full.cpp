@@ -46,6 +46,10 @@ namespace at
             {
                 *(at::BFloat16 *)(&value_) = fill_value.toBFloat16();
             }
+             else if (self.dtype() == caffe2::TypeMeta::Make<int>())
+            {
+                *(int *)(&value_) = fill_value.toInt();
+            }
             else
             {
                 TORCH_CHECK(false);

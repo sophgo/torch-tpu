@@ -6709,3 +6709,43 @@ bm_status_t sgdnnSliceScatter ( bm_handle_t handle,
   return BM_SUCCESS;
 }
 
+bool _sgdnnInfCheckAndUnscale( bm_handle_t handle,
+                              SgdnnTensor_t& input,
+                              SgdnnTensor_t& found_inf,
+                              float inv_scale)
+{
+  SGDNN_CHECK ( sgdnnIsTensorContiguous ( &input ) );
+  sg_api_inf_check_unscale_t api;
+  api.input_global_addr = input.addr;
+  api.found_inf_global_addr = found_inf.addr;
+  api.dim = input.dim;
+  for ( int i = 0; i < input.dim; i++ ) { api.shape[i] = input.shape[i]; }
+  api.inv_scale = inv_scale;
+  api.idtype = sgdnnTPUKernelDType( input.dtype );
+  api.found_inf_dtype = sgdnnTPUKernelDType( found_inf.dtype );
+  SAFE_CALL( sgdnnTPUKernelLaunch ( handle, "tpu_kernel_api_inf_check_and_unscale", &api, sizeof(api) ) );
+  
+  bm_device_mem_t SrcMem = bm_mem_from_device ( found_inf.addr, sgdnnDataSize(found_inf.dtype) );
+  float found = 0;
+  SAFE_CALL (bm_memcpy_d2s ( handle, &found, SrcMem ));
+  return found == 0.0;
+}
+
+bm_status_t sgdnnInfCheckAndUnscale( bm_handle_t handle,
+                                    std::vector<SgdnnTensor_t>& inputs,
+                                    SgdnnTensor_t found_inf,
+                                    float inv_scale )
+{
+#if defined SGDNN_BACKEND_1684X
+  for (auto& input : inputs){
+    if (!_sgdnnInfCheckAndUnscale(handle, input, found_inf, inv_scale)){
+      break;
+    }
+  }
+#elif defined SGDNN_BACKEND_2260
+  SGDNN_CHECK(false);
+#else
+  SGDNN_CHECK(false);
+#endif
+  return BM_SUCCESS;
+}
