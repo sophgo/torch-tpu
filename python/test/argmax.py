@@ -9,14 +9,15 @@ torch.set_printoptions(precision=6)
 device = "privateuseone:0"
 
 def case1():
-    input_origin=torch.rand(2,3,4,5,3)
+    dim = None
+    input_origin=torch.rand(1,1,3840,1)
     input_tpu=input_origin.to(device)
-    output_cpu=torch.argmax(input_origin,dim=2)
-    output_tpu=torch.argmax(input_tpu,dim=2).cpu()
-    print("input_origin : ",input_origin)
+    output_cpu=torch.argmax(input_origin,dim=dim)
+    output_tpu=torch.argmax(input_tpu,dim=dim).cpu()
+    # print("input_origin : ",input_origin)
     print("output_cpu : ", output_cpu.shape)
     print("output_tpu : ", output_tpu.shape)
-    print("delta : ",output_cpu==output_tpu)
+    print("delta : ",(output_cpu==output_tpu).all())
 
 if __name__ == "__main__":
     case1()

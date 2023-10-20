@@ -1448,10 +1448,11 @@ bm_status_t sgdnnReduceMaxOrMin ( bm_handle_t handle,
                               int mode,
                               SgdnnTensor_t output );
 /*
- * OUTPUT = ARG ( INPUT, AXIS, MODE )
+ * { VALUES,INDICES } = ARG ( INPUT, AXIS, MODE )
  * Note:
- * 1. The data types of INPUT and OUTPUT must be the same and one of FP32, FP16 and BF16
- * 2. INPUT and OUTPUT must be contiguous
+ * 1. The data types of INPUT and VALUES must be the same and one of FP32, FP16 and BF16
+ * 2. INPUT, VALUES, INDICES must be contiguous
+ * 3. The shape of VALUES and INDICES must be the same
  * 3. MODE must be 0 ( argmax ) or 1 ( argmin ) or 2 ( max.dim ) or 3 ( min.dim )
  */
 bm_status_t sgdnnArg( bm_handle_t handle,
