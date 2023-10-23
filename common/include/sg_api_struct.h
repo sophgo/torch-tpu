@@ -1073,6 +1073,22 @@ typedef struct {
 } sg_api_mlp_multi_core_t;
 #endif
 
+typedef struct {
+  unsigned long long input_addr;
+  unsigned long long weight0_addr;
+  unsigned long long weight1_addr;
+  unsigned long long weight2_addr;
+  unsigned long long output_addr;
+  int batch;
+  int input_w;
+  int middle_w;
+  int dtype;
+#ifndef WIN32
+} __attribute__((packed)) sg_api_llama_mlp_multi_core_t;
+#else
+} sg_api_llama_mlp_multi_core_t;
+#endif
+
 typedef struct
 {
   int start;
@@ -1476,7 +1492,7 @@ typedef struct
   int dtype;
 } WITH_PLATFORM(sg_api_permute_t);
 
-typedef struct 
+typedef struct
 {
   unsigned long long input_global_addr;
   unsigned long long value_global_addr;
@@ -1492,7 +1508,7 @@ typedef struct
   int dtype;
 } WITH_PLATFORM(sg_api_topk_t);
 
-typedef struct 
+typedef struct
 {
   unsigned long long input_global_addr;
   unsigned long long output_global_addr;
@@ -1516,7 +1532,7 @@ typedef struct
   int dtype;
 } WITH_PLATFORM(sg_api_reduce_max_or_min_t);
 
-typedef struct 
+typedef struct
 {
   unsigned long long input_global_addr;
   unsigned long long output_global_addr;
@@ -1540,7 +1556,7 @@ typedef struct
   int dtype;
 } WITH_PLATFORM(sg_api_reduce_arg_t);
 
-typedef struct 
+typedef struct
 {
   unsigned long long input_global_addr;
   unsigned long long output_global_addr;

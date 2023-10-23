@@ -915,6 +915,22 @@ bm_status_t sgdnnMlpBackward ( bm_handle_t handle,
                                   SgdnnTensor_t grad_b2);
 
 /*
+ * OUTPUT = MLP ( INPUT, WEIGHT0, WEIGHT1, WEIGHT2, OUTPUT )
+ * Note:
+ * 1. The data types of INPUT, WEIGHT0, WEIGHT1, WEIGHT2, OUTPUT must be the same and one of FP32, FP16 and BF16
+ * 2. The dimensions of INPUT, WEIGHT0, WEIGHT1, WEIGHT2, OUTPUT must be 2
+ * 3. The shape of INPUT is ( B, M ), WEIGHT0 is ( M, N ), WEIGHT1 is ( M, N ), WEIGHT2 is ( N, M ), OUTPUT is ( B, M )
+ * 4. INPUT, WEIGHT0, WEIGHT1, WEIGHT2, OUTPUT must be contiguous
+ * 5. formula: matmul(mul(matmul(INPUT, WEIGHT0), mul(matmul(INPUT, WEIGHT1), sigmoid(matmul(INPUT, WEIGHT1))), WEIGHT2)
+ */
+bm_status_t sgdnnLLamaMlp ( bm_handle_t handle,
+                          SgdnnTensor_t input,
+                          SgdnnTensor_t weight0,
+                          SgdnnTensor_t weight1,
+                          SgdnnTensor_t weight2,
+                          SgdnnTensor_t output);
+
+/*
  * OUT = ATTENTION ( INPUT, W_ATTN, W_PROJ, B_ATTN, B_PROJ, Q, K, V, SOFTMAX_OUT, SOFT_V )
  * Note:
  * 1. The data types of all the tensors must be the same and one of FP32, FP16 and BF16
@@ -1390,7 +1406,7 @@ bm_status_t sgdnnReal ( bm_handle_t handle,
                        SgdnnTensor_t input,
                        SgdnnTensor_t output);
 bm_status_t sgdnnConj ( bm_handle_t handle,
-                       SgdnnTensor_t input, 
+                       SgdnnTensor_t input,
                        SgdnnTensor_t output);
 /*
  * OUTPUT = PERMUTE ( INPUT, DIM_ORDER )

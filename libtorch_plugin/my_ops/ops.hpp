@@ -33,6 +33,13 @@ namespace at
 		const c10::optional<Tensor> &grad_b1,
 		const c10::optional<Tensor> &grad_b2);
 
+	Tensor llama_mlp_forward(
+		Tensor &input,
+		Tensor &weight0,
+		Tensor &weight1,
+		Tensor &weight2,
+		Tensor &output);
+
 	Tensor attn_forward(
 		Tensor &input,
 		Tensor &w_attn,

@@ -426,7 +426,8 @@ typedef enum
   MSE_LOSS_BACKWARD,
   SLICE_SCATTER,
   InfCheckAndUnscale,
-  OP_NUM
+  OP_NUM,
+  LLAMA_MLP_FORWARD
 }
 OpType;
 
