@@ -112,7 +112,8 @@ data_type_t dtype) {
 }
 void tpu_kernel_api_element_bitwise(const void *args) {
     sg_api_element_bitwise_t *api = (sg_api_element_bitwise_t*)args;
-    TPUKERNEL_ASSERT(api->dtype == DT_INT32 || api->dtype == DT_UINT32);
+    TPUKERNEL_ASSERT(api->dtype == DT_INT32 || api->dtype == DT_UINT32 ||
+                     api->dtype == DT_INT8 || api->dtype == DT_UINT8);
 
     int length = 1;
     for(int i = 0; i < api->dim; ++i){
