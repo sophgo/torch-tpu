@@ -223,7 +223,6 @@ class GradScaler:
 
             for device, per_dtype_grads in per_device_and_dtype_grads.items():
                 for grads in per_dtype_grads.values():
-                    import pdb;pdb.set_trace()
                     torch._amp_foreach_non_finite_check_and_unscale_(grads,
                                                                      per_device_found_inf.get(device),
                                                                      per_device_inv_scale.get(device))
@@ -422,7 +421,6 @@ class GradScaler:
             if len(found_infs) > 1:
                 for i in range(1, len(found_infs)):
                     found_inf_combined += found_infs[i]
-
             torch._amp_update_scale_(_scale,
                                      _growth_tracker,
                                      found_inf_combined,
