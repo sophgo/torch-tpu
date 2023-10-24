@@ -6143,7 +6143,6 @@ bm_status_t sgdnnHardtanh ( bm_handle_t handle,
   SGDNN_CHECK ( sgdnnIsTensorContiguous ( &input ) );
   SGDNN_CHECK ( sgdnnIsTensorContiguous ( &output ) );
 
-#if defined SGDNN_BACKEND_1684X
   sg_api_hardtanh_t api;
   api.dim = input.dim;
   api.min_value = min_value;
@@ -6154,9 +6153,11 @@ bm_status_t sgdnnHardtanh ( bm_handle_t handle,
   api.input_global_addr = input.addr;
   api.output_global_addr = output.addr;
   api.dtype = sgdnnTPUKernelDType( input.dtype );
+  
+#if defined SGDNN_BACKEND_1684X
   SAFE_CALL ( sgdnnTPUKernelLaunch ( handle, "tpu_kernel_api_hardtanh", &api, sizeof( api ) ) );
 #elif defined SGDNN_BACKEND_2260
-  SGDNN_CHECK ( false );
+  SAFE_CALL ( sgdnnTPUKernelLaunch ( handle, "tpu_kernel_api_hardtanh_multi_core", &api, sizeof( api ) ) );
 #else
   SGDNN_CHECK ( false );
 #endif
@@ -6628,7 +6629,7 @@ bm_status_t sgdnnCbrt ( bm_handle_t handle,
   SGDNN_CHECK ( sgdnnIsSameShape ( &input, &output ) );
   SGDNN_CHECK ( sgdnnIsTensorContiguous ( &input ) );
   SGDNN_CHECK ( sgdnnIsTensorContiguous ( &output ) );
-#if defined SGDNN_BACKEND_1684X
+
   sg_api_cbrt_t api;
   api.input_global_addr = input.addr;
   api.output_global_addr = output.addr;
@@ -6638,9 +6639,11 @@ bm_status_t sgdnnCbrt ( bm_handle_t handle,
     api.shape[i] = input.shape[i];
   }
   api.dtype = sgdnnTPUKernelDType ( input.dtype );
+
+#if defined SGDNN_BACKEND_1684X
   SAFE_CALL ( sgdnnTPUKernelLaunch ( handle, "tpu_kernel_api_cbrt", &api, sizeof ( api ) ) );
 #elif defined SGDNN_BACKEND_2260
-  SGDNN_CHECK ( false );
+  SAFE_CALL ( sgdnnTPUKernelLaunch ( handle, "tpu_kernel_api_cbrt_multi_core", &api, sizeof ( api ) ) );
 #else
   SGDNN_CHECK ( false );
 #endif

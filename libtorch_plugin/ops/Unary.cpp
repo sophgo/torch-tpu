@@ -80,9 +80,8 @@ Tensor cbrt_tpu(const Tensor &self) {
 }
 // TORCH_LIBRARY_IMPL ( aten, TPU, m )
 // {
-//   m.impl ( "bitwise_not", cbrt_tpu );    //
-//   pytorch2.0.1版本库没有cbrt接口，借用bitwise_not接口实现 m.impl (
-//   "bitwise_not.out", cbrt_out_tpu );
+//   m.impl ( "bitwise_not", cbrt_tpu );    // pytorch2.0.1版本库没有cbrt接口，借用bitwise_not接口实现
+//   m.impl ( "bitwise_not.out", cbrt_out_tpu );
 // }
 // TORCH_LIBRARY_IMPL ( aten, TPU, m )     // 换成pytorch2.1以上版本后可使用？
 // {

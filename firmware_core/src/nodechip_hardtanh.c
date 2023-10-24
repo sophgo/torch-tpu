@@ -93,3 +93,40 @@ void tpu_kernel_api_hardtanh(const void *args) {
     tpu_poll();
 }
 TPUKERNEL_FUNC_REGISTER(tpu_kernel_api_hardtanh);
+
+void tpu_kernel_api_hardtanh_multi_core(const void *args) {
+    sg_api_hardtanh_t *api = (sg_api_hardtanh_t*)args;
+    scalar_t min_value, max_value;
+    if(api->dtype == DT_FP32) {
+        min_value.f32 = api->min_value;
+        max_value.f32 = api->max_value;
+    }
+    else {
+        scalar_t min_value_f32 = {.f32 = api->min_value};
+        scalar_t max_value_f32 = {.f32 = api->max_value};
+        min_value = tpu_cast(min_value_f32, (data_type_t)api->dtype, DT_FP32, RM_HALF_TO_EVEN);
+        max_value = tpu_cast(max_value_f32, (data_type_t)api->dtype, DT_FP32, RM_HALF_TO_EVEN);
+    }
+
+    int length = 1;
+    for(int i = 0; i < api->dim; ++i) {
+        length *= api->shape[i];
+    }
+    tpu_initialize();
+    int core_num = tpu_core_num();
+    int core_idx = tpu_core_index();
+
+    int length_slice = DIV_UP(length, core_num);
+    int length_secs = DIV_UP(length, length_slice);
+    TPUKERNEL_ASSERT(length_secs <= core_num);
+
+    int cur_length_slice = length_slice;
+    if (core_idx == length_secs - 1) {
+        cur_length_slice = length - length_slice * (length_secs - 1);
+    }
+    nodechip_hardtanh(api->input_global_addr + (length_slice * core_idx) * tpu_data_type_size(api->dtype),
+                      api->output_global_addr + (length_slice * core_idx) * tpu_data_type_size(api->dtype),
+                      min_value, max_value, cur_length_slice, (data_type_t)api->dtype);
+    tpu_poll();
+}
+TPUKERNEL_FUNC_REGISTER(tpu_kernel_api_hardtanh_multi_core);
