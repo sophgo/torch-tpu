@@ -51,14 +51,16 @@ void tpu_kernel_api_arg_muti_core(const void *args) {
 
   unsigned int slice_num = tpu_core_num();
   unsigned int slice_idx = tpu_core_index();
-
+  // determine the length of each slice
   TPUKERNEL_ASSERT(slice_num > 0);
   TPUKERNEL_ASSERT(0 <= slice_idx && slice_idx < slice_num);
   unsigned long long length = api->shape[1];
   unsigned long long slice = length > slice_num ? DIV_UP(length, slice_num) : 1;
 
+  // determine the shape of each slice
   int shape[4] = {api->shape[0], slice, api->shape[2], api->shape[3]};
   shape[1] = MIN(slice, length - slice_idx * slice);
+  // determine the offset of input and output on each core
   unsigned int input_offset = slice_idx * slice * shape[2] * shape[3];
   unsigned int output_offset = slice_idx * slice * 1 * shape[3];
 

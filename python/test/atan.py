@@ -8,7 +8,7 @@ torch.set_printoptions(precision=6)
 device = "privateuseone:0"
 
 def case1():
-    input_origin=torch.tensor([-0.0,-0.0])
+    input_origin=torch.tensor([4.5,5.4])
     
     input_tpu=input_origin.to(device)
     
@@ -17,7 +17,7 @@ def case1():
     output_cpu_prims=torch.ops.prims.atan(input_origin)
     output_tpu_prims=torch.ops.prims.atan(input_tpu).cpu()
     
-    print("input_origin : ",input_origin)
+    # print("input_origin : ",input_origin)
     print("output_cpu_aten : ", output_cpu_aten)
     print("output_tpu_aten : ", output_tpu_aten)
     print("delta_aten : ",(output_cpu_aten-output_tpu_aten)/output_cpu_aten)

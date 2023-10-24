@@ -1061,7 +1061,7 @@ bm_status_t sgdnnNeg (bm_handle_t handle,
 /*
  * OUTPUT = BITWISE_NOT(INPUT)
  * Note:
- * 1. The data types of INPUT and OUTPUT must be the same and FP32
+ * 1. The data types of INPUT and OUTPUT must be the same and INT32
  * 2. The shapes of INPUT and OUTPUT must be the same
  * 3. INPUT and OUTPUT must be contiguous
  */
@@ -1113,9 +1113,8 @@ bm_status_t sgdnnComparisionC ( bm_handle_t handle,
 /*
  * OUTPUT = MINIMUMC(INPUT,SCALAR)
  * Note:
- * 1. The data types of INPUT and OUTPUT must be the same and one of FP32, FP16 and BF16
- * 2. The shapes of INPUT and OUTPUT must be the same
- * 3. INPUT and OUTPUT must be contiguous
+ * 1. The data types of INPUT and OUTPUT must be the same and one of FP32, FP16, BF16 and INT32
+ * 2. INPUT and OUTPUT must be contiguous
  */
 bm_status_t sgdnnMinimumC ( bm_handle_t handle,
                         SgdnnTensor_t input,
@@ -1123,11 +1122,11 @@ bm_status_t sgdnnMinimumC ( bm_handle_t handle,
                         SgdnnTensor_t output );
 
 /*
- * OUTPUT = MINIMUM(INPUT,SCALAR)
+ * OUTPUT = MINIMUM(INPUT,OTHER)
  * Note:
- * 1. The data types of INPUT and OUTPUT must be the same and one of FP32, FP16 and BF16
- * 2. The shapes of INPUT and OUTPUT must be the same
- * 3. INPUT and OUTPUT must be contiguous
+ * 1. The data types of INPUT ,OTHER and OUTPUT must be the same and one of FP32, FP16 ,BF16 and INT32
+ * 2. The shapes of INPUT ,OTHER and OUTPUT must be the same
+ * 3. INPUT ,OTHER and OUTPUT must be contiguous
  */
 bm_status_t sgdnnMinimum ( bm_handle_t handle,
                         SgdnnTensor_t input,
@@ -1135,10 +1134,10 @@ bm_status_t sgdnnMinimum ( bm_handle_t handle,
                         SgdnnTensor_t output );
 
 /*
- * OUTPUT = MINIMUMBCAST(INPUT,SCALAR)
+ * OUTPUT = MINIMUMBCAST(INPUT,OTHER)
  * Note:
- * 1. The data types of INPUT and OUTPUT must be the same and one of FP32, FP16 and BF16
- * 2. INPUT and OUTPUT must be contiguous
+ * 1. The data types of INPUT ,OTHER and OUTPUT must be the same and one of FP32, FP16 ,BF16 and INT32
+ * 2. INPUT, OTHER, OUTPUT must be contiguous
  */
 bm_status_t sgdnnMinimumBcast ( bm_handle_t handle,
                         SgdnnTensor_t input,
@@ -1147,9 +1146,8 @@ bm_status_t sgdnnMinimumBcast ( bm_handle_t handle,
 /*
  * OUTPUT = MAXIMUMC(INPUT,SCALAR)
  * Note:
- * 1. The data types of INPUT and OUTPUT must be the same and one of FP32, FP16 and BF16
- * 2. The shapes of INPUT and OUTPUT must be the same
- * 3. INPUT and OUTPUT must be contiguous
+ * 1. The data types of INPUT and OUTPUT must be the same and one of FP32, FP16, BF16 and INT32
+ * 2. INPUT and OUTPUT must be contiguous
  */
 bm_status_t sgdnnMaximumC ( bm_handle_t handle,
                         SgdnnTensor_t input,
@@ -1157,11 +1155,11 @@ bm_status_t sgdnnMaximumC ( bm_handle_t handle,
                         SgdnnTensor_t output );
 
 /*
- * OUTPUT = MAXIMUM(INPUT,SCALAR)
+ * OUTPUT = MAXIMUM(INPUT,OTHER)
  * Note:
- * 1. The data types of INPUT and OUTPUT must be the same and one of FP32, FP16 and BF16
- * 2. The shapes of INPUT and OUTPUT must be the same
- * 3. INPUT and OUTPUT must be contiguous
+ * 1. The data types of INPUT ,OTHER and OUTPUT must be the same and one of FP32, FP16 ,BF16 and INT32
+ * 2. The shapes of INPUT ,OTHER and OUTPUT must be the same
+ * 3. INPUT ,OTHER and OUTPUT must be contiguous
  */
 bm_status_t sgdnnMaximum ( bm_handle_t handle,
                         SgdnnTensor_t input,
@@ -1169,10 +1167,10 @@ bm_status_t sgdnnMaximum ( bm_handle_t handle,
                         SgdnnTensor_t output );
 
 /*
- * OUTPUT = MAXIMUMBCAST(INPUT,SCALAR)
+ * OUTPUT = MINIMUMBCAST(INPUT,OTHER)
  * Note:
- * 1. The data types of INPUT and OUTPUT must be the same and one of FP32, FP16 and BF16
- * 2. INPUT and OUTPUT must be contiguous
+ * 1. The data types of INPUT ,OTHER and OUTPUT must be the same and one of FP32, FP16 ,BF16 and INT32
+ * 2. INPUT, OTHER, OUTPUT must be contiguous
  */
 bm_status_t sgdnnMaximumBcast ( bm_handle_t handle,
                         SgdnnTensor_t input,
@@ -1182,9 +1180,9 @@ bm_status_t sgdnnMaximumBcast ( bm_handle_t handle,
 /*
  * OUTPUT = ATAN2C(SCALAR,OTHER)
  * Note:
- * 1. The data types of INPUT and OUTPUT must be the same and one of FP32, FP16 and BF16
- * 2. The shapes of INPUT and OUTPUT must be the same
- * 3. OUTPUT must be contiguous
+ * 1. The data types of OTHER must be FP32 and data type of OUTPUT must be one of FP32, FP16 and F16
+ * 2. The shapes of OTHER and OUTPUT must be the same
+ * 3. OTHER, OUTPUT must be contiguous
  */
 bm_status_t sgdnnAtan2C ( bm_handle_t handle,
                         float scalar,
@@ -1194,9 +1192,9 @@ bm_status_t sgdnnAtan2C ( bm_handle_t handle,
 /*
  * OUTPUT = ATAN2_C(INPUT,SCALAR)
  * Note:
- * 1. The data types of INPUT and OUTPUT must be the same and one of FP32, FP16 and BF16
+ * 1. The data types of INPUT must be FP32 and data type of OUTPUT must be one of FP32, FP16 and F16
  * 2. The shapes of INPUT and OUTPUT must be the same
- * 3. OUTPUT must be contiguous
+ * 3. INPUT, OUTPUT must be contiguous
  */
 bm_status_t sgdnnAtan2_C ( bm_handle_t handle,
                         SgdnnTensor_t input,
@@ -1206,9 +1204,9 @@ bm_status_t sgdnnAtan2_C ( bm_handle_t handle,
 /*
  * OUTPUT = ATAN2(INPUT,OTHER)
  * Note:
- * 1. The data types of INPUT and OUTPUT must be the same and one of FP32, FP16 and BF16
- * 2. The shapes of INPUT and OUTPUT must be the same
- * 3. OUTPUT must be contiguous
+ * 1. The data types of INPUT and OTHER must be FP32 and data type of OUTPUT must be one of FP32, FP16 and F16
+ * 2. The shapes of INPUT, OTHER and OUTPUT must be the same
+ * 3. INPUT, OTHER, OUTPUT must be contiguous
  */
 bm_status_t sgdnnAtan2 ( bm_handle_t handle,
                         SgdnnTensor_t input,
@@ -1218,9 +1216,8 @@ bm_status_t sgdnnAtan2 ( bm_handle_t handle,
 /*
  * OUTPUT = ATAN2BCAST(INPUT,OTHER)
  * Note:
- * 1. The data types of INPUT and OUTPUT must be the same and one of FP32, FP16 and BF16
- * 2. The shapes of INPUT and OUTPUT must be the same
- * 3. OUTPUT must be contiguous
+ * 1. The data types of INPUT and OTHER must be FP32 and data type of OUTPUT must be one of FP32, FP16 and F16
+ * 2. INPUT, OTHER, OUTPUT must be contiguous
  */
 bm_status_t sgdnnAtan2Bcast ( bm_handle_t handle,
                         SgdnnTensor_t input,
