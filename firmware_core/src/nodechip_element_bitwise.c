@@ -340,33 +340,30 @@ data_type_t   dtype) {
 }
 void tpu_kernel_api_element_bitwise_bcast(const void *args) {
     sg_api_element_bitwise_bcast_t *api = (sg_api_element_bitwise_bcast_t*) args;
-    TPUKERNEL_ASSERT(api->dim > 0 && api->dim <= 4);
+    TPUKERNEL_ASSERT(api->input_dim > 0 && api->input_dim <= 4 &&
+                     api->other_dim > 0 && api->other_dim <= 4);
     TPUKERNEL_ASSERT(api->dtype == DT_INT32 || api->dtype == DT_UINT32 ||
                      api->dtype == DT_INT8 || api->dtype == DT_UINT8);
 
     dim4 input_shape = { .n = 1, .c = 1, .h = 1, .w = 1 };
     dim4 other_shape = { .n = 1, .c = 1, .h = 1, .w = 1 };
     dim4 output_shape = { .n = 1, .c = 1, .h = 1, .w = 1 };
-    if(api->dim >= 1) {
-        input_shape.n = api->input_shape[0];
-        other_shape.n = api->other_shape[0];
-        output_shape.n = input_shape.n > other_shape.n ? input_shape.n : other_shape.n;
-    }
-    if(api->dim >= 2) {
-        input_shape.c = api->input_shape[1];
-        other_shape.c = api->other_shape[1];
-        output_shape.c = input_shape.c > other_shape.c ? input_shape.c : other_shape.c;
-    }
-    if(api->dim >= 3) {
-        input_shape.h = api->input_shape[2];
-        other_shape.h = api->other_shape[2];
-        output_shape.h = input_shape.h > other_shape.h ? input_shape.h : other_shape.h;
-    }
-    if(api->dim >= 4) {
-        input_shape.w = api->input_shape[3];
-        other_shape.w = api->other_shape[3];
-        output_shape.w = input_shape.w > other_shape.w ? input_shape.w : other_shape.w;
-    }
+    
+    if(api->input_dim>=1) input_shape.w = api->input_shape[api->input_dim-1];
+    if(api->other_dim>=1) other_shape.w = api->other_shape[api->other_dim-1];
+    output_shape.w = input_shape.w > other_shape.w ? input_shape.w : other_shape.w;
+
+    if(api->input_dim>=2) input_shape.h = api->input_shape[api->input_dim-2];
+    if(api->other_dim>=2) other_shape.h = api->other_shape[api->other_dim-2];
+    output_shape.h = input_shape.h > other_shape.h ? input_shape.h : other_shape.h;
+
+    if(api->input_dim>=3) input_shape.c = api->input_shape[api->input_dim-3];
+    if(api->other_dim>=3) other_shape.c = api->other_shape[api->other_dim-3];
+    output_shape.c = input_shape.c > other_shape.c ? input_shape.c : other_shape.c;
+
+    if(api->input_dim>=4) input_shape.n = api->input_shape[api->input_dim-4];
+    if(api->other_dim>=4) other_shape.n = api->other_shape[api->other_dim-4];
+    output_shape.n = input_shape.n > other_shape.n ? input_shape.n : other_shape.n;
 
     tpu_initialize();
     nodechip_element_bitwise_bcast(api->input_global_addr,

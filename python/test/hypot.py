@@ -11,8 +11,8 @@ def case1():
     # self = 13 * torch.rand((35,35,1,55), dtype=torch.float32)
     # other = 15 * torch.rand((35,35,25,55), dtype=torch.float32)
 
-    # self = 13 * torch.rand((35,35,25,55), dtype=torch.float32)
-    # other = 15 * torch.rand((1,35,25,55), dtype=torch.float32)
+    self = 13 * torch.rand((25,55), dtype=torch.float32)
+    other = 15 * torch.rand((35,35,25,55), dtype=torch.float32)
 
     # self = 13 * torch.rand((35,35,25,55), dtype=torch.float32)
     # other = 15 * torch.rand((35,35,25,55), dtype=torch.float32)
@@ -20,8 +20,8 @@ def case1():
     # self = 13 * torch.rand((35,35,25,55), dtype=torch.float32)
     # other = torch.tensor(5., dtype=torch.float32)
 
-    self = torch.tensor(5., dtype=torch.float32)
-    other = 13 * torch.rand((35,35,25,55), dtype=torch.float32)
+    # self = torch.tensor(5., dtype=torch.float32)
+    # other = 13 * torch.rand((35,35,25,55), dtype=torch.float32)
 
     self_tpu = self.to(device)
     other_tpu = other.to(device)

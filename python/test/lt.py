@@ -39,25 +39,28 @@ def case1():
     # # tpu_res = torch.lt(a1_tpu, a2)
     # tpu_res = torch.lt(a1_tpu, a2.to(device))
 
-    # lt bcast1 int
-    a1 = torch.randint(1, 10, (3, 555, 35), dtype=torch.int)
-    a1_tpu = a1.to(device)
-    a2 = torch.randint(1, 10, (1, 1, 35), dtype=torch.int)
-    cpu_res = torch.lt(a1, a2)
-    tpu_res = torch.lt(a1_tpu, a2.to(device))
-
-    # # lt bcast2 float
-    # a1 = torch.rand((3, 555, 35))
+    # # lt bcast1 int
+    # a1 = torch.randint(1, 10, (7, 35, 23, 35), dtype=torch.int)
     # a1_tpu = a1.to(device)
-    # a2 = torch.rand((1, 1, 35))
+    # a2 = torch.randint(1, 10, (23, 35), dtype=torch.int)
     # cpu_res = torch.lt(a1, a2)
     # tpu_res = torch.lt(a1_tpu, a2.to(device))
+
+    # lt bcast2 float
+    a1 = torch.rand((3, 555, 35))
+    a1_tpu = a1.to(device)
+    a2 = torch.rand((35))
+    cpu_res = torch.lt(a1, a2)
+    tpu_res = torch.lt(a1_tpu, a2.to(device))
 
     print("a1 : ", a1)
     print("a2 : ", a2)
     print("cpu result : ", cpu_res)
     print("tpu result : ", tpu_res)
-    print("diff : ", (cpu_res == tpu_res.cpu()))
+    element_size = 1
+    for num in cpu_res.size():
+        element_size *= num
+    print("max diff : ", torch.sum(cpu_res == tpu_res.cpu()) - element_size)
 
 if __name__ == "__main__":
     case1()

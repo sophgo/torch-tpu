@@ -4027,24 +4027,16 @@ bm_status_t sgdnnElementBitwiseBcast ( bm_handle_t handle,
                 input.dtype == SGDNN_DTYPE_UINT32 ||
                 input.dtype == SGDNN_DTYPE_INT8 ||
                 input.dtype == SGDNN_DTYPE_UINT8 );
-  SGDNN_CHECK ( input.dim == other.dim );
-  SGDNN_CHECK ( input.dim == output.dim );
-  for ( int i = 0; i < input.dim; ++i ) {
-    SGDNN_CHECK ( input.shape[i] == 1 || input.shape[i] == output.shape[i] );
-  }
-  for ( int i = 0; i < other.dim; ++i ) {
-    SGDNN_CHECK ( other.shape[i] == 1 || other.shape[i] == output.shape[i] );
-  }
   SGDNN_CHECK ( sgdnnIsTensorContiguous ( &input ) );
   SGDNN_CHECK ( sgdnnIsTensorContiguous ( &other ) );
   SGDNN_CHECK ( sgdnnIsTensorContiguous ( &output ) );
 
-#if defined SGDNN_BACKEND_1684X
   sg_api_element_bitwise_bcast_t api;
   api.input_global_addr = input.addr;
   api.other_global_addr = other.addr;
   api.output_global_addr = output.addr;
-  api.dim = input.dim;
+  api.input_dim = input.dim;
+  api.other_dim = other.dim;
   for ( int i = 0; i < input.dim; ++i ) {
     api.input_shape[i] = input.shape[i];
   }
@@ -4053,21 +4045,10 @@ bm_status_t sgdnnElementBitwiseBcast ( bm_handle_t handle,
   }
   api.mode = mode;
   api.dtype = sgdnnTPUKernelDType ( input.dtype );
+
+#if defined SGDNN_BACKEND_1684X
   SAFE_CALL ( sgdnnTPUKernelLaunch ( handle, "tpu_kernel_api_element_bitwise_bcast", &api, sizeof ( api ) ) );
 #elif defined SGDNN_BACKEND_2260
-  sg_api_element_bitwise_bcast_t api;
-  api.input_global_addr = input.addr;
-  api.other_global_addr = other.addr;
-  api.output_global_addr = output.addr;
-  api.dim = input.dim;
-  for ( int i = 0; i < input.dim; ++i ) {
-    api.input_shape[i] = input.shape[i];
-  }
-  for ( int i = 0; i < other.dim; ++i ) {
-    api.other_shape[i] = other.shape[i];
-  }
-  api.mode = mode;
-  api.dtype = sgdnnTPUKernelDType ( input.dtype );
   SAFE_CALL ( sgdnnTPUKernelLaunch ( handle, "tpu_kernel_api_element_bitwise_bcast", &api, sizeof ( api ) ) );
 #else
   SGDNN_CHECK ( false );
@@ -4234,17 +4215,6 @@ bm_status_t sgdnnComparisionBcast ( bm_handle_t handle,
                                     int mode,
                                     SgdnnTensor_t output ) {
   SGDNN_CHECK ( input.dtype == other.dtype );
-  SGDNN_CHECK ( input.dim == other.dim );
-  SGDNN_CHECK ( input.dim == output.dim );
-  SGDNN_CHECK ( sgdnnIsTensorContiguous ( &input ) );
-  SGDNN_CHECK ( sgdnnIsTensorContiguous ( &other ) );
-  SGDNN_CHECK ( sgdnnIsTensorContiguous ( &output ) );
-  for ( int i = 0; i < input.dim; ++i ) {
-    SGDNN_CHECK ( input.shape[i] == 1 || input.shape[i] == output.shape[i] );
-  }
-  for ( int i = 0; i < other.dim; ++i ) {
-    SGDNN_CHECK ( other.shape[i] == 1 || other.shape[i] == output.shape[i] );
-  }
   SGDNN_CHECK ( sgdnnIsTensorContiguous ( &input ) );
   SGDNN_CHECK ( sgdnnIsTensorContiguous ( &other ) );
   SGDNN_CHECK ( sgdnnIsTensorContiguous ( &output ) );
@@ -4254,7 +4224,8 @@ bm_status_t sgdnnComparisionBcast ( bm_handle_t handle,
   api.input_global_addr = input.addr;
   api.other_global_addr = other.addr;
   api.output_global_addr = output.addr;
-  api.dim = input.dim;
+  api.input_dim = input.dim;
+  api.other_dim = other.dim;
   for ( int i = 0; i < input.dim; ++i ) {
     api.input_shape[i] = input.shape[i];
   }
@@ -6205,14 +6176,6 @@ bm_status_t sgdnnHypotBcast ( bm_handle_t handle,
   SGDNN_CHECK ( input.dtype == other.dtype );
   SGDNN_CHECK ( input.dtype == output.dtype );
   SGDNN_CHECK ( input.dtype == SGDNN_DTYPE_FP32 );
-  SGDNN_CHECK ( input.dim == other.dim );
-  SGDNN_CHECK ( input.dim == output.dim );
-  for ( int i = 0; i < input.dim; ++i ) {
-    SGDNN_CHECK ( input.shape[i] == 1 || input.shape[i] == output.shape[i] );
-  }
-  for ( int i = 0; i < other.dim; ++i ) {
-    SGDNN_CHECK ( other.shape[i] == 1 || other.shape[i] == output.shape[i] );
-  }
   SGDNN_CHECK ( sgdnnIsTensorContiguous ( &input ) );
   SGDNN_CHECK ( sgdnnIsTensorContiguous ( &other ) );
   SGDNN_CHECK ( sgdnnIsTensorContiguous ( &output ) );
@@ -6222,7 +6185,8 @@ bm_status_t sgdnnHypotBcast ( bm_handle_t handle,
   api.input_global_addr = input.addr;
   api.other_global_addr = other.addr;
   api.output_global_addr = output.addr;
-  api.dim = input.dim;
+  api.input_dim = input.dim;
+  api.other_dim = other.dim;
   for ( int i = 0; i < input.dim; ++i ) {
     api.input_shape[i] = input.shape[i];
   }

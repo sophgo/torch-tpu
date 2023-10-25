@@ -572,7 +572,7 @@ Tensor &bitwise_xor_out_tpu(const Tensor &self, const Tensor &other,
     tpu::OpTimer::Instance().AddTime(tpu::BITWISE_XOR_C, timer.ElapsedUS());
 #endif
 
-  } else if (self.dim() == other.dim()) {
+  } else {
     if (tpu::TPUIsSameShape(self, other)) {
 
 #ifdef TPU_OP_TIMING
@@ -604,8 +604,6 @@ Tensor &bitwise_xor_out_tpu(const Tensor &self, const Tensor &other,
                                        timer.ElapsedUS());
 #endif
     }
-  } else {
-    TORCH_CHECK(false, "unsupported dims");
   }
 
   return out;
@@ -658,7 +656,7 @@ Tensor &bitwise_and_out_tpu(const Tensor &self, const Tensor &other,
     tpu::OpTimer::Instance().AddTime(tpu::BITWISE_AND_C, timer.ElapsedUS());
 #endif
 
-  } else if (self.dim() == other.dim()) {
+  } else {
     if (tpu::TPUIsSameShape(self, other)) {
 
 #ifdef TPU_OP_TIMING
@@ -690,8 +688,6 @@ Tensor &bitwise_and_out_tpu(const Tensor &self, const Tensor &other,
                                        timer.ElapsedUS());
 #endif
     }
-  } else {
-    TORCH_CHECK(false, "unsupported dims");
   }
 
   return out;
@@ -744,7 +740,7 @@ Tensor &bitwise_or_out_tpu(const Tensor &self, const Tensor &other,
     tpu::OpTimer::Instance().AddTime(tpu::BITWISE_OR_C, timer.ElapsedUS());
 #endif
 
-  } else if (self.dim() == other.dim()) {
+  } else {
     if (tpu::TPUIsSameShape(self, other)) {
 
 #ifdef TPU_OP_TIMING
@@ -776,8 +772,6 @@ Tensor &bitwise_or_out_tpu(const Tensor &self, const Tensor &other,
                                        timer.ElapsedUS());
 #endif
     }
-  } else {
-    TORCH_CHECK(false, "unsupported dims");
   }
 
   return out;
@@ -827,7 +821,7 @@ Tensor &equal_out_tpu(const Tensor &self, const Tensor &other, Tensor &out) {
     tpu::OpTimer::Instance().AddTime(tpu::EQUAL_C, timer.ElapsedUS());
 #endif
 
-  } else if (self.dim() == other.dim()) {
+  } else {
     if (tpu::TPUIsSameShape(self, other)) {
 
 #ifdef TPU_OP_TIMING
@@ -854,8 +848,6 @@ Tensor &equal_out_tpu(const Tensor &self, const Tensor &other, Tensor &out) {
       tpu::OpTimer::Instance().AddTime(tpu::EQUAL_BCAST, timer.ElapsedUS());
 #endif
     }
-  } else {
-    TORCH_CHECK(false, "unsupported dims");
   }
 
   return out;
@@ -906,7 +898,7 @@ Tensor &greater_or_equal_out_tpu(const Tensor &self, const Tensor &other,
                                      timer.ElapsedUS());
 #endif
 
-  } else if (self.dim() == other.dim()) {
+  } else {
     if (tpu::TPUIsSameShape(self, other)) {
 
 #ifdef TPU_OP_TIMING
@@ -934,8 +926,6 @@ Tensor &greater_or_equal_out_tpu(const Tensor &self, const Tensor &other,
                                        timer.ElapsedUS());
 #endif
     }
-  } else {
-    TORCH_CHECK(false, "unsupported dims");
   }
 
   return out;
@@ -985,7 +975,7 @@ Tensor &greater_out_tpu(const Tensor &self, const Tensor &other, Tensor &out) {
     tpu::OpTimer::Instance().AddTime(tpu::GREATER_C, timer.ElapsedUS());
 #endif
 
-  } else if (self.dim() == other.dim()) {
+  } else {
     if (tpu::TPUIsSameShape(self, other)) {
 
 #ifdef TPU_OP_TIMING
@@ -1012,8 +1002,6 @@ Tensor &greater_out_tpu(const Tensor &self, const Tensor &other, Tensor &out) {
       tpu::OpTimer::Instance().AddTime(tpu::GREATER_BCAST, timer.ElapsedUS());
 #endif
     }
-  } else {
-    TORCH_CHECK(false, "unsupported dims");
   }
 
   return out;
@@ -1064,7 +1052,7 @@ Tensor &less_than_or_equal_out_tpu(const Tensor &self, const Tensor &other,
                                      timer.ElapsedUS());
 #endif
 
-  } else if (self.dim() == other.dim()) {
+  } else {
     if (tpu::TPUIsSameShape(self, other)) {
 
 #ifdef TPU_OP_TIMING
@@ -1093,8 +1081,6 @@ Tensor &less_than_or_equal_out_tpu(const Tensor &self, const Tensor &other,
                                        timer.ElapsedUS());
 #endif
     }
-  } else {
-    TORCH_CHECK(false, "unsupported dims");
   }
 
   return out;
@@ -1115,41 +1101,41 @@ Tensor & less_than_out_tpu( const Tensor &self, const Tensor &other, Tensor &out
   else if(self.dim() == 0) {
 
 #ifdef TPU_OP_TIMING
-      auto timer = tpu::Timer().Start();
+    auto timer = tpu::Timer().Start();
 #endif
     // mode : 0 equal, 1 not equal, 2 greater, 3 greater or equal, 4 less than, 5 less than or equal
     // pos : 0 for self is scalar, 1 for other is scalar
-      bm_status_t status = sgdnnComparisionC(tpu::TPUGetDeviceHandle(),
-                                             tpu:: TPUGenerateSgdnnTensor ( other ),
-                                             self.item().toFloat(),
-                                             4,
-                                             0,
-                                             tpu:: TPUGenerateSgdnnTensor ( out ) );
-      TORCH_CHECK ( status == BM_SUCCESS );
+    bm_status_t status = sgdnnComparisionC(tpu::TPUGetDeviceHandle(),
+                                           tpu:: TPUGenerateSgdnnTensor ( other ),
+                                           self.item().toFloat(),
+                                           4,
+                                           0,
+                                           tpu:: TPUGenerateSgdnnTensor ( out ) );
+    TORCH_CHECK ( status == BM_SUCCESS );
 #ifdef TPU_OP_TIMING
-      tpu::OpTimer::Instance().AddTime ( tpu::LESS_THAN_C, timer.ElapsedUS() );
+    tpu::OpTimer::Instance().AddTime ( tpu::LESS_THAN_C, timer.ElapsedUS() );
 #endif
 
   }
   else if(other.dim() == 0) {
 
 #ifdef TPU_OP_TIMING
-      auto timer = tpu::Timer().Start();
+    auto timer = tpu::Timer().Start();
 #endif
-      bm_status_t status = sgdnnComparisionC(tpu::TPUGetDeviceHandle(),
-                                             tpu:: TPUGenerateSgdnnTensor ( self ),
-                                             other.item().toFloat(),
-                                             4,
-                                             1,
-                                             tpu:: TPUGenerateSgdnnTensor ( out ) );
-      TORCH_CHECK ( status == BM_SUCCESS );
+    bm_status_t status = sgdnnComparisionC(tpu::TPUGetDeviceHandle(),
+                                           tpu:: TPUGenerateSgdnnTensor ( self ),
+                                           other.item().toFloat(),
+                                           4,
+                                           1,
+                                           tpu:: TPUGenerateSgdnnTensor ( out ) );
+    TORCH_CHECK ( status == BM_SUCCESS );
 #ifdef TPU_OP_TIMING
-      tpu::OpTimer::Instance().AddTime ( tpu::LESS_THAN_C, timer.ElapsedUS() );
+    tpu::OpTimer::Instance().AddTime ( tpu::LESS_THAN_C, timer.ElapsedUS() );
 #endif
 
   }
-  else if(self.dim() == other.dim()) {
-      if(tpu::TPUIsSameShape(self, other)){
+  else {
+    if(tpu::TPUIsSameShape(self, other)){
 
 #ifdef TPU_OP_TIMING
       auto timer = tpu::Timer().Start();
@@ -1164,44 +1150,22 @@ Tensor & less_than_out_tpu( const Tensor &self, const Tensor &other, Tensor &out
       tpu::OpTimer::Instance().AddTime ( tpu::LESS_THAN, timer.ElapsedUS() );
 #endif
 
-      }
-      else {
+    } else {
 
 #ifdef TPU_OP_TIMING
-            auto timer = tpu::Timer().Start();
+      auto timer = tpu::Timer().Start();
 #endif
-            bm_status_t status = sgdnnComparisionBcast(tpu::TPUGetDeviceHandle(),
-                                                       tpu:: TPUGenerateSgdnnTensor ( self ),
-                                                       tpu:: TPUGenerateSgdnnTensor ( other ),
-                                                       4,
-                                                       tpu:: TPUGenerateSgdnnTensor ( out ) );
-            TORCH_CHECK ( status == BM_SUCCESS );
-#ifdef TPU_OP_TIMING
-            tpu::OpTimer::Instance().AddTime ( tpu::LESS_THAN_BCAST, timer.ElapsedUS() );
-#endif
-
-      }
-  }
-  else {
-//     TORCH_CHECK ( false, "unsupported dims" );
-//     LOG(WARNING) << "less_than_out use cpu impl";
-//     auto out_cpu = lt(self.cpu(), other.cpu());
-//     tpu::TPUCopyHostToDevice(out.data_ptr(), out_cpu.contiguous().data_ptr(), out.nbytes());
-      int s_dims = self.dim();
-      int o_dims = other.dim();
-      at::Tensor t = other.clone();
-      t = const_cast<at::Tensor &>(t);
-      at::Tensor &t_s = t;
-      bm_status_t status2 = sgdnnSqueeze(tpu::TPUGetDeviceHandle(),
-                                        tpu::TPUGenerateSgdnnTensor(self),
-                                        tpu::TPUGenerateSgdnnTensor(t_s));
-      TORCH_CHECK ( status2 == BM_SUCCESS );
       bm_status_t status = sgdnnComparisionBcast(tpu::TPUGetDeviceHandle(),
-                                              tpu:: TPUGenerateSgdnnTensor ( t_s.transpose(-1,0) ),
-                                              tpu:: TPUGenerateSgdnnTensor ( other ),
-                                              4,
-                                              tpu:: TPUGenerateSgdnnTensor ( out ) );
+                                                 tpu:: TPUGenerateSgdnnTensor ( self ),
+                                                 tpu:: TPUGenerateSgdnnTensor ( other ),
+                                                 4,
+                                                 tpu:: TPUGenerateSgdnnTensor ( out ) );
       TORCH_CHECK ( status == BM_SUCCESS );
+#ifdef TPU_OP_TIMING
+      tpu::OpTimer::Instance().AddTime ( tpu::LESS_THAN_BCAST, timer.ElapsedUS() );
+#endif
+
+    }
   }
 
   return out;
@@ -1252,7 +1216,7 @@ Tensor &not_equal_out_tpu(const Tensor &self, const Tensor &other,
     tpu::OpTimer::Instance().AddTime(tpu::NOT_EQUAL_C, timer.ElapsedUS());
 #endif
 
-  } else if (self.dim() == other.dim()) {
+  } else {
     if (tpu::TPUIsSameShape(self, other)) {
 
 #ifdef TPU_OP_TIMING
@@ -1279,8 +1243,6 @@ Tensor &not_equal_out_tpu(const Tensor &self, const Tensor &other,
       tpu::OpTimer::Instance().AddTime(tpu::NOT_EQUAL_BCAST, timer.ElapsedUS());
 #endif
     }
-  } else {
-    TORCH_CHECK(false, "unsupported dims");
   }
 
   return out;
@@ -1953,7 +1915,7 @@ Tensor & hypot_out_tpu(const Tensor &self, const Tensor &other, Tensor &out) {
                                      other.item().toFloat(), tpu::TPUGenerateSgdnnTensor(out));
     TORCH_CHECK ( status == BM_SUCCESS );
   }
-  else if(self.dim() == other.dim()) {
+  else {
     if(tpu::TPUIsSameShape(self, other)) {
       bm_status_t status = sgdnnHypot(
                               tpu::TPUGetDeviceHandle(), tpu::TPUGenerateSgdnnTensor(self),
@@ -1967,9 +1929,6 @@ Tensor & hypot_out_tpu(const Tensor &self, const Tensor &other, Tensor &out) {
       TORCH_CHECK ( status == BM_SUCCESS );
     }
   }
-  else {
-    TORCH_CHECK(false, "unsupported dims");
-  }
 
 #ifdef TPU_OP_TIMING
   tpu::OpTimer::Instance().AddTime(tpu::HYPOT, timer.ElapsedUS());
@@ -1977,41 +1936,7 @@ Tensor & hypot_out_tpu(const Tensor &self, const Tensor &other, Tensor &out) {
 
   return out;
 }
-Tensor hypot_tpu(const Tensor &self, const Tensor &other) {
-  Tensor out;
-  if((self.dim() == 0 && other.dim() == 0)) {
-    out = empty_like(self);
-  }
-  else if(self.dim() == 0) {
-    out = empty_like(other);
-  }
-  else if(other.dim() == 0) {
-    out = empty_like(self);
-  }
-  else if(self.dim() == other.dim()) {
-    if(tpu::TPUIsSameShape(self, other)) {
-      out = empty_like(self);
-    }
-    else {
-      for(int i = 0 ; i < self.dim(); ++i) {
-        if(self.size(i) == 1) {
-          out = empty_like(other);
-          break;
-        }
-        else if(other.size(i) == 1) {
-          out = empty_like(self);
-          break;
-        }
-      }
-    }
-  }
-  else {
-    TORCH_CHECK(false, "unsupported dims");
-  }
-  return hypot_out_tpu(self, other, out);
-}
 TORCH_LIBRARY_IMPL(aten, TPU, m) {
-  m.impl("hypot", hypot_tpu);
   m.impl("hypot.out", hypot_out_tpu);
 }
 

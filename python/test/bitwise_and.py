@@ -8,48 +8,42 @@ device = "privateuseone:0"
 
 def case1():
 
-    # and same shape
+    # # and same shape
     # a1 = torch.randint(1, 10, (5,5), dtype=torch.int)
     # a1_tpu = a1.to(device)
     # a2 = torch.randint(1, 10, (5,5), dtype=torch.int)
-    # a3 = a1.bitwise_and(a2)
-    # a1_tpu = a1_tpu.bitwise_and(a2.to(device))
-    # print("origin a1: ", a1)
-    # print("origin a2: ", a2)
-    # print("cpu : ", a3)
-    # print("tpu : ", a1_tpu.cpu())
+    # cpu_res = a1.bitwise_and(a2)
+    # tpu_res = a1_tpu.bitwise_and(a2.to(device)).cpu()
 
     # and bcast
-    # a1 = torch.randint(1, 10, (1,5), dtype=torch.int)
-    # a1_tpu = a1.to(device)
-    # a2 = torch.randint(1, 10, (5,5), dtype=torch.int)
-    # a3 = a1.bitwise_and(a2)
-    # a1_tpu = a1_tpu.bitwise_and(a2.to(device))
-    # print("origin a1: ", a1)
-    # print("origin a2: ", a2)
-    # print("cpu : ", a3)
-    # print("tpu : ", a1_tpu.cpu())
-
-    # # andc
-    a1 = torch.randint(1, 10, (3,500,100), dtype=torch.int)
+    a1 = torch.randint(1, 10, (25, 33, 18, 53), dtype=torch.int)
     a1_tpu = a1.to(device)
-    a2 = torch.tensor(2, dtype=torch.int)
-    a3 = a1.bitwise_and(a2)
-    a1_tpu = a1_tpu.bitwise_and(a2)
+    a2 = torch.randint(1, 10, (18, 53), dtype=torch.int)
+    cpu_res = a1.bitwise_and(a2)
+    tpu_res = a1_tpu.bitwise_and(a2.to(device)).cpu()
+
+    # # and c
+    # a1 = torch.randint(1, 10, (3,350,350), dtype=torch.int8)
+    # a1_tpu = a1.to(device)
+    # a2 = torch.tensor(2, dtype=torch.int8)
+    # cpu_res = a1.bitwise_or(a2)
+    # tpu_res = a1_tpu.bitwise_or(a2).cpu()
+
+    # # and c
+    # a1 = torch.tensor(2, dtype=torch.int8)
+    # a1_tpu = a1.to(device)
+    # a2 = torch.randint(1, 10, (3,350,350), dtype=torch.int8)
+    # a2_tpu = a2.to(device)
+    # cpu_res = a1.bitwise_and(a2)
+    # tpu_res = a1_tpu.bitwise_and(a2_tpu).cpu()
+
     print("origin a1: ", a1)
     print("origin a2: ", a2)
-    print("cpu : ", a3)
-    print("tpu : ", a1_tpu.cpu())
-    # andc
-    # a1 = torch.randint(1, 10, (5,1), dtype=torch.int)
-    # a1_tpu = a1.to(device)
-    # a2 = torch.tensor(2, dtype=torch.int)
-    # a3 = a1.bitwise_and(a2)
-    # a1_tpu = a1_tpu.bitwise_and(a2.to(device))
-    # print("origin a1: ", a1)
-    # print("origin a2: ", a2)
-    # print("cpu : ", a3)
-    # print("tpu : ", a1_tpu.cpu())
+    print("cpu res : ", cpu_res)
+    print("tpu res : ", tpu_res)
+    print("cpu res shape : ", cpu_res.size())
+    print("tpu res shape : ", tpu_res.size())
+    print("max diff: ", torch.max(cpu_res - tpu_res))
 
 
 if __name__ == "__main__":
