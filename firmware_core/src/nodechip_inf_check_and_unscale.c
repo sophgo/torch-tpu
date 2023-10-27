@@ -1,13 +1,7 @@
 #include "sg_api_struct.h"
 #include "tpu_kernel.h"
+#include "kernel_utils_func.h"
 
-extern void tpu_bdc_fp_isinf(local_addr_t dst_addr, local_addr_t src_addr,
-                      local_addr_t work0_addr, const dim4 *shape, data_type_t dtype);
-
-extern void tpu_bdc_fp_isnan(local_addr_t dst_addr, local_addr_t src_addr,
-                      local_addr_t work0_addr, local_addr_t work1_addr,
-                      local_addr_t work2_addr, const dim4 *shape,
-                      data_type_t dtype);
 
 void tpu_bdc_check_inf_nan(local_addr_t dst_addr, local_addr_t found_inf_addr, local_addr_t src_addr,
                         local_addr_t work0_addr, local_addr_t work1_addr,

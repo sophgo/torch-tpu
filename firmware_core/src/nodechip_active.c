@@ -1,5 +1,6 @@
 #include "sg_api_struct.h"
 #include "tpu_kernel.h"
+#include "kernel_utils_func.h"
 
 #define BOFFSET(index) buffer_addr + index *tensor_bsize_pnpu
 
@@ -115,48 +116,6 @@ void tpu_bdc_fp_silu(local_addr_t dst_addr, local_addr_t src_addr,
                       table_addr, shape);
     return;
   }
-}
-
-void tpu_bdc_fp_isinf(local_addr_t dst_addr, local_addr_t src_addr,
-                      local_addr_t work0_addr, const dim4 *shape,
-                      data_type_t dtype) {
-  scalar_t inf_C = {.u32 = (dtype == DT_FP32
-                                ? 0x7f800000
-                                : (dtype == DT_FP16 ? 0x7c00 : 0x7f80))};
-  scalar_t neg_C = {.u32 = (dtype == DT_FP32
-                                ? 0x7fffffff
-                                : (dtype == DT_FP16 ? 0x7fff : 0x7fff))};
-  scalar_t C = {.u8 = 1};
-
-  tpu_bdc_and_C(work0_addr, src_addr, neg_C, shape, NULL, NULL, dtype);
-  tpu_bdc_equal_C(dst_addr, work0_addr, inf_C, C, shape, NULL, NULL, DT_UINT8,
-                  dtype);
-}
-
-void tpu_bdc_fp_isnan(local_addr_t dst_addr, local_addr_t src_addr,
-                      local_addr_t work0_addr, local_addr_t work1_addr,
-                      local_addr_t work2_addr, const dim4 *shape,
-                      data_type_t dtype) {
-  scalar_t inf_C = {.u32 = (dtype == DT_FP32
-                                ? 0x7f800000
-                                : (dtype == DT_FP16 ? 0x7c00 : 0x7f80))};
-  scalar_t neg_C = {.u32 = (dtype == DT_FP32
-                                ? 0x7fffffff
-                                : (dtype == DT_FP16 ? 0x7fff : 0x7fff))};
-  scalar_t C = {.u8 = 1};
-
-  tpu_bdc_and_C(work2_addr, src_addr, inf_C, shape, NULL, NULL, dtype);
-  tpu_bdc_equal_C(work0_addr, work2_addr, inf_C, C, shape, NULL, NULL, DT_UINT8,
-                  dtype);
-
-  tpu_bdc_and_C(work2_addr, src_addr, neg_C, shape, NULL, NULL, dtype);
-  tpu_bdc_not_equal_C(work1_addr, work2_addr, inf_C, C, shape, NULL, NULL,
-                      DT_UINT8, dtype);
-
-  tpu_bdc_and(work2_addr, work0_addr, work1_addr, shape, NULL, NULL, NULL,
-              DT_UINT8);
-  tpu_bdc_equal_C(dst_addr, work2_addr, C, C, shape, NULL, NULL, DT_UINT8,
-                  DT_UINT8);
 }
 
 extern void nodechip_active_local(local_addr_t in_addr, local_addr_t out_addr,

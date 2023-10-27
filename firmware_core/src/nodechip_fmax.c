@@ -1,15 +1,7 @@
 #include "sg_api_struct.h"
 #include "tpu_kernel.h"
 #include "string.h"
-void isNan(
-    local_addr_t output_local_addr,
-    local_addr_t input_local_addr,
-    local_addr_t work0_local_addr,
-    local_addr_t work1_local_addr,
-    const dim4 *shape,
-    const dim4 *stride,
-    data_type_t dtype
-);
+#include "kernel_utils_func.h"
 
 void replaceWithNotNan(
     local_addr_t output_local_addr,

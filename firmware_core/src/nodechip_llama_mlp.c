@@ -1,6 +1,8 @@
 #include "sg_api_struct.h"
 #include "tpu_kernel.h"
+#include "config.h"
 
+#ifdef FIRMWARE_BACKEND_2260
 extern
 void nodechip_llama_mlp_forward_multi_core(
     /*
@@ -40,3 +42,4 @@ void tpu_kernel_llama_mlp_multi_core(const void* api_buf) {
 }
 
 TPUKERNEL_FUNC_REGISTER(tpu_kernel_llama_mlp_multi_core);
+#endif

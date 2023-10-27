@@ -1,0 +1,2 @@
+#cmakedefine FIRMWARE_BACKEND_1684X
+#cmakedefine FIRMWARE_BACKEND_2260
