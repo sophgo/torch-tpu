@@ -6,9 +6,11 @@ export CHIP_ARCH=${1:-bm1684x}
 
 export LIBSOPHON_STABLE=stable
 export LIBSOPHON_LATEST=latest
+export LIBSOPHON_LOCAL=local
 export LIBSOPHON_PATTERN=${2:-$LIBSOPHON_LATEST} 
      # stable: means using libsophon install from .deb in /opt/sophon/libsophon-current
      # latest: means using libsophon-latest  its directory usually at the same level with tpu-train
+     # local:  means using third_party's bmlib_cmodel.so
 echo "export TPUTRAIN_TOP=${TPUTRAIN_TOP}"
 echo "[INFO]CHIP_ARCH=$CHIP_ARCH"
 echo "[INFO]LIBSOPHON_PATTERN=$LIBSOPHON_PATTERN"
@@ -17,7 +19,7 @@ if [ $LIBSOPHON_PATTERN = $LIBSOPHON_STABLE ]; then
 elif [ $LIBSOPHON_PATTERN = $LIBSOPHON_LATEST ]; then
      export LIBSOPHON_TOP=$TPUTRAIN_TOP/../libsophon
 else 
-     echo "[ERROR] LISOPHON_PATTERN must be one of {stable, latest}"
+     export LIBSOPHON_TOP=$TPUTRAIN_TOP/third_party
 fi
 
 #source ${TPUTRAIN_TOP}/scripts/prepare_toolchains.sh
@@ -35,9 +37,9 @@ function format_code {
      echo "formated $1"
 }
 
-export BMLIB_CMODEL_PATH=$TPUTRAIN_TOP/third_party/$CHIP_ARCH/libcmodel_firmware.so
+export FIRMWARE_CMODEL_PATH=$TPUTRAIN_TOP/third_party/$CHIP_ARCH/libcmodel_firmware.so
 export BMLIB_PATH=$TPUTRAIN_TOP/third_party/$CHIP_ARCH/libbmlib.so
-echo "[INFO]USING_CMODEL_PATH=$BMLIB_CMODEL_PATH"
+echo "[INFO]USING_FIRMWARE_CMODEL_PATH=$FIRMWARE_CMODEL_PATH"
 source ${TPUTRAIN_TOP}/scripts/build_helper.sh
 source ${TPUTRAIN_TOP}/scripts/release.sh
 source ${TPUTRAIN_TOP}/scripts/regression.sh

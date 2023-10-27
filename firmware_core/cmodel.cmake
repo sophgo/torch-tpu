@@ -1,18 +1,6 @@
 set(CMAKE_BUILD_TYPE "Debug")
 if($ENV{CHIP_ARCH} STREQUAL "bm1684x")
-if($ENV{LIBSOPHON_PATTERN} MATCHES $ENV{LIBSOPHON_STABLE})
-	find_package(libsophon REQUIRED)
-elseif($ENV{LIBSOPHON_PATTERN} MATCHES $ENV{LIBSOPHON_LATEST})
-	include_directories($ENV{LIBSOPHON_TOP}/bmlib/include)
-	include_directories($ENV{LIBSOPHON_TOP}/bmlib/src)
-	link_directories($ENV{LIBSOPHON_TOP}/build/bmlib)
-endif()
-include_directories(${LIBSOPHON_INCLUDE_DIRS})
-include_directories(include)
-include_directories($ENV{TPUTRAIN_TOP}/include)
-include_directories(${CMAKE_BINARY_DIR})
-link_directories($ENV{TPUTRAIN_TOP}/lib)
-link_directories(${CMAKE_BINARY_DIR})
+
 
 set(KERNEL_HEADER "${CMAKE_BINARY_DIR}/firmware_core/kernel_module_data.h")
 add_custom_command(
@@ -31,7 +19,7 @@ target_include_directories(firmware PRIVATE
 )
 target_compile_definitions(firmware PRIVATE -DUSING_CMODEL)
 
-target_link_libraries(firmware PRIVATE $ENV{BMLIB_CMODEL_PATH} m)
+target_link_libraries(firmware PRIVATE $ENV{FIRMWARE_CMODEL_PATH} m)
 set_target_properties(firmware PROPERTIES OUTPUT_NAME cmodel)
 
 elseif($ENV{CHIP_ARCH} STREQUAL "sg2260")
@@ -41,7 +29,7 @@ elseif($ENV{CHIP_ARCH} STREQUAL "sg2260")
 	aux_source_directory(src KERNEL_SRC_FILES)
 
 	add_library(firmware SHARED ${KERNEL_SRC_FILES})
-	target_link_libraries(firmware PRIVATE $ENV{BMLIB_CMODEL_PATH} m)
+	target_link_libraries(firmware PRIVATE $ENV{FIRMWARE_CMODEL_PATH} m)
 	set_target_properties(firmware PROPERTIES OUTPUT_NAME cmodel)
 
 endif()

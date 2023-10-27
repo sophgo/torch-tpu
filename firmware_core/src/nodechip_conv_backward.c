@@ -707,6 +707,7 @@ void nodechip_weight_reorder_to_32oc(
    [1, oc, DIV_UP(ic, 32) * kh * kw, 32]
  *
 */
+static
 void nodechip_weight_reorder(
     global_addr_t   weight_global_addr,
     global_addr_t   weight_reordered_global_addr,
@@ -1433,6 +1434,7 @@ void nodechip_grad_output_reorder(
 
 // forward_input op grad_out => grad_weight
 // [ic, n, ih, iw] conv [oc, n, oh, ow] => [ic, oc, kh, kw]
+static
 void nodechip_conv_backward_weight(
     global_addr_t       forward_input_global_addr,
     global_addr_t       grad_out_global_addr,

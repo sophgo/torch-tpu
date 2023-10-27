@@ -97,6 +97,7 @@ void tpu_bdc_fp_sqrt_v2(local_addr_t dst_addr, local_addr_t src_addr,
 /**
  * tpu_bdc_fp32_silu only support DT_FP32
  */
+static
 void tpu_bdc_fp_silu(local_addr_t dst_addr, local_addr_t src_addr,
                      local_addr_t dst_fp32_addr, local_addr_t src_fp32_addr,
                      local_addr_t work0_addr, local_addr_t work1_addr,

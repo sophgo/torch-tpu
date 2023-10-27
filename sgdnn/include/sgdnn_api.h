@@ -3,6 +3,7 @@
 
 #include "bmlib_runtime.h"
 #include "sg_api_struct.h"
+#include <map>
 #include <vector>
 
 #if defined(__cplusplus)

@@ -1,60 +1,29 @@
-How to gen dependency files for bm1684x?
-0) cd nntoolchain/TPU1686&&git fetch&&git reset --hard origin/master
-   #As nntc:master has not continued to merge latest TPU1686, please directly update 1686
-1) Inside docker for nntoolchain:
-	cd /workspace/nntoolchain/net_compiler
+bm1684x thirdparty 更新
 
-    export GLOG_v=4
-	export GLOG_logtostderr=1
-	export GLOG_log_prefix=false
-	export FLAGS_log_prefix=false
-	export BMLANG_CONFIG="DEBUG=1"
-	export BMNETC_CONFIG="DEBUG=1"
-	export BMNETU_CONFIG="DEBUG=1"
-	export BMRUNTIME_CONFIG="DEBUG=1"
-	export CPU_CONFIG="DEBUG=1"
-	export DYNAMIC_CONTEXT_DEBUG=1
-	source scripts/envsetup.sh
-	rebuild_all_nntc
-	2
-	1
-	3
-	1
+```shell
+# step0 使用nntc的docker（Ubuntu18.04）sophgo:tpuc_dev:latest
 
+# step1. 进入TPU1686工程目录下
+cd </Path/of/TPU1686>
+# step2. 初始化环境
+source scripts/envsetup.sh
 
-    cd /workspace/nntoolchain/TPU1686
-    rm -rf build
-    rm -rf build_test
-    rm -rf build_runtime
-    source scripts/envsetup.sh  bm1684x
-	export EXTRA_CONFIG=-DDEBUG=ON
-	rebuild_all
-	rebuild_test sgdnnn
-	rebuild_firmware
-	Y
+# step3. 编译cmodel版本的芯片运行时库，bmlibcmodel.so
+## 注意，在此之前，确保已经拉下libsophon的工程，
+## 并保证libsophon工程位置位于</Path/of/TPU1686>/../../libsophon
+rebuild_bmlib_cmodel
+cp ../../libsophon/build/bmlib/libbmlib.so PATH/OF/tpu-train/third_party/bm1684x
 
+# step4. 编译cmodel版本firmware
+export EXTRA_CONFIG=-DDEBUG=ON
+rebuild_firmware_cmodel
+cp build/firmware_core/libcmodel_firmware.so PATH/OF/tpu-train/third_party/bm1684x
 
-	cd /workspace/nntoolchain
-	rm -rf target&&mkdir target
-    cp ./net_compiler/out/install/lib/libbmlib.so target/.
-    cp ./TPU1686/build_test/firmware_core/libcmodel_firmware.so ./target/
-    cp ./TPU1686/build/firmware_core/libfirmware_core.a ./target/
+#step5. 编译板卡实际跑的fireware
+rebuild_firmware
+cp build/firmware_core/libfirmware_core.a PATH/OF/tpu-train/third_party/bm1684x/libbm1684x.a
 
-    cd  /workspace/nntoolchain/target
-    cp libbmlib.so libbmlib_cmodel.so
-    mv libfirmware_core.a libbm1684x.a
-    ln -s libbmlib.so libbmlib.so.0
-    cd ..
-
-###############################################
-2) Inside docker for tpu-train:
-   mv /workspace/tpu-train/third_party/bm1684x/README.md  /workspace/tpu-train/third_party/README_bm1684x.md
-   rm -rf /workspace/tpu-train/third_party/bm1684x
-   cp -r /workspace/nntoolchain/target /workspace/tpu-train/third_party/bm1684x
-   mv /workspace/tpu-train/third_party/README_bm1684x.md  /workspace/tpu-train/third_party/bm1684x/README.md
-   chmod -R 777 /workspace/tpu-train/third_party/bm1684x/
-
-###############################################
-Or) Copy Jump Inside docker for tpu-train:
-    cp /workspace/nntoolchain/TPU1686/build_test/firmware_core/libcmodel_firmware.so       /workspace/tpu-train/third_party/bm1684x/libcmodel_firmware.so
-    cp /workspace/nntoolchain/TPU1686/build/firmware_core/libfirmware_core.a               /workspace/tpu-train/third_party/bm1684x/libbm1684x.a
+#step6 建立libbmlib的软连接
+cd PATH/OF/tpu-train/third_party/bm1684x
+ln -s libbmlib.so libbmlib.so.0
+```

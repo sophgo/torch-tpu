@@ -2,11 +2,12 @@
 #include "config_sgdnn_backend.h"
 #include "sg_api_struct.h"
 #include "sgdnn_api.h"
-#include "tpukernel_multicore.hpp"
 #include <stdio.h>
 
 #if defined SGDNN_BACKEND_1684X
 #include "kernel_module_data.h"
+#elif defined SGDNN_BACKEND_2260
+#include "tpukernel_multicore.hpp"
 #endif
 
 #define SGDNN_CHECK(expression) \
@@ -1282,7 +1283,7 @@ bm_status_t sgdnnReduceProd ( bm_handle_t handle,
     size *= sizeof(float);
   }
   else {
-    size *= sizeof(float16);
+    size *= sgdnnDataSize(SGDNN_DTYPE_FP16);
   }
   bm_device_mem_t dev_mem;
   bm_status_t status = bm_malloc_device_byte(handle, &dev_mem, size);
@@ -3453,10 +3454,10 @@ bm_status_t sgdnnMaskedFill ( bm_handle_t handle,
     api.mask_shape[i] = mask.shape[i];
   }
   api.value = value;
-  api.dtype = DT_FP32;
+  api.dtype = sgdnnTPUKernelDType ( SGDNN_DTYPE_FP32 );;
   SAFE_CALL ( sgdnnTPUKernelLaunch ( handle, "tpu_kernel_api_masked_fill", &api, sizeof ( api ) ) );
 #elif defined SGDNN_BACKEND_2260
-
+  SGDNN_CHECK(false);
 #else
   SGDNN_CHECK(false);
 #endif
@@ -5831,7 +5832,7 @@ bm_status_t sgdnnTopk ( bm_handle_t handle,
 #if defined SGDNN_BACKEND_1684X
   sg_api_topk_t api;
   api.dim = input.dim;
-  int64_t index_size = 1, trans_size = 1;
+  unsigned int index_size = 1, trans_size = 1;
   for(int i = 0; i < input.dim; ++i) {
     api.shape[i] = input.shape[i];
     if(i != dim && i != (dim + input.dim)) {
