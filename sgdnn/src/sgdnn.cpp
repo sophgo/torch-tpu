@@ -4995,7 +4995,9 @@ bm_status_t sgdnnBaddbmm ( bm_handle_t handle,
   // need malloc buffer to store input1
   bm_device_mem_t input1_buffer, left_contiguous_mem;
   SgdnnTensor_t left_contiguous;
-  SAFE_CALL( bm_malloc_device_byte ( handle, &input1_buffer, sgdnnTensorBytes ( &input1 ) ) );
+  if ( beta != 0){
+    SAFE_CALL( bm_malloc_device_byte ( handle, &input1_buffer, sgdnnTensorBytes ( &input1 ) ) );
+  }
   if ( sgdnnIsTensorTransposed (&batch1) ){
     left_contiguous.dim = 3;
     left_contiguous.shape[0] = batch1.shape[0];
@@ -5011,7 +5013,7 @@ bm_status_t sgdnnBaddbmm ( bm_handle_t handle,
   }
   sg_api_baddbmm_t api;
   api.input_global_addr  = input1.addr;
-  api.buffer_global_addr = input1_buffer.u.device.device_addr;
+  api.buffer_global_addr = beta == 0 ? 0x0 : input1_buffer.u.device.device_addr;
   api.batch1_global_addr = sgdnnIsTensorTransposed (&batch1) ? left_contiguous.addr : batch1.addr ;
   api.batch2_global_addr = batch2.addr;
   api.output_global_addr = out.addr;
@@ -5042,8 +5044,9 @@ bm_status_t sgdnnBaddbmm ( bm_handle_t handle,
   api.is_right_transpose = sgdnnIsTensorTransposed( &batch2 );
 
   SAFE_CALL ( sgdnnTPUKernelLaunch ( handle, "tpu_kernel_api_baddbmm", &api, sizeof ( api ) ) );
-
-  bm_free_device(handle, input1_buffer);
+  if (beta != 0){
+    bm_free_device(handle, input1_buffer);
+  }
   if ( sgdnnIsTensorTransposed (&batch1) )
   {
     bm_free_device ( handle, left_contiguous_mem );

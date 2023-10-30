@@ -66,7 +66,9 @@ void nodechip_baddbmm (
     int is_left_transpose,
     int is_right_transpose){
     // beta*input1 + alpha(batch1*batch2)
-    nodechip_const_binary_fp(input1_global_addr, input1_buffer_global_addr, input1_shape, input1_dims, beta, 0, 2, dtype, 0, 0);
+    if (beta != 0){
+        nodechip_const_binary_fp(input1_global_addr, input1_buffer_global_addr, input1_shape, input1_dims, beta, 0, 2, dtype, 0, 0);
+    }
     nodechip_batch_matmul_float(batch1_global_addr,
                                 batch2_global_addr,
                                 0,
@@ -82,7 +84,9 @@ void nodechip_baddbmm (
                                 is_right_transpose,
                                 0, 0, 0, 0);
     nodechip_const_binary_fp(output_global_addr, output_global_addr, output_shape, output_dims, alpha, 0, 2, dtype, 0, 0);
-    nodechip_bcbinary_fp(input1_buffer_global_addr, output_global_addr, output_global_addr, input1_shape, output_shape, input1_dims, output_dims, 0, dtype, 0, 0);
+    if (beta != 0){
+        nodechip_bcbinary_fp(input1_buffer_global_addr, output_global_addr, output_global_addr, input1_shape, output_shape, input1_dims, output_dims, 0, dtype, 0, 0);
+    }
 }
 
 void tpu_kernel_api_baddbmm (const void* args){

@@ -154,6 +154,12 @@ Tensor & baddbmm_out_tpu(const at::Tensor & self, const at::Tensor & batch1, con
   auto batch1_ = batch1.is_contiguous() == false && is_transposed ( batch1 ) == false ? batch1.contiguous() : batch1;
   auto batch2_ = batch2.is_contiguous() == false && is_transposed ( batch2 ) == false ? batch2.contiguous() : batch2;
   TIMING_START;
+  if (beta.toDouble() != 0)
+    out = beta * self + alpha * bmm(batch1_, batch2_);
+  else
+    out = alpha * bmm(batch1_, batch2_);
+#if 0
+  // TODO: imple this op, current has bugs
   auto status = sgdnnBaddbmm(
                 tpu::TPUGetDeviceHandle(),
                 tpu::TPUGenerateSgdnnTensor ( self_ ),
@@ -162,6 +168,7 @@ Tensor & baddbmm_out_tpu(const at::Tensor & self, const at::Tensor & batch1, con
                 tpu::TPUGenerateSgdnnTensor ( out ),
                 alpha.toDouble(),
                 beta.toDouble() );
+#endif
   TIMING_END( tpu::BADDBMM );
 #endif
   return out;
