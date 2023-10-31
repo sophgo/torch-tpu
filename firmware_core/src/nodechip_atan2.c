@@ -1,5 +1,3 @@
-#include <string.h>
-
 #include "sg_api_struct.h"
 #include "tpu_kernel.h"
 #define PI 3.14159265
@@ -1281,9 +1279,6 @@ void tpu_kernel_api_atan2_bcast_multi_core(const void *args) {
   if (core_idx == length_secs - 1) {
     cur_length_slice = length - length_slice * (length_secs - 1);
   }
-  input_shape.n = input_shape.n != 1 ? cur_length_slice : 1;
-  other_shape.n = other_shape.n != 1 ? cur_length_slice : 1;
-  output_shape.n = MAX(input_shape.n, other_shape.n);
 
   int input_offset = (input_shape.n != 1 ? length_slice : 0) * core_idx *
                      input_shape.c * input_shape.h * input_shape.w *
@@ -1294,6 +1289,11 @@ void tpu_kernel_api_atan2_bcast_multi_core(const void *args) {
   int output_offset = (output_shape.n != 1 ? length_slice : 0) * core_idx *
                       output_shape.c * output_shape.h * output_shape.w *
                       tpu_data_type_size(api->dtype);
+
+  input_shape.n = input_shape.n != 1 ? cur_length_slice : 1;
+  other_shape.n = other_shape.n != 1 ? cur_length_slice : 1;
+  output_shape.n = MAX(input_shape.n, other_shape.n);
+
   if (core_idx * length_slice < length) {
     nodechip_atan2_bcast(api->input_global_addr + input_offset,
                          api->other_global_addr + other_offset,

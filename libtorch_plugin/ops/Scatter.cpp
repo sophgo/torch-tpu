@@ -54,15 +54,20 @@ Tensor &slice_scatter_out_tpu(const Tensor &self, const Tensor &src,
   int start_value = start.has_value() ? start.value() : 0;
   int end_value = end.has_value() ? end.value() : self.size(dim);
   int num_c = 1;
-  for (int i = 0; i < dim; i++){
+  for (int i = 0; i < dim; i++) {
     num_c *= self.size(i);
   }
 
-  Tensor indices = arange(start_value,end_value,step,at::kInt).unsqueeze(0).unsqueeze(1).unsqueeze(-1).expand({1,num_c,-1,1}).to(self.device());
+  Tensor indices = arange(start_value, end_value, step, at::kInt)
+                       .unsqueeze(0)
+                       .unsqueeze(1)
+                       .unsqueeze(-1)
+                       .expand({1, num_c, -1, 1})
+                       .to(self.device());
   bm_status_t status = sgdnnSliceScatter(
       tpu::TPUGetDeviceHandle(), tpu::TPUGenerateSgdnnTensor(self),
-      tpu::TPUGenerateSgdnnTensor(src), tpu::TPUGenerateSgdnnTensor(indices),dim, 
-      tpu::TPUGenerateSgdnnTensor(out));
+      tpu::TPUGenerateSgdnnTensor(src), tpu::TPUGenerateSgdnnTensor(indices),
+      dim, tpu::TPUGenerateSgdnnTensor(out));
 
   TORCH_CHECK(status == BM_SUCCESS);
   TIMING_END(tpu::SLICE_SCATTER);
@@ -70,11 +75,11 @@ Tensor &slice_scatter_out_tpu(const Tensor &self, const Tensor &src,
   return out;
 }
 
-Tensor slice_scatter_tpu(const Tensor &self, const Tensor &src,
-                              int64_t dim, c10::optional<int64_t> start,
-                              c10::optional<int64_t> end, int64_t step) {
-  Tensor out = empty_like(self);                              
-  out = slice_scatter_out_tpu(self,src,dim,start,end,step,out);
+Tensor slice_scatter_tpu(const Tensor &self, const Tensor &src, int64_t dim,
+                         c10::optional<int64_t> start,
+                         c10::optional<int64_t> end, int64_t step) {
+  Tensor out = empty_like(self);
+  out = slice_scatter_out_tpu(self, src, dim, start, end, step, out);
   return out;
 }
 

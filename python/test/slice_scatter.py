@@ -8,13 +8,14 @@ torch.set_printoptions(precision=6)
 device = "privateuseone:0"
 
 def case1():
-    input_origin=torch.zeros(5)
-    src_origin = torch.ones(1)
+    dtype = torch.float32
+    input_origin=torch.zeros((2,4,5,6)).to(dtype)
+    src_origin = torch.ones(2,4,2,6).to(dtype)
     input_tpu=input_origin.to(device)
     src_tpu=src_origin.to(device)
 
-    output_cpu_aten=torch.ops.aten.slice_scatter(input_origin,src_origin,0,1,2)
-    output_tpu_aten=torch.ops.aten.slice_scatter(input_tpu,src_tpu,0,1,2).cpu()
+    output_cpu_aten=torch.ops.aten.slice_scatter(input_origin,src_origin,2,0,3,step=2)
+    output_tpu_aten=torch.ops.aten.slice_scatter(input_tpu,src_tpu,2,0,3,step=2).cpu()
 
 
     print("input_origin : \n",input_origin)

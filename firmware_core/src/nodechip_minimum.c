@@ -1,6 +1,6 @@
+#include "kernel_utils_func.h"
 #include "sg_api_struct.h"
 #include "tpu_kernel.h"
-#include "kernel_utils_func.h"
 
 void nodechip_minimumc(global_addr_t input_global_addr, scalar_t value,
                        global_addr_t output_global_addr, int length,
@@ -552,9 +552,6 @@ void tpu_kernel_api_minimum_bcast_multi_core(const void *args) {
   if (core_idx == length_secs - 1) {
     cur_length_slice = length - length_slice * (length_secs - 1);
   }
-  input_shape.n = input_shape.n != 1 ? cur_length_slice : 1;
-  other_shape.n = other_shape.n != 1 ? cur_length_slice : 1;
-  output_shape.n = MAX(input_shape.n, other_shape.n);
 
   int dsize = tpu_data_type_size(api->dtype);
 
@@ -564,6 +561,11 @@ void tpu_kernel_api_minimum_bcast_multi_core(const void *args) {
                      other_shape.c * other_shape.h * other_shape.w * dsize;
   int output_offset = (output_shape.n != 1 ? length_slice : 0) * core_idx *
                       output_shape.c * output_shape.h * output_shape.w * dsize;
+
+  input_shape.n = input_shape.n != 1 ? cur_length_slice : 1;
+  other_shape.n = other_shape.n != 1 ? cur_length_slice : 1;
+  output_shape.n = MAX(input_shape.n, other_shape.n);
+
   if (core_idx * length_slice < length) {
     nodechip_minimum_bcast(api->input_global_addr + input_offset,
                            api->other_global_addr + other_offset,
