@@ -113,6 +113,7 @@ data_type_t dtype) {
 void tpu_kernel_api_element_bitwise(const void *args) {
     sg_api_element_bitwise_t *api = (sg_api_element_bitwise_t*)args;
     TPUKERNEL_ASSERT(api->dtype == DT_INT32 || api->dtype == DT_UINT32 ||
+                     api->dtype == DT_INT16 || api->dtype == DT_UINT16 ||
                      api->dtype == DT_INT8 || api->dtype == DT_UINT8);
 
     int length = 1;
@@ -133,6 +134,7 @@ TPUKERNEL_FUNC_REGISTER(tpu_kernel_api_element_bitwise);
 void tpu_kernel_api_element_bitwise_multi_core(const void *args) {
     sg_api_element_bitwise_t *api = (sg_api_element_bitwise_t*)args;
     TPUKERNEL_ASSERT(api->dtype == DT_INT32 || api->dtype == DT_UINT32 ||
+                     api->dtype == DT_INT16 || api->dtype == DT_UINT16 ||
                      api->dtype == DT_INT8 || api->dtype == DT_UINT8);
 
     int length = 1;
@@ -198,7 +200,8 @@ data_type_t   dtype) {
     local_addr_t output_addr, input_addr, other_addr;
     while(true) {
         output_addr = 0;
-        int output_size = tpu_aligned_feature_size(hmax, output_shape->w, dtype) * DIV_UP(cmax, NPU_NUM) * nmax;
+        int output_size = tpu_aligned_feature_size(hmax, output_shape->w, dtype) *
+                          DIV_UP(cmax, NPU_NUM) * nmax;
         input_addr = output_addr + output_size;
         int input_size = output_size;
         other_addr = input_addr + input_size;
@@ -206,26 +209,21 @@ data_type_t   dtype) {
         int total_size = other_addr + other_size;
         if(total_size <= LOCAL_MEM_SIZE) {
             break;
-        }
-        else {
+        } else {
             if(cmax > NPU_NUM) {
                 if(cmax % NPU_NUM == 0) {
                     cmax -= NPU_NUM;
-                }
-                else {
+                } else {
                     cmax -= (cmax % NPU_NUM);
                 }
                 continue;
-            }
-            else if(nmax > 1) {
+            } else if(nmax > 1) {
                 nmax /= 2;
                 continue;
-            }
-            else if(hmax > 1) {
+            } else if(hmax > 1) {
                 hmax /= 2;
                 continue;
-            }
-            else {
+            } else {
                 TPUKERNEL_ASSERT ( false );
             }
         }
@@ -243,10 +241,7 @@ data_type_t   dtype) {
             while(htodo > 0) {
                 shape.h = MIN (htodo, hmax);
                 // Move input from global memory to local memory
-                tpu_aligned_stride (&input_local_stride,
-                                    0,
-                                    &shape,
-                                    dtype);
+                tpu_aligned_stride (&input_local_stride, 0, &shape, dtype);
                 input_local_shape.n = input_bcast[0] ? 1 : shape.n;
                 input_local_shape.c = input_bcast[1] ? 1 : shape.c;
                 input_local_shape.h = input_bcast[2] ? 1 : shape.h;
@@ -255,12 +250,8 @@ data_type_t   dtype) {
                                 ((input_bcast[0] ? 0 : ndone) * input_global_stride.n +
                                  (input_bcast[1] ? 0 : cdone) * input_global_stride.c +
                                  (input_bcast[2] ? 0 : hdone) * input_global_stride.h) * tpu_data_type_size(dtype);
-                tpu_gdma_cpy_S2L(input_addr,
-                                 input_global_addr_gdma,
-                                 &input_local_shape,
-                                 &input_local_stride,
-                                 &input_global_stride,
-                                 dtype);
+                tpu_gdma_cpy_S2L(input_addr, input_global_addr_gdma, &input_local_shape,
+                                 &input_local_stride, &input_global_stride, dtype);
                 
                 // Move other from global memory to local memory
                 tpu_aligned_stride(&other_local_stride, 0, &shape, dtype);
@@ -272,12 +263,8 @@ data_type_t   dtype) {
                                 ((other_bcast[0] ? 0 : ndone) * other_global_stride.n +
                                  (other_bcast[1] ? 0 : cdone) * other_global_stride.c +
                                  (other_bcast[2] ? 0 : hdone) * other_global_stride.h) * tpu_data_type_size(dtype);
-                tpu_gdma_cpy_S2L(other_addr,
-                                 other_global_addr_gdma,
-                                 &other_local_shape,
-                                 &other_local_stride,
-                                 &other_global_stride,
-                                 dtype);
+                tpu_gdma_cpy_S2L(other_addr, other_global_addr_gdma, &other_local_shape,
+                                 &other_local_stride, &other_global_stride, dtype);
                 
                 // Broadcast input if needed
                 if(input_bcast[1]) {
@@ -322,12 +309,8 @@ data_type_t   dtype) {
                                 (ndone * output_global_stride.n +
                                 cdone * output_global_stride.c +
                                 hdone * output_global_stride.h) * tpu_data_type_size(dtype);
-                tpu_gdma_cpy_L2S(output_global_addr_gdma,
-                                 output_addr,
-                                 &shape,
-                                 &output_global_stride,
-                                 NULL,
-                                 dtype);
+                tpu_gdma_cpy_L2S(output_global_addr_gdma, output_addr, &shape,
+                                 &output_global_stride, NULL, dtype);
                 htodo -= shape.h;
                 hdone += shape.h;
             }
@@ -343,6 +326,7 @@ void tpu_kernel_api_element_bitwise_bcast(const void *args) {
     TPUKERNEL_ASSERT(api->input_dim > 0 && api->input_dim <= 4 &&
                      api->other_dim > 0 && api->other_dim <= 4);
     TPUKERNEL_ASSERT(api->dtype == DT_INT32 || api->dtype == DT_UINT32 ||
+                     api->dtype == DT_INT16 || api->dtype == DT_UINT16 ||
                      api->dtype == DT_INT8 || api->dtype == DT_UINT8);
 
     dim4 input_shape = { .n = 1, .c = 1, .h = 1, .w = 1 };
@@ -377,6 +361,68 @@ void tpu_kernel_api_element_bitwise_bcast(const void *args) {
     tpu_poll();
 }
 TPUKERNEL_FUNC_REGISTER(tpu_kernel_api_element_bitwise_bcast);
+
+void tpu_kernel_api_element_bitwise_bcast_multi_core(const void *args) {
+    sg_api_element_bitwise_bcast_t *api = (sg_api_element_bitwise_bcast_t*) args;
+    TPUKERNEL_ASSERT(api->input_dim > 0 && api->input_dim <= 4 &&
+                     api->other_dim > 0 && api->other_dim <= 4);
+    TPUKERNEL_ASSERT(api->dtype == DT_INT32 || api->dtype == DT_UINT32 ||
+                     api->dtype == DT_INT16 || api->dtype == DT_UINT16 ||
+                     api->dtype == DT_INT8 || api->dtype == DT_UINT8);
+
+    dim4 input_shape = { .n = 1, .c = 1, .h = 1, .w = 1 };
+    dim4 other_shape = { .n = 1, .c = 1, .h = 1, .w = 1 };
+    dim4 output_shape = { .n = 1, .c = 1, .h = 1, .w = 1 };
+
+    if(api->input_dim>=1) input_shape.w = api->input_shape[api->input_dim-1];
+    if(api->other_dim>=1) other_shape.w = api->other_shape[api->other_dim-1];
+    output_shape.w = input_shape.w > other_shape.w ? input_shape.w : other_shape.w;
+
+    if(api->input_dim>=2) input_shape.h = api->input_shape[api->input_dim-2];
+    if(api->other_dim>=2) other_shape.h = api->other_shape[api->other_dim-2];
+    output_shape.h = input_shape.h > other_shape.h ? input_shape.h : other_shape.h;
+
+    if(api->input_dim>=3) input_shape.c = api->input_shape[api->input_dim-3];
+    if(api->other_dim>=3) other_shape.c = api->other_shape[api->other_dim-3];
+    output_shape.c = input_shape.c > other_shape.c ? input_shape.c : other_shape.c;
+
+    if(api->input_dim>=4) input_shape.n = api->input_shape[api->input_dim-4];
+    if(api->other_dim>=4) other_shape.n = api->other_shape[api->other_dim-4];
+    output_shape.n = input_shape.n > other_shape.n ? input_shape.n : other_shape.n;
+
+    int length = MAX(input_shape.n, other_shape.n);
+    tpu_initialize();
+    int core_num = tpu_core_num();
+    int core_idx = tpu_core_index();
+
+    int length_slice = DIV_UP(length, core_num);
+    int length_secs = DIV_UP(length, length_slice);
+    TPUKERNEL_ASSERT(length_secs <= core_num);
+    int cur_length_slice = length_slice;
+    if (core_idx == length_secs - 1) {
+        cur_length_slice = length - length_slice * (length_secs - 1);
+    }
+
+    int dsize = tpu_data_type_size(api->dtype);
+    int input_offset = (input_shape.n != 1 ? length_slice : 0) * core_idx *
+                        input_shape.c * input_shape.h * input_shape.w * dsize;
+    int other_offset = (other_shape.n != 1 ? length_slice : 0) * core_idx *
+                        other_shape.c * other_shape.h * other_shape.w * dsize;
+    int output_offset = (output_shape.n != 1 ? length_slice : 0) * core_idx *
+                        output_shape.c * output_shape.h * output_shape.w * dsize;
+    input_shape.n = input_shape.n != 1 ? cur_length_slice : 1;
+    other_shape.n = other_shape.n != 1 ? cur_length_slice : 1;
+    output_shape.n = MAX(input_shape.n, other_shape.n);
+
+    if (core_idx * length_slice < length) {
+        nodechip_element_bitwise_bcast(
+            api->input_global_addr + input_offset, api->other_global_addr + other_offset,
+            api->output_global_addr + output_offset, &input_shape, &other_shape,
+            &output_shape, api->mode, api->dtype);
+    }
+    tpu_poll();
+}
+TPUKERNEL_FUNC_REGISTER(tpu_kernel_api_element_bitwise_bcast_multi_core);
 
 void nodechip_element_bitwise_c(
 global_addr_t input_global_addr,
@@ -482,6 +528,7 @@ data_type_t dtype) {
 void tpu_kernel_api_element_bitwise_c(const void *args) {
     sg_api_element_bitwise_c_t *api = (sg_api_element_bitwise_c_t*)args;
     TPUKERNEL_ASSERT(api->dtype == DT_INT32 || api->dtype == DT_UINT32 ||
+                     api->dtype == DT_INT16 || api->dtype == DT_UINT16 ||
                      api->dtype == DT_INT8 || api->dtype == DT_UINT8);
     scalar_t value;
     if(api->dtype == DT_INT32) {
@@ -511,6 +558,7 @@ TPUKERNEL_FUNC_REGISTER(tpu_kernel_api_element_bitwise_c);
 void tpu_kernel_api_element_bitwise_c_multi_core(const void *args) {
     sg_api_element_bitwise_c_t *api = (sg_api_element_bitwise_c_t*)args;
     TPUKERNEL_ASSERT(api->dtype == DT_INT32 || api->dtype == DT_UINT32 ||
+                     api->dtype == DT_INT16 || api->dtype == DT_UINT16 ||
                      api->dtype == DT_INT8 || api->dtype == DT_UINT8);
     scalar_t value;
     if(api->dtype == DT_INT32) {

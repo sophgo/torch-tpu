@@ -173,6 +173,37 @@ void tpu_kernel_api_comparision(const void *args) {
 }
 TPUKERNEL_FUNC_REGISTER(tpu_kernel_api_comparision);
 
+void tpu_kernel_api_comparision_multi_core(const void *args) {
+    sg_api_comparision_t *api = (sg_api_comparision_t*) args;
+    int length = 1;
+    for(int i = 0; i < api->dim; ++i) {
+        length *= api->shape[i];
+    }
+
+    tpu_initialize();
+
+    int core_num = tpu_core_num();
+    int core_idx = tpu_core_index();
+
+    int length_slice = DIV_UP(length, core_num);
+    int length_secs = DIV_UP(length, length_slice);
+    TPUKERNEL_ASSERT(length_secs <= core_num);
+    int cur_length_slice = length_slice;
+    if (core_idx == length_secs - 1) {
+        cur_length_slice = length - length_slice * (length_secs - 1);
+    }
+
+    nodechip_comparision(api->input_global_addr + (length_slice * core_idx) * tpu_data_type_size(api->dtype),
+                         api->other_global_addr + (length_slice * core_idx) * tpu_data_type_size(api->dtype),
+                         api->output_global_addr + (length_slice * core_idx) * tpu_data_type_size(DT_UINT8),
+                         cur_length_slice,
+                         api->mode,
+                         (data_type_t)api->dtype);
+
+    tpu_poll();
+}
+TPUKERNEL_FUNC_REGISTER(tpu_kernel_api_comparision_multi_core);
+
 void nodechip_comparision_bcast(
 global_addr_t input_global_addr,
 global_addr_t other_global_addr,
@@ -452,6 +483,70 @@ void tpu_kernel_api_comparision_bcast(const void *args) {
 }
 TPUKERNEL_FUNC_REGISTER(tpu_kernel_api_comparision_bcast);
 
+void tpu_kernel_api_comparision_bcast_multi_core(const void *args) {
+    sg_api_comparision_bcast_t *api = (sg_api_comparision_bcast_t*) args;
+    TPUKERNEL_ASSERT(api->input_dim > 0 && api->input_dim <= 4 &&
+                     api->other_dim > 0 && api->other_dim <= 4);
+
+    dim4 input_shape = { .n = 1, .c = 1, .h = 1, .w = 1 };
+    dim4 other_shape = { .n = 1, .c = 1, .h = 1, .w = 1 };
+    dim4 output_shape = { .n = 1, .c = 1, .h = 1, .w = 1 };
+
+    if(api->input_dim>=1) input_shape.w = api->input_shape[api->input_dim-1];
+    if(api->other_dim>=1) other_shape.w = api->other_shape[api->other_dim-1];
+    output_shape.w = input_shape.w > other_shape.w ? input_shape.w : other_shape.w;
+
+    if(api->input_dim>=2) input_shape.h = api->input_shape[api->input_dim-2];
+    if(api->other_dim>=2) other_shape.h = api->other_shape[api->other_dim-2];
+    output_shape.h = input_shape.h > other_shape.h ? input_shape.h : other_shape.h;
+
+    if(api->input_dim>=3) input_shape.c = api->input_shape[api->input_dim-3];
+    if(api->other_dim>=3) other_shape.c = api->other_shape[api->other_dim-3];
+    output_shape.c = input_shape.c > other_shape.c ? input_shape.c : other_shape.c;
+
+    if(api->input_dim>=4) input_shape.n = api->input_shape[api->input_dim-4];
+    if(api->other_dim>=4) other_shape.n = api->other_shape[api->other_dim-4];
+    output_shape.n = input_shape.n > other_shape.n ? input_shape.n : other_shape.n;
+
+    int length = MAX(input_shape.n, other_shape.n);
+    tpu_initialize();
+    int core_num = tpu_core_num();
+    int core_idx = tpu_core_index();
+
+    int length_slice = DIV_UP(length, core_num);
+    int length_secs = DIV_UP(length, length_slice);
+    TPUKERNEL_ASSERT(length_secs <= core_num);
+    int cur_length_slice = length_slice;
+    if (core_idx == length_secs - 1) {
+        cur_length_slice = length - length_slice * (length_secs - 1);
+    }
+
+    int dsize = tpu_data_type_size(api->dtype);
+    int input_offset = (input_shape.n != 1 ? length_slice : 0) * core_idx *
+                        input_shape.c * input_shape.h * input_shape.w * dsize;
+    int other_offset = (other_shape.n != 1 ? length_slice : 0) * core_idx *
+                        other_shape.c * other_shape.h * other_shape.w * dsize;
+    int output_offset = (output_shape.n != 1 ? length_slice : 0) * core_idx *
+                        output_shape.c * output_shape.h * output_shape.w * tpu_data_type_size(DT_UINT8);
+
+    input_shape.n = input_shape.n != 1 ? cur_length_slice : 1;
+    other_shape.n = other_shape.n != 1 ? cur_length_slice : 1;
+    output_shape.n = MAX(input_shape.n, other_shape.n);
+
+    if (core_idx * length_slice < length) {
+    nodechip_comparision_bcast(api->input_global_addr + input_offset,
+                               api->other_global_addr + other_offset,
+                               api->output_global_addr + output_offset,
+                               &input_shape,
+                               &other_shape,
+                               &output_shape,
+                               api->mode,
+                               api->dtype);
+    }
+    tpu_poll();
+}
+TPUKERNEL_FUNC_REGISTER(tpu_kernel_api_comparision_bcast_multi_core);
+
 void nodechip_comparision_c(
 global_addr_t input_global_addr,
 global_addr_t output_global_addr,
@@ -673,3 +768,42 @@ void tpu_kernel_api_comparision_c(const void *args) {
     tpu_poll();
 }
 TPUKERNEL_FUNC_REGISTER(tpu_kernel_api_comparision_c);
+
+void tpu_kernel_api_comparision_c_multi_core(const void *args) {
+    sg_api_comparision_c_t *api = (sg_api_comparision_c_t*)args;
+    scalar_t value;
+    if(api->dtype == DT_FP32) {
+        value.f32 = api->const_value;
+    }
+    else {
+        scalar_t value_f32 = {.f32 = api->const_value};
+        value = tpu_cast(value_f32, (data_type_t)api->dtype, DT_FP32, RM_HALF_TO_EVEN);
+    }
+
+    int length = 1;
+    for(int i = 0; i < api->dim; ++i) {
+        length *= api->shape[i];
+    }
+    tpu_initialize();
+    int core_num = tpu_core_num();
+    int core_idx = tpu_core_index();
+
+    int length_slice = DIV_UP(length, core_num);
+    int length_secs = DIV_UP(length, length_slice);
+    TPUKERNEL_ASSERT(length_secs <= core_num);
+
+    int cur_length_slice = length_slice;
+    if (core_idx == length_secs - 1) {
+        cur_length_slice = length - length_slice * (length_secs - 1);
+    }
+    nodechip_comparision_c(api->input_global_addr + (length_slice * core_idx) * tpu_data_type_size(api->dtype),
+                           api->output_global_addr + (length_slice * core_idx) * tpu_data_type_size(DT_UINT8),
+                           value, 
+                           cur_length_slice,
+                           api->mode,
+                           api->scalar_pos,
+                           api->dtype);
+
+    tpu_poll();
+}
+TPUKERNEL_FUNC_REGISTER(tpu_kernel_api_comparision_c_multi_core);

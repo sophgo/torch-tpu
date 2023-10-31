@@ -64,7 +64,7 @@ def case1():
     print("a1 : ", a1)
     print("a2 : ", a2)
     print("cpu result : ", cpu_res)
-    print("tpu result : ", tpu_res)
+    print("tpu result : ", tpu_res.cpu())
     element_size = 1
     for num in cpu_res.size():
         element_size *= num

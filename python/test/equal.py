@@ -47,20 +47,20 @@ def case1():
     # tpu_res = torch.eq(a1_tpu, a2)
     # # tpu_res = torch.eq(a1_tpu, a2.to(device))
 
-    # # equal c2 int
-    # a1 = torch.randint(1, 10, (5, 5, 5), dtype=torch.int)
-    # a1_tpu = a1.to(device)
-    # a2 = torch.tensor(2)
-    # cpu_res = torch.eq(a1, a2)
-    # tpu_res = torch.eq(a1_tpu, a2)
-    # # tpu_res = torch.eq(a1_tpu, a2.to(device))
-
-    # equal bcast1 int
-    a1 = torch.randint(1, 10, (55, 3, 1, 35), dtype=torch.int)
+    # equal c2 int
+    a1 = torch.randint(1, 10, (5, 5, 5), dtype=torch.int)
     a1_tpu = a1.to(device)
-    a2 = torch.randint(1, 10, (3, 1, 35), dtype=torch.int)
+    a2 = torch.tensor(2)
     cpu_res = torch.eq(a1, a2)
-    tpu_res = torch.eq(a1_tpu, a2.to(device))
+    tpu_res = torch.eq(a1_tpu, a2)
+    # tpu_res = torch.eq(a1_tpu, a2.to(device))
+
+    # # equal bcast1 int
+    # a1 = torch.randint(1, 10, (3, 3, 1, 3), dtype=torch.int)
+    # a1_tpu = a1.to(device)
+    # a2 = torch.randint(1, 10, (1, 3), dtype=torch.int)
+    # cpu_res = torch.eq(a1, a2)
+    # tpu_res = torch.eq(a1_tpu, a2.to(device))
 
     # # equal bcast2 float
     # a1 = torch.rand((3, 555, 35))
@@ -72,7 +72,7 @@ def case1():
     print("a1 : ", a1)
     print("a2 : ", a2)
     print("cpu result : ", cpu_res)
-    print("tpu result : ", tpu_res)
+    print("tpu result : ", tpu_res.cpu())
     element_size = 1
     for num in cpu_res.size():
         element_size *= num
