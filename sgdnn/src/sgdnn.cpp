@@ -6602,13 +6602,16 @@ bm_status_t sgdnnCbrt ( bm_handle_t handle,
   return BM_SUCCESS;
 }
 
-bm_status_t sgdnnPad(bm_handle_t handle, SgdnnTensor_t input, int *pad,
+bm_status_t sgdnnPad(bm_handle_t handle, SgdnnTensor_t input, int* pad,
                      int pad_size, float value, int mode, bool pad3d,
                      SgdnnTensor_t output) {
   SGDNN_CHECK(2 * input.dim >= pad_size);
   SGDNN_CHECK(pad_size % 2 == 0);
   SGDNN_CHECK(input.dim == output.dim);
   SGDNN_CHECK(input.dtype == output.dtype);
+  SGDNN_CHECK(
+      input.dtype == SGDNN_DTYPE_FP32 || input.dtype == SGDNN_DTYPE_FP16 ||
+      input.dtype == SGDNN_DTYPE_BF16 || input.dtype == SGDNN_DTYPE_INT32);
   SGDNN_CHECK(sgdnnIsTensorContiguous(&input));
   SGDNN_CHECK(sgdnnIsTensorContiguous(&output));
 
@@ -6643,22 +6646,52 @@ bm_status_t sgdnnPad(bm_handle_t handle, SgdnnTensor_t input, int *pad,
   SAFE_CALL(
       sgdnnTPUKernelLaunch(handle, "tpu_kernel_api_pad", &api, sizeof(api)));
 #elif defined SGDNN_BACKEND_2260
-  SGDNN_CHECK(false);
+  sg_api_pad_t api;
+  api.input_global_addr = input.addr;
+  api.output_global_addr = output.addr;
+  api.buffer_global_addr = 0;
+  api.pad3d = pad3d;
+  api.dim = pad3d ? 5 : 4;
+  api.pad_size = pad_size;
+  if (pad3d) {
+    bm_device_mem_t dev_mem;
+    SAFE_CALL(
+        bm_malloc_device_byte(handle, &dev_mem, sgdnnTensorBytes(&output)));
+    api.buffer_global_addr = bm_mem_get_device_addr(dev_mem);
+  }
+  for (int i = 0; i < api.dim; ++i) {
+    if (i < api.dim - input.dim) {
+      api.shape[i] = 1;
+    } else {
+      api.shape[i] = input.shape[i - (api.dim - input.dim)];
+    }
+  }
+  for (int i = pad_size / 2 - 1, j = 0; i >= 0; --i, j += 2) {
+    api.pad[2 * i] = pad[j];
+    api.pad[2 * i + 1] = pad[j + 1];
+  }
+  api.value = value;
+  api.mode = mode;
+  api.dtype = sgdnnTPUKernelDType(input.dtype);
+  SAFE_CALL(sgdnnTPUKernelLaunch(handle, "tpu_kernel_api_pad_multi_core", &api,
+                                 sizeof(api)));
 #else
   SGDNN_CHECK(false);
 #endif
   return BM_SUCCESS;
 }
 
-bm_status_t sgdnnSliceScatter ( bm_handle_t handle,
-                       SgdnnTensor_t input,
-                       SgdnnTensor_t src,
-                       SgdnnTensor_t indices,
-                       int dim,
-                       SgdnnTensor_t output ) {
-  SGDNN_CHECK(input.dim == output.dim);
+bm_status_t sgdnnSliceScatter(bm_handle_t handle, SgdnnTensor_t input,
+                              SgdnnTensor_t src, SgdnnTensor_t indices, int dim,
+                              SgdnnTensor_t output) {
+  SGDNN_CHECK(
+      input.dtype == SGDNN_DTYPE_FP32 || input.dtype == SGDNN_DTYPE_FP16 ||
+      input.dtype == SGDNN_DTYPE_BF16 || input.dtype == SGDNN_DTYPE_INT32);
   SGDNN_CHECK(input.dtype == src.dtype);
   SGDNN_CHECK(input.dtype == output.dtype);
+  SGDNN_CHECK(input.dim == output.dim);
+  SGDNN_CHECK(input.dim == src.dim);
+  SGDNN_CHECK(sgdnnIsSameShape(&input, &output));
 
 #if defined SGDNN_BACKEND_1684X
   sg_api_slice_scatter_t api;
@@ -6678,7 +6711,7 @@ bm_status_t sgdnnSliceScatter ( bm_handle_t handle,
   SAFE_CALL(
       sgdnnTPUKernelLaunch(handle, "tpu_kernel_api_slice_scatter", &api, sizeof(api)));
 #elif defined SGDNN_BACKEND_2260
-    sg_api_slice_scatter_t api;
+  sg_api_slice_scatter_t api;
   api.input_global_addr = input.addr;
   api.src_global_addr = src.addr;
   api.output_global_addr = output.addr;

@@ -188,7 +188,7 @@ Tensor constant_pad_nd_tpu(const Tensor &self, const IntArrayRef padding,
               "The dim of the tensor should be less than or equal to 4");
 
   Tensor out;
-  if (self.dim() == 0) {
+  if (self.dim() == 0 || padding.size() == 0) {
     out = Tensor(self);
     return out;
   }
