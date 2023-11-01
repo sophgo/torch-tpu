@@ -40,6 +40,14 @@ namespace at
 		Tensor &weight2,
 		Tensor &output);
 
+	Tensor rmsnorm_forward(
+		Tensor &input,
+		const c10::optional<Tensor> &scale,
+		const c10::optional<Tensor> &bias,
+		Tensor &output,
+		int64_t axis,
+		double_t eps);
+
 	Tensor attn_forward(
 		Tensor &input,
 		Tensor &w_attn,

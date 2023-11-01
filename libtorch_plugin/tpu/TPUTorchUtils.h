@@ -427,7 +427,8 @@ typedef enum
   SLICE_SCATTER,
   InfCheckAndUnscale,
   OP_NUM,
-  LLAMA_MLP_FORWARD
+  LLAMA_MLP_FORWARD,
+  RMSNORM_FORWARD
 }
 OpType;
 

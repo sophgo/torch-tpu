@@ -1777,13 +1777,13 @@ bm_status_t sgdnnMulIndexSelect (bm_handle_t handle,
       cur_output.tensor.dim = input.dim;
       cur_output.tensor.dtype = output.dtype;
       for (int i = 0; i < axis; i++ ){
-        cur_output.tensor.shape[i] = cur_input.tensor.shape[i]; 
+        cur_output.tensor.shape[i] = cur_input.tensor.shape[i];
       }
       cur_output.tensor.shape[axis] = indices[axis].shape[0];
       for (int i = axis + 1; i < input.dim; i++){
         cur_output.tensor.shape[i] = cur_input.tensor.shape[i];
       }
-      cur_output.tensor.stride[cur_output.tensor.dim - 1] = 1; 
+      cur_output.tensor.stride[cur_output.tensor.dim - 1] = 1;
       for (int i = cur_output.tensor.dim - 2; i >=0; i-- )
       {
         cur_output.tensor.stride[i] = cur_output.tensor.shape[i+1] * cur_output.tensor.stride[i+1];
@@ -3787,6 +3787,51 @@ bm_status_t sgdnnLLamaMlp ( bm_handle_t handle,
   return BM_SUCCESS;
 }
 
+bm_status_t sgdnnRMSNorm ( bm_handle_t  handle,
+                          SgdnnTensor_t input,
+                          SgdnnTensor_t weight,
+                          SgdnnTensor_t bias,
+                          SgdnnTensor_t output,
+                          int           axis,
+                          float         eps,
+                          float         partial,
+                          int           with_scale,
+                          int           with_bias)
+{
+  SGDNN_CHECK ( input.dtype == output.dtype );
+  SGDNN_CHECK ( input.dtype == SGDNN_DTYPE_FP32 ||
+                input.dtype == SGDNN_DTYPE_FP16 ||
+                input.dtype == SGDNN_DTYPE_BF16 );
+
+  SGDNN_CHECK ( sgdnnIsSameShape( &input, &output ) );
+  SGDNN_CHECK ( axis >= 0 && axis < input.dim );
+
+  SGDNN_CHECK ( sgdnnIsTensorContiguous ( &input ) );
+  SGDNN_CHECK ( sgdnnIsTensorContiguous ( &output ) );
+
+#if defined SGDNN_BACKEND_1684X
+  SGDNN_CHECK ( false );
+#elif defined SGDNN_BACKEND_2260
+  sg_api_rmsnorm_multi_core_t api;
+  api.input_addr    = input.addr;
+  api.weight_addr   = weight.addr;
+  api.bias_addr     = bias.addr;
+  api.output_addr   = output.addr;
+  memcpy(api.shape, input.shape, sizeof(int) * input.dim);
+  api.dims          = input.dim;
+  api.axis          = axis;
+  api.eps           = eps;
+  api.with_weight   = with_scale;
+  api.with_bias     = with_bias;
+  api.partial       = partial;
+  api.dtype         = sgdnnTPUKernelDType ( input.dtype );
+
+  SAFE_CALL ( sgdnnTPUKernelLaunch ( handle, "tpu_kernel_rmsnorm_multi_core", &api, sizeof ( api ) ) );
+#else
+  SGDNN_CHECK ( false );
+#endif
+  return BM_SUCCESS;
+}
 
 bm_status_t sgdnnAttn ( bm_handle_t handle,
                           SgdnnTensor_t input,
@@ -6131,7 +6176,7 @@ bm_status_t sgdnnHardtanh ( bm_handle_t handle,
   api.input_global_addr = input.addr;
   api.output_global_addr = output.addr;
   api.dtype = sgdnnTPUKernelDType( input.dtype );
-  
+
 #if defined SGDNN_BACKEND_1684X
   SAFE_CALL ( sgdnnTPUKernelLaunch ( handle, "tpu_kernel_api_hardtanh", &api, sizeof( api ) ) );
 #elif defined SGDNN_BACKEND_2260
@@ -6698,7 +6743,7 @@ bm_status_t sgdnnSliceScatter(bm_handle_t handle, SgdnnTensor_t input,
   api.input_global_addr = input.addr;
   api.src_global_addr = src.addr;
   api.output_global_addr = output.addr;
-  api.indices_global_addr = indices.addr; 
+  api.indices_global_addr = indices.addr;
 
   api.input_dim = input.dim;
 
@@ -6715,7 +6760,7 @@ bm_status_t sgdnnSliceScatter(bm_handle_t handle, SgdnnTensor_t input,
   api.input_global_addr = input.addr;
   api.src_global_addr = src.addr;
   api.output_global_addr = output.addr;
-  api.indices_global_addr = indices.addr; 
+  api.indices_global_addr = indices.addr;
 
   api.input_dim = input.dim;
 
@@ -6748,7 +6793,7 @@ bool _sgdnnInfCheckAndUnscale( bm_handle_t handle,
   api.idtype = sgdnnTPUKernelDType( input.dtype );
   api.found_inf_dtype = sgdnnTPUKernelDType( found_inf.dtype );
   SAFE_CALL( sgdnnTPUKernelLaunch ( handle, "tpu_kernel_api_inf_check_and_unscale", &api, sizeof(api) ) );
-  
+
   bm_device_mem_t SrcMem = bm_mem_from_device ( found_inf.addr, sgdnnDataSize(found_inf.dtype) );
   float found = 0;
   SAFE_CALL (bm_memcpy_d2s ( handle, &found, SrcMem ));

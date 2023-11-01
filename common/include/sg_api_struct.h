@@ -1103,6 +1103,25 @@ typedef struct {
 } sg_api_llama_mlp_multi_core_t;
 #endif
 
+typedef struct {
+  unsigned long long input_addr;
+  unsigned long long weight_addr;
+  unsigned long long bias_addr;
+  unsigned long long output_addr;
+  int                shape[FW_MAX_SHAPE_DIMS];
+  int                dims;
+  int                axis;
+  float              partial;
+  float              eps;
+  int                with_weight;
+  int                with_bias;
+  int                dtype;
+#ifndef WIN32
+} __attribute__((packed)) sg_api_rmsnorm_multi_core_t;
+#else
+} sg_api_rmsnorm_multi_core_t;
+#endif
+
 typedef struct
 {
   int start;

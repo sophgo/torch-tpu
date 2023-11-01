@@ -840,7 +840,7 @@ bm_status_t sgdnnEmbeddingBackward ( bm_handle_t handle,
                                      SgdnnTensor_t grad_output,
                                      SgdnnTensor_t indices,
                                      SgdnnTensor_t grad_input );
-/*  
+/*
  * OUPUT = INPUT[indices]
  *   indices's size <= INPUT.dim
  *   OUTPUT[0] = INPUT[indices[0]] and so on ...
@@ -936,6 +936,24 @@ bm_status_t sgdnnLLamaMlp ( bm_handle_t handle,
                           SgdnnTensor_t weight1,
                           SgdnnTensor_t weight2,
                           SgdnnTensor_t output);
+
+/*
+ * OUTPUT = RMSNorm ( INPUT, WEIGHT, BIAS, OUTPUT )
+ * Note:
+ * 1. The data types of INPUT, WEIGHT, BIAS, OUTPUT  must be the same and one of FP32, FP16 and BF16
+ * 2. All the tensors must be contiguous
+ */
+bm_status_t sgdnnRMSNorm (  bm_handle_t handle,
+                          SgdnnTensor_t input,
+                          SgdnnTensor_t weight,
+                          SgdnnTensor_t bias,
+                          SgdnnTensor_t output,
+                          int           axis,
+                          float         eps,
+                          float         partial,
+                          int           with_scale,
+                          int           with_bias);
+
 
 /*
  * OUT = ATTENTION ( INPUT, W_ATTN, W_PROJ, B_ATTN, B_PROJ, Q, K, V, SOFTMAX_OUT, SOFT_V )
@@ -1672,7 +1690,7 @@ bm_status_t sgdnnSliceScatter ( bm_handle_t handle,
                        SgdnnTensor_t output );
 
 /*
-*  Found_inf = inf in input ? 1 : 0; 
+*  Found_inf = inf in input ? 1 : 0;
 *  Input     = inv_scale * Input;
 *  Note:
 *  1. the dim of found_inf = 1
