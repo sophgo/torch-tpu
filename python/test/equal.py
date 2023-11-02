@@ -78,5 +78,39 @@ def case1():
         element_size *= num
     print("max diff : ", torch.sum(cpu_res == tpu_res.cpu()) - element_size)
 
+def case2():
+    # # equal fp
+    # a1 = torch.tensor([[2, 5, 2, 4, 3],
+    #                    [9, 7, 1, 3, 9],
+    #                    [3, 8, 3, 9, 9],
+    #                    [3, 3, 4, 6, 5],
+    #                    [3, 4, 3, 5, 3]], dtype=torch.float)
+    # a1_tpu = a1.to(device)
+    # a2 = 9.0
+    # cpu_res = a1 == a2
+    # tpu_res = a1_tpu == a2
+
+    # equal int
+    a1 = torch.tensor([[2, 5, 0, 4, 5],
+                       [9, 7, 1, 6, 9],
+                       [3, 8, 2, 9, 9],
+                       [3, 8, 3, 6, 5],
+                       [2, 4, 4, 5, 3]], dtype=torch.int32)
+    a1_tpu = a1.to(device)
+    a2 = 9
+    cpu_res = a1 == a2
+    tpu_res = a1_tpu == a2
+
+
+    print("a1 : ", a1)
+    print("a2 : ", a2)
+    print("cpu result : ", cpu_res)
+    print("tpu result : ", tpu_res.cpu())
+    element_size = 1
+    for num in cpu_res.size():
+        element_size *= num
+    print("max diff : ", torch.sum(cpu_res == tpu_res.cpu()) - element_size)
+
 if __name__ == "__main__":
-    case1()
+    # case1()
+    case2()

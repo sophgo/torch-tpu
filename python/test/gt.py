@@ -62,5 +62,32 @@ def case1():
         element_size *= num
     print("max diff : ", torch.sum(cpu_res == tpu_res.cpu()) - element_size)
 
+def case2():
+    # gt fp
+    a1 = torch.rand((5, 6))
+    a1[0][0]=0.5
+    a1_tpu = a1.to(device)
+    a2 = 0.5
+    
+    cpu_res = a1 > a2
+    tpu_res = a1_tpu > a2
+
+    # # gt int
+    # a1 = torch.randint(1, 10, (3, 5), dtype=torch.int32)
+    # a1_tpu = a1.to(device)
+    # a2 = 6
+    # cpu_res = a1 > a2
+    # tpu_res = a1_tpu > a2
+
+    print("a1 : ", a1)
+    print("a2 : ", a2)
+    print("cpu result : ", cpu_res)
+    print("tpu result : ", tpu_res.cpu())
+    element_size = 1
+    for num in cpu_res.size():
+        element_size *= num
+    print("max diff : ", torch.sum(cpu_res == tpu_res.cpu()) - element_size)
+
 if __name__ == "__main__":
-    case1()
+    # case1()
+    case2()

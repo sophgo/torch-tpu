@@ -28,10 +28,10 @@ def case1():
 
 def case2():
 
-    a1 = torch.randint(0, 5, (5, 5), dtype=torch.float32)
+    a1 = torch.randint(0, 5, (5, 5), dtype=torch.int32)
     a1_clone = a1.clone()
     a1_tpu = a1.clone().to(device)
-    a2 = torch.randint(1 ,5, (1, 5), dtype=torch.float32)
+    a2 = torch.randint(1 ,5, (1, 5), dtype=torch.int32)
     a2_clone = a2.clone()
     a2_tpu = a2.clone().to(device)
 
@@ -47,10 +47,10 @@ def case2():
 
 def case3():
 
-    a1 = torch.randint(0, 5, (5, 5), dtype=torch.float32)
+    a1 = torch.randint(0, 5, (5, 5), dtype=torch.int32)
     a1_clone = a1.clone()
     a1_tpu = a1_clone.to(device)
-    a2 = torch.tensor(1,dtype=torch.float32)
+    a2 = torch.tensor(1,dtype=torch.int32)
 
 
     a1.sub_(a2)
@@ -63,6 +63,6 @@ def case3():
     print("***************test_sub_const end*****************")
 
 if __name__ == "__main__":
-    case1()
+    # case1()
     case2()
-    case3()
+    # case3()
