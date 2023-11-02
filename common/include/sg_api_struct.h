@@ -217,6 +217,20 @@ typedef struct
 
 typedef struct
 {
+  unsigned long long grad_output_global_addr;
+  unsigned long long input_global_addr;
+  unsigned long long weight_global_addr;
+  unsigned long long saved_mean_global_addr;
+  unsigned long long saved_invstd_global_addr;
+  unsigned long long grad_input_global_addr;
+  unsigned long long grad_weight_global_addr;
+  int shape[4];
+  int dtype;
+  int group_nums;
+} WITH_PLATFORM(sg_api_groupnorm2d_backward_t);
+
+typedef struct
+{
   unsigned long long input_global_addr;
   unsigned long long output_global_addr;
   int shape[FW_MAX_SHAPE_DIMS];

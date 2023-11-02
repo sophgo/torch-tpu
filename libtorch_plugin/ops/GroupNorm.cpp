@@ -108,31 +108,66 @@ std::tuple<Tensor, Tensor, Tensor> native_group_norm_tpu(
 //   m.impl("native_group_norm", native_group_norm_tpu);
 // }
 
-std::tuple<at::Tensor, at::Tensor, at::Tensor> native_group_norm_backward_tpu(
-    const at::Tensor &grad_out, const at::Tensor &X, const at::Tensor &mean,
-    const at::Tensor &rstd, const c10::optional<at::Tensor> &weight, int64_t N,
-    int64_t C, int64_t HxW, int64_t group, ::std::array<bool, 3> output_mask) {
+std::tuple<at::Tensor, at::Tensor, at::Tensor>
+native_group_norm_backward_tpu(const at::Tensor &grad_out, const at::Tensor &X,
+                               const at::Tensor &mean, const at::Tensor &rstd,
+                               const c10::optional<at::Tensor> &weight_opt,
+                               int64_t N, int64_t C, int64_t HxW, int64_t group,
+                               ::std::array<bool, 3> output_mask) {
   CHECK_TENSOR_IN_DEVICE(X);
   CHECK_TENSOR_IN_DEVICE(grad_out);
-  LOG(WARNING) << "group_norm_backward use cpu impl";
   c10::MaybeOwned<Tensor> weight_maybe_owned =
-      at::borrow_from_optional_tensor(weight);
-  const Tensor &weight_c = *weight_maybe_owned;
-  auto input_type = grad_out.dtype();
-  auto result = native_group_norm_backward(
-      grad_out.cpu().to(torch::kFloat32), X.cpu().to(torch::kFloat32),
-      mean.cpu().to(torch::kFloat32), rstd.cpu().to(torch::kFloat32),
-      c10::optional<Tensor>(weight_c.cpu().to(torch::kFloat)), N, C, HxW,
-      group, output_mask);
-  LOG(WARNING) << "group_norm_backward use cpu impl end";
-  CHECK_TENSOR_IN_DEVICE(X);
-  return std::tuple<Tensor, Tensor, Tensor>(
-      output_mask[0] ? TENSOR_TO_TPU(std::get<0>(result).to(input_type).contiguous())
-                     : Tensor(),
-      output_mask[1] ? TENSOR_TO_TPU(std::get<1>(result).to(input_type).contiguous())
-                     : Tensor(),
-      output_mask[2] ? TENSOR_TO_TPU(std::get<2>(result).to(input_type).contiguous())
-                     : Tensor());
+      at::borrow_from_optional_tensor(weight_opt);
+  const Tensor &weight = *weight_maybe_owned;
+  TORCH_CHECK(weight.defined(), "weight must be defined");
+  if (weight.defined()) {
+    CHECK_TENSOR_IN_DEVICE(weight);
+  }
+#if 0
+    LOG(WARNING) << "group_norm_backward use cpu impl";
+    auto input_type = grad_out.dtype();
+    auto result = native_group_norm_backward(
+        grad_out.cpu().to(torch::kFloat32), X.cpu().to(torch::kFloat32),
+        mean.cpu().to(torch::kFloat32), rstd.cpu().to(torch::kFloat32),
+        c10::optional<Tensor>(weight.cpu().to(torch::kFloat)), N, C, HxW,
+        group, output_mask);
+    CHECK_TENSOR_IN_DEVICE(X);
+    return std::tuple<Tensor, Tensor, Tensor>(
+        output_mask[0] ? TENSOR_TO_TPU(std::get<0>(result).to(input_type).contiguous())
+                      : Tensor(),
+        output_mask[1] ? TENSOR_TO_TPU(std::get<1>(result).to(input_type).contiguous())
+                      : Tensor(),
+        output_mask[2] ? TENSOR_TO_TPU(std::get<2>(result).to(input_type).contiguous())
+                      : Tensor());
+#else
+  Tensor grad_input, grad_weight, grad_bias;
+  if (output_mask[0] == true) {
+    grad_input = torch::empty(X.sizes(), X.options());
+  }
+  if (output_mask[1] == true) {
+    grad_weight = empty(weight.sizes(), weight.options());
+  }
+  if (output_mask[2] == true) {
+    // We assume that weight and bias have the same data type
+    grad_bias = empty({weight.size(0)}, weight.options());
+  }
+  bm_status_t status = sgdnnNativeGroupNormBackward(
+      tpu::TPUGetDeviceHandle(), tpu::TPUGenerateSgdnnTensor(grad_out),
+      tpu::TPUGenerateSgdnnTensor(X),
+      weight.defined() ? tpu::TPUGenerateSgdnnTensor(weight)
+                       : sgdnnUndefinedTensor(),
+      tpu::TPUGenerateSgdnnTensor(mean), tpu::TPUGenerateSgdnnTensor(rstd),
+      group,
+      output_mask[0] ? tpu::TPUGenerateSgdnnTensor(grad_input)
+                     : sgdnnUndefinedTensor(),
+      output_mask[1] ? tpu::TPUGenerateSgdnnTensor(grad_weight)
+                     : sgdnnUndefinedTensor(),
+      output_mask[1] ? tpu::TPUGenerateSgdnnTensor(grad_bias)
+                     : sgdnnUndefinedTensor());
+  TORCH_CHECK(status == BM_SUCCESS);
+  return std::tuple<Tensor, Tensor, Tensor>(grad_input, grad_weight, grad_bias);
+
+#endif
 }
 
 TORCH_LIBRARY_IMPL(aten, TPU, m) {

@@ -275,6 +275,12 @@ bm_status_t sgdnnNativeGroupNorm ( bm_handle_t handle, SgdnnTensor_t input,
                      int group, int affine, float eps, SgdnnTensor_t output,
                      SgdnnTensor_t mean, SgdnnTensor_t rstd);
 
+bm_status_t sgdnnNativeGroupNormBackward(bm_handle_t handle, SgdnnTensor_t grad_output,
+                     SgdnnTensor_t input, SgdnnTensor_t weight,
+                     SgdnnTensor_t mean, SgdnnTensor_t rstd,
+                     int group, SgdnnTensor_t out0,
+                     SgdnnTensor_t out1, SgdnnTensor_t out2);
+
 /*
  * OUTPUT = INPUT || OTHER
  * Note:

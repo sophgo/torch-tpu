@@ -2052,6 +2052,41 @@ bm_status_t sgdnnNativeGroupNorm(bm_handle_t handle, SgdnnTensor_t input,
   return BM_SUCCESS;
 }
 
+bm_status_t sgdnnNativeGroupNormBackward(bm_handle_t handle, SgdnnTensor_t grad_output,
+                     SgdnnTensor_t input, SgdnnTensor_t weight,
+                     SgdnnTensor_t mean, SgdnnTensor_t rstd,
+                     int group, SgdnnTensor_t out0,
+                     SgdnnTensor_t out1, SgdnnTensor_t out2) {
+  SGDNN_CHECK(input.dtype == SGDNN_DTYPE_FP32 ||
+              input.dtype == SGDNN_DTYPE_FP16 ||
+              input.dtype == SGDNN_DTYPE_BF16);
+  SGDNN_CHECK(sgdnnIsTensorContiguous(&input));
+  sg_api_groupnorm2d_backward_t api;
+  api.input_global_addr = input.addr;
+  api.weight_global_addr = weight.addr;
+  api.grad_output_global_addr = grad_output.addr;
+  api.group_nums = group;
+  api.saved_mean_global_addr = mean.addr;
+  api.saved_invstd_global_addr = rstd.addr;
+  api.group_nums = group;
+  api.grad_input_global_addr = out0.addr;
+  api.grad_weight_global_addr = out1.addr;
+  for (int i = 0; i < input.dim; ++i) {
+    api.shape[i] = input.shape[i];
+  }
+  api.dtype = sgdnnTPUKernelDType(input.dtype);
+#if defined SGDNN_BACKEND_1684X
+  SAFE_CALL(
+      sgdnnTPUKernelLaunch(handle, "tpu_kernel_api_groupnorm2d_backward", &api, sizeof(api)));
+#elif defined SGDNN_BACKEND_2260
+  SAFE_CALL(sgdnnTPUKernelLaunch(handle, "tpu_kernel_api_native_group_norm_multi_core", &api,
+                                 sizeof(api)));
+#else
+  SGDNN_CHECK(false);
+#endif
+  return BM_SUCCESS;
+}
+
 bm_status_t sgdnnLogicalOr ( bm_handle_t handle,
                               SgdnnTensor_t input,
                               SgdnnTensor_t other,
