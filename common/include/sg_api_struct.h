@@ -1133,6 +1133,29 @@ typedef struct {
 } sg_api_rmsnorm_multi_core_t;
 #endif
 
+typedef struct {
+  unsigned long long Q_global_addr; // local mem data
+  unsigned long long K_global_addr;
+  unsigned long long V_global_addr; // reserved
+  unsigned long long Kcache_global_addr;
+  unsigned long long Vcache_global_addr;
+  unsigned long long weight1_global_addr;
+  unsigned long long weight2_global_addr;
+  unsigned long long weight3_global_addr;
+  unsigned long long Y_global_addr;
+  int batch;
+  float C;
+  int hidden_size;
+  int num_attention_heads;
+  int num_k_v_heads;
+  int embeddings;
+  int dtype;
+#ifndef WIN32
+} __attribute__((packed)) sg_api_llama2_qkv_multi_core_t;
+#else
+} sg_api_llama2_qkv_multi_core_t;
+#endif
+
 typedef struct
 {
   int start;

@@ -3820,6 +3820,82 @@ bm_status_t sgdnnLLamaMlp ( bm_handle_t handle,
   return BM_SUCCESS;
 }
 
+bm_status_t sgdnnLlamaAttention ( bm_handle_t handle,
+                          SgdnnTensor_t Q,
+                          SgdnnTensor_t K,
+                          SgdnnTensor_t V,
+                          SgdnnTensor_t Kcache,
+                          SgdnnTensor_t Vcache,
+                          SgdnnTensor_t w1,
+                          SgdnnTensor_t w2,
+                          SgdnnTensor_t w3,
+                          SgdnnTensor_t Y,
+                          float C)
+{
+  SGDNN_CHECK ( Q.dtype == K.dtype );
+  SGDNN_CHECK ( Q.dtype == V.dtype );
+  SGDNN_CHECK ( Q.dtype == Kcache.dtype );
+  SGDNN_CHECK ( Q.dtype == Vcache.dtype );
+  SGDNN_CHECK ( Q.dtype == Y.dtype );
+  SGDNN_CHECK ( Q.dtype == w1.dtype );
+  SGDNN_CHECK ( Q.dtype == w2.dtype );
+  SGDNN_CHECK ( Q.dtype == w3.dtype );
+  SGDNN_CHECK ( Q.dtype == SGDNN_DTYPE_FP32 ||
+                Q.dtype == SGDNN_DTYPE_FP16 ||
+                Q.dtype == SGDNN_DTYPE_BF16 );
+
+  SGDNN_CHECK ( sgdnnIsSameShape( &Q, &Y ) );
+  SGDNN_CHECK ( sgdnnIsSameShape( &w1, &w2 ) );
+  SGDNN_CHECK ( Q.dim == 4 );
+  SGDNN_CHECK ( K.dim == 4 );
+  SGDNN_CHECK ( V.dim == 4 );
+  SGDNN_CHECK ( Kcache.dim == 4 );
+  SGDNN_CHECK ( Vcache.dim == 4 );
+  SGDNN_CHECK ( w1.dim == 1 );
+  SGDNN_CHECK ( w2.dim == 1 );
+  SGDNN_CHECK ( w3.dim == 1 );
+
+  SGDNN_CHECK ( sgdnnIsTensorContiguous ( &Q ) );
+  SGDNN_CHECK ( sgdnnIsTensorContiguous ( &K ) );
+  SGDNN_CHECK ( sgdnnIsTensorContiguous ( &V ) );
+  SGDNN_CHECK ( sgdnnIsTensorContiguous ( &Kcache ) );
+  SGDNN_CHECK ( sgdnnIsTensorContiguous ( &Vcache ) );
+  SGDNN_CHECK ( sgdnnIsTensorContiguous ( &Y ) );
+
+#if defined SGDNN_BACKEND_1684X
+  SGDNN_CHECK ( false );
+#elif defined SGDNN_BACKEND_2260
+  sg_api_llama2_qkv_multi_core_t api;
+  int batch = Q.shape[0];
+  int num_attention_heads = Q.shape[1];
+  int d = Q.shape[3];
+  int hidden_size = d * num_attention_heads;
+  int num_k_v_heads = num_attention_heads / 8;
+  int embeddings = w3.shape[0];
+  api.Q_global_addr    = Q.addr;
+  api.K_global_addr  = K.addr;
+  api.V_global_addr  = V.addr;
+  api.Kcache_global_addr  = Kcache.addr;
+  api.Vcache_global_addr   = Vcache.addr;
+  api.Y_global_addr = Y.addr;
+  api.weight1_global_addr = w1.addr;
+  api.weight2_global_addr = w2.addr;
+  api.weight3_global_addr = w3.addr;
+  api.batch         = batch;
+  api.hidden_size       = hidden_size;
+  api.num_attention_heads      = num_attention_heads;
+  api.num_k_v_heads = num_k_v_heads;
+  api.embeddings = embeddings;
+  api.C = C;
+  api.dtype         = sgdnnTPUKernelDType ( Q.dtype );
+
+  SAFE_CALL ( sgdnnTPUKernelLaunch ( handle, "tpu_kernel_llama_attention_multi_core", &api, sizeof ( api ) ) );
+#else
+  SGDNN_CHECK ( false );
+#endif
+  return BM_SUCCESS;
+}
+
 bm_status_t sgdnnRMSNorm ( bm_handle_t  handle,
                           SgdnnTensor_t input,
                           SgdnnTensor_t weight,

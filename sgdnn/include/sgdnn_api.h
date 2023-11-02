@@ -903,6 +903,36 @@ bm_status_t sgdnnMlp ( bm_handle_t handle,
                           SgdnnTensor_t output );
 
 /*
+ * Calc process:
+    *
+ * d = hidden_size / attention_heads
+ * The shape of WEIGHTS:
+    * weight1: (d)
+    * weight2: (d)
+    * weight3: (embeddings)
+ * The shape of INPUTS:
+    * Q : ( batch, attention_heads, 1, d )
+    * K : ( batch, k_v_heads, 1, d )
+    * V : ( batch, k_v_heads, 1, d )
+    * Kcache : ( batch, k_v_heads, embeddings-1, d )
+    * Vcache : ( batch, k_v_heads, embeddings-1, d )
+ * The shape of OUTPUTS:
+    * Y : ( batch, attention_heads, 1, d )
+ *
+ */
+bm_status_t sgdnnLlamaAttention ( bm_handle_t handle,
+                          SgdnnTensor_t Q,
+                          SgdnnTensor_t K,
+                          SgdnnTensor_t V,
+                          SgdnnTensor_t Kcache,
+                          SgdnnTensor_t Vcache,
+                          SgdnnTensor_t weight1,
+                          SgdnnTensor_t weight2,
+                          SgdnnTensor_t weight3,
+                          SgdnnTensor_t Y,
+                          float C );
+
+/*
  * [ GRAD_INPUT, GRAD_W1, GRAD_W2, GRAD_B1, GRAD_B2 ] = MLP BACKWARD ( GRAD_OUTPUT, INPUT, W1, W2, OUT1, P )
  * Note:
  * 1. The data types of all the tensors must be the same and one of FP32, FP16 and BF16

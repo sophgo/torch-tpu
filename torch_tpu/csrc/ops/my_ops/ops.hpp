@@ -48,6 +48,18 @@ namespace at
 		int64_t axis,
 		double_t eps);
 
+	Tensor llama_attention(
+		Tensor &Q,
+		Tensor &K,
+		Tensor &V,
+		Tensor &Kcache,
+		Tensor &Vcache,
+		Tensor &weight1,
+		Tensor &weight2,
+		Tensor &weight3,
+		Tensor &Y,
+		double C);
+
 	Tensor attn_forward(
 		Tensor &input,
 		Tensor &w_attn,
