@@ -1,6 +1,7 @@
 #include "kernel_utils_func.h"
 #include "sg_api_struct.h"
 #include "tpu_kernel.h"
+#include "config.h"
 
 static void replaceWithNotNan(local_addr_t output_local_addr,
                               local_addr_t input_local_addr,
@@ -115,6 +116,7 @@ void tpu_kernel_api_fminc(const void *args) {
 }
 TPUKERNEL_FUNC_REGISTER(tpu_kernel_api_fminc);
 
+#ifdef FIRMWARE_BACKEND_2260
 void tpu_kernel_api_fminc_multi_core(const void *args) {
   sg_api_fminc_t *api = (sg_api_fminc_t *)args;
   TPUKERNEL_ASSERT(api->dtype == DT_FP32 || api->dtype == DT_FP16 ||
@@ -151,6 +153,7 @@ void tpu_kernel_api_fminc_multi_core(const void *args) {
   tpu_poll();
 }
 TPUKERNEL_FUNC_REGISTER(tpu_kernel_api_fminc_multi_core);
+#endif
 
 void nodechip_fmin(global_addr_t input_global_addr,
                    global_addr_t other_global_addr,
@@ -255,6 +258,7 @@ void tpu_kernel_api_fmin(const void *args) {
 }
 TPUKERNEL_FUNC_REGISTER(tpu_kernel_api_fmin);
 
+#ifdef FIRMWARE_BACKEND_2260
 void tpu_kernel_api_fmin_multi_core(const void *args) {
   sg_api_fmin_t *api = (sg_api_fmin_t *)args;
   TPUKERNEL_ASSERT(api->dtype == DT_FP32 || api->dtype == DT_FP16 ||
@@ -288,6 +292,7 @@ void tpu_kernel_api_fmin_multi_core(const void *args) {
   tpu_poll();
 }
 TPUKERNEL_FUNC_REGISTER(tpu_kernel_api_fmin_multi_core);
+#endif
 
 void nodechip_fmin_bcast(global_addr_t input_global_addr,
                          global_addr_t other_global_addr,
@@ -507,6 +512,7 @@ void tpu_kernel_api_fmin_bcast(const void *args) {
 }
 TPUKERNEL_FUNC_REGISTER(tpu_kernel_api_fmin_bcast);
 
+#ifdef FIRMWARE_BACKEND_2260
 void tpu_kernel_api_fmin_bcast_multi_core(const void *args) {
   sg_api_fmin_bcast_t *api = (sg_api_fmin_bcast_t *)args;
   TPUKERNEL_ASSERT(api->output_dim > 0 && api->output_dim <= 4);
@@ -585,3 +591,4 @@ void tpu_kernel_api_fmin_bcast_multi_core(const void *args) {
   tpu_poll();
 }
 TPUKERNEL_FUNC_REGISTER(tpu_kernel_api_fmin_bcast_multi_core);
+#endif

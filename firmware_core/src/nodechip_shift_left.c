@@ -1,5 +1,6 @@
 #include "sg_api_struct.h"
 #include "tpu_kernel.h"
+#include "config.h"
 
 inline static void pipeline_move(unsigned long long *array, int num)
 {
@@ -122,6 +123,7 @@ void tpu_kernel_api_shift_left ( const void * args )
 }
 TPUKERNEL_FUNC_REGISTER ( tpu_kernel_api_shift_left );
 
+#ifdef FIRMWARE_BACKEND_2260
 void tpu_kernel_api_shift_left_multi_core(const void *args)
 {
   sg_api_shift_left_t * api = ( sg_api_shift_left_t * ) args;
@@ -152,6 +154,7 @@ void tpu_kernel_api_shift_left_multi_core(const void *args)
   tpu_poll();
 }
 TPUKERNEL_FUNC_REGISTER(tpu_kernel_api_shift_left_multi_core);
+#endif
 
 void nodechip_shift_left_c (
 global_addr_t output_global_addr,
@@ -260,6 +263,7 @@ void tpu_kernel_api_shift_left_c ( const void * args )
 }
 TPUKERNEL_FUNC_REGISTER ( tpu_kernel_api_shift_left_c );
 
+#ifdef FIRMWARE_BACKEND_2260
 void tpu_kernel_api_shift_left_c_multi_core(const void *args)
 {
   sg_api_shift_left_c_t * api = ( sg_api_shift_left_c_t * ) args;
@@ -289,4 +293,4 @@ void tpu_kernel_api_shift_left_c_multi_core(const void *args)
   tpu_poll();
 }
 TPUKERNEL_FUNC_REGISTER(tpu_kernel_api_shift_left_c_multi_core);
-
+#endif

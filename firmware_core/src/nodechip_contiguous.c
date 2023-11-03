@@ -1,5 +1,6 @@
 #include "sg_api_struct.h"
 #include "tpu_kernel.h"
+#include "config.h"
 
 static inline bool is_contiguous ( const int * shape, const int * stride, int dim )
 {
@@ -260,6 +261,7 @@ void tpu_kernel_api_strided_copy ( const void *args )
 
 TPUKERNEL_FUNC_REGISTER ( tpu_kernel_api_strided_copy );
 
+#ifdef FIRMWARE_BACKEND_2260
 void tpu_kernel_api_strided_copy_multi_core(const void *args) {
   sg_api_strided_copy_t *api = (sg_api_strided_copy_t*)args;
   if (tpu_core_index() == 0) {
@@ -277,3 +279,4 @@ void tpu_kernel_api_strided_copy_multi_core(const void *args) {
 }
 
 TPUKERNEL_FUNC_REGISTER(tpu_kernel_api_strided_copy_multi_core);
+#endif

@@ -1,5 +1,6 @@
 #include "sg_api_struct.h"
 #include "tpu_kernel.h"
+#include "config.h"
 
 inline static void pipeline_move(unsigned long long *array, int num) {
   for (int i = num - 1; i > 0; i--) {
@@ -10,7 +11,6 @@ inline static void pipeline_move(unsigned long long *array, int num) {
 /*
  * output = input + value * ( tensor1 * tensor2 )
  */
-
 void nodechip_addcmul_bcast (
 global_addr_t input_global_addr,
 global_addr_t tensor1_global_addr,

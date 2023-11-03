@@ -1,6 +1,7 @@
 #include "sg_api_struct.h"
 #include "tpu_kernel.h"
 #include "kernel_utils_func.h"
+#include "config.h"
 
 
 void tpu_bdc_check_inf_nan(local_addr_t dst_addr, local_addr_t found_inf_addr, local_addr_t src_addr,

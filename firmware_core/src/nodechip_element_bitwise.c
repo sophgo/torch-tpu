@@ -1,5 +1,6 @@
 #include "sg_api_struct.h"
 #include "tpu_kernel.h"
+#include "config.h"
 
 void nodechip_element_bitwise(
 global_addr_t input_global_addr,
@@ -131,6 +132,7 @@ void tpu_kernel_api_element_bitwise(const void *args) {
 }
 TPUKERNEL_FUNC_REGISTER(tpu_kernel_api_element_bitwise);
 
+#ifdef FIRMWARE_BACKEND_2260
 void tpu_kernel_api_element_bitwise_multi_core(const void *args) {
     sg_api_element_bitwise_t *api = (sg_api_element_bitwise_t*)args;
     TPUKERNEL_ASSERT(api->dtype == DT_INT32 || api->dtype == DT_UINT32 ||
@@ -162,6 +164,7 @@ void tpu_kernel_api_element_bitwise_multi_core(const void *args) {
     tpu_poll();
 }
 TPUKERNEL_FUNC_REGISTER(tpu_kernel_api_element_bitwise_multi_core);
+#endif
 
 void nodechip_element_bitwise_bcast(
 global_addr_t input_global_addr,
@@ -362,6 +365,7 @@ void tpu_kernel_api_element_bitwise_bcast(const void *args) {
 }
 TPUKERNEL_FUNC_REGISTER(tpu_kernel_api_element_bitwise_bcast);
 
+#ifdef FIRMWARE_BACKEND_2260
 void tpu_kernel_api_element_bitwise_bcast_multi_core(const void *args) {
     sg_api_element_bitwise_bcast_t *api = (sg_api_element_bitwise_bcast_t*) args;
     TPUKERNEL_ASSERT(api->input_dim > 0 && api->input_dim <= 4 &&
@@ -423,6 +427,7 @@ void tpu_kernel_api_element_bitwise_bcast_multi_core(const void *args) {
     tpu_poll();
 }
 TPUKERNEL_FUNC_REGISTER(tpu_kernel_api_element_bitwise_bcast_multi_core);
+#endif
 
 void nodechip_element_bitwise_c(
 global_addr_t input_global_addr,
@@ -555,6 +560,7 @@ void tpu_kernel_api_element_bitwise_c(const void *args) {
 }
 TPUKERNEL_FUNC_REGISTER(tpu_kernel_api_element_bitwise_c);
 
+#ifdef FIRMWARE_BACKEND_2260
 void tpu_kernel_api_element_bitwise_c_multi_core(const void *args) {
     sg_api_element_bitwise_c_t *api = (sg_api_element_bitwise_c_t*)args;
     TPUKERNEL_ASSERT(api->dtype == DT_INT32 || api->dtype == DT_UINT32 ||
@@ -595,3 +601,4 @@ void tpu_kernel_api_element_bitwise_c_multi_core(const void *args) {
     tpu_poll();
 }
 TPUKERNEL_FUNC_REGISTER(tpu_kernel_api_element_bitwise_c_multi_core);
+#endif

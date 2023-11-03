@@ -1,5 +1,6 @@
 #include "sg_api_struct.h"
 #include "tpu_kernel.h"
+#include "config.h"
 
 extern void nodechip_batch_matmul_float (
 global_addr_t L_global_addr,

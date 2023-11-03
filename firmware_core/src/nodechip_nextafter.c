@@ -1,6 +1,7 @@
 #include "kernel_utils_func.h"
 #include "sg_api_struct.h"
 #include "tpu_kernel.h"
+#include "config.h"
 
 void nodechip_nextafterc(float scalar, global_addr_t other_global_addr,
                          global_addr_t output_global_addr, int length,
@@ -216,6 +217,7 @@ void tpu_kernel_api_nextafterc(const void *args) {
 }
 TPUKERNEL_FUNC_REGISTER(tpu_kernel_api_nextafterc);
 
+#ifdef FIRMWARE_BACKEND_2260
 void tpu_kernel_api_nextafterc_multi_core(const void *args) {
   sg_api_nextafterc_t *api = (sg_api_nextafterc_t *)args;
   TPUKERNEL_ASSERT(api->dtype == DT_FP32 || api->dtype == DT_BFP16);
@@ -249,6 +251,7 @@ void tpu_kernel_api_nextafterc_multi_core(const void *args) {
   tpu_poll();
 }
 TPUKERNEL_FUNC_REGISTER(tpu_kernel_api_nextafterc_multi_core);
+#endif
 
 void nodechip_nextafter_c(global_addr_t input_global_addr, float scalar,
                           global_addr_t output_global_addr, int length,
@@ -488,6 +491,7 @@ void tpu_kernel_api_nextafter_c(const void *args) {
 }
 TPUKERNEL_FUNC_REGISTER(tpu_kernel_api_nextafter_c);
 
+#ifdef FIRMWARE_BACKEND_2260
 void tpu_kernel_api_nextafter_c_multi_core(const void *args) {
   sg_api_nextafter_c_t *api = (sg_api_nextafter_c_t *)args;
   TPUKERNEL_ASSERT(api->dtype == DT_FP32 || api->dtype == DT_BFP16);
@@ -520,6 +524,7 @@ void tpu_kernel_api_nextafter_c_multi_core(const void *args) {
   tpu_poll();
 }
 TPUKERNEL_FUNC_REGISTER(tpu_kernel_api_nextafter_c_multi_core);
+#endif
 
 void nodechip_nextafter(global_addr_t input_global_addr,
                         global_addr_t other_global_addr,
@@ -777,6 +782,7 @@ void tpu_kernel_api_nextafter(const void *args) {
 }
 TPUKERNEL_FUNC_REGISTER(tpu_kernel_api_nextafter);
 
+#ifdef FIRMWARE_BACKEND_2260
 void tpu_kernel_api_nextafter_multi_core(const void *args) {
   sg_api_nextafter_t *api = (sg_api_nextafter_t *)args;
   TPUKERNEL_ASSERT(api->dtype == DT_FP32 || api->dtype == DT_BFP16);
@@ -810,6 +816,7 @@ void tpu_kernel_api_nextafter_multi_core(const void *args) {
   tpu_poll();
 }
 TPUKERNEL_FUNC_REGISTER(tpu_kernel_api_nextafter_multi_core);
+#endif
 
 void nodechip_nextafter_bcast(global_addr_t input_global_addr,
                               global_addr_t other_global_addr,
@@ -1175,6 +1182,7 @@ void tpu_kernel_api_nextafter_bcast(const void *args) {
 }
 TPUKERNEL_FUNC_REGISTER(tpu_kernel_api_nextafter_bcast);
 
+#ifdef FIRMWARE_BACKEND_2260
 void tpu_kernel_api_nextafter_bcast_multi_core(const void *args) {
   sg_api_nextafter_bcast_t *api = (sg_api_nextafter_bcast_t *)args;
   TPUKERNEL_ASSERT(api->output_dim > 0 && api->output_dim <= 4);
@@ -1254,3 +1262,4 @@ void tpu_kernel_api_nextafter_bcast_multi_core(const void *args) {
   tpu_poll();
 }
 TPUKERNEL_FUNC_REGISTER(tpu_kernel_api_nextafter_bcast_multi_core);
+#endif

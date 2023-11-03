@@ -1,5 +1,7 @@
 #include "sg_api_struct.h"
 #include "tpu_kernel.h"
+#include "config.h"
+
 #define DEFAULT_LOCAL_ADDR 0xFFFFFFFF
 
 static inline bool nodechip_softmax_2dr1_max_pivot_split_row_only (
@@ -794,15 +796,6 @@ data_type_t dtype )
   return true;
 }
 
-extern void nodechip_softmax_forward_multi_core (
-global_addr_t input_global_addr,
-global_addr_t output_global_addr,
-int*          shape,
-int           dims,
-int           begin_dim,
-int           end_dim,
-float         scale_val,
-data_type_t   dtype );
 
 extern void nodechip_softmax ( global_addr_t bottom_global_offset,
                                global_addr_t top_global_offset,
@@ -877,6 +870,17 @@ void tpu_kernel_api_softmax ( const void * args )
 TPUKERNEL_FUNC_REGISTER ( tpu_kernel_api_softmax );
 
 
+#ifdef FIRMWARE_BACKEND_2260
+extern void nodechip_softmax_forward_multi_core (
+global_addr_t input_global_addr,
+global_addr_t output_global_addr,
+int*          shape,
+int           dims,
+int           begin_dim,
+int           end_dim,
+float         scale_val,
+data_type_t   dtype );
+
 static inline void compute_current_slice_info_multi_core(int total_num, int* expected_current_slice,
                                                          int* expected_avg_slice, int* expected_secs) {
   const int core_num = tpu_core_num();
@@ -931,7 +935,6 @@ void nodechip_softmax_forward_multi_core_v2 (
     }
 }
 
-
 void tpu_kernel_api_softmax_multi_core ( const void *args )
 {
   sg_api_softmax_t *api = ( sg_api_softmax_t * ) args;
@@ -956,3 +959,4 @@ void tpu_kernel_api_softmax_multi_core ( const void *args )
   tpu_poll();
 }
 TPUKERNEL_FUNC_REGISTER ( tpu_kernel_api_softmax_multi_core );
+#endif

@@ -1,5 +1,6 @@
 #include "sg_api_struct.h"
 #include "tpu_kernel.h"
+#include "config.h"
 
 /*
  * [oc, ic, kh, kw] => [1, oc, DIV_UP(ic, 32) * kh * kw, 32]

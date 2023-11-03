@@ -1,5 +1,6 @@
 #include "sg_api_struct.h"
 #include "tpu_kernel.h"
+#include "config.h"
 
 /*
  * output = input && other
@@ -116,6 +117,7 @@ void tpu_kernel_api_logical_and(const void *args)
 }
 TPUKERNEL_FUNC_REGISTER(tpu_kernel_api_logical_and);
 
+#ifdef FIRMWARE_BACKEND_2260
 void tpu_kernel_api_logical_and_multi_core(const void *args)
 {
   sg_api_logical_and_t * api = ( sg_api_logical_and_t * ) args;
@@ -145,3 +147,4 @@ void tpu_kernel_api_logical_and_multi_core(const void *args)
   tpu_poll();
 }
 TPUKERNEL_FUNC_REGISTER(tpu_kernel_api_logical_and_multi_core);
+#endif

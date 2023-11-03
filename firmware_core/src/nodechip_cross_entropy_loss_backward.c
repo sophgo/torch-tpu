@@ -1,7 +1,7 @@
 #include "sg_api_struct.h"
 #include "tpu_kernel.h"
+#include "config.h"
 
-#if 1
 void nodechip_cross_entropy_loss_backward (
 global_addr_t input_global_addr,
 global_addr_t target_global_addr,
@@ -318,4 +318,3 @@ void tpu_kernel_api_cross_entropy_loss_backward ( const void * args )
   tpu_poll();
 }
 TPUKERNEL_FUNC_REGISTER ( tpu_kernel_api_cross_entropy_loss_backward );
-#endif

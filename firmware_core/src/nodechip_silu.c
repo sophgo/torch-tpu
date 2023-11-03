@@ -1,5 +1,6 @@
 #include "sg_api_struct.h"
 #include "tpu_kernel.h"
+#include "config.h"
 
 static inline void nodechip_silu_forward_parallel ( global_addr_t XGlobalAddr, global_addr_t YGlobalAddr, int Len, data_type_t dtype)
 {
@@ -132,7 +133,9 @@ tpu_poll();
 }
 TPUKERNEL_FUNC_REGISTER(tpu_kernel_api_silu);
 
+#ifdef FIRMWARE_BACKEND_2260
 void tpu_kernel_api_silu_multi_core(const void *args) {
   TPUKERNEL_ASSERT_INFO(false, "not implementated");
 }
 TPUKERNEL_FUNC_REGISTER(tpu_kernel_api_silu_multi_core);
+#endif

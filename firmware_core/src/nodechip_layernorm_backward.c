@@ -1,22 +1,8 @@
 #include "sg_api_struct.h"
 #include "tpu_kernel.h"
+#include "config.h"
 
 extern void nodechip_layernorm_backward (
-global_addr_t grad_output_global_addr,
-global_addr_t input_global_addr,
-global_addr_t weight_global_addr,
-global_addr_t mean_global_addr,
-global_addr_t rstd_global_addr,
-global_addr_t grad_input_global_addr,
-global_addr_t grad_weight_global_addr,
-global_addr_t grad_bias_global_addr,
-int*          shape,
-int           dims,
-int           axis,
-int           affine,
-data_type_t   dtype );
-
-extern void nodechip_layernorm_backward_multi_core (
 global_addr_t grad_output_global_addr,
 global_addr_t input_global_addr,
 global_addr_t weight_global_addr,
@@ -54,6 +40,22 @@ void tpu_kernel_api_layernorm_backward ( const void *args )
 }
 TPUKERNEL_FUNC_REGISTER ( tpu_kernel_api_layernorm_backward );
 
+#ifdef FIRMWARE_BACKEND_2260
+extern void nodechip_layernorm_backward_multi_core (
+global_addr_t grad_output_global_addr,
+global_addr_t input_global_addr,
+global_addr_t weight_global_addr,
+global_addr_t mean_global_addr,
+global_addr_t rstd_global_addr,
+global_addr_t grad_input_global_addr,
+global_addr_t grad_weight_global_addr,
+global_addr_t grad_bias_global_addr,
+int*          shape,
+int           dims,
+int           axis,
+int           affine,
+data_type_t   dtype );
+
 void tpu_kernel_api_layernorm_backward_multi_core ( const void *args )
 {
   sg_api_layernorm_backward_t *api = ( sg_api_layernorm_backward_t * ) args;
@@ -76,3 +78,4 @@ void tpu_kernel_api_layernorm_backward_multi_core ( const void *args )
   tpu_poll();
 }
 TPUKERNEL_FUNC_REGISTER ( tpu_kernel_api_layernorm_backward_multi_core );
+#endif

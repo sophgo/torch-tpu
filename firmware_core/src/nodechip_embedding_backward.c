@@ -2,6 +2,7 @@
 #include "tpu_kernel.h"
 #include <stdlib.h>
 #include <string.h>
+#include "config.h"
 
 //[Error] will lead you to some improvements.
 //CONTROL_CODE

@@ -1,6 +1,8 @@
 #include "sg_api_struct.h"
 #include "tpu_kernel.h"
+#include "config.h"
 
+#ifdef FIRMWARE_BACKEND_2260
 extern
 void nodechip_mlp0_fuse_multi_core_v3(
     global_addr_t   input0_global_addr,
@@ -49,3 +51,4 @@ void tpu_kernel_add_ln_mm_multi_core(const void* api_buf) {
 }
 
 TPUKERNEL_FUNC_REGISTER(tpu_kernel_add_ln_mm_multi_core);
+#endif

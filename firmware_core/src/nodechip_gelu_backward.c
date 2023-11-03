@@ -1,6 +1,7 @@
 #include "sg_api_struct.h"
 #include "tpu_kernel.h"
 #include <math.h>
+#include "config.h"
 
 static inline void nodechip_gelu_backward_parallel_fp16 ( global_addr_t DXGlobalAddr, global_addr_t XGlobalAddr, global_addr_t DYGlobalAddr, int Len, data_type_t dtype )
 {
@@ -254,14 +255,6 @@ static inline void nodechip_gelu_backward (
   tpu_gdma_cpy_L2S ( DXGlobalAddr + LastDone * DSize, DXAddrs[1 - Index], &LastShape, NULL, NULL, dtype );
 }
 
-extern void nodechip_gelu_backward_multi_core (
-  global_addr_t grad_input_global_addr,
-  global_addr_t grad_output_global_addr,
-  global_addr_t input_global_addr,
-  int*          shape,
-  int           dims,
-  data_type_t   dtype );
-
 void tpu_kernel_api_gelu_backward ( const void * args )
 {
   sg_api_gelu_backward_t * api = ( sg_api_gelu_backward_t * ) args;
@@ -295,6 +288,15 @@ void tpu_kernel_api_gelu_backward ( const void * args )
 }
 TPUKERNEL_FUNC_REGISTER ( tpu_kernel_api_gelu_backward );
 
+#ifdef FIRMWARE_BACKEND_2260
+extern void nodechip_gelu_backward_multi_core (
+  global_addr_t grad_input_global_addr,
+  global_addr_t grad_output_global_addr,
+  global_addr_t input_global_addr,
+  int*          shape,
+  int           dims,
+  data_type_t   dtype );
+
 void tpu_kernel_api_gelu_backward_multi_core ( const void * args )
 {
   sg_api_gelu_backward_t * api = ( sg_api_gelu_backward_t * ) args;
@@ -310,3 +312,4 @@ void tpu_kernel_api_gelu_backward_multi_core ( const void * args )
   tpu_poll();
 }
 TPUKERNEL_FUNC_REGISTER ( tpu_kernel_api_gelu_backward_multi_core );
+#endif

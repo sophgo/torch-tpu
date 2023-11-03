@@ -1,5 +1,6 @@
 #include "sg_api_struct.h"
 #include "tpu_kernel.h"
+#include "config.h"
 
 /*
  * output = input op value
@@ -343,6 +344,7 @@ void tpu_kernel_api_csub ( const void * args )
 }
 TPUKERNEL_FUNC_REGISTER ( tpu_kernel_api_csub );
 
+#ifdef FIRMWARE_BACKEND_2260
 extern void nodechip_const_binary_fp_multi_core(
     global_addr_t A_global_addr,
     global_addr_t res_global_addr,
@@ -375,3 +377,4 @@ void tpu_kernel_api_const_binary_multi_core(const void* api_buf) {
 }
 
 TPUKERNEL_FUNC_REGISTER(tpu_kernel_api_const_binary_multi_core);
+#endif

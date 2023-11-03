@@ -2,6 +2,7 @@
 
 #include "sg_api_struct.h"
 #include "tpu_kernel.h"
+#include "config.h"
 
 // extern void nodechip_transpose(
 // global_addr_t         input_global_addr,

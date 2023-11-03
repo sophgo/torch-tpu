@@ -1,5 +1,6 @@
 #include "sg_api_struct.h"
 #include "tpu_kernel.h"
+#include "config.h"
 
 void nodechip_mse_loss_forward (
 global_addr_t input_global_addr,

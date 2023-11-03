@@ -1,17 +1,8 @@
 #include "sg_api_struct.h"
 #include "tpu_kernel.h"
+#include "config.h"
 
-// void nodechip_repeat_w(global_addr_t input_global_addr, global_addr_t
-// output_global_addr,
-//                        int cur_dim, int repeat_times, int dtype) {
-//     int dtype_size = tpu_data_type_size(dtype);
-//     for(int i = 0; i < repeat_times; ++i) {
-//         dim4 cur_shape = {.n=1, .c=1, .h=1, .w=cur_dim};
-//         tpu_gdma_cpy_S2S(output_global_addr, input_global_addr, &cur_shape,
-//         NULL, NULL, dtype); output_global_addr += cur_dim * dtype_size;
-//     }
-//     input_global_addr += cur_dim * dtype_size;
-// }
+
 void nodechip_repeat(global_addr_t input_global_addr,
                      global_addr_t output_global_addr, int *shape,
                      int *repeat_times, int dim, int repeat_dim,
@@ -151,6 +142,7 @@ void tpu_kernel_api_repeat(const void *args) {
 }
 TPUKERNEL_FUNC_REGISTER(tpu_kernel_api_repeat);
 
+#ifdef FIRMWARE_BACKEND_2260
 void tpu_kernel_api_repeat_multi_core(const void *args) {
   sg_api_repeat_t *api = (sg_api_repeat_t *)args;
 
@@ -163,3 +155,4 @@ void tpu_kernel_api_repeat_multi_core(const void *args) {
   tpu_poll();
 }
 TPUKERNEL_FUNC_REGISTER(tpu_kernel_api_repeat_multi_core);
+#endif

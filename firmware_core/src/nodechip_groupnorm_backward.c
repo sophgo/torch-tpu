@@ -1,5 +1,7 @@
 #include "sg_api_struct.h"
 #include "tpu_kernel.h"
+#include "config.h"
+
 #define DEFAULT_LOCAL_ADDR 0xFFFFFFFF
 #define MIN(x,y) (((x)) < ((y)) ? (x) : (y))
 #define GDMA_MAX_N 65535

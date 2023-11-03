@@ -1,5 +1,6 @@
 #include "sg_api_struct.h"
 #include "tpu_kernel.h"
+#include "config.h"
 
 extern void nodechip_cast (
 global_addr_t   in_global_addr,
@@ -26,6 +27,7 @@ void tpu_kernel_api_dtype_convert ( const void* args ) {
 
 TPUKERNEL_FUNC_REGISTER ( tpu_kernel_api_dtype_convert );
 
+#ifdef FIRMWARE_BACKEND_2260
 static inline void compute_current_slice_info_multi_core(int total_num, int* expected_current_slice,
                                                          int* expected_avg_slice, int* expected_secs) {
   const int core_num = tpu_core_num();
@@ -90,3 +92,4 @@ void tpu_kernel_api_dtype_convert_multi_core ( const void* args ) {
 }
 
 TPUKERNEL_FUNC_REGISTER ( tpu_kernel_api_dtype_convert_multi_core );
+#endif

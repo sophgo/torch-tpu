@@ -1,5 +1,6 @@
 #include "sg_api_struct.h"
 #include "tpu_kernel.h"
+#include "config.h"
 
 // if dtype is fp16/bf16, pooling will cast to fp32
 extern void nodechip_layernorm_forward_cast (
@@ -14,20 +15,6 @@ int           dims,
 int           axis,
 float         eps,
 bool          affine,
-data_type_t   dtype );
-
-extern void nodechip_layernorm_forward_multi_core (
-global_addr_t input_global_addr,
-global_addr_t weight_global_addr,
-global_addr_t bias_global_addr,
-global_addr_t mean_global_addr,
-global_addr_t rstd_global_addr,
-global_addr_t output_global_addr,
-int*          shape,
-int           dims,
-int           axis,
-float         eps,
-int           affine,
 data_type_t   dtype );
 
 void tpu_kernel_api_layernorm ( const void *args )
@@ -52,6 +39,20 @@ void tpu_kernel_api_layernorm ( const void *args )
 }
 TPUKERNEL_FUNC_REGISTER ( tpu_kernel_api_layernorm );
 
+#ifdef FIRMWARE_BACKEND_2260
+extern void nodechip_layernorm_forward_multi_core (
+global_addr_t input_global_addr,
+global_addr_t weight_global_addr,
+global_addr_t bias_global_addr,
+global_addr_t mean_global_addr,
+global_addr_t rstd_global_addr,
+global_addr_t output_global_addr,
+int*          shape,
+int           dims,
+int           axis,
+float         eps,
+int           affine,
+data_type_t   dtype );
 void tpu_kernel_api_layernorm_multi_core ( const void *args )
 {
   sg_api_layernorm_t *api = ( sg_api_layernorm_t * ) args;
@@ -73,3 +74,4 @@ void tpu_kernel_api_layernorm_multi_core ( const void *args )
   tpu_poll();
 }
 TPUKERNEL_FUNC_REGISTER ( tpu_kernel_api_layernorm_multi_core );
+#endif

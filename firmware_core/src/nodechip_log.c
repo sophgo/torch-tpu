@@ -1,5 +1,6 @@
 #include "sg_api_struct.h"
 #include "tpu_kernel.h"
+#include "config.h"
 
 inline static void pipeline_move(unsigned long long *array, int num) {
   for (int i = num - 1; i > 0; i--) {
@@ -134,7 +135,9 @@ void tpu_kernel_api_log(const void *args) {
 }
 TPUKERNEL_FUNC_REGISTER(tpu_kernel_api_log);
 
+#ifdef FIRMWARE_BACKEND_2260
 void tpu_kernel_api_log_multi_core(const void *args) {
   TPUKERNEL_ASSERT_INFO(false, "not implementated");
 }
 TPUKERNEL_FUNC_REGISTER(tpu_kernel_api_log_multi_core);
+#endif

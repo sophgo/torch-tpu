@@ -1,5 +1,6 @@
 #include "sg_api_struct.h"
 #include "tpu_kernel.h"
+#include "config.h"
 
 static void nodechip_gather(
   global_addr_t input_global_addr,
@@ -184,8 +185,10 @@ void tpu_kernel_api_gather ( const void *args )
 }
 TPUKERNEL_FUNC_REGISTER ( tpu_kernel_api_gather );
 
+#ifdef FIRMWARE_BACKEND_2260
 void tpu_kernel_api_gather_multi_core ( const void *args )
 {
   TPUKERNEL_ASSERT_INFO(false, "not implementated");
 }
 TPUKERNEL_FUNC_REGISTER ( tpu_kernel_api_gather_multi_core );
+#endif

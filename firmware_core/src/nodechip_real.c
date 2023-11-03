@@ -1,6 +1,7 @@
 #include "sg_api_struct.h"
 #include "tpu_kernel.h"
 #include "stdio.h"
+#include "config.h"
 
 /*
  * output = input + value * ( other )
@@ -164,8 +165,10 @@ void tpu_kernel_api_real(const void *args)
 }
 TPUKERNEL_FUNC_REGISTER(tpu_kernel_api_real);
 
+#ifdef FIRMWARE_BACKEND_2260
 void tpu_kernel_api_real_multi_core(const void *args)
 {
   TPUKERNEL_ASSERT_INFO(false, "not implementated");
 }
 TPUKERNEL_FUNC_REGISTER(tpu_kernel_api_real_multi_core);
+#endif

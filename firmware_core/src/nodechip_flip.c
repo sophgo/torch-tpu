@@ -1,5 +1,6 @@
 #include "sg_api_struct.h"
 #include "tpu_kernel.h"
+#include "config.h"
 
 extern void nodechip_reverse(global_addr_t bottom_global_offset,
                              global_addr_t top_global_offset,
@@ -22,7 +23,9 @@ void tpu_kernel_api_flip(const void *args) {
 }
 TPUKERNEL_FUNC_REGISTER(tpu_kernel_api_flip);
 
+#ifdef FIRMWARE_BACKEND_2260
 void tpu_kernel_api_flip_multi_core(const void *args) {
   TPUKERNEL_ASSERT_INFO(false, "not implementated");
 }
 TPUKERNEL_FUNC_REGISTER(tpu_kernel_api_flip_multi_core);
+#endif

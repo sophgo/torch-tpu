@@ -1,5 +1,6 @@
 #include "sg_api_struct.h"
 #include "tpu_kernel.h"
+#include "config.h"
 
 inline static void pipeline_move(unsigned long long *array, int num)
 {
@@ -131,6 +132,7 @@ void tpu_kernel_api_pow(const void *args)
 }
 TPUKERNEL_FUNC_REGISTER(tpu_kernel_api_pow);
 
+#ifdef FIRMWARE_BACKEND_2260
 void tpu_kernel_api_pow_multi_core(const void *args)
 {
    sg_api_pow_t * api = ( sg_api_pow_t * ) args;
@@ -160,3 +162,4 @@ void tpu_kernel_api_pow_multi_core(const void *args)
   tpu_poll();
 }
 TPUKERNEL_FUNC_REGISTER(tpu_kernel_api_pow_multi_core);
+#endif

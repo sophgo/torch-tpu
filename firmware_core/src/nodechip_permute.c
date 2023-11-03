@@ -1,5 +1,6 @@
 #include "sg_api_struct.h"
 #include "tpu_kernel.h"
+#include "config.h"
 
 extern void nodechip_transpose(global_addr_t         input_global_addr,
                                global_addr_t         output_global_addr,
@@ -100,9 +101,3 @@ void tpu_kernel_api_permute(const void *args) {
     tpu_poll();
 }
 TPUKERNEL_FUNC_REGISTER(tpu_kernel_api_permute);
-
-// void tpu_kernel_api_permute_multi_core(const void *args) {
-//     sg_api_permute_t *api = (sg_api_permute_t*)args;
-
-// }
-// TPUKERNEL_FUNC_REGISTER(tpu_kernel_api_permute_multi_core);

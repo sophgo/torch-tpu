@@ -1,5 +1,6 @@
 #include "sg_api_struct.h"
 #include "tpu_kernel.h"
+#include "config.h"
 
 void nodechip_reduce_sum_2d (
 global_addr_t input_global_addr,
@@ -243,6 +244,7 @@ void tpu_kernel_api_reduce ( const void *args )
 }
 TPUKERNEL_FUNC_REGISTER ( tpu_kernel_api_reduce );
 
+#ifdef FIRMWARE_BACKEND_2260
 static inline void compute_current_slice_info_multi_core(int total_num, int* expected_current_slice,
                                                          int* expected_avg_slice, int* expected_secs) {
   const int core_num = tpu_core_num();
@@ -556,3 +558,4 @@ void tpu_kernel_api_reduce_multi_core ( const void *args )
   tpu_poll();
 }
 TPUKERNEL_FUNC_REGISTER ( tpu_kernel_api_reduce_multi_core );
+#endif

@@ -1,5 +1,6 @@
 #include "sg_api_struct.h"
 #include "tpu_kernel.h"
+#include "config.h"
 
 extern void nodechip_clip_fp(
     global_addr_t A_global_addr,
@@ -36,6 +37,7 @@ void tpu_kernel_api_clamp ( const void *args )
 }
 TPUKERNEL_FUNC_REGISTER ( tpu_kernel_api_clamp );
 
+#ifdef FIRMWARE_BACKEND_2260
 void tpu_kernel_api_clamp_multi_core ( const void *args )
 {
   sg_api_clamp_t * api = ( sg_api_clamp_t * ) args;
@@ -67,3 +69,4 @@ void tpu_kernel_api_clamp_multi_core ( const void *args )
   tpu_poll();
 }
 TPUKERNEL_FUNC_REGISTER ( tpu_kernel_api_clamp_multi_core );
+#endif

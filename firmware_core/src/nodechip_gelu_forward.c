@@ -1,5 +1,6 @@
 #include "sg_api_struct.h"
 #include "tpu_kernel.h"
+#include "config.h"
 
 static inline void nodechip_gelu_forward_parallel ( global_addr_t XGlobalAddr, global_addr_t YGlobalAddr, int Len )
 {
@@ -107,13 +108,6 @@ data_type_t   dtype,
 int           active_type,
 float*        coef);
 
-extern void nodechip_gelu_forward_multi_core (
-global_addr_t input_global_addr,
-global_addr_t output_global_addr,
-int*          shape,
-int           dims,
-data_type_t   dtype );
-
 void tpu_kernel_api_gelu ( const void * args )
 {
   sg_api_gelu_t * api = ( sg_api_gelu_t * ) args;
@@ -143,6 +137,14 @@ void tpu_kernel_api_gelu ( const void * args )
 }
 TPUKERNEL_FUNC_REGISTER ( tpu_kernel_api_gelu );
 
+#ifdef FIRMWARE_BACKEND_2260
+extern void nodechip_gelu_forward_multi_core (
+global_addr_t input_global_addr,
+global_addr_t output_global_addr,
+int*          shape,
+int           dims,
+data_type_t   dtype );
+
 void tpu_kernel_api_gelu_multi_core ( const void * args )
 {
   sg_api_gelu_t * api = ( sg_api_gelu_t * ) args;
@@ -157,3 +159,4 @@ void tpu_kernel_api_gelu_multi_core ( const void * args )
   tpu_poll();
 }
 TPUKERNEL_FUNC_REGISTER ( tpu_kernel_api_gelu_multi_core );
+#endif

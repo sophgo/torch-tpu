@@ -1,5 +1,6 @@
 #include "sg_api_struct.h"
 #include "tpu_kernel.h"
+#include "config.h"
 
 void nodechip_bcast_add (
 global_addr_t output_global_addr,
@@ -223,6 +224,7 @@ void tpu_kernel_api_bcast_add ( const void * args )
 }
 TPUKERNEL_FUNC_REGISTER ( tpu_kernel_api_bcast_add );
 
+#ifdef FIRMWARE_BACKEND_2260
 extern void nodechip_binary_multi_core(
     global_addr_t A_global_addr,
     global_addr_t B_global_addr,
@@ -275,3 +277,4 @@ void tpu_kernel_api_binary_multi_core(const void* api_buf) {
 }
 
 TPUKERNEL_FUNC_REGISTER(tpu_kernel_api_binary_multi_core);
+#endif

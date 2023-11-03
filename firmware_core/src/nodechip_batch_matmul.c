@@ -1,5 +1,6 @@
 #include "sg_api_struct.h"
 #include "tpu_kernel.h"
+#include "config.h"
 
 extern void nodechip_batch_matmul_float (
 global_addr_t L_global_addr,
@@ -60,6 +61,7 @@ void tpu_kernel_api_batch_matmul ( const void * args )
 }
 TPUKERNEL_FUNC_REGISTER ( tpu_kernel_api_batch_matmul );
 
+#ifdef FIRMWARE_BACKEND_2260
 extern void nodechip_matmul_multi_core(
     global_addr_t   left_global_addr,
     global_addr_t   right_global_addr,
@@ -94,3 +96,4 @@ void tpu_kernel_api_matmul_multi_core(const void* api_buf) {
 }
 
 TPUKERNEL_FUNC_REGISTER(tpu_kernel_api_matmul_multi_core);
+#endif
