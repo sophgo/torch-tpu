@@ -118,6 +118,7 @@ Tensor &upsample_nearest2d_backward_out_tpu(
     at::Tensor &grad_input = input) {
   CHECK_TENSOR_IN_DEVICE(grad_input);
   CHECK_TENSOR_IN_DEVICE(grad_output);
+#if 0
   LOG(WARNING) << "upsample_nearest2d_backward use cpu impl";
   auto input_type = grad_input.dtype();
   auto T_input = grad_input.cpu().to(torch::kFloat32).contiguous();
@@ -130,6 +131,33 @@ Tensor &upsample_nearest2d_backward_out_tpu(
                            grad_input.nbytes());
   grad_input = grad_input.contiguous();
   LOG(WARNING) << "upsample_nearest2d_backward use cpu impl end2";
+#else
+  int kernel_size_h = output_size[0] / input_size[2];
+  int kernel_size_w = output_size[1] / input_size[3];
+  PoolingDescriptor_t pooling_desc =
+  {
+    .kh = kernel_size_h,
+    .kw = kernel_size_w,
+    .pad_h = 0,
+    .pad_w = 0,
+    .stride_h = kernel_size_h,
+    .stride_w = kernel_size_w,
+    .output_h = static_cast<int>(input_size[0]),
+    .output_w = static_cast<int>(input_size[1]),
+    .mode = POOLING_AVG
+  };
+  at::Tensor temp_res = at::empty_like(grad_input);
+
+  bm_status_t status1 = sgdnnPoolingForward (
+                       tpu::TPUGetDeviceHandle(),
+                       tpu::TPUGenerateSgdnnTensor ( grad_output ),
+                       tpu::TPUGenerateSgdnnTensor ( temp_res ),
+                       pooling_desc);
+  bm_status_t status = sgdnnMulC(
+          tpu::TPUGetDeviceHandle(), tpu::TPUGenerateSgdnnTensor(temp_res),
+          kernel_size_h * kernel_size_w, tpu::TPUGenerateSgdnnTensor(grad_input));
+  TORCH_CHECK ( status == BM_SUCCESS );
+#endif
   return grad_input;
 }
 

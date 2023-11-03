@@ -70,6 +70,35 @@ def case1():
     # except:
     #     print(mem)
 
+def test_upsample_nearest2d_backward():
+    # 创建示例梯度输出张量
+    src_size = 3
+    dst_size = 6
+    grad1 = torch.range(1, 1 * src_size * src_size).view(1, 1, src_size, src_size)  # 根据需要修改维度
+    grad_out = torch.range(1, dst_size * dst_size).view(1, 1, dst_size, dst_size)
 
+    # 定义输出和输入大小
+    output_size = (1,1,src_size,src_size)
+    input_size = (dst_size,dst_size)
+
+    # 可选的上采样比例（默认为None）
+    scales_h = None
+    scales_w = None
+
+    # 创建一个与grad_output形状相同的梯度输入张量
+    grad_o1 = torch.zeros_like(grad1)
+    grad_in = torch.zeros_like(grad1)
+    torch.ops.aten.upsample_nearest2d_backward(grad_out, input_size, output_size, grad_input=grad_in)
+    print("cpu")
+    print(grad_in)
+
+    grad_out_tpu = grad_out.clone().to(device)
+    grad_in_tpu = grad_o1.clone().to(device)
+    # out_tpu = torch.ops.aten.upsample_nearest2d_backward(grad_out_tpu, size2, size1, grad_input=grad_in_tpu)
+    out_tpu = torch.ops.aten.upsample_nearest2d_backward(grad_out_tpu, input_size, output_size)
+    print("tpu")
+    print(out_tpu.cpu())
+    
 if __name__ == "__main__":
-    case1()
+    # case1()
+    test_upsample_nearest2d_backward()
