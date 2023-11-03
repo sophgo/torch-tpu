@@ -11,7 +11,7 @@ from test_utils import *
 import torch.nn.functional as F
 from tqdm import tqdm
 
-torch.ops.load_library("../../libtorch_plugin/build/liblibtorch_plugin.so")
+torch.ops.load_library("../../build/torch_tpu/libtorch_tpu.so")
 torch.manual_seed(1000)
 torch.set_printoptions(precision=6)
 device = "privateuseone:0"

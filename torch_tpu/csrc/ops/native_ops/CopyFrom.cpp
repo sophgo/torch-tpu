@@ -57,7 +57,7 @@ Tensor _copy_from_tpu(const Tensor &self, const Tensor &dst,
       auto dst_cpu = self.cpu().to ( dst.dtype() );
       tpu::TPUCopyHostToDevice ( dst.data_ptr(), dst_cpu.contiguous().data_ptr(), dst.nbytes() );
 #else
-      if (self.dtype() == caffe2::TypeMeta::Make<long>() || dst.dtype() == caffe2::TypeMeta::Make<long>() )
+      if ( !tpu::IsSupportDtype(self.dtype()) || !tpu::IsSupportDtype( dst.dtype() ))
       {
         LOG( WARNING ) << "dtypeconvert use cpu impl";
         auto dst_cpu = self.cpu().to ( dst.dtype() );

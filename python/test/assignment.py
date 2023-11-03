@@ -5,11 +5,11 @@ import torch.nn as nn
 import copy
 from utils import Optimer
 
-torch.ops.load_library("../../libtorch_plugin/build/liblibtorch_plugin.so")
+torch.ops.load_library("../../build/torch_tpu/libtorch_tpu.so")
 torch.manual_seed(1000)
 
 device = "privateuseone"
-optimer = Optimer("../../libtorch_plugin/build/liblibtorch_plugin.so")
+optimer = Optimer("../../build/torch_tpu/libtorch_tpu.so")
 
 
 def case1():

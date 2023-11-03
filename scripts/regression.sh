@@ -52,42 +52,42 @@ function link_libsophon() {
     echo "********************************************"
 }
 
-function libtorch_zip_prepare() {
-  LIBTORCH_DOWNLOAD_FLAG=${1:-online} #online,local, or fast
-  if [ $LIBTORCH_DOWNLOAD_FLAG = "online" ] || [ $LIBTORCH_DOWNLOAD_FLAG = 'local' ];then
-    pushd  $CURRENT_DIR/..
-    cmd_rm="rm -rf libtorch"
-    $cmd_rm
-    get_libtorch="wget -nc https://download.pytorch.org/libtorch/cpu/libtorch-shared-with-deps-2.0.1%2Bcpu.zip"
-    $get_libtorch
-    unzip_code="unzip libtorch-shared-with-deps-2.0.1+cpu.zip"
-    $unzip_code
-    popd
-  fi
-}
+# function libtorch_zip_prepare() {
+#   LIBTORCH_DOWNLOAD_FLAG=${1:-online} #online,local, or fast
+#   if [ $LIBTORCH_DOWNLOAD_FLAG = "online" ] || [ $LIBTORCH_DOWNLOAD_FLAG = 'local' ];then
+#     pushd  $CURRENT_DIR/..
+#     cmd_rm="rm -rf libtorch"
+#     $cmd_rm
+#     get_libtorch="wget -nc https://download.pytorch.org/libtorch/cpu/libtorch-shared-with-deps-2.0.1%2Bcpu.zip"
+#     $get_libtorch
+#     unzip_code="unzip libtorch-shared-with-deps-2.0.1+cpu.zip"
+#     $unzip_code
+#     popd
+#   fi
+# }
 
-function build_libtorch_plugin() {
-  LIBTORCH_DOWNLOAD_FLAG=${1:-online} #online,local, or fast
-  CURRENT_DIR=$(dirname ${BASH_SOURCE})
-  echo "[INFO]LIBTORCH_DOWNLOAD_FLAG:$LIBTORCH_DOWNLOAD_FLAG"
-  if [ $LIBTORCH_DOWNLOAD_FLAG = 'online' ] || [ $LIBTORCH_DOWNLOAD_FLAG = 'local' ];then
-    libtorch_zip_prepare $LIBTORCH_DOWNLOAD_FLAG
-  fi
-  LIBTORCH_PLUGIN_PATH=$CURRENT_DIR/../libtorch_plugin
-  echo "[INFO]LIBTORCH_PLUGIN_PATH:$LIBTORCH_PLUGIN_PATH"
-  pushd "$LIBTORCH_PLUGIN_PATH"
-  if [ ! -f "./build" ]; then
-    rm_build_cmd="rm -rf $LIBTORCH_PLUGIN_PATH/build"
-    $rm_build_cmd
-    echo "[INFO] libtorch_plugin/build has been rm"
-  fi
-  mkdir build
-  popd
-  pushd $LIBTORCH_PLUGIN_PATH/build
-  cmake .. -DCMAKE_BUILD_TYPE=Debug
-  make -j$(($(nproc)-2))&& cd ..
-  popd
-}
+# function build_libtorch_plugin() {
+#   LIBTORCH_DOWNLOAD_FLAG=${1:-online} #online,local, or fast
+#   CURRENT_DIR=$(dirname ${BASH_SOURCE})
+#   echo "[INFO]LIBTORCH_DOWNLOAD_FLAG:$LIBTORCH_DOWNLOAD_FLAG"
+#   if [ $LIBTORCH_DOWNLOAD_FLAG = 'online' ] || [ $LIBTORCH_DOWNLOAD_FLAG = 'local' ];then
+#     libtorch_zip_prepare $LIBTORCH_DOWNLOAD_FLAG
+#   fi
+#   LIBTORCH_PLUGIN_PATH=$CURRENT_DIR/../libtorch_plugin
+#   echo "[INFO]LIBTORCH_PLUGIN_PATH:$LIBTORCH_PLUGIN_PATH"
+#   pushd "$LIBTORCH_PLUGIN_PATH"
+#   if [ ! -f "./build" ]; then
+#     rm_build_cmd="rm -rf $LIBTORCH_PLUGIN_PATH/build"
+#     $rm_build_cmd
+#     echo "[INFO] libtorch_plugin/build has been rm"
+#   fi
+#   mkdir build
+#   popd
+#   pushd $LIBTORCH_PLUGIN_PATH/build
+#   cmake .. -DCMAKE_BUILD_TYPE=Debug
+#   make -j$(($(nproc)-2))&& cd ..
+#   popd
+# }
 
 function make_kernel_module() {
   test_CHIP_ARCH=${1:-bm1684x}
@@ -185,7 +185,7 @@ function run_online_regression_test() {
       echo "*************** CMODEL IS SET *************"
     fi
     if [ $TEST_PATTERN = "online" ] || [ $TEST_PATTERN = "local" ];then
-      build_libtorch_plugin $TEST_PATTERN
+      # build_libtorch_plugin $TEST_PATTERN
       echo "*************** LIBTORCH_PLUGIN IS BUILT *************"
       ops_utest; ret_ops_utest=$?
       echo "[INFO]ret_ops_utest:$ret_ops_utest"
@@ -210,7 +210,7 @@ function fast_build_bm1684x_latest() {
 
 function fast_build_bm1684x_latest_and_libtorch_plugin() {
   run_online_regression_test bm1684x latest fast
-  build_libtorch_plugin fast
+  # build_libtorch_plugin fast
 }
 
 function fast_build_sg2260_latest() {
@@ -219,13 +219,13 @@ function fast_build_sg2260_latest() {
 
 function fast_build_sg2260_latest_and_libtorch_plugin() {
   run_online_regression_test sg2260 latest fast
-  build_libtorch_plugin fast
+  # build_libtorch_plugin fast
 }
 
-function fast_download_and_rebuild_libtorch_plugin() {
-  build_libtorch_plugin local
-}
+# function fast_download_and_rebuild_libtorch_plugin() {
+#   # build_libtorch_plugin local
+# }
 
-function fast_only_rebuild_libtorch_plugin() {
-  build_libtorch_plugin fast
-}
+# function fast_only_rebuild_libtorch_plugin() {
+#   # build_libtorch_plugin fast
+# }

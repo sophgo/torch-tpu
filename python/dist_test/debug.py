@@ -3,7 +3,7 @@ import os
 import torch
 import sccl_collectives
 import torch.distributed as dist
-torch.ops.load_library("../../libtorch_plugin/build/liblibtorch_plugin.so")
+torch.ops.load_library("../../build/torch_tpu/libtorch_tpu.so")
 TPU = "privateuseone"
 
 os.environ['MASTER_ADDR'] = 'localhost'

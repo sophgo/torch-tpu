@@ -5,7 +5,7 @@ import logging
 import os
 from helper import init_logger, is_master, is_slave
 import sccl_collectives
-torch.ops.load_library("../../libtorch_plugin/build/liblibtorch_plugin.so")
+torch.ops.load_library("../../build/torch_tpu/libtorch_tpu.so")
 TPU = "privateuseone"
 
 rank = os.environ.get("OMPI_COMM_WORLD_RANK", None)

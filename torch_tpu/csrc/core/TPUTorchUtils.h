@@ -120,6 +120,19 @@ static inline SgdnnDataType_t TPUConvertDType ( caffe2::TypeMeta dtype )
   return SGDNN_DTYPE_UNKNOWN;
 }
 
+static inline bool IsSupportDtype( caffe2::TypeMeta&& dtype )
+{
+  bool support = false;
+  if ( dtype == caffe2::TypeMeta::Make<float>() || dtype == caffe2::TypeMeta::Make<at::Half>() ||
+       dtype == caffe2::TypeMeta::Make<at::BFloat16>() || dtype == caffe2::TypeMeta::Make<int>() ||
+       dtype == caffe2::TypeMeta::Make<bool>() || dtype == caffe2::TypeMeta::Make<unsigned char>() ||
+       dtype == caffe2::TypeMeta::Make<int8_t>())
+  {
+    support = true;
+  }
+  return support;
+}
+
 static inline SgdnnTensor_t TPUGenerateSgdnnTensor ( const at::Tensor & Tensor )
 {
   SgdnnTensor_t t = { 0 };
@@ -428,9 +441,9 @@ typedef enum
   MSE_LOSS_BACKWARD,
   SLICE_SCATTER,
   InfCheckAndUnscale,
-  OP_NUM,
   LLAMA_MLP_FORWARD,
-  RMSNORM_FORWARD
+  RMSNORM_FORWARD,
+  OP_NUM
 }
 OpType;
 
@@ -611,7 +624,9 @@ static const char * OpTypeStr[OP_NUM] =
   "MSE Loss",
   "MSE Loss Backward",
   "Slice_scatter",
-  "Inf Check And Unscale"
+  "Inf Check And Unscale",
+  "LLAMA_MLP_FORWARD",
+  "RMSNORM_FORWARD"
 };
 
 struct OpTimer

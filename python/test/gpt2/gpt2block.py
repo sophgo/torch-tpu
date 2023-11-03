@@ -4,7 +4,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 from transformers.models.gpt2.modeling_gpt2 import GPT2LMHeadModel
 
-torch.ops.load_library("../../../libtorch_plugin/build/liblibtorch_plugin.so")
+torch.ops.load_library("../../../build/torch_tpu/libtorch_tpu.so")
 torch.manual_seed(1000)
 
 tmp1 = None

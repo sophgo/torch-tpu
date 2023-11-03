@@ -3,6 +3,7 @@
 #include "sg_api_struct.h"
 #include "sgdnn_api.h"
 #include <stdio.h>
+#include <algorithm>
 
 #if defined SGDNN_BACKEND_1684X
 #include "kernel_module_data.h"
@@ -3124,7 +3125,7 @@ bm_status_t sgdnnNorm2 ( bm_handle_t handle,
   }
   else
   {
-    SGDNN_CHECK ( output.dim == 0 );
+    SGDNN_CHECK ( (size_t)output.dim == 0 );
   }
   SGDNN_CHECK ( sgdnnIsTensorContiguous ( &input ) );
   SGDNN_CHECK ( sgdnnIsTensorContiguous ( &output ) );

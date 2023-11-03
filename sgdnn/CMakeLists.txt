@@ -1,5 +1,8 @@
 project(SGDNN CXX)
 
+set(SAFETY_FLAGS "-Wall -Wno-error=deprecated-declarations -ffunction-sections -fdata-sections -fPIC -Wno-unused-function -funwind-tables -fno-short-enums")
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++11 -lpthread -fno-strict-aliasing -D_GLIBCXX_USE_CXX11_ABI=1 ${SAFETY_FLAGS}")
+
 set(SGDNN_BACKEND_1684X 0)
 set(SGDNN_BACKEND_2260 0)
 if($ENV{CHIP_ARCH} STREQUAL "bm1684x")
@@ -36,7 +39,9 @@ if(SGDNN_BACKEND_1684X)
     link_directories(/opt/sophon/libsophon-current/lib)
   elseif($ENV{LIBSOPHON_PATTERN} MATCHES $ENV{LIBSOPHON_LATEST})
     if(NOT EXISTS "$ENV{LIBSOPHON_TOP}/build/bmlib/libbmlib.so")
-      message(WARNING "USE LOCAL BMLIB")
+      message(WARNING           
+      " NOT FOUND $ENV{LIBSOPHON_TOP}/build/bmlib/libbmlib.so,
+        USE LOCAL BMLIB, Please Make Sure you want to build CModel Version")
       link_directories(${PROJECT_ROOT}/third_party/$ENV{CHIP_ARCH})
     else()
       link_directories($ENV{LIBSOPHON_TOP}/build/bmlib)

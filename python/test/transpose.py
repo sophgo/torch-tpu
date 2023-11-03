@@ -2,7 +2,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 import copy
-torch.ops.load_library("../../libtorch_plugin/build/liblibtorch_plugin.so")
+torch.ops.load_library("../../build/torch_tpu/libtorch_tpu.so")
 torch.manual_seed(1000)
 
 def case_4d():

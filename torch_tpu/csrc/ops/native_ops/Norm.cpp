@@ -27,11 +27,8 @@ Tensor & norm_out_tpu ( const at::Tensor & self, const c10::optional<at::Scalar>
   {
     TORCH_CHECK ( p.value().toDouble() == 2., "Only support 2-Norm now" );
   }
-  TORCH_CHECK ( dim.size() == self.dim() );
-  for ( auto i = 0; i < dim.size(); ++i )
-  {
-    TORCH_CHECK ( dim[i] == i );
-  }
+  TORCH_CHECK ( dim.size() == self.dim() ); // TODO: Support partial dims
+  for (int i = 0; i < dim.size(); i++) { TORCH_CHECK ( dim[i] == i ); }
 #ifdef TPU_OP_TIMING
   auto timer = tpu::Timer().Start();
 #endif

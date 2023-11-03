@@ -6,9 +6,9 @@ import time
 from utils import Optimer, compare_model_grad, compare_model_weight
 from torch.optim import AdamW, Adam
 
-torch.ops.load_library("../../libtorch_plugin/build/liblibtorch_plugin.so")
+torch.ops.load_library("../../build/torch_tpu/libtorch_tpu.so")
 torch.manual_seed(1000)
-optimer = Optimer("../../libtorch_plugin/build/liblibtorch_plugin.so")
+optimer = Optimer("../../build/torch_tpu/libtorch_tpu.so")
 
 def case_forward(use_fp16=False):
     device = "privateuseone"

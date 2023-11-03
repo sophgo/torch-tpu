@@ -3,7 +3,7 @@ import os
 # from tkinter.messagebox import NO
 import torch
 top=os.path.dirname(__file__)
-torch.ops.load_library(os.path.join(top, "../../libtorch_plugin/build/liblibtorch_plugin.so"))
+torch.ops.load_library(os.path.join(top, "../../build/torch_tpu/libtorch_tpu.so"))
 os.environ['FORBID_CMD_EXECUTE']=str(0)
 os.environ['FILE_DUMP_CMD'] ="ins"
 os.environ['CMODEL_GLOBAL_MEM_SIZE'] = "34359738368"

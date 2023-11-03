@@ -12,7 +12,7 @@ from transformers import GPT2Config
 
 
 torch.manual_seed(1000)
-torch.ops.load_library("../../../libtorch_plugin/build/liblibtorch_plugin.so")
+torch.ops.load_library("../../../build/torch_tpu/libtorch_tpu.so")
 TP = 16
 
 class Conv1D(nn.Module):
@@ -320,7 +320,7 @@ def compare_model(res_cpu, res_tpu):
 def check_gpt3(use_half = False, test_backward = False):
     from transformers import GPT2Config
     import time
-    # torch.ops.load_library("../../libtorch_plugin/build/liblibtorch_plugin.so")
+    # torch.ops.load_library("../../build/torch_tpu/libtorch_tpu.so")
     # torch.manual_seed(1000)
     # device = "privateuseone:0"
     device = torch.device("privateuseone:0")

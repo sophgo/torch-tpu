@@ -65,7 +65,7 @@ Tensor upsample_nearest2d_tpu(const at::Tensor &self,
                               at::ArrayRef<long> output_size,
                               c10::optional<double> scales_h,
                               c10::optional<double> scales_w) {
-  CHECK_TENSOR_IN_DEVICE(self);
+  CHECK_TENSOR_IN_DEVICE_NO_CONTIGUOUS(self);
   TORCH_CHECK(self.dim() > 0, "input dim should larger than 0.");
 #if 0
   auto self_cpu = upsample_bilinear2d(self.cpu(), output_size, align_corners,
@@ -74,7 +74,6 @@ Tensor upsample_nearest2d_tpu(const at::Tensor &self,
                            self.nbytes());
 #else
 
-  TIMING_START
 
   std::vector<int64_t> output_shape(4, 0);
   output_shape[0] = self.size(0);
@@ -90,9 +89,10 @@ Tensor upsample_nearest2d_tpu(const at::Tensor &self,
     output_shape[2] = (int64_t)(scales_h.value() * self.size(2));
     output_shape[3] = (int64_t)(scales_w.value() * self.size(3));
   }
-
+  auto self_ = self.is_contiguous() ? self : self.contiguous(); 
+  TIMING_START
   bm_status_t status = sgdnnUpsampling(
-      tpu::TPUGetDeviceHandle(), tpu::TPUGenerateSgdnnTensor(self),
+      tpu::TPUGetDeviceHandle(), tpu::TPUGenerateSgdnnTensor(self_),
       tpu::TPUGenerateSgdnnTensor(out), true /*align_corners*/,
       UPSAMPLING_NEAREST);
 

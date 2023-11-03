@@ -5,7 +5,7 @@ from transformers.models.gpt2.modeling_gpt2 import GPT2Model
 import sys 
 sys.path.append("..") 
 from utils import compare_model_grad, Optimer
-PLUGIN_PATH = "../../../libtorch_plugin/build/liblibtorch_plugin.so"
+PLUGIN_PATH = "../../../build/torch_tpu/libtorch_tpu.so"
 torch.ops.load_library(PLUGIN_PATH)
 optimer = Optimer(PLUGIN_PATH)
 
