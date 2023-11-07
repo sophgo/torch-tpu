@@ -1900,6 +1900,38 @@ bm_status_t sgdnnUpsampling(bm_handle_t handle, SgdnnTensor_t input,
   return BM_SUCCESS;
 }
 
+bm_status_t sgdnnUpsampleNearest2dBackward(bm_handle_t handle, SgdnnTensor_t grad_output,
+                            SgdnnTensor_t grad_input,
+                            int scale,
+                            PoolingDescriptor_t pooling_desc) {
+  SGDNN_CHECK(sgdnnIsTensorContiguous(&grad_output));
+  SGDNN_CHECK(sgdnnIsTensorContiguous(&grad_input));
+#if defined SGDNN_BACKEND_1684X
+  sg_api_upsample2d_backward_t api;
+  api.input_global_addr = grad_output.addr;
+  api.output_global_addr = grad_input.addr;
+  for ( int i = 0; i < grad_output.dim; ++i )
+  {
+    api.input_shape[i] = grad_output.shape[i];
+    api.output_shape[i] = grad_input.shape[i];
+  }
+  api.pooling_desc = pooling_desc;
+  api.scalar = scale;
+  api.dtype = sgdnnTPUKernelDType ( grad_output.dtype );
+  if(pooling_desc.mode == POOLING_AVG ){
+    SAFE_CALL ( sgdnnTPUKernelLaunch ( handle, "tpu_kernel_api_upsample_nearest2d_backward", &api, sizeof ( api ) ) );
+  } else {
+    SGDNN_CHECK ( false );
+  }
+
+#elif defined SGDNN_BACKEND_2260
+  SGDNN_CHECK(false);
+#else
+  SGDNN_CHECK(false);
+#endif
+  return BM_SUCCESS;
+}
+
 
 bm_status_t sgdnnActive(bm_handle_t handle, SgdnnTensor_t input,
                         SgdnnTensor_t output, sg_active_type_t active_type) {

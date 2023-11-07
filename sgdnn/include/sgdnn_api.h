@@ -808,6 +808,10 @@ bm_status_t sgdnnUpsampling(bm_handle_t handle, SgdnnTensor_t input,
                             bool align_corners,
                             sg_resize_mode_t upsampling_type);
 
+bm_status_t sgdnnUpsampleNearest2dBackward(bm_handle_t handle, SgdnnTensor_t grad_output,
+                            SgdnnTensor_t grad_input, int scale,
+                            PoolingDescriptor_t pooling_desc);
+
 /*
  * OUTPUT = WHERE ( COND, SELF, OTHER ) = COND ? SELF : OTHER
  * Note:

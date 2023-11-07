@@ -144,6 +144,17 @@ typedef struct {
 
 typedef struct {
   unsigned long long input_global_addr;
+  unsigned long long output_global_addr;
+  int input_shape[FW_MAX_SHAPE_DIMS];
+  int output_shape[FW_MAX_SHAPE_DIMS];
+  int dtype;
+  int do_relu;
+  PoolingDescriptor_t pooling_desc;
+  int scalar;
+} WITH_PLATFORM(sg_api_upsample2d_backward_t);
+
+typedef struct {
+  unsigned long long input_global_addr;
   unsigned long long weight_global_addr;
   unsigned long long grad_output_global_addr;
   unsigned long long grad_input_global_addr;

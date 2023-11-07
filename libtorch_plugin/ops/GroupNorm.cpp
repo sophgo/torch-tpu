@@ -123,6 +123,7 @@ native_group_norm_backward_tpu(const at::Tensor &grad_out, const at::Tensor &X,
   if (weight.defined()) {
     CHECK_TENSOR_IN_DEVICE(weight);
   }
+  TIMING_START
 #if 0
     LOG(WARNING) << "group_norm_backward use cpu impl";
     auto input_type = grad_out.dtype();
@@ -165,6 +166,7 @@ native_group_norm_backward_tpu(const at::Tensor &grad_out, const at::Tensor &X,
       output_mask[1] ? tpu::TPUGenerateSgdnnTensor(grad_bias)
                      : sgdnnUndefinedTensor());
   TORCH_CHECK(status == BM_SUCCESS);
+  TIMING_END(tpu::GROUPNORM_BACKWARD)
   return std::tuple<Tensor, Tensor, Tensor>(grad_input, grad_weight, grad_bias);
 
 #endif
