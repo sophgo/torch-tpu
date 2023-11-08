@@ -27,28 +27,25 @@ Note:
     #it's default version, which means source scripts/envsetup.sh bm1684x latest
 Or More detailed:
     2.a) source scripts/envsetup.sh bm1684x latest
-        #CHIP_ARCH is bm1684x, and libsophon is using  tpu-train/../libsophon (gerrit-latest)
+        #CHIP_ARCH is bm1684x, and bmlib is using  tpu-train/../libsophon/build/bmlib/libbmlib.so (gerrit-latest)
+    
+    2.b) source scripts/envsetup.sh bm1684x local
+        #CHIP_ARCH is bm1684x, and bmlib is using  tpu-train/third_party/bm1684x/libbmlib.so
 
-    2.b) source scripts/envsetup.sh bm1684x stable
-        #CHIP_ARCH is bm1684x, and libsophon is using  /opt/sophon/libsophon-current (.deb)
+    2.c) source scripts/envsetup.sh bm1684x stable
+        #CHIP_ARCH is bm1684x, and bmlib is using  /opt/sophon/libsophon-current (.deb)
 
-    2.c) source scripts/envsetup.sh sg2260 latest
-        #CHIP_ARCH is sg2260,  and libsophon is using  tpu-train/../libsophon (gerrit-latest)
+    2.d) source scripts/envsetup.sh sg2260 latest
+        #CHIP_ARCH is sg2260,  and bmlib is using  tpu-train/../libsophon (gerrit-latest)
 
-    2.d) source scripts/envsetup.sh sg2260 stable
-        #CHIP_ARCH is sg2260,  and libsophon is using  /opt/sophon/libsophon-current (.deb)
+    2.e) source scripts/envsetup.sh sg2260 stable
+        #CHIP_ARCH is sg2260,  and bmlib is using  /opt/sophon/libsophon-current (.deb)
 
 [3]fast_build:
     3.a)bm1684x cmodel only:
         fast_build_bm1684x_latest
-    3.b)bm1684x cmodel+ libtorch_plugin
-        fast_build_bm1684x_latest_and_libtorch_plugin
-    3.c)sg2260 cmodel only:
+    3.b)sg2260 cmodel only:
         fast_build_sg2260_latest
-    3.d)sg2260 cmodel+ libtorch_plugin
-        fast_build_sg2260_latest_and_libtorch_plugin
-    3.e) redownload libtorch
-        build_libtorch_plugin
 
 [4]cmodel mode:
 1. mkdir build && (re)build_all
@@ -61,10 +58,9 @@ if you use SOC_MODE or need pybind, make ENABLE_PYBIND ON
     export CROSS_TOOLCHAINS=path_to_bm_prebuilt_toolchains  (absolute path ex. /workspace/bm_prebuilt_toolchains )
     else run prepare_toolchains.sh first
 2. mkdir build && cd build
-3. cmake .. (-DCMAKE_BUILD_TYPE=Debug -DUSING_CMODEL=OFF -DPCIE_MODE=ON
-)
+3. cmake .. (-DCMAKE_BUILD_TYPE=Debug -DUSING_CMODEL=OFF -DPCIE_MODE=ON)
 4. make kernel_module
-5. make -j
+5. make -j8
    5.1) quick build stable
       fast_build_bm1684x_stable   /workspace/libtorch_xxx   0.4.8
 

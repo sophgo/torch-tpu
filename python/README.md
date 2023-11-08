@@ -1,15 +1,28 @@
-How to generate tpu-plugin wheel.
-======
-1. source scripts/envsetup.sh
-2. build firmware sgdnn libtorch_plugin
-3. rebuild_bdist_wheel
-then, you can found wheel in tpu-train/out .     
 
-How to install wheel
 ======
+1. 编译安装 torch-tpu wheel
+```shell
+source scripts/envsetup.sh bm1684x stable
+new_clean
+new_build
 ```
-conda create -n tpu_train python=3.9
-conda activate tpu_train
-pip install torch==1.13.1+cpu --extra-index-url https://download.pytorch.org/whl/cpu
-pip install tpu_plugin***.whl
+2. 检查安装成功
+```shell
+pip list ｜grep torch-tpu
+```
+
+3. example使用
+```python
+import torch
+import torch-tpu
+
+batch = 8
+sequence = 1024
+hidden_size = 768
+out_size = 3
+
+inp = torch.rand(batch, sequence, hidden_size).to(device)
+ln_net = nn.Linear(hidden_size, out_size).to(device)
+out = ln_net(inp)
+print(out.cpu())
 ```
