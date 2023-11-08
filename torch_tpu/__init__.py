@@ -1,23 +1,12 @@
-import os
-import re
 import sys
-import builtins
 import types
-import atexit
-import traceback
-
-from builtins import isinstance as builtin_isinstance
-from typing import Set, Type
 from functools import wraps
 
 import torch
-import torch_tpu
 import torch_tpu._C
+import torch_tpu.tpu
 
 from torch_tpu.utils import add_torch_funcs
-
-import os
-import torch
 
 # NPU_TENSOR = set([
 #     "FloatTensor", "IntTensor", "DoubleTensor",
