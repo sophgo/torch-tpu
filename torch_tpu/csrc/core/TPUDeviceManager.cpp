@@ -237,6 +237,10 @@ TPUDeviceManager * TPUDeviceManager::instance_ = nullptr;
 
 static thread_local int kIndex = 0;
 
+TPUDeviceManager* TPUGetInstance(){
+  return &TPUDeviceManager::GetInstance();
+}
+
 int TPUGetDeviceCount ( void )
 {
   return TPUDeviceManager::GetInstance().GetDeviceCount();

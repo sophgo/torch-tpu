@@ -66,7 +66,11 @@ private:
   int64_t* offset_extragraph_ = nullptr;
   uint32_t offset_intragraph_ = 0;
   bool graph_expects_this_gen_ = false;
-
 };
 
+namespace detail {
+const at::Generator& getDefaultTPUGenerator( c10::DeviceIndex device_index = -1 );
+at::Generator createTPUGenerator(c10::DeviceIndex device_index = -1 );
+
+}; // namespace detail
 }; // namespace aten_tpu

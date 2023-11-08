@@ -5,6 +5,9 @@
 
 namespace tpu
 {
+class TPUDeviceManager;
+TPUDeviceManager* TPUGetInstance();
+
 /**
  * Get the count of TPU devices.
  */

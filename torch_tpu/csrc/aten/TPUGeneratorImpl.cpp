@@ -1,9 +1,58 @@
+#include <c10/util/Exception.h>
 #include <c10/core/Device.h>
 #include <ATen/Utils.h>
 
+#include <vector>
+#include <deque>
+
 #include "torch_tpu/csrc/aten/TPUGeneratorImpl.h"
+#include "torch_tpu/csrc/core/TPUDeviceManager.h"
 
 namespace at_tpu{
+
+namespace detail {
+static std::once_flag num_tpu_init_flag;
+static int64_t num_tpus;
+static std::deque<std::once_flag> tpu_gens_init_flag;
+static std::vector<at::Generator> default_gens_tpu;
+
+static void initTPUGenVector() {
+    num_tpus = tpu::TPUGetDeviceCount();
+    tpu_gens_init_flag.resize(num_tpus);
+    default_gens_tpu.resize(num_tpus);
+}
+
+const at::Generator& getDefaultTPUGenerator(c10::DeviceIndex device_index) {
+  std::call_once(num_tpu_init_flag, initTPUGenVector);
+  c10::DeviceIndex idx = device_index;
+  if (idx == -1) {
+    idx = tpu::TPUGetDeviceIndex();
+  } else {
+    TORCH_CHECK(idx >= 0 && idx < num_tpus);
+  }
+  std::call_once(tpu_gens_init_flag[idx], [&] {
+    default_gens_tpu[idx] = at::make_generator<TPUGeneratorImpl>(idx);
+    default_gens_tpu[idx].seed();
+  });
+  return default_gens_tpu[idx];
+}
+
+at::Generator createTPUGenerator(c10::DeviceIndex device_index) {
+  std::call_once(num_tpu_init_flag, initTPUGenVector);
+  c10::DeviceIndex idx = device_index;
+  if (idx == -1) {
+    idx = tpu::TPUGetDeviceIndex();
+  }
+  TORCH_CHECK(idx >= 0 && idx < num_tpus, "The device_index is invalid.");
+  auto gen = at::make_generator<TPUGeneratorImpl>(idx);
+  auto tpu_gen = at::check_generator<TPUGeneratorImpl>(gen);
+  tpu_gen->set_current_seed(c10::default_rng_seed_val);
+  tpu_gen->set_philox_offset_per_thread(0);
+  return gen;
+}
+
+
+}; // namespace detail
 
 TPUGeneratorImpl::TPUGeneratorImpl(c10::DeviceIndex device_index)
     : c10::GeneratorImpl{ c10::Device(c10::DeviceType::PrivateUse1, device_index),

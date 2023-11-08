@@ -88,6 +88,7 @@ if (DEFINED PYTHON_INCLUDE_DIR)
   file(GLOB_RECURSE CSRC_SRCS 
     csrc/aten/*.cpp
     csrc/tpu/*.cpp
+    csrc/utils/*.cpp
   )
   LIST(APPEND SRCS ${CSRC_SRCS})
 endif()

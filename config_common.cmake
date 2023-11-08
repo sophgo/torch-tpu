@@ -2,8 +2,8 @@
 # General configuration
 #########################################################
 option(DEBUG "option for debug" ON)
-option(USING_CMODEL "option for using cmodel" OFF)
-option(PCIE_MODE "option for pcie mode" ON)
+option(USING_CMODEL "option for using cmodel" ON)
+option(PCIE_MODE "option for pcie mode" OFF)
 option(SOC_MODE "run on soc platform" OFF)
 option(ENABLE_PYBIND "enable sgdnn pybind" OFF)
 
