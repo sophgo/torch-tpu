@@ -53,6 +53,25 @@ def case_FP16_override():
     o1 = torch.sum(inp)
     print(o1.float().cpu())
 
+def case_0d_sum(use_f16=False):
+    '''
+    corner case. Use cpu impl.
+    '''
+    ############## config ###################
+    device = "privateuseone"
+    #########################################
+    inp = torch.tensor(torch.rand(1).item())
+    inp_tpu = inp.to(device)
+    if use_f16: inp_tpu.half()
+
+    o = torch.sum(inp)
+    o_tpu = torch.sum(inp_tpu)
+
+    diff = abs(o - o_tpu.cpu()) #/abs(o_c)
+    print("max_diff: ", torch.max(diff))
+    print(o)
+    print(o_tpu.cpu())
 
 if __name__ == "__main__":
+    case_0d_sum(True)
     case_3d_sum(True)

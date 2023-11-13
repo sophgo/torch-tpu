@@ -66,6 +66,13 @@ Tensor &sum_IntList_out_tpu(const Tensor &self, OptionalIntArrayRef dim_opt,
   auto out_cpu = sum ( self.cpu(), dim_opt, keepdim, dtype_opt );
   tpu::TPUCopyHostToDevice ( out.data_ptr(), out_cpu.contiguous().data_ptr(), out.nbytes() );
 #else
+  if (self.dim() == 0) // corner case; use cpu impl.
+  {
+    auto out_cpu = sum ( self.cpu(), dim_opt, keepdim, dtype_opt );
+    tpu::TPUCopyHostToDevice ( out.data_ptr(), out_cpu.contiguous().data_ptr(), out.nbytes() );
+  }
+  else 
+  {
 #ifdef TPU_OP_TIMING
   auto timer = tpu::Timer().Start();
 #endif
@@ -93,6 +100,7 @@ Tensor &sum_IntList_out_tpu(const Tensor &self, OptionalIntArrayRef dim_opt,
 #ifdef TPU_OP_TIMING
   tpu::OpTimer::Instance().AddTime(tpu::REDUCE_SUM, timer.ElapsedUS());
 #endif
+  }
 #endif
   return out;
 }
