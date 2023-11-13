@@ -10,7 +10,7 @@ device = "privateuseone:0"
 
 
 def case1():
-    for typ in DTypeIter.float_type():
+    for typ in DTypeIter.float_type() + [torch.int32]:
         for size in ShapeIter.any_shape():
             for scalar in [1.0, -1.0, 5.0]:
                 cpu = torch.full(size, scalar, dtype=typ)
