@@ -2476,7 +2476,26 @@ bm_status_t sgdnnMul ( bm_handle_t handle,
   api.binary_type = 2;
   SAFE_CALL ( sgdnnTPUKernelLaunch ( handle, "tpu_kernel_api_arithmetic_eltwise", &api, sizeof ( api ) ) );
 #else
-  SGDNN_CHECK ( false );
+  sg_api_binary_multi_core_t api;
+  api.input0_addr = input.addr;
+  api.input1_addr = other.addr;
+  api.output_addr = output.addr;
+  api.in0_dims = input.dim;
+  api.in1_dims = other.dim;
+  api.in1_scale = 1.f;
+  api.in0_scale = 1.f;
+  api.binary_type = 2;
+  api.dtype = sgdnnTPUKernelDType ( input.dtype );
+  for ( int i = 0; i < input.dim; ++i )
+  {
+    api.in0_shape[i] = input.shape[i];
+  }
+  for ( int i = 0; i < other.dim; ++i )
+  {
+    api.in1_shape[i] = other.shape[i];
+  }
+  SAFE_CALL ( sgdnnTPUKernelLaunch ( handle, "tpu_kernel_api_binary_multi_core", &api, sizeof ( api ) ) );
+
 #endif
   return BM_SUCCESS;
 }
@@ -2514,23 +2533,25 @@ bm_status_t sgdnnDiv ( bm_handle_t handle,
   api.binary_type = 3;
   SAFE_CALL ( sgdnnTPUKernelLaunch ( handle, "tpu_kernel_api_arithmetic_eltwise", &api, sizeof ( api ) ) );
 #else
-  sg_api_arithmetic_eltwise_t api;
-  api.input_global_addr = input.addr;
-  api.other_global_addr = other.addr;
-  api.output_global_addr = output.addr;
-  api.input_dim = input.dim;
-  api.other_dim = other.dim;
+  sg_api_binary_multi_core_t api;
+  api.input0_addr = input.addr;
+  api.input1_addr = other.addr;
+  api.output_addr = output.addr;
+  api.in0_dims = input.dim;
+  api.in1_dims = other.dim;
+  api.in1_scale = 1.f;
+  api.in0_scale = 1.f;
+  api.binary_type = 3;
+  api.dtype = sgdnnTPUKernelDType ( input.dtype );
   for ( int i = 0; i < input.dim; ++i )
   {
-    api.input_shape[i] = input.shape[i];
+    api.in0_shape[i] = input.shape[i];
   }
   for ( int i = 0; i < other.dim; ++i )
   {
-    api.other_shape[i] = other.shape[i];
+    api.in1_shape[i] = other.shape[i];
   }
-  api.dtype = sgdnnTPUKernelDType ( input.dtype );
-
-  SAFE_CALL ( sgdnnTPUKernelLaunch ( handle, "tpu_kernel_api_arithmetic_eltwise_multi_core", &api, sizeof ( api ) ) );
+  SAFE_CALL ( sgdnnTPUKernelLaunch ( handle, "tpu_kernel_api_binary_multi_core", &api, sizeof ( api ) ) );
 #endif
   return BM_SUCCESS;
 }

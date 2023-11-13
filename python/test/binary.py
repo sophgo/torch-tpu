@@ -47,6 +47,82 @@ def case1(use_fp16 = False):
 
     print (torch.max(abs(out_diff)))
 
+def const_cases():
+    device = "privateuseone"
+    tensor0_cpu = torch.tensor([1, 2, 3]).int()
+    tensor0_tpu = tensor0_cpu.to(device)
+    const = 2
+    ans0_cpu = tensor0_cpu + const
+    ans1_cpu = tensor0_cpu - const
+    ans2_cpu = tensor0_cpu * const
+    ans3_cpu = tensor0_cpu / const
+    ans0_tpu = tensor0_tpu + const
+    ans1_tpu = tensor0_tpu - const
+    ans2_tpu = tensor0_tpu * const
+    ans3_tpu = tensor0_tpu / const
+    print(torch.max(torch.abs(torch.stack([ans0_cpu - ans0_tpu.cpu(),
+                                           ans1_cpu - ans1_tpu.cpu(),
+                                           ans2_cpu - ans2_tpu.cpu(),
+                                           ans3_cpu - ans3_tpu.cpu()]))))
+
+def muldiv_cases(use_fp16 = False):
+    device = "privateuseone"
+    tensor0_cpu = torch.rand(48, 32).float()
+    tensor0_tpu = tensor0_cpu.to(device)
+    tensor1_cpu = torch.rand(48, 32).float()
+    tensor1_tpu = tensor1_cpu.to(device)
+    tensor2_cpu = torch.rand(1, 32).float()
+    tensor2_tpu = tensor2_cpu.to(device)
+    if use_fp16:
+        tensor0_tpu = tensor0_tpu.half()
+        tensor1_tpu = tensor1_tpu.half()
+    
+    ans0_cpu = tensor0_cpu * tensor1_cpu / tensor2_cpu
+    ans0_tpu = tensor0_tpu * tensor1_tpu / tensor2_tpu
+    
+    ans1_cpu = tensor0_cpu / tensor1_cpu * tensor2_cpu
+    ans1_tpu = tensor0_tpu / tensor1_tpu * tensor2_tpu
+
+    print(ans0_cpu, ans0_tpu.cpu(), sep="\n")
+    print(ans1_cpu, ans1_tpu.cpu(), sep="\n")
+    print(torch.max(torch.abs(torch.stack([ans0_cpu - ans0_tpu.cpu(),
+                                           ans1_cpu - ans1_tpu.cpu()]))))
+
+def corner_cases():
+    device = "privateuseone"
+    tensor0_cpu = torch.tensor([1, 2, 3]).float()
+    tensor0_tpu = tensor0_cpu.to(device)
+    tensor1_cpu = torch.tensor(2).float()
+    tensor1_tpu = tensor1_cpu.to(device)
+    tensor2 = torch.tensor([2]).float()
+    
+    ans0_cpu = tensor0_cpu - tensor1_cpu
+    ans0_tpu = tensor0_tpu - tensor1_tpu
+    
+    ans1_cpu = tensor0_cpu - tensor2
+    ans1_tpu = tensor0_tpu - tensor2
+    print(torch.max(torch.abs(torch.stack([ans0_cpu - ans0_tpu.cpu(),
+                                           ans1_cpu - ans1_tpu.cpu()]))))
+
+def dtype_change_cases():
+    device = "privateuseone"
+    tensor0_cpu = torch.tensor([1, 2, 3]).int()
+    tensor0_tpu = tensor0_cpu.to(device)
+    tensor1_cpu = torch.tensor(2).float()
+    tensor1_tpu = tensor1_cpu.to(device)
+    tensor2 = torch.tensor([2]).float()
+    
+    ans0_cpu = tensor0_cpu - tensor1_cpu
+    ans0_tpu = tensor0_tpu - tensor1_tpu
+    
+    ans1_cpu = tensor0_cpu - tensor2
+    ans1_tpu = tensor0_tpu - tensor2
+    print(torch.max(torch.abs(ans0_cpu - ans0_tpu.cpu(), 
+                              ans1_cpu - ans1_tpu.cpu())))
 
 if __name__ == "__main__":
     case1()
+    const_cases()
+    muldiv_cases()
+    # corner_cases() # not supported now
+    # dtype_change_cases() # not supported now

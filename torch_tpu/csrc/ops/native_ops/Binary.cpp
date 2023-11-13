@@ -195,6 +195,14 @@ Tensor &sub_out_tpu(const Tensor &self, const Tensor &other,
   } else if ((IS_TPU_TENSOR(self) && IS_CPU_TENSOR(other)) ||
              (IS_CPU_TENSOR(self) && IS_TPU_TENSOR(other))) {
     if (IS_CPU_TENSOR(other)) {
+      if (self.dtype() == caffe2::TypeMeta::Make<long>() ||
+          self.dtype() == caffe2::TypeMeta::Make<int>()) {
+        LOG(WARNING) << "sub self's dtype is long or int, use cpu";
+        auto out_cpu =
+            sub(self.to(out.dtype()).cpu(), other.to(out.dtype()).cpu(), alpha);
+        out = out_cpu.to(out.device());
+        return out;
+      }
       TORCH_CHECK(other.dim() == 0, "OTHER must be a scalar");
       Tensor scalar;
       if (other.dtype() == caffe2::TypeMeta::Make<double>()) {
@@ -345,6 +353,14 @@ Tensor &mul_out_tpu(const Tensor &self, const Tensor &other, Tensor &out) {
   } else if ((IS_TPU_TENSOR(self) && IS_CPU_TENSOR(other)) ||
              (IS_CPU_TENSOR(self) && IS_TPU_TENSOR(other))) {
     if (IS_CPU_TENSOR(other)) {
+      if (self.dtype() == caffe2::TypeMeta::Make<long>() ||
+          self.dtype() == caffe2::TypeMeta::Make<int>()) {
+        LOG(WARNING) << "mul self's dtype is long or int, use cpu";
+        auto out_cpu =
+            mul(self.to(out.dtype()).cpu(), other.to(out.dtype()).cpu());
+        out = out_cpu.to(out.device());
+        return out;
+      }
       TORCH_CHECK(other.dim() == 0, "OTHER must be a scalar");
       Tensor scalar = other.to(torch::kFloat);
 #ifdef TPU_OP_TIMING
@@ -479,6 +495,14 @@ Tensor & div_out_tpu ( const Tensor & self, const Tensor & other, Tensor & out )
   else if ( ( IS_TPU_TENSOR ( self ) && IS_CPU_TENSOR ( other ) ) ||
             ( IS_CPU_TENSOR ( self ) && IS_TPU_TENSOR ( other ) ) )
   {
+    if (self.dtype() == caffe2::TypeMeta::Make<long>() ||
+        self.dtype() == caffe2::TypeMeta::Make<int>()) {
+      LOG(WARNING) << "div self's dtype is long or int, use cpu";
+      auto out_cpu =
+          div(self.to(out.dtype()).cpu(), other.to(out.dtype()).cpu());
+      out = out_cpu.to(out.device());
+      return out;
+    }
     if ( IS_CPU_TENSOR ( other ) )
     {
       TORCH_CHECK ( other.dim() == 0, "OTHER must be a scalar" );
