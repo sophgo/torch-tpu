@@ -55,7 +55,7 @@ static c10::optional<at::Device>  parse_tpu_device_optional(PyObject* obj) {
   return parse_tpu_device(obj);
 }
 
-static at::Device parse_device_with_default(PyObject* obj, const at::Device& default_device) {
+static at::Device parse_tpu_device_with_default(PyObject* obj, const at::Device& default_device) {
     if (!obj) return default_device;
     return parse_tpu_device(obj);
 }

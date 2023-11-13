@@ -33,25 +33,25 @@ def wrap_torch_error_func(func):
                            f"Use torch_tpu.{func.__name__} instead.")
     return wrapper
 
-# tpu_functions = {
-#     "one_", "fast_gelu", "_amp_foreach_non_finite_check_", "empty_with_format", "unsafe_empty_with_format", 
-#     "empty_with_format", "copy_memory_", "_dropout_with_byte_mask_backward", "dropout_with_byte_mask", 
-#     "decode_jpeg", "crop_and_resize", "reverse", "image_normalize", "image_normalize_", "img_to_tensor", 
-#     "_conv_depthwise2d_backward", "slow_conv_dilated2d_backward", "slow_conv_transpose2d_backward", 
-#     "batch_norm_reduce", "batch_norm_gather_stats_update", "format_contiguous", "check_match", 
-#     "check_memory_overlaps", "get_storage_size", "_dropout_with_byte_mask", "empty_with_format"
-# }
+tpu_functions = {
+    # "one_", "fast_gelu", "_amp_foreach_non_finite_check_", "empty_with_format", "unsafe_empty_with_format", 
+    # "empty_with_format", "copy_memory_", "_dropout_with_byte_mask_backward", "dropout_with_byte_mask", 
+    # "decode_jpeg", "crop_and_resize", "reverse", "image_normalize", "image_normalize_", "img_to_tensor", 
+    # "_conv_depthwise2d_backward", "slow_conv_dilated2d_backward", "slow_conv_transpose2d_backward", 
+    # "batch_norm_reduce", "batch_norm_gather_stats_update", "format_contiguous", "check_match", 
+    # "check_memory_overlaps", "get_storage_size", "_dropout_with_byte_mask", "empty_with_format"
+}
 
 
-# for name in dir(torch_tpu._C._VariableFunctions):
-#     if name.startswith('__'):
-#         continue
-#     globals()[name] = getattr(torch_tpu._C._VariableFunctions, name)
-#     __all__.append(name)
-#     if (name in tpu_functions) or (name.find("tpu") != -1):
-#         setattr(torch, name, wrap_torch_error_func(getattr(torch_tpu._C._VariableFunctions, name)))
-#     else:
-#         setattr(torch, name, getattr(torch_tpu._C._VariableFunctions, name))
+for name in dir(torch_tpu._C._VariableFunctions):
+    if name.startswith('__'):
+        continue
+    globals()[name] = getattr(torch_tpu._C._VariableFunctions, name)
+    __all__.append(name)
+    if (name in tpu_functions) or (name.find("tpu") != -1):
+        setattr(torch, name, wrap_torch_error_func(getattr(torch_tpu._C._VariableFunctions, name)))
+    else:
+        setattr(torch, name, getattr(torch_tpu._C._VariableFunctions, name))
 
 all_monkey_patches = [
     ["tpu", torch_tpu.tpu],

@@ -43,17 +43,19 @@ def to(self, *args, **kwargs):
             self.cast_weight(device)
 
     def convert(t):
-        if convert_to_format is not None and t.dim() == 4:
-            return t.to(device, dtype if (not dtype.is_complex) and t.dtype != torch.int64 else None,
+        if convert_to_format is not None and t.dim() in (4, 5):
+            return t.to(device, dtype if t.is_floating_point() or t.is_complex() else None,
                         non_blocking, memory_format=convert_to_format)
-        return t.to(device, dtype if (not dtype.is_complex) and t.dtype != torch.int64 else None, non_blocking)
+        return t.to(device, dtype if t.is_floating_point() or t.is_complex() else None, non_blocking)
 
     return self._apply(convert)
 
 def cast_weight(self, device):
     #TODO weight costom convert
     def _format_cast(module, class_name):
-        pass
+        if issubclass(class_name, torch.nn.Conv2d):
+            #TODO: weight reorder
+            pass
 
     support_cast_devices = [torch_tpu.tpu.native_device, torch_tpu.tpu.tpu_device]
     if device is None or not any(support_cast_device in str(device) for support_cast_device in support_cast_devices):
