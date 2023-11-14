@@ -21,7 +21,7 @@ def case1():
 
     TPU = "privateuseone:0"
     mask_tpu = torch.full((tgt_len, tgt_len), torch.tensor(torch.finfo(dtype).min, device=TPU), device=TPU)
-    mask_cond_tpu = torch.arange(mask_tpu.size(-1), device=TPU)
+    mask_cond_tpu = torch.arange(mask_tpu.size(-1), dtype=dtype, device=TPU)
     s1_t = (mask_cond_tpu + 1).view(mask_tpu.size(-1),1)
     s2_t = mask_cond_tpu < s1_t
     mask_tpu.masked_fill_(s2_t, 0)

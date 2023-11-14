@@ -137,7 +137,29 @@ TPUKERNEL_FUNC_REGISTER(tpu_kernel_api_log);
 
 #ifdef FIRMWARE_BACKEND_2260
 void tpu_kernel_api_log_multi_core(const void *args) {
-  TPUKERNEL_ASSERT_INFO(false, "not implementated");
+  sg_api_log_t *api = (sg_api_log_t *)args;
+  TPUKERNEL_ASSERT(api->dtype == DT_FP32 || api->dtype == DT_FP16 ||
+                   api->dtype == DT_BFP16);
+
+  long long length = 1;
+  for (int i = 0; i < api->dim; ++i) {
+    length *= api->shape[i];
+  }
+  tpu_initialize();
+  int core_num = tpu_core_num();
+  int core_idx = tpu_core_index();
+  int length_slice = DIV_UP(length, core_num);
+  int length_secs = DIV_UP(length, length_slice);
+  TPUKERNEL_ASSERT(length_secs <= core_num);
+  int cur_length_slice = length_slice;
+  if (core_idx == length_secs - 1)
+    cur_length_slice = length - length_slice * (length_secs - 1);
+  if (core_idx * length_slice < length) {
+  nodechip_log(api->output_global_addr + (length_slice * core_idx) * tpu_data_type_size(api->dtype),
+               api->input_global_addr + (length_slice * core_idx) * tpu_data_type_size(api->dtype),
+               cur_length_slice, (data_type_t)api->dtype, api->log_type);
+  }
+  tpu_poll();
 }
 TPUKERNEL_FUNC_REGISTER(tpu_kernel_api_log_multi_core);
 #endif

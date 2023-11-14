@@ -3528,7 +3528,7 @@ bm_status_t sgdnnMaskedFill ( bm_handle_t handle,
   SGDNN_CHECK ( input.dim == mask.dim );
   for ( int i = 0; i < input.dim; i++ )
   {
-    SGDNN_CHECK ( input.shape[i] == mask.shape[i] );
+    SGDNN_CHECK ( input.shape[i] == mask.shape[i] || mask.shape[i] == 1);
   }
 #if defined SGDNN_BACKEND_1684X
   sg_api_masked_fill_t api;
@@ -3546,7 +3546,20 @@ bm_status_t sgdnnMaskedFill ( bm_handle_t handle,
   api.dtype = sgdnnTPUKernelDType ( SGDNN_DTYPE_FP32 );;
   SAFE_CALL ( sgdnnTPUKernelLaunch ( handle, "tpu_kernel_api_masked_fill", &api, sizeof ( api ) ) );
 #elif defined SGDNN_BACKEND_2260
-  SGDNN_CHECK(false);
+  sg_api_masked_fill_t api;
+  api.input_global_addr = input.addr;
+  api.mask_global_addr = mask.addr;
+  api.out_global_addr = out.addr;
+  api.input_dims = input.dim;
+  api.mask_dims = mask.dim;
+  for ( int i = 0; i < input.dim; i++ )
+  {
+    api.input_shape[i] = input.shape[i];
+    api.mask_shape[i] = mask.shape[i];
+  }
+  api.value = value;
+  api.dtype = sgdnnTPUKernelDType ( SGDNN_DTYPE_FP32 );;
+  SAFE_CALL ( sgdnnTPUKernelLaunch ( handle, "tpu_kernel_api_masked_fill_multi_core", &api, sizeof ( api ) ) );
 #else
   SGDNN_CHECK(false);
 #endif
