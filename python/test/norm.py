@@ -18,16 +18,16 @@ def case1():
     print("p-2 cpu: ", o_2)
     print("p-2 tpu: ", ot_2.cpu())
 
-    o_1 = torch.norm(inp, 1.0)
-    ot_1 = torch.norm(inp_tpu, 1.0)
-    print("p-1 cpu: ", o_1)
-    print("p-1 tpu: ", ot_1.cpu())
+    # o_1 = torch.norm(inp, 1.0)
+    # ot_1 = torch.norm(inp_tpu, 1.0)
+    # print("p-1 cpu: ", o_1)
+    # print("p-1 tpu: ", ot_1.cpu())
 
 
-    o_inf = torch.norm(inp, torch.inf)
-    ot_inf = torch.norm(inp_tpu, torch.inf)
-    print("p-inf cpu: ", o_inf)
-    print("p-inf tpu: ", ot_inf.cpu())
+    # o_inf = torch.norm(inp, torch.inf)
+    # ot_inf = torch.norm(inp_tpu, torch.inf)
+    # print("p-inf cpu: ", o_inf)
+    # print("p-inf tpu: ", ot_inf.cpu())
 
 
 if __name__ == "__main__":

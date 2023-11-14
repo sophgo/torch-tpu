@@ -33,6 +33,7 @@ void tpu_kernel_api_masked_fill ( const void * args )
 }
 TPUKERNEL_FUNC_REGISTER(tpu_kernel_api_masked_fill);
 
+#ifdef FIRMWARE_BACKEND_2260
 void tpu_kernel_api_masked_fill_multi_core ( const void * args )
 {
     sg_api_masked_fill_t *api = ( sg_api_masked_fill_t * ) args;
@@ -170,3 +171,4 @@ TPUKERNEL_FUNC_REGISTER(tpu_kernel_api_masked_fill_multi_core);
 //     tpu_poll();
 // }
 // TPUKERNEL_FUNC_REGISTER(tpu_kernel_api_masked_fill_multi_core);
+#endif

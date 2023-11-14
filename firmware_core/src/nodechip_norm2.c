@@ -6,7 +6,8 @@ void nodechip_norm2 (
 global_addr_t input_global_addr,
 global_addr_t output_global_addr,
 int len,
-data_type_t dtype )
+data_type_t dtype,
+bool do_sqrt )
 {
   const int dsize = tpu_data_type_size ( dtype );
   const int tile = tpu_eu_num ( dtype );
@@ -188,30 +189,65 @@ data_type_t dtype )
                           DT_FP32,
                           one_fp32 );
   dim4 reduce_full_shape = { .n = 1, .c = 1, .h = 1, .w = 1 };
-  tpu_bdc_fp32_sqrt ( output_local_addr,
-                      reduce_cw_trans_fp32_local_addr,
-                      &reduce_full_shape );
-  if ( dtype != DT_FP32 )
-  {
-    tpu_bdc_cast ( output_local_addr,
-                   output_local_addr,
-                   &reduce_full_shape,
-                   NULL,
-                   NULL,
-                   dtype,
-                   DT_FP32,
-                   RM_HALF_TO_EVEN );
+  if (do_sqrt)
+  {  
+    tpu_bdc_fp32_sqrt ( output_local_addr,
+                        reduce_cw_trans_fp32_local_addr,
+                        &reduce_full_shape );
+    if ( dtype != DT_FP32 )
+    {
+      tpu_bdc_cast (output_local_addr,
+                    output_local_addr,
+                    &reduce_full_shape,
+                    NULL,
+                    NULL,
+                    dtype,
+                    DT_FP32,
+                    RM_HALF_TO_EVEN );
+    }
   }
   if ( tpu_is_parallel_state() )
   {
     tpu_parallel_end();
   }
   tpu_gdma_cpy_L2S ( output_global_addr,
-                     output_local_addr,
+                     do_sqrt ? output_local_addr : reduce_cw_trans_fp32_local_addr,
                      &reduce_full_shape,
                      NULL,
                      NULL,
-                     dtype );
+                     do_sqrt ? dtype : DT_FP32 );
+}
+
+void nodechip_reduce_and_sqrt(
+  global_addr_t input_global_addr,
+  global_addr_t output_global_addr,
+  int len,
+  data_type_t dtype
+) {
+  local_addr_t input_local_addr = 0;
+  local_addr_t reduce_local_addr = LOCAL_MEM_SIZE / 2;
+  dim4 input_shape = {1, 1, 1, 8};
+  dim2 kernel = {1, 8};
+  padding_t zero_pad = {0, 0, 0, 0};
+  dim2 oneone = {1, 1};
+  scalar_t one_fp32 = {.f32 = 1.f };
+  tpu_gdma_cpy_S2L(input_local_addr, input_global_addr, &input_shape, NULL, NULL, DT_FP32);
+  tpu_bdc_fp_avg_pool2d(reduce_local_addr,
+                        input_local_addr,
+                        &input_shape,
+                        &kernel,
+                        &zero_pad,
+                        &oneone,
+                        &oneone,
+                        DT_FP32,
+                        one_fp32);
+  input_shape.w = 1;
+  tpu_bdc_fp32_sqrt(input_local_addr, reduce_local_addr, &input_shape);
+  if (dtype != DT_FP32) {
+    tpu_bdc_cast(input_local_addr, input_local_addr, &input_shape, NULL, NULL, dtype, DT_FP32, RM_HALF_AWAY_FROM_ZERO);
+  }
+  tpu_gdma_cpy_L2S(output_global_addr, input_local_addr, &input_shape, NULL, NULL, dtype);
+
 }
 
 void tpu_kernel_api_norm2 ( const void * args )
@@ -224,7 +260,43 @@ void tpu_kernel_api_norm2 ( const void * args )
     len *= api->shape[i];
   }
   tpu_initialize();
-  nodechip_norm2 ( api->input_global_addr, api->output_global_addr, len, ( data_type_t ) api->dtype );
+  nodechip_norm2 ( api->input_global_addr, api->output_global_addr, len, ( data_type_t ) api->dtype, 1 );
   tpu_poll();
 }
 TPUKERNEL_FUNC_REGISTER ( tpu_kernel_api_norm2 );
+
+#ifdef FIRMWARE_BACKEND_2260
+void tpu_kernel_api_norm2_multi_core ( const void * args )
+{
+  sg_api_norm2_multi_core_t * api = ( sg_api_norm2_multi_core_t * ) args;
+  TPUKERNEL_ASSERT ( api->dtype == DT_FP32 || api->dtype == DT_FP16 || api->dtype == DT_BFP16 );
+  int len = 1;
+  for ( int i = 0; i < api->dim; ++i )
+  {
+    len *= api->shape[i];
+  }
+  tpu_initialize();
+  int core_num = tpu_core_num();
+  int core_idx = tpu_core_index();
+  int length_slice = DIV_UP(len, core_num);
+  int length_secs = DIV_UP(len, length_slice);
+  TPUKERNEL_ASSERT(length_secs <= core_num);
+  int cur_length_slice = length_slice;
+  if (core_idx == length_secs - 1)
+    cur_length_slice = len - length_slice * (length_secs - 1);
+  if (core_idx * length_slice < len) {
+    nodechip_norm2(api->input_global_addr + (length_slice * core_idx) * tpu_data_type_size(api->dtype),
+                   api->buffer_global_addr + core_idx * tpu_data_type_size(DT_FP32),
+                   cur_length_slice,
+                   (data_type_t)api->dtype, 0 );
+  }
+  tpu_sync_all();
+  // two step calculation. TO DO: use L2mem to reduce
+  if (core_idx == 0) {
+    nodechip_reduce_and_sqrt(api->buffer_global_addr, api->output_global_addr, len, (data_type_t)api->dtype);
+  }
+  tpu_poll();
+  
+}
+TPUKERNEL_FUNC_REGISTER ( tpu_kernel_api_norm2_multi_core );
+#endif

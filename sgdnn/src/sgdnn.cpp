@@ -3162,7 +3162,31 @@ bm_status_t sgdnnNorm2 ( bm_handle_t handle,
   api.dtype = sgdnnTPUKernelDType ( input.dtype );
   SAFE_CALL ( sgdnnTPUKernelLaunch ( handle, "tpu_kernel_api_norm2", &api, sizeof ( api ) ) );
 #elif defined SGDNN_BACKEND_2260
-  SGDNN_CHECK ( false );
+  sg_api_norm2_multi_core_t api;
+  api.input_global_addr = input.addr;
+  api.output_global_addr = output.addr;
+  api.dim = input.dim;
+  for ( int i = 0; i < input.dim; ++i )
+  {
+    api.shape[i] = input.shape[i];
+  }
+  unsigned int size = 8;
+  if (input.dtype == SGDNN_DTYPE_FP32) {
+    size *= sizeof(float);
+  }
+  else {
+    size *= sizeof(float16);
+  }
+  bm_device_mem_t dev_mem;
+  bm_status_t err = bm_malloc_device_byte(handle, &dev_mem, size);
+  if(BM_SUCCESS != err){
+    printf("malloc device error \r\n");
+    return err;
+  }
+  api.buffer_global_addr = bm_mem_get_device_addr(dev_mem);
+  api.dtype = sgdnnTPUKernelDType ( input.dtype );
+  SAFE_CALL ( sgdnnTPUKernelLaunch ( handle, "tpu_kernel_api_norm2_multi_core", &api, sizeof ( api ) ) );
+
 #else
   SGDNN_CHECK ( false );
 #endif
