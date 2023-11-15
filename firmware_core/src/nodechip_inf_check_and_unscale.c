@@ -29,10 +29,30 @@ void tpu_bdc_check_inf_nan(local_addr_t dst_addr, local_addr_t found_inf_addr, l
     dim2 kernel = {.h = pool_shape.h, .w = pool_shape.w};
     padding_t pad = {.top = 0, .bottom = 0, .left = 0, .right = 0};
     scalar_t pad_val = {.u32 = 0};
+    scalar_t one_scalar = {.u32 = 1};
     dim2 stride = {.h = 1, .w = 1};
     dim2 dilation = {.h = 1, .w = 1};
-    tpu_bdc_int8_max_pool2d(dst_addr, work0_addr, &pool_shape, &kernel, &pad, &stride, &dilation, DT_UINT8, pad_val);
+    // tpu_bdc_int8_max_pool2d(dst_addr, work0_addr, &pool_shape, &kernel, &pad, &stride, &dilation, DT_UINT8, pad_val); // bug: this outputs {1, c, 1, 1}, only first element valid
+    tpu_bdc_int8_asym_quant_conv2d_kernel_const(
+        dst_addr,
+        work0_addr,
+        one_scalar,
+        pad_val,
+        pad_val,
+        &pool_shape,
+        NULL,
+        1,
+        &kernel,
+        &pad,
+        &stride,
+        &dilation,
+        DT_UINT16, // output addr has at least 2 bytes; if has problem consider overflow
+        DT_UINT8,
+        DT_UINT8,
+        DT_UINT8,
+        0);
     dim4 found_inf_shape = {.n = 1, .c = 1, .h = 1, .w = 1};
+    tpu_bdc_min_C(dst_addr, dst_addr, one_scalar, &found_inf_shape, NULL, NULL, DT_UINT16);
     tpu_bdc_or(found_inf_addr, dst_addr, found_inf_addr, &found_inf_shape, NULL, NULL, NULL, DT_UINT8);
 }
 
@@ -151,6 +171,46 @@ void nodechip_inf_check_and_unscale(
     tpu_flush_cache ( found_inf_global_addr, 64 );
 }
 
+static inline void nodechip_find_inf(
+    global_addr_t input_global_addr,
+    global_addr_t output_global_addr,
+    data_type_t dtype
+) {
+    local_addr_t input_local_addr = 0;
+    local_addr_t output_local_addr = LOCAL_MEM_SIZE / 2;
+    dim4 input_shape = {1, 1, 1, 8};
+    dim4 input_stride = {1, 1, 1, 64 / tpu_data_type_size(dtype)};
+    dim2 kernel = {1, 8};
+    padding_t zero_pad = {0, 0, 0, 0};
+    dim2 oneone = {1, 1};
+    scalar_t zero_fp32 = {.f32 = 0.f };
+    tpu_gdma_cpy_S2L(input_local_addr, input_global_addr, &input_shape, NULL, &input_stride, dtype);
+    tpu_bdc_fp_max_pool2d(output_local_addr,
+                          input_local_addr,
+                          &input_shape,
+                          &kernel,
+                          &zero_pad,
+                          &oneone,
+                          &oneone,
+                          dtype,
+                          zero_fp32);
+    input_shape.w = 1;
+    tpu_gdma_cpy_S2L(input_local_addr, output_global_addr, &input_shape, NULL, NULL, dtype);
+    tpu_bdc_max(output_local_addr, input_local_addr, output_local_addr, &input_shape, NULL, NULL, NULL, dtype);
+    tpu_gdma_cpy_L2S(output_global_addr, output_local_addr, &input_shape, NULL, NULL, dtype);
+
+}
+
+static inline void nodechip_clear_buffer(
+    global_addr_t buffer_global_addr,
+    data_type_t dtype
+) {
+    dim4 input_shape = {1, 1, 1, 8};
+    dim4 input_stride = {1, 1, 1, 64 / tpu_data_type_size(dtype)};
+    scalar_t zero_scalar = {.u32 = 0};
+    tpu_gdma_set_C_system(buffer_global_addr, zero_scalar, &input_shape, &input_stride, dtype);
+}
+
 void tpu_kernel_api_inf_check_and_unscale(const void *args){
     sg_api_inf_check_unscale_t* api = (sg_api_inf_check_unscale_t*)args;
     int length = 1;
@@ -166,3 +226,44 @@ void tpu_kernel_api_inf_check_and_unscale(const void *args){
         (data_type_t)api->found_inf_dtype);
     tpu_poll();
 }
+TPUKERNEL_FUNC_REGISTER(tpu_kernel_api_inf_check_and_unscale);
+
+#ifdef FIRMWARE_BACKEND_2260
+void tpu_kernel_api_inf_check_and_unscale_multi_core(const void *args){
+    sg_api_inf_check_unscale_multi_core_t* api = (sg_api_inf_check_unscale_multi_core_t*)args;
+    int length = 1;
+    for (int i = 0; i < api->dim; i++ ){ length *= api->shape[i]; }
+
+    tpu_initialize();
+    int core_num = tpu_core_num();
+    int core_idx = tpu_core_index();
+    int length_slice = DIV_UP(length, core_num);
+    int length_secs = DIV_UP(length, length_slice);
+    TPUKERNEL_ASSERT(length_secs <= core_num);
+    int cur_length_slice = length_slice;
+    if (core_idx == length_secs - 1)
+        cur_length_slice = length - length_slice * (length_secs - 1);
+    // sometimes buffer memory is not empty. clear the buffer
+    if (core_idx == 0) {
+        nodechip_clear_buffer(api->found_inf_buffer_global_addr, api->found_inf_dtype);
+    }   
+    tpu_sync_all();
+
+    if (core_idx * length_slice < length) {
+        nodechip_inf_check_and_unscale(
+            api->input_global_addr + (length_slice * core_idx) * tpu_data_type_size(api->idtype),
+            api->found_inf_buffer_global_addr + core_idx * 64,
+            cur_length_slice,
+            api->inv_scale,
+            (data_type_t)api->idtype,
+            (data_type_t)api->found_inf_dtype
+            );
+    }
+    tpu_sync_all();
+    if (core_idx == 0) {
+        nodechip_find_inf(api->found_inf_buffer_global_addr, api->found_inf_global_addr, (data_type_t)api->found_inf_dtype);
+    }
+    tpu_poll();
+}
+TPUKERNEL_FUNC_REGISTER(tpu_kernel_api_inf_check_and_unscale_multi_core);
+#endif

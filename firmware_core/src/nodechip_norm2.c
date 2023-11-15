@@ -218,7 +218,7 @@ bool do_sqrt )
                      do_sqrt ? dtype : DT_FP32 );
 }
 
-void nodechip_reduce_and_sqrt(
+static inline void nodechip_reduce_and_sqrt(
   global_addr_t input_global_addr,
   global_addr_t output_global_addr,
   int len,
@@ -247,7 +247,14 @@ void nodechip_reduce_and_sqrt(
     tpu_bdc_cast(input_local_addr, input_local_addr, &input_shape, NULL, NULL, dtype, DT_FP32, RM_HALF_AWAY_FROM_ZERO);
   }
   tpu_gdma_cpy_L2S(output_global_addr, input_local_addr, &input_shape, NULL, NULL, dtype);
+}
 
+static inline void nodechip_clear_buffer(
+    global_addr_t buffer_global_addr
+) {
+    dim4 input_shape = {1, 1, 1, 8};
+    scalar_t zero_scalar = {.u32 = 0};
+    tpu_gdma_set_C_system(buffer_global_addr, zero_scalar, &input_shape, NULL, DT_FP32);
 }
 
 void tpu_kernel_api_norm2 ( const void * args )
@@ -284,6 +291,11 @@ void tpu_kernel_api_norm2_multi_core ( const void * args )
   int cur_length_slice = length_slice;
   if (core_idx == length_secs - 1)
     cur_length_slice = len - length_slice * (length_secs - 1);
+  // sometimes buffer memory is not empty. clear the buffer
+  if (core_idx == 0) {
+      nodechip_clear_buffer(api->buffer_global_addr);
+  }   
+  tpu_sync_all();
   if (core_idx * length_slice < len) {
     nodechip_norm2(api->input_global_addr + (length_slice * core_idx) * tpu_data_type_size(api->dtype),
                    api->buffer_global_addr + core_idx * tpu_data_type_size(DT_FP32),

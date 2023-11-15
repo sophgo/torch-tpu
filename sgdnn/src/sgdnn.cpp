@@ -3170,13 +3170,9 @@ bm_status_t sgdnnNorm2 ( bm_handle_t handle,
   {
     api.shape[i] = input.shape[i];
   }
-  unsigned int size = 8;
-  if (input.dtype == SGDNN_DTYPE_FP32) {
-    size *= sizeof(float);
-  }
-  else {
-    size *= sizeof(float16);
-  }
+  // make a buffer to store middle results FP32
+  unsigned int size = 8 * sizeof(float);
+
   bm_device_mem_t dev_mem;
   bm_status_t err = bm_malloc_device_byte(handle, &dev_mem, size);
   if(BM_SUCCESS != err){
@@ -6967,6 +6963,38 @@ bool _sgdnnInfCheckAndUnscale( bm_handle_t handle,
   return found == 0.0;
 }
 
+bool _sgdnnInfCheckAndUnscale_multi_core( bm_handle_t handle,
+                              SgdnnTensor_t& input,
+                              SgdnnTensor_t& found_inf,
+                              float inv_scale)
+{
+  SGDNN_CHECK ( sgdnnIsTensorContiguous ( &input ) );
+  sg_api_inf_check_unscale_multi_core_t api;
+  api.input_global_addr = input.addr;
+  api.found_inf_global_addr = found_inf.addr;
+  api.dim = input.dim;
+  for ( int i = 0; i < input.dim; i++ ) { api.shape[i] = input.shape[i]; }
+  api.inv_scale = inv_scale;
+  api.idtype = sgdnnTPUKernelDType( input.dtype );
+  api.found_inf_dtype = sgdnnTPUKernelDType( found_inf.dtype );
+  // a buffer to store middle results
+  unsigned int size = 8 * 64; // buffer need align to 64 bytes
+  bm_device_mem_t dev_mem;
+  bm_status_t err = bm_malloc_device_byte(handle, &dev_mem, size);
+  if (BM_SUCCESS != err){
+    printf("malloc device error \r\n");
+    return err;
+  }
+  api.found_inf_buffer_global_addr = bm_mem_get_device_addr(dev_mem);
+
+  SAFE_CALL( sgdnnTPUKernelLaunch ( handle, "tpu_kernel_api_inf_check_and_unscale_multi_core", &api, sizeof(api) ) );
+
+  bm_device_mem_t SrcMem = bm_mem_from_device ( found_inf.addr, sgdnnDataSize(found_inf.dtype) );
+  float found = 0;
+  SAFE_CALL (bm_memcpy_d2s ( handle, &found, SrcMem ));
+  return found == 0.0;
+}
+
 bm_status_t sgdnnInfCheckAndUnscale( bm_handle_t handle,
                                     std::vector<SgdnnTensor_t>& inputs,
                                     SgdnnTensor_t found_inf,
@@ -6979,7 +7007,11 @@ bm_status_t sgdnnInfCheckAndUnscale( bm_handle_t handle,
     }
   }
 #elif defined SGDNN_BACKEND_2260
-  SGDNN_CHECK(false);
+  for (auto& input : inputs){
+    if (!_sgdnnInfCheckAndUnscale_multi_core(handle, input, found_inf, inv_scale)){
+      break;
+    }
+  }
 #else
   SGDNN_CHECK(false);
 #endif
