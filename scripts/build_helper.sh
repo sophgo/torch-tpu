@@ -33,7 +33,7 @@ function new_build()
 {
   pushd ${TPUTRAIN_TOP}
   python setup.py build bdist_wheel
-  pip install dist/torch_tpu-2.0.1.post1-cp39-cp39-linux_x86_64.whl --force-reinstall
+  pip install dist/* --force-reinstall
   popd
 }
 function new_clean()

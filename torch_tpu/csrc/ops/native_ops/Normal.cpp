@@ -19,10 +19,11 @@ Tensor & normal_tpu(Tensor & self, double mean, double std, c10::optional<at::Ge
   for ( int i = 0; i < self.dim(); i++ ) { sizes_vec[i] = self.size( i ); }
   
   IntArrayRef sizes ( sizes_vec.data(), sizes_vec.size() );
-  TensorOptions TenOption = self.options().device("cpu");
+  TensorOptions TenOption = self.options().device("cpu").dtype(torch::kFloat);
 
   auto out_cpu = normal(mean, std, sizes, generator, TenOption);
-  tpu::TPUCopyHostToDevice ( self.data_ptr(), out_cpu.contiguous().data_ptr(), self.nbytes() );
+  self = out_cpu.to(self.device()).to(self.dtype());
+  // tpu::TPUCopyHostToDevice ( self.data_ptr(), out_cpu.contiguous().data_ptr(), self.nbytes() );
 #else
   //TODO
 #endif

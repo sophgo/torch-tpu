@@ -279,10 +279,10 @@ bm_status_t sgdnnConv2d ( bm_handle_t handle,
   }
   SGDNN_CHECK ( sgdnnIsTensorContiguous ( &output ) );
 #if defined SGDNN_BACKEND_1684X
-  bm_device_mem_t weight_reordered_mem;
+  bm_device_mem_t weight_reordered_mem, bias_fp32_mem;
   if ( weight.dtype == SGDNN_DTYPE_FP16 || weight.dtype == SGDNN_DTYPE_BF16 )
   {
-    SgdnnTensor_t weight_reordered;
+    SgdnnTensor_t weight_reordered, bias_f32;
     weight_reordered.dim = 4;
     sgdnn32ICShape ( weight.shape, weight_reordered.shape );
     sgdnnContiguousStride ( weight_reordered.shape, 4, weight_reordered.stride );
@@ -290,18 +290,26 @@ bm_status_t sgdnnConv2d ( bm_handle_t handle,
     SAFE_CALL ( bm_malloc_device_byte ( handle, &weight_reordered_mem, sgdnnTensorBytes ( &weight_reordered ) ) );
     weight_reordered.addr = bm_mem_get_device_addr ( weight_reordered_mem );
     SAFE_CALL ( sgdnnReorderConv2dWeight ( handle, weight, 0, weight_reordered ) );
+    if (bias.addr != 0){
+      bias_f32 = bias;
+      bias_f32.dtype = SGDNN_DTYPE_FP32;
+      SAFE_CALL ( bm_malloc_device_byte ( handle, &bias_fp32_mem, sgdnnTensorBytes ( &bias_f32 ) ) );
+      bias_f32.addr = bm_mem_get_device_addr ( bias_fp32_mem );
+      SAFE_CALL ( sgdnnConvert ( handle, bias, bias_f32 ) );
+    }
   }
   sg_api_conv2d_t api;
   api.input_global_addr = input.addr;
   if ( weight.dtype == SGDNN_DTYPE_FP16 || weight.dtype == SGDNN_DTYPE_BF16 )
   {
     api.weight_global_addr = bm_mem_get_device_addr ( weight_reordered_mem );
+    api.bias_global_addr = bias.addr != 0 ? bm_mem_get_device_addr ( bias_fp32_mem ) : 0 ;
   }
   else
   {
     api.weight_global_addr = weight.addr;
+    api.bias_global_addr = bias.addr;
   }
-  api.bias_global_addr = bias.addr;
   api.output_global_addr = output.addr;
   for ( int i = 0; i < input.dim; ++i )
   {
@@ -324,6 +332,9 @@ bm_status_t sgdnnConv2d ( bm_handle_t handle,
   if ( weight.dtype == SGDNN_DTYPE_FP16 || weight.dtype == SGDNN_DTYPE_BF16 )
   {
     bm_free_device ( handle, weight_reordered_mem );
+    if (bias.addr != 0){
+      bm_free_device ( handle, bias_fp32_mem );
+    }
   }
 #elif defined SGDNN_BACKEND_2260
   SGDNN_CHECK ( false );
