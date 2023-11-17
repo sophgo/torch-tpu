@@ -64,13 +64,21 @@ def check_rmsnorm():
     axis = 3
     eps = 1e-5
 
-    net_cpu = RMSNorm(axis=axis, eps=eps)
-    net_tpu = RMSNormBlock(axis=axis, eps=eps)
+    net_cpu = RMSNorm(d=hidden_size, axis=axis, eps=eps, with_bias=True, with_scale=True)
 
     x = torch.randn((batch, 1, 1, hidden_size), requires_grad=False)
     x_tpu = x.to(device).half()
 
     out_cpu = net_cpu(x)
+
+    scale = None
+    bias = None
+    if 'scale' in net_cpu.state_dict():
+        scale = net_cpu.state_dict()['scale'].clone().detach().contiguous().requires_grad_(False).to(device).half()
+    if 'bias' in net_cpu.state_dict():
+        bias = net_cpu.state_dict()['bias'].clone().detach().contiguous().requires_grad_(False).to(device).half()
+
+    net_tpu = RMSNormBlock(axis=axis, eps=eps, scale=scale, bias=bias)
     out_tpu = net_tpu(x_tpu)
     out_tpu = out_tpu.float().to("cpu")
 
