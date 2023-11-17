@@ -910,9 +910,9 @@ bm_status_t sgdnnMlp ( bm_handle_t handle,
     *
  * d = hidden_size / attention_heads
  * The shape of WEIGHTS:
-    * weight1: (d)
-    * weight2: (d)
-    * weight3: (embeddings)
+    * cos: (n, 1, d)
+    * weight2: (n, 1, d)
+    * weight3: optional(n, n)
  * The shape of INPUTS:
     * Q : ( batch, attention_heads, 1, d )
     * K : ( batch, k_v_heads, 1, d )
@@ -929,11 +929,13 @@ bm_status_t sgdnnLlamaAttention ( bm_handle_t handle,
                           SgdnnTensor_t V,
                           SgdnnTensor_t Kcache,
                           SgdnnTensor_t Vcache,
-                          SgdnnTensor_t weight1,
-                          SgdnnTensor_t weight2,
-                          SgdnnTensor_t weight3,
+                          SgdnnTensor_t cos,
+                          SgdnnTensor_t sin,
+                          SgdnnTensor_t mask,
                           SgdnnTensor_t Y,
-                          float C );
+                          int embeddings,
+                          int attention_mode,
+                          float C);
 
 /*
  * [ GRAD_INPUT, GRAD_W1, GRAD_W2, GRAD_B1, GRAD_B2 ] = MLP BACKWARD ( GRAD_OUTPUT, INPUT, W1, W2, OUT1, P )

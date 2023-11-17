@@ -16,10 +16,12 @@ namespace at
 		Tensor &V,
 		Tensor &Kcache,
 		Tensor &Vcache,
-		Tensor &weight1,
-		Tensor &weight2,
-		Tensor &weight3,
+		Tensor &cos,
+		Tensor &sin,
+		const c10::optional<Tensor> &mask,
 		Tensor &Y,
+		int64_t embeddings,
+		int64_t attention_mode,
 		double C)
 	{
 		CHECK_TENSOR_IN_DEVICE(Q);
@@ -27,9 +29,10 @@ namespace at
 		CHECK_TENSOR_IN_DEVICE(V);
 		CHECK_TENSOR_IN_DEVICE(Kcache);
 		CHECK_TENSOR_IN_DEVICE(Vcache);
-		CHECK_TENSOR_IN_DEVICE(weight1);
-		CHECK_TENSOR_IN_DEVICE(weight2);
-		CHECK_TENSOR_IN_DEVICE(weight3);
+		CHECK_TENSOR_IN_DEVICE(cos);
+		CHECK_TENSOR_IN_DEVICE(sin);
+		if (mask.has_value())
+			CHECK_TENSOR_IN_DEVICE(mask.value());
 		CHECK_TENSOR_IN_DEVICE(Y);
 #ifdef TPU_OP_TIMING
 		auto timer = tpu::Timer().Start();
@@ -41,10 +44,12 @@ namespace at
 			tpu::TPUGenerateSgdnnTensor(V),
 			tpu::TPUGenerateSgdnnTensor(Kcache),
 			tpu::TPUGenerateSgdnnTensor(Vcache),
-			tpu::TPUGenerateSgdnnTensor(weight1),
-			tpu::TPUGenerateSgdnnTensor(weight2),
-			tpu::TPUGenerateSgdnnTensor(weight3),
+			tpu::TPUGenerateSgdnnTensor(cos),
+			tpu::TPUGenerateSgdnnTensor(sin),
+			mask.has_value() ? tpu::TPUGenerateSgdnnTensor(mask.value()) : sgdnnUndefinedTensor(),
 			tpu::TPUGenerateSgdnnTensor(Y),
+			embeddings,
+			attention_mode,
 			C);
 		TORCH_CHECK(status == BM_SUCCESS);
 #ifdef TPU_OP_TIMING

@@ -1160,9 +1160,9 @@ typedef struct {
   unsigned long long V_global_addr; // reserved
   unsigned long long Kcache_global_addr;
   unsigned long long Vcache_global_addr;
-  unsigned long long weight1_global_addr;
-  unsigned long long weight2_global_addr;
-  unsigned long long weight3_global_addr;
+  unsigned long long cos_global_addr;
+  unsigned long long sin_global_addr;
+  unsigned long long mask_global_addr;
   unsigned long long Y_global_addr;
   int batch;
   float C;
@@ -1170,6 +1170,7 @@ typedef struct {
   int num_attention_heads;
   int num_k_v_heads;
   int embeddings;
+  int attention_mode;
   int dtype;
 #ifndef WIN32
 } __attribute__((packed)) sg_api_llama2_qkv_multi_core_t;

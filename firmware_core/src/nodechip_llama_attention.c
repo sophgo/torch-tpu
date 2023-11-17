@@ -21,6 +21,7 @@ void nodechip_llama2_qkv_multi_core(
     int             num_attention_heads,
     int             num_k_v_heads,
     int             embeddings,
+    int             attention_mode,
     data_type_t     dtype);
 
 void tpu_kernel_llama_attention_multi_core(const void* api_buf) {
@@ -33,9 +34,9 @@ void tpu_kernel_llama_attention_multi_core(const void* api_buf) {
         api->V_global_addr,
         api->Kcache_global_addr,
         api->Vcache_global_addr,
-        api->weight1_global_addr,
-        api->weight2_global_addr,
-        api->weight3_global_addr,
+        api->cos_global_addr,
+        api->sin_global_addr,
+        api->mask_global_addr,
         api->Y_global_addr,
         api->C,
         api->batch,
@@ -43,6 +44,7 @@ void tpu_kernel_llama_attention_multi_core(const void* api_buf) {
         api->num_attention_heads,
         api->num_k_v_heads,
         api->embeddings,
+        api->attention_mode,
         (data_type_t)api->dtype);
     tpu_poll();
 }

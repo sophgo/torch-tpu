@@ -54,10 +54,12 @@ namespace at
 		Tensor &V,
 		Tensor &Kcache,
 		Tensor &Vcache,
-		Tensor &weight1,
-		Tensor &weight2,
-		Tensor &weight3,
+		Tensor &cos,
+		Tensor &sin,
+		const c10::optional<Tensor> &mask,
 		Tensor &Y,
+		int64_t embeddings,
+		int64_t attention_mode,
 		double C);
 
 	Tensor attn_forward(
