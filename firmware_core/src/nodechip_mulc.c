@@ -142,35 +142,6 @@ void tpu_kernel_api_mulc ( const void * args )
 }
 TPUKERNEL_FUNC_REGISTER ( tpu_kernel_api_mulc );
 
-void tpu_kernel_api_addc ( const void * args )
-{
-  sg_api_addc_t * api = ( sg_api_addc_t * ) args;
-  TPUKERNEL_ASSERT ( api->dtype == DT_FP32 || api->dtype == DT_FP16 || api->dtype == DT_BFP16 || api->dtype == DT_INT32);
-  scalar_t value;
-  if ( api->dtype == DT_FP32 )
-  {
-    value.f32 = api->value;
-  }
-  else if (api->dtype == DT_INT32) {
-    scalar_t value_f32 = { .f32 = api->value };
-    value = tpu_fp_to_int_cast ( value_f32, ( data_type_t ) api->dtype, DT_FP32, RM_HALF_TO_EVEN );
-  }
-  else
-  {
-    scalar_t value_f32 = { .f32 = api->value };
-    value = tpu_fp_cast ( value_f32, ( data_type_t ) api->dtype, DT_FP32, RM_HALF_TO_EVEN );
-  }
-  int length = 1;
-  for ( int i = 0; i < api->dim; ++i )
-  {
-    length *= api->shape[i];
-  }
-  tpu_initialize();
-  nodechip_opc ( api->input_global_addr, api->output_global_addr, value, length, ( data_type_t ) api->dtype, 0 );
-  tpu_poll();
-}
-TPUKERNEL_FUNC_REGISTER ( tpu_kernel_api_addc );
-
 static inline void nodechip_cop (
 global_addr_t input_global_addr,
 global_addr_t output_global_addr,

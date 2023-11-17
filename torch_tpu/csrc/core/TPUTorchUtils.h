@@ -113,6 +113,9 @@ static inline SgdnnDataType_t TPUConvertDType ( caffe2::TypeMeta dtype )
   {
     return SGDNN_DTYPE_INT8;
   }
+  else if (dtype == caffe2::TypeMeta::Make<short>()){
+    return SGDNN_DTYPE_INT16;
+  }
   else
   {
     TORCH_CHECK ( false, "Unsupported data type ", dtype );

@@ -2176,42 +2176,6 @@ bm_status_t sgdnnLogicalOr ( bm_handle_t handle,
   return BM_SUCCESS;
 }
 
-bm_status_t sgdnnAdd ( bm_handle_t handle,
-                       SgdnnTensor_t input,
-                       SgdnnTensor_t other,
-                       float scalar,
-                       SgdnnTensor_t output )
-{
-  SGDNN_CHECK ( input.dtype == other.dtype );
-  SGDNN_CHECK ( input.dtype == output.dtype );
-  SGDNN_CHECK ( input.dtype == SGDNN_DTYPE_FP32 ||
-                input.dtype == SGDNN_DTYPE_FP16 ||
-                input.dtype == SGDNN_DTYPE_BF16 );
-  SGDNN_CHECK ( sgdnnIsTensorContiguous ( &input ) );
-  SGDNN_CHECK ( sgdnnIsTensorContiguous ( &other ) );
-  SGDNN_CHECK ( sgdnnIsTensorContiguous ( &output ) );
-  sg_api_add_t api;
-  api.input_global_addr = input.addr;
-  api.other_global_addr = other.addr;
-  api.output_global_addr = output.addr;
-  api.dim = input.dim;
-  for ( int i = 0; i < input.dim; ++i )
-  {
-    api.shape[i] = input.shape[i];
-  }
-  api.dtype = sgdnnTPUKernelDType ( input.dtype );
-  api.value = scalar;
-#if defined SGDNN_BACKEND_1684X
-  SAFE_CALL ( sgdnnTPUKernelLaunch ( handle, "tpu_kernel_api_add", &api, sizeof ( api ) ) );
-#elif defined SGDNN_BACKEND_2260
-  SAFE_CALL ( sgdnnTPUKernelLaunch ( handle, "tpu_kernel_api_add_multi_core", &api, sizeof ( api ) ) );
-#else
-  SGDNN_CHECK ( false );
-#endif
-  return BM_SUCCESS;
-}
-
-
 bm_status_t sgdnnFlip ( bm_handle_t handle,
                          SgdnnTensor_t input,
                          int axis,
@@ -2379,6 +2343,40 @@ bm_status_t sgdnnLogicalNot ( bm_handle_t handle,
   return BM_SUCCESS;
 }
 
+
+bm_status_t sgdnnAdd ( bm_handle_t handle,
+                       SgdnnTensor_t input,
+                       SgdnnTensor_t other,
+                       float scalar,
+                       SgdnnTensor_t output )
+{
+  SGDNN_CHECK ( input.dtype == other.dtype );
+  SGDNN_CHECK ( input.dtype == output.dtype );
+  SGDNN_CHECK ( input.dtype != SGDNN_DTYPE_INT64 );
+  SGDNN_CHECK ( sgdnnIsTensorContiguous ( &input ) );
+  SGDNN_CHECK ( sgdnnIsTensorContiguous ( &other ) );
+  SGDNN_CHECK ( sgdnnIsTensorContiguous ( &output ) );
+  sg_api_add_t api;
+  api.input_global_addr = input.addr;
+  api.other_global_addr = other.addr;
+  api.output_global_addr = output.addr;
+  api.dim = input.dim;
+  for ( int i = 0; i < input.dim; ++i )
+  {
+    api.shape[i] = input.shape[i];
+  }
+  api.dtype = sgdnnTPUKernelDType ( input.dtype );
+  api.value = scalar;
+#if defined SGDNN_BACKEND_1684X
+  SAFE_CALL ( sgdnnTPUKernelLaunch ( handle, "tpu_kernel_api_add", &api, sizeof ( api ) ) );
+#elif defined SGDNN_BACKEND_2260
+  SAFE_CALL ( sgdnnTPUKernelLaunch ( handle, "tpu_kernel_api_add_multi_core", &api, sizeof ( api ) ) );
+#else
+  SGDNN_CHECK ( false );
+#endif
+  return BM_SUCCESS;
+}
+
 bm_status_t sgdnnAddBcast ( bm_handle_t handle,
                             SgdnnTensor_t input,
                             SgdnnTensor_t other,
@@ -2387,9 +2385,7 @@ bm_status_t sgdnnAddBcast ( bm_handle_t handle,
 {
   SGDNN_CHECK ( input.dtype == other.dtype );
   SGDNN_CHECK ( input.dtype == output.dtype );
-  SGDNN_CHECK ( input.dtype == SGDNN_DTYPE_FP32 ||
-                input.dtype == SGDNN_DTYPE_FP16 ||
-                input.dtype == SGDNN_DTYPE_BF16 );
+  SGDNN_CHECK ( input.dtype != SGDNN_DTYPE_INT64 );
   SGDNN_CHECK ( input.dim == other.dim );
   SGDNN_CHECK ( input.dim == output.dim );
   for ( int i = 0; i < input.dim; ++i )
@@ -2403,7 +2399,7 @@ bm_status_t sgdnnAddBcast ( bm_handle_t handle,
   SGDNN_CHECK ( sgdnnIsTensorContiguous ( &input ) );
   SGDNN_CHECK ( sgdnnIsTensorContiguous ( &other ) );
   SGDNN_CHECK ( sgdnnIsTensorContiguous ( &output ) );
-#if defined SGDNN_BACKEND_1684X
+
   sg_api_bcast_add_t api;
   api.input_global_addr = input.addr;
   api.other_global_addr = other.addr;
@@ -2419,27 +2415,40 @@ bm_status_t sgdnnAddBcast ( bm_handle_t handle,
   }
   api.dtype = sgdnnTPUKernelDType ( input.dtype );
   api.value = scalar;
+#if defined SGDNN_BACKEND_1684X
   SAFE_CALL ( sgdnnTPUKernelLaunch ( handle, "tpu_kernel_api_bcast_add", &api, sizeof ( api ) ) );
 #elif defined SGDNN_BACKEND_2260
-  sg_api_binary_multi_core_t api;
-  api.input0_addr = input.addr;
-  api.input1_addr = other.addr;
-  api.output_addr = output.addr;
-  api.in0_dims = input.dim;
-  api.in1_dims = other.dim;
-  api.in1_scale = 1.f;
-  api.in0_scale = scalar;
-  api.binary_type = 0;
-  api.dtype = sgdnnTPUKernelDType ( input.dtype );
+  SAFE_CALL ( sgdnnTPUKernelLaunch ( handle, "tpu_kernel_api_bcast_add_multi_core", &api, sizeof ( api ) ) );
+#else
+  SGDNN_CHECK ( false );
+#endif
+  return BM_SUCCESS;
+}
+
+bm_status_t sgdnnAddC ( bm_handle_t handle,
+                        SgdnnTensor_t input,
+                        float scalar,
+                        SgdnnTensor_t output )
+{
+  SGDNN_CHECK ( input.dtype == output.dtype );
+  SGDNN_CHECK ( input.dtype != SGDNN_DTYPE_INT64 );
+  SGDNN_CHECK ( sgdnnIsSameShape ( &input, &output ) );
+  SGDNN_CHECK ( sgdnnIsTensorContiguous ( &input ) );
+  SGDNN_CHECK ( sgdnnIsTensorContiguous ( &output ) );
+  sg_api_addc_t api;
+  api.input_global_addr = input.addr;
+  api.output_global_addr = output.addr;
+  api.dim = input.dim;
   for ( int i = 0; i < input.dim; ++i )
   {
-    api.in0_shape[i] = input.shape[i];
+    api.shape[i] = input.shape[i];
   }
-  for ( int i = 0; i < other.dim; ++i )
-  {
-    api.in1_shape[i] = other.shape[i];
-  }
-  SAFE_CALL ( sgdnnTPUKernelLaunch ( handle, "tpu_kernel_api_binary_multi_core", &api, sizeof ( api ) ) );
+  api.dtype = sgdnnTPUKernelDType ( input.dtype );
+  api.value = scalar;
+#if defined SGDNN_BACKEND_1684X
+  SAFE_CALL ( sgdnnTPUKernelLaunch ( handle, "tpu_kernel_api_addc", &api, sizeof ( api ) ) );
+#elif defined SGDNN_BACKEND_2260
+  SAFE_CALL ( sgdnnTPUKernelLaunch ( handle, "tpu_kernel_api_addc_multi_core", &api, sizeof ( api ) ) );
 #else
   SGDNN_CHECK ( false );
 #endif
@@ -2563,51 +2572,6 @@ bm_status_t sgdnnDiv ( bm_handle_t handle,
     api.in1_shape[i] = other.shape[i];
   }
   SAFE_CALL ( sgdnnTPUKernelLaunch ( handle, "tpu_kernel_api_binary_multi_core", &api, sizeof ( api ) ) );
-#endif
-  return BM_SUCCESS;
-}
-
-bm_status_t sgdnnAddC ( bm_handle_t handle,
-                        SgdnnTensor_t input,
-                        float scalar,
-                        SgdnnTensor_t output )
-{
-  SGDNN_CHECK ( input.dtype == output.dtype );
-  SGDNN_CHECK ( input.dtype == SGDNN_DTYPE_FP32 ||
-                input.dtype == SGDNN_DTYPE_FP16 ||
-                input.dtype == SGDNN_DTYPE_BF16 ||
-                input.dtype == SGDNN_DTYPE_INT32 );
-  SGDNN_CHECK ( sgdnnIsSameShape ( &input, &output ) );
-  SGDNN_CHECK ( sgdnnIsTensorContiguous ( &input ) );
-  SGDNN_CHECK ( sgdnnIsTensorContiguous ( &output ) );
-#if defined SGDNN_BACKEND_1684X
-  sg_api_addc_t api;
-  api.input_global_addr = input.addr;
-  api.output_global_addr = output.addr;
-  api.dim = input.dim;
-  for ( int i = 0; i < input.dim; ++i )
-  {
-    api.shape[i] = input.shape[i];
-  }
-  api.dtype = sgdnnTPUKernelDType ( input.dtype );
-  api.value = scalar;
-  SAFE_CALL ( sgdnnTPUKernelLaunch ( handle, "tpu_kernel_api_addc", &api, sizeof ( api ) ) );
-#elif defined SGDNN_BACKEND_2260
-  sg_api_const_binary_float_t api;
-  api.input_addr = input.addr;
-  api.output_addr = output.addr;
-  api.dims = input.dim;
-  for ( int i = 0; i < input.dim; ++i )
-  {
-    api.shape[i] = input.shape[i];
-  }
-  api.const_value = scalar;
-  api.is_inversed = false;
-  api.dtype = sgdnnTPUKernelDType ( input.dtype );
-  api.binary_type = 0;
-  SAFE_CALL ( sgdnnTPUKernelLaunch ( handle, "tpu_kernel_api_const_binary_multi_core", &api, sizeof ( api ) ) );
-#else
-  SGDNN_CHECK ( false );
 #endif
   return BM_SUCCESS;
 }
@@ -3936,8 +3900,7 @@ bm_status_t sgdnnLlamaAttention ( bm_handle_t handle,
   int num_attention_heads = Q.shape[1];
   int d = Q.shape[3];
   int hidden_size = d * num_attention_heads;
-  int num_k_v_heads = num_attention_heads / 8;
-  int embeddings = w3.shape[0];
+  int num_k_v_heads = K.shape[1];
   api.Q_global_addr    = Q.addr;
   api.K_global_addr  = K.addr;
   api.V_global_addr  = V.addr;
@@ -3951,7 +3914,7 @@ bm_status_t sgdnnLlamaAttention ( bm_handle_t handle,
   api.hidden_size       = hidden_size;
   api.num_attention_heads      = num_attention_heads;
   api.num_k_v_heads = num_k_v_heads;
-  api.embeddings = embeddings;
+  api.embeddings = w3.shape[0];
   api.C = C;
   api.dtype         = sgdnnTPUKernelDType ( Q.dtype );
 

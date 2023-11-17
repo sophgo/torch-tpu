@@ -8,75 +8,76 @@ torch.set_printoptions(precision=6)
 device = "privateuseone:0"
 
 
-def case1():
-    a1 = torch.tensor(1, dtype=torch.int)
-    a2 = torch.tensor(1.0, dtype=torch.float)
-    a2_tpu = a2.to(device)
-    a3 = 1
-    a4 = torch.tensor(1, dtype=torch.int)
-    a5 = torch.tensor((1.0, 2.0, 3.0), dtype=torch.int)
-    a5_tpu = a5.to(device)
+def case_add():
+    print("#"*5 + "case_add" + "#"*5)
+    for dtype_t in [torch.float32, torch.float16, torch.bfloat16]:
+        a = torch.randn((5, 3, 4, 2, 6), dtype=dtype_t)
+        b = torch.randn((5, 3, 4, 2, 6), dtype=dtype_t)
 
-    # tensor add tensor
-    # a2.add_(a1)
-    # a2_tpu.add_(a1.to(device))
-    # print("origin: ",a1)
-    # print("cpu : ", a2 )
-    # print("tpu : ", a2_tpu.cpu())
+        cpu_out = a + b
+        tpu_out = a.to(device) + b.to(device)
+        print(f"dtype: {dtype_t}")
+        print(f"max_diff: {torch.max(abs(cpu_out - tpu_out.cpu()))}")
 
-    # tensor add scalar
-    # a2.add_(a3)
-    # a2_tpu.add_(float(a3))
-    # print("origin: ",a1)
-    # print("cpu : ", a2 )
-    # print("tpu : ", a2_tpu.cpu())
+    for dtype_t in [torch.int32, torch.int16, torch.int8, torch.uint8]:
+        a = torch.randint(0, 21, (5, 3, 4, 2, 6), dtype=dtype_t)
+        b = torch.randint(0, 21, (5, 3, 4, 2, 6), dtype=dtype_t)
 
-    a5.add_(a3)
-    print("cpu", a5)
-    a5_tpu.add_(a3)
-    print("tpu", a5_tpu.cpu())
+        cpu_out = a + b
+        tpu_out = a.to(device) + b.to(device)
+        print(f"dtype: {dtype_t}")
+        print(f"max_diff: {torch.max(abs(cpu_out - tpu_out.cpu()))}")
+    
 
-    # broadcast add
-    a2.add_(a4)
-    a2_tpu.add_(a4.to(device))
-    print("origin: ", a1)
-    print("cpu : ", a2)
-    print("tpu : ", a2_tpu.cpu())
+def case_add_bcast():
+    print("#"*5 + "case_add_bcast" + "#"*5)
+    for dtype_t in [torch.float32, torch.float16, torch.bfloat16]:
+        a = torch.randn((5, 3, 4, 2, 6), dtype=dtype_t)
+        b = torch.randn((1, 4, 1, 6), dtype=dtype_t)
 
+        cpu_out = a + b
+        tpu_out = a.to(device) + b.to(device)
+        print(f"dtype: {dtype_t}")
+        print(f"shape: cpu: {cpu_out.shape}, tpu: {tpu_out.shape}")
+        print(f"max_diff: {torch.max(abs(cpu_out - tpu_out.cpu()))}")
+    
+    for dtype_t in [torch.int32, torch.int16, torch.int8, torch.uint8]:
+        a = torch.randint(0, 21, (3, 4, 2, 6), dtype=dtype_t)
+        b = torch.randint(0, 21, (1, 4, 1, 6), dtype=dtype_t)
 
-def case_addbcast():
-    N = 1
-    C = 4096
-    H = 512
-    a = torch.randn(N, C, H)
-    b = torch.randn(H)
-    a_tpu = a.to(device)
-    b_tpu = b.to(device)
+        cpu_out = a + b
+        tpu_out = a.to(device) + b.to(device)
+        print(f"dtype: {dtype_t}")
+        print(f"shape: cpu: {cpu_out.shape}, tpu: {tpu_out.shape}")
+        print(f"max_diff: {torch.max(abs(cpu_out - tpu_out.cpu()))}")
 
-    o_t = a_tpu + b_tpu
-    o = a + b
+def case_add_scalar():
+    print("#"*5 + "case_add_scalar" + "#"*5)
+    for dtype_t in [torch.float32, torch.float16, torch.bfloat16]:
+        a = torch.randn((5, 3, 4, 2, 6), dtype=dtype_t)
+        b = 3.0
 
-    diff = o - o_t.cpu()
-    print(torch.max(torch.abs(diff)))
+        cpu_out = a + b
+        tpu_out = a.to(device) + b
+        tpu_out2 = b + a.to(device)
+        print(f"dtype: {dtype_t}")
+        print(f"shape: cpu: {cpu_out.shape}, tpu1: {tpu_out.shape}, tpu2: {tpu_out2.shape}")
+        print(f"tpu1 max_diff: {torch.max(abs(cpu_out - tpu_out.cpu()))}")
+        print(f"tpu2 max_diff: {torch.max(abs(cpu_out - tpu_out2.cpu()))}")
+    
+    for dtype_t in [torch.int32, torch.int16, torch.int8, torch.uint8]:
+        a = torch.randint(0, 21, (3, 4, 2, 6), dtype=dtype_t)
+        b = 3
 
-
-def case_addbcast_rev():
-    N = 1
-    C = 4096
-    H = 512
-    a = torch.randn(N, C, H)
-    b = torch.randn(H)
-    a_tpu = a.to(device)
-    b_tpu = b.to(device)
-
-    o_t = b_tpu + a_tpu
-    o = b + a
-
-    diff = o - o_t.cpu()
-    print(torch.max(torch.abs(diff)))
-
+        cpu_out = a + b
+        tpu_out = a.to(device) + b
+        tpu_out2 = b + a.to(device)
+        print(f"dtype: {dtype_t}")
+        print(f"shape: cpu: {cpu_out.shape}, tpu1: {tpu_out.shape}, tpu2: {tpu_out2.shape}")
+        print(f"tpu1 max_diff: {torch.max(abs(cpu_out - tpu_out.cpu()))}")
+        print(f"tpu2 max_diff: {torch.max(abs(cpu_out - tpu_out2.cpu()))}")
 
 if __name__ == "__main__":
-    case1()
-    case_addbcast()
-    case_addbcast_rev()
+    # case_add()
+    # case_add_bcast()
+    case_add_scalar()
