@@ -58,6 +58,7 @@ Tensor where_self_tpu ( const Tensor & condition, const Tensor & self, const Ten
 #ifdef TPU_OP_TIMING
   tpu::OpTimer::Instance().AddTime ( tpu::WHERE, timer.ElapsedUS() );
 #endif
+  SHOW_TENSOR_OP(condition, self, other, out);
   return out;
 }
 

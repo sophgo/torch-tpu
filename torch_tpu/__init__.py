@@ -6,23 +6,8 @@ import torch
 import torch_tpu._C
 import torch_tpu.tpu
 
-from torch_tpu.utils import (add_torch_funcs, add_tensor_methods, apply_module_patch)
-
-# tpu_TENSOR = set([
-#     "FloatTensor", "IntTensor", "DoubleTensor",
-#     "LongTensor", "ShortTensor", "CharTensor", "ByteTensor", "HalfTensor"])
-
-# def _isinstance(obj, class_or_tuple):
-#     try:
-#         return builtin_isinstance(obj, class_or_tuple)
-#     except TypeError as e:
-#         class_tuple = (class_or_tuple, ) if type(class_or_tuple) != tuple else class_or_tuple
-#         if torch._C.device in class_tuple or torch_tpu._C.device in class_tuple:
-#             return builtin_isinstance(obj, class_tuple + (torch._C.device, torch_tpu._C.device))
-#         raise e
-
-# builtins.isinstance = _isinstance
-
+from torch_tpu.utils import ( apply_module_patch, \
+                             add_storage_methods, add_serialization_methods, apply_device_patch)
 
 __all__ = []
 
@@ -43,27 +28,17 @@ tpu_functions = {
 }
 
 
-for name in dir(torch_tpu._C._VariableFunctions):
-    if name.startswith('__'):
+for name in dir(torch.ops.tpu):
+    if name.startswith('__')  or name in ['_dir', 'name']:
         continue
-    globals()[name] = getattr(torch_tpu._C._VariableFunctions, name)
-    __all__.append(name)
-    if (name in tpu_functions) or (name.find("tpu") != -1):
-        setattr(torch, name, wrap_torch_error_func(getattr(torch_tpu._C._VariableFunctions, name)))
-    else:
-        setattr(torch, name, getattr(torch_tpu._C._VariableFunctions, name))
+    globals()[name] = getattr(torch.ops.tpu, name)
+    if (name in tpu_functions):
+        __all__.append(name)
+    setattr(torch, name, wrap_torch_error_func(getattr(torch.ops.tpu, name)))
 
 all_monkey_patches = [
-    ["tpu", torch_tpu.tpu],
-    ["tpu.amp", torch_tpu.tpu.amp],
-    #["autograd.profiler", torch_tpu.tpu.profiler],
-    #["distributed", torch_tpu.distributed],
-    # ["nn.parallel.distributed._get_device_index", torch_tpu.tpu._get_device_index],
-    # ["distributed.distributed_c10d", torch_tpu.distributed.distributed_c10d],
-    # ["nn.parallel.distributed._get_default_group", torch_tpu.distributed.distributed_c10d._get_default_group],
     # ["nn.functional", tpu_functional],
     # ["nn", tpu_modules],
-    ["device", torch_tpu._C.device],
 ]
 
 def _apply_patches(monkey_patches):
@@ -99,13 +74,28 @@ def _apply_patches(monkey_patches):
         for attr in patch.__all__:
             setattr(dest_module, attr, getattr(patch, attr))
 
+# def _apply_distributed_patches():
+#     torch.nn.parallel.DistributedDataParallel._ddp_init_helper = torch_npu.utils.module._ddp_init_helper
+#     _apply_patches([["distributed", torch_npu.distributed]])
 
 def apply_class_patches():
-    add_torch_funcs()
-    add_tensor_methods()
+    add_storage_methods()
+    add_serialization_methods()
+    apply_device_patch()
     apply_module_patch()
+
+torch.utils.rename_privateuse1_backend("tpu")
+torch._register_device_module('tpu', torch_tpu.tpu)
+unsupported_dtype = [torch.quint8, torch.quint4x2, torch.quint2x4, torch.qint32, torch.qint8, torch.int64]
+torch.utils.generate_methods_for_privateuse1_backend(for_tensor=True, for_module=True, for_storage=True,
+                                                     unsupported_dtype=unsupported_dtype)
 
 # Apply monkey-patches.
 _apply_patches(all_monkey_patches)
 apply_class_patches()
-# torch_tpu._C._initExtension()
+
+# #### distributed
+# # init and register hccl backend
+# torch.distributed.is_sccl_available = lambda : True
+# torch.distributed.Backend.register_backend("sccl", lambda store, group_rank, group_size, timeout:
+#     torch_tpu._C._distributed_c10d.ProcessGroupSCCL(store, group_rank, group_size, timeout), devices=["tpu"])

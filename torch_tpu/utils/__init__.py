@@ -13,10 +13,10 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-__all__ = ['add_torch_funcs', 'add_tensor_methods', "apply_module_patch"]
-
-from .torch_funcs import add_torch_funcs
-from .tensor_methods import add_tensor_methods
 from .module import apply_module_patch
+from .storage import add_storage_methods
+from .serialization import add_serialization_methods
+from .device_guard import apply_device_patch
 
-from .utils import manual_seed, seed
+
+__all__ = []

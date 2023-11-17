@@ -15,7 +15,6 @@ namespace at {
 
 Tensor &binary_op_tpu(const Tensor &self, const Tensor &other,
                       const Scalar &alpha, Tensor &out, int binary_type) {
-
   if (self.dim() > 0) {
     CHECK_TENSOR_IN_DEVICE(self);
   }
@@ -71,6 +70,7 @@ Tensor &binary_op_tpu(const Tensor &self, const Tensor &other,
         TIMING_END(tpu::BINARYOP_C)
       }
     }
+    // SHOW_TENSOR_OP(self, other, out);
     return out;
   }
 
@@ -129,17 +129,18 @@ Tensor &binary_op_tpu(const Tensor &self, const Tensor &other,
     TORCH_CHECK(status == BM_SUCCESS);
     TIMING_END(tpu::BINARYOP_BCAST)
   }
+  // SHOW_TENSOR_OP(self, other, out);
   return out;
 }
 
 Tensor &add_out_tpu(const Tensor &self, const Tensor &other,
                     const Scalar &alpha, Tensor &out) {
   if (!self.is_contiguous() || !other.is_contiguous() || !out.is_contiguous()) {
-    LOG(WARNING) << "add_out not contiguous, use stride copy"
-                 << " self.is_contiguous : " << self.is_contiguous()
-                 << " other.is_contiguous : " << other.is_contiguous()
-                 << " out.is_contiguous : " << out.is_contiguous()
-                 << " [TODO]  no use strided copy";
+    // LOG(WARNING) << "add_out not contiguous, use stride copy"
+    //              << " self.is_contiguous : " << self.is_contiguous()
+    //              << " other.is_contiguous : " << other.is_contiguous()
+    //              << " out.is_contiguous : " << out.is_contiguous()
+    //              << " [TODO]  no use strided copy";
     if (out.is_contiguous()) {
       out = add(self.contiguous(), other.contiguous(), alpha);
     } else {
@@ -148,27 +149,31 @@ Tensor &add_out_tpu(const Tensor &self, const Tensor &other,
                        tpu::TPUGenerateSgdnnTensor(out_),
                        tpu::TPUGenerateSgdnnTensor(out));
     }
+    SHOW_TENSOR_OP(self, other, out);
     return out;
   }
   if (self.dim() == 0 && other.dim() == 0) {
     auto out_cpu = add(self.cpu(), other.cpu(), alpha);
     tpu::TPUCopyHostToDevice(out.data_ptr(), out_cpu.contiguous().data_ptr(),
                              out.nbytes());
+    SHOW_TENSOR_OP(self, other, out);
     return out;
   }
   // 0:add, 1:sub, 2:mul, 3:div
-  return binary_op_tpu(self, other, alpha, out, 0);
+  binary_op_tpu(self, other, alpha, out, 0);
+  SHOW_TENSOR_OP(self, other, out);
+  return out;
 }
 TORCH_LIBRARY_IMPL(aten, TPU, m) { m.impl("add.out", add_out_tpu); }
 
 Tensor &sub_out_tpu(const Tensor &self, const Tensor &other,
                     const Scalar &alpha, Tensor &out) {
   if (!self.is_contiguous() || !other.is_contiguous() || !out.is_contiguous()) {
-    LOG(WARNING) << "add_out not contiguous, use stride copy"
-                 << " self.is_contiguous : " << self.is_contiguous()
-                 << " other.is_contiguous : " << other.is_contiguous()
-                 << " out.is_contiguous : " << out.is_contiguous()
-                 << " [TODO]  no use strided copy";
+    // LOG(WARNING) << "add_out not contiguous, use stride copy"
+    //              << " self.is_contiguous : " << self.is_contiguous()
+    //              << " other.is_contiguous : " << other.is_contiguous()
+    //              << " out.is_contiguous : " << out.is_contiguous()
+    //              << " [TODO]  no use strided copy";
     if (out.is_contiguous()) {
       out = sub(self.contiguous(), other.contiguous(), alpha);
     } else {
@@ -177,26 +182,30 @@ Tensor &sub_out_tpu(const Tensor &self, const Tensor &other,
                        tpu::TPUGenerateSgdnnTensor(out_),
                        tpu::TPUGenerateSgdnnTensor(out));
     }
+    SHOW_TENSOR_OP(self, other, out);
     return out;
   }
   if (self.dim() == 0 && other.dim() == 0) {
     auto out_cpu = sub(self.cpu(), other.cpu(), alpha);
     tpu::TPUCopyHostToDevice(out.data_ptr(), out_cpu.contiguous().data_ptr(),
                              out.nbytes());
+    SHOW_TENSOR_OP(self, other, out);
     return out;
   }
   // 0:add, 1:sub, 2:mul, 3:div
-  return binary_op_tpu(self, other, alpha, out, 1);
+  binary_op_tpu(self, other, alpha, out, 1);
+  SHOW_TENSOR_OP(self, other, out);
+  return out;
 }
 TORCH_LIBRARY_IMPL(aten, TPU, m) { m.impl("sub.out", sub_out_tpu); }
 
 Tensor &mul_out_tpu(const Tensor &self, const Tensor &other, Tensor &out) {
   if (!self.is_contiguous() || !other.is_contiguous() || !out.is_contiguous()) {
-    LOG(WARNING) << "mul_out not contiguous, use stride copy"
-                 << " self.is_contiguous : " << self.is_contiguous()
-                 << " other.is_contiguous : " << other.is_contiguous()
-                 << " out.is_contiguous : " << out.is_contiguous()
-                 << " [TODO]  no use strided copy";
+    // LOG(WARNING) << "mul_out not contiguous, use stride copy"
+    //              << " self.is_contiguous : " << self.is_contiguous()
+    //              << " other.is_contiguous : " << other.is_contiguous()
+    //              << " out.is_contiguous : " << out.is_contiguous()
+    //              << " [TODO]  no use strided copy";
     if (out.is_contiguous()) {
       out = mul(self.contiguous(), other.contiguous());
     } else {
@@ -205,26 +214,30 @@ Tensor &mul_out_tpu(const Tensor &self, const Tensor &other, Tensor &out) {
                        tpu::TPUGenerateSgdnnTensor(out_),
                        tpu::TPUGenerateSgdnnTensor(out));
     }
+    SHOW_TENSOR_OP(self, other, out);
     return out;
   }
   if (self.dim() == 0 && other.dim() == 0) {
     auto out_cpu = mul(self.cpu(), other.cpu());
     tpu::TPUCopyHostToDevice(out.data_ptr(), out_cpu.contiguous().data_ptr(),
                              out.nbytes());
+    SHOW_TENSOR_OP(self, other, out);
     return out;
   }
   // 0:add, 1:sub, 2:mul, 3:div
-  return binary_op_tpu(self, other, 1, out, 2);
+  binary_op_tpu(self, other, 1, out, 2);
+  SHOW_TENSOR_OP(self, other, out);
+  return out;
 }
 TORCH_LIBRARY_IMPL(aten, TPU, m) { m.impl("mul.out", mul_out_tpu); }
 
 Tensor &div_out_tpu(const Tensor &self, const Tensor &other, Tensor &out) {
   if (!self.is_contiguous() || !other.is_contiguous() || !out.is_contiguous()) {
-    LOG(WARNING) << "div out use strided copy because of, "
-                 << " self_is_contiguous : " << self.is_contiguous()
-                 << " other_is_contiguos : " << other.is_contiguous()
-                 << " out_is_congiguous : " << out.is_contiguous()
-                 << " [TODO] no use strided copy";
+    // LOG(WARNING) << "div out use strided copy because of, "
+    //              << " self_is_contiguous : " << self.is_contiguous()
+    //              << " other_is_contiguos : " << other.is_contiguous()
+    //              << " out_is_congiguous : " << out.is_contiguous()
+    //              << " [TODO] no use strided copy";
     if (out.is_contiguous()) {
       out = div(self.contiguous(), other.contiguous());
     } else {
@@ -233,6 +246,7 @@ Tensor &div_out_tpu(const Tensor &self, const Tensor &other, Tensor &out) {
                        tpu::TPUGenerateSgdnnTensor(out_),
                        tpu::TPUGenerateSgdnnTensor(out));
     }
+    SHOW_TENSOR_OP(self, other, out);
     return out;
   }
 
@@ -240,8 +254,10 @@ Tensor &div_out_tpu(const Tensor &self, const Tensor &other, Tensor &out) {
     auto out_cpu = div(self.cpu(), other.cpu());
     tpu::TPUCopyHostToDevice(out.data_ptr(), out_cpu.contiguous().data_ptr(),
                              out.nbytes());
+    SHOW_TENSOR_OP(self, other, out);
     return out;
   }
+
   const Tensor self_f = self.to(torch::kFloat);
   const Tensor other_f = other.to(torch::kFloat);
   Tensor out_f = out.to(torch::kFloat);
@@ -249,6 +265,7 @@ Tensor &div_out_tpu(const Tensor &self, const Tensor &other, Tensor &out) {
   binary_op_tpu(self_f, other_f, 1, out_f, 3);
   tpu::TPUCopyDeviceToDevice(out.data_ptr(), out_f.to(out.dtype()).data_ptr(),
                              out.nbytes());
+  SHOW_TENSOR_OP(self, other, out);
   return out;
 }
 TORCH_LIBRARY_IMPL(aten, TPU, m) { m.impl("div.out", div_out_tpu); }
@@ -314,7 +331,6 @@ Tensor &bitwise_xor_out_tpu(const Tensor &self, const Tensor &other,
 #endif
 
     } else {
-
 #ifdef TPU_OP_TIMING
       auto timer = tpu::Timer().Start();
 #endif
@@ -330,7 +346,7 @@ Tensor &bitwise_xor_out_tpu(const Tensor &self, const Tensor &other,
 #endif
     }
   }
-
+  SHOW_TENSOR_OP(self, other, out);
   return out;
 }
 TORCH_LIBRARY_IMPL(aten, TPU, m) {
@@ -380,7 +396,6 @@ Tensor &bitwise_and_out_tpu(const Tensor &self, const Tensor &other,
 #ifdef TPU_OP_TIMING
     tpu::OpTimer::Instance().AddTime(tpu::BITWISE_AND_C, timer.ElapsedUS());
 #endif
-
   } else {
     if (tpu::TPUIsSameShape(self, other)) {
 
@@ -414,7 +429,7 @@ Tensor &bitwise_and_out_tpu(const Tensor &self, const Tensor &other,
 #endif
     }
   }
-
+  SHOW_TENSOR_OP(self, other, out);
   return out;
 }
 TORCH_LIBRARY_IMPL(aten, TPU, m) {
@@ -498,7 +513,7 @@ Tensor &bitwise_or_out_tpu(const Tensor &self, const Tensor &other,
 #endif
     }
   }
-
+  SHOW_TENSOR_OP(self, other, out);
   return out;
 }
 TORCH_LIBRARY_IMPL(aten, TPU, m) {
@@ -576,7 +591,7 @@ Tensor &equal_out_tpu(const Tensor &self, const Tensor &other, Tensor &out) {
 #endif
     }
   }
-
+  SHOW_TENSOR_OP(self, other, out);
   return out;
 }
 TORCH_LIBRARY_IMPL(aten, TPU, m) { m.impl("eq.Tensor_out", equal_out_tpu); }
@@ -656,7 +671,7 @@ Tensor &greater_or_equal_out_tpu(const Tensor &self, const Tensor &other,
 #endif
     }
   }
-
+  SHOW_TENSOR_OP(self, other, out);
   return out;
 }
 TORCH_LIBRARY_IMPL(aten, TPU, m) {
@@ -734,7 +749,7 @@ Tensor &greater_out_tpu(const Tensor &self, const Tensor &other, Tensor &out) {
 #endif
     }
   }
-
+  SHOW_TENSOR_OP(self, other, out);
   return out;
 }
 TORCH_LIBRARY_IMPL(aten, TPU, m) { m.impl("gt.Tensor_out", greater_out_tpu); }
@@ -815,7 +830,7 @@ Tensor &less_than_or_equal_out_tpu(const Tensor &self, const Tensor &other,
 #endif
     }
   }
-
+  SHOW_TENSOR_OP(self, other, out);
   return out;
 }
 TORCH_LIBRARY_IMPL(aten, TPU, m) {
@@ -894,7 +909,7 @@ Tensor &less_than_out_tpu(const Tensor &self, const Tensor &other,
 #endif
     }
   }
-
+  SHOW_TENSOR_OP(self, other, out);
   return out;
 }
 TORCH_LIBRARY_IMPL(aten, TPU, m) { m.impl("lt.Tensor_out", less_than_out_tpu); }
@@ -971,7 +986,7 @@ Tensor &not_equal_out_tpu(const Tensor &self, const Tensor &other,
 #endif
     }
   }
-
+  SHOW_TENSOR_OP(self, other, out);
   return out;
 }
 TORCH_LIBRARY_IMPL(aten, TPU, m) { m.impl("ne.Tensor_out", not_equal_out_tpu); }
@@ -1048,7 +1063,7 @@ Tensor &shift_left_out_tpu(const Tensor &self, const Tensor &other,
   } else {
     TORCH_CHECK(false, "unsupported dims");
   }
-
+  SHOW_TENSOR_OP(self, other, out);
   return out;
 }
 TORCH_LIBRARY_IMPL(aten, TPU, m) {
@@ -1136,7 +1151,7 @@ Tensor &shift_right_arithmetic_out_tpu(const Tensor &self, const Tensor &other,
   } else {
     TORCH_CHECK(false, "unsupported dims");
   }
-
+  SHOW_TENSOR_OP(self, other, out);
   return out;
 }
 TORCH_LIBRARY_IMPL(aten, TPU, m) {
@@ -1215,6 +1230,7 @@ Tensor &minimum_out_tpu(const Tensor &self, const Tensor &other, Tensor &out) {
 #endif
     }
   }
+  SHOW_TENSOR_OP(self, other, out);
   return out;
 }
 
@@ -1292,6 +1308,7 @@ Tensor &maximum_out_tpu(const Tensor &self, const Tensor &other, Tensor &out) {
 #endif
     }
   }
+  SHOW_TENSOR_OP(self, other, out);
   return out;
 }
 
@@ -1369,6 +1386,7 @@ Tensor &atan2_out_tpu(const Tensor &self, const Tensor &other, Tensor &out) {
 #endif
     }
   }
+  SHOW_TENSOR_OP(self, other, out);
   return out;
 }
 
@@ -1408,6 +1426,7 @@ Tensor &pow_out_tpu(const Tensor &self, const Tensor &other, Tensor &out) {
     TORCH_CHECK(false, "At least one input is required in TPU device");
   }
 #endif
+  SHOW_TENSOR_OP(self, other, out);
   return out;
 }
 
@@ -1440,6 +1459,7 @@ Tensor &pow_c_out_tpu(const Tensor &self, const Scalar &exponent, Tensor &out) {
   tpu::OpTimer::Instance().AddTime(tpu::POWC, timer.ElapsedUS());
 #endif
 #endif
+  SHOW_TENSOR_OP(self, out);
   return out;
 }
 TORCH_LIBRARY_IMPL(aten, TPU, m) {
@@ -1519,6 +1539,7 @@ Tensor &fmax_out_tpu(const Tensor &self, const Tensor &other, Tensor &out) {
 #endif
     }
   }
+  SHOW_TENSOR_OP(self, other, out);
   return out;
 }
 
@@ -1596,6 +1617,7 @@ Tensor &fmin_out_tpu(const Tensor &self, const Tensor &other, Tensor &out) {
 #endif
     }
   }
+  SHOW_TENSOR_OP(self, other, out);
   return out;
 }
 
@@ -1645,7 +1667,7 @@ Tensor &hypot_out_tpu(const Tensor &self, const Tensor &other, Tensor &out) {
 #ifdef TPU_OP_TIMING
   tpu::OpTimer::Instance().AddTime(tpu::HYPOT, timer.ElapsedUS());
 #endif
-
+  SHOW_TENSOR_OP(self, other, out);
   return out;
 }
 TORCH_LIBRARY_IMPL(aten, TPU, m) { m.impl("hypot.out", hypot_out_tpu); }
@@ -1723,6 +1745,7 @@ Tensor &nextafter_out_tpu(const Tensor &self, const Tensor &other,
 #endif
     }
   }
+  SHOW_TENSOR_OP(self, other, out);
   return out;
 }
 
@@ -1755,6 +1778,7 @@ Tensor &less_than_or_equal_scalar_out_tpu(const Tensor &self,
                                      timer.ElapsedUS());
 #endif
   }
+  SHOW_TENSOR_OP(self, out);
   return out;
 }
 TORCH_LIBRARY_IMPL(aten, TPU, m) {
@@ -1786,6 +1810,7 @@ Tensor &less_than_scalar_out_tpu(const Tensor &self, const Scalar &other,
     tpu::OpTimer::Instance().AddTime(tpu::LESS_THAN_C, timer.ElapsedUS());
 #endif
   }
+  SHOW_TENSOR_OP(self, out);
   return out;
 }
 TORCH_LIBRARY_IMPL(aten, TPU, m) {
@@ -1818,6 +1843,7 @@ Tensor &greater_or_equal_scalar_out_tpu(const Tensor &self, const Scalar &other,
                                      timer.ElapsedUS());
 #endif
   }
+  SHOW_TENSOR_OP(self, out);
   return out;
 }
 TORCH_LIBRARY_IMPL(aten, TPU, m) {
@@ -1850,6 +1876,7 @@ Tensor &greater_scalar_out_tpu(const Tensor &self, const Scalar &other,
     tpu::OpTimer::Instance().AddTime(tpu::GREATER_C, timer.ElapsedUS());
 #endif
   }
+  SHOW_TENSOR_OP(self, out);
   return out;
 }
 TORCH_LIBRARY_IMPL(aten, TPU, m) {
@@ -1881,6 +1908,7 @@ Tensor &not_equal_scalar_out_tpu(const Tensor &self, const Scalar &other,
     tpu::OpTimer::Instance().AddTime(tpu::NOT_EQUAL_C, timer.ElapsedUS());
 #endif
   }
+  SHOW_TENSOR_OP(self, out);
   return out;
 }
 TORCH_LIBRARY_IMPL(aten, TPU, m) {
@@ -1913,6 +1941,7 @@ Tensor &equal_scalar_out_tpu(const Tensor &self, const Scalar &other,
     tpu::OpTimer::Instance().AddTime(tpu::EQUAL_C, timer.ElapsedUS());
 #endif
   }
+  SHOW_TENSOR_OP(self, out);
   return out;
 }
 TORCH_LIBRARY_IMPL(aten, TPU, m) {

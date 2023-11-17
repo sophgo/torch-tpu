@@ -44,6 +44,7 @@ Tensor &fill__Scalar_tpu(Tensor &self, const Scalar &value) {
   tpu::OpTimer::Instance().AddTime(tpu::CONST_FILL, timer.ElapsedUS());
 #endif
 #endif
+  SHOW_TENSOR_OP(self);
   return self;
 }
 TORCH_LIBRARY_IMPL(aten, TPU, m) { m.impl("fill_.Scalar", fill__Scalar_tpu); }
@@ -91,6 +92,7 @@ Tensor &masked_fill_Scalar_tpu(Tensor &self, const Tensor &mask,
   tpu::OpTimer::Instance().AddTime(tpu::MASKED_FILL, timer.ElapsedUS());
 #endif
 #endif
+  SHOW_TENSOR_OP(self, mask);
   return self;
 }
 

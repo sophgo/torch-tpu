@@ -14,9 +14,11 @@ Tensor & _log_softmax_out_tpu ( const Tensor & self, int64_t dim, bool half_to_f
 {
   CHECK_TENSOR_IN_DEVICE ( self );
   CHECK_TENSOR_IN_DEVICE ( out );
+  CPU_IMPL_WANING();
   TORCH_CHECK ( half_to_float == false );
   auto out_cpu = _log_softmax ( self.cpu(), dim, half_to_float );
   tpu::TPUCopyHostToDevice ( out.data_ptr(), out_cpu.contiguous().data_ptr(), out.nbytes() );
+  SHOW_TENSOR_OP(self, out);
   return out;
 }
 TORCH_LIBRARY_IMPL ( aten, TPU, m )
@@ -62,6 +64,7 @@ Tensor & _softmax_out_tpu ( const Tensor & self, int64_t dim, bool half_to_float
   tpu::OpTimer::Instance().AddTime ( tpu::SOFTMAX, timer.ElapsedUS() );
 #endif
 #endif
+  SHOW_TENSOR_OP(self, out);
   return out;
 }
 TORCH_LIBRARY_IMPL ( aten, TPU, m )
@@ -93,6 +96,7 @@ Tensor & _softmax_backward_data_out_tpu ( const Tensor & grad_output, const Tens
   tpu::OpTimer::Instance().AddTime ( tpu::SOFTMAX_BACKWARD, timer.ElapsedUS() );
 #endif
 #endif
+  SHOW_TENSOR_OP(grad_output, output, grad_input);
   return grad_input;
 }
 TORCH_LIBRARY_IMPL ( aten, TPU, m )

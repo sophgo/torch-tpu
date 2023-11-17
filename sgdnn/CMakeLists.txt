@@ -1,5 +1,7 @@
 project(SGDNN CXX)
 
+include(config.cmake)
+
 set(SAFETY_FLAGS "-Wall -Wno-error=deprecated-declarations -ffunction-sections -fdata-sections -fPIC -Wno-unused-function -funwind-tables -fno-short-enums")
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++11 -lpthread -fno-strict-aliasing -D_GLIBCXX_USE_CXX11_ABI=1 ${SAFETY_FLAGS}")
 

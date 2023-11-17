@@ -24,9 +24,7 @@ Tensor upsample_bilinear2d_tpu(const at::Tensor &self,
   tpu::TPUCopyHostToDevice(out.data_ptr(), self.contiguous().data_ptr(),
                            self.nbytes());
 #else
-
   TIMING_START
-
   std::vector<int64_t> output_shape(4, 0);
   output_shape[0] = self.size(0);
   output_shape[1] = self.size(1);
@@ -52,8 +50,8 @@ Tensor upsample_bilinear2d_tpu(const at::Tensor &self,
   }
   TORCH_CHECK(status == BM_SUCCESS);
   TIMING_END(tpu::UPSAMPLING_BILINEAR)
-
 #endif
+  SHOW_TENSOR_OP(self, out);
   return out;
 }
 
@@ -73,8 +71,6 @@ Tensor upsample_nearest2d_tpu(const at::Tensor &self,
   tpu::TPUCopyHostToDevice(out.data_ptr(), self.contiguous().data_ptr(),
                            self.nbytes());
 #else
-
-
   std::vector<int64_t> output_shape(4, 0);
   output_shape[0] = self.size(0);
   output_shape[1] = self.size(1);
@@ -102,14 +98,15 @@ Tensor upsample_nearest2d_tpu(const at::Tensor &self,
   }
   TORCH_CHECK(status == BM_SUCCESS);
   TIMING_END(tpu::UPSAMPLING_NEAREST)
-
 #endif
+  SHOW_TENSOR_OP(self, out);
   return out;
 }
 
 TORCH_LIBRARY_IMPL(aten, TPU, m) {
   m.impl("upsample_nearest2d", upsample_nearest2d_tpu);
 }
+
 auto input = at::zeros(2);
 Tensor &upsample_nearest2d_backward_out_tpu(
     const at::Tensor &grad_output, at::IntArrayRef output_size,
@@ -118,20 +115,17 @@ Tensor &upsample_nearest2d_backward_out_tpu(
     at::Tensor &grad_input = input) {
   CHECK_TENSOR_IN_DEVICE(grad_input);
   CHECK_TENSOR_IN_DEVICE(grad_output);
-  TIMING_START
 #if 0
-  LOG(WARNING) << "upsample_nearest2d_backward use cpu impl";
+  CPU_IMPL_WANING();
   auto input_type = grad_input.dtype();
   auto T_input = grad_input.cpu().to(torch::kFloat32).contiguous();
   auto input_r = upsample_nearest2d_backward_outf(
       grad_output.cpu().to(torch::kFloat32), output_size, input_size,
       scales_h, scales_w, T_input);
-  LOG(WARNING) << "upsample_nearest2d_backward use cpu impl end1";
   tpu::TPUCopyHostToDevice(grad_input.data_ptr(),
                            grad_input.cpu().to(input_type).contiguous().data_ptr(),
                            grad_input.nbytes());
   grad_input = grad_input.contiguous();
-  LOG(WARNING) << "upsample_nearest2d_backward use cpu impl end2";
 #else
   PoolingDescriptor_t pooling_desc =
   {
@@ -145,6 +139,7 @@ Tensor &upsample_nearest2d_backward_out_tpu(
     .output_w = static_cast<int>(output_size[1]),
     .mode = POOLING_AVG
   };
+  TIMING_START
   bm_status_t status = sgdnnUpsampleNearest2dBackward (
                       tpu::TPUGetDeviceHandle(),
                       tpu::TPUGenerateSgdnnTensor ( grad_output ),
@@ -154,6 +149,7 @@ Tensor &upsample_nearest2d_backward_out_tpu(
   TORCH_CHECK ( status == BM_SUCCESS );
   TIMING_END(tpu::UPSAMPLING_NEAREST_BACKWARD)
 #endif
+  SHOW_TENSOR_OP(grad_output, grad_input);
   return grad_input;
 }
 

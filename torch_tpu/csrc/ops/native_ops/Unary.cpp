@@ -35,6 +35,7 @@ Tensor &bitwise_not_out_tpu(const Tensor &self, Tensor &out) {
 #endif
   }
 #endif
+  SHOW_TENSOR_OP(self, out);
   return out;
 }
 
@@ -72,6 +73,7 @@ Tensor &cbrt_out_tpu(const Tensor &self, Tensor &out) {
 #endif
   }
 #endif
+  SHOW_TENSOR_OP(self, out);
   return out;
 }
 Tensor cbrt_tpu(const Tensor &self) {

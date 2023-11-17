@@ -53,6 +53,7 @@ Tensor &mean_out_tpu(const Tensor &self, OptionalIntArrayRef dim_opt,
   tpu::OpTimer::Instance().AddTime(tpu::REDUCE_MEAN, timer.ElapsedUS());
 #endif
 #endif
+  SHOW_TENSOR_OP(self, out);
   return out;
 }
 TORCH_LIBRARY_IMPL(aten, TPU, m) { m.impl("mean.out", mean_out_tpu); }
@@ -60,15 +61,17 @@ TORCH_LIBRARY_IMPL(aten, TPU, m) { m.impl("mean.out", mean_out_tpu); }
 Tensor &sum_IntList_out_tpu(const Tensor &self, OptionalIntArrayRef dim_opt,
                             bool keepdim, c10::optional<ScalarType> dtype_opt,
                             Tensor &out) {
-  CHECK_TENSOR_IN_DEVICE(self);
+  CHECK_TENSOR_IN_DEVICE_NO_CONTIGUOUS(self);
   CHECK_TENSOR_IN_DEVICE(out);
+  if ( !self.is_contiguous() ) { LOG(WARNING) << "self not contiguous " << tpu::GetTensorInfo(self); }
+  auto self_ = self.contiguous();
 #if 0
   auto out_cpu = sum ( self.cpu(), dim_opt, keepdim, dtype_opt );
   tpu::TPUCopyHostToDevice ( out.data_ptr(), out_cpu.contiguous().data_ptr(), out.nbytes() );
 #else
-  if (self.dim() == 0) // corner case; use cpu impl.
+  if (self_.dim() == 0) // corner case; use cpu impl.
   {
-    auto out_cpu = sum ( self.cpu(), dim_opt, keepdim, dtype_opt );
+    auto out_cpu = sum ( self_.cpu(), dim_opt, keepdim, dtype_opt );
     tpu::TPUCopyHostToDevice ( out.data_ptr(), out_cpu.contiguous().data_ptr(), out.nbytes() );
   }
   else 
@@ -80,11 +83,11 @@ Tensor &sum_IntList_out_tpu(const Tensor &self, OptionalIntArrayRef dim_opt,
   std::vector<int> reduction_dim_vec;
   if (reduce_dim.size() > 0) {
     for (auto it : reduce_dim) {
-      reduction_dim_vec.push_back(it < 0 ? it + self.dim() : it);
+      reduction_dim_vec.push_back(it < 0 ? it + self_.dim() : it);
     }
     std::sort(reduction_dim_vec.begin(), reduction_dim_vec.end());
   } else {
-    for (auto i = 0; i < self.dim(); ++i) {
+    for (auto i = 0; i < self_.dim(); ++i) {
       reduction_dim_vec.push_back(i);
     }
   }
@@ -93,7 +96,7 @@ Tensor &sum_IntList_out_tpu(const Tensor &self, OptionalIntArrayRef dim_opt,
                 "Reduction only supports contiguous reduction dimension now");
   }
   bm_status_t status =
-      sgdnnReduce(tpu::TPUGetDeviceHandle(), tpu::TPUGenerateSgdnnTensor(self),
+      sgdnnReduce(tpu::TPUGetDeviceHandle(), tpu::TPUGenerateSgdnnTensor(self_),
                   reduction_dim_vec[0], reduction_dim_vec.back() + 1, keepdim,
                   1, tpu::TPUGenerateSgdnnTensor(out));
   TORCH_CHECK(status == BM_SUCCESS);
@@ -102,6 +105,7 @@ Tensor &sum_IntList_out_tpu(const Tensor &self, OptionalIntArrayRef dim_opt,
 #endif
   }
 #endif
+  SHOW_TENSOR_OP(self, out);
   return out;
 }
 TORCH_LIBRARY_IMPL(aten, TPU, m) {
@@ -125,7 +129,7 @@ Tensor &prod_int_out_tpu(const Tensor &self, long dim, bool keepdim,
 #ifdef TPU_OP_TIMING
   tpu::OpTimer::Instance().AddTime(tpu::REDUCE_PROD, timer.ElapsedUS());
 #endif
-
+  SHOW_TENSOR_OP(self, out);
   return out;
 }
 TORCH_LIBRARY_IMPL(aten, TPU, m) { m.impl("prod.int_out", prod_int_out_tpu); }
@@ -161,6 +165,7 @@ Tensor &amax_out_tpu(const Tensor &self, IntArrayRef dim_opt, bool keepdim,
   TORCH_CHECK(status == BM_SUCCESS);
   TIMING_END(tpu::REDUCE_MAX);
 #endif
+  SHOW_TENSOR_OP(self, out);
   return out;
 }
 TORCH_LIBRARY_IMPL(aten, TPU, m) { m.impl("amax.out", amax_out_tpu); }
@@ -196,6 +201,7 @@ Tensor &amin_out_tpu(const Tensor &self, IntArrayRef dim_opt, bool keepdim,
   TORCH_CHECK(status == BM_SUCCESS);
   TIMING_END(tpu::REDUCE_MIN);
 #endif
+  SHOW_TENSOR_OP(self, out);
   return out;
 }
 TORCH_LIBRARY_IMPL(aten, TPU, m) { m.impl("amin.out", amin_out_tpu); }
@@ -243,11 +249,11 @@ Tensor var_correction_tpu(const Tensor &self, OptionalIntArrayRef dims,
   }
 
   TIMING_END(tpu::REDUCE_VAR);
-
+  SHOW_TENSOR_OP(self, out);
   return out;
 }
-TORCH_LIBRARY_IMPL(aten, TPU, m) {
-  m.impl("var.correction", var_correction_tpu);
-}
+// TORCH_LIBRARY_IMPL(aten, TPU, m) {
+//   m.impl("var.correction", var_correction_tpu);
+// }
 
 }  // namespace at

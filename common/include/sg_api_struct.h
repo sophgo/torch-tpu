@@ -927,7 +927,7 @@ typedef struct
   float value;
   int dtype;
   int binary_type;
-  short inversed;
+  int inversed;
 } WITH_PLATFORM(sg_api_binary_c_t);
 
 typedef struct
@@ -1185,9 +1185,9 @@ typedef struct
   int step;
   unsigned long long output_global_addr;
   int dtype;
+  int isint64;
   int dim;
   int shape[FW_MAX_SHAPE_DIMS];
-
 } WITH_PLATFORM(sg_api_arange_t);
 
 typedef struct

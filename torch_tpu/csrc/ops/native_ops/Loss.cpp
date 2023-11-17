@@ -63,6 +63,7 @@ public:
     tpu::OpTimer::Instance().AddTime ( tpu::CROSS_ENTROPY_LOSS, timer.ElapsedUS() );
 #endif
 #endif
+    SHOW_TENSOR_OP(self, target, out);
     return out;
   }
 
@@ -110,6 +111,7 @@ public:
     tpu::OpTimer::Instance().AddTime ( tpu::CROSS_ENTROPY_LOSS_BACKWARD, timer.ElapsedUS() );
 #endif
 #endif
+    SHOW_TENSOR_OP(input, target, grad_outputs[0], grad_input);
     return {grad_input, at::Tensor(), at::Tensor(), at::Tensor(), at::Tensor(), at::Tensor() };
   }
 };

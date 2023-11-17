@@ -13,12 +13,13 @@ namespace at
 Tensor & uniform_tpu(Tensor & self, double from, double to, c10::optional<at::Generator> generator)
 {
 #if 1
-  LOG( WARNING ) << "uniform out use cpu impl";
+  CPU_IMPL_WANING();
   auto out_cpu = uniform(self.cpu(), from, to, generator);
   self = out_cpu.to(self.device());
 #else
 
 #endif
+  SHOW_TENSOR_OP(self);
   return self;
 }
 TORCH_LIBRARY_IMPL ( aten, TPU, m )

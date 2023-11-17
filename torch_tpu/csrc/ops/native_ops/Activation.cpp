@@ -35,6 +35,7 @@ Tensor &threshold_backward_grad_input_tpu(const Tensor &grad_output,
   tpu::OpTimer::Instance().AddTime(tpu::RELU_BACKWARD, timer.ElapsedUS());
 #endif
 #endif
+  SHOW_TENSOR_OP(grad_output, input, grad_input);
   return grad_input;
 }
 TORCH_LIBRARY_IMPL(aten, TPU, m) {
@@ -43,23 +44,26 @@ TORCH_LIBRARY_IMPL(aten, TPU, m) {
 
 Tensor &gelu_out_tpu(const Tensor &self, c10::string_view approximate,
                      Tensor &out) {
-  CHECK_TENSOR_IN_DEVICE(self);
-  CHECK_TENSOR_IN_DEVICE(out);
+  CHECK_TENSOR_IN_DEVICE_NO_CONTIGUOUS(self);
+  CHECK_TENSOR_IN_DEVICE_NO_CONTIGUOUS(out);
 #if 0
   auto out_cpu = gelu ( self.cpu(), approximate );
   tpu::TPUCopyHostToDevice ( out.data_ptr(), out_cpu.contiguous().data_ptr(), out.nbytes() );
-#else
+#else  
+  auto self_ = self.contiguous();
+  out = out.contiguous();
 #ifdef TPU_OP_TIMING
   auto timer = tpu::Timer().Start();
 #endif
   bm_status_t status =
-      sgdnnGELU(tpu::TPUGetDeviceHandle(), tpu::TPUGenerateSgdnnTensor(self),
+      sgdnnGELU(tpu::TPUGetDeviceHandle(), tpu::TPUGenerateSgdnnTensor(self_),
                 tpu::TPUGenerateSgdnnTensor(out));
   TORCH_CHECK(status == BM_SUCCESS);
 #ifdef TPU_OP_TIMING
   tpu::OpTimer::Instance().AddTime(tpu::GELU, timer.ElapsedUS());
 #endif
 #endif
+  SHOW_TENSOR_OP(self, out);
   return out;
 }
 TORCH_LIBRARY_IMPL(aten, TPU, m) { m.impl("gelu.out", gelu_out_tpu); }
@@ -69,24 +73,26 @@ Tensor &gelu_backward_grad_input_tpu(const Tensor &grad_output,
                                      c10::string_view approximate,
                                      Tensor &grad_input) {
   CHECK_TENSOR_IN_DEVICE(grad_output);
-  CHECK_TENSOR_IN_DEVICE(self);
+  CHECK_TENSOR_IN_DEVICE_NO_CONTIGUOUS(self);
   CHECK_TENSOR_IN_DEVICE(grad_input);
 #if 0
   auto grad_input_cpu = gelu_backward ( grad_output.cpu(), self.cpu(), approximate );
   tpu::TPUCopyHostToDevice ( grad_input.data_ptr(), grad_input_cpu.contiguous().data_ptr(), grad_input.nbytes() );
 #else
+  auto self_ = self.contiguous();
 #ifdef TPU_OP_TIMING
   auto timer = tpu::Timer().Start();
 #endif
   bm_status_t status = sgdnnGELUBackward(
       tpu::TPUGetDeviceHandle(), tpu::TPUGenerateSgdnnTensor(grad_output),
-      tpu::TPUGenerateSgdnnTensor(self),
+      tpu::TPUGenerateSgdnnTensor(self_),
       tpu::TPUGenerateSgdnnTensor(grad_input));
   TORCH_CHECK(status == BM_SUCCESS);
 #ifdef TPU_OP_TIMING
   tpu::OpTimer::Instance().AddTime(tpu::GELU_BACKWARD, timer.ElapsedUS());
 #endif
 #endif
+  SHOW_TENSOR_OP(grad_output, self, grad_input);
   return grad_input;
 }
 TORCH_LIBRARY_IMPL(aten, TPU, m) {
@@ -112,16 +118,12 @@ Tensor &silu_out_tpu(const Tensor &self, Tensor &out) {
   tpu::OpTimer::Instance().AddTime(tpu::SILU, timer.ElapsedUS());
 #endif
 #endif
+  SHOW_TENSOR_OP(self, out);
   return out;
 }
 TORCH_LIBRARY_IMPL(aten, TPU, m) { m.impl("silu.out", silu_out_tpu); }
 
 Tensor &leakyrelu__tpu(Tensor &self, Scalar negative_slope) {
-  static int count = 0;
-#ifdef SHOW_OP_INFO
-  std::cout << "LeakyReLU " << count << std::endl;
-  ++count;
-#endif
   CHECK_TENSOR_IN_DEVICE(self);
 #if 0
   auto self_cpu = self.cpu();
@@ -139,6 +141,7 @@ Tensor &leakyrelu__tpu(Tensor &self, Scalar negative_slope) {
 #ifdef TPU_OP_TIMING
   tpu::OpTimer::Instance().AddTime(tpu::LEAKY_RELU, timer.ElapsedUS());
 #endif
+  SHOW_TENSOR_OP(self);
   return self;
 #endif
 }
@@ -146,11 +149,6 @@ TORCH_LIBRARY_IMPL(aten, TPU, m) { m.impl("leakyRelu_", leakyrelu__tpu); }
 
 Tensor &leakyrelu_tpu(const Tensor &self, const Scalar &negative_slope,
                       Tensor &out) {
-  static int count = 0;
-#ifdef SHOW_OP_INFO
-  std::cout << "LEAKYRELU " << count << std::endl;
-  ++count;
-#endif
   CHECK_TENSOR_IN_DEVICE(self);
 #if 0
   auto self_cpu = self.cpu();
@@ -168,6 +166,7 @@ Tensor &leakyrelu_tpu(const Tensor &self, const Scalar &negative_slope,
 #ifdef TPU_OP_TIMING
   tpu::OpTimer::Instance().AddTime(tpu::LEAKY_RELU, timer.ElapsedUS());
 #endif
+  SHOW_TENSOR_OP(self, out);
   return out;
 #endif
 }
@@ -195,7 +194,7 @@ TIMING_START
 TIMING_END(tpu::REPEAT)
 
   }
-
+  SHOW_TENSOR_OP(self, out);
   return out;
 }
 Tensor hardtanh_tpu(const Tensor &self, const Scalar &min_value,
@@ -218,6 +217,7 @@ Tensor & sigmoid_backward_out_tpu(const Tensor & grad_output, const Tensor & out
   tpu::TPUCopyHostToDevice ( grad_input.data_ptr(), grad_input_cpu.contiguous().data_ptr(), grad_input.nbytes() );
 #else
 #endif
+  SHOW_TENSOR_OP(grad_output, output, grad_input);
   return grad_input;
 }
 

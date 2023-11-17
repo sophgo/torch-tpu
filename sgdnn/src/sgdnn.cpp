@@ -23,7 +23,15 @@ do \
 while ( false )
 
 #define SAFE_CALL(cmd) \
-SGDNN_CHECK ( ( cmd ) == BM_SUCCESS )
+do \
+{ \
+  if ( !( ( cmd ) == BM_SUCCESS ) ) \
+  { \
+    printf ( "%s:%d:%s: %s failed\n", __FILE__, __LINE__, __func__, #cmd ); \
+    throw; \
+  } \
+} \
+while ( false )
 
 #define DIV_UP(a, b) ( ( ( a ) + ( b ) - 1 ) / ( b ) )
 
@@ -152,6 +160,11 @@ static inline size_t sgdnnTensorBytes ( const SgdnnTensor_t * tensor )
   return bytes;
 }
 
+static inline bool sgdnnDtypeIsInt64 (SgdnnDataType_t dtype)
+{
+  return dtype == SGDNN_DTYPE_INT64;
+}
+
 static inline int sgdnnTPUKernelDType ( SgdnnDataType_t dtype )
 {
 #if defined SGDNN_BACKEND_1684X
@@ -237,6 +250,23 @@ size_t api_size )
   SGDNN_CHECK ( false );
 #endif
 }
+
+bm_status_t sgdnnConvertInt64toInt32 ( bm_handle_t handle, 
+                                      SgdnnTensor_t input,
+                                      SgdnnTensor_t output)
+{
+  SGDNN_CHECK ( sgdnnIsTensorContiguous ( &input ) );
+  SGDNN_CHECK ( sgdnnIsTensorContiguous ( &output ) );
+  SgdnnTensor_t input_ = input;
+  input_.dtype = SGDNN_DTYPE_INT32;
+  for (int i = input.dim - 1; i >=0; i--)
+  {
+    input_.stride[i] = input.stride[i] * 2;
+  }
+  bm_status_t status = sgdnnStridedCopy(handle, input_, output);
+  return status;
+}
+
 
 bm_status_t sgdnnConv2d ( bm_handle_t handle,
                           SgdnnTensor_t input,
@@ -1346,6 +1376,7 @@ bm_status_t sgdnnStridedCopy ( bm_handle_t handle,
                                SgdnnTensor_t output )
 {
   SGDNN_CHECK ( input.dtype == output.dtype );
+  SGDNN_CHECK ( input.dtype != SGDNN_DTYPE_INT64 );
   SGDNN_CHECK ( sgdnnIsSameShape ( &input, &output ) );
 #if defined SGDNN_BACKEND_1684X
   sg_api_strided_copy_t api;
@@ -1724,9 +1755,19 @@ bm_status_t sgdnnIndexSelect ( bm_handle_t handle,
   SGDNN_CHECK ( sgdnnIsTensorContiguous ( &indices ) );
   SGDNN_CHECK ( sgdnnIsTensorContiguous ( &output ) );
 #if defined SGDNN_BACKEND_1684X
+  SgdnnTensor_t indices_ = indices;
+  bm_device_mem_t indices_mem;
+  if (indices.dtype == SGDNN_DTYPE_INT64)
+  {
+    SAFE_CALL ( bm_malloc_device_byte ( handle, &indices_mem, sgdnnTensorBytes ( &indices ) / 2 ) );
+    indices_.dtype = SGDNN_DTYPE_INT32;
+    indices_.addr = bm_mem_get_device_addr ( indices_mem );
+    sgdnnConvertInt64toInt32(handle, indices, indices_);
+  }
+
   sg_api_index_select_t api;
   api.input_global_addr = input.addr;
-  api.index_global_addr = indices.addr;
+  api.index_global_addr = indices_.addr;
   api.output_global_addr = output.addr;
   for ( int i = 0; i < input.dim; ++i )
   {
@@ -1734,14 +1775,19 @@ bm_status_t sgdnnIndexSelect ( bm_handle_t handle,
   }
   api.dim = input.dim;
   api.index_num = 1;
-  for ( int i = 0; i < indices.dim; ++i )
+  for ( int i = 0; i < indices_.dim; ++i )
   {
-    api.index_num *= indices.shape[i];
+    api.index_num *= indices_.shape[i];
   }
   api.axis = dim;
   api.dtype = sgdnnTPUKernelDType ( input.dtype );
-  api.is_index_int64 = indices.dtype == SGDNN_DTYPE_INT64;
+  // tpu_kernel_api_embedding_backward has bugs: warning: when is_index_int64 == true, will overlap index， todo fix it.
+  api.is_index_int64 = false;
   SAFE_CALL ( sgdnnTPUKernelLaunch ( handle, "tpu_kernel_api_index_select", &api, sizeof ( api ) ) );
+  if (indices.dtype == SGDNN_DTYPE_INT64){
+    bm_free_device ( handle, indices_mem );
+  }
+
 #elif defined SGDNN_BACKEND_2260
   sg_api_index_select_t api;
   api.input_global_addr = input.addr;
@@ -1766,6 +1812,7 @@ bm_status_t sgdnnIndexSelect ( bm_handle_t handle,
 #endif
   return BM_SUCCESS;
 }
+
 bm_status_t sgdnnMulIndexSelect (bm_handle_t handle,
                                 SgdnnTensor_t input,
                                 SgdnnTensor_t output,
@@ -3930,17 +3977,22 @@ bm_status_t sgdnnArange ( bm_handle_t handle,
 {
   SGDNN_CHECK ( sgdnnIsTensorContiguous ( &out ) );
 #if defined SGDNN_BACKEND_1684X
+  SGDNN_CHECK( out.dim == 1);  // arange just need 1 dimension.
+  SGDNN_CHECK( out.dtype == SGDNN_DTYPE_INT32 || out.dtype == SGDNN_DTYPE_INT64 || out.dtype == SGDNN_DTYPE_FP32 );
   sg_api_arange_t api;
   api.start = start;
   api.end = end;
   api.step = step;
   api.output_global_addr = out.addr;
-  api.dtype = sgdnnTPUKernelDType ( out.dtype );
   api.dim = out.dim;
-  // arange just need 1 dimension.
-  SGDNN_CHECK( out.dim == 1);
   api.shape[0] = out.shape[0];
-
+  if ( out.dtype == SGDNN_DTYPE_INT64 ) {
+    api.dtype =  sgdnnTPUKernelDType ( SGDNN_DTYPE_INT32 );
+    api.isint64 = 1;
+  } else {
+    api.dtype =  sgdnnTPUKernelDType ( out.dtype );
+    api.isint64 = 0;
+  }
   SAFE_CALL ( sgdnnTPUKernelLaunch ( handle, "tpu_kernel_api_arange", &api, sizeof ( api ) ) );
 #else
   SGDNN_CHECK ( false );
@@ -4156,18 +4208,30 @@ bm_status_t sgdnnComparision ( bm_handle_t handle,
   SGDNN_CHECK ( sgdnnIsTensorContiguous ( &input ) );
   SGDNN_CHECK ( sgdnnIsTensorContiguous ( &other ) );
   SGDNN_CHECK ( sgdnnIsTensorContiguous ( &output ) );
-
+  
+  SgdnnTensor_t input_ = input, other_ = other;
+  bm_device_mem_t input_mem, other_mem;
+  if (sgdnnDtypeIsInt64(input.dtype))
+  {
+    SAFE_CALL ( bm_malloc_device_byte ( handle, &input_mem, sgdnnTensorBytes ( &input ) / 2 ) );
+    SAFE_CALL ( bm_malloc_device_byte ( handle, &other_mem, sgdnnTensorBytes ( &other ) / 2 ) );
+    input_.dtype = SGDNN_DTYPE_INT32;
+    other_.dtype = SGDNN_DTYPE_INT32;
+    input_.addr = bm_mem_get_device_addr ( input_mem );
+    other_.addr = bm_mem_get_device_addr ( other_mem );
+    sgdnnConvertInt64toInt32(handle, input, input_);
+    sgdnnConvertInt64toInt32(handle, other, other_);
+  }
   sg_api_comparision_t api;
-  api.input_global_addr = input.addr;
-  api.other_global_addr = other.addr;
+  api.input_global_addr = input_.addr;
+  api.other_global_addr = other_.addr;
   api.output_global_addr = output.addr;
-  api.dim = input.dim;
-  for(int i = 0; i < input.dim; ++i) {
-    api.shape[i] = input.shape[i];
+  api.dim = input_.dim;
+  for(int i = 0; i < input_.dim; ++i) {
+    api.shape[i] = input_.shape[i];
   }
   api.mode = mode;
-  api.dtype = sgdnnTPUKernelDType(input.dtype);
-
+  api.dtype = sgdnnTPUKernelDType(input_.dtype);
 #if defined SGDNN_BACKEND_1684X
   SAFE_CALL(sgdnnTPUKernelLaunch(handle, "tpu_kernel_api_comparision", &api, sizeof(api)));
 #elif defined SGDNN_BACKEND_2260
@@ -4175,7 +4239,10 @@ bm_status_t sgdnnComparision ( bm_handle_t handle,
 #else
   SGDNN_CHECK ( false );
 #endif
-
+  if (sgdnnDtypeIsInt64(input.dtype)){
+    bm_free_device ( handle, input_mem );
+    bm_free_device ( handle, other_mem );
+  }
   return BM_SUCCESS;
 }
 
@@ -5932,7 +5999,12 @@ bm_status_t sgdnnRepeat ( bm_handle_t handle,
   }
   api.input_global_addr = input.addr;
   api.output_global_addr = output.addr;
-  api.dtype = sgdnnTPUKernelDType( input.dtype );
+  if (input.dtype == SGDNN_DTYPE_INT64 ){
+    api.shape[input.dim - 1] *= 2;
+    api.dtype = sgdnnTPUKernelDType( SGDNN_DTYPE_INT32 );
+  } else {
+    api.dtype = sgdnnTPUKernelDType( input.dtype );
+  }
   SAFE_CALL ( sgdnnTPUKernelLaunch ( handle, "tpu_kernel_api_repeat", &api, sizeof( api ) ) );
 #elif defined SGDNN_BACKEND_2260
   sg_api_repeat_t api;

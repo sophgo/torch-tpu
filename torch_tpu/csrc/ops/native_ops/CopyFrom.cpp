@@ -59,7 +59,7 @@ Tensor _copy_from_tpu(const Tensor &self, const Tensor &dst,
 #else
       if ( !tpu::IsSupportDtype(self.dtype()) || !tpu::IsSupportDtype( dst.dtype() ))
       {
-        LOG( WARNING ) << "dtypeconvert use cpu impl";
+        LOG( WARNING ) << "dtypeconvert use cpu impl | self.dtype: " << self.dtype() << " | dst.dtype: " << dst.dtype();
         auto dst_cpu = self.cpu().to ( dst.dtype() );
         tpu::TPUCopyHostToDevice ( dst.data_ptr(), dst_cpu.contiguous().data_ptr(), dst.nbytes() );
       }
@@ -73,6 +73,7 @@ Tensor _copy_from_tpu(const Tensor &self, const Tensor &dst,
                                     tpu::TPUGenerateSgdnnTensor(dst));
           TORCH_CHECK(status == BM_SUCCESS);
           TIMING_END(tpu::DTYPE_CONVERT);
+          SHOW_TENSOR_OP(self_, dst);
         } else {
           dst.copy_(self_.to(dst.dtype()), non_blocking);
         }        

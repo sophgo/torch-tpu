@@ -68,7 +68,7 @@ std::tuple<Tensor &, Tensor &> topk_values_tpu(const Tensor &self, int64_t k,
                                indices_temp.to(indices.dtype()).data_ptr(),
                                indices.nbytes());
   }
-
+  SHOW_TENSOR_OP(self, values, indices);
   return {values, indices};
 }
 TORCH_LIBRARY_IMPL(aten, TPU, m) { m.impl("topk.values", topk_values_tpu); }

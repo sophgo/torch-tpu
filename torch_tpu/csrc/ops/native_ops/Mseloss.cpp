@@ -49,6 +49,7 @@ Tensor mse_loss_tpu(const at::Tensor & self, const at::Tensor & target, int64_t 
                                         reduction );
     TORCH_CHECK ( status == BM_SUCCESS );
     TIMING_END(tpu::MSE_LOSS);
+    SHOW_TENSOR_OP(self, target);
     return out;
 #endif
 }
@@ -94,6 +95,7 @@ Tensor mse_loss_backward_tpu( const Tensor & grad_output, const Tensor & self, c
   }
   TIMING_END(tpu::MSE_LOSS_BACKWARD);
 #endif
+  SHOW_TENSOR_OP(grad_output, self, target, grad_in);
   return grad_in;
 }
 

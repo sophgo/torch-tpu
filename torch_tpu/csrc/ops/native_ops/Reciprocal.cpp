@@ -34,7 +34,7 @@ Tensor &reciprocal_out_tpu(const at::Tensor &self, at::Tensor &out) {
     TORCH_CHECK(status == BM_SUCCESS);
     TIMING_END(tpu::RECIPROCAL)
   }
-
+  SHOW_TENSOR_OP(self, out);
   return out;
 }
 

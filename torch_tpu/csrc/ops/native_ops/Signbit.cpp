@@ -14,11 +14,6 @@ Tensor & signbit_out_tpu ( const Tensor & self, Tensor & out )
 {
   CHECK_TENSOR_IN_DEVICE ( self );
   CHECK_TENSOR_IN_DEVICE ( out );
-#ifdef SHOW_OP_INFO
-  static int count = 0;
-  std::cout << "signbit_out " << count << std::endl;
-  ++count;
-#endif
 #if 0
   auto out_cpu = signbit( self.cpu());
   tpu::TPUCopyHostToDevice ( out.data_ptr(), out_cpu.contiguous().data_ptr(), out.nbytes() );
@@ -35,7 +30,7 @@ Tensor & signbit_out_tpu ( const Tensor & self, Tensor & out )
 #ifdef TPU_OP_TIMING
   tpu::OpTimer::Instance().AddTime ( tpu::SIGNBIT, timer.ElapsedUS() );
 #endif
-
+  SHOW_TENSOR_OP(self, out);
   return out;
 }
 TORCH_LIBRARY_IMPL ( aten, TPU, m )

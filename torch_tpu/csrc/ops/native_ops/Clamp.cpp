@@ -37,6 +37,7 @@ Tensor & clamp_out_tpu( const at::Tensor & self, const c10::optional<at::Scalar>
         TORCH_CHECK(false, "Input is required in TPU device");
     }
 #endif
+    SHOW_TENSOR_OP(self, out);
     return out;
 }
 
@@ -45,10 +46,25 @@ Tensor clamp_tpu( const at::Tensor & self, const c10::optional<at::Scalar> & min
   auto out = empty(self.sizes(), self.options());
   return clamp_out_tpu ( self, min, max, out );
 }
+
+Tensor & clamp_min_out_tpu(const Tensor & self, const Scalar & min, Tensor & out)
+{
+#if 0
+    CPU_IMPL_WANING();
+    auto out_cpu = clamp_min( self.to(torch::kFloat).cpu(), min);
+    out = out_cpu.to(out.device()).to(out.dtype());
+#else
+    out = self.clamp(c10::optional<at::Scalar>( min ), c10::nullopt );
+#endif
+    return out;
+}
+
+
 TORCH_LIBRARY_IMPL ( aten, TPU, m )
 {
  m.impl ( "clamp.out",  clamp_out_tpu);
  m.impl ( "clamp",  clamp_tpu);
+ m.impl ( "clamp_min.out", clamp_min_out_tpu);
 }
 
 } // namespace at

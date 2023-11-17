@@ -19,13 +19,12 @@ namespace at
         }
         CHECK_TENSOR_IN_DEVICE(out);
 #if 0
- 
   auto self_cpu = neg ( self.cpu());
   tpu::TPUCopyHostToDevice ( self.data_ptr(),self.contiguous().data_ptr(), self.nbytes() );
 #else
         if (self.dim() == 0)
         {
-            auto self_cpu = real(self.cpu());   //直接在cpu上执行real
+            auto self_cpu = real(self.cpu());
             tpu::TPUCopyHostToDevice(out.data_ptr(), self_cpu.contiguous().data_ptr(), out.nbytes());
         }
         else if (IS_TPU_TENSOR(self))
@@ -48,12 +47,12 @@ namespace at
             TORCH_CHECK(false, "At least one input is required in TPU device");
         }
 #endif
+        SHOW_TENSOR_OP(self, out);
         return out;
     }
 
     Tensor real_tpu(const Tensor &self)
     {
-        //std::cout<<"enter real_tpu\n";
         auto out = empty(self.sizes(), self.options().dtype(at::kFloat));
         return real_out_tpu(self, out);
     }

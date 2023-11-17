@@ -59,6 +59,7 @@ Tensor & cat_out_tpu ( const ITensorListRef & tensors, int64_t dim, Tensor & out
     tpu::OpTimer::Instance().AddTime ( tpu::CONCAT, timer.ElapsedUS() );
 #endif
   }
+  SHOW_TENSOR_OP(out);
   return out;
 }
 TORCH_LIBRARY_IMPL ( aten, TPU, m )

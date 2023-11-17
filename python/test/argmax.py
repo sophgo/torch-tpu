@@ -1,9 +1,8 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+import torch_tpu
 
-
-torch.ops.load_library("../../build/torch_tpu/libtorch_tpu.so")
 torch.manual_seed(1000)
 torch.set_printoptions(precision=6)
 device = "privateuseone:0"
@@ -19,7 +18,17 @@ def case1():
     print("output_tpu : ", output_tpu.shape)
     print("delta : ",(output_cpu==output_tpu).all())
 
+def case_sd():
+    input_origin = torch.randint(0, 1000, (1,10))
+    input_tpu = input_origin.to(device)
+    o_cpu = input_origin.argmax(-1)
+    o_tpu = input_tpu.argmax(-1)
+    diff = o_cpu - o_tpu.cpu()
+    print(diff)
+    import pdb;pdb.set_trace()
+
 if __name__ == "__main__":
-    case1()
+    #case1()
+    case_sd()
 
 

@@ -19,7 +19,6 @@ namespace at
         }
         CHECK_TENSOR_IN_DEVICE(out);
 #if 0
- 
   auto self_cpu = neg ( self.cpu());
   tpu::TPUCopyHostToDevice ( self.data_ptr(),self.contiguous().data_ptr(), self.nbytes() );
 #else
@@ -49,13 +48,12 @@ namespace at
             TORCH_CHECK(false, "At least one input is required in TPU device");
         }
 #endif
+        SHOW_TENSOR_OP(self, out);
         return out;
     }
 
     Tensor conj_tpu(const Tensor &self)
-    {
-        //std::cout<<"enter conj_tpu\n";
-        
+    {        
         auto out = empty(self.sizes(), self.options());
         return conj_out_tpu(self, out);
     }

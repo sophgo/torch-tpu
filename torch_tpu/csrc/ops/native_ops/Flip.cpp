@@ -45,6 +45,7 @@ Tensor &flip_out_tpu(const Tensor &self, const c10::ArrayRef<int64_t> dims,
   tpu::OpTimer::Instance().AddTime(tpu::FLIP, timer.ElapsedUS());
 #endif
 #endif
+  SHOW_TENSOR_OP(self, out);
   return out;
 }
 

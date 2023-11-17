@@ -55,6 +55,7 @@ bool ceil_mode )
                        ADDR_IN_DEVICE ( output ) );
   TORCH_CHECK ( status == BM_SUCCESS );
   outputs = std::tuple<Tensor, Tensor> ( output, Tensor() );
+  SHOW_TENSOR_OP(self, output);
 #endif
   return outputs;
 }
@@ -124,6 +125,7 @@ const Tensor & indices )
            ADDR_IN_DEVICE ( grad_input ) );
   TORCH_CHECK ( status == BM_SUCCESS );
 #endif
+  SHOW_TENSOR_OP(grad_output, self, grad_input);
   return grad_input;
 }
 TORCH_LIBRARY_IMPL ( aten, TPU, m )
@@ -175,6 +177,7 @@ Tensor & output ){
   tpu::OpTimer::Instance().AddTime(tpu::AVG_POOLING, timer.ElapsedUS());
 #endif
 #endif
+  SHOW_TENSOR_OP(self, output);
   return output;
 }
 TORCH_LIBRARY_IMPL ( aten, TPU, m )
@@ -230,6 +233,7 @@ IntArrayRef output_size){
   tpu::OpTimer::Instance().AddTime(tpu::AVG_POOLING, timer.ElapsedUS());
 #endif
 #endif
+  SHOW_TENSOR_OP(self, output);
   return output;
 }
 TORCH_LIBRARY_IMPL ( aten, TPU, m )

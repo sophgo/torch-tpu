@@ -69,6 +69,7 @@ namespace at
             TORCH_CHECK(false, "At least one input is required in TPU device");
         }
 #endif
+        SHOW_TENSOR_OP(self);
         return self;
     }
 

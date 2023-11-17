@@ -118,6 +118,7 @@ Tensor & index_out_tpu( const Tensor & self, const c10::List<c10::optional<Tenso
       }
     }
 #endif
+    SHOW_TENSOR_OP(self, out);
     return out;
 }
 
@@ -129,6 +130,7 @@ TORCH_LIBRARY_IMPL ( aten, TPU, m )
 // copied from torch source and modified
 static std::tuple<bool, Tensor> canDispatchToMaskedFill(const Tensor& self, const torch::List<c10::optional<at::Tensor>>& indices,
 const Tensor& value){
+  SHOW_TENSOR_OP(self);
   if (!(value.numel() == 1 /*&& value.device().is_cpu()*/)){
     return std::make_tuple(false,Tensor());
   }
@@ -162,6 +164,7 @@ const Tensor& value){
 }
 
 Tensor & index_put_tpu(Tensor & self, const torch::List<c10::optional<Tensor>>& indices, const Tensor & value, const bool accumulate) {
+  SHOW_TENSOR_OP(self, value);
   CHECK_TENSOR_IN_DEVICE ( self );
 #if 0
   LOG( WARNING ) << "index_put_ use cpu impl";

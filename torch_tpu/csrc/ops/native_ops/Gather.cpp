@@ -19,7 +19,6 @@ namespace at
         }
         CHECK_TENSOR_IN_DEVICE(out);
 #if 0
- 
   auto self_cpu = gather ( self.cpu(), axis, other.cpu(), sparse_grad );
   tpu::TPUCopyHostToDevice ( self.data_ptr(),self.contiguous().data_ptr(), self.nbytes() );
   tpu::TPUCopyHostToDevice ( other.data_ptr(),other.contiguous().data_ptr(), other.nbytes() );
@@ -52,6 +51,7 @@ namespace at
             TORCH_CHECK(false, "At least one input is required in TPU device");
         }
 #endif
+        SHOW_TENSOR_OP(self, out);
         return out;
     }
 

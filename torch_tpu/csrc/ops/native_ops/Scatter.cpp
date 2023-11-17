@@ -7,7 +7,6 @@
 #include <ATen/NamedTensorUtils.h>
 #include <ATen/NativeFunctions.h>
 #include <ATen/SparseCsrTensorUtils.h>
-#include <ATen/SparseTensorUtils.h>
 #include <ATen/WrapDimUtils.h>
 #include <ATen/core/DimVector.h>
 #include <ATen/core/TensorBase.h>
@@ -72,6 +71,7 @@ Tensor &slice_scatter_out_tpu(const Tensor &self, const Tensor &src,
   TORCH_CHECK(status == BM_SUCCESS);
   TIMING_END(tpu::SLICE_SCATTER);
 #endif
+  SHOW_TENSOR_OP(self, out);
   return out;
 }
 

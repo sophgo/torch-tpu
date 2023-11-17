@@ -1,63 +1,36 @@
 import re
+import torch
+from torch import device as origin_device
+from torch.fx.graph import _register_custom_builtin
 import torch_tpu
 
 
-def torch_device_guard(func):
-    # Parse args/kwargs matched torch.device objects
-    def wrapper(*args, **kwargs):
-        if args:
-            args_list = list(args)
-            for index, arg in enumerate(args_list):
-                if isinstance(arg, torch_tpu._C.device):
-                    check_is_valid_ordinal(arg)
-                    args_list[index] = str(arg).replace("tpu", torch_tpu.tpu.native_device)
-                    break
-                elif isinstance(arg, str) and "tpu" in arg:
-                    check_is_valid_ordinal(arg)
-                    args_list[index] = arg.replace("tpu", torch_tpu.tpu.native_device)
-                    break
-            args = tuple(args_list)
-        if kwargs and kwargs.get("device"):
-            device_kwarg = kwargs.get("device")
-            if isinstance(device_kwarg, torch_tpu._C.device):
-                check_is_valid_ordinal(device_kwarg)
-                kwargs['device'] = str(kwargs['device']).replace("tpu", torch_tpu.tpu.native_device)
-            elif isinstance(device_kwarg, str) and "tpu" in device_kwarg:
-                check_is_valid_ordinal(device_kwarg)
-                kwargs['device'] = device_kwarg.replace("tpu", torch_tpu.tpu.native_device)
-            elif isinstance(device_kwarg, int):
-                check_is_valid_ordinal(device_kwarg)
-        return func(*args, **kwargs)
-    return wrapper
+class MetaDevice(type):
+    def __instancecheck__(self, instance):
+        return isinstance(instance, origin_device)
 
-env_device_cnt = None
+    def __eq__(self, other):
+        return other == origin_device
+
+    def __ne__(self, other):
+        return other != origin_device
+
+    def __hash__(self):
+        return hash(origin_device)
+
+    def __format__(self, format_spec):
+        return f"{origin_device}"
 
 
-def check_is_valid_ordinal(arg):
-    global env_device_cnt
-    if env_device_cnt is None:
-        env_device_cnt = torch_tpu.tpu.device_count()
-    # When env_device_cnt equals to 0, the error message is stored in TPU LOG.
-    if env_device_cnt == 0:
-        return
-    device_str_pattern = "^tpu:([1-9]\d*|0)$"
-    device_ofr_info = "Invalid TPU device ordinal. Valid device ordinal ranges from 0 - {}.".format(env_device_cnt - 1)
-    if isinstance(arg, torch_tpu._C.device):
-        device_index = arg.index
-        if device_index is not None:
-            if 0 <= device_index < env_device_cnt:
-                return
-            else:
-                raise RuntimeError(device_ofr_info)
-    elif isinstance(arg, str):
-        if arg == "tpu":
-            return
-        elif re.match(device_str_pattern, arg):
-            if arg.split(":")[-1] not in set([str(i) for i in range(env_device_cnt)]):
-                raise RuntimeError(device_ofr_info)
-        else:
-            raise RuntimeError("Invalid device string: {}.".format(arg))
-    elif isinstance(arg, int):
-        if 0 <= arg < env_device_cnt:
-            return
-        raise RuntimeError(device_ofr_info)
+class TPUDevice(metaclass=MetaDevice):
+    def __new__(cls, *args, **kwargs):
+        if args and isinstance(args[0], int):
+            args = ("tpu", args[0])
+        elif isinstance(kwargs.get('device'), int):
+            kwargs["device"] = f"tpu:{kwargs.get('device')}"
+        return origin_device(*args, **kwargs)
+
+
+def apply_device_patch():
+    torch.device = TPUDevice
+    _register_custom_builtin('device', 'from torch import device', TPUDevice)

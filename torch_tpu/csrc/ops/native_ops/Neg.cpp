@@ -8,10 +8,6 @@
 #include <sgdnn_api.h>
 #include "common/config.h"
 
-
-
-
-
 namespace at
 {
 Tensor & neg_out_tpu ( const Tensor & self, Tensor & out )
@@ -39,7 +35,7 @@ Tensor & neg_out_tpu ( const Tensor & self, Tensor & out )
 #ifdef TPU_OP_TIMING
   tpu::OpTimer::Instance().AddTime ( tpu::NEG, timer.ElapsedUS() );
 #endif
-
+  SHOW_TENSOR_OP(self, out);
   return out;
 }
 TORCH_LIBRARY_IMPL ( aten, TPU, m )

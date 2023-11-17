@@ -31,7 +31,7 @@ Tensor &repeat_out_tpu(const Tensor &self, const IntArrayRef repeats,
     TORCH_CHECK(status == BM_SUCCESS);
     TIMING_END(tpu::REPEAT)
   }
-
+  SHOW_TENSOR_OP(self, out);
   return out;
 }
 //  - func: repeat(Tensor self, SymInt[] repeats) -> Tensor

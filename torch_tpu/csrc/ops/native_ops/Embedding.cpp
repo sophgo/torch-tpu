@@ -45,6 +45,7 @@ Tensor index_select_tpu ( const Tensor & self, int64_t dim, const Tensor & index
   tpu::OpTimer::Instance().AddTime ( tpu::INDEX_SELECT, timer.ElapsedUS() );
 #endif
 #endif
+  SHOW_TENSOR_OP(self, index, out);
   return out;
 }
 TORCH_LIBRARY_IMPL ( aten, TPU, m )
@@ -75,6 +76,7 @@ Tensor embedding_dense_backward_tpu ( const Tensor & grad_output, const Tensor &
   tpu::OpTimer::Instance().AddTime ( tpu::EMBEDDING_BACKWARD, timer.ElapsedUS() );
 #endif
 #endif
+  SHOW_TENSOR_OP(grad_output, indices, out);
   return out;
 }
 TORCH_LIBRARY_IMPL ( aten, TPU, m )

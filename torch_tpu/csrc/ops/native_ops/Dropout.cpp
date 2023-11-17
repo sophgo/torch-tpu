@@ -28,6 +28,7 @@ public:
 #endif
     ctx->save_for_backward( {mask} );
     auto out = mask * self * (1/(1-p));
+    SHOW_TENSOR_OP(self, out);
     return out;
   }
   }
@@ -42,6 +43,7 @@ public:
       auto saved = ctx->get_saved_variables();
       auto mask = saved[0];
       auto gradinp = mask * gradout[0] * (1/(1-p));
+      SHOW_TENSOR_OP(gradinp);
       return {gradinp, at::Tensor(), at::Tensor(), at::Tensor(), at::Tensor(), at::Tensor() };
     }
   }

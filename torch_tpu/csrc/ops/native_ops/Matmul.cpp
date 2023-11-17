@@ -30,11 +30,6 @@ static inline bool is_transposed ( const Tensor & tensor )
 
 Tensor & addmm_out_tpu ( const Tensor & self, const Tensor & mat1, const Tensor & mat2, const Scalar & beta, const Scalar & alpha, Tensor & out )
 {
-  static int count = 0;
-#ifdef SHOW_OP_INFO
-  std::cout << "Addmm " << count << std::endl;
-  ++count;
-#endif
   CHECK_TENSOR_IN_DEVICE ( self );
   CHECK_TENSOR_IN_DEVICE_NO_CONTIGUOUS ( mat1 );
   CHECK_TENSOR_IN_DEVICE_NO_CONTIGUOUS ( mat2 );
@@ -63,6 +58,7 @@ Tensor & addmm_out_tpu ( const Tensor & self, const Tensor & mat1, const Tensor 
     TORCH_CHECK ( false );
   }
 #endif
+  SHOW_TENSOR_OP(self, mat1, mat2, out);
   return out;
 }
 TORCH_LIBRARY_IMPL ( aten, TPU, m )
@@ -72,11 +68,6 @@ TORCH_LIBRARY_IMPL ( aten, TPU, m )
 
 Tensor & mm_out_tpu ( const Tensor & self, const Tensor & mat2, Tensor & out )
 {
-  static int count = 0;
-#ifdef SHOW_OP_INFO
-  std::cout << "mm " << count << std::endl;
-  ++count;
-#endif
   CHECK_TENSOR_IN_DEVICE_NO_CONTIGUOUS ( self );
   CHECK_TENSOR_IN_DEVICE_NO_CONTIGUOUS ( mat2 );
   CHECK_TENSOR_IN_DEVICE ( out );
@@ -97,6 +88,7 @@ Tensor & mm_out_tpu ( const Tensor & self, const Tensor & mat2, Tensor & out )
   TORCH_CHECK ( status == BM_SUCCESS );
   TIMING_END( tpu::MM );
 #endif
+  SHOW_TENSOR_OP(self, mat2, out);
   return out;
 }
 TORCH_LIBRARY_IMPL ( aten, TPU, m )
@@ -106,11 +98,6 @@ TORCH_LIBRARY_IMPL ( aten, TPU, m )
 
 Tensor & bmm_out_tpu ( const Tensor & self, const Tensor & mat2, Tensor & out )
 {
-  static int count = 0;
-#ifdef SHOW_OP_INFO
-  std::cout << "bmm " << count << std::endl;
-  ++count;
-#endif
   CHECK_TENSOR_IN_DEVICE_NO_CONTIGUOUS ( self );
   CHECK_TENSOR_IN_DEVICE_NO_CONTIGUOUS ( mat2 );
   CHECK_TENSOR_IN_DEVICE ( out );
@@ -131,6 +118,7 @@ Tensor & bmm_out_tpu ( const Tensor & self, const Tensor & mat2, Tensor & out )
   TIMING_END( tpu::BMM );
 
 #endif
+  SHOW_TENSOR_OP(self, mat2, out);
   return out;
 }
 TORCH_LIBRARY_IMPL ( aten, TPU, m )
@@ -171,6 +159,7 @@ Tensor & baddbmm_out_tpu(const at::Tensor & self, const at::Tensor & batch1, con
 #endif
   TIMING_END( tpu::BADDBMM );
 #endif
+  SHOW_TENSOR_OP(self, batch1, batch2, out);
   return out;
 }
 TORCH_LIBRARY_IMPL ( aten, TPU, m )

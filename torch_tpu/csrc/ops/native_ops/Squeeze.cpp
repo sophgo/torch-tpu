@@ -47,6 +47,7 @@ Tensor &squeeze_out_tpu(const Tensor &self, Tensor &out) {
     TORCH_CHECK(false, "At least one input is required in TPU device");
   }
 #endif
+  SHOW_TENSOR_OP(self, out);
   return out;
 }
 
@@ -88,6 +89,7 @@ Tensor &unsqueeze_out_tpu(const Tensor &self, Tensor &out, int64_t &dim) {
     TORCH_CHECK(false, "At least one input is required in TPU device");
   }
 #endif
+  SHOW_TENSOR_OP(self, out);
   return out;
 }
 

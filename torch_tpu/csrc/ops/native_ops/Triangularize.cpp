@@ -32,6 +32,7 @@ Tensor & triu_out_tpu( const Tensor & self, int64_t diagonal, Tensor & out)
   tpu::OpTimer::Instance().AddTime ( tpu::TRIU, timer.ElapsedUS() );
 #endif
 #endif
+    SHOW_TENSOR_OP(self, out);
     return out;
 }
 

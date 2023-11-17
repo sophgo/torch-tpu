@@ -19,12 +19,20 @@ Tensor &argmax_out_tpu(const Tensor &self, c10::optional<int64_t> dim,
   CHECK_TENSOR_IN_DEVICE(out);
   CHECK_TENSOR_IN_DEVICE(self);
 #if 0
-    LOG( WARNING ) << "argmax use cpu impl";
+    CPU_IMPL_WANING();
     auto out_cpu = argmax( self.cpu(), dim, keepdim );
     out = out_cpu.to(out.device()).to(out.dtype());
 #else
   if (self.dim() == 0) {
     auto out_cpu = out.cpu().zero_();
+    out = out_cpu.to(out.device()).to(out.dtype());
+    return out;
+  }
+  if ( self.dtype() == caffe2::TypeMeta::Make<long>() ||
+       self.dtype() == caffe2::TypeMeta::Make<int>() )
+  {
+    CPU_IMPL_WANING();
+    auto out_cpu = argmax( self.cpu(), dim, keepdim );
     out = out_cpu.to(out.device()).to(out.dtype());
     return out;
   }
@@ -43,8 +51,8 @@ Tensor &argmax_out_tpu(const Tensor &self, c10::optional<int64_t> dim,
       tpu::TPUGenerateSgdnnTensor(values), tpu::TPUGenerateSgdnnTensor(out));
   TORCH_CHECK(status == BM_SUCCESS);
   TIMING_END(tpu::ARGMAX);
-
 #endif
+  SHOW_TENSOR_OP(self, out);
   return out;
 }
 

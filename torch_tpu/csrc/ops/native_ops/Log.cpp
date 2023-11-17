@@ -36,6 +36,7 @@ Tensor &logx_out_tpu(const Tensor &self, Tensor &out, sg_log_type_t log_type) {
     TORCH_CHECK(false, "At least one input is required in TPU device");
   }
 #endif
+  SHOW_TENSOR_OP(self, out);
   return out;
 }
 

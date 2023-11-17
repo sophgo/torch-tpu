@@ -23,7 +23,7 @@ from setuptools.command.egg_info import egg_info
 
 BASE_DIR = os.path.dirname(os.path.realpath(__file__))
 THIRD_PARTY_PATH = os.path.join(BASE_DIR, "third_party")
-VERSION = '2.0.1.post1'
+VERSION = '2.1.0.post1'
 
 def which(thefile):
     path = os.environ.get("PATH", os.defpath).split(os.pathsep)
@@ -59,13 +59,9 @@ def get_cmake_command():
         raise RuntimeError('no cmake or cmake3 with version >= 3.12.0 found')
 
 def get_build_type():
-    build_type = "Debug"
-    # build_type = 'Release'
-    # if os.getenv('DEBUG', default='0').upper() in ['ON', '1', 'YES', 'TRUE', 'Y']:
-    #     build_type = 'Debug'
-
-    # if os.getenv('REL_WITH_DEB_INFO', default='0').upper() in ['ON', '1', 'YES', 'TRUE', 'Y']:
-    #     build_type = 'RelWithDebInfo'
+    build_type = 'Release'
+    if os.getenv('TPUTRAIN_DEBUG', default='0').upper() in ['ON', '1', 'YES', 'TRUE', 'Y']:
+        build_type = 'Debug'
 
     return build_type
 
@@ -103,7 +99,6 @@ def CppExtension(name, sources, *args, **kwargs):
     libraries.append('torch_python')
     kwargs['libraries'] = libraries
     kwargs['language'] = 'c++'
-    print(kwargs['libraries'])
     return Extension(name, sources, *args, **kwargs)
 
 class CPPLibBuild(build_clib, object):
@@ -279,7 +274,7 @@ DEBUG = 1 #DEBUG = (os.getenv('DEBUG', default='').upper() in ['ON', '1', 'YES',
 
 extra_link_args = []
 extra_compile_args = [
-    '-std=c++14',
+    '-std=c++17',
     '-Wno-sign-compare',
     '-Wno-deprecated-declarations',
     '-Wno-return-type',

@@ -99,6 +99,7 @@ int64_t groups )
     tpu::OpTimer::Instance().AddTime ( tpu::CONVOLUTION, timer.ElapsedUS() );
 #endif
   }
+  SHOW_TENSOR_OP(input_, weight, bias, output);
   return is_batched ? output : output.squeeze ( 0 );
 #endif
 }
@@ -196,6 +197,7 @@ std::array<bool, 3> output_mask )
     tpu::OpTimer::Instance().AddTime ( tpu::CONVOLUTION_BACKWARD, timer.ElapsedUS() );
 #endif
   }
+  SHOW_TENSOR_OP(grad_output, input, weight, grad_input, grad_weight, grad_bias);
   return std::tuple<Tensor, Tensor, Tensor> ( grad_input, grad_weight, grad_bias );
 #endif
 }

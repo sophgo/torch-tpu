@@ -25,25 +25,26 @@ Tensor & _amp_update_scale_tpu(Tensor & self, Tensor & growth_tracker, const Ten
 
     auto self_cpu = self.cpu(); // scale
     auto growth_tracker_cpu = growth_tracker.cpu();
-    if (found_inf.cpu().data_ptr<float>()){ // found inf
-        *(self_cpu.data_ptr<float>()) = *(self_cpu.data_ptr<float>()) * scale_backoff_factor;
-        *(growth_tracker_cpu.data_ptr<int>()) = 0;
+    if (*(float*)found_inf.cpu().data_ptr()){ // found inf
+        *(float*)(self_cpu.data_ptr()) = *(float*)(self_cpu.data_ptr()) * scale_backoff_factor;
+        *(int*)(growth_tracker_cpu.data_ptr()) = 0;
         tpu::TPUCopyHostToDevice ( self.data_ptr(), self_cpu.data_ptr(), self.nbytes() );
         tpu::TPUCopyHostToDevice ( growth_tracker.data_ptr(), growth_tracker_cpu.data_ptr(), growth_tracker.nbytes() );
     } else {
         // Entering this branch means we just carried out a successful step,
         // so growth_tracker is incremented before comparing to growth_interval.
-        auto successful = *(growth_tracker_cpu.data_ptr<int>()) + 1;
+        int successful = *(int*)(growth_tracker_cpu.data_ptr()) + 1;
         if (successful == growth_interval){
-            *(self_cpu.data_ptr<float>()) = *(self_cpu.data_ptr<float>()) * scale_growth_factor;
-            *(growth_tracker_cpu.data_ptr<int>()) = 0;
+            *(float*)(self_cpu.data_ptr()) = *(float*)(self_cpu.data_ptr()) * scale_growth_factor;
+            *(int*)(growth_tracker_cpu.data_ptr()) = 0;
             tpu::TPUCopyHostToDevice ( self.data_ptr(), self_cpu.data_ptr(), self.nbytes() );
             tpu::TPUCopyHostToDevice ( growth_tracker.data_ptr(), growth_tracker_cpu.data_ptr(), growth_tracker.nbytes() );
         }else{
-            *(growth_tracker_cpu.data_ptr<int>()) = successful;
+            *(int*)(growth_tracker_cpu.data_ptr()) = successful;
             tpu::TPUCopyHostToDevice ( growth_tracker.data_ptr(), growth_tracker_cpu.data_ptr(), growth_tracker.nbytes() );
         }
     }
+    SHOW_TENSOR_OP(self, growth_tracker, found_inf);
     return self;
 }
 TORCH_LIBRARY_IMPL ( aten, TPU, m )

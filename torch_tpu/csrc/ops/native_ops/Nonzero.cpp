@@ -12,7 +12,6 @@ namespace at {
 
 Tensor nonzero_tpu(const Tensor &self) {
   CHECK_TENSOR_IN_DEVICE(self);
-  // LOG( WARNING ) << "the dtype of output of nonzero in tpu is 'int32'";
 #ifdef TPU_OP_TIMING
   auto timer = tpu::Timer().Start();
 #endif
@@ -42,7 +41,7 @@ Tensor nonzero_tpu(const Tensor &self) {
 #ifdef TPU_OP_TIMING
   tpu::OpTimer::Instance().AddTime(tpu::NONZERO, timer.ElapsedUS());
 #endif
-
+  SHOW_TENSOR_OP(self);
   return out;
 }
 TORCH_LIBRARY_IMPL(aten, TPU, m) { m.impl("nonzero", nonzero_tpu); }

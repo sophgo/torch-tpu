@@ -17,7 +17,7 @@ Tensor permute_tpu(const Tensor &self, IntArrayRef dim_order) {
     Tensor out = empty_like(self);
 
 #if 0
-    
+
 #else
 
 #ifdef TPU_OP_TIMING
@@ -50,7 +50,7 @@ Tensor permute_tpu(const Tensor &self, IntArrayRef dim_order) {
 #endif
 
 #endif
-
+    SHOW_TENSOR_OP(self);
     return out;
 }
 // TORCH_LIBRARY_IMPL(aten, TPU, m) {

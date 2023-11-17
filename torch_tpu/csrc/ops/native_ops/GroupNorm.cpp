@@ -10,7 +10,6 @@
 #include <sgdnn_api.h>
 #include <torch/library.h>
 #include <torch/torch.h>
-// #include "tpu_kernel.h"
 
 namespace at {
 
@@ -123,9 +122,9 @@ native_group_norm_backward_tpu(const at::Tensor &grad_out, const at::Tensor &X,
   if (weight.defined()) {
     CHECK_TENSOR_IN_DEVICE(weight);
   }
-  TIMING_START
-#if 0
-    LOG(WARNING) << "group_norm_backward use cpu impl";
+#if 1
+    // tpu impl has bug. to fix
+    CPU_IMPL_WANING();
     auto input_type = grad_out.dtype();
     auto result = native_group_norm_backward(
         grad_out.cpu().to(torch::kFloat32), X.cpu().to(torch::kFloat32),
@@ -152,6 +151,7 @@ native_group_norm_backward_tpu(const at::Tensor &grad_out, const at::Tensor &X,
     // We assume that weight and bias have the same data type
     grad_bias = empty({weight.size(0)}, weight.options());
   }
+  TIMING_START;
   bm_status_t status = sgdnnNativeGroupNormBackward(
       tpu::TPUGetDeviceHandle(), tpu::TPUGenerateSgdnnTensor(grad_out),
       tpu::TPUGenerateSgdnnTensor(X),
@@ -167,6 +167,7 @@ native_group_norm_backward_tpu(const at::Tensor &grad_out, const at::Tensor &X,
                      : sgdnnUndefinedTensor());
   TORCH_CHECK(status == BM_SUCCESS);
   TIMING_END(tpu::GROUPNORM_BACKWARD)
+  SHOW_TENSOR_OP(grad_out, X, mean, rstd, weight, grad_input, grad_weight, grad_bias);
   return std::tuple<Tensor, Tensor, Tensor>(grad_input, grad_weight, grad_bias);
 
 #endif

@@ -103,6 +103,7 @@ Tensor & addcmul_out_tpu ( const Tensor & self, const Tensor & tensor1, const Te
   #endif
   }
 #endif
+  SHOW_TENSOR_OP(self, tensor1, tensor2, out);
   return out;
 }
 TORCH_LIBRARY_IMPL ( aten, TPU, m )
@@ -130,6 +131,7 @@ Tensor & addcdiv_out_tpu ( const Tensor & self, const Tensor & tensor1, const Te
 #ifdef TPU_OP_TIMING
   tpu::OpTimer::Instance().AddTime ( tpu::ADDCDIV, timer.ElapsedUS() );
 #endif
+  SHOW_TENSOR_OP(self, tensor1, tensor2, out);
   return out;
 }
 TORCH_LIBRARY_IMPL ( aten, TPU, m )
