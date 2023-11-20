@@ -71,6 +71,13 @@ Tensor &masked_fill_Scalar_tpu(Tensor &self, const Tensor &mask,
   tpu::TPUCopyHostToDevice(self.data_ptr(), self_cpu.contiguous().data_ptr(),
                            self.nbytes());
 #else
+  if (self.dtype() != caffe2::TypeMeta::Make<float>()) {
+    LOG(WARNING) << "masked_fill_.Scalar only support fp32, use cpu impl";
+    auto self_cpu = self.cpu();
+    self_cpu.masked_fill_(mask.cpu(), value);
+    tpu::TPUCopyHostToDevice(self.data_ptr(), self_cpu.contiguous().data_ptr(),
+                            self.nbytes());
+  } else {
 #ifdef TPU_OP_TIMING
   auto timer = tpu::Timer().Start();
 #endif
@@ -88,6 +95,7 @@ Tensor &masked_fill_Scalar_tpu(Tensor &self, const Tensor &mask,
 #ifdef TPU_OP_TIMING
   tpu::OpTimer::Instance().AddTime(tpu::MASKED_FILL, timer.ElapsedUS());
 #endif
+  }
 #endif
   return self;
 }

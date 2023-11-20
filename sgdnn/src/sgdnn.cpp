@@ -3557,6 +3557,7 @@ bm_status_t sgdnnMaskedFill ( bm_handle_t handle,
                               SgdnnTensor_t out )
 {
   SGDNN_CHECK ( input.dim == mask.dim );
+  SGDNN_CHECK ( input.dtype == SGDNN_DTYPE_FP32);
   for ( int i = 0; i < input.dim; i++ )
   {
     SGDNN_CHECK ( input.shape[i] == mask.shape[i] || mask.shape[i] == 1);

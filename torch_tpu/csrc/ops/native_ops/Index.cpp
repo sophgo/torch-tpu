@@ -94,4 +94,95 @@ TORCH_LIBRARY_IMPL ( aten, TPU, m )
 {
  m.impl ( "index.Tensor_out",  index_out_tpu);
 }
+
+// copied from torch source and modified
+static std::tuple<bool, Tensor> canDispatchToMaskedFill(const Tensor& self, const torch::List<c10::optional<at::Tensor>>& indices,
+const Tensor& value){
+  if (!(value.numel() == 1 /*&& value.device().is_cpu()*/)){
+    return std::make_tuple(false,Tensor());
+  }
+  int64_t num_ind = 0;
+  Tensor mask;
+  auto self_device = self.device();
+  for (const c10::optional<Tensor>& i: indices) {
+    if (!i.has_value() || !(*i).defined()){
+      num_ind++;
+    } else {
+      const Tensor &index = *i;
+      if ((index.scalar_type() != kByte && index.scalar_type() != kBool) ||
+          index.device() != self_device || mask.defined()){
+        return std::make_tuple(false, Tensor());
+      } else {
+        mask = index;
+        for (const auto j : c10::irange(index.dim())) {
+          int64_t srcIdx = num_ind + j;
+          TORCH_CHECK_INDEX(index.size(j) == self.size(srcIdx), "The shape of the mask ", index.sizes(), " at index ", j,
+  " does not match the shape of the indexed tensor ", self.sizes(), " at index ", srcIdx);
+        }
+        num_ind += mask.ndimension();
+      }
+    }
+  }
+  for (const auto i : c10::irange(num_ind, self.ndimension())) {
+    (void)i; //Suppress unused variable warning
+    mask = mask.unsqueeze(-1);
+  }
+  return std::make_tuple(true, mask);
+}
+
+Tensor & index_put_tpu(Tensor & self, const torch::List<c10::optional<Tensor>>& indices, const Tensor & value, const bool accumulate) {
+  CHECK_TENSOR_IN_DEVICE ( self );
+#if 0
+  LOG( WARNING ) << "index_put_ use cpu impl";
+  c10::List<c10::optional<Tensor>> indices_cpu;
+  for (int i = 0; i < indices.size(); i++)
+  {
+      c10::optional<Tensor> indice = c10::nullopt;
+      if ( indices[i].has_value() ) { indice = indices[i].value().cpu(); }
+      indices_cpu.push_back(indice);
+  }
+  auto self_cpu = self.cpu();
+  auto out_cpu = index_put(self_cpu, indices_cpu, value.cpu(), accumulate);
+  tpu::TPUCopyHostToDevice(self.data_ptr(), out_cpu.contiguous().data_ptr(), out_cpu.nbytes());
+#else
+  // copied from torch source and modified
+  bool return_flag = false;
+  if (!accumulate) {
+    auto masked_fill_dispatch = canDispatchToMaskedFill(self, indices, value);
+    if (std::get<0>(masked_fill_dispatch)) {
+      // this function strictly read the data in the ORIGINAL self.addr
+      // do not use masked_fill_ here, our impl will make self.addr change
+      auto out = self.masked_fill(std::get<1>(masked_fill_dispatch), value.item());
+      tpu::TPUCopyDeviceToDevice(self.data_ptr(), out.contiguous().data_ptr(), out.nbytes());
+      return_flag = true;
+    }
+  }
+
+  if (!return_flag) {
+  #if 1
+    // have no idea how to impl in tpu. use cpu first.
+    LOG( WARNING ) << "index_put_ use cpu impl";
+    c10::List<c10::optional<Tensor>> indices_cpu;
+    for (int i = 0; i < indices.size(); i++)
+    {
+        c10::optional<Tensor> indice = c10::nullopt;
+        if ( indices[i].has_value() ) { indice = indices[i].value().cpu(); }
+        indices_cpu.push_back(indice);
+    }
+    auto self_cpu = self.cpu();
+    auto out_cpu = index_put(self_cpu, indices_cpu, value.cpu(), accumulate);
+    tpu::TPUCopyHostToDevice(self.data_ptr(), out_cpu.contiguous().data_ptr(), out_cpu.nbytes());
+  #else
+    TORCH_CHECK(false, "Not implemented");
+  #endif
+ }
+#endif
+  return self;
+}
+
+TORCH_LIBRARY_IMPL ( aten, TPU, m )
+{
+ m.impl ( "index_put_",  index_put_tpu);
+}
+
 } //namespace at
