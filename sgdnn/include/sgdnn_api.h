@@ -373,21 +373,6 @@ bm_status_t sgdnnLogicalNot ( bm_handle_t handle,
                        SgdnnTensor_t output );
 
 /*
- * OUTPUT = INPUT + SCALAR * OTHER
- * Note:
- * 1. The data types of INPUT, OTHER and OUTPUT must be the same and one of FP32, FP16 and BF16
- * 2. The shapes of INPUT, OTHER and OUTPUT must be the same, broadcasting is not allowed
- * 3. INPUT, OTHER and OUTPUT must be contiguous
- */
-
-bm_status_t sgdnnAdd ( bm_handle_t handle,
-                       SgdnnTensor_t input,
-                       SgdnnTensor_t other,
-                       float scalar,
-                       SgdnnTensor_t output );
-
-
-/*
  * OUTPUT = math.flip(INPUT, DIMS)
  * Note:
  * 1. The data types of INPUT must be the same and one of FP32, FP16 and BF16
@@ -462,15 +447,31 @@ bm_status_t sgdnnDiv ( bm_handle_t handle,
  * OUTPUT = INPUT + SCALAR * OTHER
  * Note:
  * 1. The data types of INPUT, OTHER and OUTPUT must be the same and one of FP32, FP16 and BF16
+ * 2. The shapes of INPUT, OTHER and OUTPUT must be the same, broadcasting is not allowed
+ * 3. INPUT, OTHER and OUTPUT must be contiguous
+ */
+
+bm_status_t sgdnnBinary ( bm_handle_t handle,
+                            SgdnnTensor_t input,
+                            SgdnnTensor_t other,
+                            float scalar,
+                            SgdnnTensor_t output,
+                            int binary_type );
+
+/*
+ * OUTPUT = INPUT + SCALAR * OTHER
+ * Note:
+ * 1. The data types of INPUT, OTHER and OUTPUT must be the same and one of FP32, FP16 and BF16
  * 2. The dimentions of INPUT, OTHER and OUTPUT must be the same
  * 3. INPUT and OTHER are allowed broadcasting
  * 4. INPUT, OTHER and OUTPUT must be contiguous
  */
-bm_status_t sgdnnAddBcast ( bm_handle_t handle,
-                            SgdnnTensor_t input,
-                            SgdnnTensor_t other,
-                            float scalar,
-                            SgdnnTensor_t output );
+bm_status_t sgdnnBinaryBcast (  bm_handle_t handle,
+                                  SgdnnTensor_t input,
+                                  SgdnnTensor_t other,
+                                  float scalar,
+                                  SgdnnTensor_t output,
+                                  int binary_type );
 
 /*
  * OUTPUT = INPUT + SCALAR
@@ -479,10 +480,12 @@ bm_status_t sgdnnAddBcast ( bm_handle_t handle,
  * 2. The shapes of INPUT and OUTPUT must be the same
  * 3. INPUT and OUTPUT must be contiguous
  */
-bm_status_t sgdnnAddC ( bm_handle_t handle,
-                        SgdnnTensor_t input,
-                        float scalar,
-                        SgdnnTensor_t output );
+bm_status_t sgdnnBinaryC (  bm_handle_t handle,
+                              SgdnnTensor_t input,
+                              float scalar,
+                              SgdnnTensor_t output,
+                              int binary_type,
+                              bool inversed );
 
 /*
  * OUTPUT = SCALAR - INPUT

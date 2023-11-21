@@ -2344,11 +2344,12 @@ bm_status_t sgdnnLogicalNot ( bm_handle_t handle,
 }
 
 
-bm_status_t sgdnnAdd ( bm_handle_t handle,
-                       SgdnnTensor_t input,
-                       SgdnnTensor_t other,
-                       float scalar,
-                       SgdnnTensor_t output )
+bm_status_t sgdnnBinary ( bm_handle_t handle,
+                            SgdnnTensor_t input,
+                            SgdnnTensor_t other,
+                            float scalar,
+                            SgdnnTensor_t output,
+                            int binary_type)
 {
   SGDNN_CHECK ( input.dtype == other.dtype );
   SGDNN_CHECK ( input.dtype == output.dtype );
@@ -2356,7 +2357,7 @@ bm_status_t sgdnnAdd ( bm_handle_t handle,
   SGDNN_CHECK ( sgdnnIsTensorContiguous ( &input ) );
   SGDNN_CHECK ( sgdnnIsTensorContiguous ( &other ) );
   SGDNN_CHECK ( sgdnnIsTensorContiguous ( &output ) );
-  sg_api_add_t api;
+  sg_api_binary_t api;
   api.input_global_addr = input.addr;
   api.other_global_addr = other.addr;
   api.output_global_addr = output.addr;
@@ -2367,21 +2368,23 @@ bm_status_t sgdnnAdd ( bm_handle_t handle,
   }
   api.dtype = sgdnnTPUKernelDType ( input.dtype );
   api.value = scalar;
+  api.binary_type = binary_type;
 #if defined SGDNN_BACKEND_1684X
-  SAFE_CALL ( sgdnnTPUKernelLaunch ( handle, "tpu_kernel_api_add", &api, sizeof ( api ) ) );
+  SAFE_CALL ( sgdnnTPUKernelLaunch ( handle, "tpu_kernel_api_binary", &api, sizeof ( api ) ) );
 #elif defined SGDNN_BACKEND_2260
-  SAFE_CALL ( sgdnnTPUKernelLaunch ( handle, "tpu_kernel_api_add_multi_core", &api, sizeof ( api ) ) );
+  SAFE_CALL ( sgdnnTPUKernelLaunch ( handle, "tpu_kernel_api_binary_multi_core2", &api, sizeof ( api ) ) );
 #else
   SGDNN_CHECK ( false );
 #endif
   return BM_SUCCESS;
 }
 
-bm_status_t sgdnnAddBcast ( bm_handle_t handle,
-                            SgdnnTensor_t input,
-                            SgdnnTensor_t other,
-                            float scalar,
-                            SgdnnTensor_t output )
+bm_status_t sgdnnBinaryBcast (  bm_handle_t handle,
+                                  SgdnnTensor_t input,
+                                  SgdnnTensor_t other,
+                                  float scalar,
+                                  SgdnnTensor_t output,
+                                  int binary_type )
 {
   SGDNN_CHECK ( input.dtype == other.dtype );
   SGDNN_CHECK ( input.dtype == output.dtype );
@@ -2400,7 +2403,7 @@ bm_status_t sgdnnAddBcast ( bm_handle_t handle,
   SGDNN_CHECK ( sgdnnIsTensorContiguous ( &other ) );
   SGDNN_CHECK ( sgdnnIsTensorContiguous ( &output ) );
 
-  sg_api_bcast_add_t api;
+  sg_api_binary_bcast_t api;
   api.input_global_addr = input.addr;
   api.other_global_addr = other.addr;
   api.output_global_addr = output.addr;
@@ -2415,27 +2418,30 @@ bm_status_t sgdnnAddBcast ( bm_handle_t handle,
   }
   api.dtype = sgdnnTPUKernelDType ( input.dtype );
   api.value = scalar;
+  api.binary_type = binary_type;
 #if defined SGDNN_BACKEND_1684X
-  SAFE_CALL ( sgdnnTPUKernelLaunch ( handle, "tpu_kernel_api_bcast_add", &api, sizeof ( api ) ) );
+  SAFE_CALL ( sgdnnTPUKernelLaunch ( handle, "tpu_kernel_api_binary_bcast", &api, sizeof ( api ) ) );
 #elif defined SGDNN_BACKEND_2260
-  SAFE_CALL ( sgdnnTPUKernelLaunch ( handle, "tpu_kernel_api_bcast_add_multi_core", &api, sizeof ( api ) ) );
+  SAFE_CALL ( sgdnnTPUKernelLaunch ( handle, "tpu_kernel_api_binary_bcast_multi_core", &api, sizeof ( api ) ) );
 #else
   SGDNN_CHECK ( false );
 #endif
   return BM_SUCCESS;
 }
 
-bm_status_t sgdnnAddC ( bm_handle_t handle,
-                        SgdnnTensor_t input,
-                        float scalar,
-                        SgdnnTensor_t output )
+bm_status_t sgdnnBinaryC ( bm_handle_t handle,
+                             SgdnnTensor_t input,
+                             float scalar,
+                             SgdnnTensor_t output,
+                             int binary_type,
+                             bool inversed )
 {
   SGDNN_CHECK ( input.dtype == output.dtype );
   SGDNN_CHECK ( input.dtype != SGDNN_DTYPE_INT64 );
   SGDNN_CHECK ( sgdnnIsSameShape ( &input, &output ) );
   SGDNN_CHECK ( sgdnnIsTensorContiguous ( &input ) );
   SGDNN_CHECK ( sgdnnIsTensorContiguous ( &output ) );
-  sg_api_addc_t api;
+  sg_api_binary_c_t api;
   api.input_global_addr = input.addr;
   api.output_global_addr = output.addr;
   api.dim = input.dim;
@@ -2445,10 +2451,12 @@ bm_status_t sgdnnAddC ( bm_handle_t handle,
   }
   api.dtype = sgdnnTPUKernelDType ( input.dtype );
   api.value = scalar;
+  api.binary_type = binary_type;
+  api.inversed = inversed;
 #if defined SGDNN_BACKEND_1684X
-  SAFE_CALL ( sgdnnTPUKernelLaunch ( handle, "tpu_kernel_api_addc", &api, sizeof ( api ) ) );
+  SAFE_CALL ( sgdnnTPUKernelLaunch ( handle, "tpu_kernel_api_binary_c", &api, sizeof ( api ) ) );
 #elif defined SGDNN_BACKEND_2260
-  SAFE_CALL ( sgdnnTPUKernelLaunch ( handle, "tpu_kernel_api_addc_multi_core", &api, sizeof ( api ) ) );
+  SAFE_CALL ( sgdnnTPUKernelLaunch ( handle, "tpu_kernel_api_binary_c_multi_core", &api, sizeof ( api ) ) );
 #else
   SGDNN_CHECK ( false );
 #endif
@@ -2461,7 +2469,7 @@ bm_status_t sgdnnSub ( bm_handle_t handle,
                        float scalar,
                        SgdnnTensor_t output )
 {
-  return sgdnnAdd ( handle, input, other, -scalar, output );
+  return sgdnnBinary ( handle, input, other, scalar, output, 1);
 }
 
 bm_status_t sgdnnMul ( bm_handle_t handle,

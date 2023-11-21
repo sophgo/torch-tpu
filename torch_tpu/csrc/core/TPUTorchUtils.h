@@ -447,6 +447,9 @@ typedef enum
   LLAMA_ATTENTION,
   LLAMA_MLP_FORWARD,
   RMSNORM_FORWARD,
+  BINARYOP,
+  BINARYOP_C,
+  BINARYOP_BCAST,
   OP_NUM
 }
 OpType;
@@ -632,7 +635,10 @@ static const char * OpTypeStr[OP_NUM] =
   "Slice_scatter",
   "Inf Check And Unscale",
   "LLAMA_MLP_FORWARD",
-  "RMSNORM_FORWARD"
+  "RMSNORM_FORWARD",
+  "binary_op",
+  "binary_op_c",
+  "binary_op_bcast",
 };
 
 struct OpTimer

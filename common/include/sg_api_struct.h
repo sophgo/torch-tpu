@@ -124,6 +124,13 @@ typedef enum {
   LESS_THAN_OR_EQUAL,
 } sg_comparision_mode_t;
 
+typedef enum {
+  BINARY_ADD          = 0,
+  BINARY_SUB          = 1,
+  BINARY_MUL          = 2,
+  BINARY_DIV          = 3,
+} sg_binary_type_t;
+
 typedef struct {
   unsigned long long input_global_addr;
   unsigned long long output_global_addr;
@@ -839,7 +846,8 @@ typedef struct
   int dim;
   float value;
   int dtype;
-} WITH_PLATFORM(sg_api_add_t);
+  int binary_type;
+} WITH_PLATFORM(sg_api_binary_t);
 
 typedef struct
 {
@@ -883,7 +891,8 @@ typedef struct
   int dim;
   float value;
   int dtype;
-} WITH_PLATFORM(sg_api_bcast_add_t);
+  int binary_type;
+} WITH_PLATFORM(sg_api_binary_bcast_t);
 
 typedef struct
 {
@@ -917,7 +926,9 @@ typedef struct
   int dim;
   float value;
   int dtype;
-} WITH_PLATFORM(sg_api_addc_t);
+  int binary_type;
+  short inversed;
+} WITH_PLATFORM(sg_api_binary_c_t);
 
 typedef struct
 {
