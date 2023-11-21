@@ -138,7 +138,11 @@ Tensor _to_copy_out_tpu(const Tensor &self, Tensor &out,
 
 Tensor clone_tpu(const Tensor &self,
                  c10::optional<MemoryFormat> memory_format_opt) {
-  auto dst = empty(self.sizes(), self.options(), memory_format_opt);
+  auto memory_format_opt_ = memory_format_opt;
+  if (memory_format_opt.has_value() && memory_format_opt.value() == MemoryFormat::Preserve) {
+    memory_format_opt_ = self.options().memory_format_opt();
+  }
+  auto dst = empty(self.sizes(), self.options(), memory_format_opt_);
   return _copy_from_tpu(self, dst, false);
 }
 

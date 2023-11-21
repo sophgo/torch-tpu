@@ -115,7 +115,7 @@ Tensor & bmm_out_tpu ( const Tensor & self, const Tensor & mat2, Tensor & out )
   CHECK_TENSOR_IN_DEVICE_NO_CONTIGUOUS ( mat2 );
   CHECK_TENSOR_IN_DEVICE ( out );
 #if 0
-  auto out_cpu = bmm ( self.cpu(), mat2.cpu() );
+  auto out_cpu = bmm ( self.cpu().to(torch::kFloat32), mat2.cpu().to(torch::kFloat32) ).to(out.dtype());
   tpu::TPUCopyHostToDevice ( out.data_ptr(), out_cpu.contiguous().data_ptr(), out.nbytes() );
 #else
   auto self_ = self.is_contiguous() == false && is_transposed ( self ) == false ? self.contiguous() : self;

@@ -27,6 +27,8 @@ Tensor &fill__Scalar_tpu(Tensor &self, const Scalar &value) {
     *(at::Half *)(&value_) = value.toHalf();
   } else if (self.dtype() == caffe2::TypeMeta::Make<int>()) {
     value_ = value.toInt();
+  } else if (self.dtype() == caffe2::TypeMeta::Make<bool>()) {
+    value_ = value.toBool();
   } else {
     TORCH_CHECK(false);
   }
