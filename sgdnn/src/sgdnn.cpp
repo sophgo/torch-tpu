@@ -2372,7 +2372,7 @@ bm_status_t sgdnnBinary ( bm_handle_t handle,
 #if defined SGDNN_BACKEND_1684X
   SAFE_CALL ( sgdnnTPUKernelLaunch ( handle, "tpu_kernel_api_binary", &api, sizeof ( api ) ) );
 #elif defined SGDNN_BACKEND_2260
-  SAFE_CALL ( sgdnnTPUKernelLaunch ( handle, "tpu_kernel_api_binary_multi_core2", &api, sizeof ( api ) ) );
+  SAFE_CALL ( sgdnnTPUKernelLaunch ( handle, "tpu_kernel_api_binary_multi_core", &api, sizeof ( api ) ) );
 #else
   SGDNN_CHECK ( false );
 #endif

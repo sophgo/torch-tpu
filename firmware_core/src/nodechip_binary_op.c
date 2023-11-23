@@ -106,7 +106,6 @@ void nodechip_binary(global_addr_t input_global_addr,
 
   const unsigned int bank_bsize = tpu_local_mem_size_per_npu() / tpu_bank_num();
   int dtype_size = tpu_data_type_size(dtype);
-  // int dtype_size_dst = tpu_data_type_size(dst_dtype);
   int tensor_num = 2 + 2 + 2;
   int tensor_bsize_pnpu = tpu_bank_num() / tensor_num * bank_bsize;
   TPUKERNEL_ASSERT(tensor_bsize_pnpu > 0);
@@ -281,7 +280,7 @@ void tpu_kernel_api_binary(const void *args) {
 TPUKERNEL_FUNC_REGISTER(tpu_kernel_api_binary);
 
 #ifdef FIRMWARE_BACKEND_2260
-void tpu_kernel_api_binary_multi_core2(const void *args) {
+void tpu_kernel_api_binary_multi_core(const void *args) {
   sg_api_binary_t *api = (sg_api_binary_t *)args;
   if ((sg_binary_type_t)api->binary_type == BINARY_DIV) {
     TPUKERNEL_ASSERT(api->dtype == DT_FP32);
@@ -329,7 +328,7 @@ void tpu_kernel_api_binary_multi_core2(const void *args) {
   }
   tpu_poll();
 }
-TPUKERNEL_FUNC_REGISTER(tpu_kernel_api_binary_multi_core2);
+TPUKERNEL_FUNC_REGISTER(tpu_kernel_api_binary_multi_core);
 #endif
 
 void nodechip_binary_bcast(global_addr_t input_global_addr,
@@ -346,20 +345,27 @@ void nodechip_binary_bcast(global_addr_t input_global_addr,
       other_shape->n != output_shape->n, other_shape->c != output_shape->c,
       other_shape->h != output_shape->h, other_shape->w != output_shape->w};
 
+  const unsigned int bank_bsize = tpu_local_mem_size_per_npu() / tpu_bank_num();
+  int tensor_num = 2 + 2 + 2;
+  int tensor_bsize_pnpu = tpu_bank_num() / tensor_num * bank_bsize;
+  TPUKERNEL_ASSERT(tensor_bsize_pnpu > 0);
+
+  local_addr_t input_local_addr[2] = {0, 1 * tensor_bsize_pnpu};
+  local_addr_t other_local_addr[2] = {2 * tensor_bsize_pnpu,
+                                      3 * tensor_bsize_pnpu};
+  local_addr_t output_local_addr[2] = {4 * tensor_bsize_pnpu,
+                                       5 * tensor_bsize_pnpu};
+
   const int c_per_npu = DIV_UP(output_shape->c, NPU_NUM);
   const int eu_num = tpu_eu_num(dtype);
   int nmax = output_shape->n, hmax = output_shape->h,
-      cmax = c_per_npu * NPU_NUM, wmax = output_shape->w;
+      cmax = c_per_npu * NPU_NUM,
+      wmax = MIN(output_shape->w, tpu_gdma_shape_limit(TENSOR_W_DIM));
 
-  local_addr_t output_addr, input_addr, other_addr;
   while (true) {
-    int size = tpu_aligned_feature_size(hmax, wmax, dtype) * c_per_npu * nmax;
-    output_addr = 0;
-    input_addr = output_addr + size;
-    other_addr = input_addr + size;
-    int total_size = other_addr + size;
-
-    if (total_size <= LOCAL_MEM_SIZE) {
+    int size = tpu_aligned_feature_size(hmax, wmax, dtype) *
+               DIV_UP(cmax, NPU_NUM) * nmax;
+    if (size <= tensor_bsize_pnpu) {
       break;
     } else {
       if (cmax > NPU_NUM) {
@@ -379,6 +385,10 @@ void nodechip_binary_bcast(global_addr_t input_global_addr,
       }
     }
   }
+  int index = 0;
+  bool l2s = false;
+  global_addr_t output_global_addr_gdma = 0;
+  dim4 gdma_shape;
 
   // dim4 slice_shape = {.w = output_shape->w};
   dim4 slice_shape;
@@ -396,6 +406,7 @@ void nodechip_binary_bcast(global_addr_t input_global_addr,
         int wtodo = output_shape->w, wdone = 0;
         while (wtodo > 0) {
           slice_shape.w = MIN(wtodo, wmax);
+
           // Move input from global memory to local memory
           tpu_aligned_stride(&input_local_stride, 0, &slice_shape, dtype);
           input_local_shape.n = input_bcast[0] ? 1 : slice_shape.n;
@@ -409,7 +420,7 @@ void nodechip_binary_bcast(global_addr_t input_global_addr,
                (input_bcast[2] ? 0 : hdone) * input_global_stride->h +
                (input_bcast[3] ? 0 : wdone) * input_global_stride->w) *
                   tpu_data_type_size(dtype);
-          tpu_gdma_cpy_S2L(input_addr, input_global_addr_gdma,
+          tpu_gdma_cpy_S2L(input_local_addr[index], input_global_addr_gdma,
                            &input_local_shape, &input_local_stride,
                            input_global_stride, dtype);
           // Move other from global memory to local memory
@@ -425,15 +436,15 @@ void nodechip_binary_bcast(global_addr_t input_global_addr,
                (other_bcast[2] ? 0 : hdone) * other_global_stride->h +
                (other_bcast[3] ? 0 : wdone) * other_global_stride->w) *
                   tpu_data_type_size(dtype);
-          tpu_gdma_cpy_S2L(other_addr, other_global_addr_gdma,
+          tpu_gdma_cpy_S2L(other_local_addr[index], other_global_addr_gdma,
                            &other_local_shape, &other_local_stride,
                            other_global_stride, dtype);
 
           // Broadcast input if needed
           if (input_bcast[1]) {
             input_local_shape.c = NPU_NUM;
-            tpu_bdc_npu_bcast(input_addr, input_addr, &input_local_shape,
-                              dtype);
+            tpu_bdc_npu_bcast(input_local_addr[index], input_local_addr[index],
+                              &input_local_shape, dtype);
           }
           if (input_bcast[0] || input_bcast[2] || input_bcast[3] ||
               (input_bcast[1] && slice_shape.c > NPU_NUM)) {
@@ -443,15 +454,15 @@ void nodechip_binary_bcast(global_addr_t input_global_addr,
                 .h = input_bcast[2] ? 0 : input_local_stride.h,
                 .w = input_bcast[3] ? 0 : input_local_stride.w,
             };
-            tpu_bdc_cpy(input_addr, input_addr, &slice_shape, NULL,
-                        &input_bcast_stride, dtype);
+            tpu_bdc_cpy(input_local_addr[index], input_local_addr[index],
+                        &slice_shape, NULL, &input_bcast_stride, dtype);
           }
 
           // Broadcast other if needed
           if (other_bcast[1]) {
             other_local_shape.c = NPU_NUM;
-            tpu_bdc_npu_bcast(other_addr, other_addr, &other_local_shape,
-                              dtype);
+            tpu_bdc_npu_bcast(other_local_addr[index], other_local_addr[index],
+                              &other_local_shape, dtype);
           }
           if (other_bcast[0] || other_bcast[2] || other_bcast[3] ||
               (other_bcast[1] && slice_shape.c > NPU_NUM)) {
@@ -461,35 +472,49 @@ void nodechip_binary_bcast(global_addr_t input_global_addr,
                 .h = other_bcast[2] ? 0 : other_local_stride.h,
                 .w = other_bcast[3] ? 0 : other_local_stride.w,
             };
-            tpu_bdc_cpy(other_addr, other_addr, &slice_shape, NULL,
-                        &other_bcast_stride, dtype);
+            tpu_bdc_cpy(other_local_addr[index], other_local_addr[index],
+                        &slice_shape, NULL, &other_bcast_stride, dtype);
+          }
+
+          if (tpu_is_parallel_state()) {
+            tpu_parallel_end();
+          }
+          tpu_parallel_start();
+          if (l2s) {
+            // Move out from local memory to global memory
+            tpu_gdma_cpy_L2S(output_global_addr_gdma,
+                             output_local_addr[1 - index], &gdma_shape,
+                             output_global_stride, NULL, dtype);
           }
 
           if (binary_type == BINARY_DIV) {
-            tpu_bdc_fp32_div(output_addr, input_addr, other_addr, &slice_shape,
-                             NULL, NULL, NULL);
+            tpu_bdc_fp32_div(output_local_addr[index], input_local_addr[index],
+                             other_local_addr[index], &slice_shape, NULL, NULL,
+                             NULL);
           } else if (dtype == DT_FP32 || dtype == DT_FP16 ||
                      dtype == DT_BFP16) {
             if (binary_type == BINARY_ADD || binary_type == BINARY_SUB) {
               // mul scalar
               const_binary_fp_func func_const =
                   get_const_binary_fp_func(BINARY_MUL, false);
-              func_const(other_addr, other_addr, value, &slice_shape, NULL,
-                         NULL, dtype);
+              func_const(other_local_addr[index], other_local_addr[index],
+                         value, &slice_shape, NULL, NULL, dtype);
             }
 
             // binary op
             binary_fp_func func = get_binary_fp_func(binary_type);
-            func(output_addr, input_addr, other_addr, &slice_shape, NULL, NULL,
-                 NULL, dtype);
+            func(output_local_addr[index], input_local_addr[index],
+                 other_local_addr[index], &slice_shape, NULL, NULL, NULL,
+                 dtype);
 
           } else {
             if (binary_type == BINARY_ADD || binary_type == BINARY_SUB) {
               // mul scalar
               const_binary_int_func func_const =
                   get_const_binary_int_func(BINARY_MUL, false);
-              func_const(other_addr, other_addr, value, &slice_shape, NULL,
-                         NULL, dtype, dtype, dtype, 0, NO_USE, false);
+              func_const(other_local_addr[index], other_local_addr[index],
+                         value, &slice_shape, NULL, NULL, dtype, dtype, dtype,
+                         0, NO_USE, false);
             }
 
             // for int sub op, the dst'type only support int8, int16, int32
@@ -505,31 +530,40 @@ void nodechip_binary_bcast(global_addr_t input_global_addr,
 
             // binary op
             binary_int_func func = get_binary_int_func(binary_type);
-            func(output_addr, input_addr, other_addr, &slice_shape, NULL, NULL,
-                 NULL, dst_dtype, dtype, dtype, 0, NO_USE, false);
+            func(output_local_addr[index], input_local_addr[index],
+                 other_local_addr[index], &slice_shape, NULL, NULL, NULL,
+                 dst_dtype, dtype, dtype, 0, NO_USE, false);
           }
 
-          // Move out from local memory to global memory
-          global_addr_t output_global_addr_gdma =
+          output_global_addr_gdma =
               output_global_addr + (ndone * output_global_stride->n +
                                     cdone * output_global_stride->c +
                                     hdone * output_global_stride->h +
                                     wdone * output_global_stride->w) *
                                        tpu_data_type_size(dtype);
-          tpu_gdma_cpy_L2S(output_global_addr_gdma, output_addr, &slice_shape,
-                           output_global_stride, NULL, dtype);
-
+          gdma_shape = slice_shape;
+          l2s = true;
+          index = 1 - index;
           wtodo -= slice_shape.w;
           wdone += slice_shape.w;
         }
         htodo -= slice_shape.h;
         hdone += slice_shape.h;
       }
+
       ntodo -= slice_shape.n;
       ndone += slice_shape.n;
     }
     ctodo -= slice_shape.c;
     cdone += slice_shape.c;
+  }
+  if (tpu_is_parallel_state()) {
+    tpu_parallel_end();
+  }
+  if (l2s) {
+    // Move out from local memory to global memory
+    tpu_gdma_cpy_L2S(output_global_addr_gdma, output_local_addr[1 - index],
+                     &gdma_shape, output_global_stride, NULL, dtype);
   }
 }
 
@@ -565,7 +599,7 @@ static inline void split_cw(int v, int *c, int *w) {
   *c = 1;
   *w = v;
   for (int i = NPU_NUM; i >= 2; i--) {
-    if (v % i) {
+    if (v % i == 0) {
       *c = i;
       *w = v / i;
       return;
@@ -574,7 +608,7 @@ static inline void split_cw(int v, int *c, int *w) {
 }
 
 static inline void assign_shapes(int *shape, int dim) {
-  if (dim == 4) {
+  if (dim >= 4) {
     return;
   } else if (dim == 1) {
     split_cw(shape[0], &shape[1], &shape[3]);
@@ -1003,49 +1037,8 @@ void tpu_kernel_api_binary_c_multi_core(const void *args) {
         api->output_global_addr + (length_slice * core_idx) * dsize, value,
         cur_length_slice, (data_type_t)api->dtype,
         (sg_binary_type_t)api->binary_type, api->inversed);
-    tpu_poll();
   }
-}
-TPUKERNEL_FUNC_REGISTER(tpu_kernel_api_binary_c_multi_core);
-#endif
-
-#ifdef FIRMWARE_BACKEND_2260
-extern void nodechip_binary_multi_core(
-    global_addr_t A_global_addr, global_addr_t B_global_addr,
-    global_addr_t res_global_addr, const int *A_shape, const int *B_shape,
-    int A_dim, int B_dim,
-    int binary_type, // 0: add, 1: sub, 2: mul, 3:div
-    data_type_t dtype, int if_relu, float relu_upper_limit);
-
-void tpu_kernel_api_binary_multi_core(const void *api_buf) {
-  sg_api_binary_multi_core_t *api = (sg_api_binary_multi_core_t *)api_buf;
-  if (api->binary_type == 0 && api->in0_scale < 0) {
-    // convert add to sub if in0_scale < 0
-    api->binary_type = 1;
-    api->in0_scale = -api->in0_scale;
-  }
-  TPUKERNEL_ASSERT(api->in0_scale == 1.f && api->in1_scale == 1.f);
-  int ashape[FW_MAX_SHAPE_DIMS], bshape[FW_MAX_SHAPE_DIMS];
-  for (int i = 0; i < api->in0_dims; ++i) {
-    ashape[i] = api->in0_shape[i];
-  }
-  for (int i = 0; i < api->in1_dims; ++i) {
-    bshape[i] = api->in1_shape[i];
-  }
-  int r_dim = api->in0_dims > api->in1_dims ? api->in0_dims : api->in1_dims;
-  int add_dim = r_dim < 4 ? 4 - r_dim : 0;
-  for (int i = 0; i < add_dim; ++i) {
-    ashape[api->in0_dims + i] = 1;
-    bshape[api->in1_dims + i] = 1;
-  }
-
-  tpu_initialize();
-  nodechip_binary_multi_core(
-      api->input0_addr, api->input1_addr, api->output_addr, ashape, bshape,
-      api->in0_dims + add_dim, api->in1_dims + add_dim, api->binary_type,
-      (data_type_t)api->dtype, 0, -1.f);
   tpu_poll();
 }
-
-TPUKERNEL_FUNC_REGISTER(tpu_kernel_api_binary_multi_core);
+TPUKERNEL_FUNC_REGISTER(tpu_kernel_api_binary_c_multi_core);
 #endif

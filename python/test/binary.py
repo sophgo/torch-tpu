@@ -249,7 +249,7 @@ def case_div_bcast():
     print("#"*5 + "case_div_bcast" + "#"*5)
     for dtype_t in [torch.float32, torch.float16, torch.bfloat16]:
         a = torch.randn((5, 3, 4, 2, 6), dtype=dtype_t)
-        b = torch.randn((1, 4, 1, 6), dtype=dtype_t) + 0.1
+        b = torch.randn((1, 4, 1, 6), dtype=dtype_t) + 0.01
 
         cpu_out = a / b
         tpu_out = a.to(device) / b.to(device)
@@ -270,7 +270,7 @@ def case_div_bcast():
 def case_div_scalar():
     print("#"*5 + "case_div_scalar" + "#"*5)
     for dtype_t in [torch.float32, torch.float16, torch.bfloat16]:
-        a = torch.randn((5, 3, 4, 2, 6), dtype=dtype_t) + 0.1
+        a = torch.randn((5, 3, 4, 2, 6), dtype=dtype_t) + 0.01
         b = torch.tensor(3.0)
 
         cpu_out = a / b
@@ -316,25 +316,35 @@ def test_div():
     case_div_scalar()
 
 def add_test():
-    a = torch.randn((32, 6, 50304))
-    b = torch.randn((32, 6, 1))
+    a = torch.randn((6, 50304))
+    b = torch.randn((6, 1))
 
     cpu_out = a * b
     tpu_out = a.to(device) * b.to(device)
 
     print(f"shape: cpu_out: {cpu_out.shape}, tpu_out: {tpu_out.shape}")
     print(f"max_diff: {torch.max(abs(cpu_out - tpu_out.cpu()))}")
+    print(f"where: {torch.unique(torch.where(abs(cpu_out - tpu_out.cpu()) > .1)[1])}")
+
+def temp():
+    a = torch.randn((4))
+    b = torch.tensor((3.14))
+    cpu_out = a + b
+    tpu_out = a.to(device) + b.to(device)
+    print(cpu_out)
+    print(tpu_out.cpu())
+    print(f"max_diff: {torch.max(abs(cpu_out - tpu_out.cpu()))}")
+
 
 if __name__ == "__main__":
     # test_add()
     # test_sub()
     # test_mul()
     # test_div()
-    # add_test()
 
-    case_div()
-    # case_div_bcast()
-    # case_div_scalar()
+    # add_test()
+    # temp()
+
 
 
     

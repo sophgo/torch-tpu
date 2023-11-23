@@ -110,14 +110,17 @@ Tensor &binary_op_tpu(const Tensor &self, const Tensor &other,
     SgdnnTensor_t other_t = tpu::TPUGenerateSgdnnTensor(other);
     SgdnnTensor_t out_t = tpu::TPUGenerateSgdnnTensor(out);
 
-    auto &change_t = self_dim > other_dim ? other_t : self_t;
-    const auto &change_shape = self_dim > other_dim ? other_shape : self_shape;
-    for (int i = max_dim - 1; i >= 0; i--) {
-      change_t.shape[i] = change_shape[i];
-      change_t.stride[i] =
-          i == max_dim - 1 ? 1 : change_t.stride[i + 1] * change_shape[i + 1];
+    if (self_dim != other_dim) {
+      auto &change_t = self_dim > other_dim ? other_t : self_t;
+      const auto &change_shape =
+          self_dim > other_dim ? other_shape : self_shape;
+      for (int i = max_dim - 1; i >= 0; i--) {
+        change_t.shape[i] = change_shape[i];
+        change_t.stride[i] =
+            i == max_dim - 1 ? 1 : change_t.stride[i + 1] * change_shape[i + 1];
+      }
+      change_t.dim = max_dim;
     }
-    change_t.dim = max_dim;
 
     TIMING_START
     bm_status_t status =
@@ -242,8 +245,10 @@ Tensor &div_out_tpu(const Tensor &self, const Tensor &other, Tensor &out) {
   const Tensor self_f = self.to(torch::kFloat);
   const Tensor other_f = other.to(torch::kFloat);
   Tensor out_f = out.to(torch::kFloat);
+  // 0:add, 1:sub, 2:mul, 3:div
   binary_op_tpu(self_f, other_f, 1, out_f, 3);
-  out = out_f.to(out.dtype());
+  tpu::TPUCopyDeviceToDevice(out.data_ptr(), out_f.to(out.dtype()).data_ptr(),
+                             out.nbytes());
   return out;
 }
 TORCH_LIBRARY_IMPL(aten, TPU, m) { m.impl("div.out", div_out_tpu); }
