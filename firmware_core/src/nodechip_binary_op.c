@@ -878,7 +878,7 @@ void nodechip_binary_scalar(global_addr_t input_global_addr,
         const_binary_fp32_div_func func_const =
             get_const_binary_fp32_div_func(inversed);
         func_const(out_local_addr[(stage_idx - 1) & 0x1],
-                   in_local_addr[(stage_idx - 1) & 0x1], value.s32, &cur_shape,
+                   in_local_addr[(stage_idx - 1) & 0x1], value.f32, &cur_shape,
                    NULL, NULL);
       } else if (dtype == DT_FP32 || dtype == DT_FP16 || dtype == DT_BFP16) {
         const_binary_fp_func func_const =
