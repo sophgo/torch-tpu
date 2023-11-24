@@ -448,14 +448,18 @@ void nodechip_binary_bcast(global_addr_t input_global_addr,
           }
           if (input_bcast[0] || input_bcast[2] || input_bcast[3] ||
               (input_bcast[1] && slice_shape.c > NPU_NUM)) {
-            dim4 input_bcast_stride = {
-                .n = input_bcast[0] ? 0 : input_local_stride.n,
-                .c = input_bcast[1] ? 0 : input_local_stride.c,
-                .h = input_bcast[2] ? 0 : input_local_stride.h,
-                .w = input_bcast[3] ? 0 : input_local_stride.w,
-            };
-            tpu_bdc_cpy(input_local_addr[index], input_local_addr[index],
-                        &slice_shape, NULL, &input_bcast_stride, dtype);
+            for (int i = 0; i < 4; ++i) {
+              ((int *)&input_local_stride)[i] =
+                  input_bcast[i] ? 0 : ((int *)&input_local_stride)[i];
+            }
+            // dim4 input_bcast_stride = {
+            //     .n = input_bcast[0] ? 0 : input_local_stride.n,
+            //     .c = input_bcast[1] ? 0 : input_local_stride.c,
+            //     .h = input_bcast[2] ? 0 : input_local_stride.h,
+            //     .w = input_bcast[3] ? 0 : input_local_stride.w,
+            // };
+            // tpu_bdc_cpy(input_local_addr[index], input_local_addr[index],
+            //             &slice_shape, NULL, &input_bcast_stride, dtype);
           }
 
           // Broadcast other if needed
@@ -466,20 +470,22 @@ void nodechip_binary_bcast(global_addr_t input_global_addr,
           }
           if (other_bcast[0] || other_bcast[2] || other_bcast[3] ||
               (other_bcast[1] && slice_shape.c > NPU_NUM)) {
-            dim4 other_bcast_stride = {
-                .n = other_bcast[0] ? 0 : other_local_stride.n,
-                .c = other_bcast[1] ? 0 : other_local_stride.c,
-                .h = other_bcast[2] ? 0 : other_local_stride.h,
-                .w = other_bcast[3] ? 0 : other_local_stride.w,
-            };
-            tpu_bdc_cpy(other_local_addr[index], other_local_addr[index],
-                        &slice_shape, NULL, &other_bcast_stride, dtype);
+            for (int i = 0; i < 4; ++i) {
+              ((int *)&other_local_stride)[i] =
+                  other_bcast[i] ? 0 : ((int *)&other_local_stride)[i];
+            }
+            // dim4 other_bcast_stride = {
+            //     .n = other_bcast[0] ? 0 : other_local_stride.n,
+            //     .c = other_bcast[1] ? 0 : other_local_stride.c,
+            //     .h = other_bcast[2] ? 0 : other_local_stride.h,
+            //     .w = other_bcast[3] ? 0 : other_local_stride.w,
+            // };
+            // tpu_bdc_cpy(other_local_addr[index], other_local_addr[index],
+            //             &slice_shape, NULL, &other_bcast_stride, dtype);
           }
 
-          if (tpu_is_parallel_state()) {
-            tpu_parallel_end();
-          }
           tpu_parallel_start();
+
           if (l2s) {
             // Move out from local memory to global memory
             tpu_gdma_cpy_L2S(output_global_addr_gdma,
@@ -489,8 +495,8 @@ void nodechip_binary_bcast(global_addr_t input_global_addr,
 
           if (binary_type == BINARY_DIV) {
             tpu_bdc_fp32_div(output_local_addr[index], input_local_addr[index],
-                             other_local_addr[index], &slice_shape, NULL, NULL,
-                             NULL);
+                             other_local_addr[index], &slice_shape, NULL, &input_local_stride,
+                             &other_local_stride);
           } else if (dtype == DT_FP32 || dtype == DT_FP16 ||
                      dtype == DT_BFP16) {
             if (binary_type == BINARY_ADD || binary_type == BINARY_SUB) {
@@ -498,13 +504,13 @@ void nodechip_binary_bcast(global_addr_t input_global_addr,
               const_binary_fp_func func_const =
                   get_const_binary_fp_func(BINARY_MUL, false);
               func_const(other_local_addr[index], other_local_addr[index],
-                         value, &slice_shape, NULL, NULL, dtype);
+                         value, &slice_shape, &other_local_stride, &other_local_stride, dtype);
             }
 
             // binary op
             binary_fp_func func = get_binary_fp_func(binary_type);
             func(output_local_addr[index], input_local_addr[index],
-                 other_local_addr[index], &slice_shape, NULL, NULL, NULL,
+                 other_local_addr[index], &slice_shape, NULL, &input_local_stride, &other_local_stride,
                  dtype);
 
           } else {
@@ -513,7 +519,7 @@ void nodechip_binary_bcast(global_addr_t input_global_addr,
               const_binary_int_func func_const =
                   get_const_binary_int_func(BINARY_MUL, false);
               func_const(other_local_addr[index], other_local_addr[index],
-                         value, &slice_shape, NULL, NULL, dtype, dtype, dtype,
+                         value, &slice_shape, &other_local_stride, &other_local_stride, dtype, dtype, dtype,
                          0, NO_USE, false);
             }
 
@@ -531,9 +537,10 @@ void nodechip_binary_bcast(global_addr_t input_global_addr,
             // binary op
             binary_int_func func = get_binary_int_func(binary_type);
             func(output_local_addr[index], input_local_addr[index],
-                 other_local_addr[index], &slice_shape, NULL, NULL, NULL,
+                 other_local_addr[index], &slice_shape, NULL, &input_local_stride, &other_local_stride,
                  dst_dtype, dtype, dtype, 0, NO_USE, false);
           }
+          tpu_parallel_end();
 
           output_global_addr_gdma =
               output_global_addr + (ndone * output_global_stride->n +

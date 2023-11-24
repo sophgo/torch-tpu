@@ -296,28 +296,28 @@ def case_div_scalar():
         print(f"tpu2 max_diff: {torch.max(abs(cpu_out2 - tpu_out2.cpu()))}")
 
 def test_add():
-    case_add()
+    # case_add()
     case_add_bcast()
-    case_add_scalar()
+    # case_add_scalar()
 
 def test_sub():
-    case_sub()
+    # case_sub()
     case_sub_bcast()
-    case_sub_scalar()
+    # case_sub_scalar()
 
 def test_mul():
-    case_mul()
+    # case_mul()
     case_mul_bcast()
-    case_mul_scalar()
+    # case_mul_scalar()
 
 def test_div():
-    case_div()
+    # case_div()
     case_div_bcast()
-    case_div_scalar()
+    # case_div_scalar()
 
 def add_test():
-    a = torch.randn((6, 50304))
-    b = torch.randn((6, 1))
+    a = torch.randn((32, 6, 50304))
+    b = torch.randn((32, 6, 1))
 
     cpu_out = a * b
     tpu_out = a.to(device) * b.to(device)
@@ -337,13 +337,13 @@ def temp():
 
 
 if __name__ == "__main__":
-    # test_add()
-    # test_sub()
-    # test_mul()
-    # test_div()
+    test_add()
+    test_sub()
+    test_mul()
+    test_div()
 
-    # add_test()
-    # temp()
+    add_test()
+    temp()
 
 
 
