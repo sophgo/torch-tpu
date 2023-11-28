@@ -27,65 +27,96 @@ Tensor & index_out_tpu( const Tensor & self, const c10::List<c10::optional<Tenso
     out = out_cpu.to(out.device());
 #else
     if (indices.size() == 1) {
+      TIMING_START;
+      bm_status_t status = sgdnnIndexSelect(tpu::TPUGetDeviceHandle(),
+                                            tpu::TPUGenerateSgdnnTensor(self),
+                                            tpu::TPUGenerateSgdnnTensor(indices[0].value()),
+                                            0,
+                                            tpu::TPUGenerateSgdnnTensor(out));
+      TORCH_CHECK ( status == BM_SUCCESS );
+      TIMING_END ( tpu::INDEX_SELECT );
+    } else {
+      int64_t index_size = -1;
+      std::vector<bool> broadcast;
+      std::vector<int> broadcast_shape;
+      std::vector<int> no_broadcast_shape;
+
+      std::vector<Tensor> indexes;
+      for (int i = 0; i < indices.size(); ++i) {
+        // check empty index (dim broadcast)
+        auto size = indices[i].value().numel();
+        if (!indices[i].has_value() or size == 0) {
+          broadcast.push_back(true);
+          broadcast_shape.push_back(self.size(i));
+        } else {
+          broadcast.push_back(false);
+          no_broadcast_shape.push_back(self.size(i));
+          // check index shape broadcast
+          if (index_size == -1) {
+            index_size = size;
+          } else {
+            TORCH_CHECK(size == index_size, "Does not support shape broadcast now!")
+          }
+          // matmul does not support int; fp32 has problem; use cpu here
+          // indexes.push_back(indices[i].value().to(torch::kFloat32).view(-1));
+          indexes.push_back(indices[i].value().cpu().to(torch::kInt64).view(-1));
+        }
+      }
+      for (int i = indices.size(); i < self.dim(); ++i) {
+        broadcast.push_back(true);
+        broadcast_shape.push_back(self.size(i));
+      }
+      // only support broadcast at beginning or end; in the middle not support
+      int change = 0;
+      int start = 0;
+      int end = self.dim();
+      for (int i = 0; i < broadcast.size() - 1; ++i) {
+        if (broadcast[i] != broadcast[i+1]) {
+          ++change;
+          if (broadcast[i])
+            start = i + 1;
+          else 
+            end = i + 1;
+        }
+      }
+      if (change <= 1) { 
+        std::vector<int64_t> stride_data;
+        for (auto i = start; i < end; ++i) {
+          stride_data.push_back(std::accumulate(self.sizes().begin() + i + 1, self.sizes().begin() + end, 1, std::multiplies<int64_t>()));
+        }
+        IntArrayRef size_ref = {(int64_t)stride_data.size()};
+        TensorOptions option = TensorOptions( ).device("cpu").dtype(torch::kInt64);
+        Tensor strides = from_blob(stride_data.data(), size_ref, option).clone(); //.to(torch::kFloat32).to(self.device());
+
+        auto dim0 = std::accumulate(broadcast_shape.begin(), broadcast_shape.end(), 1, std::multiplies<int>());
+        auto dim1 = std::accumulate(no_broadcast_shape.begin(), no_broadcast_shape.end(), 1, std::multiplies<int>());
+        Tensor self_two_dim = broadcast[0] ? self.view({dim0, dim1}) : self.view({dim1, dim0});
+        Tensor index_two_dim = matmul(strides, stack(indexes)).to(torch::kInt32).to(self.device());
+        Tensor out_two_dim = broadcast[0] ? out.view({dim0, -1}) : out.view({-1, dim0});
         TIMING_START;
+        
         bm_status_t status = sgdnnIndexSelect(tpu::TPUGetDeviceHandle(),
-                                              tpu::TPUGenerateSgdnnTensor(self),
-                                              tpu::TPUGenerateSgdnnTensor(indices[0].value()),
-                                              0,
-                                              tpu::TPUGenerateSgdnnTensor(out));
+                                              tpu::TPUGenerateSgdnnTensor(self_two_dim),
+                                              tpu::TPUGenerateSgdnnTensor(index_two_dim),
+                                              (int)broadcast[0],
+                                              tpu::TPUGenerateSgdnnTensor(out_two_dim));
+
         TORCH_CHECK ( status == BM_SUCCESS );
         TIMING_END ( tpu::INDEX_SELECT );
-    } else {
-        IntArrayRef size_ref = {(int64_t)self.strides().size()};
-        TensorOptions option = TensorOptions( ).device("cpu").dtype(torch::kInt64);
-        Tensor strides = from_blob(self.strides().vec().data(), size_ref, option).clone(); //.to(torch::kFloat32).to(self.device());
-        int64_t index_size = -1;
-        std::vector<Tensor> indexes;
+      } else {
+        // no support; use cpu impl
+        LOG( WARNING ) << "case not supported; index use cpu impl";
+        c10::List<c10::optional<Tensor>> indices_cpu;
         for (int i = 0; i < indices.size(); i++)
         {
-            // TODO: empty indices or broadcast shape cases
-            TORCH_CHECK (indices[i].has_value(), "Does not support empty indices now!" );
-            auto size = indices[i].value().numel();
-            TORCH_CHECK(size != 0, "Does not support empty indices now!")
-            if (index_size == -1) {
-                index_size = size;
-            } else {
-                TORCH_CHECK(size == index_size, "Does not support shape broadcast now!")
-            }
-            // matmul does not support int; fp32 has problem; use cpu here
-            // indexes.push_back(indices[i].value().to(torch::kFloat32).view(-1));
-            indexes.push_back(indices[i].value().cpu().to(torch::kInt64).view(-1));
+            c10::optional<Tensor> indice = c10::nullopt;
+            if ( indices[i].has_value() ) { indice = indices[i].value().cpu(); }
+            indices_cpu.push_back(indice);
         }
-        Tensor self_one_dim = self.view(-1);
-        // Tensor index_one_dim = matmul(strides, stack(indexes)).to(torch::kInt32);
-        Tensor index_one_dim = matmul(strides, stack(indexes)).to(self.device());
-        TIMING_START;
-        bm_status_t status = sgdnnIndexSelect(tpu::TPUGetDeviceHandle(),
-                                              tpu::TPUGenerateSgdnnTensor(self_one_dim),
-                                              tpu::TPUGenerateSgdnnTensor(index_one_dim),
-                                              0,
-                                              tpu::TPUGenerateSgdnnTensor(out));
-        TORCH_CHECK ( status == BM_SUCCESS );
-        TIMING_END ( tpu::INDEX_SELECT );
+        auto out_cpu = index( self.cpu(), indices_cpu );
+        out = out_cpu.to(out.device());
+      }
     }
-    
-    // std::vector< SgdnnTensor_t> Inds;
-    // for (int i = 0; i < indices.size(); i++){\
-    //     if (indices[i].has_value()) {
-    //         Inds.push_back( tpu::TPUGenerateSgdnnTensor(indices[i].value()) );
-    //     } else {
-    //         SgdnnTensor_t null_tensor = {0};
-    //         Inds.push_back(null_tensor);
-    //     }
-        
-    // }
-    // TIMING_START;    
-    // bm_status_t status = sgdnnMulIndexSelect(tpu::TPUGetDeviceHandle(),
-    //                                 tpu::TPUGenerateSgdnnTensor(self),
-    //                                 tpu::TPUGenerateSgdnnTensor(out),
-    //                                 Inds);
-    // TORCH_CHECK ( status == BM_SUCCESS );
-    // TIMING_END ( tpu::INDEX_SELECT );
 #endif
     return out;
 }

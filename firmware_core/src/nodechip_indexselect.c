@@ -259,7 +259,7 @@ void nodechip_cast_i64_to_i32_without_overflow_multi_core(
         out_global_addr_sliced,
         index_shape_sliced,
         2,
-        outer_num_,
+        outer_num_real,
         round_mode
       );
     }
@@ -367,7 +367,7 @@ void nodechip_index_select_multi_core(
       //output [1, c_sliced, index_num, ishape.w] index_num * ishape.w strides
       int in_offset_multi_core = outer_num_avg * core_idx * type_size * ishape.w *  ishape.h;
       int out_offset_multi_core = outer_num_avg * core_idx * type_size * index_num * ishape.w;
-      int index_offset_multi_core = outer_num_avg * core_idx * type_size * ishape.w ;
+      // int index_offset_multi_core = outer_num_avg * core_idx * type_size * ishape.w ; // index should not be sliced
       int cidx = 0, widx = 0;
 
       //2nd_level_Slicing inside CPU
@@ -381,7 +381,7 @@ void nodechip_index_select_multi_core(
         tpu_gdma_h_gather_S2S(
             output_global_addr + out_offset + out_offset_multi_core,
             input_global_addr  + in_offset + in_offset_multi_core,
-            index_global_addr + index_offset_multi_core,
+            index_global_addr,
             false,
             const_filler,
             &real_oshape,
@@ -417,7 +417,7 @@ void tpu_kernel_api_index_select_multi_core ( const void * args )
       2,
       RM_HALF_TO_EVEN);
   }
-  tpu_poll();
+  tpu_sync_all();
 
   nodechip_index_select_multi_core (
   api->input_global_addr,
