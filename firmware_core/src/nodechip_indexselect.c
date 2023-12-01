@@ -309,6 +309,47 @@ void nodechip_cast_i64_to_i32_without_overflow_multi_core(
     }
 }
 
+void nodechip_index_select_multi_core_index1_specific(
+    global_addr_t input_global_addr,
+    global_addr_t index_global_addr,
+    global_addr_t output_global_addr,
+    const int     outer_num,
+    int           inner_num,
+    int           select_num,
+    int           index_num,
+    int           const_val,
+    data_type_t   dtype
+) {
+  TPUKERNEL_ASSERT(index_num == 1);
+  TPUKERNEL_ASSERT(outer_num == 1);
+  int core_num = tpu_core_num();
+  int core_idx = tpu_core_index();
+  int inner_sliced = DIV_UP(inner_num, core_num);
+  int real_inner_sliced = MIN(inner_num - inner_sliced * core_idx, inner_sliced);
+
+  scalar_t const_filler = {.s32 = const_val};
+  if (real_inner_sliced > 0) {
+    int out_offset = inner_sliced * core_idx * tpu_data_type_size(dtype);
+    int in_offset = inner_sliced * core_idx * tpu_data_type_size(dtype);
+    dim4 real_oshape = {1, 1, index_num, real_inner_sliced};
+    dim4 params_shape = {.n = 1, .c = 1, .h = select_num, .w = inner_num};
+    dim4 params_stride;
+    tpu_continuous_stride(&params_stride, &params_shape);
+    tpu_gdma_h_gather_S2S(
+      output_global_addr + out_offset,
+      input_global_addr + in_offset,
+      index_global_addr,
+      false,
+      const_filler,
+      &real_oshape,
+      select_num,
+      NULL,
+      &params_stride,
+      NULL,
+      dtype);
+  }
+}
+
 void nodechip_index_select_multi_core(
     global_addr_t input_global_addr,
     global_addr_t index_global_addr,
@@ -419,16 +460,41 @@ void tpu_kernel_api_index_select_multi_core ( const void * args )
   }
   tpu_sync_all();
 
-  nodechip_index_select_multi_core (
-  api->input_global_addr,
-  api->index_global_addr,
-  api->output_global_addr,
-  input_shape,
-  api->dim,
-  api->index_num,
-  api->axis,
-  0,
-  ( data_type_t ) api->dtype );
+  int outer_num = 1;
+  int select_num = 1;
+  int inner_num = 1;
+  for (int i = api->axis + 1; i < api->dim; ++i) {
+    inner_num *= input_shape[i];
+  }
+  select_num = input_shape[api->axis];
+  for (int i = api->axis - 1; i >= 0; --i) {
+    outer_num *= input_shape[i];
+  }
+  // case: [1], [32000, 8192] -> [8192] can not make full use of multi core
+  if (outer_num == 1 && api->index_num == 1) {
+    nodechip_index_select_multi_core_index1_specific(
+      api->input_global_addr,
+      api->index_global_addr,
+      api->output_global_addr,
+      outer_num,
+      inner_num,
+      select_num,
+      api->index_num,
+      0,
+      ( data_type_t ) api->dtype);
+  } else {
+    nodechip_index_select_multi_core (
+    api->input_global_addr,
+    api->index_global_addr,
+    api->output_global_addr,
+    input_shape,
+    api->dim,
+    api->index_num,
+    api->axis,
+    0,
+    ( data_type_t ) api->dtype );
+  }
+
   tpu_poll();
 }
 TPUKERNEL_FUNC_REGISTER ( tpu_kernel_api_index_select_multi_core );
