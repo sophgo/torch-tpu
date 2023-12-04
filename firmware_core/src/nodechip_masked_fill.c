@@ -60,16 +60,16 @@ void tpu_kernel_api_masked_fill_multi_core ( const void * args )
     new_input_shape[2 - num_edges] *= api->input_shape[0];
     new_mask_shape[2 - num_edges] *= api->mask_shape[0];
 
-    // broadcast cases. Same as backend. mode is the dim to split.
+    // broadcast cases. Same as backend. mode is the dim to split among core.
     int mode = -1;
-    if (num_edges == 0 && !is_bcast[api->input_dims-1]) { // no broadcast
+    if (num_edges == 0 && !is_bcast[api->input_dims-1]) { // no broadcast 00
         mode = 2;
-    } else if ((num_edges == 0 && is_bcast[api->input_dims-1])
+    } else if ((num_edges == 0 && is_bcast[api->input_dims-1]) // 10
             || (num_edges == 1 && !is_bcast[api->input_dims-1])) {
         mode = 1;
-    } else if (num_edges == 1 && is_bcast[api->input_dims-1]) {
+    } else if (num_edges == 1 && is_bcast[api->input_dims-1]) { // 01
         mode = 1;
-    } else if (num_edges == 2 && !is_bcast[api->input_dims-1] && !is_bcast[0]) {
+    } else if (num_edges == 2 && !is_bcast[api->input_dims-1] && !is_bcast[0]) { // 010
         mode = 0;
     } else {
         TPUKERNEL_ASSERT_INFO(false, "not implemented");
@@ -79,8 +79,8 @@ void tpu_kernel_api_masked_fill_multi_core ( const void * args )
     int core_num = tpu_core_num();
     int core_idx = tpu_core_index();
     int length = new_input_shape[mode];
-    int input_length_other = new_input_shape[0] * new_input_shape[1] * new_input_shape[2] / length;
-    int mask_length_other = new_mask_shape[0] * new_mask_shape[1] * new_mask_shape[2] / length;
+    long long int input_length_other = new_input_shape[0] * new_input_shape[1] * new_input_shape[2] / length;
+    long long int mask_length_other = new_mask_shape[0] * new_mask_shape[1] * new_mask_shape[2] / length;
 
     int length_slice = DIV_UP(length, core_num);
     int length_secs = DIV_UP(length, length_slice);

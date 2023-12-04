@@ -3274,7 +3274,10 @@ bm_status_t sgdnnMaskedFill ( bm_handle_t handle,
                               SgdnnTensor_t out )
 {
   SGDNN_CHECK ( input.dim == mask.dim );
-  SGDNN_CHECK ( input.dtype == SGDNN_DTYPE_FP32);
+  SGDNN_CHECK ( input.dtype == SGDNN_DTYPE_FP32 ||
+                input.dtype == SGDNN_DTYPE_FP16 ||
+                input.dtype == SGDNN_DTYPE_BF16 ||
+                input.dtype == SGDNN_DTYPE_INT32 );
   for ( int i = 0; i < input.dim; i++ )
   {
     SGDNN_CHECK ( input.shape[i] == mask.shape[i] || mask.shape[i] == 1);
@@ -3307,7 +3310,7 @@ bm_status_t sgdnnMaskedFill ( bm_handle_t handle,
     api.mask_shape[i] = mask.shape[i];
   }
   api.value = value;
-  api.dtype = sgdnnTPUKernelDType ( SGDNN_DTYPE_FP32 );;
+  api.dtype = sgdnnTPUKernelDType(input.dtype);//sgdnnTPUKernelDType ( SGDNN_DTYPE_FP32 );;
   SAFE_CALL ( sgdnnTPUKernelLaunch ( handle, "tpu_kernel_api_masked_fill_multi_core", &api, sizeof ( api ) ) );
 #else
   SGDNN_CHECK(false);
