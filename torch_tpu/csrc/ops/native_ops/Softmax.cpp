@@ -14,18 +14,45 @@ Tensor & _log_softmax_out_tpu ( const Tensor & self, int64_t dim, bool half_to_f
 {
   CHECK_TENSOR_IN_DEVICE ( self );
   CHECK_TENSOR_IN_DEVICE ( out );
-  CPU_IMPL_WARNING();
   TORCH_CHECK ( half_to_float == false );
+#if 0
+  CPU_IMPL_WARNING();
   TIMING_START;
   auto out_cpu = _log_softmax ( self.cpu(), dim, half_to_float );
   tpu::TPUCopyHostToDevice ( out.data_ptr(), out_cpu.contiguous().data_ptr(), out.nbytes() );
   TIMING_END(tpu::CPU_LAYER);
+#else
+  Tensor self_f = self;
+  Tensor out_f = out;
+  if (self.dtype() == caffe2::TypeMeta::Make<at::Half>() ||
+      self.dtype() == caffe2::TypeMeta::Make<at::BFloat16>()) {
+    self_f = self.to(torch::kFloat);
+    out_f = out.to(torch::kFloat);
+  }
+
+  TIMING_START;
+  #ifdef BACKEND_1684X
+  auto status = sgdnnLogSoftmax(tpu::TPUGetDeviceHandle(),
+                                       tpu::TPUGenerateSgdnnTensor(self_f), dim,
+                                       tpu::TPUGenerateSgdnnTensor(out_f));
+  TORCH_CHECK(status == BM_SUCCESS);
+  tpu::TPUCopyDeviceToDevice(out.data_ptr(), out_f.to(out.dtype()).data_ptr(),
+                             out.nbytes());
+  #elif defined BACKEND_SG2260
+  auto status = sgdnnLogSoftmax(c10_tpu::getCurrentTPUStream(),
+                                       tpu::TPUGenerateSgdnnTensor(self_f), dim,
+                                       tpu::TPUGenerateSgdnnTensor(out_f));
+  TORCH_CHECK(status == tpuRtSuccess);
+  tpu::TPUCopyDeviceToDevice(out.data_ptr(), out_f.to(out.dtype()).data_ptr(),
+                             out.nbytes());
+  #endif
+  TIMING_END(tpu::LOGSOFTMAX);
+#endif
   SHOW_TENSOR_OP(self, out);
   return out;
 }
-TORCH_LIBRARY_IMPL ( aten, TPU, m )
-{
-  m.impl ( "_log_softmax.out", _log_softmax_out_tpu );
+TORCH_LIBRARY_IMPL(aten, TPU, m) {
+  m.impl("_log_softmax.out", _log_softmax_out_tpu);
 }
 
 #if 0

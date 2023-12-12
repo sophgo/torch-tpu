@@ -89,6 +89,7 @@ static const char * OpTypeStr[OP_NUM] =
   "Linear",
   "Softmax",
   "Softmax Backward",
+  "Log Softmax",
   "Permute",
   "Transpose",
   "Add",

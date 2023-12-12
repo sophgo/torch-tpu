@@ -766,6 +766,19 @@ tpuRtStatus_t sgdnnSoftmaxBackward ( tpuRtStream_t  stream,
                                    bool non_blocking = true);
 
 /*
+ * OUTPUT = LOGSOFTMAX ( INPUT, DIM )
+ * Note:
+ * 1. The data types of INPUT and OUTPUT must be the same and one of FP32, FP16 and BF16
+ * 2. The shapes of INPUT and OUTPUT must be the same
+ * 3. INPUT and OUTPUT must be contiguous
+ */
+tpuRtStatus_t sgdnnLogSoftmax ( tpuRtStream_t handle,
+                              SgdnnTensor_t input,
+                              int dim,
+                              SgdnnTensor_t output,
+                              bool non_blocking = true );
+
+/*
  * OUTPUT = NORM2 ( INPUT, KEEPDIM )
  * Note:
  * 1. The data types of INPUT and OUTPUT must be the same and one of FP32, FP16 and BF16

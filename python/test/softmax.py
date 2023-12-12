@@ -135,5 +135,17 @@ def test(use_half = False, test_backward = False):
         print(inp_tpu_grad.flatten()[:50])
         print (torch.max(abs(grad_diff)))
 
+def test_log_softmax():
+    device = "privateuseone"
+    x = torch.randn((20, 35, 64), dtype=torch.float16)
+    print(x.dim())
+    y_cpu = torch.log_softmax(x.to(torch.float), -1)
+    y_tpu = torch.log_softmax(x.to(device), -1)
+
+    # print(f"cpu: {y_cpu}")
+    # print(f"tpu: {y_tpu.cpu()}")
+    print(f"max diff: {torch.max(abs(y_cpu - y_tpu.cpu()))}")
+
 if __name__ == "__main__":
-    test(True, False)
+    # test(True, False)
+    test_log_softmax()
