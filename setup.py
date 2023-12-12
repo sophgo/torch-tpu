@@ -138,7 +138,8 @@ class CPPLibBuild(build_clib, object):
         build_args = ['-j', str(multiprocessing.cpu_count())]
 
         subprocess.check_call([self.cmake, BASE_DIR] + cmake_args, cwd=build_type_dir, env=os.environ)
-        subprocess.check_call(['make', 'kernel_module'], cwd=build_type_dir, env=os.environ)
+        if os.environ.get("CHIP_ARCH", None) == "bm1684x":
+            subprocess.check_call(['make', 'kernel_module'], cwd=build_type_dir, env=os.environ)
         subprocess.check_call(['make'] + build_args, cwd=build_type_dir, env=os.environ)
         generate_libs = glob.glob(os.path.join(build_type_dir, "*/*.so"), recursive=True)
         for lib in generate_libs:
