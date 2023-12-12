@@ -1,11 +1,6 @@
-#include <torch/library.h>
-#include <torch/torch.h>
-#include <ATen/core/TensorBase.h>
-#include <ATen/EmptyTensor.h>
-
-#include "TPUTorchUtils.h"
-
 #include "common/config.h"
+#include <ATen/EmptyTensor.h>
+#include "TPUTorchUtils.h"
 
 namespace at
 {
@@ -36,9 +31,5 @@ Tensor & neg_out_tpu ( const Tensor & self, Tensor & out )
   SHOW_TENSOR_OP(self, out);
   return out;
 }
-TORCH_LIBRARY_IMPL ( aten, TPU, m )
-{
-  m.impl ( "neg.out", neg_out_tpu );
-  
-}
+TORCH_LIBRARY_IMPL(aten, TPU, m) { m.impl("neg.out", neg_out_tpu); }
 } // namespace at

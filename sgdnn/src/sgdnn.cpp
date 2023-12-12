@@ -4269,7 +4269,7 @@ bm_status_t sgdnnNeg ( bm_handle_t handle,
                        SgdnnTensor_t output )
 {
   SGDNN_CHECK ( input.dtype == output.dtype );
-  SGDNN_CHECK ( input.dtype == SGDNN_DTYPE_FP32);
+  // SGDNN_CHECK ( input.dtype == SGDNN_DTYPE_FP32);
 
   SGDNN_CHECK ( sgdnnIsSameShape ( &input, &output ) );
   SGDNN_CHECK ( sgdnnIsTensorContiguous ( &input ) );

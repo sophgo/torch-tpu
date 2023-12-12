@@ -8,22 +8,17 @@ torch.set_printoptions(precision=6)
 device = "tpu:0"
 
 
-def case1():
-    a1 = torch.randn(5)
-    a2 = a1.clone()
-    a2_tpu = a2.to(device)
-    a3 = 1
-    a4 = a2.clone()
+def case_neg():
+    x = torch.randn((2, 52, 64, 45, 64), dtype=torch.float16)
+    # x = torch.randint(0, 128, (2, 3, 4), dtype=torch.uint8)
+    out_cpu = torch.neg(x)
+    out_tpu = torch.neg(x.to(device))
 
-    a2.neg_()
-    a2_tpu = a2_tpu.neg()
-    print(abs(a2 - a2_tpu.to("cpu")).max().item())
-    print(a2.size(),a2.dim())
-  #  assert (a2 - a2_tpu.to("cpu") < 1e-5).all()
-    print("origin: ",a1)
-    print("cpu : ", a2 )
-    print("tpu : ", a2_tpu.cpu())
+    # print(f"cpu out: {out_cpu}")
+    # print(f"tpu out: {out_tpu.cpu()}")
+
+    print(f"max diff: {torch.max(abs(out_cpu - out_tpu.cpu()))}")
 
 
 if __name__ == "__main__":
-    case1()
+    case_neg()
