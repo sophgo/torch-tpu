@@ -5774,7 +5774,7 @@ bm_status_t sgdnnPermute ( bm_handle_t handle,
 bm_status_t sgdnnTopk ( bm_handle_t handle,
                         SgdnnTensor_t input,
                         int k,
-                        int dim,
+                        int axis,
                         bool largest,
                         bool sorted,
                         SgdnnTensor_t value,
@@ -5787,43 +5787,24 @@ bm_status_t sgdnnTopk ( bm_handle_t handle,
   SGDNN_CHECK ( sgdnnIsTensorContiguous ( &value ) );
   SGDNN_CHECK ( sgdnnIsTensorContiguous ( &index ) );
 
-#if defined SGDNN_BACKEND_1684X
   sg_api_topk_t api;
-  api.dim = input.dim;
-  unsigned int index_size = 1, trans_size = 1;
   for(int i = 0; i < input.dim; ++i) {
     api.shape[i] = input.shape[i];
-    if(i != dim && i != (dim + input.dim)) {
-      index_size *= input.shape[i];
-    }
-    trans_size *= input.shape[i];
   }
-  index_size *= (sizeof(int) * 2);
-  bm_device_mem_t dev_mem_index, dev_mem_trans;
-  bm_status_t status = bm_malloc_device_byte(handle, &dev_mem_index, index_size);
-  if(BM_SUCCESS != status){
-    printf("malloc device error \r\n");
-    return status;
-  }
-  trans_size *= sizeof(int);
-  api.index_buffer_global_addr = bm_mem_get_device_addr(dev_mem_index);
-  status = bm_malloc_device_byte(handle, &dev_mem_trans, trans_size);
-  if(BM_SUCCESS != status){
-    printf("malloc device error \r\n");
-    return status;
-  }
-  api.trans_buffer_global_addr = bm_mem_get_device_addr(dev_mem_trans);
+
+  api.dim = input.dim;
   api.k = k;
-  api.dim_order = dim;
+  api.axis = axis;
   api.largest = largest;
   api.sorted = sorted;
   api.input_global_addr = input.addr;
   api.value_global_addr = value.addr;
   api.index_global_addr = index.addr;
   api.dtype = sgdnnTPUKernelDType( input.dtype );
+#if defined SGDNN_BACKEND_1684X
   SAFE_CALL ( sgdnnTPUKernelLaunch ( handle, "tpu_kernel_api_topk", &api, sizeof( api ) ) );
 #elif defined SGDNN_BACKEND_2260
-  SGDNN_CHECK ( false );
+  SAFE_CALL ( sgdnnTPUKernelLaunch ( handle, "tpu_kernel_api_topk_multi_core", &api, sizeof( api ) ) );
 #else
   SGDNN_CHECK ( false );
 #endif

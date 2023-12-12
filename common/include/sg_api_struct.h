@@ -1588,12 +1588,10 @@ typedef struct
   unsigned long long input_global_addr;
   unsigned long long value_global_addr;
   unsigned long long index_global_addr;
-  unsigned long long index_buffer_global_addr;
-  unsigned long long trans_buffer_global_addr;
   int shape[FW_MAX_SHAPE_DIMS];
   int dim;
   int k;
-  int dim_order;
+  int axis;
   int largest;
   int sorted;
   int dtype;
