@@ -694,6 +694,18 @@ bm_status_t sgdnnSoftmaxBackward ( bm_handle_t handle,
                                    SgdnnTensor_t grad_input );
 
 /*
+ * OUTPUT = LOGSOFTMAX ( INPUT, DIM )
+ * Note:
+ * 1. The data types of INPUT and OUTPUT must be the same and one of FP32, FP16 and BF16
+ * 2. The shapes of INPUT and OUTPUT must be the same
+ * 3. INPUT and OUTPUT must be contiguous
+ */
+bm_status_t sgdnnLogSoftmax ( bm_handle_t handle,
+                              SgdnnTensor_t input,
+                              int dim,
+                              SgdnnTensor_t output );
+
+/*
  * OUTPUT = NORM2 ( INPUT, KEEPDIM )
  * Note:
  * 1. The data types of INPUT and OUTPUT must be the same and one of FP32, FP16 and BF16

@@ -960,3 +960,64 @@ void tpu_kernel_api_softmax_multi_core ( const void *args )
 }
 TPUKERNEL_FUNC_REGISTER ( tpu_kernel_api_softmax_multi_core );
 #endif
+
+void tpu_kernel_api_log_softmax(const void *args) {
+  sg_api_log_softmax_t *api = (sg_api_log_softmax_t *)args;
+  TPUKERNEL_ASSERT(api->dtype == DT_FP32 || api->dtype == DT_FP16 ||
+                   api->dtype == DT_BFP16);
+  if (api->axis != api->dim - 1) {
+    TPUKERNEL_ASSERT_INFO(false, "not support axis != dim-1 now");
+  }
+  tpu_initialize();
+  nodechip_softmax(api->input_global_addr, api->output_global_addr, api->shape,
+                   api->dim, api->axis, api->axis, 1, 1.f,
+                   (data_type_t)api->dtype);
+  tpu_poll();
+}
+TPUKERNEL_FUNC_REGISTER(tpu_kernel_api_log_softmax);
+
+#ifdef FIRMWARE_BACKEND_2260
+void tpu_kernel_api_log_softmax_multi_core(const void *args) {
+  sg_api_log_softmax_t *api = (sg_api_log_softmax_t *)args;
+  TPUKERNEL_ASSERT(api->dtype == DT_FP32 || api->dtype == DT_FP16 ||
+                   api->dtype == DT_BFP16);
+
+  if (api->axis != api->dim - 1) {
+    TPUKERNEL_ASSERT_INFO(false, "not support axis != dim-1 now");
+  }
+
+  dim4 new_shape = {.n = 1, .c = 1, .h = 1, .w = 1};
+  // new_shape.h = shape[axis];
+  for (int i = 0; i < api->axis; i++) {
+    new_shape.c *= api->shape[i];
+  }
+
+  for (int i = api->axis; i < api->dim; i++) {
+    new_shape.w *= api->shape[i];
+  }
+
+  int outer_num = new_shape.c;
+  int outer_num_real = 1, outer_num_avg = 1;
+  int min_cores_needed = 1;
+  compute_current_slice_info_multi_core(outer_num, &outer_num_real,
+                                        &outer_num_avg, &min_cores_needed);
+  tpu_initialize();
+  const int core_idx = tpu_core_index();
+  if (core_idx < min_cores_needed) {
+    // Shape:  [n',c',h',w'] ->  [1. slice_intracores, 1, size_from_axis]
+    // Input:  [1, c, h, w]  ->  [1, c_sliced, 1, size_from_axis]
+    // output: [1, c, h, w]  ->  [1, c_sliced, 1, size_from_axis]
+    new_shape.c = outer_num_real;
+    int sliced_shape[4];
+    sliced_shape[0] = new_shape.n;
+    sliced_shape[1] = new_shape.c;
+    sliced_shape[2] = new_shape.h;
+    sliced_shape[3] = new_shape.w;
+    nodechip_softmax(api->input_global_addr + core_idx * outer_num_avg * new_shape.h * new_shape.w * tpu_data_type_size(api->dtype),
+                     api->output_global_addr + core_idx * outer_num_avg * new_shape.h * new_shape.w * tpu_data_type_size(api->dtype),
+                     sliced_shape, 4, 3, 3, 1, 1.f, (data_type_t)api->dtype);
+  }
+  tpu_poll();
+}
+TPUKERNEL_FUNC_REGISTER(tpu_kernel_api_log_softmax_multi_core);
+#endif
