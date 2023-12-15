@@ -401,7 +401,7 @@ bm_status_t sgdnnLogicalAnd ( bm_handle_t handle,
 /*
  * OUTPUT = math.pow (INPUT, OTHER)
  * Note:
- * 1. The data types of INPUT, OTHER and OUTPUT must be the same and one of FP32, FP16 and BF16
+ * 1. The data types of INPUT, OTHER and OUTPUT must be one of FP32, FP16, BF16 and INT32
  * 2. The shapes of INPUT, OTHER and OUTPUT must be the same
  * 3. INPUT, OTHER and OUTPUT must be contiguous
  */
@@ -409,6 +409,18 @@ bm_status_t sgdnnPow ( bm_handle_t handle,
                        SgdnnTensor_t input,
                        SgdnnTensor_t other,
                        SgdnnTensor_t output );
+
+/*
+ * OUTPUT = math.pow (INPUT, OTHER)
+ * Note:
+ * 1. The data types of INPUT, OTHER and OUTPUT must be one of FP32, FP16, BF16 and INT32
+ * 2. The shapes of INPUT, OTHER must can be broadcast
+ * 3. INPUT, OTHER and OUTPUT must be contiguous
+ */
+bm_status_t sgdnnPowBcast ( bm_handle_t handle,
+                            SgdnnTensor_t input,
+                            SgdnnTensor_t other,
+                            SgdnnTensor_t output );
 
 /*
  * OUTPUT = INPUT - SCALAR * OTHER
@@ -1449,12 +1461,24 @@ bm_status_t sgdnnSignbit(bm_handle_t handle,
 
 /*
  * OUTPUT = POWC(INPUT, EXPONENT)
- * 1. The data types of INPUT and OUTPUT must be the same and one of FP32, FP16 and BF16
+ * 1. The data types of INPUT and OUTPUT must be one of FP32, FP16, BF16 and INT32
  * 2. The shapes of INPUT and OUTPUT must be the same
  * 3. INPUT and OUTPUT must be contiguous
  * 4. EXPONENT is a single float number.
 */
 bm_status_t sgdnnPowC ( bm_handle_t handle,
+                      SgdnnTensor_t self,
+                      float scalar,
+                      SgdnnTensor_t out );
+
+/*
+ * OUTPUT = POWC(EXPONENT, INPUT)
+ * 1. The data types of INPUT and OUTPUT must be one of FP32, FP16, BF16 and INT32
+ * 2. The shapes of INPUT and OUTPUT must be the same
+ * 3. INPUT and OUTPUT must be contiguous
+ * 4. EXPONENT is a single float number.
+*/
+bm_status_t sgdnnCPow ( bm_handle_t handle,
                       SgdnnTensor_t self,
                       float scalar,
                       SgdnnTensor_t out );

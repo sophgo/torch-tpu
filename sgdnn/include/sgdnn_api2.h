@@ -435,7 +435,7 @@ tpuRtStatus_t sgdnnLogicalAnd ( tpuRtStream_t  stream,
 /*
  * OUTPUT = math.pow (INPUT, OTHER)
  * Note:
- * 1. The data types of INPUT, OTHER and OUTPUT must be the same and one of FP32, FP16 and BF16
+ * 1. The data types of INPUT, OTHER and OUTPUT must be one of FP32, FP16, BF16 and INT32
  * 2. The shapes of INPUT, OTHER and OUTPUT must be the same
  * 3. INPUT, OTHER and OUTPUT must be contiguous
  */
@@ -444,6 +444,19 @@ tpuRtStatus_t sgdnnPow ( tpuRtStream_t  stream,
                        SgdnnTensor_t other,
                        SgdnnTensor_t output , 
                        bool non_blocking = true);
+
+/*
+ * OUTPUT = math.pow (INPUT, OTHER)
+ * Note:
+ * 1. The data types of INPUT, OTHER and OUTPUT must be one of FP32, FP16, BF16 and INT32
+ * 2. The shapes of INPUT, OTHER must can be broadcast
+ * 3. INPUT, OTHER and OUTPUT must be contiguous
+ */
+tpuRtStatus_t sgdnnPowBcast ( tpuRtStream_t  stream,
+                            SgdnnTensor_t input,
+                            SgdnnTensor_t other,
+                            SgdnnTensor_t output,
+                            bool non_blocking = true );
 
 /*
  * OUTPUT = INPUT - SCALAR * OTHER
@@ -1565,6 +1578,19 @@ tpuRtStatus_t sgdnnPowC ( tpuRtStream_t  stream,
                       SgdnnTensor_t self,
                       float scalar,
                       SgdnnTensor_t out , 
+                      bool non_blocking = true);
+
+/*
+ * OUTPUT = POWC(EXPONENT, INPUT)
+ * 1. The data types of INPUT and OUTPUT must be one of FP32, FP16, BF16 and INT32
+ * 2. The shapes of INPUT and OUTPUT must be the same
+ * 3. INPUT and OUTPUT must be contiguous
+ * 4. EXPONENT is a single float number.
+*/
+tpuRtStatus_t sgdnnCPow ( tpuRtStream_t  stream,
+                      SgdnnTensor_t self,
+                      float scalar,
+                      SgdnnTensor_t out,
                       bool non_blocking = true);
 
 /*
