@@ -22,9 +22,13 @@ public:
     return self;
   } else {
 #if 1
+    CPU_IMPL_WARNING(Dropout);
+    TIMING_START;
     TensorOptions option = TensorOptions( ).device("cpu").dtype ( self.dtype() );
     at::Tensor mask_cpu = torch::rand_like(self, option) > p;
     at::Tensor mask = mask_cpu.to(self.device()).to(self.dtype());
+    TIMING_END(tpu::CPU_LAYER);
+#else
 #endif
     ctx->save_for_backward( {mask} );
     auto out = mask * self * (1/(1-p));

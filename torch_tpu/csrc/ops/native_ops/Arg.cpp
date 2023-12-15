@@ -19,21 +19,26 @@ Tensor &argmax_out_tpu(const Tensor &self, c10::optional<int64_t> dim,
   CHECK_TENSOR_IN_DEVICE(out);
   CHECK_TENSOR_IN_DEVICE(self);
 #if 0
-    CPU_IMPL_WANING();
+    CPU_IMPL_WARNING();
     auto out_cpu = argmax( self.cpu(), dim, keepdim );
     out = out_cpu.to(out.device()).to(out.dtype());
 #else
   if (self.dim() == 0) {
+    CPU_IMPL_WARNING();
+    TIMING_START;
     auto out_cpu = out.cpu().zero_();
     out = out_cpu.to(out.device()).to(out.dtype());
+    TIMING_END(tpu::CPU_LAYER);
     return out;
   }
   if ( self.dtype() == caffe2::TypeMeta::Make<long>() ||
        self.dtype() == caffe2::TypeMeta::Make<int>() )
   {
-    CPU_IMPL_WANING();
+    CPU_IMPL_WARNING();
+    TIMING_START;
     auto out_cpu = argmax( self.cpu(), dim, keepdim );
     out = out_cpu.to(out.device()).to(out.dtype());
+    TIMING_END(tpu::CPU_LAYER);
     return out;
   }
 
@@ -43,7 +48,8 @@ Tensor &argmax_out_tpu(const Tensor &self, c10::optional<int64_t> dim,
     }
     TORCH_CHECK(dim.value() >= 0 || dim.value() < self.dim());
   }
-  auto values = empty_like(out).to(self.dtype());
+  TensorOptions options = TensorOptions ( self.device() ).dtype ( self.dtype() );
+  Tensor values = empty({out.sizes()}, options);
   TIMING_START;
   bm_status_t status = sgdnnArg(
       tpu::TPUGetDeviceHandle(), tpu::TPUGenerateSgdnnTensor(self),
@@ -63,13 +69,16 @@ Tensor &argmin_out_tpu(const Tensor &self, c10::optional<int64_t> dim,
   CHECK_TENSOR_IN_DEVICE(out);
   CHECK_TENSOR_IN_DEVICE(self);
 #if 0
-    LOG( WARNING ) << "argmin use cpu impl";
+    CPU_IMPL_WARNING();
     auto out_cpu = argmin( self.cpu(), dim, keepdim );
     out = out_cpu.to(out.device()).to(out.dtype());
 #else
   if (self.dim() == 0) {
+    CPU_IMPL_WARNING();
+    TIMING_START;
     auto out_cpu = out.cpu().zero_();
     out = out_cpu.to(out.device()).to(out.dtype());
+    TIMING_END(tpu::CPU_LAYER);
     return out;
   }
   if (dim.has_value()) {
@@ -78,7 +87,8 @@ Tensor &argmin_out_tpu(const Tensor &self, c10::optional<int64_t> dim,
     }
     TORCH_CHECK(dim.value() >= 0 || dim.value() < self.dim());
   }
-  auto values = empty_like(out).to(self.dtype());
+  TensorOptions options = TensorOptions ( self.device() ).dtype ( self.dtype() );
+  Tensor values = empty({out.sizes()}, options);
   TIMING_START;
   bm_status_t status = sgdnnArg(
       tpu::TPUGetDeviceHandle(), tpu::TPUGenerateSgdnnTensor(self),
@@ -100,16 +110,19 @@ std::tuple<Tensor &, Tensor &> max_dim_max_out_tpu(const Tensor &self,
   CHECK_TENSOR_IN_DEVICE(values);
   CHECK_TENSOR_IN_DEVICE(self);
 #if 0
-    LOG( WARNING ) << "max.dim_max use cpu impl";
+    CPU_IMPL_WARNING();
     auto out_cpu =  max(self.cpu(),dim,keepdim);
     values = TENSOR_TO_TPU(std::get<0>(out_cpu));
     indices = TENSOR_TO_TPU(std::get<1>(out_cpu));
 #else
   if (self.dim() == 0) {
+    CPU_IMPL_WARNING();
+    TIMING_START;
     tpu::TPUCopyHostToDevice(values.data_ptr(), self.contiguous().data_ptr(),
                              self.nbytes());
     auto indices_cpu = indices.cpu().zero_();
     indices = indices_cpu.to(indices.device()).to(indices.dtype());
+    TIMING_END(tpu::CPU_LAYER);
     return {values, indices};
   }
   if (dim < 0) {
@@ -137,16 +150,19 @@ std::tuple<Tensor &, Tensor &> min_dim_min_out_tpu(const Tensor &self,
   CHECK_TENSOR_IN_DEVICE(values);
   CHECK_TENSOR_IN_DEVICE(self);
 #if 0
-    LOG( WARNING ) << "min.dim_min use cpu impl";
+    CPU_IMPL_WARNING();
     auto out_cpu =  min(self.cpu(),dim,keepdim);
     values = TENSOR_TO_TPU(std::get<0>(out_cpu));
     indices = TENSOR_TO_TPU(std::get<1>(out_cpu));
 #else
   if (self.dim() == 0) {
+    CPU_IMPL_WARNING();
+    TIMING_START;
     tpu::TPUCopyHostToDevice(values.data_ptr(), self.contiguous().data_ptr(),
                              self.nbytes());
     auto indices_cpu = indices.cpu().zero_();
     indices = indices_cpu.to(indices.device()).to(indices.dtype());
+    TIMING_END(tpu::CPU_LAYER);
     return {values, indices};
   }
   if (dim < 0) {

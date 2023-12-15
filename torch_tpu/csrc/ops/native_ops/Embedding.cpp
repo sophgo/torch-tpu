@@ -18,9 +18,6 @@ Tensor index_select_tpu ( const Tensor & self, int64_t dim, const Tensor & index
   auto out_cpu = index_select ( self.cpu(), dim, index.cpu() );
   auto out = TENSOR_TO_TPU ( out_cpu );
 #else
-#ifdef TPU_OP_TIMING
-  auto timer = tpu::Timer().Start();
-#endif
   TensorOptions options = TensorOptions ( self.device() ).dtype ( self.dtype() );
   std::vector<int64_t> sizes_vec;
   for ( int i = 0; i < dim; i++ ) {
@@ -34,6 +31,7 @@ Tensor index_select_tpu ( const Tensor & self, int64_t dim, const Tensor & index
   }
   IntArrayRef sizes ( sizes_vec.data(), sizes_vec.size() );
   auto out = torch::empty ( sizes, options );
+  TIMING_START;
   bm_status_t status = sgdnnIndexSelect (
                        tpu::TPUGetDeviceHandle(),
                        tpu::TPUGenerateSgdnnTensor ( self ),
@@ -41,9 +39,7 @@ Tensor index_select_tpu ( const Tensor & self, int64_t dim, const Tensor & index
                        dim,
                        tpu::TPUGenerateSgdnnTensor ( out ) );
   TORCH_CHECK ( status == BM_SUCCESS );
-#ifdef TPU_OP_TIMING
-  tpu::OpTimer::Instance().AddTime ( tpu::INDEX_SELECT, timer.ElapsedUS() );
-#endif
+  TIMING_END ( tpu::INDEX_SELECT );
 #endif
   SHOW_TENSOR_OP(self, index, out);
   return out;
@@ -63,18 +59,15 @@ Tensor embedding_dense_backward_tpu ( const Tensor & grad_output, const Tensor &
 #else
   TensorOptions out_option = TensorOptions ( grad_output.device() ).dtype ( grad_output.dtype() );
   torch::Tensor out = torch::empty ( {num_weights, grad_output.size ( grad_output.dim() - 1 ) }, out_option );
-#ifdef TPU_OP_TIMING
-  auto timer = tpu::Timer().Start();
-#endif
+  TIMING_START;
   bm_status_t status = sgdnnEmbeddingBackward (
                        tpu::TPUGetDeviceHandle(),
                        tpu::TPUGenerateSgdnnTensor ( grad_output ),
                        tpu::TPUGenerateSgdnnTensor ( indices ),
                        tpu::TPUGenerateSgdnnTensor ( out ) );
   TORCH_CHECK ( status == BM_SUCCESS );
-#ifdef TPU_OP_TIMING
-  tpu::OpTimer::Instance().AddTime ( tpu::EMBEDDING_BACKWARD, timer.ElapsedUS() );
-#endif
+
+  TIMING_END ( tpu::EMBEDDING_BACKWARD );
 #endif
   SHOW_TENSOR_OP(grad_output, indices, out);
   return out;

@@ -46,10 +46,7 @@ Tensor &slice_scatter_out_tpu(const Tensor &self, const Tensor &src,
   }
   CHECK_TENSOR_IN_DEVICE(out);
 #if 0
-
 #else
-  TIMING_START;
-
   int start_value = start.has_value() ? start.value() : 0;
   int end_value = end.has_value() ? end.value() : self.size(dim);
   int num_c = 1;
@@ -63,6 +60,7 @@ Tensor &slice_scatter_out_tpu(const Tensor &self, const Tensor &src,
                        .unsqueeze(-1)
                        .expand({1, num_c, -1, 1})
                        .to(self.device());
+  TIMING_START;
   bm_status_t status = sgdnnSliceScatter(
       tpu::TPUGetDeviceHandle(), tpu::TPUGenerateSgdnnTensor(self),
       tpu::TPUGenerateSgdnnTensor(src), tpu::TPUGenerateSgdnnTensor(indices),

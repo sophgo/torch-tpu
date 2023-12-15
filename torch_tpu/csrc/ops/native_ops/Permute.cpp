@@ -15,17 +15,13 @@ Tensor permute_tpu(const Tensor &self, IntArrayRef dim_order) {
         TORCH_CHECK(self.device().type() == DeviceType::TPU, "self is not in TPU device");
     }
     Tensor out = empty_like(self);
-
 #if 0
-
 #else
-
-#ifdef TPU_OP_TIMING
-    auto timer = tpu::Timer().Start();
-#endif
-
     if(self.dim() == 0 || self.dim() == 1) {
+        CPU_IMPL_WARNING();
+        TIMING_START;
         tpu::TPUCopyHostToDevice(out.data_ptr(), self.contiguous().data_ptr(), out.nbytes());
+        TIMING_END(tpu::CPU_LAYER);
     }
     else {
         std::vector<int> dim_order_vec;
@@ -37,18 +33,14 @@ Tensor permute_tpu(const Tensor &self, IntArrayRef dim_order) {
         }
         IntArrayRef out_shape_arr(out_shape_vec);
         out = out.reshape(out_shape_arr);
-
+        TIMING_START;
         bm_status_t status = sgdnnPermute( tpu::TPUGetDeviceHandle(),
                                            tpu::TPUGenerateSgdnnTensor(self),
                                            dim_order_vec.data(),
                                            tpu::TPUGenerateSgdnnTensor(out));
         TORCH_CHECK(status == BM_SUCCESS);
+        TIMING_END(tpu::PERMUTE);
     }
-
-#ifdef TPU_OP_TIMING
-    tpu::OpTimer::Instance().AddTime(tpu::PERMUTE, timer.ElapsedUS());
-#endif
-
 #endif
     SHOW_TENSOR_OP(self);
     return out;

@@ -30,9 +30,7 @@ namespace at
 		CHECK_TENSOR_IN_DEVICE(out1);
 		CHECK_TENSOR_IN_DEVICE(p);
 		CHECK_TENSOR_IN_DEVICE(out2);
-#ifdef TPU_OP_TIMING
-		auto timer = tpu::Timer().Start();
-#endif
+		TIMING_START;
 		bm_status_t status = sgdnnMlp(
 			tpu::TPUGetDeviceHandle(),
 			tpu::TPUGenerateSgdnnTensor(input),
@@ -44,10 +42,7 @@ namespace at
 			tpu::TPUGenerateSgdnnTensor(p),
 			tpu::TPUGenerateSgdnnTensor(out2));
 		TORCH_CHECK(status == BM_SUCCESS);
-#ifdef TPU_OP_TIMING
-		tpu::OpTimer::Instance().AddTime(tpu::MLP_FORWARD, timer.ElapsedUS());
-#endif
-
+		TIMING_END(tpu::MLP_FORWARD);
 		return out2;
 	}
 
@@ -77,9 +72,8 @@ namespace at
 			CHECK_TENSOR_IN_DEVICE(grad_b1.value());
 		if (grad_b2.has_value())
 			CHECK_TENSOR_IN_DEVICE(grad_b2.value());
-#ifdef TPU_OP_TIMING
-		auto timer = tpu::Timer().Start();
-#endif
+
+		TIMING_START;
 		bm_status_t status = sgdnnMlpBackward(
 			tpu::TPUGetDeviceHandle(),
 			tpu::TPUGenerateSgdnnTensor(grad_output),
@@ -94,9 +88,7 @@ namespace at
 			grad_b1.has_value() ? tpu::TPUGenerateSgdnnTensor(grad_b1.value()) : sgdnnUndefinedTensor(),
 			grad_b2.has_value() ? tpu::TPUGenerateSgdnnTensor(grad_b2.value()) : sgdnnUndefinedTensor());
 		TORCH_CHECK(status == BM_SUCCESS);
-#ifdef TPU_OP_TIMING
-		tpu::OpTimer::Instance().AddTime(tpu::MLP_BACKWARD, timer.ElapsedUS());
-#endif
+		TIMING_END(tpu::MLP_BACKWARD);
 		return std::tuple<Tensor, Tensor, Tensor, c10::optional<Tensor>, c10::optional<Tensor>>(grad_input, grad_w1, grad_w2, grad_b1, grad_b2);
 	}
 }

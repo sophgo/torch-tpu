@@ -17,18 +17,15 @@ Tensor & signbit_out_tpu ( const Tensor & self, Tensor & out )
 #if 0
   auto out_cpu = signbit( self.cpu());
   tpu::TPUCopyHostToDevice ( out.data_ptr(), out_cpu.contiguous().data_ptr(), out.nbytes() );
-#endif
-#ifdef TPU_OP_TIMING
-  auto timer = tpu::Timer().Start();
-#endif
+#else
+  TIMING_START;
   bm_status_t status = sgdnnSignbit(
                        tpu::TPUGetDeviceHandle(),
                        tpu::TPUGenerateSgdnnTensor ( self ),
                     
                        tpu::TPUGenerateSgdnnTensor ( out ) );
   TORCH_CHECK ( status == BM_SUCCESS );
-#ifdef TPU_OP_TIMING
-  tpu::OpTimer::Instance().AddTime ( tpu::SIGNBIT, timer.ElapsedUS() );
+  TIMING_END ( tpu::SIGNBIT );
 #endif
   SHOW_TENSOR_OP(self, out);
   return out;
@@ -36,6 +33,5 @@ Tensor & signbit_out_tpu ( const Tensor & self, Tensor & out )
 TORCH_LIBRARY_IMPL ( aten, TPU, m )
 {
   m.impl ( "signbit.out", signbit_out_tpu );
-  
 }
 } // namespace at

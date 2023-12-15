@@ -160,9 +160,7 @@ Tensor expand_out_tpu(const Tensor &self, const IntArrayRef output_size)
   tpu::TPUCopyHostToDevice(out.data_ptr(), self_cpu.contiguous().data_ptr(),
                            out.nbytes());
 #else
-  TIMING_START
   auto out = self.repeat(repeat_size);
-  TIMING_END(tpu::EXPAND)
   return out;
 #endif
   // SHOW_TENSOR_OP(self, out);
@@ -232,9 +230,12 @@ Tensor &reflection_pad2d_out_tpu(const Tensor &self, IntArrayRef padding,
 
 #else
   if (self.dim() == 0) {
+    CPU_IMPL_WARNING();
+    TIMING_START;
     auto out_cpu = reflection_pad2d(self.cpu(), padding);
     tpu::TPUCopyDeviceToDevice(out.data_ptr(), out_cpu.data_ptr(),
                                out.nbytes());
+    TIMING_END(tpu::CPU_LAYER);
     return out;
   }
   std::vector<int> pad(padding.begin(), padding.end());
@@ -276,9 +277,12 @@ Tensor &replication_pad2d_out_tpu(const Tensor &self, IntArrayRef padding,
 
 #else
   if (self.dim() == 0) {
+    CPU_IMPL_WARNING();
+    TIMING_START;
     auto out_cpu = replication_pad2d(self.cpu(), padding);
     tpu::TPUCopyDeviceToDevice(out.data_ptr(), out_cpu.data_ptr(),
                                out.nbytes());
+    TIMING_END(tpu::CPU_LAYER);
     return out;
   }
   std::vector<int> pad(padding.begin(), padding.end());
@@ -308,13 +312,16 @@ Tensor &replication_pad3d_out_tpu(const Tensor &self, IntArrayRef padding,
 
 #else
   if (self.dim() == 0) {
+    CPU_IMPL_WARNING();
+    TIMING_START;
     auto out_cpu = replication_pad3d(self.cpu(), padding);
     tpu::TPUCopyDeviceToDevice(out.data_ptr(), out_cpu.data_ptr(),
                                out.nbytes());
+    TIMING_END(tpu::CPU_LAYER);
     return out;
   }
-  std::vector<int> pad(padding.begin(), padding.end());
 
+  std::vector<int> pad(padding.begin(), padding.end());
   TIMING_START;
   bm_status_t status = sgdnnPad(
       tpu::TPUGetDeviceHandle(), tpu::TPUGenerateSgdnnTensor(self), pad.data(),

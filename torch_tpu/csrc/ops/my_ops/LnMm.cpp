@@ -32,9 +32,8 @@ namespace at
 		CHECK_TENSOR_IN_DEVICE(mean);
 		CHECK_TENSOR_IN_DEVICE(rstd);
 		CHECK_TENSOR_IN_DEVICE(out);
-#ifdef TPU_OP_TIMING
-		auto timer = tpu::Timer().Start();
-#endif
+
+		TIMING_START;
 		bm_status_t status = sgdnnLnMm(
 			tpu::TPUGetDeviceHandle(),
 			tpu::TPUGenerateSgdnnTensor(input),
@@ -47,10 +46,7 @@ namespace at
 			tpu::TPUGenerateSgdnnTensor(rstd),
 			tpu::TPUGenerateSgdnnTensor(out));
 		TORCH_CHECK(status == BM_SUCCESS);
-#ifdef TPU_OP_TIMING
-		tpu::OpTimer::Instance().AddTime(tpu::LN_MM_FORWARD, timer.ElapsedUS());
-#endif
-
+		TIMING_END(tpu::LN_MM_FORWARD);
 		return std::tuple<Tensor, Tensor, Tensor>(mean, rstd, out);
     }
 
@@ -75,9 +71,7 @@ namespace at
 		CHECK_TENSOR_IN_DEVICE(grad_gamma);
 		CHECK_TENSOR_IN_DEVICE(grad_beta);
 
-#ifdef TPU_OP_TIMING
-		auto timer = tpu::Timer().Start();
-#endif
+		TIMING_START;
 		bm_status_t status = sgdnnLayernormBackward (
 			tpu::TPUGetDeviceHandle(),
 			tpu::TPUGenerateSgdnnTensor ( grad_out_ln ),
@@ -91,10 +85,7 @@ namespace at
 			tpu::TPUGenerateSgdnnTensor( grad_beta ));
 		
 		TORCH_CHECK(status == BM_SUCCESS);
-#ifdef TPU_OP_TIMING
-		tpu::OpTimer::Instance().AddTime(tpu::LN_MM_BACKWARD, timer.ElapsedUS());
-#endif
-
+		TIMING_END(tpu::LN_MM_BACKWARD);
 		return std::tuple<Tensor, Tensor, Tensor>(grad_input, grad_gamma, grad_beta);
     }
 }

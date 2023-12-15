@@ -24,15 +24,14 @@ namespace at
 #else
         if (size.size() == 0)
         {
+            CPU_IMPL_WARNING();
+            TIMING_START;
             auto self_cpu = full(size, fill_value, dtype, layout, c10::nullopt, pin_memory);
             tpu::TPUCopyHostToDevice(self.data_ptr(), self_cpu.contiguous().data_ptr(), self.nbytes());
+            TIMING_END(tpu::CPU_LAYER);
         }
         else if (IS_TPU_TENSOR(self))
         {
-
-#ifdef TPU_OP_TIMING
-            auto timer = tpu::Timer().Start();
-#endif
             int64_t value_;
             if (self.dtype() == caffe2::TypeMeta::Make<float>())
             {
@@ -54,15 +53,13 @@ namespace at
             {
                 TORCH_CHECK(false);
             }
-
+            TIMING_START;
             bm_status_t status = sgdnnFill(
                 tpu::TPUGetDeviceHandle(),
                 &value_,
                 tpu::TPUGenerateSgdnnTensor(self));
             TORCH_CHECK(status == BM_SUCCESS);
-#ifdef TPU_OP_TIMING
-            tpu::OpTimer::Instance().AddTime(tpu::FULL, timer.ElapsedUS());
-#endif
+            TIMING_END(tpu::FULL);
         }
         else
         {

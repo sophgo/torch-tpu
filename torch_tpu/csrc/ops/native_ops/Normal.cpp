@@ -14,7 +14,8 @@ Tensor & normal_tpu(Tensor & self, double mean, double std, c10::optional<at::Ge
 {
   CHECK_TENSOR_IN_DEVICE ( self );
 #if 1
-  CPU_IMPL_WANING();
+  CPU_IMPL_WARNING();
+  TIMING_START;
   std::vector<int64_t> sizes_vec ( self.dim() );
   for ( int i = 0; i < self.dim(); i++ ) { sizes_vec[i] = self.size( i ); }
   
@@ -23,7 +24,7 @@ Tensor & normal_tpu(Tensor & self, double mean, double std, c10::optional<at::Ge
 
   auto out_cpu = normal(mean, std, sizes, c10::nullopt, TenOption);
   self = out_cpu.to(self.device()).to(self.dtype());
-  // tpu::TPUCopyHostToDevice ( self.data_ptr(), out_cpu.contiguous().data_ptr(), self.nbytes() );
+  TIMING_END(tpu::CPU_LAYER);
 #else
   //TODO
 #endif

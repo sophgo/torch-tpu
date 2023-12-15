@@ -20,9 +20,7 @@ namespace at
 	{
 		CHECK_TENSOR_IN_DEVICE(input);
 		CHECK_TENSOR_IN_DEVICE(output);
-#ifdef TPU_OP_TIMING
-		auto timer = tpu::Timer().Start();
-#endif
+		TIMING_START;
 		bm_status_t status = sgdnnRMSNorm(
 			tpu::TPUGetDeviceHandle(),
 			tpu::TPUGenerateSgdnnTensor(input),
@@ -35,9 +33,7 @@ namespace at
 			scale.has_value(),
 			bias.has_value());
 		TORCH_CHECK(status == BM_SUCCESS);
-#ifdef TPU_OP_TIMING
-		tpu::OpTimer::Instance().AddTime(tpu::RMSNORM_FORWARD, timer.ElapsedUS());
-#endif
+		TIMING_END(tpu::RMSNORM_FORWARD);
 		return output;
 	}
 

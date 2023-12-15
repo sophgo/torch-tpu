@@ -25,7 +25,7 @@ Tensor & norm_out_tpu ( const at::Tensor & self, const c10::optional<at::Scalar>
   // not support case, use cpu impl
   if (dim.size() != self.dim() && dim.size() != 0 )
   {
-    CPU_IMPL_WANING();
+    CPU_IMPL_WARNING();
     auto out_cpu = norm ( self.to(torch::kFloat).cpu(), p, dim, keepdim );
     out = out_cpu.to(out.device()).to(out.dtype());
   }

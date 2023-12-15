@@ -134,19 +134,19 @@ Tensor & baddbmm_out_tpu(const at::Tensor & self, const at::Tensor & batch1, con
   CHECK_TENSOR_IN_DEVICE_NO_CONTIGUOUS ( batch2 );
   CHECK_TENSOR_IN_DEVICE ( out );
 #if 0
-  LOG( WARNING ) << "baddbmm use cpu impl";
+  CPU_IMPL_WARNING();
   auto out_cpu = baddbmm ( self.to(torch::kFloat).cpu(), batch1.to(torch::kFloat).cpu(), batch2.to(torch::kFloat).cpu(), beta, alpha );
   out = out_cpu.to(out.device()).to(out.dtype());
 #else
   auto self_ = self.is_contiguous() ? self : self.contiguous();
   auto batch1_ = batch1.is_contiguous() == false && is_transposed ( batch1 ) == false ? batch1.contiguous() : batch1;
   auto batch2_ = batch2.is_contiguous() == false && is_transposed ( batch2 ) == false ? batch2.contiguous() : batch2;
-  TIMING_START;
   if (beta.toDouble() != 0)
     out = beta * self + alpha * bmm(batch1_, batch2_);
   else
     out = alpha * bmm(batch1_, batch2_);
 #if 0
+  TIMING_START;
   // TODO: imple this op, current has bugs
   auto status = sgdnnBaddbmm(
                 tpu::TPUGetDeviceHandle(),
@@ -156,8 +156,8 @@ Tensor & baddbmm_out_tpu(const at::Tensor & self, const at::Tensor & batch1, con
                 tpu::TPUGenerateSgdnnTensor ( out ),
                 alpha.toDouble(),
                 beta.toDouble() );
-#endif
   TIMING_END( tpu::BADDBMM );
+#endif
 #endif
   SHOW_TENSOR_OP(self, batch1, batch2, out);
   return out;

@@ -24,7 +24,6 @@ Tensor upsample_bilinear2d_tpu(const at::Tensor &self,
   tpu::TPUCopyHostToDevice(out.data_ptr(), self.contiguous().data_ptr(),
                            self.nbytes());
 #else
-  TIMING_START
   std::vector<int64_t> output_shape(4, 0);
   output_shape[0] = self.size(0);
   output_shape[1] = self.size(1);
@@ -40,6 +39,7 @@ Tensor upsample_bilinear2d_tpu(const at::Tensor &self,
   at::IntArrayRef output_shape_ref(output_shape);
   auto out = empty(output_shape_ref, self.options());
 
+  TIMING_START;
   bm_status_t status = sgdnnUpsampling(
       tpu::TPUGetDeviceHandle(), tpu::TPUGenerateSgdnnTensor(self),
       tpu::TPUGenerateSgdnnTensor(out), align_corners, UPSAMPLING_BILINEAR);
@@ -116,7 +116,7 @@ Tensor &upsample_nearest2d_backward_out_tpu(
   CHECK_TENSOR_IN_DEVICE(grad_input);
   CHECK_TENSOR_IN_DEVICE(grad_output);
 #if 0
-  CPU_IMPL_WANING();
+  CPU_IMPL_WARNING();
   auto input_type = grad_input.dtype();
   auto T_input = grad_input.cpu().to(torch::kFloat32).contiguous();
   auto input_r = upsample_nearest2d_backward_outf(

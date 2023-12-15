@@ -15,10 +15,13 @@ Tensor &repeat_out_tpu(const Tensor &self, const IntArrayRef repeats,
   Tensor contiguous_self = self.is_contiguous() ? self : self.contiguous();
   std::vector<int> repeat_times;
   if (self.dim() == 0) {
+    CPU_IMPL_WARNING();
+    TIMING_START;
     Tensor out_cpu = out.cpu();
     repeat_out(out_cpu, self.cpu(), repeats);
     tpu::TPUCopyHostToDevice(out.data_ptr(), out_cpu.contiguous().data_ptr(),
                              out.nbytes());
+    TIMING_END(tpu::CPU_LAYER);
   } else {
     for (int i = 0; i < repeats.size(); ++i) {
       repeat_times.push_back((int)repeats[i]);

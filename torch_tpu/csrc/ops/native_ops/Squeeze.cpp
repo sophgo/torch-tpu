@@ -33,16 +33,12 @@ Tensor &squeeze_out_tpu(const Tensor &self, Tensor &out) {
         return out;
       }
     }
-#ifdef TPU_OP_TIMING
-    auto timer = tpu::Timer().Start();
-#endif
+    TIMING_START;
     bm_status_t status = sgdnnSqueeze(tpu::TPUGetDeviceHandle(),
                                       tpu::TPUGenerateSgdnnTensor(self),
                                       tpu::TPUGenerateSgdnnTensor(out));
     TORCH_CHECK(status == BM_SUCCESS);
-#ifdef TPU_OP_TIMING
-    tpu::OpTimer::Instance().AddTime(tpu::SQUEEZE, timer.ElapsedUS());
-#endif
+    TIMING_END(tpu::SQUEEZE);
   } else {
     TORCH_CHECK(false, "At least one input is required in TPU device");
   }
@@ -74,17 +70,13 @@ Tensor &unsqueeze_out_tpu(const Tensor &self, Tensor &out, int64_t &dim) {
         return out;
       }
     }
-#ifdef TPU_OP_TIMING
-    auto timer = tpu::Timer().Start();
-#endif
+    TIMING_START;
     // same as squeeze
     bm_status_t status = sgdnnSqueeze(tpu::TPUGetDeviceHandle(),
                                       tpu::TPUGenerateSgdnnTensor(self),
                                       tpu::TPUGenerateSgdnnTensor(out));
     TORCH_CHECK(status == BM_SUCCESS);
-#ifdef TPU_OP_TIMING
-    tpu::OpTimer::Instance().AddTime(tpu::UNSQUEEZE, timer.ElapsedUS());
-#endif
+    TIMING_END(tpu::UNSQUEEZE);
   } else {
     TORCH_CHECK(false, "At least one input is required in TPU device");
   }

@@ -34,9 +34,8 @@ namespace at
 		if (mask.has_value())
 			CHECK_TENSOR_IN_DEVICE(mask.value());
 		CHECK_TENSOR_IN_DEVICE(Y);
-#ifdef TPU_OP_TIMING
-		auto timer = tpu::Timer().Start();
-#endif
+
+		TIMING_START;
 		bm_status_t status = sgdnnLlamaAttention(
 			tpu::TPUGetDeviceHandle(),
 			tpu::TPUGenerateSgdnnTensor(Q),
@@ -52,9 +51,7 @@ namespace at
 			attention_mode,
 			C);
 		TORCH_CHECK(status == BM_SUCCESS);
-#ifdef TPU_OP_TIMING
-		tpu::OpTimer::Instance().AddTime(tpu::LLAMA_ATTENTION, timer.ElapsedUS());
-#endif
+		TIMING_END(tpu::LLAMA_ATTENTION);
 		return Y;
 	}
 

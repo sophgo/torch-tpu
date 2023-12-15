@@ -23,6 +23,7 @@ Tensor & _amp_update_scale_tpu(Tensor & self, Tensor & growth_tracker, const Ten
     TORCH_CHECK(self.scalar_type() == at::ScalarType::Float, "current_scale must be a float tensor.");
     TORCH_CHECK(found_inf.scalar_type() == at::ScalarType::Float, "found_inf must be a float tensor.");
 
+    TIMING_START;
     auto self_cpu = self.cpu(); // scale
     auto growth_tracker_cpu = growth_tracker.cpu();
     if (*(float*)found_inf.cpu().data_ptr()){ // found inf
@@ -44,6 +45,7 @@ Tensor & _amp_update_scale_tpu(Tensor & self, Tensor & growth_tracker, const Ten
             tpu::TPUCopyHostToDevice ( growth_tracker.data_ptr(), growth_tracker_cpu.data_ptr(), growth_tracker.nbytes() );
         }
     }
+    TIMING_END(tpu::CPU_LAYER);
     SHOW_TENSOR_OP(self, growth_tracker, found_inf);
     return self;
 }

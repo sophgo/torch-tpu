@@ -14,14 +14,14 @@ Tensor & arange_start_out_tpu( const at::Scalar & start, const at::Scalar & end,
 {
     CHECK_TENSOR_IN_DEVICE ( out );
 #if 0
-    CPU_IMPL_WANING();
+    CPU_IMPL_WARNING();
     auto out_cpu = arange(start,end,step);
     out = out_cpu.to(out.device()).to(out.dtype());
 #else
     if ((start.toInt() >= 0 && end.toInt() >= 0)){
         int empty_length = (end.toInt()-start.toInt() - 1) / step.toInt() + 1;
         out = empty({empty_length},out.options());
-        TIMING_START
+        TIMING_START;
         bm_status_t status = sgdnnArange ( tpu::TPUGetDeviceHandle(),
                                             start.toInt(),
                                             end.toInt(),
@@ -30,9 +30,11 @@ Tensor & arange_start_out_tpu( const at::Scalar & start, const at::Scalar & end,
         TORCH_CHECK ( status == BM_SUCCESS );
         TIMING_END(tpu::ARANGE)
     }else{
-        CPU_IMPL_WANING();
+        CPU_IMPL_WARNING();
+        TIMING_START;
         auto out_cpu = arange(start,end,step);
         out = out_cpu.to(out.device()).to(out.dtype());
+        TIMING_END(tpu::CPU_LAYER);
     }
 #endif
     SHOW_TENSOR_OP(out);

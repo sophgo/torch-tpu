@@ -13,9 +13,11 @@ namespace at
 Tensor & uniform_tpu(Tensor & self, double from, double to, c10::optional<at::Generator> generator)
 {
 #if 1
-  CPU_IMPL_WANING();
+  CPU_IMPL_WARNING();
+  TIMING_START;
   auto out_cpu = uniform(self.cpu(), from, to, generator);
   self = out_cpu.to(self.device());
+  TIMING_END(tpu::CPU_LAYER);
 #else
 
 #endif

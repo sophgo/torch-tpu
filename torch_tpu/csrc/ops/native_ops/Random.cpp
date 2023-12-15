@@ -12,9 +12,11 @@ namespace at
 {
 Tensor & random_from_to_tpu(Tensor & self, int64_t from, c10::optional<int64_t> to, c10::optional<Generator> generator){
 #if 1
-  CPU_IMPL_WANING();
+  CPU_IMPL_WARNING();
+  TIMING_START;
   auto out_cpu = random(self.cpu(), from, to, generator);
   self = out_cpu.to(self.device());
+  TIMING_END(tpu::CPU_LAYER);
 #else
 
 #endif
@@ -30,9 +32,11 @@ Tensor& random_to_tpu(Tensor& self, int64_t to, c10::optional<Generator> generat
 Tensor& random__tpu(Tensor& self, c10::optional<Generator> generator)
 {
 #if 1
-  LOG( WARNING ) << "random_ use cpu impl";
+  CPU_IMPL_WARNING();
+  TIMING_START;
   auto out_cpu = random(self, generator);
   self = out_cpu.to(self.device());
+  TIMING_END(tpu::CPU_LAYER);
 #else
 
 #endif

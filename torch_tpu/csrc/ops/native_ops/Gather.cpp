@@ -26,15 +26,16 @@ namespace at
         if (self.dim() == 0 && other.dim() == 0)
         {
             //need to check whether this situation is possible
+            CPU_IMPL_WARNING();
+            TIMING_START;
             auto out_cpu = gather(self.cpu(), axis, other.cpu());
             tpu::TPUCopyHostToDevice(out.data_ptr(), out_cpu.contiguous().data_ptr(), out.nbytes());
+            TIMING_END(tpu::CPU_LAYER);
         }
         else if (IS_TPU_TENSOR(self) && IS_TPU_TENSOR ( other ))
         {
         //need to consider broadcast later
-#ifdef TPU_OP_TIMING
-            auto timer = tpu::Timer().Start();
-#endif
+            TIMING_START;
             bm_status_t status = sgdnnGather(
                 tpu::TPUGetDeviceHandle(),
                 tpu::TPUGenerateSgdnnTensor(self),
@@ -42,9 +43,7 @@ namespace at
                 tpu::TPUGenerateSgdnnTensor(out),
                 axis);
             TORCH_CHECK(status == BM_SUCCESS);
-#ifdef TPU_OP_TIMING
-            tpu::OpTimer::Instance().AddTime(tpu::GATHER, timer.ElapsedUS());
-#endif
+            TIMING_END(tpu::GATHER);
         }
         else
         {

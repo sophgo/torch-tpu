@@ -33,8 +33,10 @@ Tensor _copy_from_tpu(const Tensor &self, const Tensor &dst,
       }
     } else if (IS_TPU_TENSOR(self) && IS_TPU_TENSOR(dst)) {
       if (self.is_contiguous() && dst.is_contiguous()) {
+        TIMING_START;
         tpu::TPUCopyDeviceToDevice(dst.data_ptr(), self.data_ptr(),
                                    dst.nbytes());
+        TIMING_END(tpu::COPY);
       } else {
         TIMING_START;
         bm_status_t status = sgdnnStridedCopy(tpu::TPUGetDeviceHandle(),
@@ -60,8 +62,10 @@ Tensor _copy_from_tpu(const Tensor &self, const Tensor &dst,
       if ( !tpu::IsSupportDtype(self.dtype()) || !tpu::IsSupportDtype( dst.dtype() ))
       {
         LOG( WARNING ) << "dtypeconvert use cpu impl | self.dtype: " << self.dtype() << " | dst.dtype: " << dst.dtype();
+        TIMING_START;
         auto dst_cpu = self.cpu().to ( dst.dtype() );
         tpu::TPUCopyHostToDevice ( dst.data_ptr(), dst_cpu.contiguous().data_ptr(), dst.nbytes() );
+        TIMING_END(tpu::CPU_LAYER);
       }
       else
       {

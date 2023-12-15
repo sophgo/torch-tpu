@@ -31,6 +31,8 @@ std::tuple<Tensor &, Tensor &> topk_values_tpu(const Tensor &self, int64_t k,
   CHECK_TENSOR_IN_DEVICE(indices);
 
   if (self.dim() == 0) {
+    CPU_IMPL_WARNING();
+    TIMING_START;
     auto out_cpu = topk(self.cpu(), k, axis, largest, sorted);
     tpu::TPUCopyHostToDevice(values.data_ptr(),
                              std::get<0>(out_cpu).contiguous().data_ptr(),
@@ -38,6 +40,7 @@ std::tuple<Tensor &, Tensor &> topk_values_tpu(const Tensor &self, int64_t k,
     tpu::TPUCopyHostToDevice(indices.data_ptr(),
                              std::get<1>(out_cpu).contiguous().data_ptr(),
                              indices.nbytes());
+    TIMING_END(tpu::CPU_LAYER);
   } else {
     if (axis < 0) {
       axis += self.dim();
@@ -60,13 +63,14 @@ std::tuple<Tensor &, Tensor &> topk_values_tpu(const Tensor &self, int64_t k,
         axis, largest, sorted, tpu::TPUGenerateSgdnnTensor(values_temp),
         tpu::TPUGenerateSgdnnTensor(indices_temp));
     TORCH_CHECK(status == BM_SUCCESS);
-    TIMING_END(tpu::TOPK)
+    
     tpu::TPUCopyDeviceToDevice(values.data_ptr(),
                                values_temp.to(values.dtype()).data_ptr(),
                                values.nbytes());
     tpu::TPUCopyDeviceToDevice(indices.data_ptr(),
                                indices_temp.to(indices.dtype()).data_ptr(),
                                indices.nbytes());
+    TIMING_END(tpu::TOPK);
   }
   SHOW_TENSOR_OP(self, values, indices);
   return {values, indices};
@@ -83,6 +87,7 @@ std::tuple<Tensor &, Tensor &> sort_values_stable_tpu(const Tensor &self, c10::o
   CHECK_TENSOR_IN_DEVICE(indices);
 
   if (self.dim() == 0) {
+    TIMING_START;
     auto out_cpu = sort(self.cpu(), stable, axis, descending);
     tpu::TPUCopyHostToDevice(values.data_ptr(),
                              std::get<0>(out_cpu).contiguous().data_ptr(),
@@ -90,6 +95,7 @@ std::tuple<Tensor &, Tensor &> sort_values_stable_tpu(const Tensor &self, c10::o
     tpu::TPUCopyHostToDevice(indices.data_ptr(),
                              std::get<1>(out_cpu).contiguous().data_ptr(),
                              indices.nbytes());
+    TIMING_END(tpu::CPU_LAYER);
   } else {
     if (axis < 0) {
       axis += self.dim();
@@ -105,20 +111,21 @@ std::tuple<Tensor &, Tensor &> sort_values_stable_tpu(const Tensor &self, c10::o
       values_temp = values_temp.to(torch::kFloat);
     }
 
-    TIMING_START
+    TIMING_START;
     bm_status_t status =
         sgdnnTopk(tpu::TPUGetDeviceHandle(),
                   tpu::TPUGenerateSgdnnTensor(self_temp), self.size(axis), axis,
                   descending, false, tpu::TPUGenerateSgdnnTensor(values_temp),
                   tpu::TPUGenerateSgdnnTensor(indices_temp));
     TORCH_CHECK(status == BM_SUCCESS);
-    TIMING_END(tpu::TOPK)
+
     tpu::TPUCopyDeviceToDevice(values.data_ptr(),
                                values_temp.to(values.dtype()).data_ptr(),
                                values.nbytes());
     tpu::TPUCopyDeviceToDevice(indices.data_ptr(),
                                indices_temp.to(indices.dtype()).data_ptr(),
                                indices.nbytes());
+    TIMING_END(tpu::TOPK);
   }
 
   return {values, indices};

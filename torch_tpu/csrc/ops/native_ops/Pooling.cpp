@@ -22,10 +22,13 @@ bool ceil_mode )
   CHECK_TENSOR_IN_DEVICE ( self );
   std::tuple<Tensor, Tensor> outputs;
 #if 1
+  CPU_IMPL_WARNING();
+  TIMING_START;
   auto outputs_cpu = max_pool2d_with_indices ( self.to ( torch::kFloat32 ).cpu(), kernel_size, stride, padding, dilation, ceil_mode );
   outputs = std::tuple<Tensor, Tensor> (
             TENSOR_TO_TPU ( std::get<0> ( outputs_cpu ) ).to ( self.dtype() ),
             TENSOR_TO_TPU ( std::get<1> ( outputs_cpu ) ) );
+  TIMING_END(tpu::CPU_LAYER);
 #else
   TORCH_CHECK ( ceil_mode == false );
   TORCH_CHECK ( dilation[0] == 1 && dilation[1] == 1, "DILATION must be one" );
@@ -44,6 +47,7 @@ bool ceil_mode )
   int output_h = at::native::pooling_output_shape ( self.size ( 2 ), kernel_size[0], padding[0], stride[0], dilation[0], ceil_mode );
   int output_w = at::native::pooling_output_shape ( self.size ( 3 ), kernel_size[1], padding[1], stride[1], dilation[1], ceil_mode );
   auto output = empty ( { self.size ( 0 ), self.size ( 1 ), output_h, output_w }, self.options() );
+  TIMING_START;
   bm_status_t status = sgdnnPoolingForward (
                        tpu::TPUGetDeviceHandle(),
                        pooling_desc,
@@ -54,6 +58,7 @@ bool ceil_mode )
                        tpu::TPUGenerateSgdnnTensor ( output ),
                        ADDR_IN_DEVICE ( output ) );
   TORCH_CHECK ( status == BM_SUCCESS );
+  TIMING_END(tpu::MAX_POOLING);
   outputs = std::tuple<Tensor, Tensor> ( output, Tensor() );
   SHOW_TENSOR_OP(self, output);
 #endif
@@ -79,8 +84,11 @@ const Tensor & indices )
   CHECK_TENSOR_IN_DEVICE ( indices );
   Tensor grad_input;
 #if 1
+  CPU_IMPL_WARNING();
+  TIMING_START;
   auto grad_input_cpu = max_pool2d_with_indices_backward ( grad_output.to ( torch::kFloat32 ).cpu(), self.to ( torch::kFloat32 ).cpu(), kernel_size, stride, padding, dilation, ceil_mode, indices.cpu() );
   grad_input = TENSOR_TO_TPU ( grad_input_cpu ).to ( self.dtype() );
+  TIMING_END(tpu::CPU_LAYER);
 #else
   TORCH_CHECK ( ceil_mode == false );
   TORCH_CHECK ( dilation[0] == 1 && dilation[1] == 1, "DILATION must be one" );
@@ -99,6 +107,7 @@ const Tensor & indices )
   int output_h = at::native::pooling_output_shape ( self.size ( 2 ), kernel_size[0], padding[0], stride[0], dilation[0], ceil_mode );
   int output_w = at::native::pooling_output_shape ( self.size ( 3 ), kernel_size[1], padding[1], stride[1], dilation[1], ceil_mode );
   auto output = empty ( { self.size ( 0 ), self.size ( 1 ), output_h, output_w }, self.options() );
+  TIMING_START;
   bm_status_t status = sgdnn_pooling_forward (
                        tpu::TPUGetDeviceHandle(),
                        pooling_desc,
@@ -124,6 +133,7 @@ const Tensor & indices )
            tpu::TPUGenerateSgdnnTensor ( grad_input ),
            ADDR_IN_DEVICE ( grad_input ) );
   TORCH_CHECK ( status == BM_SUCCESS );
+  TIMING_END(tpu::MAX_POOLING);
 #endif
   SHOW_TENSOR_OP(grad_output, self, grad_input);
   return grad_input;
@@ -163,19 +173,14 @@ Tensor & output ){
     .output_w = output_w,
     .mode = POOLING_AVG
   };
-#ifdef TPU_OP_TIMING
-  auto timer = tpu::Timer().Start();
-#endif
-
+  TIMING_START;
   bm_status_t status = sgdnnPoolingForward (
                        tpu::TPUGetDeviceHandle(),
                        tpu::TPUGenerateSgdnnTensor ( self ),
                        tpu::TPUGenerateSgdnnTensor ( output ),
                        pooling_desc);
   TORCH_CHECK ( status == BM_SUCCESS );
-#ifdef TPU_OP_TIMING
-  tpu::OpTimer::Instance().AddTime(tpu::AVG_POOLING, timer.ElapsedUS());
-#endif
+  TIMING_END(tpu::AVG_POOLING);
 #endif
   SHOW_TENSOR_OP(self, output);
   return output;
@@ -219,19 +224,15 @@ IntArrayRef output_size){
     .output_w = (int)output_size[1],
     .mode = POOLING_AVG
   };
-#ifdef TPU_OP_TIMING
-  auto timer = tpu::Timer().Start();
-#endif
 
+  TIMING_START;
   bm_status_t status = sgdnnPoolingForward (
                        tpu::TPUGetDeviceHandle(),
                        tpu::TPUGenerateSgdnnTensor ( self ),
                        tpu::TPUGenerateSgdnnTensor ( output ),
                        pooling_desc);
   TORCH_CHECK ( status == BM_SUCCESS );
-#ifdef TPU_OP_TIMING
-  tpu::OpTimer::Instance().AddTime(tpu::AVG_POOLING, timer.ElapsedUS());
-#endif
+  TIMING_END(tpu::AVG_POOLING);
 #endif
   SHOW_TENSOR_OP(self, output);
   return output;

@@ -42,9 +42,9 @@ do{                                                     \
 #endif
 
 #ifdef SHOW_CPU_OP
-#define CPU_IMPL_WANING(...)  LOG( WARNING ) << __func__ << " use cpu impl." << #__VA_ARGS__;
+#define CPU_IMPL_WARNING(...)  LOG( WARNING ) << __func__ << " use cpu impl." << #__VA_ARGS__;
 #else
-#define CPU_IMPL_WANING(...)
+#define CPU_IMPL_WARNING(...)
 #endif
 
 #define CHECK_TENSOR_IN_DEVICE(t) \
@@ -328,6 +328,7 @@ typedef enum
   CDMA_S2D,
   CDMA_C2C,
   COPY,
+  CPU_LAYER,
   CONVOLUTION,
   CONVOLUTION_BACKWARD,
   BATCHNORM,
@@ -335,6 +336,7 @@ typedef enum
   LAYERNORM,
   LAYERNORM_BACKWARD,
   AVG_POOLING,
+  MAX_POOLING,
   RELU,
   RELU_BACKWARD,
   GELU,
@@ -508,6 +510,8 @@ typedef enum
   BINARYOP,
   BINARYOP_C,
   BINARYOP_BCAST,
+  REAL,
+  CONJ,
   OP_NUM
 }
 OpType;
@@ -518,6 +522,7 @@ static const char * OpTypeStr[OP_NUM] =
   "CDMA S2D",
   "CDMA C2C",
   "Copy",
+  "Cpu Layer",
   "Convolution",
   "Convolution Backward",
   "BatchNorm",
@@ -525,6 +530,7 @@ static const char * OpTypeStr[OP_NUM] =
   "LayerNorm",
   "LayerNorm Backward",
   "Avg Pooling",
+  "Max Pooling",
   "ReLU",
   "ReLU Backward",
   "GeLU",
@@ -692,11 +698,14 @@ static const char * OpTypeStr[OP_NUM] =
   "MSE Loss Backward",
   "Slice_scatter",
   "Inf Check And Unscale",
+  "LLAMA_ATTENTION",
   "LLAMA_MLP_FORWARD",
   "RMSNORM_FORWARD",
   "binary_op",
   "binary_op_c",
   "binary_op_bcast",
+  "real",
+  "Conj"
 };
 
 struct OpTimer

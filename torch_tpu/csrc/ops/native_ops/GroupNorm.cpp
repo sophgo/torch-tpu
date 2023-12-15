@@ -87,18 +87,14 @@ std::tuple<Tensor, Tensor, Tensor> native_group_norm_tpu(
   mean = std::get<1>(result).cpu();
   rstd = std::get<2>(result).cpu();
 #else
-#ifdef TPU_OP_TIMING
-  auto timer = tpu::Timer().Start();
-#endif
+  TIMING_START;
   bm_status_t status = sgdnnNativeGroupNorm(
       tpu::TPUGetDeviceHandle(), tpu::TPUGenerateSgdnnTensor(X_32),
       tpu::TPUGenerateSgdnnTensor(weight), tpu::TPUGenerateSgdnnTensor(bias),
       group, affine, eps, tpu::TPUGenerateSgdnnTensor(Y),
       tpu::TPUGenerateSgdnnTensor(mean), tpu::TPUGenerateSgdnnTensor(rstd));
   TORCH_CHECK(status == BM_SUCCESS);
-#ifdef TPU_OP_TIMING
-  tpu::OpTimer::Instance().AddTime(tpu::NATIVE_GROUP_NORM, timer.ElapsedUS());
-#endif
+  TIMING_END(tpu::NATIVE_GROUP_NORM);
 #endif
   return std::make_tuple(Y, mean, rstd);
 }
@@ -124,14 +120,15 @@ native_group_norm_backward_tpu(const at::Tensor &grad_out, const at::Tensor &X,
   }
 #if 1
     // tpu impl has bug. to fix
-    CPU_IMPL_WANING();
+    CPU_IMPL_WARNING();
+    TIMING_START;
     auto input_type = grad_out.dtype();
     auto result = native_group_norm_backward(
         grad_out.cpu().to(torch::kFloat32), X.cpu().to(torch::kFloat32),
         mean.cpu().to(torch::kFloat32), rstd.cpu().to(torch::kFloat32),
         c10::optional<Tensor>(weight.cpu().to(torch::kFloat)), N, C, HxW,
         group, output_mask);
-    CHECK_TENSOR_IN_DEVICE(X);
+    TIMING_END(tpu::CPU_LAYER);
     return std::tuple<Tensor, Tensor, Tensor>(
         output_mask[0] ? TENSOR_TO_TPU(std::get<0>(result).to(input_type).contiguous())
                       : Tensor(),
