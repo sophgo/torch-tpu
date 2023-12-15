@@ -888,8 +888,23 @@ typedef struct
   unsigned long long output_global_addr;
   int shape[FW_MAX_SHAPE_DIMS];
   int dim;
-  int dtype;
+  int input_dtype;
+  int other_dtype;
+  int output_dtype;
 } WITH_PLATFORM(sg_api_pow_t);
+
+typedef struct
+{
+  unsigned long long input_global_addr;
+  unsigned long long other_global_addr;
+  unsigned long long output_global_addr;
+  int input_shape[FW_MAX_SHAPE_DIMS];
+  int other_shape[FW_MAX_SHAPE_DIMS];
+  int dim;
+  int input_dtype;
+  int other_dtype;
+  int output_dtype;
+} WITH_PLATFORM(sg_api_pow_bcast_t);
 
 typedef struct
 {
@@ -1567,6 +1582,7 @@ typedef struct
   int dim;
   float value;
   int dtype;
+  int out_is_int;
 } WITH_PLATFORM(sg_api_pow_tensor_scalar_t);
 
 typedef struct

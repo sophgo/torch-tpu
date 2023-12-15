@@ -27,49 +27,21 @@ Tensor &binary_op_tpu(const Tensor &self, const Tensor &other,
   if (self.dim() == 0 || other.dim() == 0) {
     // tensor op scalar
     if (self.dim() == 0) {
-      if (self.dtype() == caffe2::TypeMeta::Make<long>() ||
-          self.dtype() == caffe2::TypeMeta::Make<int>() ||
-          self.dtype() == caffe2::TypeMeta::Make<short>()) {
-        Tensor scalar = self.cpu().to(torch::kLong);
-        TIMING_START
-        bm_status_t status = sgdnnBinaryC(
-            tpu::TPUGetDeviceHandle(), tpu::TPUGenerateSgdnnTensor(other),
-            *scalar.data_ptr<long>() * alpha.toFloat(),
-            tpu::TPUGenerateSgdnnTensor(out), binary_type, 1);
-        TORCH_CHECK(status == BM_SUCCESS);
-        TIMING_END(tpu::BINARYOP_C)
-      } else {
-        Tensor scalar = self.cpu().to(torch::kFloat);
-        TIMING_START
-        bm_status_t status = sgdnnBinaryC(
-            tpu::TPUGetDeviceHandle(), tpu::TPUGenerateSgdnnTensor(other),
-            *scalar.data_ptr<float>() * alpha.toFloat(),
-            tpu::TPUGenerateSgdnnTensor(out), binary_type, 1);
-        TORCH_CHECK(status == BM_SUCCESS);
-        TIMING_END(tpu::BINARYOP_C)
-      }
+      TIMING_START
+      bm_status_t status = sgdnnBinaryC(
+          tpu::TPUGetDeviceHandle(), tpu::TPUGenerateSgdnnTensor(other),
+          self.item().toFloat() * alpha.toFloat(),
+          tpu::TPUGenerateSgdnnTensor(out), binary_type, 1);
+      TORCH_CHECK(status == BM_SUCCESS);
+      TIMING_END(tpu::BINARYOP_C)
     } else {
-      if (other.dtype() == caffe2::TypeMeta::Make<long>() ||
-          other.dtype() == caffe2::TypeMeta::Make<int>() ||
-          other.dtype() == caffe2::TypeMeta::Make<short>()) {
-        Tensor scalar = other.cpu().to(torch::kLong);
-        TIMING_START
-        bm_status_t status = sgdnnBinaryC(
-            tpu::TPUGetDeviceHandle(), tpu::TPUGenerateSgdnnTensor(self),
-            *scalar.data_ptr<long>() * alpha.toFloat(),
-            tpu::TPUGenerateSgdnnTensor(out), binary_type, 0);
-        TORCH_CHECK(status == BM_SUCCESS);
-        TIMING_END(tpu::BINARYOP_C)
-      } else {
-        Tensor scalar = other.cpu().to(torch::kFloat);
-        TIMING_START
-        bm_status_t status = sgdnnBinaryC(
-            tpu::TPUGetDeviceHandle(), tpu::TPUGenerateSgdnnTensor(self),
-            *scalar.data_ptr<float>() * alpha.toFloat(),
-            tpu::TPUGenerateSgdnnTensor(out), binary_type, 0);
-        TORCH_CHECK(status == BM_SUCCESS);
-        TIMING_END(tpu::BINARYOP_C)
-      }
+      TIMING_START
+      bm_status_t status = sgdnnBinaryC(
+          tpu::TPUGetDeviceHandle(), tpu::TPUGenerateSgdnnTensor(self),
+          other.item().toFloat() * alpha.toFloat(),
+          tpu::TPUGenerateSgdnnTensor(out), binary_type, 0);
+      TORCH_CHECK(status == BM_SUCCESS);
+      TIMING_END(tpu::BINARYOP_C)
     }
     return out;
   }
@@ -1378,22 +1350,25 @@ Tensor &pow_out_tpu(const Tensor &self, const Tensor &other, Tensor &out) {
   if (self.dim() > 0) {
     CHECK_TENSOR_IN_DEVICE(self);
   }
-  CHECK_TENSOR_IN_DEVICE(other);
+  if (other.dim() > 0) {
+    CHECK_TENSOR_IN_DEVICE(other);
+  }
   CHECK_TENSOR_IN_DEVICE(out);
-#if 0
+  if (self.dim() == 0 && other.dim() == 0) {
+    auto out_cpu = pow(self.cpu(), other.cpu());
+    tpu::TPUCopyHostToDevice(out.data_ptr(), out_cpu.contiguous().data_ptr(),
+                             out.nbytes());
+    return out;
+  }
 
-  auto self_cpu = pow ( self.cpu(),other.cpu());
-  tpu::TPUCopyHostToDevice ( self.data_ptr(),self.contiguous().data_ptr(), self.nbytes() );
-  tpu::TPUCopyHostToDevice ( other.data_ptr(),other.contiguous().data_ptr(), other.nbytes() );
-#else
   if (self.dim() == 0) {
-    auto self_cpu = pow(self.cpu(), other.cpu());
-    tpu::TPUCopyHostToDevice(self.data_ptr(), self.contiguous().data_ptr(),
-                             self.nbytes());
-    tpu::TPUCopyHostToDevice(other.data_ptr(), other.contiguous().data_ptr(),
-                             other.nbytes());
-  } else if (IS_TPU_TENSOR(self)) {
+    return pow_outf(self.item(), other, out);
+  }
+  if (other.dim() == 0) {
+    return pow_outf(self, other.item(), out);
+  }
 
+  if (tpu::TPUIsSameShape(self, other)) {
 #ifdef TPU_OP_TIMING
     auto timer = tpu::Timer().Start();
 #endif
@@ -1402,33 +1377,69 @@ Tensor &pow_out_tpu(const Tensor &self, const Tensor &other, Tensor &out) {
         tpu::TPUGenerateSgdnnTensor(other), tpu::TPUGenerateSgdnnTensor(out));
     TORCH_CHECK(status == BM_SUCCESS);
 #ifdef TPU_OP_TIMING
-    tpu::OpTimer::Instance().AddTime(tpu::POW_FORWARD, timer.ElapsedUS());
+    tpu::OpTimer::Instance().AddTime(tpu::POW, timer.ElapsedUS());
 #endif
   } else {
-    TORCH_CHECK(false, "At least one input is required in TPU device");
+    int self_dim = self.dim(), other_dim = other.dim();
+    int max_dim = std::max(self_dim, other_dim);
+    int self_shape[max_dim], other_shape[max_dim];
+    for (int i = max_dim - 1; i >= 0; i--) {
+      if (i >= max_dim - self_dim) {
+        self_shape[i] = self.size(i + self_dim - max_dim);
+      } else {
+        self_shape[i] = 1;
+      }
+      if (i >= max_dim - other_dim) {
+        other_shape[i] = other.size(i + other_dim - max_dim);
+      } else {
+        other_shape[i] = 1;
+      }
+    }
+    for (int i = 0; i < max_dim; i++) {
+      TORCH_CHECK(self_shape[i] == other_shape[i] || self_shape[i] == 1 ||
+                      other_shape[i] == 1,
+                  "The size of tensor a (%d) must match the size of tensor b "
+                  "(%d) at non-signleton dimension %d",
+                  self_shape[i], other_shape[i], i)
+    }
+
+    SgdnnTensor_t self_t = tpu::TPUGenerateSgdnnTensor(self);
+    SgdnnTensor_t other_t = tpu::TPUGenerateSgdnnTensor(other);
+    SgdnnTensor_t out_t = tpu::TPUGenerateSgdnnTensor(out);
+
+    if (self_dim != other_dim) {
+      auto &change_t = self_dim > other_dim ? other_t : self_t;
+      const auto &change_shape =
+          self_dim > other_dim ? other_shape : self_shape;
+      for (int i = max_dim - 1; i >= 0; i--) {
+        change_t.shape[i] = change_shape[i];
+        change_t.stride[i] =
+            i == max_dim - 1 ? 1 : change_t.stride[i + 1] * change_shape[i + 1];
+      }
+      change_t.dim = max_dim;
+    }
+    TIMING_START
+    bm_status_t status =
+        sgdnnPowBcast(tpu::TPUGetDeviceHandle(), self_t, other_t, out_t);
+    TORCH_CHECK(status == BM_SUCCESS);
+    TIMING_END(tpu::POW_BCAST)
   }
-#endif
   return out;
 }
-
-Tensor &pow_tpu(const Tensor &self, const Tensor &other) {
-  auto out = empty(self.sizes(), self.options());
-  return pow_out_tpu(self, other, out);
-}
-
 TORCH_LIBRARY_IMPL(aten, TPU, m) {
-  // m.impl("pow.out", pow_out_tpu);
   m.impl("pow.Tensor_Tensor_out", pow_out_tpu);
 }
 
 Tensor &pow_c_out_tpu(const Tensor &self, const Scalar &exponent, Tensor &out) {
   CHECK_TENSOR_IN_DEVICE(self);
   CHECK_TENSOR_IN_DEVICE(out);
-#if 0
-  LOG( WARNING ) << "pow_out_tpu use cpu impl";
-  auto out_cpu = pow( self.cpu(), exponent );
-  out = out_cpu.to(out.device());
-#else
+  if (self.dim() == 0) {
+    Tensor out_cpu = pow(self.cpu(), exponent);
+    tpu::TPUCopyHostToDevice(out.data_ptr(), out_cpu.contiguous().data_ptr(),
+                             out.nbytes());
+    return out;
+  }
+  TORCH_CHECK(exponent.toDouble() > 0);
 #ifdef TPU_OP_TIMING
   auto timer = tpu::Timer().Start();
 #endif
@@ -1439,12 +1450,35 @@ Tensor &pow_c_out_tpu(const Tensor &self, const Scalar &exponent, Tensor &out) {
 #ifdef TPU_OP_TIMING
   tpu::OpTimer::Instance().AddTime(tpu::POWC, timer.ElapsedUS());
 #endif
-#endif
   return out;
 }
 TORCH_LIBRARY_IMPL(aten, TPU, m) {
   m.impl("pow.Tensor_Scalar_out", pow_c_out_tpu);
 }
+
+Tensor &c_pow_out_tpu(const Scalar &self, const Tensor &exponent, Tensor &out) {
+  CHECK_TENSOR_IN_DEVICE(exponent);
+  CHECK_TENSOR_IN_DEVICE(out);
+  if (exponent.dim() == 0) {
+    Tensor out_cpu = pow(self, exponent.cpu());
+    tpu::TPUCopyHostToDevice(out.data_ptr(), out_cpu.contiguous().data_ptr(),
+                             out.nbytes());
+    return out;
+  }
+  TORCH_CHECK(self.toDouble() > 0);
+#ifdef TPU_OP_TIMING
+  auto timer = tpu::Timer().Start();
+#endif
+  bm_status_t status = sgdnnCPow(
+      tpu::TPUGetDeviceHandle(), tpu::TPUGenerateSgdnnTensor(exponent),
+      self.toDouble(), tpu::TPUGenerateSgdnnTensor(out));
+  TORCH_CHECK(status == BM_SUCCESS);
+#ifdef TPU_OP_TIMING
+  tpu::OpTimer::Instance().AddTime(tpu::CPOW, timer.ElapsedUS());
+#endif
+  return out;
+}
+TORCH_LIBRARY_IMPL(aten, TPU, m) { m.impl("pow.Scalar_out", c_pow_out_tpu); }
 
 Tensor &fmax_out_tpu(const Tensor &self, const Tensor &other, Tensor &out) {
   if (self.dim() > 0) {
