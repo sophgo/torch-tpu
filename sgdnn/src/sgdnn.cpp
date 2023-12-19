@@ -2162,6 +2162,7 @@ bm_status_t sgdnnNativeGroupNormBackward(bm_handle_t handle, SgdnnTensor_t grad_
   api.group_nums = group;
   api.grad_input_global_addr = out0.addr;
   api.grad_weight_global_addr = out1.addr;
+  api.grad_bias_global_addr = out2.addr;
   for (int i = 0; i < input.dim; ++i) {
     api.shape[i] = input.shape[i];
   }

@@ -242,6 +242,7 @@ typedef struct
   unsigned long long saved_invstd_global_addr;
   unsigned long long grad_input_global_addr;
   unsigned long long grad_weight_global_addr;
+  unsigned long long grad_bias_global_addr;
   int shape[4];
   int dtype;
   int group_nums;
