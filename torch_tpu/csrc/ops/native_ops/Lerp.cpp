@@ -14,14 +14,14 @@ Tensor & lerp_scalar_out_tpu(const at::Tensor & self, const at::Tensor & end, co
   CHECK_TENSOR_IN_DEVICE( out );
   CHECK_TENSOR_IN_DEVICE( self );
   CHECK_TENSOR_IN_DEVICE( end );
-#if 1
+#if 0
     CPU_IMPL_WARNING();
     TIMING_START;
     auto out_cpu = lerp(self.cpu(), end.cpu(), weight);
     tpu::TPUCopyHostToDevice(out.data_ptr(), out_cpu.data_ptr(), out.nbytes());
     TIMING_END(tpu::CPU_LAYER);
 #else
-    TORCH_CHECK(false, "not impl lerp scalar kernel");
+    out = self + weight * (end - self); //TODO
 #endif
   SHOW_TENSOR_OP(self, end, out);
   return out;
