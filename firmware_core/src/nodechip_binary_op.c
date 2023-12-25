@@ -310,11 +310,11 @@ void tpu_kernel_api_binary_multi_core(const void *args) {
   int core_num = tpu_core_num();
   int core_idx = tpu_core_index();
 
-  int length_slice = DIV_UP(length, core_num);
+  long long length_slice = DIV_UP(length, core_num);
   int length_secs = DIV_UP(length, length_slice);
   TPUKERNEL_ASSERT(length_secs <= core_num);
 
-  int cur_length_slice = length_slice;
+  long long cur_length_slice = length_slice;
   if (core_idx == length_secs - 1) {
     cur_length_slice = length - length_slice * (length_secs - 1);
   }
@@ -415,10 +415,10 @@ void nodechip_binary_bcast(global_addr_t input_global_addr,
           input_local_shape.w = input_bcast[3] ? 1 : slice_shape.w;
           global_addr_t input_global_addr_gdma =
               input_global_addr +
-              ((input_bcast[0] ? 0 : ndone) * input_global_stride->n +
-               (input_bcast[1] ? 0 : cdone) * input_global_stride->c +
-               (input_bcast[2] ? 0 : hdone) * input_global_stride->h +
-               (input_bcast[3] ? 0 : wdone) * input_global_stride->w) *
+              ((input_bcast[0] ? 0 : ndone) * (long long)input_global_stride->n +
+               (input_bcast[1] ? 0 : cdone) * (long long)input_global_stride->c +
+               (input_bcast[2] ? 0 : hdone) * (long long)input_global_stride->h +
+               (input_bcast[3] ? 0 : wdone) * (long long)input_global_stride->w) *
                   tpu_data_type_size(dtype);
           tpu_gdma_cpy_S2L(input_local_addr[index], input_global_addr_gdma,
                            &input_local_shape, &input_local_stride,
@@ -431,10 +431,10 @@ void nodechip_binary_bcast(global_addr_t input_global_addr,
           other_local_shape.w = other_bcast[3] ? 1 : slice_shape.w;
           global_addr_t other_global_addr_gdma =
               other_global_addr +
-              ((other_bcast[0] ? 0 : ndone) * other_global_stride->n +
-               (other_bcast[1] ? 0 : cdone) * other_global_stride->c +
-               (other_bcast[2] ? 0 : hdone) * other_global_stride->h +
-               (other_bcast[3] ? 0 : wdone) * other_global_stride->w) *
+              ((other_bcast[0] ? 0 : ndone) * (long long)other_global_stride->n +
+               (other_bcast[1] ? 0 : cdone) * (long long)other_global_stride->c +
+               (other_bcast[2] ? 0 : hdone) * (long long)other_global_stride->h +
+               (other_bcast[3] ? 0 : wdone) * (long long)other_global_stride->w) *
                   tpu_data_type_size(dtype);
           tpu_gdma_cpy_S2L(other_local_addr[index], other_global_addr_gdma,
                            &other_local_shape, &other_local_stride,
@@ -543,10 +543,10 @@ void nodechip_binary_bcast(global_addr_t input_global_addr,
           tpu_parallel_end();
 
           output_global_addr_gdma =
-              output_global_addr + (ndone * output_global_stride->n +
-                                    cdone * output_global_stride->c +
-                                    hdone * output_global_stride->h +
-                                    wdone * output_global_stride->w) *
+              output_global_addr + (ndone * (long long)output_global_stride->n +
+                                    cdone * (long long)output_global_stride->c +
+                                    hdone * (long long)output_global_stride->h +
+                                    wdone * (long long)output_global_stride->w) *
                                        tpu_data_type_size(dtype);
           gdma_shape = slice_shape;
           l2s = true;
@@ -1028,11 +1028,11 @@ void tpu_kernel_api_binary_c_multi_core(const void *args) {
   int core_num = tpu_core_num();
   int core_idx = tpu_core_index();
 
-  int length_slice = DIV_UP(length, core_num);
+  long long length_slice = DIV_UP(length, core_num);
   int length_secs = DIV_UP(length, length_slice);
   TPUKERNEL_ASSERT(length_secs <= core_num);
 
-  int cur_length_slice = length_slice;
+  long long cur_length_slice = length_slice;
   if (core_idx == length_secs - 1) {
     cur_length_slice = length - length_slice * (length_secs - 1);
   }

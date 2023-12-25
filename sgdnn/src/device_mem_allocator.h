@@ -17,8 +17,16 @@
       }                                                                          \
     } while (0)
 
-static bool operator < (bm_device_mem_t m0, bm_device_mem_t m1){
+static bool operator < (sg_device_mem_t m0, sg_device_mem_t m1){
     return memcmp(&m0, &m1, sizeof(m0))<0;
+}
+
+static sg_system_mem_t sg_mem_from_system(void *system_addr) {
+  sg_system_mem_t mem;
+  memset(&mem, 0x0, sizeof(sg_device_mem_t));
+  mem.u.system.system_addr = system_addr;
+  mem.flags.u.mem_type = BM_MEM_TYPE_SYSTEM;
+  return mem;
 }
 
 class DeviceMemAllocator{
@@ -27,10 +35,10 @@ public:
         _handle(handle) {}
 
     template<typename T=uint8_t>
-    bm_device_mem_t alloc_on_device(size_t elem_size, std::function<size_t (T* ptr, size_t len)> init_func = nullptr){
-        bm_device_mem_t mem;
+    sg_device_mem_t alloc_on_device(size_t elem_size, std::function<size_t (T* ptr, size_t len)> init_func = nullptr){
+        sg_device_mem_t mem;
         size_t byte_size = elem_size * sizeof(T);
-        auto ret = bm_malloc_device_byte(_handle, &mem, byte_size);
+        auto ret = sg_malloc_device_byte(_handle, &mem, byte_size);
         if(ret != BM_SUCCESS){
             destroy_mem();
             throw ret;
@@ -38,7 +46,7 @@ public:
         if(init_func){
             T* ptr = new T[elem_size];
             auto len = init_func(ptr, elem_size);
-            auto ret = bm_memcpy_s2d_partial(_handle, mem, ptr, len*sizeof(T));
+            auto ret = sg_memcpy_s2d_partial(_handle, mem, ptr, len*sizeof(T));
             delete [] ptr;
             if(ret != BM_SUCCESS){
                 destroy_mem();
@@ -49,17 +57,17 @@ public:
         return mem;
     }
 
-    void dealloc(const bm_device_mem_t& mem){
-        if (bm_mem_get_type(mem) == BM_MEM_TYPE_SYSTEM){
+    void dealloc(const sg_device_mem_t& mem){
+        if (sg_mem_get_type(mem) == BM_MEM_TYPE_SYSTEM){
             if(_mem_need_free.count(mem)){
-                bm_free_device(_handle, mem);
+                sg_free_device(_handle, mem);
                 _mem_need_free.erase(mem);
             } else {
                 destroy_mem();
                 throw BM_ERR_FAILURE;
             }
         } else {
-            auto ptr = (unsigned char*)bm_mem_get_system_addr(mem);
+            auto ptr = (unsigned char*)sg_mem_get_system_addr(mem);
             if(_ptr_need_free.count(ptr)){
                 delete [] ptr;
                 _ptr_need_free.erase(ptr);
@@ -71,7 +79,7 @@ public:
     }
 
     template<typename T>
-    bm_device_mem_t alloc_on_system(size_t elem_size, std::function<void (T* ptr, size_t len)> init_func = nullptr){
+    sg_device_mem_t alloc_on_system(size_t elem_size, std::function<void (T* ptr, size_t len)> init_func = nullptr){
         size_t byte_size = elem_size*sizeof(T);
         unsigned char* ptr = new unsigned char[byte_size];
         if(ptr == nullptr){
@@ -82,16 +90,16 @@ public:
             init_func((T*)ptr, elem_size);
         }
         _ptr_need_free.insert(ptr);
-        bm_device_mem_t mem;
-        bm_mem_set_system_addr(&mem, ptr);
+        sg_device_mem_t mem;
+        sg_mem_set_system_addr(&mem, ptr);
         return mem;
     }
 
     template<typename T>
-    bm_device_mem_t map_input_to_device(const bm_device_mem_t& raw_mem, size_t elem_size){
-        if (bm_mem_get_type(raw_mem) == BM_MEM_TYPE_SYSTEM){
-            bm_device_mem_t new_mem = alloc_on_device<T>(elem_size);
-            auto ret = bm_memcpy_s2d(_handle, new_mem, bm_mem_get_system_addr(raw_mem));
+    sg_device_mem_t map_input_to_device(const sg_device_mem_t& raw_mem, size_t elem_size){
+        if (sg_mem_get_type(raw_mem) == BM_MEM_TYPE_SYSTEM){
+            sg_device_mem_t new_mem = alloc_on_device<T>(elem_size);
+            auto ret = sg_memcpy_s2d(_handle, new_mem, sg_mem_get_system_addr(raw_mem));
             if(ret != BM_SUCCESS){
                 destroy_mem();
                 throw ret;
@@ -102,13 +110,13 @@ public:
     }
 
     template<typename T>
-    bm_device_mem_t map_output_to_device(const bm_device_mem_t& raw_mem, size_t elem_size,
+    sg_device_mem_t map_output_to_device(const sg_device_mem_t& raw_mem, size_t elem_size,
                                          bool is_inplace = false){
-        if (bm_mem_get_type(raw_mem) == BM_MEM_TYPE_SYSTEM){
-            bm_device_mem_t new_mem = alloc_on_device<T>(elem_size);
+        if (sg_mem_get_type(raw_mem) == BM_MEM_TYPE_SYSTEM){
+            sg_device_mem_t new_mem = alloc_on_device<T>(elem_size);
             _post_copy_map[raw_mem] = new_mem;
             if (is_inplace) {
-                auto ret = bm_memcpy_s2d(_handle, new_mem, bm_mem_get_system_addr(raw_mem));
+                auto ret = sg_memcpy_s2d(_handle, new_mem, sg_mem_get_system_addr(raw_mem));
                 if(ret != BM_SUCCESS){
                     destroy_mem();
                     throw ret;
@@ -119,7 +127,7 @@ public:
         return raw_mem;
     }
 
-    bm_device_mem_t map_output_to_device(const bm_device_mem_t& raw_mem, size_t elem_size, SgdnnDataType_t dtype,
+    sg_device_mem_t map_output_to_device(const sg_device_mem_t& raw_mem, size_t elem_size, SgdnnDataType_t dtype,
                                          bool is_inplace = false){
         switch(dtype){
         case SGDNN_DTYPE_FP32:
@@ -145,10 +153,10 @@ public:
         default:
             ASSERT_INFO(0, "unsupported dtype=%d", dtype);
         }
-        return bm_device_mem_t{};
+        return sg_device_mem_t{};
     }
 
-    bm_device_mem_t map_input_to_device(const bm_device_mem_t& raw_mem, size_t elem_size, SgdnnDataType_t dtype){
+    sg_device_mem_t map_input_to_device(const sg_device_mem_t& raw_mem, size_t elem_size, SgdnnDataType_t dtype){
         switch(dtype){
         case SGDNN_DTYPE_FP32:
             return map_input_to_device<float>(raw_mem, elem_size);
@@ -173,37 +181,37 @@ public:
         default:
             ASSERT_INFO(0, "unsupported dtype=%d", dtype);
         }
-        return bm_device_mem_t{};
+        return sg_device_mem_t{};
     }
 
     unsigned long long map_input_to_device_addr(void* raw_ptr, size_t elem_size, SgdnnDataType_t dtype){
-        return map_input_to_device_addr(bm_mem_from_system(raw_ptr), elem_size, dtype);
+        return map_input_to_device_addr(sg_mem_from_system(raw_ptr), elem_size, dtype);
     }
-    unsigned long long map_input_to_device_addr(const bm_device_mem_t& raw_mem, size_t elem_size, SgdnnDataType_t dtype){
+    unsigned long long map_input_to_device_addr(const sg_device_mem_t& raw_mem, size_t elem_size, SgdnnDataType_t dtype){
 
         auto mem = map_input_to_device(raw_mem, elem_size, dtype);
-        return bm_mem_get_device_addr(mem);
+        return sg_mem_get_device_addr(mem);
     }
 
-    unsigned long long map_output_to_device_addr(const bm_device_mem_t& raw_mem, size_t elem_size, SgdnnDataType_t dtype,
+    unsigned long long map_output_to_device_addr(const sg_device_mem_t& raw_mem, size_t elem_size, SgdnnDataType_t dtype,
                                                  bool is_post_copy = false, bool is_inplace = false){
         auto mem = map_output_to_device(raw_mem, elem_size, dtype, is_inplace);
-        return bm_mem_get_device_addr(mem);
+        return sg_mem_get_device_addr(mem);
     }
 
     unsigned long long map_output_to_device_addr(void* raw_ptr, size_t elem_size, SgdnnDataType_t dtype){
-        return map_output_to_device_addr(bm_mem_from_system(raw_ptr), elem_size, dtype);
+        return map_output_to_device_addr(sg_mem_from_system(raw_ptr), elem_size, dtype);
     }
 
     unsigned long long map_buffer_to_device_addr(size_t buffer_size){
         if (buffer_size == 0) return -1;
         auto mem = alloc_on_device<char>(buffer_size);
-        return bm_mem_get_device_addr(mem);
+        return sg_mem_get_device_addr(mem);
     }
 
     void flush_output() {
         for(auto m: _post_copy_map){
-            bm_memcpy_d2s(_handle, bm_mem_get_system_addr(m.first), m.second);
+            sg_memcpy_d2s(_handle, sg_mem_get_system_addr(m.first), m.second);
         }
         _post_copy_map.clear();
     }
@@ -220,14 +228,14 @@ private:
         }
         _ptr_need_free.clear();
         for(auto m: _mem_need_free){
-            bm_free_device(_handle, m);
+            sg_free_device(_handle, m);
         }
         _mem_need_free.clear();
     }
     bm_handle_t _handle;
-    std::set<bm_device_mem_t> _mem_need_free;
+    std::set<sg_device_mem_t> _mem_need_free;
     std::set<unsigned char*> _ptr_need_free;
-    std::map<bm_device_mem_t, bm_device_mem_t> _post_copy_map;
+    std::map<sg_device_mem_t, sg_device_mem_t> _post_copy_map;
 };
 
 #endif // BMCV_MEM_ALLOCATOR_H

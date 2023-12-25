@@ -115,12 +115,12 @@ public:
 
   // the input is on host, map_input will alloc a device memory and do s2d automatically
   // or return the original device_addr directly
-  unsigned long long map_input(bm_device_mem_t input, size_t num_elem, SgdnnDataType_t dtype){
+  unsigned long long map_input(sg_device_mem_t input, size_t num_elem, SgdnnDataType_t dtype){
     return _allocator.map_input_to_device_addr(input, num_elem, dtype);
   }
 
   // the output is on host, map_output will alloc a device memory and do d2s when sync is called
-  unsigned long long map_output(bm_device_mem_t output, size_t num_elem, SgdnnDataType_t dtype, bool is_inplace=false){
+  unsigned long long map_output(sg_device_mem_t output, size_t num_elem, SgdnnDataType_t dtype, bool is_inplace=false){
     bool is_post_copy = true;
     return _allocator.map_output_to_device_addr(output, num_elem, dtype, is_post_copy, is_inplace);
   }
@@ -129,12 +129,12 @@ public:
   unsigned long long use_buffer(size_t byte_size){
     auto mem = _allocator.alloc_on_device(byte_size);
     buffers.push_back(mem);
-    return bm_mem_get_device_addr(mem);
+    return sg_mem_get_device_addr(mem);
   }
 
 private:
   bm_handle_t _handle;
   DeviceMemAllocator _allocator;
   std::vector<int> core_list;
-  std::vector<bm_device_mem_t> buffers;
+  std::vector<sg_device_mem_t> buffers;
 };
