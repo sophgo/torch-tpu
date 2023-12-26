@@ -69,8 +69,7 @@ TORCH_LIBRARY_IMPL ( aten, TPU, m )
 std::vector<at::Tensor> _foreach_norm_tpu(at::TensorList tensors, const at::Scalar & ord) {
   std::vector<at::Tensor> outs;
   for (const auto& t : tensors){
-    IntArrayRef dim = IntArrayRef{};
-    outs.emplace_back(norm(t, ord, dim, true));
+    outs.emplace_back(linalg_vector_norm(t, ord));
   }
   return outs;
 }

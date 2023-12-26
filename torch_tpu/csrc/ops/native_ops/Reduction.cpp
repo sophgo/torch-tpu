@@ -59,7 +59,6 @@ Tensor &sum_IntList_out_tpu(const Tensor &self, OptionalIntArrayRef dim_opt,
                             Tensor &out) {
   CHECK_TENSOR_IN_DEVICE_NO_CONTIGUOUS(self);
   CHECK_TENSOR_IN_DEVICE(out);
-  if ( !self.is_contiguous() ) { LOG(WARNING) << "self not contiguous " << tpu::GetTensorInfo(self); }
   auto self_ = self.contiguous();
 #if 0
   auto out_cpu = sum ( self.cpu(), dim_opt, keepdim, dtype_opt );

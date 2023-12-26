@@ -117,7 +117,8 @@ IntArrayRef output_padding,
 int64_t groups,
 std::array<bool, 3> output_mask )
 {
-  CHECK_TENSOR_IN_DEVICE ( grad_output );
+  auto grad_output_ = grad_output.contiguous();
+  CHECK_TENSOR_IN_DEVICE ( grad_output_ );
   CHECK_TENSOR_IN_DEVICE ( input );
   CHECK_TENSOR_IN_DEVICE ( weight );
 #if 0
@@ -180,7 +181,7 @@ std::array<bool, 3> output_mask )
     TIMING_START;
     bm_status_t status = sgdnnConv2dBackward (
                          tpu::TPUGetDeviceHandle(),
-                         tpu::TPUGenerateSgdnnTensor ( grad_output ),
+                         tpu::TPUGenerateSgdnnTensor ( grad_output_ ),
                          tpu::TPUGenerateSgdnnTensor ( input ),
                          tpu::TPUGenerateSgdnnTensor ( weight ),
                          conv_param,
@@ -190,7 +191,7 @@ std::array<bool, 3> output_mask )
     TORCH_CHECK ( status == BM_SUCCESS );
     TIMING_END ( tpu::CONVOLUTION_BACKWARD );
   }
-  SHOW_TENSOR_OP(grad_output, input, weight, grad_input, grad_weight, grad_bias);
+  SHOW_TENSOR_OP(grad_output_, input, weight, grad_input, grad_weight, grad_bias);
   return std::tuple<Tensor, Tensor, Tensor> ( grad_input, grad_weight, grad_bias );
 #endif
 }
