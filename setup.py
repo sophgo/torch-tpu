@@ -7,6 +7,7 @@ import multiprocessing
 import glob
 import shutil
 import re
+from pathlib import Path
 
 from sysconfig import get_paths
 
@@ -139,7 +140,10 @@ class CPPLibBuild(build_clib, object):
         generate_libs = glob.glob(os.path.join(build_type_dir, "*/*.so"), recursive=True)
         for lib in generate_libs:
             subprocess.check_call(['cp']+[lib, output_lib_path], cwd=build_type_dir, env=os.environ)
-
+        subprocess.check_call(["patchelf", "--set-rpath",
+                                "$ORIGIN",
+                                os.path.relpath(os.path.join(BASE_DIR, f"build/{get_build_type()}/packages/torch_tpu/lib/libtorch_tpu.so"))
+                                  ])
 class Build(build_ext, object):
 
     def run(self):
