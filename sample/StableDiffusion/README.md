@@ -55,7 +55,7 @@ wget https://mirrors.tuna.tsinghua.edu.cn/anaconda/miniconda/Miniconda3-py311_23
 bash Miniconda3-py311_23.5.0-3-Linux-x86_64.sh
 ```
 #### 1.2.2 配置python环境
-请确保当前Python是3.9的版本。如果安装了Conda，可以通过下面命令新建一个Python3.10的工作环境（建议）
+请确保当前Python是3.10的版本。如果安装了Conda，可以通过下面命令新建一个Python3.10的工作环境（建议）
 ```bash
 conda create -n SD python=3.10
 conda activate SD

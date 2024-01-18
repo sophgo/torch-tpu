@@ -29,13 +29,52 @@ Torch TPU主要依赖libsophon、python、Pytorch，其版本要求如下:
 > 1. 目前仅支持torch2.1,BM1684X的板卡模态。
 
 ## 安装说明
+
+### 安装libsophon
+请提前安装好libsophon,安装参考文档[libsophon](https://doc.sophgo.com/sdk-docs/v23.07.01/docs_latest_release/docs/libsophon/guide/html/1_install.html)。
+libsophon的下载链接在[算能SDK](https://developer.sophgo.com/site/index/material/41/all.html)。
+安装的主要命令如下：
+```bash
+安装依赖库，只需要执行一次:
+sudo apt install dkms libncurses5
+安装 libsophon:
+sudo dpkg -i sophon-*.deb
+在终端执行如下命令，或者登出再登入当前用户后即可使用 bm-smi 等命令:
+source /etc/profile
+```
 ### 方式1 使用whl包安装
 请确保满足上述环境依赖。
+```bash
+pip install https://github.com/sophgo/torch-tpu/releases/download/v0.1/torch_tpu-2.1.0.post1-cp310-cp310-linux_x86_64.whl
 ```
-    pip install torch_tpu-2.1.0.post1-cp310-cp310-linux_x86_64.whl
+### 方式2 在安装好torch-tpu的docker中直接使用
+从 DockerHub https://hub.docker.com/r/sophgo/torch_tpu 下载所需的镜像:
 ```
-### 方式2 在安装好torch-tpu的docker中，直接使用
-TODO
+$ docker pull sophgo/torch_tpu:v0.1
+```
+如果是首次使用Docker, 可执行下述命令进行安装和配置(仅首次执行):
+```
+$ sudo apt install docker.io
+$ sudo systemctl start docker
+$ sudo systemctl enable docker
+$ sudo groupadd docker
+$ sudo usermod -aG docker $USER
+$ newgrp docker
+```
+创建docker容器并进入。
+```bash
+docker run --cap-add SYS_ADMIN -itd --restart always \
+      -e LD_LIBRARY_PATH=/opt/sophon/libsophon-current/lib:$LD_LIBRARY_PATH \
+      -e PATH=/opt/sophon/libsophon-current/bin:$PATH \
+      --device=/dev/bmdev-ctl:/dev/bmdev-ctl \
+      --device=/dev/bm-sophon0:/dev/bm-sophon0 \
+      -v $HOME:/workspace \
+      -v /opt:/opt   \
+      -w /workspace \
+      --name torch_tpu_0 sophgo/torch_tpu:v0.1 bash
+
+docker attach torch_tpu_0
+```
 
 安装完之后，可以通过下面的python脚本进行检验，
 ```python
