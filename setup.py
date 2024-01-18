@@ -296,8 +296,10 @@ else:
 setup(
         name=os.environ.get('TORCH_TPU_PACKAGE_NAME', 'torch_tpu'),
         version=VERSION,
+        author="sophgo",
+        author_email="dev@sophgo.com",
         description='TPU bridge for PyTorch',
-        url='',
+        url='https://github.com/sophgo/torch-tpu',
         packages=["torch_tpu"],
         libraries=[('torch_tpu', {'sources': list()})],
         package_dir={'': os.path.relpath(os.path.join(BASE_DIR, f"build/{get_build_type()}/packages"))},
@@ -311,6 +313,11 @@ setup(
                 library_dirs=lib_directories,
                 extra_link_args=extra_link_args + ['-Wl,-rpath,$ORIGIN/lib'],
             ),
+        ],
+        python_requires=">=3.10,<3.11",
+        install_requires = ["torch==2.1.0"],
+        dependency_links = [
+            "https://download.pytorch.org/whl/cpu",
         ],
         extras_require={
         },
