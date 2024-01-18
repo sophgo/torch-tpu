@@ -315,7 +315,7 @@ setup(
             ),
         ],
         python_requires=">=3.10,<3.11",
-        install_requires = ["torch==2.1.0"],
+        install_requires = ["torch==2.1.0", "torchvision==0.16.0", "torchaudio==2.1.0"],
         dependency_links = [
             "https://download.pytorch.org/whl/cpu",
         ],
