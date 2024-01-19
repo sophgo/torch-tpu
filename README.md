@@ -30,6 +30,12 @@ Torch TPU主要依赖libsophon、python、Pytorch，其版本要求如下:
 
 ## 安装说明
 
+### 安装PyToch
+请按照如下命令安装PyTorch：
+```bash
+pip install torch==2.1.0 torchvision==0.16.0 torchaudio==2.1.0 --index-url https://download.pytorch.org/whl/cpu
+```
+
 ### 安装libsophon
 请提前安装好libsophon,安装参考文档[libsophon](https://doc.sophgo.com/sdk-docs/v23.07.01/docs_latest_release/docs/libsophon/guide/html/1_install.html)。
 libsophon的下载链接在[算能SDK](https://developer.sophgo.com/site/index/material/41/all.html)。
@@ -63,7 +69,7 @@ $ newgrp docker
 ```
 创建docker容器并进入。
 ```bash
-docker run --cap-add SYS_ADMIN -itd --restart always \
+docker run --cap-add SYS_ADMIN -itd --restart always --privileged=true \
       -e LD_LIBRARY_PATH=/opt/sophon/libsophon-current/lib:$LD_LIBRARY_PATH \
       -e PATH=/opt/sophon/libsophon-current/bin:$PATH \
       --device=/dev/bmdev-ctl:/dev/bmdev-ctl \
