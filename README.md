@@ -43,6 +43,13 @@ sudo dpkg -i sophon-*.deb
 source /etc/profile
 ```
 ### 方式1 使用whl包安装
+
+### 安装PyToch
+请按照如下命令安装PyTorch：
+```bash
+pip install torch==2.1.0 torchvision==0.16.0 torchaudio==2.1.0 --index-url https://download.pytorch.org/whl/cpu
+```
+
 请确保满足上述环境依赖。
 ```bash
 pip install https://github.com/sophgo/torch-tpu/releases/download/v0.1/torch_tpu-2.1.0.post1-cp310-cp310-linux_x86_64.whl
@@ -63,7 +70,7 @@ $ newgrp docker
 ```
 创建docker容器并进入。
 ```bash
-docker run --cap-add SYS_ADMIN -itd --restart always \
+docker run --cap-add SYS_ADMIN -itd --restart always --privileged=true \
       -e LD_LIBRARY_PATH=/opt/sophon/libsophon-current/lib:$LD_LIBRARY_PATH \
       -e PATH=/opt/sophon/libsophon-current/bin:$PATH \
       --device=/dev/bmdev-ctl:/dev/bmdev-ctl \
