@@ -38,7 +38,8 @@ function get_pytorch_install_dir(){
 ######## ===== ENVS TO COMPILE TPUTRAIN ======########
 export TPUTRAIN_TOP=$(cd $(dirname "${BASH_SOURCE[0]}")/.. && pwd)
 export TPUTRAIN_DEBUG=OFF
-export CROSS_TOOLCHAINS=$HOME/workspace/
+# cross toolchains
+source ${TPUTRAIN_TOP}/scripts/prepare_toolchains.sh
 export CHIP_ARCH=${1:-bm1684x}
 export PS1="\[\e[1;35m\]("train-"${CHIP_ARCH}):\[\e[1;33m\]\w\[\e[1;34m\]\$ \[\e[0m\]"
 export FIRMWARE_CMODEL_PATH=$TPUTRAIN_TOP/third_party/$CHIP_ARCH/libcmodel_firmware.so
@@ -72,6 +73,5 @@ echo "[INFO]PYTORCH_INSTALL_DIR=$PYTORCH_INSTALL_DIR"
 source ${TPUTRAIN_TOP}/scripts/build_helper.sh
 source ${TPUTRAIN_TOP}/scripts/release.sh
 source ${TPUTRAIN_TOP}/scripts/regression.sh
-#source ${TPUTRAIN_TOP}/scripts/prepare_toolchains.sh
 
 export LD_LIBRARY_PATH=$TPUTRAIN_TOP/third_party/oneDNN/lib:$LD_LIBRARY_PATH

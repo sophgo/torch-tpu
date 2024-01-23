@@ -2,10 +2,10 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
-torch.ops.load_library("../../build/torch_tpu/libtorch_tpu.so")
+import torch_tpu
 torch.manual_seed(1000)
 torch.set_printoptions(precision=6)
-device = "privateuseone:0"
+device = "tpu:0"
 
 # 如果需要测试，请进入Unary.cpp文件，注释bitwise_not_tpu相关函数，取消注释cbrt_tpu相关函数
 def case1():

@@ -4,7 +4,7 @@ import torch.nn.functional as F
 import torch_tpu
 
 torch.set_printoptions(precision=6)
-device = "privateuseone"
+device = "tpu"
 
 def case1():
     step = 1

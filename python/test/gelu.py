@@ -3,14 +3,14 @@ import torch.nn as nn
 import torch.nn.functional as F
 import copy
 
-torch.ops.load_library("../../build/torch_tpu/libtorch_tpu.so")
+import torch_tpu
 torch.manual_seed(1000)
 
 def case1():
     """
     gelu backward 
     """
-    device = "privateuseone:1"
+    device = "tpu:1"
     batch = 1
     sequence = 1024
     hidden_size = 768
@@ -47,7 +47,7 @@ def case1():
     import pdb;pdb.set_trace();
     
 def case2():
-    device = "privateuseone"
+    device = "tpu"
     batch = 8
     sequence = 1024
     hidden_size = 768
@@ -70,7 +70,7 @@ def case2():
     print (torch.max(abs(out_diff)))
 
 def test(use_half = False, test_backward = False):
-    device = "privateuseone"
+    device = "tpu"
     batch = 1
     sequence = 1024
     hidden_size = 3072

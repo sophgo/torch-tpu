@@ -5,7 +5,7 @@ import torch_tpu
 
 torch.manual_seed(1000)
 torch.set_printoptions(precision=6)
-device = "privateuseone:0"
+device = "tpu:0"
 
 def case1():
     dim = None

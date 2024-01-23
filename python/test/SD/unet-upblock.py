@@ -13,7 +13,7 @@ from utils import compare_model_grad, Optimer
 PLUGIN_PATH = "../../../build/torch_tpu/libtorch_tpu.so"
 torch.ops.load_library(PLUGIN_PATH)
 OPT = Optimer(PLUGIN_PATH)
-device = "privateuseone"
+device = "tpu"
 os.environ["CMODEL_GLOBAL_MEM_SIZE"]="12000000000"
 
 def test_UpBlock2D():

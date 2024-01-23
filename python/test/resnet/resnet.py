@@ -7,7 +7,7 @@ import time
 from ..utils import Optimer,compare_model_grad
 torch.manual_seed(1000)
 torch.ops.load_library("../../../build/torch_tpu/libtorch_tpu.so")
-device = torch.device("privateuseone:0")
+device = torch.device("tpu:0")
 OPT = Optimer()
 
 def R50_update(use_fp16 = False):

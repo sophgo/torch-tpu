@@ -4,11 +4,11 @@ import torch.nn.functional as F
 import copy
 import time
 
-torch.ops.load_library("../../build/torch_tpu/libtorch_tpu.so")
+import torch_tpu
 torch.manual_seed(1000)
 
 def case_forward(use_fp16 = False):
-    device = "privateuseone"
+    device = "tpu"
     batch = 1
     head_num = 1
     sequence = 4
@@ -40,7 +40,7 @@ def case_forward(use_fp16 = False):
     print ("diff:", torch.max(abs(out_diff)))
 
 def case_backward(use_fp16 = False):
-    device = "privateuseone"
+    device = "tpu"
     batch = 32
     head_num = 12
     sequence = 1024
@@ -90,7 +90,7 @@ def case_backward(use_fp16 = False):
     print ("diff:", torch.max(abs(diff)))
 
 def test(use_half = False, test_backward = False):
-    device = "privateuseone"
+    device = "tpu"
     batch = 8
     head_num = 64
     sequence = 256

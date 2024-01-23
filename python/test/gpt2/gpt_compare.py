@@ -320,10 +320,10 @@ def compare_model(res_cpu, res_tpu):
 def check_gpt3(use_half = False, test_backward = False):
     from transformers import GPT2Config
     import time
-    # torch.ops.load_library("../../build/torch_tpu/libtorch_tpu.so")
+    # import torch_tpu
     # torch.manual_seed(1000)
-    # device = "privateuseone:0"
-    device = torch.device("privateuseone:0")
+    # device = "tpu:0"
+    device = torch.device("tpu:0")
     ############# configure ###############
     configure = GPT2Config()
     configure.attn_pdrop = 0

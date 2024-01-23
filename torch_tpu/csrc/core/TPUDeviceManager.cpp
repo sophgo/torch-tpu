@@ -52,17 +52,13 @@ private:
     }
   }
 
-  static TPUDeviceManager * instance_;
+  static TPUDeviceManager instance_;
 
 public:
 
   static TPUDeviceManager & GetInstance()
   {
-    if ( instance_ == nullptr )
-    {
-      instance_ = new TPUDeviceManager();
-    }
-    return *instance_;
+    return instance_;
   }
 
   int GetDeviceCount() const
@@ -204,7 +200,7 @@ private:
   std::vector<std::unordered_map<unsigned long long, bm_device_mem_t>> AddrMemMaps_;
 };
 
-TPUDeviceManager * TPUDeviceManager::instance_ = nullptr;
+TPUDeviceManager TPUDeviceManager::instance_ = TPUDeviceManager();
 
 static thread_local int kIndex = 0;
 

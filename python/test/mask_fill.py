@@ -2,7 +2,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
-torch.ops.load_library("../../build/torch_tpu/libtorch_tpu.so")
+import torch_tpu
 torch.manual_seed(1000)
 torch.set_printoptions(precision=6)
 
@@ -19,7 +19,7 @@ def case1():
     # mask_cpu = mask_cpu.to(dtype)
     # import pdb;pdb.set_trace()
 
-    TPU = "privateuseone:0"
+    TPU = "tpu:0"
     mask_tpu = torch.full((tgt_len, tgt_len), torch.tensor(torch.finfo(dtype).min, device=TPU), device=TPU)
     mask_cond_tpu = torch.arange(mask_tpu.size(-1), dtype=dtype, device=TPU)
     s1_t = (mask_cond_tpu + 1).view(mask_tpu.size(-1),1)

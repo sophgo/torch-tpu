@@ -3,7 +3,7 @@ from typing import Any, List, Union, Callable
 from torch import nn
 import numpy as np
 
-device = "privateuseone:0"
+device = "tpu:0"
 
 
 class InputIter:

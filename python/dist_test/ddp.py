@@ -6,8 +6,8 @@ import torch.nn as nn
 import torch.optim as optim
 from torch.nn.parallel import DistributedDataParallel as DDP
 
-torch.ops.load_library("../../build/torch_tpu/libtorch_tpu.so")
-device = "privateuseone:"
+import torch_tpu
+device = "tpu:"
 
 def example(rank, world_size):
     # create default process group

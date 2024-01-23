@@ -6,10 +6,10 @@ import sys
 import copy
 
 
-torch.ops.load_library("../../build/torch_tpu/libtorch_tpu.so")
+import torch_tpu
 torch.manual_seed(1000)
 torch.set_printoptions(precision=6)
-device = "privateuseone:0"
+device = "tpu:0"
 
 class RMSNorm(nn.Module):
     def __init__(self, d=0, axis=-1., eps=1e-8, with_scale=False, with_bias=False):

@@ -3,14 +3,14 @@ import torch.nn as nn
 import torch.nn.functional as F
 import copy
 
-torch.ops.load_library("../../build/torch_tpu/libtorch_tpu.so")
+import torch_tpu
 torch.manual_seed(1000)
 
 def case1(use_fp16):
     """
     gelu backward
     """
-    device = "privateuseone"
+    device = "tpu"
     batch = 8
     sequence = 1024
     hidden_size = 768

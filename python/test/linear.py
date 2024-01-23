@@ -6,7 +6,7 @@ import time
 from utils import Optimer, compare_model_grad, compare_model_weight
 from torch.optim import AdamW, Adam
 
-# torch.ops.load_library("../../build/torch_tpu/libtorch_tpu.so")
+# import torch_tpu
 torch.manual_seed(1000)
 # optimer = Optimer("../../build/torch_tpu/libtorch_tpu.so")
 import torch_tpu
@@ -38,7 +38,7 @@ def case_forward(use_fp16=False):
     print (torch.max(abs(out_diff)))
 
 def case_backward(use_fp16=False):
-    device = "privateuseone"
+    device = "tpu"
     batch = 32
     sequence = 256
     hidden_size = 768
@@ -79,7 +79,7 @@ def case_backward(use_fp16=False):
     compare_model_grad(ln_cpu, ln_tpu)
 
 def case_update_weight(use_fp16=False):
-    device = "privateuseone"
+    device = "tpu"
     batch = 32
     sequence = 256
     hidden_size = 768

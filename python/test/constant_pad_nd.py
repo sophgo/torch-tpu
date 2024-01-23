@@ -2,8 +2,8 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
-torch.ops.load_library("../../build/torch_tpu/libtorch_tpu.so")
-device = "privateuseone:0"
+import torch_tpu
+device = "tpu:0"
 torch.set_printoptions(precision=8)
 
 def case1():

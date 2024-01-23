@@ -4,9 +4,9 @@ import torch.nn.functional as F
 import copy
 from utils import compare_model_grad, Optimer
 
-torch.ops.load_library("../../build/torch_tpu/libtorch_tpu.so")
+import torch_tpu
 torch.manual_seed(1000)
-device = "privateuseone:0"
+device = "tpu:0"
 OPT = Optimer()
 
 def case_embedding():

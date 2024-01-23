@@ -2,11 +2,11 @@ import torch
 import torch.nn as nn
 import copy
 from utils import compare_model_grad, Optimer
-torch.ops.load_library("../../build/torch_tpu/libtorch_tpu.so")
+import torch_tpu
 torch.manual_seed(1000)
 OPT = Optimer()
 if __name__ == "__main__":
-    device = "privateuseone"
+    device = "tpu"
     N = 4
     C = 64
     H = 128

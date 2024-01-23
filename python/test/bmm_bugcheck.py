@@ -10,7 +10,7 @@ import unittest
 from parameterized import  parameterized,param
 
 torch.manual_seed(1000)
-torch.ops.load_library("../../build/torch_tpu/libtorch_tpu.so")
+import torch_tpu
 optimer = Optimer("../../build/torch_tpu/libtorch_tpu.so")
 
 class Conv1D(nn.Module):
@@ -332,7 +332,7 @@ def case_gptblock_backward(bs=2, h=12, m=16, d=768, use_half=True):
     global grads_list
     grads_list = []
     ############# configure ###############
-    device = torch.device("privateuseone:0")
+    device = torch.device("tpu:0")
     configure = GPT2Config()
     configure.attn_pdrop = 0
     configure.embd_pdrop = 0

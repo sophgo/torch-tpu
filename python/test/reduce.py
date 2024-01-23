@@ -2,17 +2,17 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
-torch.ops.load_library("../../build/torch_tpu/libtorch_tpu.so")
+import torch_tpu
 torch.manual_seed(1000)
 torch.set_printoptions(precision=6)
-device = "privateuseone:0"
+device = "tpu:0"
 
 def case_2d_sum(use_f16=False):
     """
     reduce sum
     """
     ############## config ###################
-    device = "privateuseone"
+    device = "tpu"
     h = 999
     w = 111111
     #########################################
@@ -30,7 +30,7 @@ def case_2d_sum(use_f16=False):
 
 def case_3d_sum(use_f16=False):
     ############## config ###################
-    device = "privateuseone"
+    device = "tpu"
     batch = 32
     sequence = 256
     hidden_size = 768
@@ -58,7 +58,7 @@ def case_0d_sum(use_f16=False):
     corner case. Use cpu impl.
     '''
     ############## config ###################
-    device = "privateuseone"
+    device = "tpu"
     #########################################
     inp = torch.tensor(torch.rand(1).item())
     inp_tpu = inp.to(device)

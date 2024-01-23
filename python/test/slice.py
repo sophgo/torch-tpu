@@ -2,13 +2,13 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
-torch.ops.load_library("../../build/torch_tpu/libtorch_tpu.so")
+import torch_tpu
 
 def case1():
     """
     slice + contiguous + crossentroy loss + backward
     """
-    device = "privateuseone"
+    device = "tpu"
     batch = 2
     sequence = 8
     hidden_size = 3
@@ -70,7 +70,7 @@ def case2():
     """
     slice backward
     """
-    device = "privateuseone"
+    device = "tpu"
     batch = 2
     sequence = 8
     hidden_size = 3
@@ -109,7 +109,7 @@ def case3_slice_backward():
     slice's backward is equal to copy.
     this case use copy to simulate slice's backward.
     """
-    device = "privateuseone"
+    device = "tpu"
     batch = 2
     sequence = 8
     hidden_size = 3
@@ -128,7 +128,7 @@ def case4():
     """
     slice + slice
     """
-    device = "privateuseone"
+    device = "tpu"
     batch = 2
     sequence = 8
     hidden_size = 3

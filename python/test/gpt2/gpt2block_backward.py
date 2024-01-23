@@ -306,7 +306,7 @@ class GPT2Block(nn.Module):
 
 def case_gptblock_backward():
     ############# configure ###############
-    device = torch.device("privateuseone:0")
+    device = torch.device("tpu:0")
     configure = GPT2Config()
     configure.attn_pdrop = 0
     configure.embd_pdrop = 0
@@ -374,7 +374,7 @@ def case_gptblock_backward():
 
 def case_gptmlp_backward():
     ############# configure ###############
-    device = torch.device("privateuseone:0")
+    device = torch.device("tpu:0")
     configure = GPT2Config()
     configure.attn_pdrop = 0
     configure.embd_pdrop = 0

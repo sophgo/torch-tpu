@@ -4,14 +4,14 @@ import torch.nn.functional as F
 import copy
 from utils import compare_model_grad
 
-torch.ops.load_library("../../build/torch_tpu/libtorch_tpu.so")
+import torch_tpu
 torch.manual_seed(1000)
 
 def case1(use_fp16=False):
     """
     conv backward 
     """
-    device = "privateuseone"
+    device = "tpu"
     B = 64
     C = 3
     H = 224

@@ -28,15 +28,15 @@ if __name__ == "__main__":
 
     ## 1.input
     inp = torch.randint(0,configure.vocab_size,(batch, sequence))
-    inp_tpu = inp.clone().int().to("privateuseone:0")
+    inp_tpu = inp.clone().int().to("tpu:0")
     ref = torch.rand(batch, sequence, configure.hidden_size)
-    ref_tpu = ref.to("privateuseone:0").half()
+    ref_tpu = ref.to("tpu:0").half()
 
     ## 2.network
     net = GPT2LMHeadModel(configure).train()
     #net = GPT2Model(configure)
     net_tpu = copy.deepcopy(net)
-    net_tpu.to("privateuseone:0").half()
+    net_tpu.to("tpu:0").half()
     #net_tpu.lm_head.weight = net_tpu.transformer.wte.weight
 
     ## 3.optimizer

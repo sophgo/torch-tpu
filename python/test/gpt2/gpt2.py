@@ -6,7 +6,7 @@ import sys
 sys.path.append("..") 
 from utils import compare_model_grad, Optimer
 PLUGIN_PATH = "../../../build/torch_tpu/libtorch_tpu.so"
-TPU = "privateuseone:0"
+TPU = "tpu:0"
 torch.ops.load_library(PLUGIN_PATH)
 optimer = Optimer(PLUGIN_PATH)
 

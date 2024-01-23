@@ -360,14 +360,14 @@ if __name__ == "__main__":
     ########################################
 
     inp = torch.rand(batch, sequence, configure.hidden_size)
-    inp_tpu = inp.clone().to("privateuseone:0").half()
+    inp_tpu = inp.clone().to("tpu:0").half()
 
     #net = GPT2MLP(4 * configure.hidden_size, configure)
     #net = GPT2Attention(configure)
     net = GPT2Block(configure)
 
     net_tpu = copy.deepcopy(net)
-    net_tpu.to("privateuseone:0").half()
+    net_tpu.to("tpu:0").half()
     #net.double()
 
     print("start run")
