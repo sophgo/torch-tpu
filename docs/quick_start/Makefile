@@ -1,8 +1,8 @@
 # You can set these variables from the command line.
 
 # module_name === project in conf.py, use \_ instead of _ if module name contains _
-module_name := TORCH-TPU
-output_file_prefix := TORCH-TPU_quick_start
+module_name := torch-tpu
+output_file_prefix := torch-tpu_quick_start
 
 # SOURCEDIR_en     = source_en
 # pdf_name_en      = $(output_file_prefix)_en.pdf

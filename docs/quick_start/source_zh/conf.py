@@ -19,7 +19,7 @@
 
 # -- Project information -----------------------------------------------------
 
-project = u'TORCH-TPU'
+project = u'torch-tpu'
 copyright = u'2022, SOPHGO'
 author = u'SOPHGO'
 

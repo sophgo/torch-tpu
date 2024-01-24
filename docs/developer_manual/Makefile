@@ -1,7 +1,7 @@
 # You can set these variables from the command line.
 
 # module_name === project in conf.py, use \_ instead of _ if module name contains _
-module_name = TORCH-TPU
+module_name = torch-tpu
 output_file_prefix = torch-tpu_technical_manual
 
 SOURCEDIR_en     = source_en
