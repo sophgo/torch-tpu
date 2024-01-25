@@ -104,6 +104,7 @@ Docker环境配置
    $ python 
    >> import torch
    >> import torch_tpu
+   >> import torch.nn as nn
    >> inp = torch.rand(8,1024,768).to('tpu')
    >> In_net = nn.Linear(768,3).to('tpu')
    >> out = In_net(inp)
@@ -205,6 +206,7 @@ torch-tpu安装
    $ python 
    >> import torch
    >> import torch_tpu
+   >> import torch.nn as nn
    >> inp = torch.rand(8,1024,768).to('tpu')
    >> In_net = nn.Linear(768,3).to('tpu')
    >> out = In_net(inp)
