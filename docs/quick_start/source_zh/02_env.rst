@@ -15,15 +15,31 @@
 Docker环境配置
 ==================
 
+安装libsophon
+------------------
+
+第一步，需要提前安装好libsophon，可以从 https://developer.sophgo.com/site/index/material/41/all.html 下载最新的算能SDK。
+
+然后通过执行下述命令进行安装：
+
+.. code-block:: shell
+
+   # 安装依赖库，只需要执行一次:
+   $ sudo apt install dkms libncurses5
+   # 安装 libsophon:
+   $ sudo dpkg -i sophon-*.deb
+   # 在终端执行如下命令，或者登出再登入当前用户后即可使用 bm-smi 等命令:
+   $ source /etc/profile
+
+安装过程，如遇到其他问题，可以参考 https://doc.sophgo.com/sdk-docs/v23.07.01/docs_latest_release/docs/libsophon/guide/html/1_install.html 继续进行驱动安装步骤。
+
 安装Docker（首次）
 ------------------
 
 如果是首次使用Docker, 可执行下述命令进行安装和配置(仅首次执行):
 
 .. code-block:: shell
-
-   :linenos:
-
+   
    $ sudo apt install docker.io
    $ sudo systemctl start docker
    $ sudo systemctl enable docker
@@ -34,11 +50,11 @@ Docker环境配置
 获取镜像
 ------------------
 
-首先，从 *********************************** 下载所需的镜像:
+从 DockerHub https://hub.docker.com/r/sophgo/torch_tpu 下载所需的镜像:
 
 .. code-block:: shell
 
-   $ docker pull ************
+   $ docker pull sophgo/torch_tpu:v0.1
 
 创建容器
 ------------------
@@ -56,20 +72,21 @@ Docker环境配置
 .. code-block:: shell
   :linenos:
 
-   $ sudo docker run --cap-add SYS_ADMIN -itd --restart always \
-    --device=/dev/bmdev-ctl:/dev/bmdev-ctl \
-        --device=/dev/bm-sophon0:/dev/bm-sophon0 
-    -v <YOUR WORKSPACE>:/workspace \
-        -v /opt:/opt \
-    -w /workspace \
-    --name <YOUR_NAME>\
-    sophgo/tpuc_dev:latest bash
+   docker run --cap-add SYS_ADMIN -itd --restart always \
+      -e LD_LIBRARY_PATH=/opt/sophon/libsophon-current/lib:$LD_LIBRARY_PATH \
+      -e PATH=/opt/sophon/libsophon-current/bin:$PATH \
+      --device=/dev/bmdev-ctl:/dev/bmdev-ctl \
+      --device=/dev/bm-sophon0:/dev/bm-sophon0 \
+      -v $HOME:/workspace \
+      -v /opt:/opt   \
+      -w /workspace \
+      --name torch_tpu_0 sophgo/torch_tpu:v0.1 bash
 
-  # <YOUR WORKSPACE>为当前工作目录
+   docker attach torch_tpu_0
 
-  # <YOUR_NAME>为自己想要的容器的名字
+  # <torch_tpu_0>为自己想要的容器的名字
 
-  # 当前为单机器创建容器示例，如果有多台机器，设备要全被映射，可按如下格式添加参数：
+  # 当前为单机器创建容器示例，如果有多台机器，设备要全部被映射，可按如下格式添加参数：
 
   #  --device=/dev/bm-sophon0:/dev/bm-sophon0 --device=/dev/bm-sophon7:/dev/bm-sophon1 \
   #      --device=/dev/bm-sophon3:/dev/bm-sophon2 --device=/dev/bm-sophon8:/dev/bm-sophon3
@@ -166,7 +183,7 @@ torch需要适配当前支持版本torch2.1.0：
 
 .. code-block:: shell
 
-   $ pip install torch==2.1.0 --index-url https://download.pytorch.org/whl/cpu
+   $ pip install torch==2.1.0 torchvision==0.16.0 torchaudio==2.1.0 --index-url https://download.pytorch.org/whl/cpu
 
 torch-tpu安装
 -----------------------
@@ -176,7 +193,7 @@ torch-tpu安装
 
 .. code-block:: shell
    
-   $ pip install torch_tpu-2.1.0.*-linux_x86_64.whl
+   $ pip install https://github.com/sophgo/torch-tpu/releases/download/v0.1/torch_tpu-2.1.0.post1-cp310-cp310-linux_x86_64.whl
 
 安装测试
 -----------------------
