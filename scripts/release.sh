@@ -12,7 +12,8 @@ source scripts/release_doc.sh
 # ------------------------------------------------------------------------------
 BUILD_PATH=build/Release
 torch_tpu_version="$(grep TORCHTPU_VERSION ${BUILD_PATH}/CMakeCache.txt | cut -d "=" -f2)"
-tar -cvzf "torch-tpu_${torch_tpu_version}.tar.gz" ${release_archive}
+commit=$(git log -1 --pretty=format:"%h")
+tar -cvzf "torch-tpu_${torch_tpu_version}_${commit}.tar.gz" ${release_archive}
 rm -rf ${release_archive}
 
 popd
