@@ -14,8 +14,6 @@ TORCH-TPU开发参考手册
    02_environment
    03_overview
    04_device_and_mem
-   06_operator_call
-   07_mix_precision
-   08_distribute
-   09_compile_mode
-   10_custom_op
+   05_mix_precision
+   06_distribute
+   07_custom_op
