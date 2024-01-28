@@ -58,8 +58,6 @@ Diffusers 采用源码安装的方式，目前支持版本为v0.20.0。可执行
 
 .. code-block:: shell
 
-    :linenos:
-
     $ git clone https://github.com/huggingface/diffusers.git
     $ cd diffusers
     $ git checkout v0.20.0
@@ -72,8 +70,6 @@ Diffusers 采用源码安装的方式，目前支持版本为v0.20.0。可执行
 Transformers 采用源码安装的方式，目前支持版本为v4.29.1。可执行下述命令进行安装：
 
 .. code-block:: shell
-
-    :linenos:
 
     $ git clone https://github.com/huggingface/transformers.git
     $ cd transformers
@@ -89,8 +85,6 @@ accelerate 为 Diffusers 训练和推理的加速依赖库。
 accelerate 采用源码安装的方式，目前支持版本为v0.16.0。可执行下述命令进行安装：
 
 .. code-block:: shell
-
-    :linenos:
 
     $ git clone https://github.com/huggingface/accelerate.git
     $ cd accelerate
@@ -133,14 +127,12 @@ accelerate 采用源码安装的方式，目前支持版本为v0.16.0。可执�
 
 .. code-block:: shell
 
-    :linenos:
-
-    python setup.py build develop
+    $ python setup.py build develop
 
 进行文生图的推理
 ==================
 
-完成上述准备工作之后，接下来便可以通过使用 Diffusers 代码库，进行 文字图像生成 的推理。
+完成上述准备工作之后，接下来便可以通过使用 Diffusers 代码库，进行文字图像生成的推理。
 
 需要注意的是，本节示例代码会自动从 https://huggingface.co/CompVis/stable-diffusion-v1-4/tree/main 下载所需模型权重文件，
 请提前确保能够正确访问链接，以免下载失败。
@@ -195,16 +187,25 @@ accelerate 采用源码安装的方式，目前支持版本为v0.16.0。可执�
     image.save(f"pokemon.png")
 
 
-执行如上示例代码后，会在当前的路径下生成一张名为 “pokemon.png” 的符合我们预设提示词的龙宝宝图片。
+执行示例代码，如下图所示，即为正常运行。
 
-.. figure:: ../assets/tutorial1_dragon.png
+.. figure:: ../assets/without_lora_demo.png
+   :width: 2200px
+   :height: 400px
+   :scale: 50%
+   :align: center
+   :alt: SOPHGO LOGO
+
+执行如上示例代码成功执行后，会在当前的路径下生成一张名为 “pokemon.png” 的符合我们预设提示词的龙宝宝图片。
+
+.. figure:: ../assets/without_lora.png
    :width: 400px
    :height: 400px
    :scale: 50%
    :align: center
    :alt: SOPHGO LOGO
 
-使用预训练参数，加载LoRA参数进行文生图推理
+使用预训练参数，加载 LoRA 参数进行文生图推理
 ------------------
 
 本节将介绍在使用 StableDiffusion 预训练参数的基础上，同时加载 LoRA 参数进行文生图的 python 示例代码。
@@ -237,9 +238,18 @@ accelerate 采用源码安装的方式，目前支持版本为v0.16.0。可执�
     image = pipe(prompt, num_inference_steps=30, guidance_scale=7.5).images[0]
     image.save("pokemon_lora.png")
 
+执行示例代码，如下图所示，即为正常运行。
+
+.. figure:: ../assets/lora_demo.png
+   :width: 1900px
+   :height: 400px
+   :scale: 50%
+   :align: center
+   :alt: SOPHGO LOGO
+
 执行如上示例代码后，会在当前的路径下生成一张名为 “pokemon_lora.png” 的图片。因为本示例加载的 LoRA 参数是在卡通风格的数据集上训练的，所以相较于未加载 LoRA 参数的示例生成的更贴近卡通形象。
 
-.. figure:: ../assets/tutorial1_dragon_lora.png
+.. figure:: ../assets/lora.png
    :width: 400px
    :height: 400px
    :scale: 50%
@@ -254,7 +264,7 @@ accelerate 采用源码安装的方式，目前支持版本为v0.16.0。可执�
 环境准备
 ------------------
 
-在实现 Finetune 训练前，我们需要根据环境配置需求文件进行相关库文件的安装：
+在实现 Finetune 训练前，我们需要根据环境配置需求文件进行相关库文件的安装。lorafinetune的代码位置在 diffusers/exampels/text_to_image ，进入该路径，首先进行环境配置。
 
 .. code-block:: shell
 
@@ -303,16 +313,16 @@ Torch-TPU 支持
 
 （3） 'DATASET_NAME'
 
-训练数据集。第一次训练时，会自动从huggingface下载。
+训练数据集，这里采用 lambdalabs/pokemon-blip-captions（https://huggingface.co/datasets/lambdalabs/pokemon-blip-captions），是一个宝可梦卡通动画的数据集，改数据集的每一个样本都由一张宝可梦图片和对应的描述构成。
+第一次训练时，会自动从huggingface下载。
 
-使用 fp32 精度进行训练
+使用 FP32 精度进行训练
 ------------------
 
-按顺序依次键入如下命令行：
+执行下面的shell脚本：
 
 .. code-block:: shell
 
-    :linenos:
 
     $ ulimit -n 65535
     $ ulimit -n
@@ -332,14 +342,62 @@ Torch-TPU 支持
         --output_dir="sd-pokemon-model-lora_fp32" \
         --validation_prompt="cute dragon creature"
 
-使用 fp16 精度进行训练
-------------------
+执行如上指令，如下图所示，即为正常运行。
 
-按顺序依次键入如下命令行：
+.. figure:: ../assets/fp32_demo.png
+   :width: 1600px
+   :height: 400px
+   :scale: 50%
+   :align: center
+   :alt: SOPHGO LOGO
+
+执行如上指令，训练完成后，会在当前目录下生成名为 sd-pokemon-model-lora_fp32 的文件夹，其中包含训练得到的lora参数、训练记录logs，以及checkpoint数据。文件结构如下。
 
 .. code-block:: shell
 
-    :linenos:
+   /text_to_image/sd-pokemon-model-lora_fp32/
+   |—— checkpoint-*
+   │    ├── optimizer.bin
+   │    ├── pytorch_model.bin
+   │    ├── random_states_0.pkl
+   │    └── scaler.pt
+   |—— logs
+   └── pytorch_lora_weights.safetensors
+
+在完成上述 LoRA Finetune 训练任务后，可以执行以下推理脚本，加载训练好的 lora 参数进行 FP32 精度下的推理。
+
+.. code-block:: python
+
+    from diffusers import StableDiffusionPipeline
+    import torch
+    import torch_tpu
+    torch.manual_seed(42)
+    device = torch.device("tpu:0")
+    MODEL_NAME="/workspace/all_in_one/CompVis_SD14_pretrained_weights/133a221b8aa7292a167afc5127cb63fb5005638b"
+    lora_weight_path = "sd-pokemon-model-lora_fp32"
+    prompt = "cute dragon creature"
+    pipe = StableDiffusionPipeline.from_pretrained(MODEL_NAME, torch_dtype=torch.float32)
+    pipe.unet.load_attn_procs(lora_weight_path)
+    pipe.to(device)
+    image = pipe(prompt, num_inference_steps=30, guidance_scale=7.5).images[0]
+    image.save("pokemon_lora.png")
+
+执行如上示例代码后，会在当前的路径下生成一张名为 “pokemon_lora.png” 的图片。
+
+.. figure:: ../assets/lora_finetune.png
+   :width: 400px
+   :height: 400px
+   :scale: 50%
+   :align: center
+   :alt: SOPHGO LOGO
+
+使用 FP16 精度进行训练
+------------------
+
+执行下面的shell脚本：
+
+.. code-block:: shell
+
 
     $ ulimit -n 65535
     $ ulimit -n
@@ -359,22 +417,25 @@ Torch-TPU 支持
         --output_dir="sd-pokemon-model-lora_fp16" \
         --validation_prompt="cute dragon creature"
 
-下载资源
-==================
+执行如上指令，训练完成后，如 FP32 精度训练一样，会在当前目录下生成名为 sd-pokemon-model-lora_fp16 的文件夹。
 
-由于网络原因 huggingface 的官网可能无法访问。我们为使用者提供了下载好的[模型、数据集、以及torch_tpu和libsophon的包](https://disk.sophgo.vip/sharing/igJxL3Ymn)。其中，各个文件夹的内容如下：
+在完成上述 LoRA Finetune 训练任务后，可以执行以下推理脚本，加载训练好的 lora 参数进行 FP16 精度下的推理。
 
-.. code-block:: shell
+.. code-block:: python
 
-    - CompVis_SD14_pretrained_weights: 
-    >>> "CompVis/stable-diffusion-v1-4"的预训练模型参数
-    - dataset: 
-    >>> "lambdalabs/pokemon-blip-captions"数据集
-    - SophgoTrained_lroa_weight: 
-    >>> 使用bm1684x训练得到的lora权重
-    - sayakpau_sd_lora-t4: 
-    >>> "sayakpaul/sd-model-finetuned-lora-t4"训练得到的lora权重
-    - torch_tpu: 
-    >>> torch_tpu的wheel包
-    - libsophon: 
-    >>> libsophon的安装包
+    from diffusers import StableDiffusionPipeline
+    import torch
+    import torch_tpu
+    torch.manual_seed(42)
+    device = torch.device("tpu:0")
+    MODEL_NAME="/workspace/all_in_one/CompVis_SD14_pretrained_weights/133a221b8aa7292a167afc5127cb63fb5005638b"
+    lora_weight_path = "sd-pokemon-model-lora_fp16"
+    prompt = "cute dragon creature"
+    pipe = StableDiffusionPipeline.from_pretrained(MODEL_NAME, torch_dtype=torch.float16)
+    pipe.unet.load_attn_procs(lora_weight_path)
+    pipe.to(device)
+    image = pipe(prompt, num_inference_steps=30, guidance_scale=7.5).images[0]
+    image.save("pokemon_lora.png")
+
+
+执行如上示例代码后，也会在当前的路径下生成一张名为 “pokemon_lora.png” 的图片。
