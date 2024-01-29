@@ -67,7 +67,7 @@ Docker环境配置
 
 该步骤目的：建立docker容器，并将host机器映射至docker容器。
 
-确保安装包在当前目录, 然后在当前目录创建容器如下：
+创建容器如下：
 
 .. code-block:: shell
   :linenos:
@@ -91,13 +91,15 @@ Docker环境配置
   #  --device=/dev/bm-sophon0:/dev/bm-sophon0 --device=/dev/bm-sophon7:/dev/bm-sophon1 \
   #      --device=/dev/bm-sophon3:/dev/bm-sophon2 --device=/dev/bm-sophon8:/dev/bm-sophon3
 
+上面命令，将主机的Host路径映射到容器中的/workspace，用户可以按需映射。
+
 后文假定用户已经处于docker里面的/workspace目录。
 
 
 安装测试
 ------------------
 
-按照上述步骤安装完成torch-tpu后，我们可以通过如下python脚本验证是否安装成功：
+在docker中，已经安装好了一个torch-tpu。我们可以通过如下python脚本验证是否可用：
 
 .. code-block:: shell
 
@@ -110,7 +112,9 @@ Docker环境配置
    >> out = In_net(inp)
    >> print(out)
 
-若运行正常，且能正常打印 out 参数值，至此，torch-tpu环境配置完成。
+若运行正常，且能正常打印 out 参数值。
+
+若要更新torch-tpu，仅需获取新的torch-tpu包，重新pip install即可。至此，torch-tpu环境配置完成。
 
 .. _env setup:
 
@@ -172,7 +176,7 @@ Anaconda安装（可选）
 
 .. code-block:: shell
 
-   $ conda create -n SD python=3.8
+   $ conda create -n SD python=3.10
    $ conda activate SD
 
 后续环境配置操作默认在Conda环境下执行，也可以自行通过pip指令进行如下环境包安装配置。
@@ -189,12 +193,12 @@ torch需要适配当前支持版本torch2.1.0：
 torch-tpu安装
 -----------------------
 
-请通过 https://disk.sophgo.vip/sharing/igJxL3Ymn 获取 torch_tpu 的wheel包。
+请通过 sdk中 获取 torch_tpu 的wheel包。
 通过如下方式进行安装：
 
 .. code-block:: shell
    
-   $ pip install https://github.com/sophgo/torch-tpu/releases/download/v0.1/torch_tpu-2.1.0.post1-cp310-cp310-linux_x86_64.whl
+   $ pip install torch_tpu-2.1.0.post1-cp310-cp310-linux_x86_64.whl
 
 安装测试
 -----------------------

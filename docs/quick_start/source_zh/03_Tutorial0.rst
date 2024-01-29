@@ -17,7 +17,7 @@
 
 本示例是在默认的FP32精度下实现的模型训练。
 
-项目示例代码可以从 https://github.com/sophgo/torch-tpu/blob/main/sample/mnist/mnist_fp32.py 获取。
+项目示例代码可以从 torch-tpu*.whl包中的 torch_tpu/demo/mnist/mnist_fp32.py 获取。(解压whl包即可看到)
 
 执行上述 mnist_fp32.py 文件，得到如下结果（此处只显示训练5个epoch的训练和验证数据）：
 
@@ -91,7 +91,7 @@
 
             model.half()    
 
-项目示例代码可以从 https://github.com/sophgo/torch-tpu/blob/main/sample/mnist/mnist_fp16.py 获取。
+项目示例代码可以从 torch-tpu*.whl包中的 torch_tpu/demo//mnist/mnist_fp16.py 获取。
 
 执行 mnist_fp16.py 文件，得到如下结果（此处只显示训练5个epoch的训练和验证数据）：
 
@@ -174,7 +174,7 @@
 
     optimizer.zero_grad()
 
-完整的项目示例代码可以从 https://github.com/sophgo/torch-tpu/blob/main/sample/mnist/mnist_mix_precision.py 获取。
+完整的项目示例代码可以从 torch-tpu*.whl包中的 torch_tpu/demo/mnist/mnist_mix_precision.py 获取。
 
 执行上述 mnist_mix_precision.py 文件，得到如下结果（此处只显示训练5个epoch的训练和验证数据）：
 

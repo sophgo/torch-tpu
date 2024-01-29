@@ -109,7 +109,7 @@ accelerate 采用源码安装的方式，目前支持版本为v0.16.0。可执�
 修改为:
 
 .. code-block:: python
-
+    import torch_tpu
     if not torch.cuda.is_available() and not parse_flag_from_env("ACCELERATE_USE_MPS_DEVICE") and not torch_tpu.tpu.is_available():
         raise ValueError(err.format(mode="fp16", requirement="a GPU"))
     kwargs = self.scaler_handler.to_kwargs() if self.scaler_handler is not None else {}
@@ -118,7 +118,6 @@ accelerate 采用源码安装的方式，目前支持版本为v0.16.0。可执�
 
         self.scaler = ShardedGradScaler(**kwargs)
     elif self.device.type == "tpu":
-        import torch_tpu
         self.scaler = torch_tpu.tpu.amp.GradScaler(**kwargs)
     else:
         self.scaler = torch.cuda.amp.GradScaler(**kwargs)
@@ -336,7 +335,7 @@ Torch-TPU 支持
         --dataset_name=$DATASET_NAME --caption_column="text" \
         --resolution=512 --random_flip \
         --train_batch_size=1 \
-        --num_train_epochs=10 --checkpointing_steps=500 \
+        --num_train_epochs=1 --checkpointing_steps=500 \
         --learning_rate=1e-04 --lr_scheduler="constant" --lr_warmup_steps=0 \
         --seed=42 \
         --output_dir="sd-pokemon-model-lora_fp32" \
@@ -373,7 +372,7 @@ Torch-TPU 支持
     import torch_tpu
     torch.manual_seed(42)
     device = torch.device("tpu:0")
-    MODEL_NAME="/workspace/all_in_one/CompVis_SD14_pretrained_weights/133a221b8aa7292a167afc5127cb63fb5005638b"
+    MODEL_NAME="CompVis/stable-diffusion-v1-4" #"/workspace/all_in_one/CompVis_SD14_pretrained_weights/133a221b8aa7292a167afc5127cb63fb5005638b"
     lora_weight_path = "sd-pokemon-model-lora_fp32"
     prompt = "cute dragon creature"
     pipe = StableDiffusionPipeline.from_pretrained(MODEL_NAME, torch_dtype=torch.float32)
@@ -411,7 +410,7 @@ Torch-TPU 支持
         --dataset_name=$DATASET_NAME --caption_column="text" \
         --resolution=512 --random_flip \
         --train_batch_size=1 \
-        --num_train_epochs=10 --checkpointing_steps=500 \
+        --num_train_epochs=1 --checkpointing_steps=500 \
         --learning_rate=1e-04 --lr_scheduler="constant" --lr_warmup_steps=0 \
         --seed=42 \
         --output_dir="sd-pokemon-model-lora_fp16" \
@@ -428,7 +427,7 @@ Torch-TPU 支持
     import torch_tpu
     torch.manual_seed(42)
     device = torch.device("tpu:0")
-    MODEL_NAME="/workspace/all_in_one/CompVis_SD14_pretrained_weights/133a221b8aa7292a167afc5127cb63fb5005638b"
+    MODEL_NAME="CompVis/stable-diffusion-v1-4" #"/workspace/all_in_one/CompVis_SD14_pretrained_weights/133a221b8aa7292a167afc5127cb63fb5005638b"
     lora_weight_path = "sd-pokemon-model-lora_fp16"
     prompt = "cute dragon creature"
     pipe = StableDiffusionPipeline.from_pretrained(MODEL_NAME, torch_dtype=torch.float16)

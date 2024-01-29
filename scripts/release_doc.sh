@@ -19,6 +19,6 @@ popd
 
 mkdir -p ${DIR}/dist/docs
 cp -rf ${DIR}/docs/quick_start/build_zh/torch-tpu_quick_start_zh.pdf \
-   ${DIR}/dist/docs
+   ${DIR}/dist/docs/"TORCH-TPU快速入门指南.pdf"
 cp -rf ${DIR}/docs/developer_manual/build_zh/torch-tpu_technical_manual_zh.pdf \
-   ${DIR}/dist/docs
+   ${DIR}/dist/docs/"TORCH-TPU开发参考手册.pdf"
