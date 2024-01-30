@@ -158,7 +158,7 @@ accelerate 采用源码安装的方式，目前支持版本为v0.16.0。可执�
 .. code-block:: python
 
     MODEL_NAME="CompVis/stable-diffusion-v1-4"
-    pipe = DiffusionPipeline.from_pretrained(MODEL_PATH, revision = None, torch_dtype=torch.float16)
+    pipe = DiffusionPipeline.from_pretrained(MODEL_NAME, revision = None, torch_dtype=torch.float16)
 
 我们想要生成一张可爱的龙宝宝的图片，因此给定提示词为：
 
@@ -180,7 +180,7 @@ accelerate 采用源码安装的方式，目前支持版本为v0.16.0。可执�
     MODEL_NAME="CompVis/stable-diffusion-v1-4" #or PATH/OF/all_in_one/CompVis_SD14_pretrained_weights
     prompt = "cute dragon creature"
 
-    pipe = DiffusionPipeline.from_pretrained(MODEL_PATH, revision = None, torch_dtype=torch.float16)
+    pipe = DiffusionPipeline.from_pretrained(MODEL_NAME, revision = None, torch_dtype=torch.float16)
     pipe.to(device)
     image = pipe(prompt, num_inference_steps=20, generator=generator).images[0]
     image.save(f"pokemon.png")
