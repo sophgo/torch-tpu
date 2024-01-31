@@ -109,6 +109,7 @@ accelerate 采用源码安装的方式，目前支持版本为v0.16.0。可执�
 修改为:
 
 .. code-block:: python
+
     import torch_tpu
     if not torch.cuda.is_available() and not parse_flag_from_env("ACCELERATE_USE_MPS_DEVICE") and not torch_tpu.tpu.is_available():
         raise ValueError(err.format(mode="fp16", requirement="a GPU"))
