@@ -2,14 +2,14 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
-torch.ops.load_library("../../build/torch_tpu/libtorch_tpu.so")
+import torch_tpu
 
 def case1_split_heads():
     """
     Splits => (result to uncontiguous Tensor) => Permute
     """
     ############## config ###################
-    device = "privateuseone"
+    device = "tpu"
     batch = 2
     sequence = 8
     hidden_size = 768

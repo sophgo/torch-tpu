@@ -103,13 +103,7 @@ public:
     bm_handle_t Handle = GetDeviceHandle ( Index );
     TORCH_CHECK ( Handle != nullptr, "TPU handle of device #", Index, " is null" );
     sg_device_mem_t Mem;
-#ifdef TPU_OP_TIMING
-    auto timer = tpu::Timer().Start();
-#endif
     bm_status_t Status = sg_malloc_device_byte ( Handle, &Mem, Size );
-#ifdef TPU_OP_TIMING
-    tpu::OpTimer::Instance().AddTime ( tpu::MALLOC, timer.ElapsedUS() );
-#endif
     TORCH_CHECK ( Status == BM_SUCCESS, "Failed to allocate memory on TPU device #", Index, " size = ", Size, "bytes" );
     unsigned long long Addr = sg_mem_get_device_addr ( Mem );
     AddrMemMaps_[Index].emplace ( Addr, Mem );
@@ -140,13 +134,8 @@ public:
     TORCH_CHECK ( Handle != nullptr, "TPU handle of device #", Index, " is null" );
     auto Iter = AddrMemMaps_[Index].find ( ( unsigned long long ) Ptr );
     TORCH_CHECK ( Iter != AddrMemMaps_[Index].end(), "Memory of address = ", Ptr, " is not found" );
-#ifdef TPU_OP_TIMING
-    auto timer = tpu::Timer().Start();
-#endif
     sg_free_device ( Handle, Iter->second );
-#ifdef TPU_OP_TIMING
-    tpu::OpTimer::Instance().AddTime ( tpu::FREE, timer.ElapsedUS() );
-#endif
+
 #ifdef SHOW_MALLOC_INFO
     static int free_num = 0;
     free_num++;
@@ -176,14 +165,8 @@ public:
     bm_handle_t Handle = GetDeviceHandle ( Index );
     TORCH_CHECK ( Handle != nullptr, "TPU handle of device #", Index, " is null" );
     sg_device_mem_t DstMem = sg_mem_from_device ( ( unsigned long long ) Dst, Size );
-#ifdef TPU_OP_TIMING
-    auto timer = tpu::Timer().Start();
-#endif
     bm_status_t Status = sg_memcpy_s2d ( Handle, DstMem, ( void * ) Src );
     TORCH_CHECK ( Status == BM_SUCCESS, "Failed to copy memory from host to TPU device #", Index, " size = ", Size, "bytes" );
-#ifdef TPU_OP_TIMING
-    tpu::OpTimer::Instance().AddTime ( tpu::CDMA_S2D, timer.ElapsedUS() );
-#endif
   }
 
   void CopyDeviceToHost ( void * Dst, const void * Src, size_t Size, int Index )
@@ -194,14 +177,8 @@ public:
     bm_handle_t Handle = GetDeviceHandle ( Index );
     TORCH_CHECK ( Handle != nullptr, "TPU handle of device #", Index, " is null" );
     sg_device_mem_t SrcMem = sg_mem_from_device ( ( unsigned long long ) Src, Size );
-#ifdef TPU_OP_TIMING
-    auto timer = tpu::Timer().Start();
-#endif
     bm_status_t Status = sg_memcpy_d2s ( Handle, Dst, SrcMem );
     TORCH_CHECK ( Status == BM_SUCCESS, "Failed to copy memory from TPU device #", Index, " to host size = ", Size, "bytes" );
-#ifdef TPU_OP_TIMING
-    tpu::OpTimer::Instance().AddTime ( tpu::CDMA_D2S, timer.ElapsedUS() );
-#endif
   }
 
 void CopyDeviceToDevice(void* Dst, const void* Src, size_t Size, int Index)
@@ -224,13 +201,8 @@ void CopyDeviceToDevice(void* Dst, const void* Src, size_t Size, int Index)
     auto SrcMem = bm_mem_from_device((unsigned long long)Src + chunkOffset, chunkCopySize);
 
     bm_status_t Status = BM_SUCCESS;
-#ifdef TPU_OP_TIMING
-    auto timer = tpu::Timer().Start();
-#endif
-    Status = bm_memcpy_d2d_byte(Handle, DstMem, 0, SrcMem, 0, chunkCopySize);
-#ifdef TPU_OP_TIMING
-    tpu::OpTimer::Instance().AddTime(tpu::COPY, timer.ElapsedUS());
-#endif
+    Status = bm_memcpy_d2d_byte ( Handle, DstMem, 0, SrcMem, 0, Size );
+    TORCH_CHECK (Status == BM_SUCCESS, "D2D failed! Error Code : #", Status );
   }
 }
 

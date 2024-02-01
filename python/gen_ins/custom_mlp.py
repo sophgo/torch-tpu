@@ -10,7 +10,7 @@ DI = DumpIns()
 
 
 if __name__ == "__main__":
-    device = "privateuseone"
+    device = "tpu"
     B = 6
     sequence = 4096
     hidden_size = 12288

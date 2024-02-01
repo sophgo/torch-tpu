@@ -1,18 +1,9 @@
 #########################################################
 # General configuration
 #########################################################
-option(DEBUG "option for debug" ON)
-option(USING_CMODEL "option for using cmodel" ON)
-option(PCIE_MODE "option for pcie mode" OFF)
+option(USING_CMODEL "option for using cmodel" OFF)
+option(PCIE_MODE "option for pcie mode" ON)
 option(SOC_MODE "run on soc platform" OFF)
-option(ENABLE_PYBIND "enable sgdnn pybind" OFF)
-
-if(DEBUG)
-  set(CMAKE_BUILD_TYPE "Debug")
-  add_definitions(-DDEBUG)
-else()
-  set(CMAKE_BUILD_TYPE "Release")
-endif()
 
 if(USING_CMODEL)
   if ($ENV{LIBSOPHON_PATTERN} MATCHES $ENV{LIBSOPHON_STABLE})
@@ -35,16 +26,4 @@ endif()
 if(SOC_MODE)
   message(FATAL_ERROR "NO CHEK NOW")
   add_definitions(-DSOC_MODE)
-endif()
-
-if(USING_CMODEL AND DEBUG)
-  add_definitions(-rdynamic)
-endif()
-
-if(NOT DEBUG)
-  add_definitions(-O3)
-endif()
-
-if(ENABLE_PYBIND)
-  add_definitions(-DENABLE_PYBIND)
 endif()

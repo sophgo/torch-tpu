@@ -29,6 +29,7 @@ void _amp_foreach_non_finite_check_and_unscale_tpu(at::TensorList self, at::Tens
         *inv_scale_cpu.data_ptr<float>());
     TORCH_CHECK(status == BM_SUCCESS, "_amp_foreach_non_finite_check_and_unscale_ failed.");
     TIMING_END(tpu::InfCheckAndUnscale);
+    SHOW_TENSOR_OP( found_inf, inv_scale);
 }
 
 

@@ -4,10 +4,10 @@ import torch.nn.functional as F
 import numpy as np
 
 
-torch.ops.load_library("../../build/torch_tpu/libtorch_tpu.so")
+import torch_tpu
 torch.manual_seed(1000)
 torch.set_printoptions(precision=6)
-device = "privateuseone:0"
+device = "tpu:0"
 
 batch_size = 4
 length = 10

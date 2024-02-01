@@ -242,6 +242,7 @@ typedef struct
   unsigned long long saved_invstd_global_addr;
   unsigned long long grad_input_global_addr;
   unsigned long long grad_weight_global_addr;
+  unsigned long long grad_bias_global_addr;
   int shape[4];
   int dtype;
   int group_nums;
@@ -952,7 +953,7 @@ typedef struct
   float value;
   int dtype;
   int binary_type;
-  short inversed;
+  int inversed;
 } WITH_PLATFORM(sg_api_binary_c_t);
 
 typedef struct
@@ -1210,9 +1211,9 @@ typedef struct
   int step;
   unsigned long long output_global_addr;
   int dtype;
+  int isint64;
   int dim;
   int shape[FW_MAX_SHAPE_DIMS];
-
 } WITH_PLATFORM(sg_api_arange_t);
 
 typedef struct

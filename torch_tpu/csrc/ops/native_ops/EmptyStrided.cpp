@@ -3,7 +3,7 @@
 #include <ATen/EmptyTensor.h>
 #include <TPUAllocator.h>
 #include <TPUDeviceManager.h>
-
+#include <TPUTorchUtils.h>
 #include "common/config.h"
 
 namespace at
@@ -15,6 +15,7 @@ Tensor empty_strided_tpu ( IntArrayRef                size,
                            c10::optional<Device>      device_opt,
                            c10::optional<bool>        pin_memory_opt )
 {
+  TIMING_START;
   if ( device_opt.has_value() )
   {
     tpu::TPUSetDeviceIndex ( device_opt.value().index() );
@@ -33,7 +34,8 @@ Tensor empty_strided_tpu ( IntArrayRef                size,
   constexpr c10::DispatchKeySet ks ( c10::DispatchKey::TPU );
   auto tensor = detail::make_tensor_base<TensorImpl> ( std::move ( storage_impl ), ks, dtype );
   tensor.unsafeGetTensorImpl()->set_sizes_and_strides ( size, stride );
-  //TORCH_CHECK ( tensor.is_contiguous() );
+  TIMING_END(tpu::MALLOC);
+  SHOW_EMPTY_INFO(tensor);
   return tensor;
 }
 TORCH_LIBRARY_IMPL ( aten, TPU, m )
@@ -49,6 +51,7 @@ c10::optional<Device>             device_opt,
 c10::optional<bool>               pin_memory_opt,
 c10::optional<c10::MemoryFormat>  memory_format_opt )
 {
+  TIMING_START;
   if ( device_opt.has_value() )
   {
     tpu::TPUSetDeviceIndex ( device_opt.value().index() );
@@ -80,7 +83,8 @@ c10::optional<c10::MemoryFormat>  memory_format_opt )
       tensor.unsafeGetTensorImpl()->empty_tensor_restride ( *memory_format_opt );
     }
   }
-  //TORCH_CHECK ( tensor.is_contiguous() );
+  TIMING_END(tpu::MALLOC);
+  SHOW_EMPTY_INFO(tensor);
   return tensor;
 }
 TORCH_LIBRARY_IMPL ( aten, TPU, m )

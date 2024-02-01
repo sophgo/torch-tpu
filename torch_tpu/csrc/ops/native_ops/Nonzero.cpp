@@ -12,22 +12,19 @@ namespace at {
 
 Tensor nonzero_tpu(const Tensor &self) {
   CHECK_TENSOR_IN_DEVICE(self);
-  // LOG( WARNING ) << "the dtype of output of nonzero in tpu is 'int32'";
-#ifdef TPU_OP_TIMING
-  auto timer = tpu::Timer().Start();
-#endif
   int size = 1;
   for (int i=0; i<self.dim(); i++){
     size *= self.size(i);
   }
-  
   Tensor out_temp = empty({size, self.dim()}, self.options().dtype(kInt));
   Tensor num = empty({1}, self.options().dtype(kInt));
+  TIMING_START;
   bm_status_t status = sgdnnNonzero(tpu::TPUGetDeviceHandle(), 
                                     tpu::TPUGenerateSgdnnTensor(self),
                                     tpu::TPUGenerateSgdnnTensor(out_temp),
                                     tpu::TPUGenerateSgdnnTensor(num));
   TORCH_CHECK(status == BM_SUCCESS);
+  TIMING_END(tpu::NONZERO);
 
   Tensor out = empty({num.item().toInt(), self.dim()}, self.options().dtype(kInt));
   for (int i=0; i<num.item().toInt(); ++i){
@@ -35,14 +32,9 @@ Tensor nonzero_tpu(const Tensor &self) {
       out[i][j] = out_temp[i][j];
     }
   }
-
   // wait tpu support resize_
   // out.resize_((num.item().toInt(), self.dim()), c10::nullopt);
-
-#ifdef TPU_OP_TIMING
-  tpu::OpTimer::Instance().AddTime(tpu::NONZERO, timer.ElapsedUS());
-#endif
-
+  SHOW_TENSOR_OP(self);
   return out;
 }
 TORCH_LIBRARY_IMPL(aten, TPU, m) { m.impl("nonzero", nonzero_tpu); }

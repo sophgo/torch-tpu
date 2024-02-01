@@ -6,23 +6,25 @@ import time
 from utils import Optimer, compare_model_grad, compare_model_weight
 from torch.optim import AdamW, Adam
 
-torch.ops.load_library("../../build/torch_tpu/libtorch_tpu.so")
+# import torch_tpu
 torch.manual_seed(1000)
-optimer = Optimer("../../build/torch_tpu/libtorch_tpu.so")
+# optimer = Optimer("../../build/torch_tpu/libtorch_tpu.so")
+import torch_tpu
 
 def case_forward(use_fp16=False):
-    device = "privateuseone"
+    device = "tpu:0"
     batch = 8
     sequence = 1024
     hidden_size = 768
     out_size = 3
 
     inp_cpu = torch.rand(batch, sequence, hidden_size)
-    inp_tpu = inp_cpu.to(device).half()
-
+    inp_tpu = inp_cpu.to(device).to(torch.float16) #.half()
     ln_cpu = nn.Linear(hidden_size, out_size)
     ln_tpu = copy.deepcopy(ln_cpu)
-    ln_tpu = ln_tpu.to(device).half()
+    ln_tpu = ln_tpu.to(device)
+    ln_tpu.to(torch.float16)
+    import pdb;pdb.set_trace()
 
     out_cpu = ln_cpu(inp_cpu)
     out_tpu = ln_tpu(inp_tpu)
@@ -36,7 +38,7 @@ def case_forward(use_fp16=False):
     print (torch.max(abs(out_diff)))
 
 def case_backward(use_fp16=False):
-    device = "privateuseone"
+    device = "tpu"
     batch = 32
     sequence = 256
     hidden_size = 768
@@ -77,7 +79,7 @@ def case_backward(use_fp16=False):
     compare_model_grad(ln_cpu, ln_tpu)
 
 def case_update_weight(use_fp16=False):
-    device = "privateuseone"
+    device = "tpu"
     batch = 32
     sequence = 256
     hidden_size = 768
@@ -143,5 +145,6 @@ def case_update_weight(use_fp16=False):
     # print ("diff:", torch.max(abs(diff)))
 
 if __name__ == "__main__":
+    case_forward(True)
     #case_backward(True)
-    case_update_weight()
+    #case_update_weight()

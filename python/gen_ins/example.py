@@ -8,7 +8,7 @@ def dump_forward():
     """
     gelu 
     """
-    device = "privateuseone"
+    device = "tpu"
     batch = 8
     sequence = 2
     hidden_size = 8
@@ -31,7 +31,7 @@ def dump_backward():
     """
     gelu 
     """
-    device = "privateuseone"
+    device = "tpu"
     batch = 8
     sequence = 2
     hidden_size = 8

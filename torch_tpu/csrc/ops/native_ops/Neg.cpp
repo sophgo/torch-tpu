@@ -8,28 +8,25 @@
 #include <torch/library.h>
 #include <torch/torch.h>
 
-namespace at {
-Tensor &neg_out_tpu(const Tensor &self, Tensor &out) {
-  CHECK_TENSOR_IN_DEVICE(self);
-  CHECK_TENSOR_IN_DEVICE(out);
-
-  if (self.dim() == 0) {
-    auto out_cpu = neg(self.cpu());
-    tpu::TPUCopyHostToDevice(out.data_ptr(), out_cpu.contiguous().data_ptr(),
-                             out.nbytes());
-  }
-
-#ifdef TPU_OP_TIMING
-  auto timer = tpu::Timer().Start();
+namespace at
+{
+Tensor & neg_out_tpu ( const Tensor & self, Tensor & out )
+{
+  CHECK_TENSOR_IN_DEVICE ( self );
+  CHECK_TENSOR_IN_DEVICE ( out );
+#if 0
+  auto out_cpu = neg( self.cpu());
+  tpu::TPUCopyHostToDevice ( out.data_ptr(), out_cpu.contiguous().data_ptr(), out.nbytes() );
+#else
+  TIMING_START;
+  bm_status_t status = sgdnnNeg(
+                       tpu::TPUGetDeviceHandle(),
+                       tpu::TPUGenerateSgdnnTensor ( self ),
+                       tpu::TPUGenerateSgdnnTensor ( out ) );
+  TORCH_CHECK ( status == BM_SUCCESS );
+  TIMING_END ( tpu::NEG );
 #endif
-  bm_status_t status =
-      sgdnnNeg(tpu::TPUGetDeviceHandle(), tpu::TPUGenerateSgdnnTensor(self),
-               tpu::TPUGenerateSgdnnTensor(out));
-  TORCH_CHECK(status == BM_SUCCESS);
-#ifdef TPU_OP_TIMING
-  tpu::OpTimer::Instance().AddTime(tpu::NEG, timer.ElapsedUS());
-#endif
-
+  SHOW_TENSOR_OP(self, out);
   return out;
 }
 TORCH_LIBRARY_IMPL(aten, TPU, m) { m.impl("neg.out", neg_out_tpu); }

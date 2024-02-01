@@ -65,6 +65,10 @@ bm_status_t sgdnnReorderConv2dWeight ( bm_handle_t handle,
                                        int mode,
                                        SgdnnTensor_t output );
 
+bm_status_t sgdnnConvertInt64toInt32 ( bm_handle_t handle, 
+                                      SgdnnTensor_t input,
+                                      SgdnnTensor_t output);
+
 /*
  * OUTPUT = CONV2D ( INPUT, WEIGHT, BIAS )
  * Note:

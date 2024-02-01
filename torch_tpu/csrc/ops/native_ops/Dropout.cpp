@@ -22,12 +22,17 @@ public:
     return self;
   } else {
 #if 1
+    CPU_IMPL_WARNING(Dropout);
+    TIMING_START;
     TensorOptions option = TensorOptions( ).device("cpu").dtype ( self.dtype() );
     at::Tensor mask_cpu = torch::rand_like(self, option) > p;
     at::Tensor mask = mask_cpu.to(self.device()).to(self.dtype());
+    TIMING_END(tpu::CPU_LAYER);
+#else
 #endif
     ctx->save_for_backward( {mask} );
     auto out = mask * self * (1/(1-p));
+    SHOW_TENSOR_OP(self, out);
     return out;
   }
   }
@@ -42,6 +47,7 @@ public:
       auto saved = ctx->get_saved_variables();
       auto mask = saved[0];
       auto gradinp = mask * gradout[0] * (1/(1-p));
+      SHOW_TENSOR_OP(gradinp);
       return {gradinp, at::Tensor(), at::Tensor(), at::Tensor(), at::Tensor(), at::Tensor() };
     }
   }

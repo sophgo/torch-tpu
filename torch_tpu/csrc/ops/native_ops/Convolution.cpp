@@ -84,9 +84,8 @@ int64_t groups )
       .dilation_w = ( int ) dilation[1],
       .groups = ( int ) groups,
     };
-#ifdef TPU_OP_TIMING
-    auto timer = tpu::Timer().Start();
-#endif
+
+    TIMING_START;
     bm_status_t status = sgdnnConv2d (
                          tpu::TPUGetDeviceHandle(),
                          tpu::TPUGenerateSgdnnTensor ( input ),
@@ -95,10 +94,9 @@ int64_t groups )
                          conv_param,
                          tpu::TPUGenerateSgdnnTensor ( output ) );
     TORCH_CHECK ( status == BM_SUCCESS );
-#ifdef TPU_OP_TIMING
-    tpu::OpTimer::Instance().AddTime ( tpu::CONVOLUTION, timer.ElapsedUS() );
-#endif
+    TIMING_END ( tpu::CONVOLUTION );
   }
+  SHOW_TENSOR_OP(input_, weight, bias, output);
   return is_batched ? output : output.squeeze ( 0 );
 #endif
 }
@@ -119,7 +117,8 @@ IntArrayRef output_padding,
 int64_t groups,
 std::array<bool, 3> output_mask )
 {
-  CHECK_TENSOR_IN_DEVICE ( grad_output );
+  auto grad_output_ = grad_output.contiguous();
+  CHECK_TENSOR_IN_DEVICE ( grad_output_ );
   CHECK_TENSOR_IN_DEVICE ( input );
   CHECK_TENSOR_IN_DEVICE ( weight );
 #if 0
@@ -179,12 +178,10 @@ std::array<bool, 3> output_mask )
       .dilation_w = ( int ) dilation[1],
       .groups = ( int ) groups,
     };
-#ifdef TPU_OP_TIMING
-    auto timer = tpu::Timer().Start();
-#endif
+    TIMING_START;
     bm_status_t status = sgdnnConv2dBackward (
                          tpu::TPUGetDeviceHandle(),
-                         tpu::TPUGenerateSgdnnTensor ( grad_output ),
+                         tpu::TPUGenerateSgdnnTensor ( grad_output_ ),
                          tpu::TPUGenerateSgdnnTensor ( input ),
                          tpu::TPUGenerateSgdnnTensor ( weight ),
                          conv_param,
@@ -192,10 +189,9 @@ std::array<bool, 3> output_mask )
                          output_mask[1] ? tpu::TPUGenerateSgdnnTensor ( grad_weight ) : sgdnnUndefinedTensor(),
                          output_mask[2] ? tpu::TPUGenerateSgdnnTensor ( grad_bias ) : sgdnnUndefinedTensor() );
     TORCH_CHECK ( status == BM_SUCCESS );
-#ifdef TPU_OP_TIMING
-    tpu::OpTimer::Instance().AddTime ( tpu::CONVOLUTION_BACKWARD, timer.ElapsedUS() );
-#endif
+    TIMING_END ( tpu::CONVOLUTION_BACKWARD );
   }
+  SHOW_TENSOR_OP(grad_output_, input, weight, grad_input, grad_weight, grad_bias);
   return std::tuple<Tensor, Tensor, Tensor> ( grad_input, grad_weight, grad_bias );
 #endif
 }

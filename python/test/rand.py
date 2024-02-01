@@ -2,10 +2,10 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
-torch.ops.load_library("../../build/torch_tpu/libtorch_tpu.so")
+import torch_tpu
 torch.manual_seed(1000)
 torch.set_printoptions(precision=6)
-device = "privateuseone:0"
+device = "tpu:0"
 
 def case1():
     N = 1
@@ -18,5 +18,13 @@ def case1():
     out_tpu = torch.rand_like(inp_tpu)
     print("out_tpu", out_tpu.cpu())
 
+def randint():
+    res_cpu = torch.randint(0, 1000, (5,), device='cpu')
+    res_tpu = torch.randint(0, 1000, (5,), device='tpu')
+    print("res cpu: ", res_cpu, ", dtype :", res_tpu.dtype)
+    print("res tpu: ", res_tpu.cpu(), ", dtype :", res_tpu.dtype)
+    
+
 if __name__ == "__main__":
     case1()
+    randint()

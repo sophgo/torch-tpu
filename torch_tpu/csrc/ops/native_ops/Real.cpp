@@ -19,41 +19,38 @@ namespace at
         }
         CHECK_TENSOR_IN_DEVICE(out);
 #if 0
- 
   auto self_cpu = neg ( self.cpu());
   tpu::TPUCopyHostToDevice ( self.data_ptr(),self.contiguous().data_ptr(), self.nbytes() );
 #else
         if (self.dim() == 0)
         {
-            auto self_cpu = real(self.cpu());   //直接在cpu上执行real
+            CPU_IMPL_WARNING();
+            TIMING_START;
+            auto self_cpu = real(self.cpu());
             tpu::TPUCopyHostToDevice(out.data_ptr(), self_cpu.contiguous().data_ptr(), out.nbytes());
+            TIMING_END(tpu::CPU_LAYER);
         }
         else if (IS_TPU_TENSOR(self))
         {
-
-#ifdef TPU_OP_TIMING
-            auto timer = tpu::Timer().Start();
-#endif
+            TIMING_START;
             bm_status_t status = sgdnnReal(
                 tpu::TPUGetDeviceHandle(),
                 tpu::TPUGenerateSgdnnTensorforComplex64(self),
                 tpu::TPUGenerateSgdnnTensorforComplex64(out));
             TORCH_CHECK(status == BM_SUCCESS);
-#ifdef TPU_OP_TIMING
-            tpu::OpTimer::Instance().AddTime(tpu::ADD, timer.ElapsedUS());
-#endif
+            TIMING_END(tpu::REAL);
         }
         else
         {
             TORCH_CHECK(false, "At least one input is required in TPU device");
         }
 #endif
+        SHOW_TENSOR_OP(self, out);
         return out;
     }
 
     Tensor real_tpu(const Tensor &self)
     {
-        //std::cout<<"enter real_tpu\n";
         auto out = empty(self.sizes(), self.options().dtype(at::kFloat));
         return real_out_tpu(self, out);
     }

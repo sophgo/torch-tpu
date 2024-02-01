@@ -1,10 +1,10 @@
 import torch
 
-torch.ops.load_library("../../build/torch_tpu/libtorch_tpu.so")
+import torch_tpu
 torch.manual_seed(1000)
 
 def case_broadcast():
-    device = "privateuseone"
+    device = "tpu"
     N = 1
     C = 512
     H = 64
@@ -34,7 +34,7 @@ def case_broadcast():
     print("tpu:", res_tpu.cpu().flatten()[idx])
 
 def case_eltwise():
-    device = "privateuseone"
+    device = "tpu"
     N = 1
     C = 512
     H = 64

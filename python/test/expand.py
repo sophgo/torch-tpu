@@ -3,10 +3,10 @@ import torch.nn as nn
 import torch.nn.functional as F
 from utils import Optimer
 
-torch.ops.load_library("../../build/torch_tpu/libtorch_tpu.so")
+import torch_tpu
 torch.manual_seed(1000)
 torch.set_printoptions(precision=6)
-device = "privateuseone:0"
+device = "tpu:0"
 OPT = Optimer()
 
 def case1():

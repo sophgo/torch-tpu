@@ -14,6 +14,13 @@ Tensor &_log_softmax_out_tpu(const Tensor &self, int64_t dim,
   CHECK_TENSOR_IN_DEVICE(self);
   CHECK_TENSOR_IN_DEVICE(out);
   TORCH_CHECK(half_to_float == false);
+#if 0
+  CPU_IMPL_WARNING();
+  TIMING_START;
+  auto out_cpu = _log_softmax ( self.cpu(), dim, half_to_float );
+  tpu::TPUCopyHostToDevice ( out.data_ptr(), out_cpu.contiguous().data_ptr(), out.nbytes() );
+  TIMING_END(tpu::CPU_LAYER);
+#else
   if (self.dim() == 0) {
     auto out_cpu = _log_softmax(self.cpu(), dim, half_to_float);
     tpu::TPUCopyHostToDevice(out.data_ptr(), out_cpu.contiguous().data_ptr(),
@@ -29,20 +36,16 @@ Tensor &_log_softmax_out_tpu(const Tensor &self, int64_t dim,
     out_f = out.to(torch::kFloat);
   }
 
-#ifdef TPU_OP_TIMING
-  auto timer = tpu::Timer().Start();
-#endif
+  TIMING_START;
   bm_status_t status = sgdnnLogSoftmax(tpu::TPUGetDeviceHandle(),
                                        tpu::TPUGenerateSgdnnTensor(self_f), dim,
                                        tpu::TPUGenerateSgdnnTensor(out_f));
   TORCH_CHECK(status == BM_SUCCESS);
-#ifdef TPU_OP_TIMING
-  tpu::OpTimer::Instance().AddTime(tpu::LOGSOFTMAX, timer.ElapsedUS());
-#endif
-
   tpu::TPUCopyDeviceToDevice(out.data_ptr(), out_f.to(out.dtype()).data_ptr(),
                              out.nbytes());
-
+  TIMING_END(tpu::LOGSOFTMAX);
+#endif
+  SHOW_TENSOR_OP(self, out);
   return out;
 }
 TORCH_LIBRARY_IMPL(aten, TPU, m) {
@@ -74,19 +77,16 @@ Tensor & _softmax_out_tpu ( const Tensor & self, int64_t dim, bool half_to_float
   auto out_cpu = _softmax ( self.cpu(), dim, half_to_float );
   tpu::TPUCopyHostToDevice ( out.data_ptr(), out_cpu.contiguous().data_ptr(), out.nbytes() );
 #else
-#ifdef TPU_OP_TIMING
-  auto timer = tpu::Timer().Start();
-#endif
+  TIMING_START;
   bm_status_t status = sgdnnSoftmax (
                        tpu::TPUGetDeviceHandle(),
                        tpu::TPUGenerateSgdnnTensor ( self ),
                        dim,
                        tpu::TPUGenerateSgdnnTensor ( out ) );
   TORCH_CHECK ( status == BM_SUCCESS );
-#ifdef TPU_OP_TIMING
-  tpu::OpTimer::Instance().AddTime ( tpu::SOFTMAX, timer.ElapsedUS() );
+  TIMING_END ( tpu::SOFTMAX );
 #endif
-#endif
+  SHOW_TENSOR_OP(self, out);
   return out;
 }
 TORCH_LIBRARY_IMPL ( aten, TPU, m )
@@ -104,9 +104,7 @@ Tensor & _softmax_backward_data_out_tpu ( const Tensor & grad_output, const Tens
   auto grad_input_cpu = _softmax_backward_data ( grad_output.cpu(), output.cpu(), dim, input_dtype );
   tpu::TPUCopyHostToDevice ( grad_input.data_ptr(), grad_input_cpu.contiguous().data_ptr(), grad_input.nbytes() );
 #else
-#ifdef TPU_OP_TIMING
-  auto timer = tpu::Timer().Start();
-#endif
+  TIMING_START;
   bm_status_t status = sgdnnSoftmaxBackward (
                        tpu::TPUGetDeviceHandle(),
                        tpu::TPUGenerateSgdnnTensor ( grad_output ),
@@ -114,10 +112,9 @@ Tensor & _softmax_backward_data_out_tpu ( const Tensor & grad_output, const Tens
                        dim,
                        tpu::TPUGenerateSgdnnTensor ( grad_input ) );
   TORCH_CHECK ( status == BM_SUCCESS );
-#ifdef TPU_OP_TIMING
-  tpu::OpTimer::Instance().AddTime ( tpu::SOFTMAX_BACKWARD, timer.ElapsedUS() );
+  TIMING_END ( tpu::SOFTMAX_BACKWARD );
 #endif
-#endif
+  SHOW_TENSOR_OP(grad_output, output, grad_input);
   return grad_input;
 }
 TORCH_LIBRARY_IMPL ( aten, TPU, m )

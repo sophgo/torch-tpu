@@ -15,23 +15,20 @@ Tensor & triu_out_tpu( const Tensor & self, int64_t diagonal, Tensor & out)
     CHECK_TENSOR_IN_DEVICE ( out );
     CHECK_TENSOR_IN_DEVICE ( self );
 #if 0
-    LOG( WARNING ) << "triu use cpu impl";
+    CPU_IMPL_WARNING();
     auto out_cpu = triu( self.cpu(), diagonal );
     out = out_cpu.to(out.device());
 #else
-#ifdef TPU_OP_TIMING
-  auto timer = tpu::Timer().Start();
-#endif
+    TIMING_START;
     bm_status_t status = sgdnnTriangularize(  tpu::TPUGetDeviceHandle(), 
                                     tpu::TPUGenerateSgdnnTensor(self),
                                     1,
                                     diagonal,
                                     tpu::TPUGenerateSgdnnTensor(out));
   TORCH_CHECK ( status == BM_SUCCESS );
-#ifdef TPU_OP_TIMING
-  tpu::OpTimer::Instance().AddTime ( tpu::TRIU, timer.ElapsedUS() );
+  TIMING_END ( tpu::TRIU );
 #endif
-#endif
+    SHOW_TENSOR_OP(self, out);
     return out;
 }
 

@@ -14,7 +14,7 @@ if __name__ == "__main__":
     from transformers import GPT2Config
     import copy
     import time
-    device = torch.device("privateuseone:1")
+    device = torch.device("tpu:1")
     configure = GPT2Config()
     configure.attn_pdrop = 0
     configure.embd_pdrop = 0

@@ -1,26 +1,39 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+import torch_tpu
 
-torch.ops.load_library("../../build/torch_tpu/libtorch_tpu.so")
 torch.set_printoptions(precision=6)
-device = "privateuseone:0"
+device = "tpu"
 
 def case1():
-    length = 2
-    end = 65536*64*10
-    out1=torch.arange(0, end, length,device="cpu")
+    step = 1
+    end = 1
+    out1=torch.arange(0, end, step, device="cpu")
     print("cpu: ", out1)
 
     # TPU: just support arange(int,int,int) currentlly.
-    out2=torch.arange(0, end, length,device=device)
+    out2=torch.arange(0, end, step, device=device)
     print("Tpu: ", out2.cpu())
 
     diff = torch.sum( out1 - out2.cpu() )
     print( "Difference: ", diff)
 
+def case_dtype():
+    step = 3
+    end = 8
+    out1=torch.arange(0, end, step, dtype = torch.float32, device="cpu")
+    print("cpu: ", out1)
 
+    # TPU: just support arange(int,int,int) currentlly.
+    out2=torch.arange(0, end, step, dtype = torch.float32, device=device)
+    print("Tpu: ", out2.cpu())
+
+    diff = torch.sum( out1 - out2.cpu() )
+    print( "Difference: ", diff)
+    import pdb;pdb.set_trace()
 
 
 if __name__ == "__main__":
-    case1()
+    #case1()
+    case_dtype()

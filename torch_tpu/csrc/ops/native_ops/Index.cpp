@@ -15,7 +15,7 @@ Tensor & index_out_tpu( const Tensor & self, const c10::List<c10::optional<Tenso
     CHECK_TENSOR_IN_DEVICE ( out );
     CHECK_TENSOR_IN_DEVICE ( self );
 #if 0
-    LOG( WARNING ) << "index use cpu impl";
+    CPU_IMPL_WARNING();
     c10::List<c10::optional<Tensor>> indices_cpu;
     for (int i = 0; i < indices.size(); i++)
     {
@@ -94,7 +94,6 @@ Tensor & index_out_tpu( const Tensor & self, const c10::List<c10::optional<Tenso
         Tensor index_two_dim = matmul(strides, stack(indexes)).to(torch::kInt32).to(self.device());
         Tensor out_two_dim = broadcast[0] ? out.view({dim0, -1}) : out.view({-1, dim0});
         TIMING_START;
-        
         bm_status_t status = sgdnnIndexSelect(tpu::TPUGetDeviceHandle(),
                                               tpu::TPUGenerateSgdnnTensor(self_two_dim),
                                               tpu::TPUGenerateSgdnnTensor(index_two_dim),
@@ -105,7 +104,8 @@ Tensor & index_out_tpu( const Tensor & self, const c10::List<c10::optional<Tenso
         TIMING_END ( tpu::INDEX_SELECT );
       } else {
         // no support; use cpu impl
-        LOG( WARNING ) << "case not supported; index use cpu impl";
+        CPU_IMPL_WARNING();
+        TIMING_START;
         c10::List<c10::optional<Tensor>> indices_cpu;
         for (int i = 0; i < indices.size(); i++)
         {
@@ -115,9 +115,11 @@ Tensor & index_out_tpu( const Tensor & self, const c10::List<c10::optional<Tenso
         }
         auto out_cpu = index( self.cpu(), indices_cpu );
         out = out_cpu.to(out.device());
+        TIMING_END(tpu::CPU_LAYER);
       }
     }
 #endif
+    SHOW_TENSOR_OP(self, out);
     return out;
 }
 
@@ -129,6 +131,7 @@ TORCH_LIBRARY_IMPL ( aten, TPU, m )
 // copied from torch source and modified
 static std::tuple<bool, Tensor> canDispatchToMaskedFill(const Tensor& self, const torch::List<c10::optional<at::Tensor>>& indices,
 const Tensor& value){
+  SHOW_TENSOR_OP(self);
   if (!(value.numel() == 1 /*&& value.device().is_cpu()*/)){
     return std::make_tuple(false,Tensor());
   }
@@ -162,9 +165,10 @@ const Tensor& value){
 }
 
 Tensor & index_put_tpu(Tensor & self, const torch::List<c10::optional<Tensor>>& indices, const Tensor & value, const bool accumulate) {
+  SHOW_TENSOR_OP(self, value);
   CHECK_TENSOR_IN_DEVICE ( self );
 #if 0
-  LOG( WARNING ) << "index_put_ use cpu impl";
+  CPU_IMPL_WARNING();
   c10::List<c10::optional<Tensor>> indices_cpu;
   for (int i = 0; i < indices.size(); i++)
   {
@@ -192,7 +196,8 @@ Tensor & index_put_tpu(Tensor & self, const torch::List<c10::optional<Tensor>>& 
   if (!return_flag) {
   #if 1
     // have no idea how to impl in tpu. use cpu first.
-    LOG( WARNING ) << "index_put_ use cpu impl";
+    CPU_IMPL_WARNING();
+    TIMING_START;
     c10::List<c10::optional<Tensor>> indices_cpu;
     for (int i = 0; i < indices.size(); i++)
     {
@@ -203,6 +208,7 @@ Tensor & index_put_tpu(Tensor & self, const torch::List<c10::optional<Tensor>>& 
     auto self_cpu = self.cpu();
     auto out_cpu = index_put(self_cpu, indices_cpu, value.cpu(), accumulate);
     tpu::TPUCopyHostToDevice(self.data_ptr(), out_cpu.contiguous().data_ptr(), out_cpu.nbytes());
+    TIMING_END(tpu::CPU_LAYER);
   #else
     TORCH_CHECK(false, "Not implemented");
   #endif

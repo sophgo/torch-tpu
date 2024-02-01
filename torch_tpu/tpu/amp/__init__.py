@@ -1,4 +1,5 @@
 __all__ = [
-    "GradScaler"
+    "GradScaler", "autocast"
 ]
 from .grad_scaler import GradScaler
+from .autocast_mode import autocast

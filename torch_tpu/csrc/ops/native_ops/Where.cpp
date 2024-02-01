@@ -45,9 +45,7 @@ Tensor where_self_tpu ( const Tensor & condition, const Tensor & self, const Ten
   TensorOptions options = TensorOptions ( condition_.device() ).dtype ( self.dtype() );
   IntArrayRef sizes ( sizes_vec.data(), sizes_vec.size() );
   auto out = torch::empty ( sizes, options );
-#ifdef TPU_OP_TIMING
-  auto timer = tpu::Timer().Start();
-#endif
+  TIMING_START;
   bm_status_t status = sgdnnWhere (
                        tpu::TPUGetDeviceHandle(),
                        tpu::TPUGenerateSgdnnTensor ( condition_ ),
@@ -55,9 +53,9 @@ Tensor where_self_tpu ( const Tensor & condition, const Tensor & self, const Ten
                        tpu::TPUGenerateSgdnnTensor ( other ),
                        tpu::TPUGenerateSgdnnTensor ( out ) );
   TORCH_CHECK ( status == BM_SUCCESS );
-#ifdef TPU_OP_TIMING
-  tpu::OpTimer::Instance().AddTime ( tpu::WHERE, timer.ElapsedUS() );
-#endif
+  TIMING_END ( tpu::WHERE );
+
+  SHOW_TENSOR_OP(condition, self, other, out);
   return out;
 }
 

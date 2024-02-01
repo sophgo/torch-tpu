@@ -3,10 +3,8 @@ import warnings
 import logging
 
 import torch
-from torch._C._nn import _parse_to as torch_parse_to
 
 import torch_tpu
-from torch_tpu.utils.device_guard import torch_device_guard
 
 
 logger = logging.getLogger(__name__)
@@ -57,8 +55,7 @@ def cast_weight(self, device):
             #TODO: weight reorder
             pass
 
-    support_cast_devices = [torch_tpu.tpu.native_device, torch_tpu.tpu.tpu_device]
-    if device is None or not any(support_cast_device in str(device) for support_cast_device in support_cast_devices):
+    if device is None or "tpu" not in str(device):
         return
 
     current_class = self.__class__
@@ -72,13 +69,9 @@ def cast_weight(self, device):
             sub_module.cast_weight(device)
 
 
-@torch_device_guard
-def _parse_to(*args, **kwargs):
-    return torch_parse_to(*args, **kwargs)
 
 def apply_module_patch():
     torch.nn.Module.tpu = tpu
     torch.nn.Module.to = to
     torch.nn.Module.cast_weight = cast_weight #TODO
-    torch._C._nn._parse_to = _parse_to
     ##TODO: parallel, special module

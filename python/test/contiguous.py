@@ -3,10 +3,10 @@ import torch.nn as nn
 import torch.nn.functional as F
 import copy
 from utils import Optimer
-torch.ops.load_library("../../build/torch_tpu/libtorch_tpu.so")
+import torch_tpu
 torch.manual_seed(1000)
 optimer = Optimer("../../build/torch_tpu/libtorch_tpu.so")
-device = "privateuseone"
+device = "tpu"
 
 def case1():
     a = torch.rand(10,10)
@@ -16,7 +16,7 @@ def case1():
     optimer.dump()
 
 def case_mergeSplitpermute_sequence_256(use_fp16 = False):
-    device = "privateuseone"
+    device = "tpu"
     batch = 32
     head_num = 12
     hidden_size = 768

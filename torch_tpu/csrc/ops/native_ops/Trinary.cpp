@@ -23,9 +23,7 @@ Tensor & addcmul_out_tpu ( const Tensor & self, const Tensor & tensor1, const Te
 #else
   if ( tpu::TPUIsSameShape(self, tensor1) && tpu::TPUIsSameShape(self, tensor2) )
   {
-#ifdef TPU_OP_TIMING
-  auto timer = tpu::Timer().Start();
-#endif
+  TIMING_START;
   bm_status_t status = sgdnnAddCMul (
                        tpu::TPUGetDeviceHandle(),
                        tpu::TPUGenerateSgdnnTensor ( self ),
@@ -34,9 +32,7 @@ Tensor & addcmul_out_tpu ( const Tensor & self, const Tensor & tensor1, const Te
                        value.toDouble(),
                        tpu::TPUGenerateSgdnnTensor ( out ) );
   TORCH_CHECK ( status == BM_SUCCESS );
-#ifdef TPU_OP_TIMING
-  tpu::OpTimer::Instance().AddTime ( tpu::ADDCMUL, timer.ElapsedUS() );
-#endif
+  TIMING_END ( tpu::ADDCMUL );
   }
   else
   {
@@ -87,9 +83,7 @@ Tensor & addcmul_out_tpu ( const Tensor & self, const Tensor & tensor1, const Te
       tensor2_t.dim = maxdim;
     }
 
-  #ifdef TPU_OP_TIMING
-    auto timer = tpu::Timer().Start();
-  #endif
+    TIMING_START;
     bm_status_t status = sgdnnAddCMulBcast (
                         tpu::TPUGetDeviceHandle(),
                         self_t,
@@ -98,11 +92,10 @@ Tensor & addcmul_out_tpu ( const Tensor & self, const Tensor & tensor1, const Te
                         value.toDouble(),
                         tpu::TPUGenerateSgdnnTensor ( out ) );
     TORCH_CHECK ( status == BM_SUCCESS );
-  #ifdef TPU_OP_TIMING
-    tpu::OpTimer::Instance().AddTime ( tpu::ADDCMUL, timer.ElapsedUS() );
-  #endif
+    TIMING_END ( tpu::ADDCMUL );
   }
 #endif
+  SHOW_TENSOR_OP(self, tensor1, tensor2, out);
   return out;
 }
 TORCH_LIBRARY_IMPL ( aten, TPU, m )
@@ -116,9 +109,7 @@ Tensor & addcdiv_out_tpu ( const Tensor & self, const Tensor & tensor1, const Te
   CHECK_TENSOR_IN_DEVICE ( tensor1 );
   CHECK_TENSOR_IN_DEVICE ( tensor2 );
   CHECK_TENSOR_IN_DEVICE ( out );
-#ifdef TPU_OP_TIMING
-  auto timer = tpu::Timer().Start();
-#endif
+  TIMING_START;
   bm_status_t status = sgdnnAddCDiv (
                        tpu::TPUGetDeviceHandle(),
                        tpu::TPUGenerateSgdnnTensor ( self ),
@@ -127,9 +118,8 @@ Tensor & addcdiv_out_tpu ( const Tensor & self, const Tensor & tensor1, const Te
                        value.toDouble(),
                        tpu::TPUGenerateSgdnnTensor ( out ) );
   TORCH_CHECK ( status == BM_SUCCESS );
-#ifdef TPU_OP_TIMING
-  tpu::OpTimer::Instance().AddTime ( tpu::ADDCDIV, timer.ElapsedUS() );
-#endif
+  TIMING_END ( tpu::ADDCDIV );
+  SHOW_TENSOR_OP(self, tensor1, tensor2, out);
   return out;
 }
 TORCH_LIBRARY_IMPL ( aten, TPU, m )

@@ -1,19 +1,10 @@
+cmake_minimum_required(VERSION 3.18 FATAL_ERROR)
+
 project(TORCH_TPU CXX)
 
-option(JIT_TRAIN_ENABLE "option for enable jit train" OFF)
-add_compile_options(-std=c++14 -Wno-attributes)
+include(${CMAKE_CURRENT_SOURCE_DIR}/config.cmake)
+add_compile_options(-std=c++17 -Wno-attributes)
 add_definitions("-D_GLIBCXX_USE_CXX11_ABI=0")
-
-set(CMAKE_BUILD_TYPE "Debug")
-add_definitions(-DDEBUG)
-
-set(TPU_OP_TIMING 1)
-#set(SHOW_OP_INFO 1)
-#set(SHOW_MALLOC_INFO 1)
-
-configure_file(
-    "${PROJECT_SOURCE_DIR}/csrc/common/config.h.in"
-    "${PROJECT_SOURCE_DIR}/csrc/common/config.h" )
 
 ## libsophon
 if($ENV{LIBSOPHON_PATTERN} MATCHES $ENV{LIBSOPHON_STABLE})
@@ -78,7 +69,7 @@ else()
     csrc/core/TPUCtypeApi.cpp
     csrc/ops/native_ops/*.cpp
     csrc/ops/my_ops/*.cpp
-    csrc/ops/distOps/*.cpp
+    csrc/ops/autocast_ops/*.cpp
   )
 endif()
 

@@ -7,6 +7,7 @@ import multiprocessing
 import glob
 import shutil
 import re
+from pathlib import Path
 
 from sysconfig import get_paths
 
@@ -23,7 +24,7 @@ from setuptools.command.egg_info import egg_info
 
 BASE_DIR = os.path.dirname(os.path.realpath(__file__))
 THIRD_PARTY_PATH = os.path.join(BASE_DIR, "third_party")
-VERSION = '2.0.1.post1'
+VERSION = '2.1.0.post1'
 
 def which(thefile):
     path = os.environ.get("PATH", os.defpath).split(os.pathsep)
@@ -59,13 +60,9 @@ def get_cmake_command():
         raise RuntimeError('no cmake or cmake3 with version >= 3.12.0 found')
 
 def get_build_type():
-    build_type = "Debug"
-    # build_type = 'Release'
-    # if os.getenv('DEBUG', default='0').upper() in ['ON', '1', 'YES', 'TRUE', 'Y']:
-    #     build_type = 'Debug'
-
-    # if os.getenv('REL_WITH_DEB_INFO', default='0').upper() in ['ON', '1', 'YES', 'TRUE', 'Y']:
-    #     build_type = 'RelWithDebInfo'
+    build_type = 'Release'
+    if os.getenv('TPUTRAIN_DEBUG', default='0').upper() in ['ON', '1', 'YES', 'TRUE', 'Y']:
+        build_type = 'Debug'
 
     return build_type
 
@@ -103,7 +100,6 @@ def CppExtension(name, sources, *args, **kwargs):
     libraries.append('torch_python')
     kwargs['libraries'] = libraries
     kwargs['language'] = 'c++'
-    print(kwargs['libraries'])
     return Extension(name, sources, *args, **kwargs)
 
 class CPPLibBuild(build_clib, object):
@@ -126,25 +122,32 @@ class CPPLibBuild(build_clib, object):
 
         cmake_args = [
             '-DCMAKE_BUILD_TYPE=' + get_build_type(),
-            # '-DCMAKE_INSTALL_PREFIX=' + os.path.realpath(output_lib_path),
-            # '-DCMAKE_LIBRARY_OUTPUT_DIRECTORY=' + os.path.realpath(output_lib_path),
-            # '-DCMAKE_ARCHIVE_OUTPUT_DIRECTORY=' + os.path.realpath(output_lib_path),
-            # '-DTORCHTPU_INSTALL_LIBDIR=' + os.path.realpath(output_lib_path),
             '-DPYTHON_INCLUDE_DIR=' + get_paths()['include'],
-            # '-DTORCH_VERSION=' + VERSION,
             '-DPYTORCH_INSTALL_DIR=' + get_pytorch_dir()
             ]
-
-        build_args = ['-j', str(multiprocessing.cpu_count())]
-
+        if os.environ.get("LIBSOPHON_PATTERN", None) == "local": ##cmodel mode
+            cmake_args.extend(
+                [
+                    "-DUSING_CMODEL=ON",
+                    "-DPCIE_MODE=OFF",
+                    "-DSOC_MODE=OFF"
+                ]
+            )
+        build_args = ['-j', str(multiprocessing.cpu_count()-2)]
         subprocess.check_call([self.cmake, BASE_DIR] + cmake_args, cwd=build_type_dir, env=os.environ)
         if os.environ.get("CHIP_ARCH", None) == "bm1684x":
             subprocess.check_call(['make', 'kernel_module'], cwd=build_type_dir, env=os.environ)
         subprocess.check_call(['make'] + build_args, cwd=build_type_dir, env=os.environ)
+
         generate_libs = glob.glob(os.path.join(build_type_dir, "*/*.so"), recursive=True)
         for lib in generate_libs:
             subprocess.check_call(['cp']+[lib, output_lib_path], cwd=build_type_dir, env=os.environ)
 
+        if os.environ.get("LIBSOPHON_PATTERN", None) != "local": #cmodel mode will no release 
+            subprocess.check_call(["patchelf", "--set-rpath",
+                                    "$ORIGIN",
+                                    os.path.relpath(os.path.join(BASE_DIR, f"build/{get_build_type()}/packages/torch_tpu/lib/libtorch_tpu.so"))
+                                    ])
 class Build(build_ext, object):
 
     def run(self):
@@ -279,7 +282,7 @@ DEBUG = 1 #DEBUG = (os.getenv('DEBUG', default='').upper() in ['ON', '1', 'YES',
 
 extra_link_args = []
 extra_compile_args = [
-    '-std=c++14',
+    '-std=c++17',
     '-Wno-sign-compare',
     '-Wno-deprecated-declarations',
     '-Wno-return-type',
@@ -297,8 +300,10 @@ else:
 setup(
         name=os.environ.get('TORCH_TPU_PACKAGE_NAME', 'torch_tpu'),
         version=VERSION,
+        author="sophgo",
+        author_email="dev@sophgo.com",
         description='TPU bridge for PyTorch',
-        url='',
+        url='https://github.com/sophgo/torch-tpu',
         packages=["torch_tpu"],
         libraries=[('torch_tpu', {'sources': list()})],
         package_dir={'': os.path.relpath(os.path.join(BASE_DIR, f"build/{get_build_type()}/packages"))},
@@ -312,6 +317,11 @@ setup(
                 library_dirs=lib_directories,
                 extra_link_args=extra_link_args + ['-Wl,-rpath,$ORIGIN/lib'],
             ),
+        ],
+        python_requires=">=3.10,<3.11",
+        install_requires = [],
+        dependency_links = [
+            "https://download.pytorch.org/whl/cpu",
         ],
         extras_require={
         },

@@ -10,7 +10,6 @@
 #include <sgdnn_api.h>
 #include <torch/library.h>
 #include <torch/torch.h>
-// #include "tpu_kernel.h"
 
 namespace at {
 
@@ -88,18 +87,14 @@ std::tuple<Tensor, Tensor, Tensor> native_group_norm_tpu(
   mean = std::get<1>(result).cpu();
   rstd = std::get<2>(result).cpu();
 #else
-#ifdef TPU_OP_TIMING
-  auto timer = tpu::Timer().Start();
-#endif
+  TIMING_START;
   bm_status_t status = sgdnnNativeGroupNorm(
       tpu::TPUGetDeviceHandle(), tpu::TPUGenerateSgdnnTensor(X_32),
       tpu::TPUGenerateSgdnnTensor(weight), tpu::TPUGenerateSgdnnTensor(bias),
       group, affine, eps, tpu::TPUGenerateSgdnnTensor(Y),
       tpu::TPUGenerateSgdnnTensor(mean), tpu::TPUGenerateSgdnnTensor(rstd));
   TORCH_CHECK(status == BM_SUCCESS);
-#ifdef TPU_OP_TIMING
-  tpu::OpTimer::Instance().AddTime(tpu::NATIVE_GROUP_NORM, timer.ElapsedUS());
-#endif
+  TIMING_END(tpu::NATIVE_GROUP_NORM);
 #endif
   return std::make_tuple(Y, mean, rstd);
 }
@@ -123,16 +118,17 @@ native_group_norm_backward_tpu(const at::Tensor &grad_out, const at::Tensor &X,
   if (weight.defined()) {
     CHECK_TENSOR_IN_DEVICE(weight);
   }
-  TIMING_START
 #if 0
-    LOG(WARNING) << "group_norm_backward use cpu impl";
+    // tpu impl has bug. to fix
+    CPU_IMPL_WARNING();
+    TIMING_START;
     auto input_type = grad_out.dtype();
     auto result = native_group_norm_backward(
         grad_out.cpu().to(torch::kFloat32), X.cpu().to(torch::kFloat32),
         mean.cpu().to(torch::kFloat32), rstd.cpu().to(torch::kFloat32),
         c10::optional<Tensor>(weight.cpu().to(torch::kFloat)), N, C, HxW,
         group, output_mask);
-    CHECK_TENSOR_IN_DEVICE(X);
+    TIMING_END(tpu::CPU_LAYER);
     return std::tuple<Tensor, Tensor, Tensor>(
         output_mask[0] ? TENSOR_TO_TPU(std::get<0>(result).to(input_type).contiguous())
                       : Tensor(),
@@ -141,6 +137,7 @@ native_group_norm_backward_tpu(const at::Tensor &grad_out, const at::Tensor &X,
         output_mask[2] ? TENSOR_TO_TPU(std::get<2>(result).to(input_type).contiguous())
                       : Tensor());
 #else
+  TORCH_CHECK(X.dim() == 4);
   Tensor grad_input, grad_weight, grad_bias;
   if (output_mask[0] == true) {
     grad_input = torch::empty(X.sizes(), X.options());
@@ -152,21 +149,39 @@ native_group_norm_backward_tpu(const at::Tensor &grad_out, const at::Tensor &X,
     // We assume that weight and bias have the same data type
     grad_bias = empty({weight.size(0)}, weight.options());
   }
-  bm_status_t status = sgdnnNativeGroupNormBackward(
-      tpu::TPUGetDeviceHandle(), tpu::TPUGenerateSgdnnTensor(grad_out),
-      tpu::TPUGenerateSgdnnTensor(X),
-      weight.defined() ? tpu::TPUGenerateSgdnnTensor(weight)
-                       : sgdnnUndefinedTensor(),
-      tpu::TPUGenerateSgdnnTensor(mean), tpu::TPUGenerateSgdnnTensor(rstd),
-      group,
-      output_mask[0] ? tpu::TPUGenerateSgdnnTensor(grad_input)
-                     : sgdnnUndefinedTensor(),
-      output_mask[1] ? tpu::TPUGenerateSgdnnTensor(grad_weight)
-                     : sgdnnUndefinedTensor(),
-      output_mask[1] ? tpu::TPUGenerateSgdnnTensor(grad_bias)
-                     : sgdnnUndefinedTensor());
-  TORCH_CHECK(status == BM_SUCCESS);
-  TIMING_END(tpu::GROUPNORM_BACKWARD)
+
+  auto mean1 = mean.view({N, group, 1});
+  auto rstd1 = rstd.view({N, group, 1});
+  auto X1    = X.view({N,group, C/group * HxW});
+  auto x_hat = (X1 - mean1) * rstd1;
+  if (output_mask[0] == true) { // grad inp
+    auto dx_hat = (grad_out * weight.view({1, C, 1, 1})).view({N, group, C/group * HxW});
+    grad_input = ((dx_hat - dx_hat.mean(-1, true) - (dx_hat * x_hat).mean(-1, true) * x_hat) * rstd1).view(X.sizes());
+  }
+  if (output_mask[1] == true) {
+    grad_weight = (grad_out.view({N, group, C/group * HxW}) * x_hat).view({N, C, -1}).sum(0).sum(-1);
+  }
+  if (output_mask[2] == true) {
+    grad_bias = grad_out.sum(0).sum(-1).sum(-1);
+  }
+  // TODO:FIX BUG
+  // TIMING_START;
+  // bm_status_t status = sgdnnNativeGroupNormBackward(
+  //     tpu::TPUGetDeviceHandle(), tpu::TPUGenerateSgdnnTensor(grad_out),
+  //     tpu::TPUGenerateSgdnnTensor(X),
+  //     weight.defined() ? tpu::TPUGenerateSgdnnTensor(weight)
+  //                      : sgdnnUndefinedTensor(),
+  //     tpu::TPUGenerateSgdnnTensor(mean), tpu::TPUGenerateSgdnnTensor(rstd),
+  //     group,
+  //     output_mask[0] ? tpu::TPUGenerateSgdnnTensor(grad_input)
+  //                    : sgdnnUndefinedTensor(),
+  //     output_mask[1] ? tpu::TPUGenerateSgdnnTensor(grad_weight)
+  //                    : sgdnnUndefinedTensor(),
+  //     output_mask[1] ? tpu::TPUGenerateSgdnnTensor(grad_bias)
+  //                    : sgdnnUndefinedTensor());
+  // TORCH_CHECK(status == BM_SUCCESS);
+  // TIMING_END(tpu::GROUPNORM_BACKWARD)
+  // SHOW_TENSOR_OP(grad_out, X, mean, rstd, weight, grad_input, grad_weight, grad_bias);
   return std::tuple<Tensor, Tensor, Tensor>(grad_input, grad_weight, grad_bias);
 
 #endif

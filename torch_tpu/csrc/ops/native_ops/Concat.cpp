@@ -23,9 +23,10 @@ Tensor & cat_out_tpu ( const ITensorListRef & tensors, int64_t dim, Tensor & out
       break;
     }
   }
-  if(flag) LOG(WARNING) << "concat use cpu impl";
   if ( tensors.size() > TPU_MAX_CONCAT_NUM || flag )
   {
+    CPU_IMPL_WARNING();
+    TIMING_START;
     std::vector<Tensor> tensors_cpu;
     for ( auto tensor : tensors )
     {
@@ -35,6 +36,7 @@ Tensor & cat_out_tpu ( const ITensorListRef & tensors, int64_t dim, Tensor & out
       auto out_cpu = cat ( tensors_lis_cpu, dim );
       tpu::TPUCopyHostToDevice ( out.data_ptr(), out_cpu.contiguous().data_ptr(), out.nbytes() );
     }
+    TIMING_END(tpu::CPU_LAYER);
   }
   else
   {
@@ -46,19 +48,17 @@ Tensor & cat_out_tpu ( const ITensorListRef & tensors, int64_t dim, Tensor & out
       contiguous_tensors.push_back ( tensor.contiguous() );
       inputs.push_back ( tpu:: TPUGenerateSgdnnTensor ( contiguous_tensors.back() ) );
     }
-#ifdef TPU_OP_TIMING
-    auto timer = tpu::Timer().Start();
-#endif
+
+    TIMING_START;
     auto status = sgdnnConcat ( tpu::TPUGetDeviceHandle(),
                                 inputs.data(),
                                 inputs.size(),
                                 dim,
                                 tpu:: TPUGenerateSgdnnTensor ( out ) );
     TORCH_CHECK ( status == BM_SUCCESS );
-#ifdef TPU_OP_TIMING
-    tpu::OpTimer::Instance().AddTime ( tpu::CONCAT, timer.ElapsedUS() );
-#endif
+    TIMING_END ( tpu::CONCAT );
   }
+  SHOW_TENSOR_OP(out);
   return out;
 }
 TORCH_LIBRARY_IMPL ( aten, TPU, m )

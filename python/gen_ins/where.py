@@ -5,7 +5,7 @@ torch.ops.load_library("/home/yu.hu/workspace/tpu-train/libtorch_plugin/build/li
 torch.manual_seed(1000)
 DI = DumpIns("/home/yu.hu/workspace/tpu-train/libtorch_plugin/build/liblibtorch_plugin.so")
 if __name__ == "__main__":
-    device = "privateuseone"
+    device = "tpu"
     batch = 1
     sequence = 8
     head_size = 3

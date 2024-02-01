@@ -18,9 +18,12 @@ Tensor &reciprocal_out_tpu(const at::Tensor &self, at::Tensor &out) {
 #endif
 
   if (self.dim() == 0) {
+    CPU_IMPL_WARNING();
+    TIMING_START;
     auto out_cpu = reciprocal(self.cpu());
     tpu::TPUCopyHostToDevice(out.data_ptr(), out_cpu.contiguous().data_ptr(),
                              out.nbytes());
+    TIMING_END(tpu::CPU_LAYER);
   } else {
     TIMING_START
     /**
@@ -34,7 +37,7 @@ Tensor &reciprocal_out_tpu(const at::Tensor &self, at::Tensor &out) {
     TORCH_CHECK(status == BM_SUCCESS);
     TIMING_END(tpu::RECIPROCAL)
   }
-
+  SHOW_TENSOR_OP(self, out);
   return out;
 }
 

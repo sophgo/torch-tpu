@@ -1,6 +1,7 @@
 #include <c10/util/Exception.h>
 #include <c10/core/Device.h>
 #include <ATen/Utils.h>
+#include <ATen/core/GeneratorForPrivateuseone.h>
 
 #include <vector>
 #include <deque>
@@ -69,6 +70,24 @@ uint64_t TPUGeneratorImpl::current_seed() const {
     return seed_;
 }
 
+/**
+ * Sets the offset to be used by curandStatePhilox4_32_10
+ *
+ * See Note [Acquire lock when using random generators]
+ */
+void TPUGeneratorImpl::set_offset(uint64_t offset) {
+  philox_offset_per_thread_ = offset;
+}
+
+/**
+ * Gets the current offset of TPUGeneratorImpl.
+ */
+uint64_t TPUGeneratorImpl::get_offset() const {
+  // Debatable if get_offset() should be allowed in captured regions.
+  // Conservatively disallow it for now.
+  return philox_offset_per_thread_;
+}
+
 uint64_t TPUGeneratorImpl::seed() {
     auto random = c10::detail::getNonDeterministicRandom(true);
     this->set_current_seed(random);
@@ -116,7 +135,7 @@ void TPUGeneratorImpl::set_state(const c10::TensorImpl& new_state) {
     }
 
     uint64_t input_seed;
-    auto new_rng_state = new_state.data<uint8_t>();
+    auto new_rng_state = new_state.data_dtype_initialized<uint8_t>();
     memcpy(&input_seed, new_rng_state, seed_size);
     this->set_current_seed(input_seed);
     int64_t philox_offset = 0;
@@ -140,5 +159,12 @@ TPUGeneratorImpl* TPUGeneratorImpl::clone_impl() const {
     gen->set_philox_offset_per_thread(this->philox_offset_per_thread_);
     return gen;
 }
+
+// this is used to register generator
+at::Generator make_tpu_generator(c10::DeviceIndex device_index) {
+  return at::make_generator<TPUGeneratorImpl>(device_index);
+}
+
+REGISTER_GENERATOR_PRIVATEUSE1(make_tpu_generator)
 
 };

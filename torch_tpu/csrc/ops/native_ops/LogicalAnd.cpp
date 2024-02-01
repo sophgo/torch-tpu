@@ -26,30 +26,30 @@ namespace at
 #else
         if (self.dim() == 0 && other.dim() == 0)
         {
+            CPU_IMPL_WARNING();
+            TIMING_START;
             auto out_cpu = logical_and(self.cpu(),other.cpu());
             tpu::TPUCopyHostToDevice(out.data_ptr(), out_cpu.contiguous().data_ptr(), out.nbytes());
+            TIMING_END(tpu::CPU_LAYER);
         }
         else if (IS_TPU_TENSOR(self) && IS_TPU_TENSOR ( other ))
         {
         //need to consider broadcast later
-#ifdef TPU_OP_TIMING
-            auto timer = tpu::Timer().Start();
-#endif
+            TIMING_START;
             bm_status_t status = sgdnnLogicalAnd(
                 tpu::TPUGetDeviceHandle(),
                 tpu::TPUGenerateSgdnnTensor(self),
                 tpu::TPUGenerateSgdnnTensor(other),
                 tpu::TPUGenerateSgdnnTensor(out));
             TORCH_CHECK(status == BM_SUCCESS);
-#ifdef TPU_OP_TIMING
-            tpu::OpTimer::Instance().AddTime(tpu::LOGICAL_AND, timer.ElapsedUS());
-#endif
+            TIMING_END(tpu::LOGICAL_AND);
         }
         else
         {
             TORCH_CHECK(false, "At least one input is required in TPU device");
         }
 #endif
+        SHOW_TENSOR_OP(self, other, out);
         return out;
     }
 

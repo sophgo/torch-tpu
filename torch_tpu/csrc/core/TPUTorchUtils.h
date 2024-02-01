@@ -4,6 +4,7 @@
 #include <torch/torch.h>
 #include <ATen/core/TensorBase.h>
 #include <c10/util/Logging.h>
+#include <c10/util/Half.h>
 #include <sgdnn_api.h>
 #include <TPUDeviceManager.h>
 #include <sys/time.h>
@@ -12,19 +13,44 @@
 #include <fstream>
 #include <vector>
 
+#define DEBUG_SHOW(dtype, func, ...)                    \
+do{                                                     \
+  std::cout << __func__ << "|" << #__VA_ARGS__ << "";   \
+  const dtype args[] = {__VA_ARGS__};                   \
+  int numArgs = sizeof(args) / sizeof(args[0]);         \
+  for (int i = 0; i < numArgs; ++i) {                   \
+      std::cout << "| " << func(args[i]);               \
+  }                                                     \
+  std::cout << "\n";                                    \
+} while (0)
+
 #ifdef TPU_OP_TIMING
 #define TIMING_START auto timer = tpu::Timer().Start();
-#define TIMING_END(TIMING_NAME)                                                \
+#define TIMING_END(TIMING_NAME)  \
   tpu::OpTimer::Instance().AddTime(TIMING_NAME, timer.ElapsedUS());
 #else
 #define TIMING_START
 #define TIMING_END(OP)
 #endif
 
+#ifdef SHOW_OP_INFO
+#define SHOW_TENSOR_OP(...) DEBUG_SHOW(Tensor, tpu::GetTensorInfo, __VA_ARGS__)
+#define SHOW_EMPTY_INFO(Tensor) std::cout << __func__ << ": " << Tensor.data_ptr() << std::endl;
+#else
+#define SHOW_TENSOR_OP(...) 
+#define SHOW_EMPTY_INFO(Tensor)
+#endif
+
+#ifdef SHOW_CPU_OP
+#define CPU_IMPL_WARNING(...)  LOG( WARNING ) << __func__ << " use cpu impl." << #__VA_ARGS__;
+#else
+#define CPU_IMPL_WARNING(...)
+#endif
+
 #define CHECK_TENSOR_IN_DEVICE(t) \
 do \
 { \
-TORCH_CHECK ( t.device().type() == DeviceType::TPU, #t, " is not in TPU device" ); \
+TORCH_CHECK ( t.device().type() == DeviceType::TPU, ":", __func__, ": ", #t, " is not in TPU device" ); \
 TORCH_CHECK ( t.is_contiguous() == true, __FILE__ ,":" ,__func__, ": ", #t, " is not contiguous" ); \
 } \
 while ( 0 )
@@ -49,6 +75,7 @@ while ( 0 )
 
 #define TPU_DEVICE_INDEX_BITS 6
 #define TPU_GLOBAL_ADDR_BITS (64 - TPU_DEVICE_INDEX_BITS)
+
 
 namespace tpu
 {
@@ -76,6 +103,7 @@ static inline at::Device TPUGetCurrentDevice()
 
 static inline void SaveTensorToBinaryFile ( const at::Tensor & Tensor, const std::string & Path )
 {
+  if (!Tensor.has_storage()) { return; }
   auto TensorCPU = TENSOR_TO_CPU ( Tensor ).contiguous();
   std::ofstream fout ( Path, std::ios::out | std::ios::binary );
   TORCH_CHECK ( fout.is_open() == true, "Failed to open file ", Path );
@@ -148,6 +176,36 @@ static inline SgdnnTensor_t TPUGenerateSgdnnTensor ( const at::Tensor & Tensor )
     t.stride[i] = Tensor.stride ( i );
   }
   return t;
+}
+
+static inline std::string GetTensorInfo( const at::Tensor & Tensor )
+{
+  std::ostringstream Tensor_info;
+  if (Tensor.has_storage()){
+    auto dtype = Tensor.dtype();
+    Tensor_info << "addr : " << Tensor.data_ptr() << ", ";
+    Tensor_info << "dtype : " << dtype << ", ";
+    if (dtype == caffe2::TypeMeta::Make<float>())
+    {
+      Tensor_info << "data0 : " << *((float*)(Tensor.cpu().data_ptr())) << ",";
+    }
+    else if (dtype == caffe2::TypeMeta::Make<c10::Half>())
+    {
+      Tensor_info << "data0 : " << (float)c10::detail::fp16_ieee_to_fp32_value(((c10::Half*)(Tensor.cpu().data_ptr()))->x) << ",";
+    }
+    Tensor_info << "size : [";
+    for ( auto i = 0; i < Tensor.dim(); ++i )
+    {
+      Tensor_info << " " << Tensor.size ( i );
+    }
+    Tensor_info << "], strides : [";
+    for ( auto i = 0; i < Tensor.dim(); ++i )
+    {
+      Tensor_info << " " << Tensor.stride ( i );
+    }
+    Tensor_info << "];";
+  }
+  return Tensor_info.str();
 }
 
 static inline SgdnnTensor_t TPUGenerateSgdnnTensorforComplex64 ( const at::Tensor & Tensor )
@@ -270,6 +328,7 @@ typedef enum
   CDMA_S2D,
   CDMA_C2C,
   COPY,
+  CPU_LAYER,
   CONVOLUTION,
   CONVOLUTION_BACKWARD,
   BATCHNORM,
@@ -277,6 +336,7 @@ typedef enum
   LAYERNORM,
   LAYERNORM_BACKWARD,
   AVG_POOLING,
+  MAX_POOLING,
   RELU,
   RELU_BACKWARD,
   GELU,
@@ -453,6 +513,8 @@ typedef enum
   BINARYOP,
   BINARYOP_C,
   BINARYOP_BCAST,
+  REAL,
+  CONJ,
   OP_NUM
 }
 OpType;
@@ -463,6 +525,7 @@ static const char * OpTypeStr[OP_NUM] =
   "CDMA S2D",
   "CDMA C2C",
   "Copy",
+  "Cpu Layer",
   "Convolution",
   "Convolution Backward",
   "BatchNorm",
@@ -470,6 +533,7 @@ static const char * OpTypeStr[OP_NUM] =
   "LayerNorm",
   "LayerNorm Backward",
   "Avg Pooling",
+  "Max Pooling",
   "ReLU",
   "ReLU Backward",
   "GeLU",
@@ -640,11 +704,14 @@ static const char * OpTypeStr[OP_NUM] =
   "MSE Loss Backward",
   "Slice_scatter",
   "Inf Check And Unscale",
+  "LLAMA_ATTENTION",
   "LLAMA_MLP_FORWARD",
   "RMSNORM_FORWARD",
   "binary_op",
   "binary_op_c",
   "binary_op_bcast",
+  "real",
+  "Conj"
 };
 
 struct OpTimer

@@ -23,18 +23,15 @@ Tensor &bitwise_not_out_tpu(const Tensor &self, Tensor &out) {
     tpu::TPUCopyHostToDevice(out.data_ptr(), out_cpu.contiguous().data_ptr(),
                              out.nbytes());
   } else if (IS_TPU_TENSOR(self)) {
-#ifdef TPU_OP_TIMING
-    auto timer = tpu::Timer().Start();
-#endif
+    TIMING_START;
     bm_status_t status = sgdnnBitwiseNot(tpu::TPUGetDeviceHandle(),
                                          tpu::TPUGenerateSgdnnTensor(self),
                                          tpu::TPUGenerateSgdnnTensor(out));
     TORCH_CHECK(status == BM_SUCCESS);
-#ifdef TPU_OP_TIMING
-    tpu::OpTimer::Instance().AddTime(tpu::BITWISE_NOT, timer.ElapsedUS());
-#endif
+    TIMING_END(tpu::BITWISE_NOT);
   }
 #endif
+  SHOW_TENSOR_OP(self, out);
   return out;
 }
 
@@ -60,18 +57,15 @@ Tensor &cbrt_out_tpu(const Tensor &self, Tensor &out) {
     auto out_cpu = cbrt(self.item().toFloat());
     tpu::TPUCopyHostToDevice(out.data_ptr(), &out_cpu, out.nbytes());
   } else if (IS_TPU_TENSOR(self)) {
-#ifdef TPU_OP_TIMING
-    auto timer = tpu::Timer().Start();
-#endif
+    TIMING_START;
     bm_status_t status =
         sgdnnCbrt(tpu::TPUGetDeviceHandle(), tpu::TPUGenerateSgdnnTensor(self),
                   tpu::TPUGenerateSgdnnTensor(out));
     TORCH_CHECK(status == BM_SUCCESS);
-#ifdef TPU_OP_TIMING
-    tpu::OpTimer::Instance().AddTime(tpu::CBRT, timer.ElapsedUS());
-#endif
+    TIMING_END(tpu::CBRT);
   }
 #endif
+  SHOW_TENSOR_OP(self, out);
   return out;
 }
 Tensor cbrt_tpu(const Tensor &self) {

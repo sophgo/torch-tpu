@@ -16,9 +16,6 @@ Tensor &fill__Scalar_tpu(Tensor &self, const Scalar &value) {
   self_cpu.fill_ ( value );
   tpu::TPUCopyHostToDevice ( self.data_ptr(), self_cpu.contiguous().data_ptr(), self.nbytes() );
 #else
-#ifdef TPU_OP_TIMING
-  auto timer = tpu::Timer().Start();
-#endif
   auto self_ = self.dim() == 0 ? self.unsqueeze(0) : self;
   int64_t value_;
   if (self.dtype() == caffe2::TypeMeta::Make<float>()) {
@@ -32,18 +29,18 @@ Tensor &fill__Scalar_tpu(Tensor &self, const Scalar &value) {
   } else {
     TORCH_CHECK(false);
   }
+  TIMING_START;
   bm_status_t status = sgdnnFill(tpu::TPUGetDeviceHandle(), &value_,
                                  tpu::TPUGenerateSgdnnTensor(self_));
   TORCH_CHECK(status == BM_SUCCESS);
+  TIMING_END(tpu::CONST_FILL);
   // unsqueeze may cause different address between self_ and self:
   if (self.data_ptr() != self_.data_ptr()) {
     tpu::TPUCopyDeviceToDevice(self.data_ptr(), self_.data_ptr(),
                                self.nbytes());
   }
-#ifdef TPU_OP_TIMING
-  tpu::OpTimer::Instance().AddTime(tpu::CONST_FILL, timer.ElapsedUS());
 #endif
-#endif
+  SHOW_TENSOR_OP(self);
   return self;
 }
 TORCH_LIBRARY_IMPL(aten, TPU, m) { m.impl("fill_.Scalar", fill__Scalar_tpu); }
@@ -73,24 +70,21 @@ Tensor &masked_fill_Scalar_tpu(Tensor &self, const Tensor &mask,
   tpu::TPUCopyHostToDevice(self.data_ptr(), self_cpu.contiguous().data_ptr(),
                            self.nbytes());
 #else
-#ifdef TPU_OP_TIMING
-  auto timer = tpu::Timer().Start();
-#endif
   Tensor o = self.clone();
   Tensor &out = o;
   Tensor maski = mask.clone().to(self.dtype());
   Tensor &mask_int = maski;
+  TIMING_START;
   bm_status_t status = sgdnnMaskedFill ( tpu::TPUGetDeviceHandle(),
                                          tpu:: TPUGenerateSgdnnTensor ( self ),
                                          tpu:: TPUGenerateSgdnnTensor ( mask_int ),
                                          value.toDouble(),
                                          tpu:: TPUGenerateSgdnnTensor(out) );
   TORCH_CHECK( status == BM_SUCCESS );
+  TIMING_END(tpu::MASKED_FILL);
   self = out.clone();
-#ifdef TPU_OP_TIMING
-  tpu::OpTimer::Instance().AddTime(tpu::MASKED_FILL, timer.ElapsedUS());
 #endif
-#endif
+  SHOW_TENSOR_OP(self, mask);
   return self;
 }
 

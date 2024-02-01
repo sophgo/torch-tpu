@@ -5,13 +5,13 @@ from utils import ForwardHack, BackwardHack,DumpIns
 DI = DumpIns()
 # torch.ops.load_library("../../../build/torch_tpu/libtorch_tpu.so")
 torch.manual_seed(1000)
-device = "privateuseone:0"
+device = "tpu:0"
 
 # def dump_backward():
 #     """
 #     embedding
 #     """
-#     device = "privateuseone"
+#     device = "tpu"
 
 #  ##########################
 #     batch      = 1

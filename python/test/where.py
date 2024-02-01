@@ -1,10 +1,10 @@
 import torch
 
-torch.ops.load_library("../../build/torch_tpu/libtorch_tpu.so")
+import torch_tpu
 torch.manual_seed(1000)
 
 if __name__ == "__main__":
-    device = "privateuseone"
+    device = "tpu"
     batch = 1
     sequence = 8
     head_size = 3

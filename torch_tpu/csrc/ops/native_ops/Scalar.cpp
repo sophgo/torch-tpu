@@ -12,8 +12,17 @@ namespace at
 {
 Scalar _local_scalar_dense_tpu ( const Tensor & self )
 {
+  SHOW_TENSOR_OP(self);
   CHECK_TENSOR_IN_DEVICE ( self );
-  return _local_scalar_dense ( TENSOR_TO_CPU ( self ) );
+  Scalar out;
+#if 1
+  CPU_IMPL_WARNING();
+  TIMING_START;
+  out = _local_scalar_dense ( TENSOR_TO_CPU ( self ) );
+  TIMING_END(tpu::CPU_LAYER);
+#else
+#endif
+  return out;
 }
 TORCH_LIBRARY_IMPL ( aten, TPU, m )
 {
@@ -26,7 +35,6 @@ Tensor scalar_tensor_tpu (const Scalar& s,
                           c10::optional<Device> device,
                           c10::optional<bool> pin_memory)
 {
-  printf("using scalar_tensor_tpu\n");
   TensorOptions options = TensorOptions().dtype(dtype).layout(layout).device(device).pinned_memory(pin_memory);
   return empty({}, options).fill_(s);
 }

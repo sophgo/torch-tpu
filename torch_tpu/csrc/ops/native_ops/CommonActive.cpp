@@ -92,6 +92,7 @@ namespace at {
         TORCH_CHECK(false, "At least one input is required in TPU device");    \
       }                                                                        \
     }                                                                          \
+    SHOW_TENSOR_OP(self, out);                                                        \
     return out;                                                                \
   }
 

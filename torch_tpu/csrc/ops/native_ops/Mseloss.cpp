@@ -49,6 +49,7 @@ Tensor mse_loss_tpu(const at::Tensor & self, const at::Tensor & target, int64_t 
                                         reduction );
     TORCH_CHECK ( status == BM_SUCCESS );
     TIMING_END(tpu::MSE_LOSS);
+    SHOW_TENSOR_OP(self, target);
     return out;
 #endif
 }
@@ -70,12 +71,10 @@ Tensor mse_loss_backward_tpu( const Tensor & grad_output, const Tensor & self, c
   CHECK_TENSOR_IN_DEVICE ( target );
   Tensor grad_in;
 #if 0
-  LOG( WARNING ) << " mes_loss_backward use cpu impl";
+  CPU_IMPL_WARNING();
   auto grad_in_cpu = mse_loss_backward(grad_output.cpu(), self.cpu(), target.cpu(), reduction );
   grad_in = grad_in_cpu.to(self.device());
 #else
-  TIMING_START;
-  // TODO: use a kernel func 
   auto dz2_dz1 = 2 * (self - target);
   if (reduction == 0 ) // none
   {
@@ -92,8 +91,12 @@ Tensor mse_loss_backward_tpu( const Tensor & grad_output, const Tensor & self, c
   else{
     TORCH_CHECK( false );
   }
+
+  TIMING_START;
+  // TODO: use a kernel func =
   TIMING_END(tpu::MSE_LOSS_BACKWARD);
 #endif
+  SHOW_TENSOR_OP(grad_output, self, target, grad_in);
   return grad_in;
 }
 

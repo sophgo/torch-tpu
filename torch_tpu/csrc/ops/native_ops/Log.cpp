@@ -21,11 +21,13 @@ Tensor &logx_out_tpu(const Tensor &self, Tensor &out, sg_log_type_t log_type) {
                            out.nbytes());
 #else
   if (self.dim() == 0) {
+    CPU_IMPL_WARNING();
+    TIMING_START;
     auto out_cpu = log(self.cpu());
     tpu::TPUCopyHostToDevice(out.data_ptr(), out_cpu.contiguous().data_ptr(),
                              out.nbytes());
+    TIMING_END(tpu::CPU_LAYER);
   } else if (IS_TPU_TENSOR(self)) {
-
     TIMING_START
     bm_status_t status =
         sgdnnLog(tpu::TPUGetDeviceHandle(), tpu::TPUGenerateSgdnnTensor(self),
@@ -36,6 +38,7 @@ Tensor &logx_out_tpu(const Tensor &self, Tensor &out, sg_log_type_t log_type) {
     TORCH_CHECK(false, "At least one input is required in TPU device");
   }
 #endif
+  SHOW_TENSOR_OP(self, out);
   return out;
 }
 

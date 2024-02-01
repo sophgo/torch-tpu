@@ -1514,12 +1514,12 @@ void tpu_kernel_api_groupnorm2d_backward ( const void *args )
                         api->saved_invstd_global_addr,
                         api->grad_input_global_addr,
                         api->grad_weight_global_addr,
-                        0,
+                        api->grad_bias_global_addr,
                         shape,
                         ( data_type_t ) api->dtype,
                         api->grad_input_global_addr != 0,
                         api->grad_weight_global_addr != 0,
-                        0,
+                        api->grad_bias_global_addr != 0,
                         api->group_nums );
     if ( !split_c_only )
     {
@@ -1531,12 +1531,12 @@ void tpu_kernel_api_groupnorm2d_backward ( const void *args )
       api->saved_invstd_global_addr,
       api->grad_input_global_addr,
       api->grad_weight_global_addr,
-      0,
+      api->grad_bias_global_addr,
       shape,
       ( data_type_t ) api->dtype,
       api->grad_input_global_addr != 0,
       api->grad_weight_global_addr != 0,
-      0,
+      api->grad_bias_global_addr != 0,
       api->group_nums );
     }
   }

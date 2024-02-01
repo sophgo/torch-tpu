@@ -2,8 +2,8 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
-torch.ops.load_library("../../build/torch_tpu/libtorch_tpu.so")
-device = "privateuseone"
+import torch_tpu
+device = "tpu"
 def case1():
     a = torch.randn((5,5))
     a_tpu = a.to(device)

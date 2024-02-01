@@ -15,7 +15,7 @@ if __name__ == "__main__":
     Hidden = 8
     sequence = 8
     p_drop = 0.5
-    device = "privateuseone"
+    device = "tpu"
     ###################################
     inp = torch.randn((Batch, nHead, sequence, sequence))
     inp_tpu = inp.to(device)

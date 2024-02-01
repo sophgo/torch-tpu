@@ -6,7 +6,7 @@ import copy
 import torch_tpu
 
 def is_torch_device():
-    device = torch.device("privateuseone", 0)
+    device = torch.device("tpu", 0)
     tensor = torch.randn((10)).to(device)
     net = nn.Conv2d(in_channels=3, out_channels=1, kernel_size=3, bias=True).to(device)
 

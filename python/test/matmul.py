@@ -3,7 +3,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 import copy
 
-torch.ops.load_library("../../build/torch_tpu/libtorch_tpu.so")
+import torch_tpu
 torch.manual_seed(1000)
 
 class MyMatmul(nn.Module):
@@ -16,7 +16,7 @@ class MyMatmul(nn.Module):
     
 
 def check_matmul():
-    device = "privateuseone"
+    device = "tpu"
     use_half = False
 
     b = 2

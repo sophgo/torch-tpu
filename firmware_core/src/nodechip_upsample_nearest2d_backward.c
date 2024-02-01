@@ -960,7 +960,7 @@ void nodechip_upsample_nearest2d_backward_parallel_special_case(
           tpu_bdc_fp_mul_C(
             ping ? oaddr_pong : oaddr_ping,
             ping ? oaddr_pong : oaddr_ping,
-            scale_c,
+            tpu_cast(scale_c, dtype, DT_FP32, RM_HALF_TO_EVEN),
             &last_oshape,
             NULL,
             NULL,
@@ -995,7 +995,7 @@ void nodechip_upsample_nearest2d_backward_parallel_special_case(
       tpu_bdc_fp_mul_C(
             ping ? oaddr_pong : oaddr_ping,
             ping ? oaddr_pong : oaddr_ping,
-            scale_c,
+            tpu_cast(scale_c, dtype, DT_FP32, RM_HALF_TO_EVEN),
             &last_oshape,
             NULL,
             NULL,
@@ -1251,7 +1251,7 @@ void nodechip_upsample_nearest2d_backward_parallel(
             tpu_bdc_fp_mul_C(
                 ofmap_offset_local,
                 ofmap_offset_local,
-                scale_c,
+                tpu_cast(scale_c, dtype, DT_FP32, RM_HALF_TO_EVEN),
                 &top_shape_tmp,
                 NULL,
                 NULL,

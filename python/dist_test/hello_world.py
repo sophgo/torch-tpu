@@ -2,8 +2,8 @@ import torch
 import logging
 from helper import init_logger, is_master, is_slave
 import sccl_collectives
-torch.ops.load_library("../../build/torch_tpu/libtorch_tpu.so")
-TPU = "privateuseone"
+import torch_tpu
+TPU = "tpu"
 
 torch.distributed.init_process_group(backend="sccl")
 

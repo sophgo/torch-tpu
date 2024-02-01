@@ -14,7 +14,7 @@ class _MultiDeviceReplicator:
     Lazily serves copies of a tensor to requested devices.  Copies are cached per-device.
     """
     def __init__(self, master_tensor: torch.Tensor) -> None:
-        assert master_tensor.device.type == 'privateuseone'
+        assert master_tensor.is_tpu
         self.master = master_tensor
         self._per_device_tensors: Dict[torch.device, torch.Tensor] = {}
 
@@ -116,7 +116,7 @@ class GradScaler:
                  growth_interval=2000,
                  enabled=True):
         if enabled:
-            warnings.warn("TpuPlugin.amp.GradScaler is enabled")
+            warnings.warn("torch_tpu.tpu.amp.GradScaler is enabled")
             self._enabled = enabled
 
         if self._enabled:
@@ -160,7 +160,7 @@ class GradScaler:
 
         # Short-circuit for the common case.
         if isinstance(outputs, torch.Tensor):
-            assert outputs.device.type == "privateuseone"
+            assert outputs.is_tpu
             if self._scale is None:
                 self._lazy_init_scale_growth_tracker(outputs.device)
             assert self._scale is not None

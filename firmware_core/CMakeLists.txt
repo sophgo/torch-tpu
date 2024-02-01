@@ -1,5 +1,11 @@
 project(FIRMWARE C)
 
+include(config.cmake)
+
+if(USING_CMODEL AND (DEBUG OR "$ENV{TPUTRAIN_BUILD_TYPE}" STREQUAL "ON"))
+  add_definitions(-rdynamic)
+endif()
+
 set(SAFETY_FLAGS "-Wall -Wno-error=deprecated-declarations -ffunction-sections -fdata-sections -fPIC -Wno-unused-function -funwind-tables -fno-short-enums")
 set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} ${SAFETY_FLAGS}")
 

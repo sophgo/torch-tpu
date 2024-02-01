@@ -48,9 +48,8 @@ public:
     TORCH_CHECK ( reduction == 1 || reduction == 2 );
     TORCH_CHECK ( !weight.defined() );
     TORCH_CHECK ( ignore_index < 0 );
-#ifdef TPU_OP_TIMING
-    auto timer = tpu::Timer().Start();
-#endif
+
+    TIMING_START;
     bm_status_t status = sgdnnCrossEntropyLoss (
                          tpu::TPUGetDeviceHandle(),
                          tpu::TPUGenerateSgdnnTensor ( self ),
@@ -59,10 +58,9 @@ public:
                          label_smoothing,
                          tpu::TPUGenerateSgdnnTensor ( out ) );
     TORCH_CHECK ( status == BM_SUCCESS );
-#ifdef TPU_OP_TIMING
-    tpu::OpTimer::Instance().AddTime ( tpu::CROSS_ENTROPY_LOSS, timer.ElapsedUS() );
+    TIMING_END ( tpu::CROSS_ENTROPY_LOSS );
 #endif
-#endif
+    SHOW_TENSOR_OP(self, target, out);
     return out;
   }
 
@@ -94,9 +92,8 @@ public:
     TORCH_CHECK ( reduction == 1 || reduction == 2 );
     TORCH_CHECK ( !weight_has_value );
     TORCH_CHECK ( ignore_index < 0 );
-#ifdef TPU_OP_TIMING
-    auto timer = tpu::Timer().Start();
-#endif
+
+    TIMING_START;
     bm_status_t status = sgdnnCrossEntropyLossBackward (
                          tpu::TPUGetDeviceHandle(),
                          tpu::TPUGenerateSgdnnTensor ( input ),
@@ -106,10 +103,9 @@ public:
                          label_smoothing,
                          tpu::TPUGenerateSgdnnTensor ( grad_input ) );
     TORCH_CHECK ( status == BM_SUCCESS );
-#ifdef TPU_OP_TIMING
-    tpu::OpTimer::Instance().AddTime ( tpu::CROSS_ENTROPY_LOSS_BACKWARD, timer.ElapsedUS() );
+    TIMING_END ( tpu::CROSS_ENTROPY_LOSS_BACKWARD );
 #endif
-#endif
+    SHOW_TENSOR_OP(input, target, grad_outputs[0], grad_input);
     return {grad_input, at::Tensor(), at::Tensor(), at::Tensor(), at::Tensor(), at::Tensor() };
   }
 };

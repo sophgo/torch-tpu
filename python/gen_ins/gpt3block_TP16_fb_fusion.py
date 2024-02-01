@@ -536,11 +536,11 @@ if __name__ == "__main__":
     sequence = 4096
     
     DI.dump("Copy_input")
-    inp = torch.rand(batch, sequence, configure.hidden_size).to("privateuseone:0").half()
-    ref = torch.ones((batch, sequence, configure.hidden_size)).to("privateuseone:0").half()
+    inp = torch.rand(batch, sequence, configure.hidden_size).to("tpu:0").half()
+    ref = torch.ones((batch, sequence, configure.hidden_size)).to("tpu:0").half()
 
     DI.dump("Copy_model_weight")
-    net = GPT2Block(configure).to("privateuseone:0").half()
+    net = GPT2Block(configure).to("tpu:0").half()
 
     out_cpu = net(inp)
 

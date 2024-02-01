@@ -1,6 +1,10 @@
 #include <torch/csrc/python_headers.h>
+#include <torch/csrc/utils/python_arg_parser.h>
+#include <torch/csrc/tensor/python_tensor.h>
 
-#include "torch_tpu/csrc/utils/DeviceParser.h"
+#include <ATen/ATen.h>
+#include <ATen/NativeFunctions.h>
+
 #include "torch_tpu/csrc/core/TPUDeviceManager.h"
 #include "torch_tpu/csrc/aten/TPUGeneratorImpl.h"
 #include "torch_tpu/csrc/utils/LazyInit.h"
@@ -75,12 +79,33 @@ PyObject* THPTModule_getDeviceCount_wrap(PyObject* self, PyObject* noargs) {
   END_HANDLE_TH_ERRORS
 }
 
+PyObject* THPTModule_tensor_construct_from_storage(PyObject* self, PyObject* args) {
+  HANDLE_TH_ERRORS
+  static torch::PythonArgParser parser(
+      {"set_storage_with_format_(Storage source)", },
+      /* traceable= */ false
+      );
+
+  torch::ParsedArgs<1> parsed_args;
+  auto _r = parser.parse(args, nullptr, parsed_args);
+
+  at::ScalarType storage_scalar_type;
+  bool is_typed_storage = true;
+  c10::Storage storage = _r.storage(0, storage_scalar_type, is_typed_storage);
+  auto dst_options = c10::TensorOptions().device(storage.device()).dtype(at::kByte);
+  auto dst_tensor = at::empty({0}, {}, dst_options).set_(storage);
+  return THPVariable_Wrap(dst_tensor);
+
+  END_HANDLE_TH_ERRORS
+}
+
 static struct PyMethodDef THPTModule_methods[] = {
     {"_tpu_init", (PyCFunction)THPTModule_initExtension, METH_NOARGS, nullptr},
     {"_tpu_set_run_yet_variable_to_false", (PyCFunction)THPTModule_set_run_yet_variable_to_false_wrap, METH_NOARGS, nullptr},
     {"_tpu_setDevice", (PyCFunction)THPTModule_setDevice_wrap, METH_O, nullptr},
     {"_tpu_getDevice", (PyCFunction)THPTModule_getDevice_wrap, METH_NOARGS, nullptr},
     {"_tpu_getDeviceCount", (PyCFunction)THPTModule_getDeviceCount_wrap, METH_NOARGS, nullptr},
+    {"_tensor_construct_from_storage", (PyCFunction)THPTModule_tensor_construct_from_storage, METH_VARARGS, nullptr},
     {nullptr}
 };
 

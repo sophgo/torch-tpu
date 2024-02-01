@@ -2,7 +2,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 import copy
-torch.ops.load_library("../../build/torch_tpu/libtorch_tpu.so")
+import torch_tpu
 torch.manual_seed(1000)
 
 def case_4d():
@@ -10,7 +10,7 @@ def case_4d():
     [N C H W] => [N C W H] 
     """
     ############## config ###################
-    device = "privateuseone"
+    device = "tpu"
     batch = 32
     sequence = 256
     hidden_size = 768
@@ -41,7 +41,7 @@ def case_3d():
     """
     """
     ############## config ###################
-    device = "privateuseone"
+    device = "tpu"
     N = 128
     C = 512
     H = 512
@@ -67,7 +67,7 @@ def case_2d():
     """
     """
     ############## config ###################
-    device = "privateuseone"
+    device = "tpu"
     N = 128
     C = 512
     H = 512

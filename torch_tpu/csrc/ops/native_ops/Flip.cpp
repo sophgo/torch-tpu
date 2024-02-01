@@ -20,9 +20,12 @@ Tensor &flip_out_tpu(const Tensor &self, const c10::ArrayRef<int64_t> dims,
   CHECK_TENSOR_IN_DEVICE(out);
 
   if (self.dim() <= 0 || self.dim() > 4 || dims.size() <= 0 || self.dim() < dims.size()) {
+    CPU_IMPL_WARNING();
+    TIMING_START;
     auto self_cpu = flip(self.cpu(), dims);
     tpu::TPUCopyHostToDevice(out.data_ptr(), self_cpu.contiguous().data_ptr(),
                              out.nbytes());
+    TIMING_END(tpu::CPU_LAYER);
     return out;
   }
 #if 0
@@ -30,9 +33,7 @@ Tensor &flip_out_tpu(const Tensor &self, const c10::ArrayRef<int64_t> dims,
   tpu::TPUCopyHostToDevice(out.data_ptr(), self_cpu.contiguous().data_ptr(),
                            out.nbytes());
 #else
-#ifdef TPU_OP_TIMING
-  auto timer = tpu::Timer().Start();
-#endif
+  TIMING_START;
   auto temp_result = self;
   for (uint i = 0; i < dims.size(); i++) {
     bm_status_t status = sgdnnFlip(tpu::TPUGetDeviceHandle(),
@@ -41,10 +42,9 @@ Tensor &flip_out_tpu(const Tensor &self, const c10::ArrayRef<int64_t> dims,
     TORCH_CHECK(status == BM_SUCCESS);
     temp_result = out;
   }
-#ifdef TPU_OP_TIMING
-  tpu::OpTimer::Instance().AddTime(tpu::FLIP, timer.ElapsedUS());
+  TIMING_END(tpu::FLIP);
 #endif
-#endif
+  SHOW_TENSOR_OP(self, out);
   return out;
 }
 

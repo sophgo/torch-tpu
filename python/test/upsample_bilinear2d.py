@@ -3,10 +3,10 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
-torch.ops.load_library("../../build/torch_tpu/libtorch_tpu.so")
+import torch_tpu
 torch.manual_seed(1000)
 torch.set_printoptions(precision=6)
-device = "privateuseone:0"
+device = "tpu:0"
 
 # 创建一个输入张量
 input_tensor = torch.tensor([[1, 2], [3, 4]], dtype=torch.float32).reshape(

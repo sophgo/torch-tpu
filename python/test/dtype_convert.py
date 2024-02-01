@@ -3,18 +3,18 @@ import torch.nn as nn
 import torch.nn.functional as F
 import time
 
-torch.ops.load_library("../../build/torch_tpu/libtorch_tpu.so")
+import torch_tpu
 torch.manual_seed(1000)
 
 def uint8_to_bool():
-    device = "privateuseone"
+    device = "tpu"
     seq = 8
     
     inp = torch.randint(1,1, seq, seq)
     inp_tpu = inp.to(device)
 
 def case_f32_to_f16():
-    device = "privateuseone"
+    device = "tpu"
     batch = 32
     head_num = 12
     sequence = 1024
@@ -31,7 +31,7 @@ def case_f32_to_f16():
     print("[time]f16->f32:", t2 - t1)
 
 def case_int64_to_int32():
-    device = "privateuseone"
+    device = "tpu"
     batch = 32
     head_num = 12
     sequence = 1024
