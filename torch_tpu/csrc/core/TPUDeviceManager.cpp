@@ -1,13 +1,18 @@
+
 #include <vector>
 #include <unordered_map>
 #include <mutex>
+#include <iostream>
+#include <thread>
+#include <atomic>
+
 #include <c10/util/Logging.h>
 #include <c10/core/DeviceType.h>
-#include <TPUDeviceManager.h>
-#include <sgdnn_api.h>
-#include <TPUTorchUtils.h>
+#include "TPUDeviceManager.h"
 
-#include <iostream>
+#ifdef BACKEND_1684X
+#include <sgdnn_api.h>
+#include "TPUTorchUtils.h"
 
 namespace tpu
 {
@@ -208,6 +213,11 @@ TPUDeviceManager* TPUGetInstance(){
   return &TPUDeviceManager::GetInstance();
 }
 
+TPUMgrStatus InitTPUMgr() { TPUSetDeviceIndex(0); return INIT_SUCCESS; }
+TPUMgrStatus DestoryTpuMgr() { return DESTORY_SUCCESS;}
+TPUMgrStatus IsTPUMgrInited() { return INIT_ALREADY; }
+TPUMgrStatus TPUDeviceInitialize( int Index) { TPUSetDeviceIndex(Index); return INIT_SUCCESS;}
+
 int TPUGetDeviceCount ( void )
 {
   return TPUDeviceManager::GetInstance().GetDeviceCount();
@@ -261,21 +271,21 @@ void TPUFree ( void * Ptr )
 }
 
 
-void TPUCopyHostToDevice ( void * Dst, const void * Src, size_t Size )
+void TPUCopyHostToDevice ( void * Dst, const void * Src, size_t Size, bool non_blocking /*= false */ )
 {
   unsigned long long dev_index = GetDeviceIndexByUnifiedAddr((unsigned long long)Dst);
   unsigned long long dst_ptr = GetAddrByUnifiedAddr((unsigned long long)Dst);
   TPUDeviceManager::GetInstance().CopyHostToDevice ( (void*)dst_ptr, Src, Size, dev_index );
 }
 
-void TPUCopyDeviceToHost ( void * Dst, const void * Src, size_t Size )
+void TPUCopyDeviceToHost ( void * Dst, const void * Src, size_t Size, bool non_blocking /*= false */ )
 {
   unsigned long long dev_index = GetDeviceIndexByUnifiedAddr((unsigned long long)Src);
   unsigned long long src_ptr = GetAddrByUnifiedAddr((unsigned long long)Src);
   TPUDeviceManager::GetInstance().CopyDeviceToHost ( Dst, (void*)src_ptr, Size, dev_index );
 }
 
-void TPUCopyDeviceToDevice ( void * Dst, const void * Src, size_t Size )
+void TPUCopyDeviceToDevice ( void * Dst, const void * Src, size_t Size, bool non_blocking /*= false */ )
 {
   unsigned long long src_index = GetDeviceIndexByUnifiedAddr((unsigned long long)Src);
   unsigned long long src_ptr = GetAddrByUnifiedAddr((unsigned long long)Src);
@@ -286,3 +296,28 @@ void TPUCopyDeviceToDevice ( void * Dst, const void * Src, size_t Size )
 }
 
 } // namespace tpu
+
+class DummyDaemon
+{
+public:
+    DummyDaemon(){
+        // std::cout << "DummyDamon thread init \n";
+        _run = true;
+        _daemon_thread = std::thread([this](){while(_run) {}});
+    }
+    DummyDaemon(const DummyDaemon&) = delete;
+    DummyDaemon(const DummyDaemon&&) = delete;
+
+    ~DummyDaemon(){
+        _run = false;
+        // std::cout << "DummyDamon thread finish\n";
+        _daemon_thread.join();
+    }
+private:
+    std::thread _daemon_thread;
+    std::atomic<bool> _run;
+};
+
+DummyDaemon dummyDaemon = DummyDaemon();
+
+#endif // BACKEND_1684X

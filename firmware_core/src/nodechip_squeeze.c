@@ -1,6 +1,6 @@
 #include "sg_api_struct.h"
 #include "tpu_kernel.h"
-#include "config.h"
+
 
 inline static void pipeline_move(unsigned long long *array, int num) {
   for (int i = num - 1; i > 0; i--) {
@@ -54,7 +54,7 @@ void tpu_kernel_api_squeeze(const void *args) {
 }
 TPUKERNEL_FUNC_REGISTER(tpu_kernel_api_squeeze);
 
-#ifdef FIRMWARE_BACKEND_2260
+#ifdef BACKEND_SG2260
 /**
  * output = squeeze(input, dim)
  */

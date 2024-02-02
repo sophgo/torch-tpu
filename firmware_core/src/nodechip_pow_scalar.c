@@ -1,6 +1,6 @@
 #include "sg_api_struct.h"
 #include "tpu_kernel.h"
-#include "config.h"
+
 
 #define BOFFSET(index) buffer_addr + index *tensor_bsize_pnpu
 
@@ -197,7 +197,7 @@ void tpu_kernel_api_pow_c(const void *args) {
 }
 TPUKERNEL_FUNC_REGISTER(tpu_kernel_api_pow_c);
 
-#ifdef FIRMWARE_BACKEND_2260
+#ifdef BACKEND_SG2260
 void tpu_kernel_api_pow_c_multi_core(const void *args) {
   sg_api_pow_tensor_scalar_t *api = (sg_api_pow_tensor_scalar_t *)args;
   data_type_t dtype = (data_type_t)api->dtype;

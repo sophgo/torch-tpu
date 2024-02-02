@@ -1,6 +1,6 @@
 #include "sg_api_struct.h"
 #include "tpu_kernel.h"
-#include "config.h"
+
 
 // softmax backward only support last dim for now
 // if dtype is fp16/bf16, pooling will cast to fp32
@@ -31,7 +31,7 @@ void tpu_kernel_api_softmax_backward ( const void *args )
 }
 TPUKERNEL_FUNC_REGISTER ( tpu_kernel_api_softmax_backward );
 
-#ifdef FIRMWARE_BACKEND_2260
+#ifdef BACKEND_SG2260
 extern void nodechip_softmax_backward_multi_core (
   global_addr_t grad_input_global_addr,
   global_addr_t grad_output_global_addr,

@@ -1,6 +1,6 @@
 #include "sg_api_struct.h"
 #include "tpu_kernel.h"
-#include "config.h"
+
 
 // if dtype is fp16/bf16, pooling will cast to fp32
 extern void nodechip_layernorm_forward_cast (
@@ -39,7 +39,7 @@ void tpu_kernel_api_layernorm ( const void *args )
 }
 TPUKERNEL_FUNC_REGISTER ( tpu_kernel_api_layernorm );
 
-#ifdef FIRMWARE_BACKEND_2260
+#ifdef BACKEND_SG2260
 extern void nodechip_layernorm_forward_multi_core (
 global_addr_t input_global_addr,
 global_addr_t weight_global_addr,

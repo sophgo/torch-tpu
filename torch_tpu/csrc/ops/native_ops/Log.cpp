@@ -1,8 +1,8 @@
 #include <ATen/EmptyTensor.h>
 #include <ATen/core/TensorBase.h>
-#include <TPUDeviceManager.h>
-#include <TPUTorchUtils.h>
-#include <sgdnn_api.h>
+
+#include "TPUTorchUtils.h"
+
 #include <torch/library.h>
 #include <torch/torch.h>
 
@@ -28,11 +28,18 @@ Tensor &logx_out_tpu(const Tensor &self, Tensor &out, sg_log_type_t log_type) {
                              out.nbytes());
     TIMING_END(tpu::CPU_LAYER);
   } else if (IS_TPU_TENSOR(self)) {
-    TIMING_START
-    bm_status_t status =
+    TIMING_START;
+    #if defined BACKEND_1684X
+    auto status =
         sgdnnLog(tpu::TPUGetDeviceHandle(), tpu::TPUGenerateSgdnnTensor(self),
                  tpu::TPUGenerateSgdnnTensor(out), log_type);
     TORCH_CHECK(status == BM_SUCCESS);
+    #elif defined BACKEND_SG2260
+    auto status =
+        sgdnnLog(c10_tpu::getCurrentTPUStream(), tpu::TPUGenerateSgdnnTensor(self),
+                 tpu::TPUGenerateSgdnnTensor(out), log_type);
+    TORCH_CHECK(status == tpuRtSuccess);
+    #endif
     TIMING_END(tpu::LOG_FORWARD)
   } else {
     TORCH_CHECK(false, "At least one input is required in TPU device");

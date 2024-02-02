@@ -2,9 +2,9 @@
 #include <torch/torch.h>
 #include <ATen/core/TensorBase.h>
 #include <ATen/EmptyTensor.h>
-#include <TPUDeviceManager.h>
-#include <TPUTorchUtils.h>
-#include <sgdnn_api.h>
+
+#include "TPUTorchUtils.h"
+
 
 #include "common/config.h"
 
@@ -54,11 +54,19 @@ namespace at
                 TORCH_CHECK(false);
             }
             TIMING_START;
-            bm_status_t status = sgdnnFill(
+            #if defined BACKEND_1684X
+            auto status = sgdnnFill(
                 tpu::TPUGetDeviceHandle(),
                 &value_,
                 tpu::TPUGenerateSgdnnTensor(self));
             TORCH_CHECK(status == BM_SUCCESS);
+            #elif defined BACKEND_SG2260
+            auto status = sgdnnFill(
+                c10_tpu::getCurrentTPUStream(),
+                &value_,
+                tpu::TPUGenerateSgdnnTensor(self));
+            TORCH_CHECK(status == tpuRtSuccess);
+            #endif
             TIMING_END(tpu::FULL);
         }
         else

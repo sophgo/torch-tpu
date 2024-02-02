@@ -3,7 +3,7 @@
 #include <torch/library.h>
 #include <torch/torch.h>
 
-#include "TPUDeviceManager.h"
+
 #include "TPUTorchUtils.h"
 #include "common/config.h"
 #include "sgdnn_api.h"
@@ -57,19 +57,32 @@ std::tuple<Tensor &, Tensor &> topk_values_tpu(const Tensor &self, int64_t k,
       values_temp = values_temp.to(torch::kFloat);
     }
 
-    TIMING_START
-    bm_status_t status = sgdnnTopk(
+    TIMING_START;
+    #if defined BACKEND_1684X
+    auto status = sgdnnTopk(
         tpu::TPUGetDeviceHandle(), tpu::TPUGenerateSgdnnTensor(self_temp), k,
         axis, largest, sorted, tpu::TPUGenerateSgdnnTensor(values_temp),
         tpu::TPUGenerateSgdnnTensor(indices_temp));
     TORCH_CHECK(status == BM_SUCCESS);
-    
     tpu::TPUCopyDeviceToDevice(values.data_ptr(),
                                values_temp.to(values.dtype()).data_ptr(),
                                values.nbytes());
     tpu::TPUCopyDeviceToDevice(indices.data_ptr(),
                                indices_temp.to(indices.dtype()).data_ptr(),
                                indices.nbytes());
+    #elif defined BACKEND_SG2260
+    auto status = sgdnnTopk(
+        c10_tpu::getCurrentTPUStream(), tpu::TPUGenerateSgdnnTensor(self_temp), k,
+        axis, largest, sorted, tpu::TPUGenerateSgdnnTensor(values_temp),
+        tpu::TPUGenerateSgdnnTensor(indices_temp));
+    TORCH_CHECK(status == tpuRtSuccess);
+    tpu::TPUCopyDeviceToDevice(values.data_ptr(),
+                               values_temp.to(values.dtype()).data_ptr(),
+                               values.nbytes());
+    tpu::TPUCopyDeviceToDevice(indices.data_ptr(),
+                               indices_temp.to(indices.dtype()).data_ptr(),
+                               indices.nbytes());
+    #endif
     TIMING_END(tpu::TOPK);
   }
   SHOW_TENSOR_OP(self, values, indices);
@@ -112,7 +125,8 @@ std::tuple<Tensor &, Tensor &> sort_values_stable_tpu(const Tensor &self, c10::o
     }
 
     TIMING_START;
-    bm_status_t status =
+  #if defined BACKEND_1684X
+    auto status =
         sgdnnTopk(tpu::TPUGetDeviceHandle(),
                   tpu::TPUGenerateSgdnnTensor(self_temp), self.size(axis), axis,
                   descending, false, tpu::TPUGenerateSgdnnTensor(values_temp),
@@ -125,6 +139,21 @@ std::tuple<Tensor &, Tensor &> sort_values_stable_tpu(const Tensor &self, c10::o
     tpu::TPUCopyDeviceToDevice(indices.data_ptr(),
                                indices_temp.to(indices.dtype()).data_ptr(),
                                indices.nbytes());
+    #elif defined BACKEND_SG2260
+    auto status =
+        sgdnnTopk(c10_tpu::getCurrentTPUStream(),
+                  tpu::TPUGenerateSgdnnTensor(self_temp), self.size(axis), axis,
+                  descending, false, tpu::TPUGenerateSgdnnTensor(values_temp),
+                  tpu::TPUGenerateSgdnnTensor(indices_temp));
+    TORCH_CHECK(status == tpuRtSuccess);
+
+    tpu::TPUCopyDeviceToDevice(values.data_ptr(),
+                               values_temp.to(values.dtype()).data_ptr(),
+                               values.nbytes());
+    tpu::TPUCopyDeviceToDevice(indices.data_ptr(),
+                               indices_temp.to(indices.dtype()).data_ptr(),
+                               indices.nbytes());
+    #endif
     TIMING_END(tpu::TOPK);
   }
 

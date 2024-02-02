@@ -2,9 +2,9 @@
 #include <torch/torch.h>
 #include <ATen/core/TensorBase.h>
 #include <ATen/EmptyTensor.h>
-#include <TPUDeviceManager.h>
-#include <TPUTorchUtils.h>
-#include <sgdnn_api.h>
+
+#include "TPUTorchUtils.h"
+
 
 #include "common/config.h"
 
@@ -19,7 +19,6 @@ namespace at
         }
         CHECK_TENSOR_IN_DEVICE(out);
 #if 0
- 
   auto self_cpu = logical_and ( self.cpu(),other.cpu());
   tpu::TPUCopyHostToDevice ( self.data_ptr(),self.contiguous().data_ptr(), self.nbytes() );
   tpu::TPUCopyHostToDevice ( other.data_ptr(),other.contiguous().data_ptr(), other.nbytes() );
@@ -36,12 +35,21 @@ namespace at
         {
         //need to consider broadcast later
             TIMING_START;
-            bm_status_t status = sgdnnLogicalAnd(
+            #if defined BACKEND_1684X
+            auto status = sgdnnLogicalAnd(
                 tpu::TPUGetDeviceHandle(),
                 tpu::TPUGenerateSgdnnTensor(self),
                 tpu::TPUGenerateSgdnnTensor(other),
                 tpu::TPUGenerateSgdnnTensor(out));
             TORCH_CHECK(status == BM_SUCCESS);
+            #elif defined BACKEND_SG2260
+            auto status = sgdnnLogicalAnd(
+                c10_tpu::getCurrentTPUStream(),
+                tpu::TPUGenerateSgdnnTensor(self),
+                tpu::TPUGenerateSgdnnTensor(other),
+                tpu::TPUGenerateSgdnnTensor(out));
+            TORCH_CHECK(status == tpuRtSuccess);
+            #endif
             TIMING_END(tpu::LOGICAL_AND);
         }
         else

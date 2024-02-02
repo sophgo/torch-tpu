@@ -1,8 +1,8 @@
 #include <ATen/EmptyTensor.h>
 #include <ATen/core/TensorBase.h>
-#include <TPUDeviceManager.h>
-#include <TPUTorchUtils.h>
-#include <sgdnn_api.h>
+
+#include "TPUTorchUtils.h"
+
 #include <torch/library.h>
 #include <torch/torch.h>
 
@@ -34,10 +34,17 @@ Tensor &squeeze_out_tpu(const Tensor &self, Tensor &out) {
       }
     }
     TIMING_START;
-    bm_status_t status = sgdnnSqueeze(tpu::TPUGetDeviceHandle(),
+    #if defined BACKEND_1684X
+    auto status = sgdnnSqueeze(tpu::TPUGetDeviceHandle(),
                                       tpu::TPUGenerateSgdnnTensor(self),
                                       tpu::TPUGenerateSgdnnTensor(out));
     TORCH_CHECK(status == BM_SUCCESS);
+    #elif defined BACKEND_SG2260
+    auto status = sgdnnSqueeze(c10_tpu::getCurrentTPUStream(),
+                                      tpu::TPUGenerateSgdnnTensor(self),
+                                      tpu::TPUGenerateSgdnnTensor(out));
+    TORCH_CHECK(status == tpuRtSuccess);
+    #endif
     TIMING_END(tpu::SQUEEZE);
   } else {
     TORCH_CHECK(false, "At least one input is required in TPU device");
@@ -71,11 +78,18 @@ Tensor &unsqueeze_out_tpu(const Tensor &self, Tensor &out, int64_t &dim) {
       }
     }
     TIMING_START;
+    #if defined BACKEND_1684X
     // same as squeeze
-    bm_status_t status = sgdnnSqueeze(tpu::TPUGetDeviceHandle(),
+    auto status = sgdnnSqueeze(tpu::TPUGetDeviceHandle(),
                                       tpu::TPUGenerateSgdnnTensor(self),
                                       tpu::TPUGenerateSgdnnTensor(out));
     TORCH_CHECK(status == BM_SUCCESS);
+    #elif defined BACKEND_SG2260
+    auto status = sgdnnSqueeze(c10_tpu::getCurrentTPUStream(),
+                                      tpu::TPUGenerateSgdnnTensor(self),
+                                      tpu::TPUGenerateSgdnnTensor(out));
+    TORCH_CHECK(status == tpuRtSuccess);
+    #endif
     TIMING_END(tpu::UNSQUEEZE);
   } else {
     TORCH_CHECK(false, "At least one input is required in TPU device");

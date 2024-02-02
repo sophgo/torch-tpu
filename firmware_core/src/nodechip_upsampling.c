@@ -1,6 +1,6 @@
 #include "sg_api_struct.h"
 #include "tpu_kernel.h"
-#include "config.h"
+
 
 extern void nodechip_interp_parallel(
     global_addr_t bottom_global_addr, global_addr_t top_global_addr,
@@ -30,7 +30,7 @@ void tpu_kernel_api_interp(const void *args) {
 }
 TPUKERNEL_FUNC_REGISTER(tpu_kernel_api_interp);
 
-#ifdef FIRMWARE_BACKEND_2260
+#ifdef BACKEND_SG2260
 void tpu_kernel_api_interp_multi_core(const void *args) {
   TPUKERNEL_ASSERT_INFO(false, "not implementated");
 }

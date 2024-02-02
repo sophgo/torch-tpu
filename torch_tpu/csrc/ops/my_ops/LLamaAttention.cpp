@@ -2,9 +2,8 @@
 #include <torch/torch.h>
 #include <ATen/core/TensorBase.h>
 #include <ATen/EmptyTensor.h>
-#include <TPUDeviceManager.h>
-#include <TPUTorchUtils.h>
-#include <sgdnn_api.h>
+
+#include "TPUTorchUtils.h"
 
 #include "common/config.h"
 
@@ -36,8 +35,9 @@ namespace at
 		CHECK_TENSOR_IN_DEVICE(Y);
 
 		TIMING_START;
-		bm_status_t status = sgdnnLlamaAttention(
-			tpu::TPUGetDeviceHandle(),
+		#if defined BACKEND_SG2260
+		tpuRtStatus_t status = sgdnnLlamaAttention(
+			c10_tpu::getCurrentTPUStream(),
 			tpu::TPUGenerateSgdnnTensor(Q),
 			tpu::TPUGenerateSgdnnTensor(K),
 			tpu::TPUGenerateSgdnnTensor(V),
@@ -50,7 +50,10 @@ namespace at
 			embeddings,
 			attention_mode,
 			C);
-		TORCH_CHECK(status == BM_SUCCESS);
+		TORCH_CHECK(status == tpuRtSuccess);
+		#elif defined BACKEND_1684X
+		TORCH_CHECK(false);
+		#endif
 		TIMING_END(tpu::LLAMA_ATTENTION);
 		return Y;
 	}

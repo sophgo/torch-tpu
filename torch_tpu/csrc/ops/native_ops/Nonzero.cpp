@@ -1,10 +1,9 @@
 #include "common/config.h"
 #include <ATen/EmptyTensor.h>
 #include <ATen/core/TensorBase.h>
-#include <ATen/native/ConvUtils.h>
-#include <TPUDeviceManager.h>
-#include <TPUTorchUtils.h>
-#include <sgdnn_api.h>
+
+#include "TPUTorchUtils.h"
+
 #include <torch/library.h>
 #include <torch/torch.h>
 
@@ -19,11 +18,19 @@ Tensor nonzero_tpu(const Tensor &self) {
   Tensor out_temp = empty({size, self.dim()}, self.options().dtype(kInt));
   Tensor num = empty({1}, self.options().dtype(kInt));
   TIMING_START;
-  bm_status_t status = sgdnnNonzero(tpu::TPUGetDeviceHandle(), 
+  #if defined BACKEND_1684X
+  auto status = sgdnnNonzero(tpu::TPUGetDeviceHandle(), 
                                     tpu::TPUGenerateSgdnnTensor(self),
                                     tpu::TPUGenerateSgdnnTensor(out_temp),
                                     tpu::TPUGenerateSgdnnTensor(num));
   TORCH_CHECK(status == BM_SUCCESS);
+  #elif defined BACKEND_SG2260
+  auto status = sgdnnNonzero(c10_tpu::getCurrentTPUStream(), 
+                                    tpu::TPUGenerateSgdnnTensor(self),
+                                    tpu::TPUGenerateSgdnnTensor(out_temp),
+                                    tpu::TPUGenerateSgdnnTensor(num));
+  TORCH_CHECK(status == tpuRtSuccess);
+  #endif
   TIMING_END(tpu::NONZERO);
 
   Tensor out = empty({num.item().toInt(), self.dim()}, self.options().dtype(kInt));

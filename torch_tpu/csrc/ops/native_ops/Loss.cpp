@@ -2,9 +2,9 @@
 #include <torch/torch.h>
 #include <ATen/core/TensorBase.h>
 #include <ATen/EmptyTensor.h>
-#include <TPUDeviceManager.h>
-#include <TPUTorchUtils.h>
-#include <sgdnn_api.h>
+
+#include "TPUTorchUtils.h"
+
 
 #include "common/config.h"
 
@@ -50,7 +50,8 @@ public:
     TORCH_CHECK ( ignore_index < 0 );
 
     TIMING_START;
-    bm_status_t status = sgdnnCrossEntropyLoss (
+    #if defined BACKEND_1684X
+    auto status = sgdnnCrossEntropyLoss (
                          tpu::TPUGetDeviceHandle(),
                          tpu::TPUGenerateSgdnnTensor ( self ),
                          tpu::TPUGenerateSgdnnTensor ( target ),
@@ -58,6 +59,16 @@ public:
                          label_smoothing,
                          tpu::TPUGenerateSgdnnTensor ( out ) );
     TORCH_CHECK ( status == BM_SUCCESS );
+    #elif defined BACKEND_SG2260
+    auto status = sgdnnCrossEntropyLoss (
+                         c10_tpu::getCurrentTPUStream(),
+                         tpu::TPUGenerateSgdnnTensor ( self ),
+                         tpu::TPUGenerateSgdnnTensor ( target ),
+                         reduction - 1,
+                         label_smoothing,
+                         tpu::TPUGenerateSgdnnTensor ( out ) );
+    TORCH_CHECK ( status == tpuRtSuccess );
+    #endif
     TIMING_END ( tpu::CROSS_ENTROPY_LOSS );
 #endif
     SHOW_TENSOR_OP(self, target, out);
@@ -94,7 +105,8 @@ public:
     TORCH_CHECK ( ignore_index < 0 );
 
     TIMING_START;
-    bm_status_t status = sgdnnCrossEntropyLossBackward (
+    #if defined BACKEND_1684X
+    auto status = sgdnnCrossEntropyLossBackward (
                          tpu::TPUGetDeviceHandle(),
                          tpu::TPUGenerateSgdnnTensor ( input ),
                          tpu::TPUGenerateSgdnnTensor ( target ),
@@ -103,6 +115,17 @@ public:
                          label_smoothing,
                          tpu::TPUGenerateSgdnnTensor ( grad_input ) );
     TORCH_CHECK ( status == BM_SUCCESS );
+    #elif defined BACKEND_SG2260
+    auto status = sgdnnCrossEntropyLossBackward (
+                         c10_tpu::getCurrentTPUStream(),
+                         tpu::TPUGenerateSgdnnTensor ( input ),
+                         tpu::TPUGenerateSgdnnTensor ( target ),
+                         tpu::TPUGenerateSgdnnTensor ( grad_outputs[0] ),
+                         reduction - 1,
+                         label_smoothing,
+                         tpu::TPUGenerateSgdnnTensor ( grad_input ) );
+    TORCH_CHECK ( status == tpuRtSuccess );
+    #endif
     TIMING_END ( tpu::CROSS_ENTROPY_LOSS_BACKWARD );
 #endif
     SHOW_TENSOR_OP(input, target, grad_outputs[0], grad_input);

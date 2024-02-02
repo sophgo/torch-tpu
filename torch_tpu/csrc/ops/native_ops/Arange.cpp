@@ -2,10 +2,9 @@
 #include <torch/torch.h>
 #include <ATen/core/TensorBase.h>
 #include <ATen/EmptyTensor.h>
-#include <ATen/native/ConvUtils.h>
-#include <TPUDeviceManager.h>
-#include <TPUTorchUtils.h>
-#include <sgdnn_api.h>
+
+#include "TPUTorchUtils.h"
+
 #include "common/config.h"
 
 namespace at 
@@ -22,12 +21,21 @@ Tensor & arange_start_out_tpu( const at::Scalar & start, const at::Scalar & end,
         int empty_length = (end.toInt()-start.toInt() - 1) / step.toInt() + 1;
         out = empty({empty_length},out.options());
         TIMING_START;
-        bm_status_t status = sgdnnArange ( tpu::TPUGetDeviceHandle(),
+        #if defined BACKEND_1684X
+        auto status = sgdnnArange ( tpu::TPUGetDeviceHandle(),
                                             start.toInt(),
                                             end.toInt(),
                                             step.toInt(),
                                             tpu::TPUGenerateSgdnnTensor ( out ));
         TORCH_CHECK ( status == BM_SUCCESS );
+        #elif defined BACKEND_SG2260
+        auto status = sgdnnArange ( c10_tpu::getCurrentTPUStream(),
+                                            start.toInt(),
+                                            end.toInt(),
+                                            step.toInt(),
+                                            tpu::TPUGenerateSgdnnTensor ( out ));
+        TORCH_CHECK ( status == tpuRtSuccess );
+        #endif
         TIMING_END(tpu::ARANGE)
     }else{
         CPU_IMPL_WARNING();

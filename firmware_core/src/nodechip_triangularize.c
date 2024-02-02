@@ -1,7 +1,7 @@
 #include <string.h>
 #include "sg_api_struct.h"
 #include "tpu_kernel.h"
-#include "config.h"
+
 
 extern void nodechip_triangularize(
     global_addr_t input_global_addr,
@@ -33,7 +33,7 @@ void tpu_kernel_api_triangularize(const void *args){
 }
 TPUKERNEL_FUNC_REGISTER(tpu_kernel_api_triangularize);
 
-#ifdef FIRMWARE_BACKEND_2260
+#ifdef BACKEND_SG2260
 void tpu_kernel_api_triangularize_multi_core(const void *args) {
   TPUKERNEL_ASSERT_INFO(false, "not implementated");
 }

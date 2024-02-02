@@ -17,14 +17,14 @@
 #include <ATen/native/cpu/CatKernel.h>
 #include <ATen/native/cpu/StackKernel.h>
 #include <ATen/quantized/QTensorImpl.h>
-#include <TPUDeviceManager.h>
-#include <TPUTorchUtils.h>
+
+#include "TPUTorchUtils.h"
 #include <c10/util/Exception.h>
 #include <c10/util/Optional.h>
 #include <c10/util/SmallVector.h>
 #include <c10/util/accumulate.h>
 #include <c10/util/irange.h>
-#include <sgdnn_api.h>
+
 #include <torch/library.h>
 #include <torch/torch.h>
 
@@ -61,12 +61,19 @@ Tensor &slice_scatter_out_tpu(const Tensor &self, const Tensor &src,
                        .expand({1, num_c, -1, 1})
                        .to(self.device());
   TIMING_START;
-  bm_status_t status = sgdnnSliceScatter(
+  #if defined BACKEND_1684X
+  auto status = sgdnnSliceScatter(
       tpu::TPUGetDeviceHandle(), tpu::TPUGenerateSgdnnTensor(self),
       tpu::TPUGenerateSgdnnTensor(src), tpu::TPUGenerateSgdnnTensor(indices),
       dim, tpu::TPUGenerateSgdnnTensor(out));
-
   TORCH_CHECK(status == BM_SUCCESS);
+  #elif defined BACKEND_SG2260
+  auto status = sgdnnSliceScatter(
+      c10_tpu::getCurrentTPUStream(), tpu::TPUGenerateSgdnnTensor(self),
+      tpu::TPUGenerateSgdnnTensor(src), tpu::TPUGenerateSgdnnTensor(indices),
+      dim, tpu::TPUGenerateSgdnnTensor(out));
+  TORCH_CHECK(status == tpuRtSuccess);
+  #endif
   TIMING_END(tpu::SLICE_SCATTER);
 #endif
   SHOW_TENSOR_OP(self, out);

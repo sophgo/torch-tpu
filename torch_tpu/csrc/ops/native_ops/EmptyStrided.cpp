@@ -2,9 +2,10 @@
 #include <ATen/core/TensorBase.h>
 #include <ATen/EmptyTensor.h>
 #include <TPUAllocator.h>
-#include <TPUDeviceManager.h>
-#include <TPUTorchUtils.h>
+
+#include "TPUTorchUtils.h"
 #include "common/config.h"
+#include "TPUDeviceUtils.h"
 
 namespace at
 {
@@ -16,12 +17,9 @@ Tensor empty_strided_tpu ( IntArrayRef                size,
                            c10::optional<bool>        pin_memory_opt )
 {
   TIMING_START;
-  if ( device_opt.has_value() )
-  {
-    tpu::TPUSetDeviceIndex ( device_opt.value().index() );
-  }
+  torch_tpu::utils::maybe_initialize_tpu(device_opt);
   auto scalar_type = dtype_or_default ( dtype_opt );
-  auto pin_memory = pinned_memory_or_default ( pin_memory_opt );
+  // auto pin_memory = pinned_memory_or_default ( pin_memory_opt );
   at::detail::check_size_nonnegative ( size );
   caffe2::TypeMeta dtype = scalarTypeToTypeMeta ( scalar_type );
   auto size_bytes = at::detail::computeStorageNbytes ( size, stride, dtype.itemsize() );
@@ -52,12 +50,9 @@ c10::optional<bool>               pin_memory_opt,
 c10::optional<c10::MemoryFormat>  memory_format_opt )
 {
   TIMING_START;
-  if ( device_opt.has_value() )
-  {
-    tpu::TPUSetDeviceIndex ( device_opt.value().index() );
-  }
+  torch_tpu::utils::maybe_initialize_tpu(device_opt);
   auto scalar_type = dtype_or_default ( dtype_opt );
-  auto pin_memory = pinned_memory_or_default ( pin_memory_opt );
+  // auto pin_memory = pinned_memory_or_default ( pin_memory_opt );
   constexpr c10::DispatchKeySet ks ( c10::DispatchKey::TPU );
   auto allocator = c10::GetTPUAllocator();
   at::detail::check_size_nonnegative ( size );

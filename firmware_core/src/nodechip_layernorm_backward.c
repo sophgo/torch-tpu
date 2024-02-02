@@ -1,6 +1,6 @@
 #include "sg_api_struct.h"
 #include "tpu_kernel.h"
-#include "config.h"
+
 
 extern void nodechip_layernorm_backward (
 global_addr_t grad_output_global_addr,
@@ -40,7 +40,7 @@ void tpu_kernel_api_layernorm_backward ( const void *args )
 }
 TPUKERNEL_FUNC_REGISTER ( tpu_kernel_api_layernorm_backward );
 
-#ifdef FIRMWARE_BACKEND_2260
+#ifdef BACKEND_SG2260
 extern void nodechip_layernorm_backward_multi_core (
 global_addr_t grad_output_global_addr,
 global_addr_t input_global_addr,

@@ -23,7 +23,11 @@ from setuptools.command.egg_info import egg_info
 
 
 BASE_DIR = os.path.dirname(os.path.realpath(__file__))
+SGDNN_PATH = os.path.join(BASE_DIR, "sgdnn")
+SGAPI_STRUCT_PATH = os.path.join(BASE_DIR, "common")
 THIRD_PARTY_PATH = os.path.join(BASE_DIR, "third_party")
+TPUV7_RUNTIME_PATH = os.path.join(THIRD_PARTY_PATH, "tpuv7_runtime")
+
 VERSION = '2.1.0.post1'
 
 def which(thefile):
@@ -123,17 +127,10 @@ class CPPLibBuild(build_clib, object):
         cmake_args = [
             '-DCMAKE_BUILD_TYPE=' + get_build_type(),
             '-DPYTHON_INCLUDE_DIR=' + get_paths()['include'],
-            '-DPYTORCH_INSTALL_DIR=' + get_pytorch_dir()
+            '-DPYTORCH_INSTALL_DIR=' + get_pytorch_dir(),
+            '-DBUILD_LIBTORCH=0'
             ]
-        if os.environ.get("LIBSOPHON_PATTERN", None) == "local": ##cmodel mode
-            cmake_args.extend(
-                [
-                    "-DUSING_CMODEL=ON",
-                    "-DPCIE_MODE=OFF",
-                    "-DSOC_MODE=OFF"
-                ]
-            )
-        build_args = ['-j', str(multiprocessing.cpu_count()-2)]
+        build_args = ['-j', str(8)]
         subprocess.check_call([self.cmake, BASE_DIR] + cmake_args, cwd=build_type_dir, env=os.environ)
         if os.environ.get("CHIP_ARCH", None) == "bm1684x":
             subprocess.check_call(['make', 'kernel_module'], cwd=build_type_dir, env=os.environ)
@@ -143,7 +140,7 @@ class CPPLibBuild(build_clib, object):
         for lib in generate_libs:
             subprocess.check_call(['cp']+[lib, output_lib_path], cwd=build_type_dir, env=os.environ)
 
-        if os.environ.get("LIBSOPHON_PATTERN", None) != "local": #cmodel mode will no release 
+        if os.environ.get("MODE_PATTERN", None) != "local": #cmodel mode will no release 
             subprocess.check_call(["patchelf", "--set-rpath",
                                     "$ORIGIN",
                                     os.path.relpath(os.path.join(BASE_DIR, f"build/{get_build_type()}/packages/torch_tpu/lib/libtorch_tpu.so"))
@@ -192,21 +189,25 @@ class Clean(distutils.command.clean.clean):
         distutils.command.clean.clean.run(self)
 
         remove_files = [
-            'torch_npu/csrc/aten/RegisterCPU.cpp',
-            'torch_npu/csrc/aten/RegisterNPU.cpp',
-            'torch_npu/csrc/aten/RegisterAutogradNPU.cpp',
-            'torch_npu/csrc/aten/RegisterUnsupprotNPU.cpp',
-            'torch_npu/csrc/aten/NPUNativeFunctions.h',
-            'torch_npu/csrc/aten/python_custom_functions.cpp',
-            'torch_npu/utils/torch_funcs.py',
-            'torch_npu/version.py',
         ]
         for remove_file in remove_files:
             file_path = os.path.join(BASE_DIR, remove_file)
             if os.path.exists(file_path):
                 os.remove(file_path)
 
+def generate_backend_py():
+    backend_f = os.path.join(BASE_DIR, "torch_tpu", "tpu/backend.py")
+    with open(backend_f, 'w') as f:
+        if os.environ.get("CHIP_ARCH", None) == 'bm1684x':
+            f.write("BACKEND='1684X'")
+        elif os.environ.get("CHIP_ARCH", None) == 'sg2260':
+            f.write("BACKEND='SG2260'")
+        else:
+            raise RuntimeError("Failed to generate backend.py")
+
 def get_src_py_and_dst():
+
+    generate_backend_py()
     ret = []
     generated_python_files = glob.glob(
         os.path.join(BASE_DIR, "torch_tpu", '**/*.py'),
@@ -273,6 +274,9 @@ class EggInfoBuild(egg_info, object):
 
 include_directories = [
     BASE_DIR,
+    os.path.join(TPUV7_RUNTIME_PATH, "tpuv7-emulator_0.1.0", "include"),
+    os.path.join(SGDNN_PATH, "include"),
+    os.path.join(SGAPI_STRUCT_PATH, "include")
 ]
 lib_directories = [
     os.path.join(BASE_DIR, f"build/{get_build_type()}/packages", "torch_tpu/lib"),
@@ -289,6 +293,9 @@ extra_compile_args = [
     '-D__FILENAME__=\"$(notdir $(abspath $<))\"',
     '-D_GLIBCXX_USE_CXX11_ABI=0'
 ]
+
+if os.environ.get("CHIP_ARCH", None) == 'sg2260':
+    extra_compile_args += ["-DBACKEND_SG2260"]
 
 if DEBUG:
     extra_compile_args += ['-O0', '-g']

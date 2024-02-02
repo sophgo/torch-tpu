@@ -1,8 +1,8 @@
 #include <ATen/EmptyTensor.h>
 #include <ATen/core/TensorBase.h>
-#include <TPUDeviceManager.h>
-#include <TPUTorchUtils.h>
-#include <sgdnn_api.h>
+
+#include "TPUTorchUtils.h"
+
 #include <torch/library.h>
 #include <torch/torch.h>
 
@@ -40,7 +40,8 @@ Tensor upsample_bilinear2d_tpu(const at::Tensor &self,
   auto out = empty(output_shape_ref, self.options());
 
   TIMING_START;
-  bm_status_t status = sgdnnUpsampling(
+  #if defined BACKEND_1684X
+  auto status = sgdnnUpsampling(
       tpu::TPUGetDeviceHandle(), tpu::TPUGenerateSgdnnTensor(self),
       tpu::TPUGenerateSgdnnTensor(out), align_corners, UPSAMPLING_BILINEAR);
 
@@ -49,6 +50,17 @@ Tensor upsample_bilinear2d_tpu(const at::Tensor &self,
               .slice(3, c10::nullopt, size_ref[1]);
   }
   TORCH_CHECK(status == BM_SUCCESS);
+  #elif defined BACKEND_SG2260
+  auto status = sgdnnUpsampling(
+      c10_tpu::getCurrentTPUStream(), tpu::TPUGenerateSgdnnTensor(self),
+      tpu::TPUGenerateSgdnnTensor(out), align_corners, UPSAMPLING_BILINEAR);
+
+  if (scales_h.has_value() && scales_w.has_value()) {
+    out = out.slice(2, c10::nullopt, size_ref[0])
+              .slice(3, c10::nullopt, size_ref[1]);
+  }
+  TORCH_CHECK(status == tpuRtSuccess);
+  #endif
   TIMING_END(tpu::UPSAMPLING_BILINEAR)
 #endif
   SHOW_TENSOR_OP(self, out);
@@ -86,8 +98,9 @@ Tensor upsample_nearest2d_tpu(const at::Tensor &self,
     output_shape[3] = (int64_t)(scales_w.value() * self.size(3));
   }
   auto self_ = self.is_contiguous() ? self : self.contiguous(); 
-  TIMING_START
-  bm_status_t status = sgdnnUpsampling(
+  TIMING_START;
+  #if defined BACKEND_1684X
+  auto status = sgdnnUpsampling(
       tpu::TPUGetDeviceHandle(), tpu::TPUGenerateSgdnnTensor(self_),
       tpu::TPUGenerateSgdnnTensor(out), true /*align_corners*/,
       UPSAMPLING_NEAREST);
@@ -97,6 +110,8 @@ Tensor upsample_nearest2d_tpu(const at::Tensor &self,
               .slice(3, c10::nullopt, size_ref[1]);
   }
   TORCH_CHECK(status == BM_SUCCESS);
+  #elif defined BACKEND_SG2260
+  #endif
   TIMING_END(tpu::UPSAMPLING_NEAREST)
 #endif
   SHOW_TENSOR_OP(self, out);
@@ -139,14 +154,17 @@ Tensor &upsample_nearest2d_backward_out_tpu(
     .output_w = static_cast<int>(output_size[1]),
     .mode = POOLING_AVG
   };
-  TIMING_START
-  bm_status_t status = sgdnnUpsampleNearest2dBackward (
+  TIMING_START;
+  #if defined BACKEND_1684X
+  auto status = sgdnnUpsampleNearest2dBackward (
                       tpu::TPUGetDeviceHandle(),
                       tpu::TPUGenerateSgdnnTensor ( grad_output ),
                       tpu::TPUGenerateSgdnnTensor ( grad_input ),
                       scales_h.value() * scales_w.value(),
                       pooling_desc );
   TORCH_CHECK ( status == BM_SUCCESS );
+  #elif defined BACKEND_SG2260
+  #endif
   TIMING_END(tpu::UPSAMPLING_NEAREST_BACKWARD)
 #endif
   SHOW_TENSOR_OP(grad_output, grad_input);

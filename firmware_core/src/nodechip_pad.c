@@ -2,7 +2,7 @@
 
 #include "sg_api_struct.h"
 #include "tpu_kernel.h"
-#include "config.h"
+
 
 #define CONSTANT (0)
 #define REFLECT (1)
@@ -98,7 +98,7 @@ void tpu_kernel_api_pad(const void *args) {
 }
 TPUKERNEL_FUNC_REGISTER(tpu_kernel_api_pad);
 
-#ifdef FIRMWARE_BACKEND_2260
+#ifdef BACKEND_SG2260
 void tpu_kernel_api_pad_multi_core(const void *args) {
   sg_api_pad_t *api = (sg_api_pad_t *)args;
   TPUKERNEL_ASSERT(api->dtype == DT_FP32 || api->dtype == DT_FP16 ||

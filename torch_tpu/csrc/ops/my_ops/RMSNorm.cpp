@@ -2,10 +2,8 @@
 #include <torch/torch.h>
 #include <ATen/core/TensorBase.h>
 #include <ATen/EmptyTensor.h>
-#include <TPUDeviceManager.h>
-#include <TPUTorchUtils.h>
-#include <sgdnn_api.h>
 
+#include "TPUTorchUtils.h"
 #include "common/config.h"
 
 namespace at
@@ -21,8 +19,9 @@ namespace at
 		CHECK_TENSOR_IN_DEVICE(input);
 		CHECK_TENSOR_IN_DEVICE(output);
 		TIMING_START;
-		bm_status_t status = sgdnnRMSNorm(
-			tpu::TPUGetDeviceHandle(),
+#if defined BACKEND_SG2260
+		tpuRtStatus_t status = sgdnnRMSNorm(
+			c10_tpu::getCurrentTPUStream(),
 			tpu::TPUGenerateSgdnnTensor(input),
 			scale.has_value() ? tpu::TPUGenerateSgdnnTensor(scale.value()) : sgdnnUndefinedTensor(),
 			bias.has_value() ? tpu::TPUGenerateSgdnnTensor(bias.value()) : sgdnnUndefinedTensor(),
@@ -32,7 +31,10 @@ namespace at
 			1.,
 			scale.has_value(),
 			bias.has_value());
-		TORCH_CHECK(status == BM_SUCCESS);
+		TORCH_CHECK(status == tpuRtSuccess);
+#elif defined BACKEND_1684X
+		TORCH_CHECK(false);
+#endif
 		TIMING_END(tpu::RMSNORM_FORWARD);
 		return output;
 	}

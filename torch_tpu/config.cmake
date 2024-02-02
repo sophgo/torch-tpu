@@ -3,10 +3,11 @@
 #########################################################
 option(DEBUG "option for debug"                                           OFF)
 option(JIT_TRAIN_ENABLE "option for enable jit train"                     OFF)
-option(TPU_OP_TIMING    "option for op timing"                            OFF)
+option(TPU_OP_TIMING    "option for op timing"                            ON)
 option(SHOW_OP_INFO     "option for op calls infomation, for debug only " OFF)
 option(SHOW_CPU_OP      "option for cpu op using "                        OFF)
 option(SHOW_MALLOC_INFO "option for memory usage info"                    OFF)
+option(BUILD_LIBTORCH   "option for control use only build libtorch"      ON)
 
 if(DEBUG OR "$ENV{TPUTRAIN_BUILD_TYPE}" STREQUAL "ON")
   set(CMAKE_BUILD_TYPE "Debug")
@@ -29,4 +30,11 @@ endif()
 
 if(SHOW_MALLOC_INFO)
   add_definitions(-DSHOW_MALLOC_INFO)
+endif()
+
+######################################
+###             LIBTORCH
+######################################
+if(BUILD_LIBTORCH)
+  add_definitions(-DBUILD_LIBTORCH)
 endif()

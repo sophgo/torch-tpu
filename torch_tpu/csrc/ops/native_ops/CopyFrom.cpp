@@ -1,9 +1,9 @@
 #include <ATen/core/TensorBase.h>
-#include <TPUDeviceManager.h>
-#include <TPUTorchUtils.h>
+
+#include "TPUTorchUtils.h"
 #include <c10/util/Logging.h>
 #include <iostream>
-#include <sgdnn_api.h>
+
 #include <torch/library.h>
 #include <torch/torch.h>
 
@@ -13,21 +13,24 @@ namespace at {
 
 Tensor _copy_from_tpu(const Tensor &self, const Tensor &dst,
                       bool non_blocking) {
-  TORCH_CHECK(non_blocking == false);
   if (self.dtype() == dst.dtype()) {
     TORCH_CHECK(self.nbytes() == dst.nbytes(),
                 "SELF and dst number bytes must be the same");
     if (IS_CPU_TENSOR(self) && IS_TPU_TENSOR(dst)) {
       if (dst.is_contiguous()) {
+        TIMING_START;
         tpu::TPUCopyHostToDevice(dst.data_ptr(), self.contiguous().data_ptr(),
-                                 dst.nbytes());
+                                 dst.nbytes(), non_blocking);
+        TIMING_END(tpu::CDMA_S2D);
       } else {
         dst.copy_(self.contiguous().to(dst.device()), non_blocking);
       }
     } else if (IS_TPU_TENSOR(self) && IS_CPU_TENSOR(dst)) {
       if (dst.is_contiguous()) {
+        TIMING_START;
         tpu::TPUCopyDeviceToHost(dst.data_ptr(), self.contiguous().data_ptr(),
-                                 dst.nbytes());
+                                 dst.nbytes(), non_blocking);
+        TIMING_END(tpu::CDMA_D2S);
       } else {
         dst.copy_(self.contiguous().to(dst.device()), non_blocking);
       }
@@ -35,14 +38,22 @@ Tensor _copy_from_tpu(const Tensor &self, const Tensor &dst,
       if (self.is_contiguous() && dst.is_contiguous()) {
         TIMING_START;
         tpu::TPUCopyDeviceToDevice(dst.data_ptr(), self.data_ptr(),
-                                   dst.nbytes());
+                                   dst.nbytes(), non_blocking);
         TIMING_END(tpu::COPY);
       } else {
         TIMING_START;
-        bm_status_t status = sgdnnStridedCopy(tpu::TPUGetDeviceHandle(),
+        #if defined BACKEND_1684X
+        auto status = sgdnnStridedCopy(tpu::TPUGetDeviceHandle(),
                                               tpu::TPUGenerateSgdnnTensor(self),
                                               tpu::TPUGenerateSgdnnTensor(dst));
         TORCH_CHECK(status == BM_SUCCESS);
+        #elif defined BACKEND_SG2260
+        auto status = sgdnnStridedCopy(c10_tpu::getCurrentTPUStream(),
+                                              tpu::TPUGenerateSgdnnTensor(self),
+                                              tpu::TPUGenerateSgdnnTensor(dst),
+                                              non_blocking);
+        TORCH_CHECK(status == tpuRtSuccess);
+        #endif
         TIMING_END(tpu::STRIDED_COPY);
       }
     } else {
@@ -57,14 +68,14 @@ Tensor _copy_from_tpu(const Tensor &self, const Tensor &dst,
     } else if (IS_TPU_TENSOR(self) && IS_TPU_TENSOR(dst)) {
 #if 0
       auto dst_cpu = self.cpu().to ( dst.dtype() );
-      tpu::TPUCopyHostToDevice ( dst.data_ptr(), dst_cpu.contiguous().data_ptr(), dst.nbytes() );
+      tpu::TPUCopyHostToDevice ( dst.data_ptr(), dst_cpu.contiguous().data_ptr(), dst.nbytes(), non_blocking );
 #else
       if ( !tpu::IsSupportDtype(self.dtype()) || !tpu::IsSupportDtype( dst.dtype() ))
       {
         CPU_IMPL_WARNING("unsupport dtype.");
         TIMING_START;
         auto dst_cpu = self.cpu().to ( dst.dtype() );
-        tpu::TPUCopyHostToDevice ( dst.data_ptr(), dst_cpu.contiguous().data_ptr(), dst.nbytes() );
+        tpu::TPUCopyHostToDevice ( dst.data_ptr(), dst_cpu.contiguous().data_ptr(), dst.nbytes(), non_blocking );
         TIMING_END(tpu::CPU_LAYER);
       }
       else
@@ -72,10 +83,18 @@ Tensor _copy_from_tpu(const Tensor &self, const Tensor &dst,
         auto self_ = self.contiguous();
         if (dst.is_contiguous()) {
           TIMING_START;
+          #if defined BACKEND_1684X
           auto status = sgdnnConvert(tpu::TPUGetDeviceHandle(),
                                     tpu::TPUGenerateSgdnnTensor(self_),
                                     tpu::TPUGenerateSgdnnTensor(dst));
           TORCH_CHECK(status == BM_SUCCESS);
+          #elif defined BACKEND_SG2260
+          auto status = sgdnnConvert(c10_tpu::getCurrentTPUStream(),
+                                    tpu::TPUGenerateSgdnnTensor(self_),
+                                    tpu::TPUGenerateSgdnnTensor(dst),
+                                    non_blocking);
+          TORCH_CHECK(status == tpuRtSuccess);
+          #endif
           TIMING_END(tpu::DTYPE_CONVERT);
           SHOW_TENSOR_OP(self_, dst);
         } else {
@@ -99,7 +118,6 @@ Tensor _to_copy_tpu(const Tensor &self, c10::optional<ScalarType> dtype_opt,
                     c10::optional<Device> device_opt,
                     c10::optional<bool> pin_memory_opt, bool non_blocking,
                     c10::optional<MemoryFormat> memory_format_opt) {
-  TORCH_CHECK(non_blocking == false);
 
   auto option = self.options();
   auto dtype = dtype_opt.has_value() ? dtype_opt.value()
@@ -124,7 +142,6 @@ Tensor _to_copy_out_tpu(const Tensor &self, Tensor &out,
                         c10::optional<Device> device_opt,
                         c10::optional<bool> pin_memory_opt, bool non_blocking,
                         c10::optional<MemoryFormat> memory_format_opt) {
-  TORCH_CHECK(non_blocking == false);
 
   auto option = self.options();
   auto dtype = dtype_opt.has_value() ? dtype_opt.value()

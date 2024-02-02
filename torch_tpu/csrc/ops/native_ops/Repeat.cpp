@@ -3,7 +3,7 @@
 #include <torch/library.h>
 #include <torch/torch.h>
 
-#include "TPUDeviceManager.h"
+
 #include "TPUTorchUtils.h"
 #include "common/config.h"
 #include "sgdnn_api.h"
@@ -23,15 +23,22 @@ Tensor &repeat_out_tpu(const Tensor &self, const IntArrayRef repeats,
                              out.nbytes());
     TIMING_END(tpu::CPU_LAYER);
   } else {
-    for (int i = 0; i < repeats.size(); ++i) {
+    for (int i = 0; i < (int)repeats.size(); ++i) {
       repeat_times.push_back((int)repeats[i]);
     }
 
-    TIMING_START
-    bm_status_t status = sgdnnRepeat(
+    TIMING_START;
+    #if defined BACKEND_1684X
+    auto status = sgdnnRepeat(
         tpu::TPUGetDeviceHandle(), tpu::TPUGenerateSgdnnTensor(contiguous_self),
         repeat_times.data(), repeats.size(), tpu::TPUGenerateSgdnnTensor(out));
     TORCH_CHECK(status == BM_SUCCESS);
+    #elif defined BACKEND_SG2260
+    auto status = sgdnnRepeat(
+        c10_tpu::getCurrentTPUStream(), tpu::TPUGenerateSgdnnTensor(contiguous_self),
+        repeat_times.data(), repeats.size(), tpu::TPUGenerateSgdnnTensor(out));
+    TORCH_CHECK(status == tpuRtSuccess);
+    #endif
     TIMING_END(tpu::REPEAT)
   }
   SHOW_TENSOR_OP(self, out);
@@ -41,7 +48,7 @@ Tensor &repeat_out_tpu(const Tensor &self, const IntArrayRef repeats,
 Tensor repeat_tpu(const Tensor &self, const IntArrayRef repeats) {
   if (self.dim() > 0) {
     CHECK_TENSOR_IN_DEVICE_NO_CONTIGUOUS(self);
-    TORCH_CHECK(repeats.size() >= self.dim());
+    TORCH_CHECK((int64_t)repeats.size() >= self.dim());
   }
 
   IntArrayRef size(repeats);

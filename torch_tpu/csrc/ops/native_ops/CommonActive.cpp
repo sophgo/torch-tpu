@@ -46,9 +46,9 @@
  */
 #include <ATen/EmptyTensor.h>
 #include <ATen/core/TensorBase.h>
-#include <TPUDeviceManager.h>
-#include <TPUTorchUtils.h>
-#include <sgdnn_api.h>
+
+#include "TPUTorchUtils.h"
+
 #include <torch/library.h>
 #include <torch/torch.h>
 
@@ -66,6 +66,7 @@ namespace at {
 #define IMP_ACTIVE_(OP)                                                        \
   Tensor &OP##__tpu(Tensor &self) { return OP##_out_tpu(self, self); }
 
+#if defined BACKEND_1684X 
 #define IMP_ACTIVE_OUT(OP, ACTIVE_TYPE, TIMING_NAME)                           \
   Tensor &OP##_out_tpu(const Tensor &self, Tensor &out) {                      \
     if (self.dim() > 0) {                                                      \
@@ -82,8 +83,8 @@ namespace at {
         tpu::TPUCopyHostToDevice(self.data_ptr(),                              \
                                  self.contiguous().data_ptr(), self.nbytes()); \
       } else if (IS_TPU_TENSOR(self)) {                                        \
-        TIMING_START                                                           \
-        bm_status_t status = sgdnnActive(                                      \
+        TIMING_START;                                                          \
+        auto status = sgdnnActive(                                             \
             tpu::TPUGetDeviceHandle(), tpu::TPUGenerateSgdnnTensor(self),      \
             tpu::TPUGenerateSgdnnTensor(out), ACTIVE_TYPE);                    \
         TORCH_CHECK(status == BM_SUCCESS);                                     \
@@ -92,9 +93,40 @@ namespace at {
         TORCH_CHECK(false, "At least one input is required in TPU device");    \
       }                                                                        \
     }                                                                          \
-    SHOW_TENSOR_OP(self, out);                                                        \
+    SHOW_TENSOR_OP(self, out);                                                 \
     return out;                                                                \
   }
+#elif defined BACKEND_SG2260
+#define IMP_ACTIVE_OUT(OP, ACTIVE_TYPE, TIMING_NAME)                           \
+  Tensor &OP##_out_tpu(const Tensor &self, Tensor &out) {                      \
+    if (self.dim() > 0) {                                                      \
+      CHECK_TENSOR_IN_DEVICE(self);                                            \
+    }                                                                          \
+    CHECK_TENSOR_IN_DEVICE(out);                                               \
+    if (HACK_CPU_IMP) {                                                        \
+      auto self_cpu = OP(self.cpu());                                          \
+      tpu::TPUCopyHostToDevice(self.data_ptr(), self.contiguous().data_ptr(),  \
+                               self.nbytes());                                 \
+    } else {                                                                   \
+      if (self.dim() == 0) {                                                   \
+        auto self_cpu = OP(self.cpu());                                        \
+        tpu::TPUCopyHostToDevice(self.data_ptr(),                              \
+                                 self.contiguous().data_ptr(), self.nbytes()); \
+      } else if (IS_TPU_TENSOR(self)) {                                        \
+        TIMING_START;                                                          \
+        auto status = sgdnnActive(                                             \
+            c10_tpu::getCurrentTPUStream(), tpu::TPUGenerateSgdnnTensor(self), \
+            tpu::TPUGenerateSgdnnTensor(out), ACTIVE_TYPE, true);              \
+        TORCH_CHECK(status == tpuRtSuccess);                                     \
+        TIMING_END(TIMING_NAME)                                                \
+      } else {                                                                 \
+        TORCH_CHECK(false, "At least one input is required in TPU device");    \
+      }                                                                        \
+    }                                                                          \
+    SHOW_TENSOR_OP(self, out);                                                 \
+    return out;                                                                \
+  }
+#endif
 
 IMP_ACTIVE_OUT(abs, ACTIVE_ABSVAL, tpu::ABS_FORWARD)
 IMP_ACTIVE(abs)

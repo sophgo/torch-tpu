@@ -3,9 +3,9 @@
 #include <ATen/core/TensorBase.h>
 #include <ATen/EmptyTensor.h>
 #include <ATen/native/ConvUtils.h>
-#include <TPUDeviceManager.h>
-#include <TPUTorchUtils.h>
-#include <sgdnn_api.h>
+
+#include "TPUTorchUtils.h"
+
 #include "common/config.h"
 
 namespace at

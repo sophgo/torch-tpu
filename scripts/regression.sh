@@ -25,7 +25,7 @@ function link_libsophon() {
     echo "********************************************"
     echo "[STEP]install libsophon"
     CURRENT_DIR=$(dirname ${BASH_SOURCE})
-    LIBSOPHON_LINK_PATTERN=${1:-latest}
+    LIBSOPHON_LINK_PATTERN=${1:-local}
     DEB_PATH_STABLE=${2:-none}
     VERSION_PATH_STABLE=${3:-0.4.8}
     if [ $LIBSOPHON_LINK_PATTERN = 'stable' ]; then
@@ -118,10 +118,8 @@ function run_online_regression_test() {
   echo "[NOTE]Print_necessary_info"
   echo "[INFO]CURRENT_DIR:$CURRENT_DIR"
   
-  update_pytorch_to_2_1;
-  
   test_CHIP_ARCH=${1:-bm1684x}
-  LIBSOPHON_LINK_PATTERN=${2:-latest} #latest or stable
+  LIBSOPHON_LINK_PATTERN=${2:-local} #local or stable
   TEST_PATTERN=${3:-online} #online,local, or fast
   DEB_PATH_STABLE=${4:-none} #none or given path
   VERSION_PATH_STABLE=${5:-0.4.8}
@@ -135,12 +133,13 @@ function run_online_regression_test() {
   else
     if [ $LIBSOPHON_LINK_PATTERN = 'stable' ];then
       echo "[INFO]test_CHIP_ARCH:$test_CHIP_ARCH"
-      build_kernel_module_real $test_CHIP_ARCH
-    elif [ $LIBSOPHON_LINK_PATTERN = 'latest' ];then
+      source  $CURRENT_DIR/envsetup.sh $test_CHIP_ARCH $LIBSOPHON_LINK_PATTERN
+      new_clean;new_build
+    elif [ $LIBSOPHON_LINK_PATTERN = 'local' ];then
       echo "************** $LIBSOPHON_LINK_PATTERN-LIBSOPHON IS REAEDY *********"
-      source  $CURRENT_DIR/envsetup.sh $test_CHIP_ARCH
-      rebuild_all
-      TPU_TRAIN_CMODEL_PATH=$CURRENT_DIR/../build/firmware_core/libcmodel.so
+      source  $CURRENT_DIR/envsetup.sh $test_CHIP_ARCH $LIBSOPHON_LINK_PATTERN
+      new_clean;new_build
+      TPU_TRAIN_CMODEL_PATH=$CURRENT_DIR/../build/Release/firmware_core/libcmodel.so
       echo "[INFO]tpu_train_cmodel_path:$TPU_TRAIN_CMODEL_PATH"
       set_cmodel_firmware $TPU_TRAIN_CMODEL_PATH
       echo "*************** CMODEL IS SET *************"
@@ -166,17 +165,17 @@ function fast_build_bm1684x_stable() {
 }
 
 function fast_build_bm1684x_latest() {
-  run_online_regression_test bm1684x latest fast
+  run_online_regression_test bm1684x local fast
 }
 
 function fast_build_bm1684x_latest_and_libtorch_plugin() {
-  run_online_regression_test bm1684x latest fast
+  run_online_regression_test bm1684x local fast
 }
 
 function fast_build_sg2260_latest() {
-  run_online_regression_test sg2260 latest fast
+  run_online_regression_test sg2260 local fast
 }
 
 function fast_build_sg2260_latest_and_libtorch_plugin() {
-  run_online_regression_test sg2260 latest fast
+  run_online_regression_test sg2260 local fast
 }

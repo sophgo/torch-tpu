@@ -2,9 +2,9 @@
 #include <torch/torch.h>
 #include <ATen/core/TensorBase.h>
 #include <ATen/EmptyTensor.h>
-#include <TPUDeviceManager.h>
-#include <TPUTorchUtils.h>
-#include <sgdnn_api.h>
+
+#include "TPUTorchUtils.h"
+
 
 #include "common/config.h"
 namespace torch{
@@ -29,6 +29,9 @@ public:
     at::Tensor mask = mask_cpu.to(self.device()).to(self.dtype());
     TIMING_END(tpu::CPU_LAYER);
 #else
+    #if defined BACKEND_1684X
+    #elif defined BACKEND_SG2260
+    #endif
 #endif
     ctx->save_for_backward( {mask} );
     auto out = mask * self * (1/(1-p));

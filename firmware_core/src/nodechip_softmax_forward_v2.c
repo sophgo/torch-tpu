@@ -1,6 +1,6 @@
 #include "sg_api_struct.h"
 #include "tpu_kernel.h"
-#include "config.h"
+
 
 #define DEFAULT_LOCAL_ADDR 0xFFFFFFFF
 
@@ -870,7 +870,7 @@ void tpu_kernel_api_softmax ( const void * args )
 TPUKERNEL_FUNC_REGISTER ( tpu_kernel_api_softmax );
 
 
-#ifdef FIRMWARE_BACKEND_2260
+#ifdef BACKEND_SG2260
 extern void nodechip_softmax_forward_multi_core (
 global_addr_t input_global_addr,
 global_addr_t output_global_addr,

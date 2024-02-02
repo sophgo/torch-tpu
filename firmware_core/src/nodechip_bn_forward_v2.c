@@ -1,6 +1,6 @@
 #include "sg_api_struct.h"
 #include "tpu_kernel.h"
-#include "config.h"
+
 
 static inline void nodechip_batchnorm2d_forward_training_parallel (
 global_addr_t input_global_addr,

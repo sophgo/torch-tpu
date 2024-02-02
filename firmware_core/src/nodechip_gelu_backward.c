@@ -1,7 +1,7 @@
 #include "sg_api_struct.h"
 #include "tpu_kernel.h"
 #include <math.h>
-#include "config.h"
+
 
 static inline void nodechip_gelu_backward_parallel_fp16 ( global_addr_t DXGlobalAddr, global_addr_t XGlobalAddr, global_addr_t DYGlobalAddr, int Len, data_type_t dtype )
 {
@@ -288,7 +288,7 @@ void tpu_kernel_api_gelu_backward ( const void * args )
 }
 TPUKERNEL_FUNC_REGISTER ( tpu_kernel_api_gelu_backward );
 
-#ifdef FIRMWARE_BACKEND_2260
+#ifdef BACKEND_SG2260
 extern void nodechip_gelu_backward_multi_core (
   global_addr_t grad_input_global_addr,
   global_addr_t grad_output_global_addr,

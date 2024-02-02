@@ -2,15 +2,11 @@
 #include <ATen/EmptyTensor.h>
 #include <ATen/OpMathType.h>
 #include <ATen/core/TensorBase.h>
-#include <ATen/native/ConvUtils.h>
-#include <ATen/native/cpu/mixed_data_type.h>
-#include <ATen/native/cpu/moments_utils.h>
-#include <TPUDeviceManager.h>
-#include <TPUTorchUtils.h>
-#include <sgdnn_api.h>
+
+#include "TPUTorchUtils.h"
+
 #include <torch/library.h>
 #include <torch/torch.h>
-// #include "tpu_kernel.h"
 
 namespace at {
 
@@ -19,7 +15,7 @@ Tensor &flip_out_tpu(const Tensor &self, const c10::ArrayRef<int64_t> dims,
   CHECK_TENSOR_IN_DEVICE(self);
   CHECK_TENSOR_IN_DEVICE(out);
 
-  if (self.dim() <= 0 || self.dim() > 4 || dims.size() <= 0 || self.dim() < dims.size()) {
+  if (self.dim() <= 0 || self.dim() > 4 || dims.size() <= 0 || self.dim() < (int)dims.size()) {
     CPU_IMPL_WARNING();
     TIMING_START;
     auto self_cpu = flip(self.cpu(), dims);
@@ -34,14 +30,25 @@ Tensor &flip_out_tpu(const Tensor &self, const c10::ArrayRef<int64_t> dims,
                            out.nbytes());
 #else
   TIMING_START;
+  #if defined BACKEND_1684X
   auto temp_result = self;
   for (uint i = 0; i < dims.size(); i++) {
-    bm_status_t status = sgdnnFlip(tpu::TPUGetDeviceHandle(),
+    auto status = sgdnnFlip(tpu::TPUGetDeviceHandle(),
                                    tpu::TPUGenerateSgdnnTensor(temp_result),
                                    dims[i], tpu::TPUGenerateSgdnnTensor(out));
     TORCH_CHECK(status == BM_SUCCESS);
     temp_result = out;
   }
+  #elif defined BACKEND_SG2260
+  auto temp_result = self;
+  for (uint i = 0; i < dims.size(); i++) {
+    auto status = sgdnnFlip(c10_tpu::getCurrentTPUStream(),
+                                   tpu::TPUGenerateSgdnnTensor(temp_result),
+                                   dims[i], tpu::TPUGenerateSgdnnTensor(out));
+    TORCH_CHECK(status == tpuRtSuccess);
+    temp_result = out;
+  }
+  #endif
   TIMING_END(tpu::FLIP);
 #endif
   SHOW_TENSOR_OP(self, out);

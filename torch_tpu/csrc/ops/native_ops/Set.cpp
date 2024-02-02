@@ -1,11 +1,11 @@
 #include <ATen/EmptyTensor.h>
 #include <ATen/core/TensorBase.h>
-#include <TPUDeviceManager.h>
-#include <TPUTorchUtils.h>
-#include <sgdnn_api.h>
 #include <torch/library.h>
 #include <torch/torch.h>
 #include <ATen/native/Resize.h>
+
+#include "TPUTorchUtils.h"
+#include "Resize.h"
 
 #include "common/config.h"
 
@@ -32,10 +32,9 @@ TensorImpl* resize_impl_tpu_( TensorImpl* self, ArrayRef<T> size, at::OptionalAr
         size, itemsize, storage_offset);
   }
 
-  // TODO 
-  // if (resize_storage) {
-  //   _maybe_resize_storage(self, std::move(storage_size));
-  // }
+  if (resize_storage) {
+    maybe_resize_storage_tpu(self, std::move(storage_size));
+  }
 
   return self;
 }

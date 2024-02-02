@@ -2,10 +2,8 @@
 #include <torch/torch.h>
 #include <ATen/core/TensorBase.h>
 #include <ATen/EmptyTensor.h>
-#include <ATen/native/ConvUtils.h>
-#include <TPUDeviceManager.h>
-#include <TPUTorchUtils.h>
-#include <sgdnn_api.h>
+
+#include "TPUTorchUtils.h"
 #include "common/config.h"
 
 namespace at
@@ -19,12 +17,19 @@ Tensor & signbit_out_tpu ( const Tensor & self, Tensor & out )
   tpu::TPUCopyHostToDevice ( out.data_ptr(), out_cpu.contiguous().data_ptr(), out.nbytes() );
 #else
   TIMING_START;
-  bm_status_t status = sgdnnSignbit(
+  #if defined BACKEND_1684X
+  auto status = sgdnnSignbit(
                        tpu::TPUGetDeviceHandle(),
                        tpu::TPUGenerateSgdnnTensor ( self ),
-                    
                        tpu::TPUGenerateSgdnnTensor ( out ) );
   TORCH_CHECK ( status == BM_SUCCESS );
+  #elif defined BACKEND_SG2260
+  auto status = sgdnnSignbit(
+                       c10_tpu::getCurrentTPUStream(),
+                       tpu::TPUGenerateSgdnnTensor ( self ),
+                       tpu::TPUGenerateSgdnnTensor ( out ) );
+  TORCH_CHECK ( status == tpuRtSuccess );
+  #endif
   TIMING_END ( tpu::SIGNBIT );
 #endif
   SHOW_TENSOR_OP(self, out);

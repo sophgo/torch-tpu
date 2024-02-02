@@ -1,7 +1,7 @@
 #include "sg_api_struct.h"
 #include "tpu_kernel.h"
 #include "kernel_utils_func.h"
-#include "config.h"
+
 
 
 void tpu_bdc_check_inf_nan(local_addr_t dst_addr, local_addr_t found_inf_addr, local_addr_t src_addr,
@@ -228,7 +228,7 @@ void tpu_kernel_api_inf_check_and_unscale(const void *args){
 }
 TPUKERNEL_FUNC_REGISTER(tpu_kernel_api_inf_check_and_unscale);
 
-#ifdef FIRMWARE_BACKEND_2260
+#ifdef BACKEND_SG2260
 void tpu_kernel_api_inf_check_and_unscale_multi_core(const void *args){
     sg_api_inf_check_unscale_multi_core_t* api = (sg_api_inf_check_unscale_multi_core_t*)args;
     int length = 1;
@@ -246,7 +246,12 @@ void tpu_kernel_api_inf_check_and_unscale_multi_core(const void *args){
     // sometimes buffer memory is not empty. clear the buffer
     if (core_idx == 0) {
         nodechip_clear_buffer(api->found_inf_buffer_global_addr, api->found_inf_dtype);
-    }   
+        if (api->need_clear_found_inf){
+            scalar_t zero_scalar = {.u32 = 0};
+            dim4 shape = {1, 1, 1, 1};
+            tpu_gdma_set_C_system(api->found_inf_global_addr, zero_scalar,&shape, NULL, api->found_inf_dtype);
+        }
+    }
     tpu_sync_all();
 
     if (core_idx * length_slice < length) {

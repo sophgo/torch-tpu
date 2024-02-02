@@ -2,9 +2,9 @@
 #include <torch/torch.h>
 #include <ATen/core/TensorBase.h>
 #include <ATen/EmptyTensor.h>
-#include <TPUDeviceManager.h>
-#include <TPUTorchUtils.h>
-#include <sgdnn_api.h>
+
+#include "TPUTorchUtils.h"
+
 
 #include "common/config.h"
 
@@ -54,12 +54,21 @@ Tensor & _softmax_out_tpu ( const Tensor & self, int64_t dim, bool half_to_float
   tpu::TPUCopyHostToDevice ( out.data_ptr(), out_cpu.contiguous().data_ptr(), out.nbytes() );
 #else
   TIMING_START;
-  bm_status_t status = sgdnnSoftmax (
+  #if defined BACKEND_1684X
+  auto status = sgdnnSoftmax (
                        tpu::TPUGetDeviceHandle(),
                        tpu::TPUGenerateSgdnnTensor ( self ),
                        dim,
                        tpu::TPUGenerateSgdnnTensor ( out ) );
   TORCH_CHECK ( status == BM_SUCCESS );
+  #elif defined BACKEND_SG2260
+  auto status = sgdnnSoftmax (
+                       c10_tpu::getCurrentTPUStream(),
+                       tpu::TPUGenerateSgdnnTensor ( self ),
+                       dim,
+                       tpu::TPUGenerateSgdnnTensor ( out ) );
+  TORCH_CHECK ( status == tpuRtSuccess );
+  #endif
   TIMING_END ( tpu::SOFTMAX );
 #endif
   SHOW_TENSOR_OP(self, out);
@@ -81,13 +90,23 @@ Tensor & _softmax_backward_data_out_tpu ( const Tensor & grad_output, const Tens
   tpu::TPUCopyHostToDevice ( grad_input.data_ptr(), grad_input_cpu.contiguous().data_ptr(), grad_input.nbytes() );
 #else
   TIMING_START;
-  bm_status_t status = sgdnnSoftmaxBackward (
+  #if defined BACKEND_1684X
+  auto status = sgdnnSoftmaxBackward (
                        tpu::TPUGetDeviceHandle(),
                        tpu::TPUGenerateSgdnnTensor ( grad_output ),
                        tpu::TPUGenerateSgdnnTensor ( output ),
                        dim,
                        tpu::TPUGenerateSgdnnTensor ( grad_input ) );
   TORCH_CHECK ( status == BM_SUCCESS );
+  #elif defined BACKEND_SG2260
+  auto status = sgdnnSoftmaxBackward (
+                       c10_tpu::getCurrentTPUStream(),
+                       tpu::TPUGenerateSgdnnTensor ( grad_output ),
+                       tpu::TPUGenerateSgdnnTensor ( output ),
+                       dim,
+                       tpu::TPUGenerateSgdnnTensor ( grad_input ) );
+  TORCH_CHECK ( status == tpuRtSuccess );
+  #endif
   TIMING_END ( tpu::SOFTMAX_BACKWARD );
 #endif
   SHOW_TENSOR_OP(grad_output, output, grad_input);

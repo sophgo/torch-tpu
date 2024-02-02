@@ -1,9 +1,9 @@
 #include <ATen/EmptyTensor.h>
 #include <ATen/core/TensorBase.h>
 #include <ATen/quantized/QTensorImpl.h>
-#include <TPUDeviceManager.h>
-#include <TPUTorchUtils.h>
-#include <sgdnn_api.h>
+
+#include "TPUTorchUtils.h"
+
 #include <torch/library.h>
 #include <torch/torch.h>
 
@@ -30,21 +30,37 @@ Tensor &binary_op_tpu(const Tensor &self, const Tensor &other,
           self.dtype() == caffe2::TypeMeta::Make<int>() ||
           self.dtype() == caffe2::TypeMeta::Make<short>()) {
         Tensor scalar = self.cpu().to(torch::kLong);
-        TIMING_START
-        bm_status_t status = sgdnnBinaryC(
+        TIMING_START;
+        #if defined BACKEND_1684X
+        auto status = sgdnnBinaryC(
             tpu::TPUGetDeviceHandle(), tpu::TPUGenerateSgdnnTensor(other),
             *scalar.data_ptr<long>() * alpha.toFloat(),
             tpu::TPUGenerateSgdnnTensor(out), binary_type, 1);
         TORCH_CHECK(status == BM_SUCCESS);
+        #elif defined BACKEND_SG2260
+        auto status = sgdnnBinaryC(
+            c10_tpu::getCurrentTPUStream(), tpu::TPUGenerateSgdnnTensor(other),
+            *scalar.data_ptr<long>() * alpha.toFloat(),
+            tpu::TPUGenerateSgdnnTensor(out), binary_type, 1);
+        TORCH_CHECK(status == tpuRtSuccess);
+        #endif
         TIMING_END(tpu::BINARYOP_C)
       } else {
         Tensor scalar = self.cpu().to(torch::kFloat);
-        TIMING_START
-        bm_status_t status = sgdnnBinaryC(
+        TIMING_START;
+        #if defined BACKEND_1684X
+        auto status = sgdnnBinaryC(
             tpu::TPUGetDeviceHandle(), tpu::TPUGenerateSgdnnTensor(other),
             *scalar.data_ptr<float>() * alpha.toFloat(),
             tpu::TPUGenerateSgdnnTensor(out), binary_type, 1);
         TORCH_CHECK(status == BM_SUCCESS);
+        #elif defined BACKEND_SG2260
+        auto status = sgdnnBinaryC(
+            c10_tpu::getCurrentTPUStream(), tpu::TPUGenerateSgdnnTensor(other),
+            *scalar.data_ptr<float>() * alpha.toFloat(),
+            tpu::TPUGenerateSgdnnTensor(out), binary_type, 1);
+        TORCH_CHECK(status == tpuRtSuccess);  
+        #endif
         TIMING_END(tpu::BINARYOP_C)
       }
     } else {
@@ -52,21 +68,37 @@ Tensor &binary_op_tpu(const Tensor &self, const Tensor &other,
           other.dtype() == caffe2::TypeMeta::Make<int>() ||
           other.dtype() == caffe2::TypeMeta::Make<short>()) {
         Tensor scalar = other.cpu().to(torch::kLong);
-        TIMING_START
-        bm_status_t status = sgdnnBinaryC(
+        TIMING_START;
+        #if defined BACKEND_1684X
+        auto status = sgdnnBinaryC(
             tpu::TPUGetDeviceHandle(), tpu::TPUGenerateSgdnnTensor(self),
             *scalar.data_ptr<long>() * alpha.toFloat(),
             tpu::TPUGenerateSgdnnTensor(out), binary_type, 0);
         TORCH_CHECK(status == BM_SUCCESS);
+        #elif defined BACKEND_SG2260
+        auto status = sgdnnBinaryC(
+            c10_tpu::getCurrentTPUStream(), tpu::TPUGenerateSgdnnTensor(self),
+            *scalar.data_ptr<long>() * alpha.toFloat(),
+            tpu::TPUGenerateSgdnnTensor(out), binary_type, 0);
+        TORCH_CHECK(status == tpuRtSuccess);
+        #endif
         TIMING_END(tpu::BINARYOP_C)
       } else {
         Tensor scalar = other.cpu().to(torch::kFloat);
-        TIMING_START
-        bm_status_t status = sgdnnBinaryC(
+        TIMING_START;
+        #if defined BACKEND_1684X
+        auto status = sgdnnBinaryC(
             tpu::TPUGetDeviceHandle(), tpu::TPUGenerateSgdnnTensor(self),
             *scalar.data_ptr<float>() * alpha.toFloat(),
             tpu::TPUGenerateSgdnnTensor(out), binary_type, 0);
         TORCH_CHECK(status == BM_SUCCESS);
+        #elif defined BACKEND_SG2260
+        auto status = sgdnnBinaryC(
+            c10_tpu::getCurrentTPUStream(), tpu::TPUGenerateSgdnnTensor(self),
+            *scalar.data_ptr<float>() * alpha.toFloat(),
+            tpu::TPUGenerateSgdnnTensor(out), binary_type, 0);
+        TORCH_CHECK(status == tpuRtSuccess);
+        #endif
         TIMING_END(tpu::BINARYOP_C)
       }
     }
@@ -74,12 +106,20 @@ Tensor &binary_op_tpu(const Tensor &self, const Tensor &other,
   }
 
   if (tpu::TPUIsSameShape(self, other)) {
-    TIMING_START
-    bm_status_t status = sgdnnBinary(
+    TIMING_START;
+    #if defined BACKEND_1684X
+    auto status = sgdnnBinary(
         tpu::TPUGetDeviceHandle(), tpu::TPUGenerateSgdnnTensor(self),
         tpu::TPUGenerateSgdnnTensor(other), alpha.toDouble(),
         tpu::TPUGenerateSgdnnTensor(out), binary_type);
     TORCH_CHECK(status == BM_SUCCESS);
+    #elif defined BACKEND_SG2260
+    auto status = sgdnnBinary(
+        c10_tpu::getCurrentTPUStream(), tpu::TPUGenerateSgdnnTensor(self),
+        tpu::TPUGenerateSgdnnTensor(other), alpha.toDouble(),
+        tpu::TPUGenerateSgdnnTensor(out), binary_type);
+    TORCH_CHECK(status == tpuRtSuccess);
+    #endif
     TIMING_END(tpu::BINARYOP)
   } else {
     int self_dim = self.dim(), other_dim = other.dim();
@@ -121,11 +161,18 @@ Tensor &binary_op_tpu(const Tensor &self, const Tensor &other,
       change_t.dim = max_dim;
     }
 
-    TIMING_START
-    bm_status_t status =
+    TIMING_START;
+    #if defined BACKEND_1684X
+    auto status =
         sgdnnBinaryBcast(tpu::TPUGetDeviceHandle(), self_t, other_t,
                          alpha.toDouble(), out_t, binary_type);
     TORCH_CHECK(status == BM_SUCCESS);
+    #elif defined BACKEND_SG2260
+    auto status =
+        sgdnnBinaryBcast(c10_tpu::getCurrentTPUStream(), self_t, other_t,
+                         alpha.toDouble(), out_t, binary_type);
+    TORCH_CHECK(status == tpuRtSuccess);
+    #endif
     TIMING_END(tpu::BINARYOP_BCAST)
   }
   return out;
@@ -144,9 +191,15 @@ Tensor &add_out_tpu(const Tensor &self, const Tensor &other,
     } else {
       auto out_ = add(self.contiguous(), other.contiguous(), alpha);
       TIMING_START;
+      #if defined BACKEND_1684X
       sgdnnStridedCopy(tpu::TPUGetDeviceHandle(),
                        tpu::TPUGenerateSgdnnTensor(out_),
                        tpu::TPUGenerateSgdnnTensor(out));
+      #elif defined BACKEND_SG2260
+      sgdnnStridedCopy(c10_tpu::getCurrentTPUStream(),
+                       tpu::TPUGenerateSgdnnTensor(out_),
+                       tpu::TPUGenerateSgdnnTensor(out));
+      #endif
       TIMING_END(tpu::STRIDED_COPY);
     }
     SHOW_TENSOR_OP(self, other, out);
@@ -182,9 +235,15 @@ Tensor &sub_out_tpu(const Tensor &self, const Tensor &other,
     } else {
       auto out_ = sub(self.contiguous(), other.contiguous(), alpha);
       TIMING_START;
+      #if defined BACKEND_1684X
       sgdnnStridedCopy(tpu::TPUGetDeviceHandle(),
                        tpu::TPUGenerateSgdnnTensor(out_),
                        tpu::TPUGenerateSgdnnTensor(out));
+      #elif defined BACKEND_SG2260
+      sgdnnStridedCopy(c10_tpu::getCurrentTPUStream(),
+                       tpu::TPUGenerateSgdnnTensor(out_),
+                       tpu::TPUGenerateSgdnnTensor(out));
+      #endif
       TIMING_END(tpu::STRIDED_COPY);
     }
     SHOW_TENSOR_OP(self, other, out);
@@ -219,9 +278,15 @@ Tensor &mul_out_tpu(const Tensor &self, const Tensor &other, Tensor &out) {
     } else {
       auto out_ = mul(self.contiguous(), other.contiguous());
       TIMING_START;
+      #if defined BACKEND_1684X
       sgdnnStridedCopy(tpu::TPUGetDeviceHandle(),
                        tpu::TPUGenerateSgdnnTensor(out_),
                        tpu::TPUGenerateSgdnnTensor(out));
+      #elif defined BACKEND_SG2260
+      sgdnnStridedCopy(c10_tpu::getCurrentTPUStream(),
+                       tpu::TPUGenerateSgdnnTensor(out_),
+                       tpu::TPUGenerateSgdnnTensor(out));
+      #endif
       TIMING_END(tpu::STRIDED_COPY);
     }
     SHOW_TENSOR_OP(self, other, out);
@@ -256,9 +321,15 @@ Tensor &div_out_tpu(const Tensor &self, const Tensor &other, Tensor &out) {
     } else {
       auto out_ = div(self.contiguous(), other.contiguous());
       TIMING_START;
+      #if defined BACKEND_1684X
       sgdnnStridedCopy(tpu::TPUGetDeviceHandle(),
                        tpu::TPUGenerateSgdnnTensor(out_),
                        tpu::TPUGenerateSgdnnTensor(out));
+      #elif defined BACKEND_SG2260
+      sgdnnStridedCopy(c10_tpu::getCurrentTPUStream(),
+                       tpu::TPUGenerateSgdnnTensor(out_),
+                       tpu::TPUGenerateSgdnnTensor(out));
+      #endif
       TIMING_END(tpu::STRIDED_COPY);
     }
     SHOW_TENSOR_OP(self, other, out);
@@ -299,40 +370,76 @@ Tensor &bitwise_xor_out_tpu(const Tensor &self, const Tensor &other,
                              out.nbytes());
   } else if (self.dim() == 0) {
     TIMING_START;
-    bm_status_t status = sgdnnElementBitwiseC(
+    #if defined BACKEND_1684X
+    auto status = sgdnnElementBitwiseC(
         tpu::TPUGetDeviceHandle(), tpu::TPUGenerateSgdnnTensor(other),
         self.item().toInt(),
         0, // 0 for xor, 1 for and, 2 for or
         tpu::TPUGenerateSgdnnTensor(out));
     TORCH_CHECK(status == BM_SUCCESS);
+    #elif defined BACKEND_SG2260
+    auto status = sgdnnElementBitwiseC(
+        c10_tpu::getCurrentTPUStream(), tpu::TPUGenerateSgdnnTensor(other),
+        self.item().toInt(),
+        0, // 0 for xor, 1 for and, 2 for or
+        tpu::TPUGenerateSgdnnTensor(out));
+    TORCH_CHECK(status == tpuRtSuccess);
+    #endif
     TIMING_END(tpu::BITWISE_XOR_C);
   } else if (other.dim() == 0) {
     TIMING_START;
-    bm_status_t status = sgdnnElementBitwiseC(
+    #if defined BACKEND_1684X
+    auto status = sgdnnElementBitwiseC(
         tpu::TPUGetDeviceHandle(), tpu::TPUGenerateSgdnnTensor(self),
         other.item().toInt(),
         0, // 0 for xor, 1 for and, 2 for or
         tpu::TPUGenerateSgdnnTensor(out));
     TORCH_CHECK(status == BM_SUCCESS);
+    #elif defined BACKEND_SG2260
+    auto status = sgdnnElementBitwiseC(
+        c10_tpu::getCurrentTPUStream(), tpu::TPUGenerateSgdnnTensor(self),
+        other.item().toInt(),
+        0, // 0 for xor, 1 for and, 2 for or
+        tpu::TPUGenerateSgdnnTensor(out));
+    TORCH_CHECK(status == tpuRtSuccess);
+    #endif
     TIMING_END(tpu::BITWISE_XOR_C);
   } else {
     if (tpu::TPUIsSameShape(self, other)) {
       TIMING_START;
-      bm_status_t status = sgdnnElementBitwise(
+      #if defined BACKEND_1684X
+      auto status = sgdnnElementBitwise(
           tpu::TPUGetDeviceHandle(), tpu::TPUGenerateSgdnnTensor(self),
           tpu::TPUGenerateSgdnnTensor(other),
           0, // 0 for xor, 1 for and, 2 for or
           tpu::TPUGenerateSgdnnTensor(out));
       TORCH_CHECK(status == BM_SUCCESS);
+      #elif defined BACKEND_SG2260
+      auto status = sgdnnElementBitwise(
+          c10_tpu::getCurrentTPUStream(), tpu::TPUGenerateSgdnnTensor(self),
+          tpu::TPUGenerateSgdnnTensor(other),
+          0, // 0 for xor, 1 for and, 2 for or
+          tpu::TPUGenerateSgdnnTensor(out));
+      TORCH_CHECK(status == tpuRtSuccess);
+      #endif
       TIMING_END(tpu::BITWISE_XOR);
     } else {
       TIMING_START;
-      bm_status_t status = sgdnnElementBitwiseBcast(
+      #if defined BACKEND_1684X
+      auto status = sgdnnElementBitwiseBcast(
           tpu::TPUGetDeviceHandle(), tpu::TPUGenerateSgdnnTensor(self),
           tpu::TPUGenerateSgdnnTensor(other),
           0, // 0 for xor, 1 for and, 2 for or
           tpu::TPUGenerateSgdnnTensor(out));
       TORCH_CHECK(status == BM_SUCCESS);
+      #elif defined BACKEND_SG2260
+      auto status = sgdnnElementBitwiseBcast(
+          c10_tpu::getCurrentTPUStream(), tpu::TPUGenerateSgdnnTensor(self),
+          tpu::TPUGenerateSgdnnTensor(other),
+          0, // 0 for xor, 1 for and, 2 for or
+          tpu::TPUGenerateSgdnnTensor(out));
+      TORCH_CHECK(status == tpuRtSuccess);
+      #endif
       TIMING_END(tpu::BITWISE_XOR_BCAST);
     }
   }
@@ -362,40 +469,76 @@ Tensor &bitwise_and_out_tpu(const Tensor &self, const Tensor &other,
     TIMING_END(tpu::CPU_LAYER);
   } else if (self.dim() == 0) {
     TIMING_START;
-    bm_status_t status = sgdnnElementBitwiseC(
+    #if defined BACKEND_1684X
+    auto status = sgdnnElementBitwiseC(
         tpu::TPUGetDeviceHandle(), tpu::TPUGenerateSgdnnTensor(other),
         self.item().toInt(),
         1, // 0 for xor, 1 for and, 2 for or
         tpu::TPUGenerateSgdnnTensor(out));
     TORCH_CHECK(status == BM_SUCCESS);
+    #elif defined BACKEND_SG2260
+    auto status = sgdnnElementBitwiseC(
+        c10_tpu::getCurrentTPUStream(), tpu::TPUGenerateSgdnnTensor(other),
+        self.item().toInt(),
+        1, // 0 for xor, 1 for and, 2 for or
+        tpu::TPUGenerateSgdnnTensor(out));
+    TORCH_CHECK(status == tpuRtSuccess);
+    #endif
     TIMING_END(tpu::BITWISE_AND_C);
   } else if (other.dim() == 0) {
     TIMING_START;
-    bm_status_t status = sgdnnElementBitwiseC(
+    #if defined BACKEND_1684X
+    auto status = sgdnnElementBitwiseC(
         tpu::TPUGetDeviceHandle(), tpu::TPUGenerateSgdnnTensor(self),
         other.item().toInt(),
         1, // 0 for xor, 1 for and, 2 for or
         tpu::TPUGenerateSgdnnTensor(out));
     TORCH_CHECK(status == BM_SUCCESS);
+    #elif defined BACKEND_SG2260
+    auto status = sgdnnElementBitwiseC(
+        c10_tpu::getCurrentTPUStream(), tpu::TPUGenerateSgdnnTensor(self),
+        other.item().toInt(),
+        1, // 0 for xor, 1 for and, 2 for or
+        tpu::TPUGenerateSgdnnTensor(out));
+    TORCH_CHECK(status == tpuRtSuccess);
+    #endif
     TIMING_END(tpu::BITWISE_AND_C);
   } else {
     if (tpu::TPUIsSameShape(self, other)) {
       TIMING_START;
-      bm_status_t status = sgdnnElementBitwise(
+      #if defined BACKEND_1684X
+      auto status = sgdnnElementBitwise(
           tpu::TPUGetDeviceHandle(), tpu::TPUGenerateSgdnnTensor(self),
           tpu::TPUGenerateSgdnnTensor(other),
           1, // 0 for xor, 1 for and, 2 for or
           tpu::TPUGenerateSgdnnTensor(out));
       TORCH_CHECK(status == BM_SUCCESS);
+      #elif defined BACKEND_SG2260
+      auto status = sgdnnElementBitwise(
+          c10_tpu::getCurrentTPUStream(), tpu::TPUGenerateSgdnnTensor(self),
+          tpu::TPUGenerateSgdnnTensor(other),
+          1, // 0 for xor, 1 for and, 2 for or
+          tpu::TPUGenerateSgdnnTensor(out));
+      TORCH_CHECK(status == tpuRtSuccess);
+      #endif
       TIMING_END(tpu::BITWISE_AND);
     } else {
       TIMING_START;
-      bm_status_t status = sgdnnElementBitwiseBcast(
+      #if defined BACKEND_1684X
+      auto status = sgdnnElementBitwiseBcast(
           tpu::TPUGetDeviceHandle(), tpu::TPUGenerateSgdnnTensor(self),
           tpu::TPUGenerateSgdnnTensor(other),
           1, // 0 for xor, 1 for and, 2 for or
           tpu::TPUGenerateSgdnnTensor(out));
       TORCH_CHECK(status == BM_SUCCESS);
+      #elif defined BACKEND_SG2260
+      auto status = sgdnnElementBitwiseBcast(
+          c10_tpu::getCurrentTPUStream(), tpu::TPUGenerateSgdnnTensor(self),
+          tpu::TPUGenerateSgdnnTensor(other),
+          1, // 0 for xor, 1 for and, 2 for or
+          tpu::TPUGenerateSgdnnTensor(out));
+      TORCH_CHECK(status == tpuRtSuccess);
+      #endif
       TIMING_END(tpu::BITWISE_AND_BCAST);
     }
   }
@@ -425,40 +568,76 @@ Tensor &bitwise_or_out_tpu(const Tensor &self, const Tensor &other,
     TIMING_END(tpu::CPU_LAYER);
   } else if (self.dim() == 0) {
     TIMING_START;
-    bm_status_t status = sgdnnElementBitwiseC(
+    #if defined BACKEND_1684X
+    auto status = sgdnnElementBitwiseC(
         tpu::TPUGetDeviceHandle(), tpu::TPUGenerateSgdnnTensor(other),
         self.item().toInt(),
         2, // 0 for xor, 1 for and, 2 for or
         tpu::TPUGenerateSgdnnTensor(out));
     TORCH_CHECK(status == BM_SUCCESS);
+    #elif defined BACKEND_SG2260
+    auto status = sgdnnElementBitwiseC(
+        c10_tpu::getCurrentTPUStream(), tpu::TPUGenerateSgdnnTensor(other),
+        self.item().toInt(),
+        2, // 0 for xor, 1 for and, 2 for or
+        tpu::TPUGenerateSgdnnTensor(out));
+    TORCH_CHECK(status == tpuRtSuccess);
+    #endif
     TIMING_END(tpu::BITWISE_OR_C);
   } else if (other.dim() == 0) {
     TIMING_START;
-    bm_status_t status = sgdnnElementBitwiseC(
+    #if defined BACKEND_1684X
+    auto status = sgdnnElementBitwiseC(
         tpu::TPUGetDeviceHandle(), tpu::TPUGenerateSgdnnTensor(self),
         other.item().toInt(),
         2, // 0 for xor, 1 for and, 2 for or
         tpu::TPUGenerateSgdnnTensor(out));
     TORCH_CHECK(status == BM_SUCCESS);
+    #elif defined BACKEND_SG2260
+    auto status = sgdnnElementBitwiseC(
+        c10_tpu::getCurrentTPUStream(), tpu::TPUGenerateSgdnnTensor(self),
+        other.item().toInt(),
+        2, // 0 for xor, 1 for and, 2 for or
+        tpu::TPUGenerateSgdnnTensor(out));
+    TORCH_CHECK(status == tpuRtSuccess);
+    #endif
     TIMING_END(tpu::BITWISE_OR_C);
   } else {
     if (tpu::TPUIsSameShape(self, other)) {
       TIMING_START;
-      bm_status_t status = sgdnnElementBitwise(
+      #if defined BACKEND_1684X
+      auto status = sgdnnElementBitwise(
           tpu::TPUGetDeviceHandle(), tpu::TPUGenerateSgdnnTensor(self),
           tpu::TPUGenerateSgdnnTensor(other),
           2, // 0 for xor, 1 for and, 2 for or
           tpu::TPUGenerateSgdnnTensor(out));
       TORCH_CHECK(status == BM_SUCCESS);
+      #elif defined BACKEND_SG2260
+      auto status = sgdnnElementBitwise(
+          c10_tpu::getCurrentTPUStream(), tpu::TPUGenerateSgdnnTensor(self),
+          tpu::TPUGenerateSgdnnTensor(other),
+          2, // 0 for xor, 1 for and, 2 for or
+          tpu::TPUGenerateSgdnnTensor(out));
+      TORCH_CHECK(status == tpuRtSuccess);
+      #endif
       TIMING_END(tpu::BITWISE_OR);
     } else {
       TIMING_START;
-      bm_status_t status = sgdnnElementBitwiseBcast(
+      #if defined BACKEND_1684X
+      auto status = sgdnnElementBitwiseBcast(
           tpu::TPUGetDeviceHandle(), tpu::TPUGenerateSgdnnTensor(self),
           tpu::TPUGenerateSgdnnTensor(other),
           2, // 0 for xor, 1 for and, 2 for or
           tpu::TPUGenerateSgdnnTensor(out));
       TORCH_CHECK(status == BM_SUCCESS);
+      #elif defined BACKEND_SG2260
+      auto status = sgdnnElementBitwiseBcast(
+          c10_tpu::getCurrentTPUStream(), tpu::TPUGenerateSgdnnTensor(self),
+          tpu::TPUGenerateSgdnnTensor(other),
+          2, // 0 for xor, 1 for and, 2 for or
+          tpu::TPUGenerateSgdnnTensor(out));
+      TORCH_CHECK(status == tpuRtSuccess);
+      #endif
       TIMING_END(tpu::BITWISE_OR_BCAST);
     }
   }
@@ -486,36 +665,66 @@ Tensor &equal_out_tpu(const Tensor &self, const Tensor &other, Tensor &out) {
     TIMING_END(tpu::CPU_LAYER);
   } else if (self.dim() == 0) {
     TIMING_START;
+  #if defined BACKEND_1684X
     // mode : 0 equal, 1 not equal, 2 greater, 3 greater or equal, 4 less than,
     // 5 less than or equal pos : 0 for self is scalar, 1 for other is scalar
-    bm_status_t status = sgdnnComparisionC(
+    auto status = sgdnnComparisionC(
         tpu::TPUGetDeviceHandle(), tpu::TPUGenerateSgdnnTensor(other),
         self.item().toFloat(), 0, 0, tpu::TPUGenerateSgdnnTensor(out));
     TORCH_CHECK(status == BM_SUCCESS);
+    #elif defined BACKEND_SG2260
+    auto status = sgdnnComparisionC(
+        c10_tpu::getCurrentTPUStream(), tpu::TPUGenerateSgdnnTensor(other),
+        self.item().toFloat(), 0, 0, tpu::TPUGenerateSgdnnTensor(out));
+    TORCH_CHECK(status == tpuRtSuccess);
+    #endif
     TIMING_END(tpu::EQUAL_C);
   } else if (other.dim() == 0) {
     TIMING_START;
-    bm_status_t status = sgdnnComparisionC(
+    #if defined BACKEND_1684X
+    auto status = sgdnnComparisionC(
         tpu::TPUGetDeviceHandle(), tpu::TPUGenerateSgdnnTensor(self),
         other.item().toFloat(), 0, 1, tpu::TPUGenerateSgdnnTensor(out));
     TORCH_CHECK(status == BM_SUCCESS);
+    #elif defined BACKEND_SG2260
+    auto status = sgdnnComparisionC(
+        c10_tpu::getCurrentTPUStream(), tpu::TPUGenerateSgdnnTensor(self),
+        other.item().toFloat(), 0, 1, tpu::TPUGenerateSgdnnTensor(out));
+    TORCH_CHECK(status == tpuRtSuccess);
+    #endif
     TIMING_END(tpu::EQUAL_C);
   } else {
     if (tpu::TPUIsSameShape(self, other)) {
       TIMING_START;
-      bm_status_t status = sgdnnComparision(
+      #if defined BACKEND_1684X
+      auto status = sgdnnComparision(
           tpu::TPUGetDeviceHandle(), tpu::TPUGenerateSgdnnTensor(self),
           tpu::TPUGenerateSgdnnTensor(other), 0,
           tpu::TPUGenerateSgdnnTensor(out));
       TORCH_CHECK(status == BM_SUCCESS);
+      #elif defined BACKEND_SG2260
+      auto status = sgdnnComparision(
+          c10_tpu::getCurrentTPUStream(), tpu::TPUGenerateSgdnnTensor(self),
+          tpu::TPUGenerateSgdnnTensor(other), 0,
+          tpu::TPUGenerateSgdnnTensor(out));
+      TORCH_CHECK(status == tpuRtSuccess);
+      #endif
       TIMING_END(tpu::EQUAL);
     } else {
       TIMING_START;
-      bm_status_t status = sgdnnComparisionBcast(
+      #if defined BACKEND_1684X
+      auto status = sgdnnComparisionBcast(
           tpu::TPUGetDeviceHandle(), tpu::TPUGenerateSgdnnTensor(self),
           tpu::TPUGenerateSgdnnTensor(other), 0,
           tpu::TPUGenerateSgdnnTensor(out));
       TORCH_CHECK(status == BM_SUCCESS);
+      #elif defined BACKEND_SG2260
+      auto status = sgdnnComparisionBcast(
+          c10_tpu::getCurrentTPUStream(), tpu::TPUGenerateSgdnnTensor(self),
+          tpu::TPUGenerateSgdnnTensor(other), 0,
+          tpu::TPUGenerateSgdnnTensor(out));
+      TORCH_CHECK(status == tpuRtSuccess);
+      #endif
       TIMING_END(tpu::EQUAL_BCAST);
     }
   }
@@ -543,36 +752,66 @@ Tensor &greater_or_equal_out_tpu(const Tensor &self, const Tensor &other,
     TIMING_END(tpu::CPU_LAYER);
   } else if (self.dim() == 0) {
     TIMING_START;
+    #if defined BACKEND_1684X
     // mode : 0 equal, 1 not equal, 2 greater, 3 greater or equal, 4 less than,
     // 5 less than or equal pos : 0 for self is scalar, 1 for other is scalar
-    bm_status_t status = sgdnnComparisionC(
+    auto status = sgdnnComparisionC(
         tpu::TPUGetDeviceHandle(), tpu::TPUGenerateSgdnnTensor(other),
         self.item().toFloat(), 3, 0, tpu::TPUGenerateSgdnnTensor(out));
     TORCH_CHECK(status == BM_SUCCESS);
+    #elif defined BACKEND_SG2260
+    auto status = sgdnnComparisionC(
+        c10_tpu::getCurrentTPUStream(), tpu::TPUGenerateSgdnnTensor(other),
+        self.item().toFloat(), 3, 0, tpu::TPUGenerateSgdnnTensor(out));
+    TORCH_CHECK(status == tpuRtSuccess);
+    #endif
     TIMING_END(tpu::GREATER_OR_EQUAL_C);
   } else if (other.dim() == 0) {
     TIMING_START;
-    bm_status_t status = sgdnnComparisionC(
+    #if defined BACKEND_1684X
+    auto status = sgdnnComparisionC(
         tpu::TPUGetDeviceHandle(), tpu::TPUGenerateSgdnnTensor(self),
         other.item().toFloat(), 3, 1, tpu::TPUGenerateSgdnnTensor(out));
     TORCH_CHECK(status == BM_SUCCESS);
+    #elif defined BACKEND_SG2260
+    auto status = sgdnnComparisionC(
+        c10_tpu::getCurrentTPUStream(), tpu::TPUGenerateSgdnnTensor(self),
+        other.item().toFloat(), 3, 1, tpu::TPUGenerateSgdnnTensor(out));
+    TORCH_CHECK(status == tpuRtSuccess);
+    #endif
     TIMING_END(tpu::GREATER_OR_EQUAL_C);
   } else {
     if (tpu::TPUIsSameShape(self, other)) {
       TIMING_START;
-      bm_status_t status = sgdnnComparision(
+      #if defined BACKEND_1684X
+      auto status = sgdnnComparision(
           tpu::TPUGetDeviceHandle(), tpu::TPUGenerateSgdnnTensor(self),
           tpu::TPUGenerateSgdnnTensor(other), 3,
           tpu::TPUGenerateSgdnnTensor(out));
       TORCH_CHECK(status == BM_SUCCESS);
+      #elif defined BACKEND_SG2260
+      auto status = sgdnnComparision(
+          c10_tpu::getCurrentTPUStream(), tpu::TPUGenerateSgdnnTensor(self),
+          tpu::TPUGenerateSgdnnTensor(other), 3,
+          tpu::TPUGenerateSgdnnTensor(out));
+      TORCH_CHECK(status == tpuRtSuccess);
+      #endif
       TIMING_END(tpu::GREATER_OR_EQUAL);
     } else {
       TIMING_START;
-      bm_status_t status = sgdnnComparisionBcast(
+      #if defined BACKEND_1684X
+      auto status = sgdnnComparisionBcast(
           tpu::TPUGetDeviceHandle(), tpu::TPUGenerateSgdnnTensor(self),
           tpu::TPUGenerateSgdnnTensor(other), 3,
           tpu::TPUGenerateSgdnnTensor(out));
       TORCH_CHECK(status == BM_SUCCESS);
+      #elif defined BACKEND_SG2260
+      auto status = sgdnnComparisionBcast(
+          c10_tpu::getCurrentTPUStream(), tpu::TPUGenerateSgdnnTensor(self),
+          tpu::TPUGenerateSgdnnTensor(other), 3,
+          tpu::TPUGenerateSgdnnTensor(out));
+      TORCH_CHECK(status == tpuRtSuccess);
+      #endif
       TIMING_END(tpu::GREATER_OR_EQUAL_BCAST);
     }
   }
@@ -601,36 +840,66 @@ Tensor &greater_out_tpu(const Tensor &self, const Tensor &other, Tensor &out) {
     TIMING_END(tpu::CPU_LAYER);
   } else if (self.dim() == 0) {
     TIMING_START;
+    #if defined BACKEND_1684X
     // mode : 0 equal, 1 not equal, 2 greater, 3 greater or equal, 4 less than,
     // 5 less than or equal pos : 0 for self is scalar, 1 for other is scalar
-    bm_status_t status = sgdnnComparisionC(
+    auto status = sgdnnComparisionC(
         tpu::TPUGetDeviceHandle(), tpu::TPUGenerateSgdnnTensor(other),
         self.item().toFloat(), 2, 0, tpu::TPUGenerateSgdnnTensor(out));
     TORCH_CHECK(status == BM_SUCCESS);
+    #elif defined BACKEND_SG2260
+    auto status = sgdnnComparisionC(
+        c10_tpu::getCurrentTPUStream(), tpu::TPUGenerateSgdnnTensor(other),
+        self.item().toFloat(), 2, 0, tpu::TPUGenerateSgdnnTensor(out));
+    TORCH_CHECK(status == tpuRtSuccess);
+    #endif
     TIMING_END(tpu::GREATER_C);
   } else if (other.dim() == 0) {
     TIMING_START;
-    bm_status_t status = sgdnnComparisionC(
+    #if defined BACKEND_1684X
+    auto status = sgdnnComparisionC(
         tpu::TPUGetDeviceHandle(), tpu::TPUGenerateSgdnnTensor(self),
         other.item().toFloat(), 2, 1, tpu::TPUGenerateSgdnnTensor(out));
     TORCH_CHECK(status == BM_SUCCESS);
+    #elif defined BACKEND_SG2260
+    auto status = sgdnnComparisionC(
+        c10_tpu::getCurrentTPUStream(), tpu::TPUGenerateSgdnnTensor(self),
+        other.item().toFloat(), 2, 1, tpu::TPUGenerateSgdnnTensor(out));
+    TORCH_CHECK(status == tpuRtSuccess);
+    #endif
     TIMING_END(tpu::GREATER_C);
   } else {
     if (tpu::TPUIsSameShape(self, other)) {
       TIMING_START;
-      bm_status_t status = sgdnnComparision(
+      #if defined BACKEND_1684X
+      auto status = sgdnnComparision(
           tpu::TPUGetDeviceHandle(), tpu::TPUGenerateSgdnnTensor(self),
           tpu::TPUGenerateSgdnnTensor(other), 2,
           tpu::TPUGenerateSgdnnTensor(out));
       TORCH_CHECK(status == BM_SUCCESS);
+      #elif defined BACKEND_SG2260
+      auto status = sgdnnComparision(
+          c10_tpu::getCurrentTPUStream(), tpu::TPUGenerateSgdnnTensor(self),
+          tpu::TPUGenerateSgdnnTensor(other), 2,
+          tpu::TPUGenerateSgdnnTensor(out));
+      TORCH_CHECK(status == tpuRtSuccess);
+      #endif
       TIMING_END(tpu::GREATER);
     } else {
       TIMING_START;
-      bm_status_t status = sgdnnComparisionBcast(
+      #if defined BACKEND_1684X
+      auto status = sgdnnComparisionBcast(
           tpu::TPUGetDeviceHandle(), tpu::TPUGenerateSgdnnTensor(self),
           tpu::TPUGenerateSgdnnTensor(other), 2,
           tpu::TPUGenerateSgdnnTensor(out));
       TORCH_CHECK(status == BM_SUCCESS);
+      #elif defined BACKEND_SG2260
+      auto status = sgdnnComparisionBcast(
+          c10_tpu::getCurrentTPUStream(), tpu::TPUGenerateSgdnnTensor(self),
+          tpu::TPUGenerateSgdnnTensor(other), 2,
+          tpu::TPUGenerateSgdnnTensor(out));
+      TORCH_CHECK(status == tpuRtSuccess);
+      #endif
       TIMING_END(tpu::GREATER_BCAST);
     }
   }
@@ -657,36 +926,66 @@ Tensor &less_than_or_equal_out_tpu(const Tensor &self, const Tensor &other,
     TIMING_END(tpu::CPU_LAYER);
   } else if (self.dim() == 0) {
     TIMING_START;
+  #if defined BACKEND_1684X
     // mode : 0 equal, 1 not equal, 2 greater, 3 greater or equal, 4 less than,
     // 5 less than or equal pos : 0 for self is scalar, 1 for other is scalar
-    bm_status_t status = sgdnnComparisionC(
+    auto status = sgdnnComparisionC(
         tpu::TPUGetDeviceHandle(), tpu::TPUGenerateSgdnnTensor(other),
         self.item().toFloat(), 5, 0, tpu::TPUGenerateSgdnnTensor(out));
     TORCH_CHECK(status == BM_SUCCESS);
+    #elif defined BACKEND_SG2260
+    auto status = sgdnnComparisionC(
+        c10_tpu::getCurrentTPUStream(), tpu::TPUGenerateSgdnnTensor(other),
+        self.item().toFloat(), 5, 0, tpu::TPUGenerateSgdnnTensor(out));
+    TORCH_CHECK(status == tpuRtSuccess);
+    #endif
     TIMING_END(tpu::LESS_THAN_OR_EQUAL_C);
   } else if (other.dim() == 0) {
     TIMING_START;
-    bm_status_t status = sgdnnComparisionC(
+    #if defined BACKEND_1684X
+    auto status = sgdnnComparisionC(
         tpu::TPUGetDeviceHandle(), tpu::TPUGenerateSgdnnTensor(self),
         other.item().toFloat(), 5, 1, tpu::TPUGenerateSgdnnTensor(out));
     TORCH_CHECK(status == BM_SUCCESS);
+    #elif defined BACKEND_SG2260
+    auto status = sgdnnComparisionC(
+        c10_tpu::getCurrentTPUStream(), tpu::TPUGenerateSgdnnTensor(self),
+        other.item().toFloat(), 5, 1, tpu::TPUGenerateSgdnnTensor(out));
+    TORCH_CHECK(status == tpuRtSuccess);
+    #endif
     TIMING_END(tpu::LESS_THAN_OR_EQUAL_C);
   } else {
     if (tpu::TPUIsSameShape(self, other)) {
       TIMING_START;
-      bm_status_t status = sgdnnComparision(
+      #if defined BACKEND_1684X
+      auto status = sgdnnComparision(
           tpu::TPUGetDeviceHandle(), tpu::TPUGenerateSgdnnTensor(self),
           tpu::TPUGenerateSgdnnTensor(other), 5,
           tpu::TPUGenerateSgdnnTensor(out));
       TORCH_CHECK(status == BM_SUCCESS);
+      #elif defined BACKEND_SG2260
+      auto status = sgdnnComparision(
+          c10_tpu::getCurrentTPUStream(), tpu::TPUGenerateSgdnnTensor(self),
+          tpu::TPUGenerateSgdnnTensor(other), 5,
+          tpu::TPUGenerateSgdnnTensor(out));
+      TORCH_CHECK(status == tpuRtSuccess);
+      #endif
       TIMING_END(tpu::LESS_THAN_OR_EQUAL);
     } else {
       TIMING_START;
-      bm_status_t status = sgdnnComparisionBcast(
+      #if defined BACKEND_1684X
+      auto status = sgdnnComparisionBcast(
           tpu::TPUGetDeviceHandle(), tpu::TPUGenerateSgdnnTensor(self),
           tpu::TPUGenerateSgdnnTensor(other), 5,
           tpu::TPUGenerateSgdnnTensor(out));
       TORCH_CHECK(status == BM_SUCCESS);
+      #elif defined BACKEND_SG2260
+      auto status = sgdnnComparisionBcast(
+          c10_tpu::getCurrentTPUStream(), tpu::TPUGenerateSgdnnTensor(self),
+          tpu::TPUGenerateSgdnnTensor(other), 5,
+          tpu::TPUGenerateSgdnnTensor(out));
+      TORCH_CHECK(status == tpuRtSuccess);
+      #endif
       TIMING_END(tpu::LESS_THAN_OR_EQUAL_BCAST);
     }
   }
@@ -716,36 +1015,66 @@ Tensor &less_than_out_tpu(const Tensor &self, const Tensor &other,
     TIMING_END(tpu::CPU_LAYER);
   } else if (self.dim() == 0) {
     TIMING_START;
+  #if defined BACKEND_1684X
     // mode : 0 equal, 1 not equal, 2 greater, 3 greater or equal, 4 less than,
     // 5 less than or equal pos : 0 for self is scalar, 1 for other is scalar
-    bm_status_t status = sgdnnComparisionC(
+    auto status = sgdnnComparisionC(
         tpu::TPUGetDeviceHandle(), tpu::TPUGenerateSgdnnTensor(other),
         self.item().toFloat(), 4, 0, tpu::TPUGenerateSgdnnTensor(out));
     TORCH_CHECK(status == BM_SUCCESS);
+    #elif defined BACKEND_SG2260
+    auto status = sgdnnComparisionC(
+        c10_tpu::getCurrentTPUStream(), tpu::TPUGenerateSgdnnTensor(other),
+        self.item().toFloat(), 4, 0, tpu::TPUGenerateSgdnnTensor(out));
+    TORCH_CHECK(status == tpuRtSuccess);
+    #endif
     TIMING_END(tpu::LESS_THAN_C);
   } else if (other.dim() == 0) {
     TIMING_START;
-    bm_status_t status = sgdnnComparisionC(
+    #if defined BACKEND_1684X
+    auto status = sgdnnComparisionC(
         tpu::TPUGetDeviceHandle(), tpu::TPUGenerateSgdnnTensor(self),
         other.item().toFloat(), 4, 1, tpu::TPUGenerateSgdnnTensor(out));
     TORCH_CHECK(status == BM_SUCCESS);
+    #elif defined BACKEND_SG2260
+    auto status = sgdnnComparisionC(
+        c10_tpu::getCurrentTPUStream(), tpu::TPUGenerateSgdnnTensor(self),
+        other.item().toFloat(), 4, 1, tpu::TPUGenerateSgdnnTensor(out));
+    TORCH_CHECK(status == tpuRtSuccess);
+    #endif
     TIMING_END(tpu::LESS_THAN_C);
   } else {
     if (tpu::TPUIsSameShape(self, other)) {
       TIMING_START;
-      bm_status_t status = sgdnnComparision(
+      #if defined BACKEND_1684X
+      auto status = sgdnnComparision(
           tpu::TPUGetDeviceHandle(), tpu::TPUGenerateSgdnnTensor(self),
           tpu::TPUGenerateSgdnnTensor(other), 4,
           tpu::TPUGenerateSgdnnTensor(out));
       TORCH_CHECK(status == BM_SUCCESS);
+      #elif defined BACKEND_SG2260
+      auto status = sgdnnComparision(
+          c10_tpu::getCurrentTPUStream(), tpu::TPUGenerateSgdnnTensor(self),
+          tpu::TPUGenerateSgdnnTensor(other), 4,
+          tpu::TPUGenerateSgdnnTensor(out));
+      TORCH_CHECK(status == tpuRtSuccess);
+      #endif
       TIMING_END(tpu::LESS_THAN);
     } else {
       TIMING_START;
-      bm_status_t status = sgdnnComparisionBcast(
+      #if defined BACKEND_1684X
+      auto status = sgdnnComparisionBcast(
           tpu::TPUGetDeviceHandle(), tpu::TPUGenerateSgdnnTensor(self),
           tpu::TPUGenerateSgdnnTensor(other), 4,
           tpu::TPUGenerateSgdnnTensor(out));
       TORCH_CHECK(status == BM_SUCCESS);
+      #elif defined BACKEND_SG2260
+      auto status = sgdnnComparisionBcast(
+          c10_tpu::getCurrentTPUStream(), tpu::TPUGenerateSgdnnTensor(self),
+          tpu::TPUGenerateSgdnnTensor(other), 4,
+          tpu::TPUGenerateSgdnnTensor(out));
+      TORCH_CHECK(status == tpuRtSuccess);
+      #endif
       TIMING_END(tpu::LESS_THAN_BCAST);
     }
   }
@@ -772,36 +1101,66 @@ Tensor &not_equal_out_tpu(const Tensor &self, const Tensor &other,
     TIMING_END(tpu::CPU_LAYER);
   } else if (self.dim() == 0) {
     TIMING_START;
+  #if defined BACKEND_1684X
     // mode : 0 equal, 1 not equal, 2 greater, 3 greater or equal, 4 less than,
     // 5 less than or equal pos : 0 for self is scalar, 1 for other is scalar
-    bm_status_t status = sgdnnComparisionC(
+    auto status = sgdnnComparisionC(
         tpu::TPUGetDeviceHandle(), tpu::TPUGenerateSgdnnTensor(other),
         self.item().toFloat(), 1, 0, tpu::TPUGenerateSgdnnTensor(out));
     TORCH_CHECK(status == BM_SUCCESS);
+    #elif defined BACKEND_SG2260
+    auto status = sgdnnComparisionC(
+        c10_tpu::getCurrentTPUStream(), tpu::TPUGenerateSgdnnTensor(other),
+        self.item().toFloat(), 1, 0, tpu::TPUGenerateSgdnnTensor(out));
+    TORCH_CHECK(status == tpuRtSuccess);
+    #endif
     TIMING_END(tpu::NOT_EQUAL_C);
   } else if (other.dim() == 0) {
     TIMING_START;
-    bm_status_t status = sgdnnComparisionC(
+  #if defined BACKEND_1684X
+    auto status = sgdnnComparisionC(
         tpu::TPUGetDeviceHandle(), tpu::TPUGenerateSgdnnTensor(self),
         other.item().toFloat(), 1, 1, tpu::TPUGenerateSgdnnTensor(out));
     TORCH_CHECK(status == BM_SUCCESS);
+    #elif defined BACKEND_SG2260
+    auto status = sgdnnComparisionC(
+        c10_tpu::getCurrentTPUStream(), tpu::TPUGenerateSgdnnTensor(self),
+        other.item().toFloat(), 1, 1, tpu::TPUGenerateSgdnnTensor(out));
+    TORCH_CHECK(status == tpuRtSuccess);
+    #endif
     TIMING_END(tpu::NOT_EQUAL_C);
   } else {
     if (tpu::TPUIsSameShape(self, other)) {
       TIMING_START;
-      bm_status_t status = sgdnnComparision(
+      #if defined BACKEND_1684X
+      auto status = sgdnnComparision(
           tpu::TPUGetDeviceHandle(), tpu::TPUGenerateSgdnnTensor(self),
           tpu::TPUGenerateSgdnnTensor(other), 1,
           tpu::TPUGenerateSgdnnTensor(out));
       TORCH_CHECK(status == BM_SUCCESS);
+      #elif defined BACKEND_SG2260
+      auto status = sgdnnComparision(
+          c10_tpu::getCurrentTPUStream(), tpu::TPUGenerateSgdnnTensor(self),
+          tpu::TPUGenerateSgdnnTensor(other), 1,
+          tpu::TPUGenerateSgdnnTensor(out));
+      TORCH_CHECK(status == tpuRtSuccess);
+      #endif
       TIMING_END(tpu::NOT_EQUAL);
     } else {
       TIMING_START;
-      bm_status_t status = sgdnnComparisionBcast(
+      #if defined BACKEND_1684X
+      auto status = sgdnnComparisionBcast(
           tpu::TPUGetDeviceHandle(), tpu::TPUGenerateSgdnnTensor(self),
           tpu::TPUGenerateSgdnnTensor(other), 1,
           tpu::TPUGenerateSgdnnTensor(out));
       TORCH_CHECK(status == BM_SUCCESS);
+      #elif defined BACKEND_SG2260
+      auto status = sgdnnComparisionBcast(
+          c10_tpu::getCurrentTPUStream(), tpu::TPUGenerateSgdnnTensor(self),
+          tpu::TPUGenerateSgdnnTensor(other), 1,
+          tpu::TPUGenerateSgdnnTensor(out));
+      TORCH_CHECK(status == tpuRtSuccess);
+      #endif
       TIMING_END(tpu::NOT_EQUAL_BCAST);
     }
   }
@@ -827,32 +1186,60 @@ Tensor &shift_left_out_tpu(const Tensor &self, const Tensor &other,
     //     out_cpu.contiguous().data_ptr(), out.nbytes());
   } else if (self.dim() == 0) {
     TIMING_START;
-    bm_status_t status = sgdnnShiftLeftC(
+    #if defined BACKEND_1684X
+    auto status = sgdnnShiftLeftC(
         tpu::TPUGetDeviceHandle(), tpu::TPUGenerateSgdnnTensor(other),
         self.item().toChar(), tpu::TPUGenerateSgdnnTensor(out));
     TORCH_CHECK(status == BM_SUCCESS);
+    #elif defined BACKEND_SG2260
+    auto status = sgdnnShiftLeftC(
+        c10_tpu::getCurrentTPUStream(), tpu::TPUGenerateSgdnnTensor(other),
+        self.item().toChar(), tpu::TPUGenerateSgdnnTensor(out));
+    TORCH_CHECK(status == tpuRtSuccess);
+    #endif
     TIMING_END(tpu::SHIFT_LEFT_C);
   } else if (other.dim() == 0) {
     TIMING_START;
-    bm_status_t status = sgdnnShiftLeftC(
+    #if defined BACKEND_1684X
+    auto status = sgdnnShiftLeftC(
         tpu::TPUGetDeviceHandle(), tpu::TPUGenerateSgdnnTensor(self),
         other.item().toChar(), tpu::TPUGenerateSgdnnTensor(out));
     TORCH_CHECK(status == BM_SUCCESS);
+    #elif defined BACKEND_SG2260
+    auto status = sgdnnShiftLeftC(
+        c10_tpu::getCurrentTPUStream(), tpu::TPUGenerateSgdnnTensor(self),
+        other.item().toChar(), tpu::TPUGenerateSgdnnTensor(out));
+    TORCH_CHECK(status == tpuRtSuccess);
+    #endif
     TIMING_END(tpu::SHIFT_LEFT_C);
   } else if (self.dim() == other.dim()) {
     if (tpu::TPUIsSameShape(self, other)) {
       TIMING_START;
-      bm_status_t status = sgdnnShiftLeft(
+      #if defined BACKEND_1684X
+      auto status = sgdnnShiftLeft(
           tpu::TPUGetDeviceHandle(), tpu::TPUGenerateSgdnnTensor(self),
           tpu::TPUGenerateSgdnnTensor(other), tpu::TPUGenerateSgdnnTensor(out));
       TORCH_CHECK(status == BM_SUCCESS);
+      #elif defined BACKEND_SG2260
+      auto status = sgdnnShiftLeft(
+          c10_tpu::getCurrentTPUStream(), tpu::TPUGenerateSgdnnTensor(self),
+          tpu::TPUGenerateSgdnnTensor(other), tpu::TPUGenerateSgdnnTensor(out));
+      TORCH_CHECK(status == tpuRtSuccess);
+      #endif
       TIMING_END(tpu::SHIFT_LEFT);
     } else {
       TIMING_START;
-      bm_status_t status = sgdnnShiftLeftBcast(
+      #if defined BACKEND_1684X
+      auto status = sgdnnShiftLeftBcast(
           tpu::TPUGetDeviceHandle(), tpu::TPUGenerateSgdnnTensor(self),
           tpu::TPUGenerateSgdnnTensor(other), tpu::TPUGenerateSgdnnTensor(out));
       TORCH_CHECK(status == BM_SUCCESS);
+      #elif defined BACKEND_SG2260
+      auto status = sgdnnShiftLeftBcast(
+          c10_tpu::getCurrentTPUStream(), tpu::TPUGenerateSgdnnTensor(self),
+          tpu::TPUGenerateSgdnnTensor(other), tpu::TPUGenerateSgdnnTensor(out));
+      TORCH_CHECK(status == tpuRtSuccess);
+      #endif
       TIMING_END(tpu::SHIFT_LEFT_BCAST);
     }
   } else {
@@ -882,29 +1269,51 @@ Tensor &shift_right_arithmetic_out_tpu(const Tensor &self, const Tensor &other,
     TORCH_CHECK(false, "unsupported dims");
   } else if (self.dim() == 0) {
     TIMING_START;
-    bm_status_t status = sgdnnShiftRightArithmeticC(
+    #if defined BACKEND_1684X
+    auto status = sgdnnShiftRightArithmeticC(
         tpu::TPUGetDeviceHandle(), tpu::TPUGenerateSgdnnTensor(other),
         self.item().toInt(), tpu::TPUGenerateSgdnnTensor(out));
     TORCH_CHECK(status == BM_SUCCESS);
+    #elif defined BACKEND_SG2260
+    auto status = sgdnnShiftRightArithmeticC(
+        c10_tpu::getCurrentTPUStream(), tpu::TPUGenerateSgdnnTensor(other),
+        self.item().toInt(), tpu::TPUGenerateSgdnnTensor(out));
+    TORCH_CHECK(status == tpuRtSuccess);
+    #endif
     TIMING_END(tpu::SHIFT_RIGHT_ARITHMETIC_C);
   } else if (other.dim() == 0) {
     TIMING_START;
-    bm_status_t status = sgdnnShiftRightArithmeticC(
+    #if defined BACKEND_1684X
+    auto status = sgdnnShiftRightArithmeticC(
         tpu::TPUGetDeviceHandle(), tpu::TPUGenerateSgdnnTensor(self),
         other.item().toInt(), tpu::TPUGenerateSgdnnTensor(out));
     TORCH_CHECK(status == BM_SUCCESS);
+    #elif defined BACKEND_SG2260
+    auto status = sgdnnShiftRightArithmeticC(
+        c10_tpu::getCurrentTPUStream(), tpu::TPUGenerateSgdnnTensor(self),
+        other.item().toInt(), tpu::TPUGenerateSgdnnTensor(out));
+    TORCH_CHECK(status == tpuRtSuccess);
+    #endif
     TIMING_END(tpu::SHIFT_RIGHT_ARITHMETIC_C);
   } else if (self.dim() == other.dim()) {
     if (tpu::TPUIsSameShape(self, other)) {
       TIMING_START;
-      bm_status_t status = sgdnnShiftRightArithmetic(
+      #if defined BACKEND_1684X
+      auto status = sgdnnShiftRightArithmetic(
           tpu::TPUGetDeviceHandle(), tpu::TPUGenerateSgdnnTensor(self),
           tpu::TPUGenerateSgdnnTensor(other), tpu::TPUGenerateSgdnnTensor(out));
       TORCH_CHECK(status == BM_SUCCESS);
+      #elif defined BACKEND_SG2260
+      auto status = sgdnnShiftRightArithmetic(
+          c10_tpu::getCurrentTPUStream(), tpu::TPUGenerateSgdnnTensor(self),
+          tpu::TPUGenerateSgdnnTensor(other), tpu::TPUGenerateSgdnnTensor(out));
+      TORCH_CHECK(status == tpuRtSuccess);
+      #endif
       TIMING_END(tpu::SHIFT_RIGHT_ARITHMETIC);
     } else {
       TIMING_START;
-      // bm_status_t status =
+      #if defined BACKEND_1684X
+      // auto status =
       // sgdnnShiftRightArithmeticBcast(tpu::TPUGetDeviceHandle(),
       //                                      tpu:: TPUGenerateSgdnnTensor (
       //                                      self ), tpu::
@@ -912,6 +1321,8 @@ Tensor &shift_right_arithmetic_out_tpu(const Tensor &self, const Tensor &other,
       //                                      tpu:: TPUGenerateSgdnnTensor ( out
       //                                      ) );
       // TORCH_CHECK ( status == BM_SUCCESS );
+      #elif defined BACKEND_SG2260
+      #endif
       TIMING_END(tpu::SHIFT_RIGHT_ARITHMETIC_BCAST);
       TORCH_CHECK(false, "unsupported dims");
     }
@@ -945,42 +1356,76 @@ Tensor &minimum_out_tpu(const Tensor &self, const Tensor &other, Tensor &out) {
     // self is scalar
     Tensor scalar = self.to(torch::kFloat).cpu();
     TIMING_START;
-    bm_status_t status = sgdnnMinimumC(
+    #if defined BACKEND_1684X
+    auto status = sgdnnMinimumC(
         tpu::TPUGetDeviceHandle(),
         tpu::TPUGenerateSgdnnTensor(other.to(out.dtype())),
         *scalar.data_ptr<float>(), tpu::TPUGenerateSgdnnTensor(out));
     TORCH_CHECK(status == BM_SUCCESS);
+    #elif defined BACKEND_SG2260
+    auto status = sgdnnMinimumC(
+        c10_tpu::getCurrentTPUStream(),
+        tpu::TPUGenerateSgdnnTensor(other.to(out.dtype())),
+        *scalar.data_ptr<float>(), tpu::TPUGenerateSgdnnTensor(out));
+    TORCH_CHECK(status == tpuRtSuccess);
+    #endif
     TIMING_END(tpu::MINIMUM);
   } else if (other.dim() == 0) {
     // other is scalar
     Tensor scalar = other.to(torch::kFloat).cpu();
     TIMING_START;
-    bm_status_t status = sgdnnMinimumC(
+    #if defined BACKEND_1684X
+    auto status = sgdnnMinimumC(
         tpu::TPUGetDeviceHandle(),
         tpu::TPUGenerateSgdnnTensor(self.to(out.dtype())),
         *scalar.data_ptr<float>(), tpu::TPUGenerateSgdnnTensor(out));
     TORCH_CHECK(status == BM_SUCCESS);
+    #elif defined BACKEND_SG2260
+    auto status = sgdnnMinimumC(
+        c10_tpu::getCurrentTPUStream(),
+        tpu::TPUGenerateSgdnnTensor(self.to(out.dtype())),
+        *scalar.data_ptr<float>(), tpu::TPUGenerateSgdnnTensor(out));
+    TORCH_CHECK(status == tpuRtSuccess);
+    #endif
     TIMING_END(tpu::MINIMUM);
   } else {
     // self and other have the same shape
     if (self.sizes() == other.sizes()) {
       TIMING_START;
-      bm_status_t status =
+      #if defined BACKEND_1684X
+      auto status =
           sgdnnMinimum(tpu::TPUGetDeviceHandle(),
                        tpu::TPUGenerateSgdnnTensor(self.to(out.dtype())),
                        tpu::TPUGenerateSgdnnTensor(other.to(out.dtype())),
                        tpu::TPUGenerateSgdnnTensor(out));
       TORCH_CHECK(status == BM_SUCCESS);
+      #elif defined BACKEND_SG2260
+      auto status =
+          sgdnnMinimum(c10_tpu::getCurrentTPUStream(),
+                       tpu::TPUGenerateSgdnnTensor(self.to(out.dtype())),
+                       tpu::TPUGenerateSgdnnTensor(other.to(out.dtype())),
+                       tpu::TPUGenerateSgdnnTensor(out));
+      TORCH_CHECK(status == tpuRtSuccess);
+      #endif
       TIMING_END(tpu::MINIMUM);
     } else {
       // The shapes of self and other are not the same, need to broadcast
       TIMING_START;
-      bm_status_t status =
+      #if defined BACKEND_1684X
+      auto status =
           sgdnnMinimumBcast(tpu::TPUGetDeviceHandle(),
                             tpu::TPUGenerateSgdnnTensor(self.to(out.dtype())),
                             tpu::TPUGenerateSgdnnTensor(other.to(out.dtype())),
                             tpu::TPUGenerateSgdnnTensor(out));
       TORCH_CHECK(status == BM_SUCCESS);
+      #elif defined BACKEND_SG2260
+      auto status =
+          sgdnnMinimumBcast(c10_tpu::getCurrentTPUStream(),
+                            tpu::TPUGenerateSgdnnTensor(self.to(out.dtype())),
+                            tpu::TPUGenerateSgdnnTensor(other.to(out.dtype())),
+                            tpu::TPUGenerateSgdnnTensor(out));
+      TORCH_CHECK(status == tpuRtSuccess);
+      #endif
       TIMING_END(tpu::MINIMUM);
     }
   }
@@ -1010,42 +1455,76 @@ Tensor &maximum_out_tpu(const Tensor &self, const Tensor &other, Tensor &out) {
     // self is scalar
     Tensor scalar = self.to(torch::kFloat).cpu();
     TIMING_START;
-    bm_status_t status = sgdnnMaximumC(
+    #if defined BACKEND_1684X
+    auto status = sgdnnMaximumC(
         tpu::TPUGetDeviceHandle(),
         tpu::TPUGenerateSgdnnTensor(other.to(out.dtype())),
         *scalar.data_ptr<float>(), tpu::TPUGenerateSgdnnTensor(out));
     TORCH_CHECK(status == BM_SUCCESS);
+    #elif defined BACKEND_SG2260
+    auto status = sgdnnMaximumC(
+        c10_tpu::getCurrentTPUStream(),
+        tpu::TPUGenerateSgdnnTensor(other.to(out.dtype())),
+        *scalar.data_ptr<float>(), tpu::TPUGenerateSgdnnTensor(out));
+    TORCH_CHECK(status == tpuRtSuccess);
+    #endif
     TIMING_END(tpu::MAXIMUM);
   } else if (other.dim() == 0) {
     // other is scalar
     Tensor scalar = other.to(torch::kFloat).cpu();
     TIMING_START;
-    bm_status_t status = sgdnnMaximumC(
+    #if defined BACKEND_1684X
+    auto status = sgdnnMaximumC(
         tpu::TPUGetDeviceHandle(),
         tpu::TPUGenerateSgdnnTensor(self.to(out.dtype())),
         *scalar.data_ptr<float>(), tpu::TPUGenerateSgdnnTensor(out));
     TORCH_CHECK(status == BM_SUCCESS);
+    #elif defined BACKEND_SG2260
+    auto status = sgdnnMaximumC(
+        c10_tpu::getCurrentTPUStream(),
+        tpu::TPUGenerateSgdnnTensor(self.to(out.dtype())),
+        *scalar.data_ptr<float>(), tpu::TPUGenerateSgdnnTensor(out));
+    TORCH_CHECK(status == tpuRtSuccess);
+    #endif
     TIMING_END(tpu::MAXIMUM);
   } else {
     // self and other have the same shape
     if (self.sizes() == other.sizes()) {
       TIMING_START;
-      bm_status_t status =
+      #if defined BACKEND_1684X
+      auto status =
           sgdnnMaximum(tpu::TPUGetDeviceHandle(),
                        tpu::TPUGenerateSgdnnTensor(self.to(out.dtype())),
                        tpu::TPUGenerateSgdnnTensor(other.to(out.dtype())),
                        tpu::TPUGenerateSgdnnTensor(out));
       TORCH_CHECK(status == BM_SUCCESS);
+      #elif defined BACKEND_SG2260
+      auto status =
+          sgdnnMaximum(c10_tpu::getCurrentTPUStream(),
+                       tpu::TPUGenerateSgdnnTensor(self.to(out.dtype())),
+                       tpu::TPUGenerateSgdnnTensor(other.to(out.dtype())),
+                       tpu::TPUGenerateSgdnnTensor(out));
+      TORCH_CHECK(status == tpuRtSuccess);
+      #endif
       TIMING_END(tpu::MAXIMUM);
     } else {
       // The shapes of self and other are not the same, need to broadcast
       TIMING_START;
-      bm_status_t status =
+      #if defined BACKEND_1684X
+      auto status =
           sgdnnMaximumBcast(tpu::TPUGetDeviceHandle(),
                             tpu::TPUGenerateSgdnnTensor(self.to(out.dtype())),
                             tpu::TPUGenerateSgdnnTensor(other.to(out.dtype())),
                             tpu::TPUGenerateSgdnnTensor(out));
       TORCH_CHECK(status == BM_SUCCESS);
+      #elif defined BACKEND_SG2260
+      auto status =
+          sgdnnMaximumBcast(c10_tpu::getCurrentTPUStream(),
+                            tpu::TPUGenerateSgdnnTensor(self.to(out.dtype())),
+                            tpu::TPUGenerateSgdnnTensor(other.to(out.dtype())),
+                            tpu::TPUGenerateSgdnnTensor(out));
+      TORCH_CHECK(status == tpuRtSuccess);
+      #endif
       TIMING_END(tpu::MAXIMUM);
     }
   }
@@ -1075,42 +1554,76 @@ Tensor &atan2_out_tpu(const Tensor &self, const Tensor &other, Tensor &out) {
     // self is scalar
     Tensor scalar = self.to(torch::kFloat).cpu();
     TIMING_START;
-    bm_status_t status =
+    #if defined BACKEND_1684X
+    auto status =
         sgdnnAtan2C(tpu::TPUGetDeviceHandle(), *scalar.data_ptr<float>(),
                     tpu::TPUGenerateSgdnnTensor(other.to(torch::kFloat)),
                     tpu::TPUGenerateSgdnnTensor(out));
     TORCH_CHECK(status == BM_SUCCESS);
+    #elif defined BACKEND_SG2260
+    auto status =
+        sgdnnAtan2C(c10_tpu::getCurrentTPUStream(), *scalar.data_ptr<float>(),
+                    tpu::TPUGenerateSgdnnTensor(other.to(torch::kFloat)),
+                    tpu::TPUGenerateSgdnnTensor(out));
+    TORCH_CHECK(status == tpuRtSuccess);
+    #endif
     TIMING_END(tpu::ATAN2);
   } else if (other.dim() == 0) {
     // other is scalar
     Tensor scalar = other.to(torch::kFloat).cpu();
     TIMING_START;
-    bm_status_t status = sgdnnAtan2_C(
+    #if defined BACKEND_1684X
+    auto status = sgdnnAtan2_C(
         tpu::TPUGetDeviceHandle(),
         tpu::TPUGenerateSgdnnTensor(self.to(torch::kFloat)),
         *scalar.data_ptr<float>(), tpu::TPUGenerateSgdnnTensor(out));
     TORCH_CHECK(status == BM_SUCCESS);
+    #elif defined BACKEND_SG2260
+    auto status = sgdnnAtan2_C(
+        c10_tpu::getCurrentTPUStream(),
+        tpu::TPUGenerateSgdnnTensor(self.to(torch::kFloat)),
+        *scalar.data_ptr<float>(), tpu::TPUGenerateSgdnnTensor(out));
+    TORCH_CHECK(status == tpuRtSuccess);
+    #endif
     TIMING_END(tpu::ATAN2);
   } else {
     // self and other have the same shape
     if (self.sizes() == other.sizes()) {
       TIMING_START;
-      bm_status_t status =
+      #if defined BACKEND_1684X
+      auto status =
           sgdnnAtan2(tpu::TPUGetDeviceHandle(),
                      tpu::TPUGenerateSgdnnTensor(self.to(torch::kFloat)),
                      tpu::TPUGenerateSgdnnTensor(other.to(torch::kFloat)),
                      tpu::TPUGenerateSgdnnTensor(out));
       TORCH_CHECK(status == BM_SUCCESS);
+      #elif defined BACKEND_SG2260
+      auto status =
+          sgdnnAtan2(c10_tpu::getCurrentTPUStream(),
+                     tpu::TPUGenerateSgdnnTensor(self.to(torch::kFloat)),
+                     tpu::TPUGenerateSgdnnTensor(other.to(torch::kFloat)),
+                     tpu::TPUGenerateSgdnnTensor(out));
+      TORCH_CHECK(status == tpuRtSuccess);
+      #endif
       TIMING_END(tpu::ATAN2);
     } else {
       // The shapes of self and other are not the same, need to broadcast
       TIMING_START;
-      bm_status_t status =
+      #if defined BACKEND_1684X
+      auto status =
           sgdnnAtan2Bcast(tpu::TPUGetDeviceHandle(),
                           tpu::TPUGenerateSgdnnTensor(self.to(torch::kFloat)),
                           tpu::TPUGenerateSgdnnTensor(other.to(torch::kFloat)),
                           tpu::TPUGenerateSgdnnTensor(out));
       TORCH_CHECK(status == BM_SUCCESS);
+      #elif defined BACKEND_SG2260
+      auto status =
+          sgdnnAtan2Bcast(c10_tpu::getCurrentTPUStream(),
+                          tpu::TPUGenerateSgdnnTensor(self.to(torch::kFloat)),
+                          tpu::TPUGenerateSgdnnTensor(other.to(torch::kFloat)),
+                          tpu::TPUGenerateSgdnnTensor(out));
+      TORCH_CHECK(status == tpuRtSuccess);
+      #endif
       TIMING_END(tpu::ATAN2);
     }
   }
@@ -1142,10 +1655,17 @@ Tensor &pow_out_tpu(const Tensor &self, const Tensor &other, Tensor &out) {
     TIMING_END(tpu::CPU_LAYER);
   } else if (IS_TPU_TENSOR(self)) {
     TIMING_START;
-    bm_status_t status = sgdnnPow(
+    #if defined BACKEND_1684X
+    auto status = sgdnnPow(
         tpu::TPUGetDeviceHandle(), tpu::TPUGenerateSgdnnTensor(self),
         tpu::TPUGenerateSgdnnTensor(other), tpu::TPUGenerateSgdnnTensor(out));
     TORCH_CHECK(status == BM_SUCCESS);
+    #elif defined BACKEND_SG2260
+    auto status = sgdnnPow(
+        c10_tpu::getCurrentTPUStream(), tpu::TPUGenerateSgdnnTensor(self),
+        tpu::TPUGenerateSgdnnTensor(other), tpu::TPUGenerateSgdnnTensor(out));
+    TORCH_CHECK(status == tpuRtSuccess);
+    #endif
     TIMING_END(tpu::POW_FORWARD);
   } else {
     TORCH_CHECK(false, "At least one input is required in TPU device");
@@ -1174,10 +1694,17 @@ Tensor &pow_c_out_tpu(const Tensor &self, const Scalar &exponent, Tensor &out) {
   out = out_cpu.to(out.device());
 #else
   TIMING_START;
-  bm_status_t status =
+  #if defined BACKEND_1684X
+  auto status =
       sgdnnPowC(tpu::TPUGetDeviceHandle(), tpu::TPUGenerateSgdnnTensor(self),
                 exponent.toDouble(), tpu::TPUGenerateSgdnnTensor(out));
   TORCH_CHECK(status == BM_SUCCESS);
+  #elif defined BACKEND_SG2260
+  auto status =
+      sgdnnPowC(c10_tpu::getCurrentTPUStream(), tpu::TPUGenerateSgdnnTensor(self),
+                exponent.toDouble(), tpu::TPUGenerateSgdnnTensor(out));
+  TORCH_CHECK(status == tpuRtSuccess);
+  #endif
   TIMING_END(tpu::POWC);
 #endif
   SHOW_TENSOR_OP(self, out);
@@ -1207,43 +1734,77 @@ Tensor &fmax_out_tpu(const Tensor &self, const Tensor &other, Tensor &out) {
     // self is scalar
     Tensor scalar = self.to(torch::kFloat).cpu();
     TIMING_START;
-    bm_status_t status =
+  #if defined BACKEND_1684X
+    auto status =
         sgdnnFmaxC(tpu::TPUGetDeviceHandle(),
                    tpu::TPUGenerateSgdnnTensor(other.to(out.dtype())),
                    *scalar.data_ptr<float>(), tpu::TPUGenerateSgdnnTensor(out));
     TORCH_CHECK(status == BM_SUCCESS);
+    #elif defined BACKEND_SG2260
+    auto status =
+        sgdnnFmaxC(c10_tpu::getCurrentTPUStream(),
+                   tpu::TPUGenerateSgdnnTensor(other.to(out.dtype())),
+                   *scalar.data_ptr<float>(), tpu::TPUGenerateSgdnnTensor(out));
+    TORCH_CHECK(status == tpuRtSuccess);
+    #endif
     TIMING_END(tpu::FMAX);
   } else if (other.dim() == 0) {
     // other is scalar
     Tensor scalar = other.to(torch::kFloat).cpu();
     TIMING_START;
-    bm_status_t status =
+  #if defined BACKEND_1684X
+    auto status =
         sgdnnFmaxC(tpu::TPUGetDeviceHandle(),
                    tpu::TPUGenerateSgdnnTensor(self.to(out.dtype())),
                    *scalar.data_ptr<float>(), tpu::TPUGenerateSgdnnTensor(out));
     TORCH_CHECK(status == BM_SUCCESS);
+    #elif defined BACKEND_SG2260
+    auto status =
+        sgdnnFmaxC(c10_tpu::getCurrentTPUStream(),
+                   tpu::TPUGenerateSgdnnTensor(self.to(out.dtype())),
+                   *scalar.data_ptr<float>(), tpu::TPUGenerateSgdnnTensor(out));
+    TORCH_CHECK(status == tpuRtSuccess);
+    #endif
     TIMING_END(tpu::FMAX);
   } else {
     // self and other have the same shape
     if (self.sizes() == other.sizes()) {
       TIMING_START;
-      bm_status_t status =
+      #if defined BACKEND_1684X
+      auto status =
           sgdnnFmax(tpu::TPUGetDeviceHandle(),
                     tpu::TPUGenerateSgdnnTensor(self.to(out.dtype())),
                     tpu::TPUGenerateSgdnnTensor(other.to(out.dtype())),
                     tpu::TPUGenerateSgdnnTensor(out));
       TORCH_CHECK(status == BM_SUCCESS);
+      #elif defined BACKEND_SG2260
+      auto status =
+          sgdnnFmax(c10_tpu::getCurrentTPUStream(),
+                    tpu::TPUGenerateSgdnnTensor(self.to(out.dtype())),
+                    tpu::TPUGenerateSgdnnTensor(other.to(out.dtype())),
+                    tpu::TPUGenerateSgdnnTensor(out));
+      TORCH_CHECK(status == tpuRtSuccess);
+      #endif
       TIMING_END(tpu::FMAX);
     } else {
       // The shapes of self and other are not the same, need to broadcast
       TIMING_START;
-      bm_status_t status =
+      #if defined BACKEND_1684X
+      auto status =
           sgdnnFmaxBcast(tpu::TPUGetDeviceHandle(),
                          tpu::TPUGenerateSgdnnTensor(self.to(out.dtype())),
                          tpu::TPUGenerateSgdnnTensor(other.to(out.dtype())),
                          tpu::TPUGenerateSgdnnTensor(out));
       TORCH_CHECK(status == BM_SUCCESS);
-      TIMING_END(tpu::FMAX);
+      #elif defined BACKEND_SG2260
+      auto status =
+          sgdnnFmaxBcast(c10_tpu::getCurrentTPUStream(),
+                         tpu::TPUGenerateSgdnnTensor(self.to(out.dtype())),
+                         tpu::TPUGenerateSgdnnTensor(other.to(out.dtype())),
+                         tpu::TPUGenerateSgdnnTensor(out));
+      TORCH_CHECK(status == tpuRtSuccess);
+      #endif
+    TIMING_END(tpu::FMAX);
     }
   }
   SHOW_TENSOR_OP(self, other, out);
@@ -1272,42 +1833,76 @@ Tensor &fmin_out_tpu(const Tensor &self, const Tensor &other, Tensor &out) {
     // self is scalar
     Tensor scalar = self.to(torch::kFloat).cpu();
     TIMING_START;
-    bm_status_t status =
+    #if defined BACKEND_1684X
+    auto status =
         sgdnnFminC(tpu::TPUGetDeviceHandle(),
                    tpu::TPUGenerateSgdnnTensor(other.to(out.dtype())),
                    *scalar.data_ptr<float>(), tpu::TPUGenerateSgdnnTensor(out));
     TORCH_CHECK(status == BM_SUCCESS);
+    #elif defined BACKEND_SG2260
+    auto status =
+        sgdnnFminC(c10_tpu::getCurrentTPUStream(),
+                   tpu::TPUGenerateSgdnnTensor(other.to(out.dtype())),
+                   *scalar.data_ptr<float>(), tpu::TPUGenerateSgdnnTensor(out));
+    TORCH_CHECK(status == tpuRtSuccess);
+    #endif
     TIMING_END(tpu::FMIN);
   } else if (other.dim() == 0) {
     // other is scalar
     Tensor scalar = other.to(torch::kFloat).cpu();
     TIMING_START;
-    bm_status_t status =
+    #if defined BACKEND_1684X
+    auto status =
         sgdnnFminC(tpu::TPUGetDeviceHandle(),
                    tpu::TPUGenerateSgdnnTensor(self.to(out.dtype())),
                    *scalar.data_ptr<float>(), tpu::TPUGenerateSgdnnTensor(out));
     TORCH_CHECK(status == BM_SUCCESS);
+    #elif defined BACKEND_SG2260
+    auto status =
+        sgdnnFminC(c10_tpu::getCurrentTPUStream(),
+                   tpu::TPUGenerateSgdnnTensor(self.to(out.dtype())),
+                   *scalar.data_ptr<float>(), tpu::TPUGenerateSgdnnTensor(out));
+    TORCH_CHECK(status == tpuRtSuccess);
+    #endif
     TIMING_END(tpu::FMIN);
   } else {
     // self and other have the same shape
     if (self.sizes() == other.sizes()) {
       TIMING_START;
-      bm_status_t status =
+  #if defined BACKEND_1684X
+      auto status =
           sgdnnFmin(tpu::TPUGetDeviceHandle(),
                     tpu::TPUGenerateSgdnnTensor(self.to(out.dtype())),
                     tpu::TPUGenerateSgdnnTensor(other.to(out.dtype())),
                     tpu::TPUGenerateSgdnnTensor(out));
       TORCH_CHECK(status == BM_SUCCESS);
+      #elif defined BACKEND_SG2260
+      auto status =
+          sgdnnFmin(c10_tpu::getCurrentTPUStream(),
+                    tpu::TPUGenerateSgdnnTensor(self.to(out.dtype())),
+                    tpu::TPUGenerateSgdnnTensor(other.to(out.dtype())),
+                    tpu::TPUGenerateSgdnnTensor(out));
+      TORCH_CHECK(status == tpuRtSuccess);
+      #endif
       TIMING_END(tpu::FMIN);
     } else {
       // The shapes of self and other are not the same, need to broadcast
       TIMING_START;
-      bm_status_t status =
+      #if defined BACKEND_1684X
+      auto status =
           sgdnnFminBcast(tpu::TPUGetDeviceHandle(),
                          tpu::TPUGenerateSgdnnTensor(self.to(out.dtype())),
                          tpu::TPUGenerateSgdnnTensor(other.to(out.dtype())),
                          tpu::TPUGenerateSgdnnTensor(out));
       TORCH_CHECK(status == BM_SUCCESS);
+      #elif defined BACKEND_SG2260
+      auto status =
+          sgdnnFminBcast(c10_tpu::getCurrentTPUStream(),
+                         tpu::TPUGenerateSgdnnTensor(self.to(out.dtype())),
+                         tpu::TPUGenerateSgdnnTensor(other.to(out.dtype())),
+                         tpu::TPUGenerateSgdnnTensor(out));
+      TORCH_CHECK(status == tpuRtSuccess);
+      #endif
       TIMING_END(tpu::FMIN);
     }
   }
@@ -1335,32 +1930,60 @@ Tensor &hypot_out_tpu(const Tensor &self, const Tensor &other, Tensor &out) {
     TIMING_END(tpu::CPU_LAYER);
   } else if (self.dim() == 0) {
     TIMING_START;
-    bm_status_t status = sgdnnHypotC(
+  #if defined BACKEND_1684X
+    auto status = sgdnnHypotC(
         tpu::TPUGetDeviceHandle(), tpu::TPUGenerateSgdnnTensor(other),
         self.item().toFloat(), tpu::TPUGenerateSgdnnTensor(out));
     TORCH_CHECK(status == BM_SUCCESS);
+    #elif defined BACKEND_SG2260
+    auto status = sgdnnHypotC(
+        c10_tpu::getCurrentTPUStream(), tpu::TPUGenerateSgdnnTensor(other),
+        self.item().toFloat(), tpu::TPUGenerateSgdnnTensor(out));
+    TORCH_CHECK(status == tpuRtSuccess);
+    #endif
     TIMING_END(tpu::HYPOT);
   } else if (other.dim() == 0) {
     TIMING_START;
-    bm_status_t status = sgdnnHypotC(
+    #if defined BACKEND_1684X
+    auto status = sgdnnHypotC(
         tpu::TPUGetDeviceHandle(), tpu::TPUGenerateSgdnnTensor(self),
         other.item().toFloat(), tpu::TPUGenerateSgdnnTensor(out));
     TORCH_CHECK(status == BM_SUCCESS);
+    #elif defined BACKEND_SG2260
+    auto status = sgdnnHypotC(
+        c10_tpu::getCurrentTPUStream(), tpu::TPUGenerateSgdnnTensor(self),
+        other.item().toFloat(), tpu::TPUGenerateSgdnnTensor(out));
+    TORCH_CHECK(status == tpuRtSuccess);
+    #endif
     TIMING_END(tpu::HYPOT);
   } else {
     if (tpu::TPUIsSameShape(self, other)) {
       TIMING_START;
-      bm_status_t status = sgdnnHypot(
+      #if defined BACKEND_1684X
+      auto status = sgdnnHypot(
           tpu::TPUGetDeviceHandle(), tpu::TPUGenerateSgdnnTensor(self),
           tpu::TPUGenerateSgdnnTensor(other), tpu::TPUGenerateSgdnnTensor(out));
       TORCH_CHECK(status == BM_SUCCESS);
+      #elif defined BACKEND_SG2260
+      auto status = sgdnnHypot(
+          c10_tpu::getCurrentTPUStream(), tpu::TPUGenerateSgdnnTensor(self),
+          tpu::TPUGenerateSgdnnTensor(other), tpu::TPUGenerateSgdnnTensor(out));
+      TORCH_CHECK(status == tpuRtSuccess);
+      #endif
       TIMING_END(tpu::HYPOT);
     } else {
       TIMING_START;
-      bm_status_t status = sgdnnHypotBcast(
+      #if defined BACKEND_1684X
+      auto status = sgdnnHypotBcast(
           tpu::TPUGetDeviceHandle(), tpu::TPUGenerateSgdnnTensor(self),
           tpu::TPUGenerateSgdnnTensor(other), tpu::TPUGenerateSgdnnTensor(out));
       TORCH_CHECK(status == BM_SUCCESS);
+      #elif defined BACKEND_SG2260
+      auto status = sgdnnHypotBcast(
+          c10_tpu::getCurrentTPUStream(), tpu::TPUGenerateSgdnnTensor(self),
+          tpu::TPUGenerateSgdnnTensor(other), tpu::TPUGenerateSgdnnTensor(out));
+      TORCH_CHECK(status == tpuRtSuccess);
+      #endif
       TIMING_END(tpu::HYPOT);
     }
   }
@@ -1390,42 +2013,76 @@ Tensor &nextafter_out_tpu(const Tensor &self, const Tensor &other,
     // self is scalar
     Tensor scalar = self.to(torch::kFloat32).cpu();
     TIMING_START;
-    bm_status_t status =
+    #if defined BACKEND_1684X
+    auto status =
         sgdnnNextafterC(tpu::TPUGetDeviceHandle(), *scalar.data_ptr<float>(),
                         tpu::TPUGenerateSgdnnTensor(other.to(out.dtype())),
                         tpu::TPUGenerateSgdnnTensor(out));
     TORCH_CHECK(status == BM_SUCCESS);
+    #elif defined BACKEND_SG2260
+    auto status =
+        sgdnnNextafterC(c10_tpu::getCurrentTPUStream(), *scalar.data_ptr<float>(),
+                        tpu::TPUGenerateSgdnnTensor(other.to(out.dtype())),
+                        tpu::TPUGenerateSgdnnTensor(out));
+    TORCH_CHECK(status == tpuRtSuccess);
+    #endif
     TIMING_END(tpu::NEXTAFTER);
   } else if (other.dim() == 0) {
     // other is scalar
     Tensor scalar = other.to(torch::kFloat32).cpu();
     TIMING_START;
-    bm_status_t status = sgdnnNextafter_C(
+    #if defined BACKEND_1684X
+    auto status = sgdnnNextafter_C(
         tpu::TPUGetDeviceHandle(),
         tpu::TPUGenerateSgdnnTensor(self.to(out.dtype())),
         *scalar.data_ptr<float>(), tpu::TPUGenerateSgdnnTensor(out));
     TORCH_CHECK(status == BM_SUCCESS);
+    #elif defined BACKEND_SG2260
+    auto status = sgdnnNextafter_C(
+        c10_tpu::getCurrentTPUStream(),
+        tpu::TPUGenerateSgdnnTensor(self.to(out.dtype())),
+        *scalar.data_ptr<float>(), tpu::TPUGenerateSgdnnTensor(out));
+    TORCH_CHECK(status == tpuRtSuccess);
+    #endif
     TIMING_END(tpu::NEXTAFTER);
   } else {
     // self and other have the same shape
     if (self.sizes() == other.sizes()) {
       TIMING_START;
-      bm_status_t status =
+      #if defined BACKEND_1684X
+      auto status =
           sgdnnNextafter(tpu::TPUGetDeviceHandle(),
                          tpu::TPUGenerateSgdnnTensor(self.to(out.dtype())),
                          tpu::TPUGenerateSgdnnTensor(other.to(out.dtype())),
                          tpu::TPUGenerateSgdnnTensor(out));
       TORCH_CHECK(status == BM_SUCCESS);
-      TIMING_END(tpu::NEXTAFTER);
+      #elif defined BACKEND_SG2260
+      auto status =
+          sgdnnNextafter(c10_tpu::getCurrentTPUStream(),
+                         tpu::TPUGenerateSgdnnTensor(self.to(out.dtype())),
+                         tpu::TPUGenerateSgdnnTensor(other.to(out.dtype())),
+                         tpu::TPUGenerateSgdnnTensor(out));
+      TORCH_CHECK(status == tpuRtSuccess);
+      #endif
+    TIMING_END(tpu::NEXTAFTER);
     } else {
       // The shapes of self and other are not the same, need to broadcast
       TIMING_START;
-      bm_status_t status = sgdnnNextafterBcast(
+      #if defined BACKEND_1684X
+      auto status = sgdnnNextafterBcast(
           tpu::TPUGetDeviceHandle(),
           tpu::TPUGenerateSgdnnTensor(self.to(out.dtype())),
           tpu::TPUGenerateSgdnnTensor(other.to(out.dtype())),
           tpu::TPUGenerateSgdnnTensor(out));
       TORCH_CHECK(status == BM_SUCCESS);
+      #elif defined BACKEND_SG2260
+      auto status = sgdnnNextafterBcast(
+          c10_tpu::getCurrentTPUStream(),
+          tpu::TPUGenerateSgdnnTensor(self.to(out.dtype())),
+          tpu::TPUGenerateSgdnnTensor(other.to(out.dtype())),
+          tpu::TPUGenerateSgdnnTensor(out));
+      TORCH_CHECK(status == tpuRtSuccess);
+      #endif
       TIMING_END(tpu::NEXTAFTER);
     }
   }
@@ -1451,12 +2108,19 @@ Tensor &less_than_or_equal_scalar_out_tpu(const Tensor &self,
     TIMING_END(tpu::CPU_LAYER);
   } else {
     TIMING_START;
+    #if defined BACKEND_1684X
     // mode : 0 equal, 1 not equal, 2 greater, 3 greater or equal, 4 less than,
     // 5 less than or equal pos : 0 for self is scalar, 1 for other is scalar
-    bm_status_t status = sgdnnComparisionC(
+    auto status = sgdnnComparisionC(
         tpu::TPUGetDeviceHandle(), tpu::TPUGenerateSgdnnTensor(self),
         other.toFloat(), 5, 1, tpu::TPUGenerateSgdnnTensor(out));
     TORCH_CHECK(status == BM_SUCCESS);
+    #elif defined BACKEND_SG2260
+    auto status = sgdnnComparisionC(
+        c10_tpu::getCurrentTPUStream(), tpu::TPUGenerateSgdnnTensor(self),
+        other.toFloat(), 5, 1, tpu::TPUGenerateSgdnnTensor(out));
+    TORCH_CHECK(status == tpuRtSuccess);
+    #endif
     TIMING_END(tpu::LESS_THAN_OR_EQUAL_C);
   }
   SHOW_TENSOR_OP(self, out);
@@ -1482,12 +2146,19 @@ Tensor &less_than_scalar_out_tpu(const Tensor &self, const Scalar &other,
     TIMING_END(tpu::CPU_LAYER);
   } else {
     TIMING_START;
+    #if defined BACKEND_1684X
     // mode : 0 equal, 1 not equal, 2 greater, 3 greater or equal, 4 less than,
     // 5 less than or equal pos : 0 for self is scalar, 1 for other is scalar
-    bm_status_t status = sgdnnComparisionC(
+    auto status = sgdnnComparisionC(
         tpu::TPUGetDeviceHandle(), tpu::TPUGenerateSgdnnTensor(self),
         other.toFloat(), 4, 1, tpu::TPUGenerateSgdnnTensor(out));
     TORCH_CHECK(status == BM_SUCCESS);
+    #elif defined BACKEND_SG2260
+    auto status = sgdnnComparisionC(
+        c10_tpu::getCurrentTPUStream(), tpu::TPUGenerateSgdnnTensor(self),
+        other.toFloat(), 4, 1, tpu::TPUGenerateSgdnnTensor(out));
+    TORCH_CHECK(status == tpuRtSuccess);
+    #endif
     TIMING_END(tpu::LESS_THAN_C);
   }
   SHOW_TENSOR_OP(self, out);
@@ -1513,12 +2184,19 @@ Tensor &greater_or_equal_scalar_out_tpu(const Tensor &self, const Scalar &other,
     TIMING_END(tpu::CPU_LAYER);
   } else {
     TIMING_START;
+  #if defined BACKEND_1684X
     // mode : 0 equal, 1 not equal, 2 greater, 3 greater or equal, 4 less than,
     // 5 less than or equal pos : 0 for self is scalar, 1 for other is scalar
-    bm_status_t status = sgdnnComparisionC(
+    auto status = sgdnnComparisionC(
         tpu::TPUGetDeviceHandle(), tpu::TPUGenerateSgdnnTensor(self),
         other.toFloat(), 3, 1, tpu::TPUGenerateSgdnnTensor(out));
     TORCH_CHECK(status == BM_SUCCESS);
+    #elif defined BACKEND_SG2260
+    auto status = sgdnnComparisionC(
+        c10_tpu::getCurrentTPUStream(), tpu::TPUGenerateSgdnnTensor(self),
+        other.toFloat(), 3, 1, tpu::TPUGenerateSgdnnTensor(out));
+    TORCH_CHECK(status == tpuRtSuccess);
+    #endif
     TIMING_END(tpu::GREATER_OR_EQUAL_C);
   }
   SHOW_TENSOR_OP(self, out);
@@ -1544,12 +2222,19 @@ Tensor &greater_scalar_out_tpu(const Tensor &self, const Scalar &other,
     TIMING_END(tpu::CPU_LAYER);
   } else {
     TIMING_START;
+    #if defined BACKEND_1684X
     // mode : 0 equal, 1 not equal, 2 greater, 3 greater or equal, 4 less than,
     // 5 less than or equal pos : 0 for self is scalar, 1 for other is scalar
-    bm_status_t status = sgdnnComparisionC(
+    auto status = sgdnnComparisionC(
         tpu::TPUGetDeviceHandle(), tpu::TPUGenerateSgdnnTensor(self),
         other.toFloat(), 2, 1, tpu::TPUGenerateSgdnnTensor(out));
     TORCH_CHECK(status == BM_SUCCESS);
+    #elif defined BACKEND_SG2260
+    auto status = sgdnnComparisionC(
+        c10_tpu::getCurrentTPUStream(), tpu::TPUGenerateSgdnnTensor(self),
+        other.toFloat(), 2, 1, tpu::TPUGenerateSgdnnTensor(out));
+    TORCH_CHECK(status == tpuRtSuccess);
+    #endif
     TIMING_END(tpu::GREATER_C);
   }
   SHOW_TENSOR_OP(self, out);
@@ -1575,12 +2260,19 @@ Tensor &not_equal_scalar_out_tpu(const Tensor &self, const Scalar &other,
     TIMING_END(tpu::CPU_LAYER);
   } else {
     TIMING_START;
+    #if defined BACKEND_1684X
     // mode : 0 equal, 1 not equal, 2 greater, 3 greater or equal, 4 less than,
     // 5 less than or equal pos : 0 for self is scalar, 1 for other is scalar
-    bm_status_t status = sgdnnComparisionC(
+    auto status = sgdnnComparisionC(
         tpu::TPUGetDeviceHandle(), tpu::TPUGenerateSgdnnTensor(self),
         other.toFloat(), 1, 1, tpu::TPUGenerateSgdnnTensor(out));
     TORCH_CHECK(status == BM_SUCCESS);
+    #elif defined BACKEND_SG2260
+    auto status = sgdnnComparisionC(
+        c10_tpu::getCurrentTPUStream(), tpu::TPUGenerateSgdnnTensor(self),
+        other.toFloat(), 1, 1, tpu::TPUGenerateSgdnnTensor(out));
+    TORCH_CHECK(status == tpuRtSuccess);
+    #endif
     TIMING_END(tpu::NOT_EQUAL_C);
   }
   SHOW_TENSOR_OP(self, out);
@@ -1606,12 +2298,19 @@ Tensor &equal_scalar_out_tpu(const Tensor &self, const Scalar &other,
     TIMING_END(tpu::CPU_LAYER);
   } else {
     TIMING_START;
+    #if defined BACKEND_1684X
     // mode : 0 equal, 1 not equal, 2 greater, 3 greater or equal, 4 less than,
     // 5 less than or equal pos : 0 for self is scalar, 1 for other is scalar
-    bm_status_t status = sgdnnComparisionC(
+    auto status = sgdnnComparisionC(
         tpu::TPUGetDeviceHandle(), tpu::TPUGenerateSgdnnTensor(self),
         other.toFloat(), 0, 1, tpu::TPUGenerateSgdnnTensor(out));
     TORCH_CHECK(status == BM_SUCCESS);
+    #elif defined BACKEND_SG2260
+    auto status = sgdnnComparisionC(
+        c10_tpu::getCurrentTPUStream(), tpu::TPUGenerateSgdnnTensor(self),
+        other.toFloat(), 0, 1, tpu::TPUGenerateSgdnnTensor(out));
+    TORCH_CHECK(status == tpuRtSuccess);
+    #endif
     TIMING_END(tpu::EQUAL_C);
   }
   SHOW_TENSOR_OP(self, out);

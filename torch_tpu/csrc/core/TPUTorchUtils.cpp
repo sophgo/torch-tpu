@@ -3,6 +3,260 @@
 namespace tpu
 {
 
+void TPUCompareResult ( const at::Tensor & Got, const at::Tensor & Exp,
+                        double Threshold, double ErrScale )
+{
+  if ( Got.dtype() != Exp.dtype() )
+  {
+    LOG ( FATAL ) << "Tensor comparing failed: Got data type = "
+                  << Got.dtype() << ", Exp data type = " << Exp.dtype();
+  }
+  if ( Got.sizes() != Exp.sizes() )
+  {
+    LOG ( FATAL ) << "Tensor comparing failed: Got shape = "
+                  << Got.sizes() << ", Exp shape = " << Exp.sizes();
+  }
+  if ( Got.dtype() == caffe2::TypeMeta::Make<float>() )
+  {
+    int ErrCnt = 0;
+    const auto MaxErrCnt = 100;//Got.numel();
+    auto Err = torch::sub ( Got, Exp );
+    auto AbsErr = torch::abs ( Err );
+    auto AbsExp = torch::abs ( Exp );
+    auto RltAbsErr = torch::div ( AbsErr, AbsExp ) * ErrScale;
+    auto ErrPtr = Err.data_ptr<float>();
+    auto GotPtr = Got.data_ptr<float>();
+    auto ExpPtr = Exp.data_ptr<float>();
+    auto AbsErrPtr = AbsErr.data_ptr<float>();
+    auto RltAbsErrPtr = RltAbsErr.data_ptr<float>();
+    for ( auto i = 0; i < Got.numel(); ++i )
+    {
+      if ( std::isnan ( ExpPtr[i] ) == true && std::isnan ( GotPtr[i] ) == true )
+      {
+        continue;
+      }
+      if ( AbsErrPtr[i] < Threshold || RltAbsErrPtr[i] <= 1e-5 )
+      {
+        continue;
+      }
+FAILED:
+      if ( ErrCnt < MaxErrCnt )
+      {
+        LOG ( WARNING ) << "Compare failed: Got = " << GotPtr[i]
+                        << ", Exp = " << ExpPtr[i]
+                        << ", Err = " << ErrPtr[i]
+                        << ", index = " << i;
+      }
+      else
+      {
+        LOG ( WARNING ) << "<Skip the other compare errors>";
+        return;
+      }
+      ++ErrCnt;
+    }
+  }
+  else
+  {
+    LOG ( FATAL ) << "Unsupported data type " << Got.dtype();
+  }
+}
+
+#ifdef TPU_OP_TIMING
+
+static const char * OpTypeStr[OP_NUM] =
+{
+  "CDMA D2S",
+  "CDMA S2D",
+  "CDMA C2C",
+  "Copy",
+  "Cpu Layer",
+  "Convolution",
+  "Convolution Backward",
+  "BatchNorm",
+  "BatchNorm Backward",
+  "LayerNorm",
+  "LayerNorm Backward",
+  "Avg Pooling",
+  "Max Pooling",
+  "ReLU",
+  "ReLU Backward",
+  "GeLU",
+  "GeLU Backward",
+  "Leaky ReLU",
+  "MatMul",
+  "Add MatMul",
+  "Batch MatMul",
+  "Linear",
+  "Softmax",
+  "Softmax Backward",
+  "Permute",
+  "Transpose",
+  "Add",
+  "Sub",
+  "Mul",
+  "Div",
+  "Add Bcast",
+  "Index Select",
+  "DType Convert",
+  "Reduce Mean",
+  "Reduce Sum",
+  "REDUCE_PROD",
+  "Reduce Max",
+  "Reduce Min",
+  "Reduce var",
+  "Where",
+  "Strided Copy",
+  "Concat",
+  "Const Fill",
+  "Masked Fill",
+  "Sqrt",
+  "Rsqrt",
+  "Sign",
+  "Addcdiv",
+  "Addcmul",
+  "Embedding Backward",
+  "Malloc",
+  "Free",
+  "Cross Entropy Loss",
+  "Cross Entropy Loss Backward",
+  "AddC",
+  "MulC",
+  "CSub",
+  "CDiv",
+  "Norm2",
+  "Native Group Norm",
+  "Groupnorm backward",
+  "Bcast Add",
+  "MLP Forward",
+  "MLP Backward",
+  "Attention Forward",
+  "Attention Backward",
+  "BITWISE_XOR",
+  "BITWISE_XOR_BCAST",
+  "BITWISE_XOR_C",
+  "Abs Forward",
+  "Cos Forward",
+  "Sin Forward",
+  "Tan Forward",
+  "Log Forward",
+  "ACosH Forward",
+  "ASinH Forward",
+  "ATanH Forward",
+  "SinH Forward",
+  "CosH Forward",
+  "TanH Forward",
+  "Exp Forward",
+  "Asin",
+  "Acos",
+  "Atan",
+  "Sinh",
+  "Cosh",
+  "Tanh",
+  "Ceil",
+  "Floor",
+  "Round",
+  "Neg",
+  "Exp2",
+  "EXPM1",
+  "Expand",
+  "Flip",
+  "Squeeze",
+  "Unsqueeze",
+  "Isfinite",
+  "Isinf",
+  "Isnan",
+  "Bitwise_Not",
+  "Minimum",
+  "Maximum",
+  "Fmin",
+  "Fmax",
+  "Atan2",
+  "Logical And",
+  "Logical Or",
+  "BITWISE_AND",
+  "BITWISE_AND_BCAST",
+  "BITWISE_AND_C",
+  "BITWISE_OR",
+  "BITWISE_OR_BCAST",
+  "BITWISE_OR_C",
+  "EQUAL",
+  "EQUAL_BCAST",
+  "EQUAL_C",
+  "GREATER_OR_EQUAL",
+  "GREATER_OR_EQUAL_BCAST",
+  "GREATER_OR_EQUAL_C",
+  "GREATER",
+  "GREATER_BCAST",
+  "GREATER_C",
+  "LESS_THAN_OR_EQUAL",
+  "LESS_THAN_OR_EQUAL_BCAST",
+  "LESS_THAN_OR_EQUAL_C",
+  "SHIFT_LEFT",
+  "SHIFT_LEFT_BCAST",
+  "SHIFT_LEFT_C",
+  "SHIFT_RIGHT_ARITHMETIC",
+  "SHIFT_RIGHT_ARITHMETIC_BCAST",
+  "SHIFT_RIGHT_ARITHMETIC_C",
+  "LESS_THAN",
+  "LESS_THAN_BCAST",
+  "LESS_THAN_C",
+  "NOT_EQUAL",
+  "NOT_EQUAL_BCAST",
+  "NOT_EQUAL_C",
+  "SIGNBIT",
+  "FULL",
+  "Logical Not",
+  "Upsampl Bilinear2d",
+  "Upsampl nearest",
+  "Upsampl nearest2d Backward",
+  "Arrange",
+  "SiLU",
+  "Sigmoid",
+  "CLAMP",
+  "layernorm Matmul",
+  "ERF",
+  "ERFC",
+  "Pow Forward",
+  "Add Layernorm Matmul",
+  "RECIPROCAL",
+  "TRUNC",
+  "POW SCALAR",
+  "layernorm Matmul Backward",
+  "Add layernorm Matmul Backward",
+  "TOPK",
+  "NonZero",
+  "REPEAT",
+  "Argmax",
+  "Argmin",
+  "Max_dim",
+  "Min_dim",
+  "HARDTANH",
+  "HYPOT",
+  "Nextafter",
+  "Triu",
+  "Cbrt",
+  "Constant_pad",
+  "Reflection_pad2d",
+  "Replication_pad2d",
+  "Replication_pad3d",
+  "GATHER",
+  "BADDBMM",
+  "MSE Loss",
+  "MSE Loss Backward",
+  "Slice_scatter",
+  "Inf Check And Unscale",
+  "LLAMA_ATTENTION",
+  "LLAMA_MLP_FORWARD",
+  "RMSNORM_FORWARD",
+  "binary_op",
+  "binary_op_c",
+  "binary_op_bcast",
+  "real",
+  "Conj",
+  "Dummy"
+};
+
+
 OpTimer * OpTimer::instance_ = nullptr;
 
 OpTimer & OpTimer::Clear()
@@ -106,14 +360,14 @@ void TensorWatcher::AddTensor ( const at::Tensor & Tensor )
 
 bool TensorWatcher::Watch() const
 {
-  for ( auto I = 0; I < tensors_.size(); ++I )
+  for ( auto I = 0; I < (int)tensors_.size(); ++I )
   {
     if ( tensors_[I].defined() )
     {
       auto tensor_cpu = TENSOR_TO_CPU ( tensors_[I] );
       auto ptr_saved = ( unsigned char * ) tensors_cpu_[I].data_ptr();
       auto ptr_current = ( unsigned char * ) tensor_cpu.data_ptr();
-      for ( auto i = 0; i < tensors_[I].nbytes(); ++i )
+      for ( auto i = 0; i < (int)tensors_[I].nbytes(); ++i )
       {
         if ( ptr_saved[i] != ptr_current[i] )
         {
@@ -135,5 +389,5 @@ TensorWatcher & TensorWatcher::Instance()
   }
   return *instance_;
 }
-
+#endif // TPU_OP_TIMING
 } // namespace tpu

@@ -3,7 +3,7 @@
 
 #include "sg_api_struct.h"
 #include "tpu_kernel.h"
-#include "config.h"
+
 
 #define MAX_SHAPE 8
 #define CW_LIMIT 65535

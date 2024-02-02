@@ -9,6 +9,7 @@ import os
 import subprocess
 import numpy as np
 import pathlib
+import torch_tpu
 
 # Over 2k Ops in Torch Now
 # https://github.com/pytorch/pytorch/blob/main/aten/src/ATen/native/native_functions.yaml
@@ -133,7 +134,6 @@ class Tester_Basic():
       self.dump_flag = dump_flag
       self.case_name = case_name
       self.Dumper = Dumper(self.case_name, self.device_cpu)
-      torch.ops.load_library("../../build/torch_tpu/libtorch_tpu.so")
 
       self.convert_table = {
                       'f32':torch.float32,

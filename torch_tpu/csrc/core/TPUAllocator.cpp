@@ -1,6 +1,5 @@
-#include <TPUAllocator.h>
-#include <TPUDeviceManager.h>
-#include <TPUTorchUtils.h>
+#include "TPUAllocator.h"
+#include "TPUTorchUtils.h"
 
 namespace c10
 {

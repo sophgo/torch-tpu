@@ -2,14 +2,9 @@
 #include <torch/torch.h>
 #include <ATen/core/TensorBase.h>
 #include <ATen/EmptyTensor.h>
-#include <TPUDeviceManager.h>
-#include <TPUTorchUtils.h>
-#include <sgdnn_api.h>
-
-#include "common/config.h"
 
 namespace at
-{
+{	
 	Tensor mlp_forward(
 		Tensor &input,
 		Tensor &w1,

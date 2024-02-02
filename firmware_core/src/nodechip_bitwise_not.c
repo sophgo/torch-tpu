@@ -1,6 +1,6 @@
 #include "sg_api_struct.h"
 #include "tpu_kernel.h"
-#include "config.h"
+
 
 /*
  * output = bitwise_not(input)
@@ -87,7 +87,7 @@ void tpu_kernel_api_bitwise_not(const void* args) {
 }
 TPUKERNEL_FUNC_REGISTER(tpu_kernel_api_bitwise_not);
 
-#ifdef FIRMWARE_BACKEND_2260
+#ifdef BACKEND_SG2260
 void tpu_kernel_api_bitwise_not_multi_core(const void* args) {
   sg_api_bitwise_not_t* api = (sg_api_bitwise_not_t*)args;
   TPUKERNEL_ASSERT(api->dtype == DT_INT32);
