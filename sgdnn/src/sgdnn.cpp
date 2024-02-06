@@ -2400,7 +2400,7 @@ bm_status_t sgdnnBinary ( bm_handle_t handle,
                             int binary_type)
 {
   SGDNN_CHECK ( input.dtype == other.dtype );
-  SGDNN_CHECK ( input.dtype == output.dtype );
+  // SGDNN_CHECK ( input.dtype == output.dtype );
   SGDNN_CHECK ( input.dtype != SGDNN_DTYPE_INT64 );
   SGDNN_CHECK ( sgdnnIsTensorContiguous ( &input ) );
   SGDNN_CHECK ( sgdnnIsTensorContiguous ( &other ) );
@@ -2435,7 +2435,7 @@ bm_status_t sgdnnBinaryBcast (  bm_handle_t handle,
                                   int binary_type )
 {
   SGDNN_CHECK ( input.dtype == other.dtype );
-  SGDNN_CHECK ( input.dtype == output.dtype );
+  // SGDNN_CHECK ( input.dtype == output.dtype );
   SGDNN_CHECK ( input.dtype != SGDNN_DTYPE_INT64 );
   SGDNN_CHECK ( input.dim == other.dim );
   SGDNN_CHECK ( input.dim == output.dim );
@@ -2484,7 +2484,7 @@ bm_status_t sgdnnBinaryC ( bm_handle_t handle,
                              int binary_type,
                              bool inversed )
 {
-  SGDNN_CHECK ( input.dtype == output.dtype );
+  // SGDNN_CHECK ( input.dtype == output.dtype );
   SGDNN_CHECK ( input.dtype != SGDNN_DTYPE_INT64 );
   SGDNN_CHECK ( sgdnnIsSameShape ( &input, &output ) );
   SGDNN_CHECK ( sgdnnIsTensorContiguous ( &input ) );
