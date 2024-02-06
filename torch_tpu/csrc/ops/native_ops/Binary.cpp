@@ -248,17 +248,8 @@ Tensor &div_out_tpu(const Tensor &self, const Tensor &other, Tensor &out) {
     return out;
   }
 
-  const Tensor self_f = self.to(torch::kFloat);
-  const Tensor other_f = other.to(torch::kFloat);
-  Tensor out_f = out.to(torch::kFloat);
   // 0:add, 1:sub, 2:mul, 3:div
-  binary_op_tpu(self_f, other_f, 1, out_f, 3);
-  
-  TIMING_START;
-  tpu::TPUCopyDeviceToDevice(out.data_ptr(), out_f.to(out.dtype()).data_ptr(),
-                             out.nbytes());
-  TIMING_END(tpu::COPY);
-
+  binary_op_tpu(self, other, 1, out, 3);
   SHOW_TENSOR_OP(self, other, out);
   return out;
 }
