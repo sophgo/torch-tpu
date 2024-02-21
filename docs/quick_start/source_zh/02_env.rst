@@ -72,7 +72,7 @@ Docker环境配置
 .. code-block:: shell
   :linenos:
 
-   docker run --cap-add SYS_ADMIN -itd --restart always \
+   docker run --cap-add SYS_ADMIN -itd --restart always --privileged \
       -e LD_LIBRARY_PATH=/opt/sophon/libsophon-current/lib:$LD_LIBRARY_PATH \
       -e PATH=/opt/sophon/libsophon-current/bin:$PATH \
       --device=/dev/bmdev-ctl:/dev/bmdev-ctl \
@@ -110,7 +110,7 @@ Docker环境配置
    >> inp = torch.rand(8,1024,768).to('tpu')
    >> In_net = nn.Linear(768,3).to('tpu')
    >> out = In_net(inp)
-   >> print(out)
+   >> print(out.cpu())
 
 若运行正常，且能正常打印 out 参数值。
 
@@ -214,7 +214,7 @@ torch-tpu安装
    >> inp = torch.rand(8,1024,768).to('tpu')
    >> In_net = nn.Linear(768,3).to('tpu')
    >> out = In_net(inp)
-   >> print(out)
+   >> print(out.cpu())
 
 若运行正常，且能正常打印 out 参数值，至此，torch-tpu环境配置完成。
 
