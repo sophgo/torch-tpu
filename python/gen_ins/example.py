@@ -2,6 +2,8 @@ import copy
 import torch
 import torch.nn as nn
 from utils import ForwardHack, BackwardHack, DumpIns
+torch.set_num_threads(1)
+
 DI = DumpIns()
 
 def dump_forward():

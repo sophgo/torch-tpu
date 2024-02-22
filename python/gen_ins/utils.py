@@ -4,7 +4,7 @@ import os
 import torch
 import torch_tpu
 top=os.path.dirname(__file__)
-os.environ['FORBID_CMD_EXECUTE']=str(0)
+os.environ['FORBID_CMD_EXECUTE']=str(1)
 os.environ['FILE_DUMP_CMD'] ="ins"
 os.environ['CMODEL_GLOBAL_MEM_SIZE'] = "34359738368"
 
