@@ -2,8 +2,9 @@ import copy
 import torch
 import torch.nn as nn
 from utils import ForwardHack, BackwardHack,DumpIns
+torch.set_num_threads(1)
+
 DI = DumpIns()
-# torch.ops.load_library("../../../build/torch_tpu/libtorch_tpu.so")
 torch.manual_seed(1000)
 device = "tpu:0"
 

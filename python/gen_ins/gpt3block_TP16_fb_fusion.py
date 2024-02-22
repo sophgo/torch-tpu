@@ -3,6 +3,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 from transformers.models.gpt2.modeling_gpt2 import GPT2LMHeadModel
 from utils import ForwardHack, BackwardHack,DumpIns
+torch.set_num_threads(1)
 
 DI = DumpIns()
 torch.manual_seed(1000)

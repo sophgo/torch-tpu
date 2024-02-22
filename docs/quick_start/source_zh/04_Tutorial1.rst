@@ -50,6 +50,9 @@ Transformers提供了数以千计的预训练模型，支持 100 多种语言的
 
 在本节开始之前，首先检查Torch-TPU是否正常，如果异常请参考 开发环境配置 进行正确的环境配置。
 
+请注意，下面 "Diffusers"、"Transformers"、"accelerate" 三个仓库，应放置在同级目录下。
+
+”Transformers“若不采用源码安装则，无需下载。
 
 下载安装 Diffusers
 ------------------
@@ -64,10 +67,10 @@ Diffusers 采用源码安装的方式，目前支持版本为v0.20.0。可执行
     $ python setup.py build develop
 
 
-下载安装 Transformers
+安装 Transformers
 ------------------
 
-Transformers 采用源码安装的方式，目前支持版本为v4.29.1。可执行下述命令进行安装：
+Transformers 目前支持版本为v4.29.1。可以采用源码安装的方式，可执行下述命令进行安装：
 
 .. code-block:: shell
 
@@ -75,6 +78,12 @@ Transformers 采用源码安装的方式，目前支持版本为v4.29.1。可执
     $ cd transformers
     $ git checkout v4.29.1
     $ python setup.py build develop
+
+如果因为网络问题无法下载transformers进行源码安装，可以使用下面的命令进行安装：
+
+.. code-block:: shell
+
+    $ pip install transformers==4.29.1 -i https://pypi.tuna.tsinghua.edu.cn/simple
 
 
 下载安装 accelerate
