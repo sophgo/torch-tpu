@@ -108,7 +108,6 @@ Tensor &addcdiv_out_tpu(const Tensor &self, const Tensor &tensor1,
   CHECK_TENSOR_IN_DEVICE(tensor2);
   CHECK_TENSOR_IN_DEVICE(out);
   TIMING_START;
-
   auto status = sgdnnAddCDiv(
       tpu::TPUGetDeviceResource(), tpu::TPUGenerateSgdnnTensor(self),
       tpu::TPUGenerateSgdnnTensor(tensor1),

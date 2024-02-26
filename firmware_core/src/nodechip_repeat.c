@@ -159,8 +159,17 @@ void tpu_kernel_api_repeat(const void *args) {
   sg_api_repeat_t *api = (sg_api_repeat_t *)args;
 
   tpu_initialize();
-  nodechip_repeat(api->input_global_addr, api->output_global_addr, api->shape,
-                  api->repeat_times, api->dim, api->repeat_dim, api->dtype);
+  if( is_last_dim_spec(api) ){
+    int rows = 1, cols = api->shape[api->dim - 1];
+    for (int i = 0; i < api->dim - 1; ++i) {
+      rows *= api->shape[i];
+    }
+    int repeats = api->repeat_times[api->repeat_dim - 1];
+    nodechip_repeat_spec_for_last_dim(api->input_global_addr, api->output_global_addr,  rows, cols, repeats, api->dtype);
+  }else{
+    nodechip_repeat(api->input_global_addr, api->output_global_addr, api->shape,
+                    api->repeat_times, api->dim, api->repeat_dim, api->dtype);
+  }
   tpu_poll();
 }
 TPUKERNEL_FUNC_REGISTER(tpu_kernel_api_repeat);

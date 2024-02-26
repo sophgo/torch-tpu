@@ -21,7 +21,7 @@ class _MultiDeviceReplicator:
     def get(self, device) -> torch.Tensor:
         retval = self._per_device_tensors.get(device, None)
         if retval is None:
-            retval = self.master.to(device=device, non_blocking=False, copy=True)
+            retval = self.master.cpu().to(device=device, non_blocking=False, copy=True)
             self._per_device_tensors[device] = retval
         return retval
 
@@ -412,7 +412,7 @@ class GradScaler:
         else:
             # Consume shared inf/nan data collected from optimizers to update the scale.
             # If all found_inf tensors are on the same device as self._scale, this operation is asynchronous.
-            found_infs = [found_inf.to(device=_scale.device, non_blocking=True)
+            found_infs = [found_inf.cpu().to(device=_scale.device)
                           for state in self._per_optimizer_states.values()
                           for found_inf in state["found_inf_per_device"].values()]
 

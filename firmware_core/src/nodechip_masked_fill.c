@@ -13,11 +13,25 @@ extern void nodechip_masked_fill(
     float          value,
     data_type_t    dtype);
 
+extern void nodechip_select_fp(
+    global_addr_t cond_global_addr,
+    global_addr_t res_global_addr,
+    global_addr_t sel0_global_addr,
+    bool         sel0_is_const,
+    float        sel0_const_val,
+    global_addr_t sel1_global_addr,
+    bool         sel1_is_const,
+    float        sel1_const_val,
+    const int*   cond_shape,
+    int          shape_dim,
+    data_type_t  cond_dtype,
+    data_type_t  res_dtype);
 
 void tpu_kernel_api_masked_fill ( const void * args )
 {
     sg_api_masked_fill_t *api = ( sg_api_masked_fill_t * ) args;
     tpu_initialize();
+    #if 0
     nodechip_masked_fill(
         api->input_global_addr,
         api->mask_global_addr,
@@ -29,6 +43,22 @@ void tpu_kernel_api_masked_fill ( const void * args )
         api->value,
         api->dtype
     );
+    #else
+    nodechip_select_fp(
+        /* cond_global_addr */ api->mask_global_addr,
+        /* res_global_addr */ api->out_global_addr,
+        /* sel0_global_addr */ 0,
+        /* sel0_is_const */ true,
+        /* sel0_const_val */ api->value,
+        /* sel1_global_addr */ api->input_global_addr,
+        /* sel1_is_const */ false,
+        /* sel1_const_val */ 0,
+        /* cond_shape */ api->mask_shape,
+        /* shape_dim */ api->mask_dims,
+        /* cond_dtype */ api->dtype,
+        /* res_dtype */ api->dtype
+    );
+    #endif
     tpu_poll();
 }
 TPUKERNEL_FUNC_REGISTER(tpu_kernel_api_masked_fill);

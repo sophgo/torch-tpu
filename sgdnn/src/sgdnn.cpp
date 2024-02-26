@@ -3498,7 +3498,7 @@ tpu_status_t sgdnnMaskedFill ( tpu_resource_t resource ,
     api.mask_shape[i] = mask.shape[i];
   }
   api.value = value;
-  api.dtype = sgdnnTPUKernelDType ( SGDNN_DTYPE_FP32 );;
+  api.dtype = sgdnnTPUKernelDType ( input.dtype );;
   SAFE_CALL ( sgdnnTPUKernelLaunch ( resource , "tpu_kernel_api_masked_fill", &api, sizeof ( api ) ) );
 #elif defined BACKEND_SG2260
   sg_api_masked_fill_t api;

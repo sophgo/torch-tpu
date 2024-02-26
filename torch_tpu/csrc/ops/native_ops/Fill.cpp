@@ -63,6 +63,9 @@ Tensor &masked_fill_Scalar_tpu(Tensor &self, const Tensor &mask,
                                const Scalar &value) {
   CHECK_TENSOR_IN_DEVICE(self);
   CHECK_TENSOR_IN_DEVICE(mask);
+  auto mask_dim = mask.dim();
+  if(mask_dim == 0) 
+    return self;
 #if 0
   LOG(WARNING) << "masked_fill_.Scalar use cpu impl";
   auto self_cpu = self.cpu();

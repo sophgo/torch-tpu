@@ -60,15 +60,16 @@ Tensor embedding_dense_backward_tpu ( const Tensor & grad_output, const Tensor &
 #else
   TensorOptions out_option = TensorOptions ( grad_output.device() ).dtype ( grad_output.dtype() );
   torch::Tensor out = torch::empty ( {num_weights, grad_output.size ( grad_output.dim() - 1 ) }, out_option );
+  // indices should not be int64_t
+  auto indices_int32 = indices.to ( torch::kInt32 );
   TIMING_START;
-
   auto status = sgdnnEmbeddingBackward (
                        tpu::TPUGetDeviceResource(),
                        tpu::TPUGenerateSgdnnTensor ( grad_output ),
-                       tpu::TPUGenerateSgdnnTensor ( indices ),
+                       tpu::TPUGenerateSgdnnTensor ( indices_int32 ),
                        tpu::TPUGenerateSgdnnTensor ( out ) );
   TORCH_CHECK ( status == SG_SUCCESS );
-    TIMING_END ( tpu::EMBEDDING_BACKWARD );
+  TIMING_END ( tpu::EMBEDDING_BACKWARD );
 #endif
   SHOW_TENSOR_OP(grad_output, indices, out);
   return out;
