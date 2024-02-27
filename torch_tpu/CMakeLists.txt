@@ -67,6 +67,7 @@ else()
     csrc/core/TPUDeviceManager.cpp
     csrc/core/TPUTorchUtils.cpp
     csrc/core/TPUCtypeApi.cpp
+    csrc/core/Daemon.cpp
     csrc/ops/native_ops/*.cpp
     csrc/ops/my_ops/*.cpp
     csrc/ops/autocast_ops/*.cpp
