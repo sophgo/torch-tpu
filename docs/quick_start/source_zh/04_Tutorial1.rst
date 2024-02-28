@@ -176,6 +176,12 @@ accelerate 采用源码安装的方式，目前支持版本为v0.16.0。可执�
 
     prompt = "cute dragon creature"
 
+在执行代码前，为保证顺利进行，需要先执行以下命令：
+
+.. code-block:: shell
+
+    $ ulimit -n 65535
+
 该示例的完整代码如下：
 
 .. code-block:: python
