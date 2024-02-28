@@ -426,7 +426,19 @@ Torch-TPU 支持
         --output_dir="sd-pokemon-model-lora_fp16" \
         --validation_prompt="cute dragon creature"
 
-执行如上指令，训练完成后，如 FP32 精度训练一样，会在当前目录下生成名为 sd-pokemon-model-lora_fp16 的文件夹。
+执行如上指令，训练完成后，如 FP32 精度训练一样，会在当前目录下生成名为 sd-pokemon-model-lora_fp16 的文件夹。其中包含训练得到的lora参数、训练记录logs，以及checkpoint数据。文件结构如下。
+
+.. code-block:: shell
+
+   /text_to_image/sd-pokemon-model-lora_fp16/
+   |—— checkpoint-*
+   │    ├── optimizer.bin
+   │    ├── pytorch_model.bin
+   │    ├── random_states_0.pkl
+   │    └── scaler.pt
+   |—— logs
+   │    └── text2image-fine-tune
+   └── pytorch_lora_weights.safetensors
 
 在完成上述 LoRA Finetune 训练任务后，可以执行以下推理脚本，加载训练好的 lora 参数进行 FP16 精度下的推理。
 
