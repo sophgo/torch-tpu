@@ -116,6 +116,9 @@ void tpu_kernel_api_concat_multi_core ( const void * args )
   sg_api_concat_t * api = ( sg_api_concat_t * ) args;
   int st_by_concatway[FW_MAX_CONCAT_NUM] = { 0 };
   tpu_initialize();
+#ifdef USING_PERF_MODE
+    tpu_sync_all();
+#endif
   nodechip_concat_nd_multi_core ( api->input_global_addrs,
                        api->output_global_addr,
                        api->input_shapes,

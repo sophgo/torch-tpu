@@ -147,6 +147,9 @@ void tpu_kernel_api_repeat_multi_core(const void *args) {
   sg_api_repeat_t *api = (sg_api_repeat_t *)args;
 
   tpu_initialize();
+#ifdef USING_PERF_MODE
+    tpu_sync_all();
+#endif
   int core_idx = tpu_core_index();
   // TODO: other op depends on repeat, just use core 0 to do
   if (core_idx == 0)

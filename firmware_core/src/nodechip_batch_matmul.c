@@ -74,11 +74,26 @@ extern void nodechip_matmul_multi_core(
     int             L_trans,
     int             R_trans,
     data_type_t     in_dtype,
-    data_type_t     out_dtype);
+    data_type_t     out_dtype,
+    int             slice_core_m,
+    int             slice_core_n,
+    int             slice_m,
+    int             slice_n,
+    int             slice_k,
+    int             slyt_num,
+    int             left_slyt_fmt,
+    int             right_slyt_fmt,
+    int             result_slyt_fmt,
+    global_addr_t*  ga_private_left,
+    global_addr_t*  ga_private_right,
+    global_addr_t*  ga_private_result);
 
 void tpu_kernel_api_matmul_multi_core(const void* api_buf) {
     sg_api_matmul_multi_core_t *api = (sg_api_matmul_multi_core_t *)api_buf;
     tpu_initialize();
+#ifdef USING_PERF_MODE
+    tpu_sync_all();
+#endif
     nodechip_matmul_multi_core(
         api->left_global_addr,
         api->right_global_addr,
@@ -91,7 +106,19 @@ void tpu_kernel_api_matmul_multi_core(const void* api_buf) {
         api->L_trans,
         api->R_trans,
         (data_type_t)api->in_dtype,
-        (data_type_t)api->out_dtype);
+        (data_type_t)api->out_dtype,
+        api->slice_core_m,
+        api->slice_core_n,
+        api->slice_m,
+        api->slice_n,
+        api->slice_k,
+        api->slyt_num,
+        api->left_slyt_fmt,
+        api->right_slyt_fmt,
+        api->result_slyt_fmt,
+        api->left_slyt_global_addr,
+        api->right_slyt_global_addr,
+        api->result_slyt_global_addr);
     tpu_poll();
 }
 

@@ -397,6 +397,21 @@ typedef struct
   int                R_trans;
   int                in_dtype;
   int                out_dtype;
+  int                slice_core_m; 
+  int                slice_core_n; 
+  int                slice_m;
+  int                slice_n;
+  int                slice_k;
+  int                slyt_num;
+  int                left_slyt_fmt; // 0:vertial, 1:horizontal
+  int                right_slyt_fmt; // 0:vertial, 1:horizontal
+  int                result_slyt_fmt; // 0:vertial, 1:horizontal
+  int                left_slyt_buf_size;
+  int                right_slyt_buf_size;
+  int                result_slyt_buf_size;
+  unsigned long long left_slyt_global_addr[8];
+  unsigned long long right_slyt_global_addr[8];
+  unsigned long long result_slyt_global_addr[8];
 } WITH_PLATFORM(sg_api_matmul_multi_core_t);
 
 typedef struct

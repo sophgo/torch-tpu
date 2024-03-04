@@ -4,6 +4,7 @@
 option(USING_CMODEL "option for using cmodel" OFF)
 option(PCIE_MODE "option for pcie mode" ON)
 option(SOC_MODE "run on soc platform" OFF)
+option(USING_PERF_MODE "Using performance mode" OFF)
 
 if(USING_CMODEL)
   if ($ENV{LIBSOPHON_PATTERN} MATCHES $ENV{LIBSOPHON_STABLE})
@@ -26,4 +27,8 @@ endif()
 if(SOC_MODE)
   message(FATAL_ERROR "NO CHEK NOW")
   add_definitions(-DSOC_MODE)
+endif()
+
+if(USING_PERF_MODE)
+  add_definitions(-DUSING_PERF_MODE)
 endif()

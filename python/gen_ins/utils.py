@@ -16,6 +16,7 @@ class DumpIns:
         self.libpath = lib_path
         self._lib = ct.cdll.LoadLibrary(lib_path)
     def dump(self, path):
+        print("==========" + path + "==========")
         self._lib.set_file_dump_subdir(path.encode())
 
 class ForwardHack(torch.autograd.Function):
