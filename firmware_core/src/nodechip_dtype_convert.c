@@ -47,6 +47,9 @@ static inline void compute_current_slice_info_multi_core(int total_num, int* exp
 void tpu_kernel_api_dtype_convert_multi_core ( const void* args ) {
   sg_api_dtype_convert_t* api = ( sg_api_dtype_convert_t* ) args;
   tpu_initialize();
+#ifdef USING_PERF_MODE
+  tpu_sync_all();
+#endif
   const int core_num = tpu_core_num();
   const int core_idx = tpu_core_index();
   int new_dim = api->dim >= 2 ? 2 : 1;

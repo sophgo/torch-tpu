@@ -11,6 +11,10 @@
 #include "tpukernel_multicore.hpp"
 #endif
 
+#ifdef USING_PERF_MODE
+#include <iostream>
+#endif
+
 #define SGDNN_CHECK(expression) \
 do \
 { \
@@ -996,6 +1000,26 @@ bm_status_t sgdnnLayernormBackward ( bm_handle_t handle,
     api.shape[i] = input.shape[i];
   }
   api.dim = input.dim;
+#ifdef USING_PERF_MODE
+  std::cout << "input_num\n" << 5 <<std::endl;
+  std::cout << "output_num\n" << 3 <<std::endl;
+  std::cout << "input_addr0\n" << api.grad_output_global_addr << std::endl;
+  std::cout << "input_size0\n" << sgdnnTensorBytes(&grad_output) << std::endl;
+  std::cout << "input_addr1\n" << api.input_global_addr << std::endl;
+  std::cout << "input_size1\n" << sgdnnTensorBytes(&input) << std::endl;
+  std::cout << "input_addr2\n" << api.weight_global_addr << std::endl;
+  std::cout << "input_size2\n" << sgdnnTensorBytes(&weight) << std::endl;
+  std::cout << "input_addr3\n" << api.mean_global_addr << std::endl;
+  std::cout << "input_size3\n" << sgdnnTensorBytes(&mean) << std::endl;
+  std::cout << "input_addr4\n" << api.rstd_global_addr << std::endl;
+  std::cout << "input_size4\n" << sgdnnTensorBytes(&rstd) << std::endl;
+  std::cout << "output_addr0\n" << api.grad_input_global_addr << std::endl;
+  std::cout << "output_size0\n" << sgdnnTensorBytes(&grad_input) << std::endl;
+  std::cout << "output_addr1\n" << api.grad_weight_global_addr << std::endl;
+  std::cout << "output_size1\n" << sgdnnTensorBytes(&grad_weight) << std::endl;
+  std::cout << "output_addr2\n" << api.grad_bias_global_addr << std::endl;
+  std::cout << "output_size2\n" << sgdnnTensorBytes(&grad_bias) << std::endl;
+#endif
 #if defined SGDNN_BACKEND_1684X
   SAFE_CALL ( sgdnnTPUKernelLaunch ( handle, "tpu_kernel_api_layernorm_backward", &api, sizeof ( api ) ) );
 #elif defined SGDNN_BACKEND_2260
@@ -1329,6 +1353,14 @@ bm_status_t sgdnnReduce ( bm_handle_t handle,
   api.end_dim = end_dim;
   api.dtype = sgdnnTPUKernelDType ( input.dtype );
   api.mode = mode;
+#ifdef USING_PERF_MODE
+  std::cout << "input_num\n" << 1 <<std::endl;
+  std::cout << "output_num\n" << 1 <<std::endl;
+  std::cout << "input_addr0\n" << api.input_global_addr << std::endl;
+  std::cout << "input_size0\n" << sgdnnTensorBytes(&input) << std::endl;
+  std::cout << "output_addr0\n" << api.output_global_addr << std::endl;
+  std::cout << "output_size0\n" << sgdnnTensorBytes(&output) << std::endl;
+#endif
   SAFE_CALL ( sgdnnTPUKernelLaunch ( handle, "tpu_kernel_api_reduce_multi_core", &api, sizeof ( api ) ) );
 #else
   SGDNN_CHECK ( false );
@@ -1441,6 +1473,14 @@ bm_status_t sgdnnStridedCopy ( bm_handle_t handle,
     api.output_stride[i] = output.stride[i];
   }
   api.dtype = sgdnnTPUKernelDType ( input.dtype );
+#ifdef USING_PERF_MODE
+  std::cout << "input_num\n" << 1 <<std::endl;
+  std::cout << "output_num\n" << 1 <<std::endl;
+  std::cout << "input_addr0\n" << api.input_global_addr << std::endl;
+  std::cout << "input_size0\n" << sgdnnTensorBytes(&input) << std::endl;
+  std::cout << "output_addr0\n" << api.output_global_addr << std::endl;
+  std::cout << "output_size0\n" << sgdnnTensorBytes(&output) << std::endl;
+#endif
   SAFE_CALL ( sgdnnTPUKernelLaunch ( handle, "tpu_kernel_api_strided_copy_multi_core", &api, sizeof ( api ) ) );
 #else
   SGDNN_CHECK ( false );
@@ -1478,6 +1518,14 @@ bm_status_t sgdnnConvert ( bm_handle_t handle,
   }
   api.input_dtype = sgdnnTPUKernelDType ( input.dtype );
   api.output_dtype = sgdnnTPUKernelDType ( output.dtype );
+#ifdef USING_PERF_MODE
+  std::cout << "input_num\n" << 1 <<std::endl;
+  std::cout << "output_num\n" << 1 <<std::endl;
+  std::cout << "input_addr0\n" << api.input_global_addr << std::endl;
+  std::cout << "input_size0\n" << sgdnnTensorBytes(&input) << std::endl;
+  std::cout << "output_addr0\n" << api.output_global_addr << std::endl;
+  std::cout << "output_size0\n" << sgdnnTensorBytes(&output) << std::endl;
+#endif
   SAFE_CALL ( sgdnnTPUKernelLaunch ( handle, "tpu_kernel_api_dtype_convert_multi_core", &api, sizeof ( api ) ) );
 #else
   SGDNN_CHECK ( false );
@@ -1699,6 +1747,17 @@ bm_status_t sgdnnConcat ( bm_handle_t handle,
   api.dim = output.dim;
   api.axis = dim;
   api.dtype = sgdnnTPUKernelDType ( output.dtype );
+#ifdef USING_PERF_MODE
+  std::cout << "input_num\n" << input_num <<std::endl;
+  std::cout << "output_num\n" << 1 <<std::endl;
+  for ( int i = 0; i < input_num; ++i )
+  {
+    std::cout << "input_addr" << i << "\n" << api.input_global_addrs[i] << std::endl;
+    std::cout << "input_size" << i << "\n" << sgdnnTensorBytes(&inputs[i]) << std::endl;
+  }
+    std::cout << "output_addr0\n" << api.output_global_addr << std::endl;
+    std::cout << "output_size0\n" << sgdnnTensorBytes(&output) << std::endl;
+#endif
   SAFE_CALL ( sgdnnTPUKernelLaunch ( handle, "tpu_kernel_api_concat_multi_core", &api, sizeof ( api ) ) );
 #else
   SGDNN_CHECK ( false );
@@ -2410,6 +2469,16 @@ bm_status_t sgdnnBinary ( bm_handle_t handle,
   api.dtype = sgdnnTPUKernelDType ( input.dtype );
   api.value = scalar;
   api.binary_type = binary_type;
+#ifdef USING_PERF_MODE
+  std::cout << "input_num\n" << 2 <<std::endl;
+  std::cout << "output_num\n" << 1 <<std::endl;
+  std::cout << "input_addr0\n" << api.input_global_addr << std::endl;
+  std::cout << "input_size0\n" << sgdnnTensorBytes(&input) << std::endl;
+  std::cout << "input_addr1\n" << api.other_global_addr << std::endl;
+  std::cout << "input_size1\n" << sgdnnTensorBytes(&other) << std::endl;
+  std::cout << "output_addr0\n" << api.output_global_addr << std::endl;
+  std::cout << "output_size0\n" << sgdnnTensorBytes(&output) << std::endl;
+#endif
 #if defined SGDNN_BACKEND_1684X
   SAFE_CALL ( sgdnnTPUKernelLaunch ( handle, "tpu_kernel_api_binary", &api, sizeof ( api ) ) );
 #elif defined SGDNN_BACKEND_2260
@@ -2686,6 +2755,35 @@ bm_status_t sgdnnMatmul ( bm_handle_t handle,
   }
   api.in_dtype = sgdnnTPUKernelDType ( left.dtype );
   api.out_dtype = sgdnnTPUKernelDType ( output.dtype );
+  //TODO: set matmul 8ch params
+  // const int chn_num = 8; // 8ch ddr
+  api.slice_core_m = 0;
+  api.slice_core_n = 0;
+  api.slice_m = 0;
+  api.slice_n = 0;
+  api.slice_k = 0;
+  api.slyt_num = 0;
+  api.left_slyt_fmt = 0;
+  api.right_slyt_fmt = 0;
+  api.result_slyt_fmt = 0;
+  api.left_slyt_buf_size = 0;
+  api.right_slyt_buf_size = 0;
+  api.result_slyt_buf_size = 0;
+  for (int i = 0; i < 8; i++) {
+    api.left_slyt_global_addr[i] = 0;
+    api.right_slyt_global_addr[i] = 0;
+    api.result_slyt_global_addr[i] = 0;
+  }
+#ifdef USING_PERF_MODE
+  std::cout << "input_num\n" << 2 <<std::endl;
+  std::cout << "output_num\n" << 1 <<std::endl;
+  std::cout << "input_addr0\n" << api.left_global_addr << std::endl;
+  std::cout << "input_size0\n" << sgdnnTensorBytes(&left) << std::endl;
+  std::cout << "input_addr1\n" << api.right_global_addr << std::endl;
+  std::cout << "input_size1\n" << sgdnnTensorBytes(&right) << std::endl;
+  std::cout << "output_addr0\n" << api.output_global_addr << std::endl;
+  std::cout << "output_size0\n" << sgdnnTensorBytes(&output) << std::endl;
+#endif
   SAFE_CALL ( sgdnnTPUKernelLaunch ( handle, "tpu_kernel_api_matmul_multi_core", &api, sizeof ( api ) ) );
 #else
   SGDNN_CHECK ( false );
@@ -2774,6 +2872,35 @@ bm_status_t sgdnnBatchMatmul ( bm_handle_t handle,
   }
   api.in_dtype = sgdnnTPUKernelDType ( left.dtype );
   api.out_dtype = sgdnnTPUKernelDType ( output.dtype );
+  //TODO: set matmul 8ch params
+  // const int chn_num = 8; // 8ch ddr
+  api.slice_core_m = 0;
+  api.slice_core_n = 0;
+  api.slice_m = 0;
+  api.slice_n = 0;
+  api.slice_k = 0;
+  api.slyt_num = 0;
+  api.left_slyt_fmt = 0;
+  api.right_slyt_fmt = 0;
+  api.result_slyt_fmt = 0;
+  api.left_slyt_buf_size = 0;
+  api.right_slyt_buf_size = 0;
+  api.result_slyt_buf_size = 0;
+  for (int i = 0; i < 8; i++) {
+    api.left_slyt_global_addr[i] = 0;
+    api.right_slyt_global_addr[i] = 0;
+    api.result_slyt_global_addr[i] = 0;
+  }
+#ifdef USING_PERF_MODE
+  std::cout << "input_num\n" << 2 <<std::endl;
+  std::cout << "output_num\n" << 1 <<std::endl;
+  std::cout << "input_addr0\n" << api.left_global_addr << std::endl;
+  std::cout << "input_size0\n" << sgdnnTensorBytes(&left) << std::endl;
+  std::cout << "input_addr1\n" << api.right_global_addr << std::endl;
+  std::cout << "input_size1\n" << sgdnnTensorBytes(&right) << std::endl;
+  std::cout << "output_addr0\n" << api.output_global_addr << std::endl;
+  std::cout << "output_size0\n" << sgdnnTensorBytes(&output) << std::endl;
+#endif
   SAFE_CALL ( sgdnnTPUKernelLaunch ( handle, "tpu_kernel_api_matmul_multi_core", &api, sizeof ( api ) ) );
 #else
   SGDNN_CHECK ( false );
@@ -2978,6 +3105,14 @@ bm_status_t sgdnnGELU ( bm_handle_t handle,
     api.shape[i] = input.shape[i];
   }
   api.dtype = sgdnnTPUKernelDType ( input.dtype );
+#ifdef USING_PERF_MODE
+  std::cout << "input_num\n" << 1 <<std::endl;
+  std::cout << "output_num\n" << 1 <<std::endl;
+  std::cout << "input_addr0\n" << api.input_global_addr << std::endl;
+  std::cout << "input_size0\n" << sgdnnTensorBytes(&input) << std::endl;
+  std::cout << "output_addr0\n" << api.output_global_addr << std::endl;
+  std::cout << "output_size0\n" << sgdnnTensorBytes(&output) << std::endl;
+#endif
 #if defined SGDNN_BACKEND_1684X
   SAFE_CALL ( sgdnnTPUKernelLaunch ( handle, "tpu_kernel_api_gelu", &api, sizeof ( api ) ) );
 #elif defined SGDNN_BACKEND_2260
@@ -3048,6 +3183,16 @@ bm_status_t sgdnnGELUBackward ( bm_handle_t handle,
     api.shape[i] = input.shape[i];
   }
   api.dtype = sgdnnTPUKernelDType ( input.dtype );
+#ifdef USING_PERF_MODE
+  std::cout << "input_num\n" << 2 <<std::endl;
+  std::cout << "output_num\n" << 1 <<std::endl;
+  std::cout << "input_addr0\n" << api.grad_output_global_addr << std::endl;
+  std::cout << "input_size0\n" << sgdnnTensorBytes(&grad_output) << std::endl;
+  std::cout << "input_addr1\n" << api.input_global_addr << std::endl;
+  std::cout << "input_size1\n" << sgdnnTensorBytes(&input) << std::endl;
+  std::cout << "output_addr0\n" << api.grad_input_global_addr << std::endl;
+  std::cout << "output_size0\n" << sgdnnTensorBytes(&grad_input) << std::endl;
+#endif
 #if defined SGDNN_BACKEND_1684X
   SAFE_CALL ( sgdnnTPUKernelLaunch ( handle, "tpu_kernel_api_gelu_backward", &api, sizeof ( api ) ) );
 #elif defined SGDNN_BACKEND_2260

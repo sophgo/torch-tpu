@@ -437,6 +437,9 @@ void tpu_kernel_api_binary(const void *args) {
   }
 
   tpu_initialize();
+#ifdef USING_PERF_MODE
+    tpu_sync_all();
+#endif
   if ((sg_binary_type_t)api->binary_type == BINARY_DIV) {
     nodechip_binary_div(api->input_global_addr, api->other_global_addr,
                         api->output_global_addr, length,
@@ -454,6 +457,10 @@ TPUKERNEL_FUNC_REGISTER(tpu_kernel_api_binary);
 #ifdef FIRMWARE_BACKEND_2260
 void tpu_kernel_api_binary_multi_core(const void *args) {
   sg_api_binary_t *api = (sg_api_binary_t *)args;
+  tpu_initialize();
+#ifdef USING_PERF_MODE
+    tpu_sync_all();
+#endif
   TPUKERNEL_ASSERT(api->dtype == DT_INT8 || api->dtype == DT_UINT8 ||
                    api->dtype == DT_INT16 || api->dtype == DT_UINT16 ||
                    api->dtype == DT_INT32 || api->dtype == DT_UINT32 ||
@@ -491,7 +498,6 @@ void tpu_kernel_api_binary_multi_core(const void *args) {
     cur_length_slice = length - length_slice * (length_secs - 1);
   }
 
-  tpu_initialize();
   if (core_idx < length_secs) {
     if ((sg_binary_type_t)api->binary_type == BINARY_DIV) {
       nodechip_binary_div(
@@ -1575,6 +1581,10 @@ TPUKERNEL_FUNC_REGISTER(tpu_kernel_api_binary_c);
 #ifdef FIRMWARE_BACKEND_2260
 void tpu_kernel_api_binary_c_multi_core(const void *args) {
   sg_api_binary_c_t *api = (sg_api_binary_c_t *)args;
+  tpu_initialize();
+#ifdef USING_PERF_MODE
+    tpu_sync_all();
+#endif
   TPUKERNEL_ASSERT(api->dtype == DT_INT8 || api->dtype == DT_UINT8 ||
                    api->dtype == DT_INT16 || api->dtype == DT_UINT16 ||
                    api->dtype == DT_INT32 || api->dtype == DT_UINT32 ||
@@ -1611,7 +1621,6 @@ void tpu_kernel_api_binary_c_multi_core(const void *args) {
     cur_length_slice = length - length_slice * (length_secs - 1);
   }
 
-  tpu_initialize();
   if (core_idx < length_secs) {
     if ((sg_binary_type_t)api->binary_type == BINARY_DIV) {
       nodechip_binary_scalar_div(

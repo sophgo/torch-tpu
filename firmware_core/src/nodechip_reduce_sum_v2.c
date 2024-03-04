@@ -505,6 +505,9 @@ void tpu_kernel_api_reduce_multi_core ( const void *args )
   TPUKERNEL_ASSERT ( api->dtype == DT_FP32 || api->dtype == DT_FP16 || api->dtype == DT_BFP16 );
   TPUKERNEL_ASSERT ( api->mode == 0 || api->mode == 1 );
   tpu_initialize();
+#ifdef USING_PERF_MODE
+    tpu_sync_all();
+#endif
   //Notice
   //[start_dim, end_dim)
   if ( api->end_dim == api->dim)

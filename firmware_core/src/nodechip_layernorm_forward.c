@@ -58,6 +58,9 @@ void tpu_kernel_api_layernorm_multi_core ( const void *args )
   sg_api_layernorm_t *api = ( sg_api_layernorm_t * ) args;
   TPUKERNEL_ASSERT ( api->dtype == DT_FP32 || api->dtype == DT_FP16 || api->dtype == DT_BFP16 );
   tpu_initialize();
+#ifdef USING_PERF_MODE
+  tpu_sync_all();
+#endif
   nodechip_layernorm_forward_multi_core (
     api->input_global_addr,
     api->weight_global_addr,
