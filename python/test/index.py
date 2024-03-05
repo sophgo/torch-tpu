@@ -54,7 +54,29 @@ def case2():
     print(a_tpu.cpu())
     print('diff', torch.max(torch.abs(a - a_tpu.cpu())))
 
+def case3():
+    w = torch.randn((4001, 8192), dtype=torch.float16)
+    w_tpu = w.to(device)
+
+    max_diff = {}
+    num = 1
+    while (num <= 16*4096):
+        index = torch.randint(0, 4001, (num, ), dtype=torch.int32)
+
+        index_tpu = index.to(device)
+        tpu_out = w_tpu[index_tpu]
+        cpu_out = w[index]
+
+        print(tpu_out.shape, cpu_out.shape)
+        # print(f'num: {num}, max diff: {torch.max(torch.abs(cpu_out - tpu_out.cpu()))}')
+        max_diff[num] = torch.max(torch.abs(cpu_out - tpu_out.cpu()))
+        num *= 2
+    
+    print(max_diff)
+
+
 
 if __name__ == "__main__":
     case1()
     case2()
+    case3()

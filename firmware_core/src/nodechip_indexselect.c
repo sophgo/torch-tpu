@@ -309,7 +309,7 @@ void nodechip_cast_i64_to_i32_without_overflow_multi_core(
     }
 }
 
-void nodechip_index_select_multi_core_index1_specific(
+void nodechip_index_select_multi_core_split_inner(  
     global_addr_t input_global_addr,
     global_addr_t index_global_addr,
     global_addr_t output_global_addr,
@@ -320,7 +320,6 @@ void nodechip_index_select_multi_core_index1_specific(
     int           const_val,
     data_type_t   dtype
 ) {
-  TPUKERNEL_ASSERT(index_num == 1);
   TPUKERNEL_ASSERT(outer_num == 1);
   int core_num = tpu_core_num();
   int core_idx = tpu_core_index();
@@ -332,9 +331,9 @@ void nodechip_index_select_multi_core_index1_specific(
     int out_offset = inner_sliced * core_idx * tpu_data_type_size(dtype);
     int in_offset = inner_sliced * core_idx * tpu_data_type_size(dtype);
     dim4 real_oshape = {1, 1, index_num, real_inner_sliced};
-    dim4 params_shape = {.n = 1, .c = 1, .h = select_num, .w = inner_num};
-    dim4 params_stride;
-    tpu_continuous_stride(&params_stride, &params_shape);
+    dim4 output_stride = {.n=inner_num, .c=inner_num, .h=inner_num, .w=1};
+    dim4 params_stride = {.n=inner_num, .c=inner_num, .h=inner_num, .w=1};
+    
     tpu_gdma_h_gather_S2S(
       output_global_addr + out_offset,
       input_global_addr + in_offset,
@@ -343,8 +342,48 @@ void nodechip_index_select_multi_core_index1_specific(
       const_filler,
       &real_oshape,
       select_num,
-      NULL,
+      &output_stride,
       &params_stride,
+      NULL,
+      dtype);
+  }
+}
+
+void nodechip_index_select_multi_core_split_index(  
+    global_addr_t input_global_addr,
+    global_addr_t index_global_addr,
+    global_addr_t output_global_addr,
+    const int     outer_num,
+    int           inner_num,
+    int           select_num,
+    int           index_num,
+    int           const_val,
+    data_type_t   dtype
+) {
+  TPUKERNEL_ASSERT(outer_num == 1);
+  int core_num = tpu_core_num();
+  int core_idx = tpu_core_index();
+  int index_sliced = DIV_UP(index_num, core_num);
+  int allocated_core = DIV_UP(index_num, index_sliced);
+  if (core_idx == allocated_core - 1)
+    index_sliced = index_num - core_idx * index_sliced;
+ 
+  scalar_t const_filler = {.s32 = const_val};
+  if (core_idx < allocated_core) {
+    int out_offset = index_sliced * core_idx * inner_num * tpu_data_type_size(dtype);
+    int index_offset = index_sliced * core_idx * tpu_data_type_size(DT_INT32);
+    dim4 real_oshape = {1, 1, index_sliced, inner_num};
+    
+    tpu_gdma_h_gather_S2S(
+      output_global_addr + out_offset,
+      input_global_addr,
+      index_global_addr + index_offset,
+      false,
+      const_filler,
+      &real_oshape,
+      select_num,
+      NULL,
+      NULL,
       NULL,
       dtype);
   }
@@ -471,17 +510,30 @@ void tpu_kernel_api_index_select_multi_core ( const void * args )
     outer_num *= input_shape[i];
   }
   // case: [1], [32000, 8192] -> [8192] can not make full use of multi core
-  if (outer_num == 1 && api->index_num == 1) {
-    nodechip_index_select_multi_core_index1_specific(
-      api->input_global_addr,
-      api->index_global_addr,
-      api->output_global_addr,
-      outer_num,
-      inner_num,
-      select_num,
-      api->index_num,
-      0,
-      ( data_type_t ) api->dtype);
+  if (outer_num == 1) {
+    if (select_num < inner_num) {
+      nodechip_index_select_multi_core_split_inner(
+          api->input_global_addr, 
+          api->index_global_addr,
+          api->output_global_addr, 
+          outer_num, 
+          inner_num, 
+          select_num,
+          api->index_num, 
+          0, 
+          (data_type_t)api->dtype);
+    } else {
+      nodechip_index_select_multi_core_split_index(
+          api->input_global_addr, 
+          api->index_global_addr,
+          api->output_global_addr, 
+          outer_num, 
+          inner_num, 
+          select_num,
+          api->index_num, 
+          0, 
+          (data_type_t)api->dtype);
+    }
   } else {
     nodechip_index_select_multi_core (
     api->input_global_addr,
