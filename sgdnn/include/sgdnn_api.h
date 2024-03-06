@@ -11,6 +11,8 @@
 extern "C" {
 #endif
 
+#define USE_QKV_PACKED
+
 typedef struct
 {
   int kernel_h;
@@ -1039,43 +1041,36 @@ tpu_status_t sgdnnMlp ( tpu_resource_t  stream,
 
 /*
  * Calc process:
-    *
- * d = hidden_size / attention_heads
- * The shape of WEIGHTS:
-    * cos: (n, 1, d)
-    * weight2: (n, 1, d)
-    * weight3: optional(n, n)
- * The shape of INPUTS:
-    * Q : ( batch, attention_heads, 1, d )
-    * K : ( batch, k_v_heads, 1, d )
-    * V : ( batch, k_v_heads, 1, d )
-    * Kcache : ( batch, k_v_heads, embeddings-1, d )
-    * Vcache : ( batch, k_v_heads, embeddings-1, d )
- * The shape of OUTPUTS:
-    * Y : ( batch, attention_heads, 1, d )
- *
+ * OUT, Q: (tokens, q_heads, head_size)
+ * K, V: (tokens, kv_heads, head_size)
+ * Kcache, Vcache: (blocks, block_size, kv_heads, head_size)
+ * cos, sin: (tokens, 1, 128)
+ * input_lengths: (first_len, seconde_len, third_len, ...)
+ * save_slots: prefill.shape(batch, slots_size), decode.shape(batch, 1)
+ * fetch_slots: prefill:null, decode.shape(batch, slots_size)
+ * mask: prefill.shape(mask_size, mask_size), decode:null
+ * attention_mode: multi_batch_prefill:2 multi_batch_decode:3
  */
-tpu_status_t sgdnnLlamaAttention ( tpu_resource_t  stream,
-                          SgdnnTensor_t Q,
-                          SgdnnTensor_t K,
-                          SgdnnTensor_t V,
-                          SgdnnTensor_t Kcache,
-                          SgdnnTensor_t Vcache,
-                          SgdnnTensor_t cos,
-                          SgdnnTensor_t sin,
-                          SgdnnTensor_t mask,
-                          SgdnnTensor_t Y,
-                          SgdnnTensor_t Input_length,
-                          SgdnnTensor_t Save_slots,
-                          SgdnnTensor_t Fetch_slots,
-                          SgdnnTensor_t Q_buffer,
-                          SgdnnTensor_t K_buffer,
-                          SgdnnTensor_t V_buffer,
-                          int embeddings,
-                          int attention_mode,
-                          float C,
-                          int max_s,
-                          bool non_blocking = true);
+tpu_status_t sgdnnLlamaAttention ( tpu_resource_t resource,
+                                  SgdnnTensor_t OUT,
+                                  SgdnnTensor_t Q,
+                                  SgdnnTensor_t K,
+                                  SgdnnTensor_t V,
+                                  SgdnnTensor_t Kcache,
+                                  SgdnnTensor_t Vcache,
+                                  SgdnnTensor_t cos,
+                                  SgdnnTensor_t sin,
+                                  SgdnnTensor_t input_lengths,
+                                  SgdnnTensor_t save_slots,
+                                  SgdnnTensor_t fetch_slots,
+                                  SgdnnTensor_t mask,
+                                  int slots_size,
+                                  int mask_size,
+                                  int block_size,
+                                  float C,
+                                  int attention_mode,
+                                  int Ntotal,
+                                  bool non_blocking = true);
 
 /*
  * [ GRAD_INPUT, GRAD_W1, GRAD_W2, GRAD_B1, GRAD_B2 ] = MLP BACKWARD ( GRAD_OUTPUT, INPUT, W1, W2, OUT1, P )

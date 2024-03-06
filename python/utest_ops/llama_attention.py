@@ -93,7 +93,17 @@ class LLamaAttention(nn.Module):
 
 class LLamaAttentionFunc(torch.autograd.Function):
     @staticmethod
-    def forward(ctx, Q, K, V, Kcache, Vcache, cos, sin, mask, input_length, save_slots, fetch_slots, embeddings, attention_mode, softmax_scale, max_s):
+    def forward(ctx, Q, K, V, Kcache, Vcache, cos, sin, mask, input_length, save_slots, fetch_slots, embeddings, attention_mode, softmax_scale, max_s, block_size = 16):
+        block_size = 16
+        if Kcache.dim() == 3:
+            Kcache = Kcache.view(Kcache.shape[0]//block_size, block_size, Kcache.shape[1], Kcache.shape[2])
+        if Vcache.dim() == 3:
+            Vcache = Vcache.view(Vcache.shape[0]//block_size, block_size, Vcache.shape[1], Vcache.shape[2])
+        if cos.dim() == 2:
+            cos = cos.view(cos.shape[0], 1, cos.shape[1])
+        if sin.dim() == 2:
+            sin = sin.view(sin.shape[0], 1, sin.shape[1])
+
         output = torch.empty(Q.shape, dtype = Q.dtype, device = Q.device)
         if attention_mode == "decode":
             Qbuffer = None
@@ -104,25 +114,23 @@ class LLamaAttentionFunc(torch.autograd.Function):
             Qbuffer = torch.empty(Q.shape, dtype = Q.dtype, device = Q.device)
             Kbuffer  = torch.empty(K.shape, dtype = K.dtype, device = K.device)
             Vbuffer  = torch.empty(V.shape, dtype = V.dtype, device = V.device)
-        torch.ops.my_ops.llama_attention(Q,
+        torch.ops.my_ops.llama_attention(output,
+                                    Q,
                                     K,
                                     V,
                                     Kcache,
                                     Vcache,
                                     cos,
                                     sin,
-                                    mask,
-                                    output,
                                     input_length,
                                     save_slots,
                                     fetch_slots,
-                                    Qbuffer,
-                                    Kbuffer,
-                                    Vbuffer,
-                                    embeddings,
-                                    1 if attention_mode == "decode" else 0,
+                                    mask,
+                                    fetch_slots.size(1) if attention_mode == 'decode' else save_slots.size(1),
+                                    max_s,
+                                    block_size,
                                     softmax_scale,
-                                    max_s)
+                                    3 if attention_mode == 'decode' else 2)
         return output
 
 class LLamaAttentionBlock(nn.Module):

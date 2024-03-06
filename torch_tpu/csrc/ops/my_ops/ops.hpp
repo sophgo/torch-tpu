@@ -4,7 +4,7 @@
 #include <ATen/EmptyTensor.h>
 
 namespace at
-{	
+{
 	Tensor mlp_forward(
 		Tensor &input,
 		Tensor &w1,
@@ -44,25 +44,23 @@ namespace at
 		double_t eps);
 
 	Tensor llama_attention(
+		Tensor &OUT,
 		Tensor &Q,
 		Tensor &K,
 		Tensor &V,
 		Tensor &Kcache,
 		Tensor &Vcache,
-		Tensor &cos,
-		Tensor &sin,
+		const c10::optional<Tensor> &cos,
+		const c10::optional<Tensor> &sin,
+		const Tensor &input_lengths,
+		const Tensor &save_slots,
+		const c10::optional<Tensor> &fetch_slots,
 		const c10::optional<Tensor> &mask,
-		Tensor &Y,
-		Tensor &Input_length,
-		Tensor &Save_slots,
-		Tensor &Fetch_slots,
-		const c10::optional<Tensor> &Q_buffer,
-		Tensor &K_buffer,
-		Tensor &V_buffer,
-		int64_t embeddings,
-		int64_t attention_mode,
+		int64_t	slots_size,
+		int64_t mask_size,
+		int64_t block_size,
 		double C,
-		int64_t max_s);
+		int64_t attention_mode);
 
 	Tensor attn_forward(
 		Tensor &input,

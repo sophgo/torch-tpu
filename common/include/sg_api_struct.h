@@ -398,8 +398,8 @@ typedef struct
   int                R_trans;
   int                in_dtype;
   int                out_dtype;
-  int                slice_core_m; 
-  int                slice_core_n; 
+  int                slice_core_m;
+  int                slice_core_n;
   int                slice_m;
   int                slice_n;
   int                slice_k;
@@ -1198,36 +1198,65 @@ typedef struct {
 #endif
 
 typedef struct {
-    unsigned long long Q_global_addr;
-    unsigned long long K_global_addr;
-    unsigned long long V_global_addr;
-    unsigned long long Qbuffer_global_addr;
-    unsigned long long Kbuffer_global_addr;
-    unsigned long long Vbuffer_global_addr;
-    unsigned long long Kcache_global_addr;
-    unsigned long long Vcache_global_addr;
-    unsigned long long RoPE_cos_global_addr;
-    unsigned long long RoPE_sin_global_addr;
-    unsigned long long Mask_global_addr;
-    unsigned long long Y_global_addr;
-    unsigned long long input_length_global_addr;
-    unsigned long long save_slots_global_addr;
-    unsigned long long fetch_slots_global_addr;
-    int slots_size;
-    float C;
-    int batch;
-    int mask_max;
-    int hidden_size;
-    int num_attention_heads;
-    int num_k_v_heads;
-    int embeddings;
-    int attention_mode;
-    int block_size;
-    int dtype;
+  unsigned long long OUT_global_addr;
+  unsigned long long Q_global_addr; // local mem data
+  unsigned long long K_global_addr;
+  unsigned long long V_global_addr; // reserved
+  unsigned long long Kcache_global_addr;
+  unsigned long long Vcache_global_addr;
+  unsigned long long cos_global_addr;
+  unsigned long long sin_global_addr;
+  unsigned long long input_lengths_global_addr;
+  unsigned long long save_slots_global_addr;
+  unsigned long long fetch_slots_global_addr;
+  unsigned long long mask_global_addr;
+  unsigned long long Qbuffer_global_addr; // buffer
+  unsigned long long Kbuffer_global_addr;
+  unsigned long long Vbuffer_global_addr;
+  int slots_size;
+  int mask_size;
+  int block_size;
+  float C;
+  int attention_mode;
+  int batch;
+  int q_heads;
+  int kv_heads;
+  int hidden_size;
+  int dtype;
+  int qkv_packed;
 #ifndef WIN32
 } __attribute__((packed)) sg_api_llama2_qkv_multi_core_t;
 #else
 } sg_api_llama2_qkv_multi_core_t;
+#endif
+
+
+typedef struct {
+  unsigned long long OUT_global_addr;
+  unsigned long long Q_global_addr;
+  unsigned long long K_global_addr;
+  unsigned long long V_global_addr;
+  unsigned long long Kcache_global_addr;
+  unsigned long long Vcache_global_addr;
+  unsigned long long input_lengths_global_addr;
+  unsigned long long save_slots_global_addr;
+  unsigned long long fetch_slots_global_addr;
+  unsigned long long mask_global_addr;
+  int slots_size;
+  int mask_size;
+  int block_size;
+  float C;
+  int attention_mode;
+  int batch;
+  int head_size;
+  int q_heads;
+  int kv_heads;
+  int dtype;
+  int qkv_packed;
+#ifndef WIN32
+} __attribute__((packed)) sg_api_llama2_qkv_t;
+#else
+} sg_api_llama2_qkv_t;
 #endif
 
 typedef struct

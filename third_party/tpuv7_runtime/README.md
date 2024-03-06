@@ -4,7 +4,7 @@
 - tpuv7_runtime
 bdfa3f2769f0b2d1f244a28e8ea8e55ea1d6e749
 - TPU1686
-6a6e2e6e30fd0f105a8ec02497600a05a6b12bc2
+3baf5bf830d62da97b7e421fed4f8da8d5cb6ddf
 
 ## intro
 `tpuv7_runtime` 是TPUv7.0的异步运行时库。其中，

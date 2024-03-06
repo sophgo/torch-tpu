@@ -13,300 +13,270 @@ device = "tpu:0"
 tpu_device = "tpu:0"
 torch.set_printoptions(profile="full")
 
-class LLamaAttention(nn.Module):
-    def __init__(self, hidden_size, num_attention_heads, embeddings, C):
-        super().__init__()
-        self.C = C
-        self.num_attention_heads = num_attention_heads
-        self.embeddings = embeddings
-        self.d = int(hidden_size / num_attention_heads)
-        self.kv_heads = int(num_attention_heads / 8)
-        self.w1 = nn.Parameter(torch.rand(self.d))
-        self.w2 = nn.Parameter(torch.rand(self.d))
-        self.w3 = nn.Parameter(torch.rand(self.embeddings))
+
+def SophLlamaAttentionDecode(q, k, v, k_cache, v_cache, cos, sin, input_lengths, save_slots, fetch_slots, mask, slots_size, mask_size, block_size, C):
+
+    attn_out = torch.empty_like(q).to(q.device)
+    torch.ops.my_ops.llama_attention( attn_out, q, k, v, k_cache, v_cache, 
+                                      cos, sin, input_lengths, save_slots, fetch_slots, 
+                                      mask, slots_size, mask_size, block_size, C, 3)
+    return attn_out.cpu()
+
+def SophLlamaAttentionPrefill(q, k, v, k_cache, v_cache, cos, sin, input_lengths, save_slots, fetch_slots, mask, slots_size, mask_size, block_size, C):
+
+    attn_out = torch.empty_like(q).to(q.device)
+    torch.ops.my_ops.llama_attention( attn_out, q, k, v, k_cache, v_cache, 
+                                      cos, sin, input_lengths, save_slots, fetch_slots, 
+                                      mask, slots_size, mask_size, block_size, C, 2)
+    return attn_out.cpu()
+
+
+def case(isPrefill):
+    if isPrefill:
+        data = torch.load("../../attention/PrefillTPU.pth", map_location="cpu")
+    else:
+        data = torch.load("../../attention/DecodeCPU.pth", map_location="cpu")
+
+    query = data['query']
+    key = data['key']
+    value = data['value']
+    k_cache = data['k_cache']
+    v_cache = data['v_cache']
+    cos = data['cos']
+    sin = data['sin']
+    input_lengths = data['input_lengths']
+    save_slots = data['save_slots']
+    fetch_slots = data['fetch_slots']
+    slots_size = data['slots_size']
+    mask = data['mask']
+    mask_size = data['mask_size']
+    block_size = data['block_size']
+    softmax_scale = data['softmax_scale']
+
+    attention_out = data['attention_out']
+
+    fetch_slots = fetch_slots.to(tpu_device) if fetch_slots is not None else None
+    mask = mask.to(tpu_device) if mask is not None else None
+
+    if isPrefill:
+        attn_out = SophLlamaAttentionPrefill(query.to(tpu_device), key.to(tpu_device), value.to(tpu_device), k_cache.to(tpu_device), v_cache.to(tpu_device), 
+                                         cos.to(tpu_device), sin.to(tpu_device), input_lengths.to(tpu_device), 
+                                         save_slots.to(tpu_device), fetch_slots, mask, 
+                                         slots_size, mask_size, block_size, softmax_scale)
+    else:
+        attn_out =  SophLlamaAttentionDecode(query.to(tpu_device), key.to(tpu_device), value.to(tpu_device), k_cache.to(tpu_device), v_cache.to(tpu_device), 
+                                            cos.to(tpu_device), sin.to(tpu_device), input_lengths.to(tpu_device), 
+                                            save_slots.to(tpu_device), fetch_slots, mask, 
+                                            slots_size, mask_size, block_size, softmax_scale)
     
-    def embedding(self, x, cos, sin, mask_coeff):
-        x_temp = torch.concat((x[..., 64:], x[..., :64]), dim=-1)
-        x = x * cos + x_temp * mask_coeff * sin
-        return x
-
-    def forward(self, Q, K, V, Kcache, Vcache):
-        mask_coeff = torch.ones(128)
-        mask_coeff[:64] *= -1.
-        K = self.embedding(K, self.w1, self.w2, mask_coeff)
-        Q = self.embedding(Q, self.w1, self.w2, mask_coeff)
-        # K = K * self.w1 * mask_coeff + K * self.w2
-        # Q = Q * self.w1 * mask_coeff + Q * self.w2
-        KConcat = torch.concat([torch.permute(Kcache, (0,1,3,2)),torch.permute(K, (0,1,3,2))], dim=3)
-        VConcat = torch.concat([Vcache, V], dim=2)
-        KConcat = KConcat.unsqueeze(2)
-        VConcat = VConcat.unsqueeze(2)
-        KConcat = KConcat.repeat((1, 1, int(self.num_attention_heads / self.kv_heads), 1, 1))
-        VConcat = VConcat.repeat((1, 1, int(self.num_attention_heads / self.kv_heads), 1, 1))
-        KConcat = torch.flatten(KConcat, start_dim=1, end_dim=2)
-        VConcat = torch.flatten(VConcat, start_dim=1, end_dim=2)
-        print(f"CPU SHAPE: {Q.shape, KConcat.shape, self.w3.shape}")
-        res_qk = torch.matmul(Q, KConcat) * self.C + self.w3
-        res_qk = F.softmax(res_qk, dim=3)
-        Y = torch.matmul(res_qk, VConcat)
-        return Y, KConcat[:, 0].transpose(1, 2), VConcat[:, 0].transpose(1, 2)
+    print(f"max diff: {torch.max(torch.abs(attention_out - attn_out))}")
 
 
-class LLamaAttentionFunc(torch.autograd.Function):
-    @staticmethod
-    def forward(ctx, Q, K, V, Kcache, Vcache, w1, w2, w3, embeddings, C):
-        output = torch.empty(Q.shape, dtype = Q.dtype, device = Q.device)
+def case_contiguous():
+    head_size= 128
+    num_heads = 8
+    num_key_value_heads = 1
+    batches_num = 16
+    block_size = 16
 
-        torch.ops.my_ops.llama_attention(Q,
-                                    K,
-                                    V,
-                                    Kcache,
-                                    Vcache,
-                                    w1,
-                                    w2,
-                                    w3,
-                                    output,
-                                    embeddings,
-                                    C)
-        return output, Kcache, Vcache
+    qkv = torch.randn((batches_num, (num_heads+2*num_key_value_heads)*head_size), dtype=torch.float16).to(tpu_device)
+    query, key, value = qkv.split(
+        [
+            head_size * num_heads,
+            head_size * num_key_value_heads,
+            head_size * num_key_value_heads,
+        ],
+        dim=1,
+    )
+    query = query.view(-1, num_heads, head_size)
+    kv_view = lambda x : x.view(-1, num_key_value_heads, head_size)
+    key = kv_view(key)
+    value = kv_view(value)
 
-class LLamaAttentionBlock(nn.Module):
-    def __init__(self, w0, w1, w2, C):
-        super().__init__()
-        self.w0 = w0
-        self.w1 = w1
-        self.w2 = w2
-        self.C = C
-
-    def forward(self, Q, K, V, Kcache, Vcache, embeddings):
-        print(f"shape: {Q.shape, K.shape, V.shape}")
-        print(f"{Kcache.shape, Vcache.shape}")
-        return LLamaAttentionFunc.apply(Q, K, V, Kcache, Vcache, self.w0, self.w1, self.w2, embeddings, self.C)
-
-
-def check_mlp():
-    #  TP8: attention_heads 8, hidden_size 1024
-    #  TP4: attention_heads 16, hidden_size 2048
-    #  TP8: attention_heads 64, hidden_size 8192
-
-    batch = 16
-    # # TP8
-    attention_heads = 8
-    hidden_size = 1024
-    # TP4
-    # attention_heads = 16
-    # hidden_size = 2048
-    # # TP1
-    # attention_heads = 64
-    # hidden_size = 8192
-
-    embeddings = 4096
-    C = 1. / np.sqrt(128)  # sqrt(128)
-    d = int(hidden_size/ attention_heads)  # 128
-    assert d == 128
-    k_v_heads = int(attention_heads / 8)
-    net_cpu = LLamaAttention(hidden_size, attention_heads, embeddings, C)
-
-    w0 = net_cpu.state_dict()['w1'].clone().detach().contiguous().requires_grad_(False).to(device).half()
-    w1 = net_cpu.state_dict()['w2'].clone().detach().contiguous().requires_grad_(False).to(device).half()
-    w2 = net_cpu.state_dict()['w3'].clone().detach().contiguous().requires_grad_(False).to(device).half()
-
-    net_tpu = LLamaAttentionBlock(w0, w1, w2, C)
-
-    print("=====forward======")
-    Q = torch.randn((batch, attention_heads, 1, d), requires_grad=False, dtype=torch.float16)
-    K = torch.randn((batch, k_v_heads, 1, d), requires_grad=False, dtype=torch.float16)
-    V = torch.randn((batch, k_v_heads, 1, d), requires_grad=False, dtype=torch.float16)
-    Kcache = torch.randn((batch, k_v_heads, embeddings-1, d), requires_grad=False, dtype=torch.float16)
-    Vcache = torch.randn((batch, k_v_heads, embeddings-1, d), requires_grad=False, dtype=torch.float16)
-
-    out_cpu, Kcache, Vcache = net_cpu(Q, K, V, Kcache, Vcache)
-
-    Q_tpu = Q.to(device).half()
-    K_tpu = K.to(device).half()
-    V_tpu = V.to(device).half()
-
-    Kcache_tpu = torch.empty((batch, k_v_heads, embeddings,  d), dtype=torch.float16)
-    Vcache_tpu = torch.empty((batch, k_v_heads, embeddings,  d), dtype=torch.float16)
-    Kcache_tpu[:, :, :-1] = Kcache
-    Vcache_tpu[:, :, :-1] = Vcache
-    Kcache_tpu = Kcache_tpu.to(device)
-    Vcache_tpu = Vcache_tpu.to(device)
-
-    out_tpu, Kcache_tpu, Vcache_tpu = net_tpu(Q_tpu, K_tpu, V_tpu, Kcache_tpu, Vcache_tpu, embeddings)
-    out_tpu = out_tpu.float().to("cpu")
-    Kcache_tpu = Kcache_tpu.squeeze().cpu()
-    Vcache_tpu = Vcache_tpu.squeeze().cpu()
+    batches_num = 16
+    sequence_length = 4096
+    head_size = 128
+    num_heads = 8
+    num_key_value_heads = 1
 
     
-    out_cpu_f = out_cpu.flatten()
-    out_tpu_f = out_tpu.flatten()
-    out_diff = out_cpu_f - out_tpu_f
-    print('-'*40 + " onnx_out " + '-'*40)
-    print(out_cpu_f[128:128+50])
-    print('-'*40 + " tpu_out " + '-'*40)
-    print(out_tpu_f[128:128+50])
-    # print(out_cpu.shape)
-    print('-'*40 + " max diff " + '-'*40)
-    print (torch.max(abs(out_diff)))
-    print('-'*40 + " diff > 0.01 position " + '-'*40)
-    print(torch.where(abs(out_diff) > 0.01))
+    slots = torch.tensor([sequence_length*i for i in range(1, batches_num+1)], dtype=torch.int32, device=tpu_device)
+    block_tables = torch.arange(sequence_length, dtype=torch.int32, device=tpu_device).view(batches_num, 256)
 
-    print("kv cache")
-    k_cache_diff = abs(Kcache - Kcache_tpu)
-    print(torch.where(k_cache_diff > 0.01))
-    print(f"k cache diff max: {torch.max(k_cache_diff)}")
+    k_cache = torch.randn((4096, block_size, num_key_value_heads, head_size), dtype=torch.float16, device=tpu_device)
+    v_cache = torch.randn((4096, block_size, num_key_value_heads, head_size), dtype=torch.float16, device=tpu_device)
+
+    cos = torch.randn((batches_num, 1, head_size), dtype=torch.float16, device=tpu_device)
+    sin = torch.randn((batches_num, 1, head_size), dtype=torch.float16, device=tpu_device)
+    mask = None
+    mask_size = 0
+    softmax_scale = head_size**-0.5
+    input_lengths = torch.tensor([sequence_length-1 for i in range(16)], dtype=torch.int32, device=tpu_device)
+
+    attention_out = torch.empty_like(query)
+    save_slots = slots.unsqueeze(1)
+    fetch_slots = block_tables * block_size
+
+    torch.ops.my_ops.llama_attention(attention_out, query, key, value, k_cache, v_cache, 
+                                        cos, sin, input_lengths, save_slots, fetch_slots, mask,
+                                        block_tables.size(1), mask_size, block_size, softmax_scale, 3)
+    
+    print(attention_out.shape)
+
+def case_llama_attention_1684x_prefill():
+    num_heads = 32
+    num_kv_heads = 32
+    hidden_size = 4096
+
+    head_size = hidden_size // num_heads
+    softmax_scale = head_size**-0.5
 
 
-    return
+    # prefill
+    input_lengths = torch.tensor([4096, 4096, 4096, 4096], dtype=torch.int32)
+    Ntotal = input_lengths.sum().item()
+    max_s = input_lengths.max().item()
+    batches = len(input_lengths)
 
-
-
-def debug(q, k_cache, v_cache, softmax_scale, slots):
+    query = torch.randn((Ntotal, num_heads, head_size), dtype=torch.float16, device=device)
+    key = torch.randn((Ntotal,  num_heads, head_size), dtype=torch.float16, device=device)
+    value = torch.randn((Ntotal,  num_heads, head_size), dtype=torch.float16, device=device)
     # import pdb; pdb.set_trace()
-    res_qk_71 = torch.matmul(q[:, 6].to(torch.float32), k_cache[:, 0, :, :slots+1].to(torch.float32)) * softmax_scale
-    res_qk_71 = torch.nn.functional.softmax(res_qk_71, dim=2)
-    out_711 = torch.matmul(res_qk_71, v_cache[:, 0, :slots+1].to(torch.float32))
-    out_712 = torch.matmul(res_qk_71, v_cache[:, 1, :slots+1].to(torch.float32))
-    out_713 = torch.matmul(res_qk_71, v_cache[:, 2, :slots+1].to(torch.float32))
 
-    res_qk_72 = torch.matmul(q[:, 6].to(torch.float32), k_cache[:, 1, :, :slots+1].to(torch.float32)) * softmax_scale
-    res_qk_72 = torch.nn.functional.softmax(res_qk_72, dim=2)
-    out_721 = torch.matmul(res_qk_72, v_cache[:, 0, :slots+1].to(torch.float32))
-    out_722 = torch.matmul(res_qk_72, v_cache[:, 1, :slots+1].to(torch.float32))
-    out_723 = torch.matmul(res_qk_72, v_cache[:, 2, :slots+1].to(torch.float32))
+    block_size = 16
+    block_tables = torch.zeros((batches, (max_s + block_size - 1) // block_size), dtype=torch.int32, device=device)
 
-def CPULlamaAttentionFun(q, k, v, k_cache, v_cache, cos, sin, mask, softmax_scale, slots):
-        def rotary_embedding(x, cos, sin, mask_coeff):
-            x_temp = torch.concat((x[..., 64:], x[..., :64]), dim=-1)
-            x = x * cos + x_temp * mask_coeff * sin
-            return x
-        
-        mask_coeff = torch.ones(128)
-        mask_coeff[:64] *= -1.
-        k = rotary_embedding(k, cos, sin, mask_coeff)
-        q = rotary_embedding(q, cos, sin, mask_coeff)
-        k_cache[:, :, slots] = k[:, :, 0]
-        v_cache[:, :, slots] = v[:, :, 0]
+    cu_seqlen_prefill = torch.zeros((batches + 1, ), dtype=torch.int32, device=device)
+    slots = torch.zeros((Ntotal, ), dtype=torch.int32, device=device)
 
-        # save_dict = {"k_cache_cat":k_cache, "v_cache_cat":v_cache}
-        # import os
-        # path = "/usr/src/server/attention/"
-        # os.makedirs(path, exist_ok=True)
-        # torch.save(save_dict, path + f"kv_cache_cat.pth")
+    block_id = 0
+    for i in range(batches):
+        cu_seqlen_prefill[i + 1] = cu_seqlen_prefill[i] + input_lengths[i]
+        need_block_num = (input_lengths[i] + block_size - 1) // block_size
+        temp = torch.arange(input_lengths[i], dtype=torch.int32)+(block_id*block_size)
+        slots[cu_seqlen_prefill[i] : cu_seqlen_prefill[i + 1]] = temp.to(device)
+        for j in range(need_block_num):
+            block_tables[i][j] = block_id
+            block_id += 1
 
-        k_cache = torch.permute(k_cache, (0, 1, 3, 2))
+    k_cache = torch.randn((block_id, block_size, num_kv_heads, head_size), dtype=torch.float16, device=device)
+    v_cache = torch.randn((block_id, block_size, num_kv_heads, head_size), dtype=torch.float16, device=device)
 
-        q_head = q.size(1)
-        kv_head = k.size(1)
-
-        # debug(q, k_cache, v_cache, softmax_scale, slots)
-
-        k_cache = k_cache.unsqueeze(2)
-        v_cache = v_cache.unsqueeze(2)
-        k_cache = k_cache.repeat((1, 1, int(q_head / kv_head), 1, 1))
-        v_cache = v_cache.repeat((1, 1, int(q_head / kv_head), 1, 1))
-        k_cache = torch.flatten(k_cache, start_dim=1, end_dim=2)
-        v_cache = torch.flatten(v_cache, start_dim=1, end_dim=2)
-        # import pdb; pdb.set_trace()
-
-        # mask = torch.zeros_like(mask, dtype=torch.float32)
-        # mask[slots+1:] = torch.tensor(-float('inf'), dtype=torch.float32)
-        # res_qk = torch.matmul(q.to(torch.float32), k_cache.to(torch.float32))* softmax_scale + mask
-        # res_qk[..., slots+1:] = torch.tensor(-float('inf'))
-        # Y = torch.matmul(res_qk, v_cache.to(torch.float32))
-
-        res_qk = torch.matmul(q.to(torch.float32), k_cache[..., :slots+1].to(torch.float32)) * softmax_scale
-        res_qk = torch.nn.functional.softmax(res_qk, dim=3)
-        Y = torch.matmul(res_qk, v_cache[:, :, :slots+1].to(torch.float32))
-        return Y.squeeze_(2)
-
-
-def case3():
-    parameter = torch.load("/workspace/model.layers.0.self_attn.pth")
-    q = parameter['q']
-    k = parameter['k']
-    v = parameter['v']
-    k_cache_soph = parameter['k_cache']
-    v_cache_soph = parameter['v_cache']
-    cos = parameter['cos']
-    sin = parameter['sin']
-    mask = parameter['mask']
-    embedding = parameter['embedding']
-    softmax_scale = parameter['softmax_scale']
-    embedding = 8
-
-    k_cache_cpu = k_cache_soph.clone().detach()
-    v_cache_cpu = v_cache_soph.clone().detach()
-
-    attn_output = torch.empty_like(q, dtype=torch.float16).to(tpu_device)
-    k_cache_tpu = k_cache_soph[:, :, :embedding].clone().detach().to(tpu_device)
-    v_cache_tpu = v_cache_soph[:, :, :embedding].clone().detach().to(tpu_device)
-    cos_tpu = cos.to(tpu_device)
-    sin_tpu = sin.to(tpu_device)
-    q_tpu = q.to(tpu_device)
-    k_tpu = k.to(tpu_device)
-    v_tpu = v.to(tpu_device)
-    mask_tpu = torch.zeros((embedding,), dtype=torch.float16).to(tpu_device)
-
-    # save_dict = {"q":q, "k":k, "v":v, "k_cache":k_cache_cpu, "v_cache":v_cache_cpu, "cos":cos, "sin":sin, "embedding":embedding, "softmax_scale":softmax_scale}
-    # attn_output_cpu = CPULlamaAttentionFun(q, k, v, k_cache_cpu, v_cache_cpu, cos, sin, mask, softmax_scale, embedding-1)
-    # save_dict['attn_output'] = attn_output_cpu
-
-    # import os
-    # # path = "/worksapce/tpu-train/"
-    # # os.makedirs(path, exist_ok=True)
-    # torch.save(save_dict, "cpu_sw.pth")
-    # print("save dict")
+    attention_out = torch.empty_like(query)
 
     # import pdb; pdb.set_trace()
 
-    Ycpu = np.loadtxt("/workspace/Ytpu_teng.txt")
-    Ycpu_tensor = torch.from_numpy(Ycpu).reshape((1, 64, 128))
-    # print(f"{Ycpu_tensor.shape, attn_output_cpu.shape}")
-    # print(f"cpu diff: {torch.max(abs(Ycpu_tensor - attn_output_cpu))}")
-    # print(f"diff where: {torch.where(abs(Ycpu_tensor - attn_output_cpu) > 1)[1]}")
+    print('begin')
+    if cu_seqlen_prefill is not None: 
+        mask = torch.triu(torch.full((max_s, max_s), float('-inf'), dtype=torch.float16), diagonal=1).to(query.device)
+        save_slots = block_tables.cpu() * block_size
+        save_slots = save_slots.to(device)
+        fetch_slots = None
+        torch.ops.my_ops.llama_attention(attention_out, query, key, value, k_cache, v_cache, 
+                                        None, None, input_lengths.to(device), save_slots, fetch_slots, mask,
+                                        block_tables.size(1), max_s, block_size, softmax_scale, 2)
+    print(attention_out.shape)
 
-    # import pdb; pdb.set_trace()
+    print("done")
 
-    # print(f"q : {torch.max(abs(q - q_tpu.cpu()))}")
-    # print(f"k : {torch.max(abs(k - k_tpu.cpu()))}")
-    # print(f"v : {torch.max(abs(v - v_tpu.cpu()))}")
-    # # print(f"k_cache_soph : {torch.max(abs(k_cache_soph - k_cache_tpu.cpu()))}")
-    # # print(f"v_cache_soph : {torch.max(abs(v_cache_soph - v_cache_tpu.cpu()))}")
-    # print(f"cos : {torch.max(abs(cos - cos_tpu.cpu()))}")
-    # print(f"sin : {torch.max(abs(sin - sin_tpu.cpu()))}")
-    # print(f"shape: {k_cache_tpu.shape, v_cache_tpu.shape}")
 
-    torch.ops.my_ops.llama_attention(q_tpu, k_tpu, v_tpu, 
-                                    k_cache_tpu, v_cache_tpu, 
-                                    cos_tpu, sin_tpu, mask_tpu, 
-                                    attn_output, embedding, 0, softmax_scale)
+def case_llama_attention_1684x_decode():
+    num_heads = 32
+    num_kv_heads =  32
+    head_size = 128
+    softmax_scale = head_size**-0.5
 
-    print(attn_output.shape, attn_output.device)
-    attn_output = attn_output.cpu().squeeze_(2)
+    input_lengths = torch.tensor([2 for _ in range(16)], dtype=torch.int32).to(device)
+    batches = len(input_lengths)
+    Ntotal = batches
+    max_s = max(input_lengths).item()
 
-    # print(k_cache_tpu.shape)
-    # print(attn_output[0, :, :2])
-    # print(attn_output_cpu[0, :, :2])
-    # print(f"cpu tpu diff: {torch.max(abs(attn_output_cpu - attn_output.cpu()))}")
-    # print(f"diff where: {torch.where(abs(attn_output_cpu - attn_output.cpu()) > .1)}")
-    print(f"cpu tpu diff: {torch.max(abs(Ycpu_tensor - attn_output.cpu()))}")
-    print(f"diff where: {torch.where(abs(Ycpu_tensor - attn_output.cpu()) > .1)}")
+    block_size = 16
+    block_tables = torch.zeros((batches, (max_s + block_size - 1) // block_size), dtype=torch.int32, device=device)
 
-def add_one(x):
-    x = x + torch.ones(1).to(tpu_device)
-    print(x.cpu())
+    cu_seqlen_prefill = None
+    slots = torch.zeros((Ntotal, ), dtype=torch.int32, device=device)
 
-def test_temp():
-    x = torch.zeros((3, 4)).to(tpu_device)
-    print(x.cpu())
-    add_one(x)
-    print(x.cpu())
+    block_id = 0
+    for i in range(batches):
+        need_block_num = (input_lengths[i].item() + block_size - 1) // block_size
+        slots[i] = block_id * block_size + input_lengths[i]-1
+        for j in range(need_block_num):
+            block_tables[i][j] = block_id
+            block_id += 1
 
+    kv_cache = [(torch.randn((block_id, block_size, num_kv_heads, head_size), dtype=torch.float16, device=device),
+                  torch.randn((block_id, block_size, num_kv_heads, head_size), dtype=torch.float16, device=device)) for _ in range(1)]
+
+    input_ids = torch.randint(0, 32000, (Ntotal, ), dtype=torch.int32).to(device)
+    position_ids = input_lengths.clone().detach()
+
+    query = torch.randn((Ntotal, num_heads, head_size), dtype=torch.float16, device=device)
+    key = torch.randn((Ntotal, num_heads, head_size), dtype=torch.float16, device=device)
+    value = torch.randn((Ntotal, num_heads, head_size), dtype=torch.float16, device=device)
+
+    mask = None
+    save_slots = slots.unsqueeze(1)
+    fetch_slots = block_tables.cpu() * block_size
+    fetch_slots = fetch_slots.to(query.device)
+
+    attention_out = torch.empty_like(query)
+
+    torch.ops.my_ops.llama_attention(attention_out, query, key, value, kv_cache[0][0], kv_cache[0][1], 
+                                         None, None, input_lengths, save_slots, fetch_slots, mask,
+                                         block_tables.size(1), max_s, block_size, softmax_scale, 3)
+    print('done')
+
+def case_llama_attention_2260_decode():
+    num_heads = 64
+    num_kv_heads =  8
+    head_size = 128
+    softmax_scale = head_size**-0.5
+
+    input_lengths = torch.tensor([2 for _ in range(4)], dtype=torch.int32).to(device)
+    batches = len(input_lengths)
+    Ntotal = batches
+    max_s = max(input_lengths).item()
+
+    block_size = 16
+    block_tables = torch.zeros((batches, (max_s + block_size - 1) // block_size), dtype=torch.int32, device=device)
+
+    cu_seqlen_prefill = None
+    slots = torch.zeros((Ntotal, ), dtype=torch.int32, device=device)
+
+    block_id = 0
+    for i in range(batches):
+        need_block_num = (input_lengths[i].item() + block_size - 1) // block_size
+        slots[i] = block_id * block_size + input_lengths[i]-1
+        for j in range(need_block_num):
+            block_tables[i][j] = block_id
+            block_id += 1
+
+    kv_cache = [(torch.randn((block_id, block_size, num_kv_heads, head_size), dtype=torch.float16, device=device),
+                  torch.randn((block_id, block_size, num_kv_heads, head_size), dtype=torch.float16, device=device)) for _ in range(1)]
+
+    input_ids = torch.randint(0, 32000, (Ntotal, ), dtype=torch.int32).to(device)
+    position_ids = input_lengths.clone().detach()
+
+    query = torch.randn((Ntotal, num_heads, head_size), dtype=torch.float16, device=device)
+    key = torch.randn((Ntotal, num_kv_heads, head_size), dtype=torch.float16, device=device)
+    value = torch.randn((Ntotal, num_kv_heads, head_size), dtype=torch.float16, device=device)
+
+    mask = None
+    save_slots = slots.unsqueeze(1)
+    fetch_slots = block_tables.cpu() * block_size
+    fetch_slots = fetch_slots.to(query.device)
+
+    attention_out = torch.empty_like(query)
+
+    torch.ops.my_ops.llama_attention(attention_out, query, key, value, kv_cache[0][0], kv_cache[0][1], 
+                                         None, None, input_lengths, save_slots, fetch_slots, mask,
+                                         block_tables.size(1), max_s, block_size, softmax_scale, 3)
+    print('done')
 
 if __name__ == "__main__":
-    # check_mlp()
-    case2()
-    # case3()
-    # test_temp()
+    # case(False)
+    # case_contiguous()
+    # case_llama_attention_1684x_prefill()
+    # case_llama_attention_1684x_decode()
+    case_llama_attention_2260_decode()
