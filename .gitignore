@@ -47,3 +47,4 @@ python/setup.py
 python/**/*.so
 python/gen_ins/*
 !python/gen_ins/*.py
+toolchains_dir

@@ -2,9 +2,9 @@ import torch
 
 import torch_tpu
 torch.manual_seed(1000)
+device = "tpu"
 
-if __name__ == "__main__":
-    device = "tpu"
+def case1():
     batch = 1
     sequence = 8
     head_size = 3
@@ -34,3 +34,32 @@ if __name__ == "__main__":
     print("idx: ", idx)
     print("cpu:", res_cpu.flatten()[idx])
     print("tpu:", res_tpu.cpu().flatten()[idx])
+
+
+def case2():
+     x = torch.randint(0, 32000, (16, 4096), dtype=torch.int32)
+     x_tpu = x.to(device)
+     min_id = 4000
+     max_id = 8000
+     null_idx = 4001
+
+     out_tpu = torch.where(
+          (min_id > x_tpu) | (x_tpu >= max_id),
+          null_idx,
+          x_tpu - min_id,
+     )
+     out_cpu = torch.where(
+          (min_id > x) | (x >= max_id),
+          null_idx,
+          x - min_id,
+     )
+    #  print(x)
+    #  print(out_cpu)
+    #  print(out_tpu.cpu())
+     print(out_tpu.shape, out_cpu.shape)
+     print(f"max diff: {torch.max(torch.abs(out_cpu - out_tpu.cpu()))}")
+
+if __name__ == "__main__":
+    case2()
+
+    
