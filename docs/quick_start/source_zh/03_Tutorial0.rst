@@ -7,6 +7,21 @@
 
 本节默认使用者已经按照第2章说明完成torch-tpu环境配置安装。
 
+项目示例代码可以从 torch-tpu*.whl包中的 torch_tpu/demo/mnist/ 获取。
+
+通过以下命令可以直接解压whl包，即可获取到本章节示例代码：
+
+.. code-block:: shell
+
+    $ unzip torch-tpu*.whl
+
+这里需要注意，由于硬件设备的状态不用，所以各项指标（推理时间、推理精度）的实际测试值会与文档给出的 log 日志有出入。用户可根据
+以下标准来判定是否复现成功：
+
+（1）针对 Accuracy 的复现结果：当数值与本手册所给出的 log 中对应数值相差不超过5%，且 Accuracy 数值在随着 epoch 增加而呈现上升趋势时，判定为复现成功。
+
+（2）针对 Total execution time 的复现结果：该数值的实际复现结果会因为基于主机 CPU 状态不同而存在差异，不作为判断是否成功复现的依据。
+
 
 模型训练_FP32
 ------------------
@@ -17,7 +32,20 @@
 
 本示例是在默认的FP32精度下实现的模型训练。
 
-项目示例代码可以从 torch-tpu*.whl包中的 torch_tpu/demo/mnist/mnist_fp32.py 获取。(解压whl包即可看到)
+为了保证复现结果与本手册结果一致，且用户更容易验证环境配置与训练过程复现是否成功，需要在运行前设置随机数种子：
+
+.. code-block:: shell
+
+            torch.manual_seed(0) 
+
+修改后如图所示：
+
+.. figure:: ../assets/3_fp32.png
+   :width: 2200px
+   :height: 900px
+   :scale: 50%
+   :align: center
+   :alt: SOPHGO LOGO
 
 执行上述 mnist_fp32.py 文件，得到如下结果（此处只显示训练5个epoch的训练和验证数据）：
 
@@ -27,32 +55,32 @@
   ===== log:
   Epoch 1
   -------------------------------
-  loss: 2.314975  [   64/60000]
-  loss: 2.292758  [ 6464/60000]
-  loss: 2.284506  [12864/60000]
-  loss: 2.266513  [19264/60000]
-  loss: 2.262220  [25664/60000]
-  loss: 2.239860  [32064/60000]
-  loss: 2.231590  [38464/60000]
-  loss: 2.205216  [44864/60000]
-  loss: 2.206877  [51264/60000]
-  loss: 2.162311  [57664/60000]
-  Test Error:
-  Accuracy: 41.1%, Avg loss: 2.160750
+  loss: 2.305312  [   64/60000]
+  loss: 2.298351  [ 6464/60000]
+  loss: 2.277986  [12864/60000]
+  loss: 2.275867  [19264/60000]
+  loss: 2.254384  [25664/60000]
+  loss: 2.230112  [32064/60000]
+  loss: 2.230498  [38464/60000]
+  loss: 2.198090  [44864/60000]
+  loss: 2.203433  [51264/60000]
+  loss: 2.172684  [57664/60000]
+  Test Error: 
+  Accuracy: 49.5%, Avg loss: 2.162513 
 
   Epoch 2
   ·····························
-  Accuracy: 58.0%, Avg loss: 1.901019
+  Accuracy: 59.2%, Avg loss: 1.899496 
   Epoch 3
   ·····························
-  Accuracy: 61.7%, Avg loss: 1.536028
+  Accuracy: 61.3%, Avg loss: 1.524535 
   Epoch 4
   ·····························
-  Accuracy: 63.5%, Avg loss: 1.266675
+  Accuracy: 63.5%, Avg loss: 1.246983
   Epoch 5
   ·····························
-  Accuracy: 64.7%, Avg loss: 1.097683
-  Total execution time = 48.419 sec
+  Accuracy: 64.9%, Avg loss: 1.076180
+  Total execution time = 43.904 sec
   """
 
 
@@ -91,7 +119,23 @@
 
             model.half()    
 
-项目示例代码可以从 torch-tpu*.whl包中的 torch_tpu/demo//mnist/mnist_fp16.py 获取。
+项目示例代码可以从 torch-tpu*.whl包中的 torch_tpu/demo/mnist/mnist_fp16.py 获取。
+
+为了保证复现结果与本手册结果一致，且用户更容易验证环境配置与训练过程复现是否成功，需要在运行前设置随机数种子：
+
+.. code-block:: shell
+
+            torch.manual_seed(0) 
+
+修改后如图所示：
+
+.. figure:: ../assets/3_fp16.png
+   :width: 2200px
+   :height: 900px
+   :scale: 50%
+   :align: center
+   :alt: SOPHGO LOGO
+
 
 执行 mnist_fp16.py 文件，得到如下结果（此处只显示训练5个epoch的训练和验证数据）：
 
@@ -101,32 +145,32 @@
   ===== log:
   Epoch 1
   -------------------------------
-  loss: 2.296875  [   64/60000]
-  loss: 2.300781  [ 6464/60000]
+  loss: 2.304688  [   64/60000]
+  loss: 2.306641  [ 6464/60000]
   loss: 2.300781  [12864/60000]
   loss: 2.304688  [19264/60000]
-  loss: 2.291016  [25664/60000]
-  loss: 2.289062  [32064/60000]
+  loss: 2.296875  [25664/60000]
+  loss: 2.287109  [32064/60000]
   loss: 2.287109  [38464/60000]
-  loss: 2.279297  [44864/60000]
-  loss: 2.283203  [51264/60000]
-  loss: 2.273438  [57664/60000]
-  Test Error:
-  Accuracy: 13.9%, Avg loss: 2.274557
+  loss: 2.275391  [44864/60000]
+  loss: 2.289062  [51264/60000]
+  loss: 2.285156  [57664/60000]
+  Test Error: 
+  Accuracy: 18.5%, Avg loss: 2.276759 
   
   Epoch 2
   ·····························
-  Accuracy: 19.7%, Avg loss: 2.243021
+  Accuracy: 39.1%, Avg loss: 2.248383 
   Epoch 3
   ·····························
-  Accuracy: 22.9%, Avg loss: 2.209171
+  Accuracy: 46.6%, Avg loss: 2.218551
   Epoch 4
   ·····························
-  Accuracy: 25.9%, Avg loss: 2.169723
+  Accuracy: 46.3%, Avg loss: 2.184738 
   Epoch 5
   ·····························
-  Accuracy: 34.6%, Avg loss: 2.121927
-  Total execution time = 42.809 sec
+  Accuracy: 46.9%, Avg loss: 2.144656 
+  Total execution time = 37.058 sec
   """
 
 模型训练_混合精度
@@ -174,7 +218,25 @@
 
     optimizer.zero_grad()
 
-完整的项目示例代码可以从 torch-tpu*.whl包中的 torch_tpu/demo/mnist/mnist_mix_precision.py 获取。
+完整的项目示例代码可以从 torch-tpu*.whl包中获取。
+
+（torch_tpu/demo/mnist/mnist_mix_precision.py ）
+
+为了保证复现结果与本手册结果一致，且用户更容易验证环境配置与训练过程复现是否成功，需要在运行前设置随机数种子：
+
+.. code-block:: shell
+
+            torch.manual_seed(0) 
+
+修改后如图所示：
+
+.. figure:: ../assets/3_mix.png
+   :width: 2200px
+   :height: 700px
+   :scale: 50%
+   :align: center
+   :alt: SOPHGO LOGO
+
 
 执行上述 mnist_mix_precision.py 文件，得到如下结果（此处只显示训练5个epoch的训练和验证数据）：
 
@@ -184,29 +246,29 @@
   Epoch 1
   -------------------------------
   loss: 2.304688  [   64/60000]
-  loss: 2.291016  [ 6464/60000]
-  loss: 2.271484  [12864/60000]
-  loss: 2.253906  [19264/60000]
-  loss: 2.246094  [25664/60000]
-  loss: 2.210938  [32064/60000]
-  loss: 2.212891  [38464/60000]
-  loss: 2.181641  [44864/60000]
-  loss: 2.179688  [51264/60000]
-  loss: 2.126953  [57664/60000]
-  Test Error:
-  Accuracy: 42.5%, Avg loss: 2.133435
+  loss: 2.298828  [ 6464/60000]
+  loss: 2.277344  [12864/60000]
+  loss: 2.275391  [19264/60000]
+  loss: 2.253906  [25664/60000]
+  loss: 2.230469  [32064/60000]
+  loss: 2.230469  [38464/60000]
+  loss: 2.199219  [44864/60000]
+  loss: 2.203125  [51264/60000]
+  loss: 2.173828  [57664/60000]
+  Test Error: 
+  Accuracy: 49.5%, Avg loss: 2.162669 
 
   Epoch 2
   ·····························
-  Accuracy: 57.5%, Avg loss: 1.841567
+  Accuracy: 59.2%, Avg loss: 1.899893
   Epoch 3
   ·····························
-  Accuracy: 60.6%, Avg loss: 1.484369
+  Accuracy: 61.2%, Avg loss: 1.525266 
   Epoch 4
   ·····························
-  Accuracy: 63.3%, Avg loss: 1.234953
+  Accuracy: 63.5%, Avg loss: 1.247403
   Epoch 5
   ·····························
-  Accuracy: 64.8%, Avg loss: 1.078707
-  Total execution time = 60.383 sec
+  Accuracy: 64.9%, Avg loss: 1.076614 
+  Total execution time = 53.047 sec
   """

@@ -1,0 +1,1201 @@
+
+===================
+torch.nn
+===================
+
+.. list-table::
+   :widths: 30 10 65
+   :header-rows: 1
+
+   * - Pytorch API
+     - Compatibility
+     - Mapping
+   * - torch.nn.parameter.Parameter
+     - Y
+     - nn.Parameter(torch.randn(3, 3).tpu())
+   * - torch.nn.parameter.UninitializedParameter
+     - Y
+     - nn.UninitializedParameter(device='tpu')
+   * - torch.nn.parameter.UninitializedParameter.cls_to_become
+     - Y
+     - from torch.nn.parameter import Parameter, UninitializedParameter
+       uninitialized_param = UninitializedParameter(device='tpu')
+       uninitialized_param.materialize((3,3))
+       uninitialized_param.data = torch.randn(3, 3).tpu()
+       print("cls_to_become:", UninitializedParameter.cls_to_become)
+   * - torch.nn.parameter.UninitializedBuffer
+     - Y
+     - from torch.nn.parameter import UninitializedBuffer
+       uninitialized_buffer = UninitializedBuffer(device='tpu')
+       print("Buffer data:", uninitialized_buffer.data)
+   * - torch.nn.Module
+     - Y
+     - 
+   * - torch.nn.Module.add_module
+     - Y
+     - import torch.nn as nn
+       class CustomModule(nn.Module):
+           def __init__(self):
+               super(CustomModule, self).__init__()
+               layers = [
+                   nn.Linear(10, 20),
+                   nn.ReLU(),
+                   nn.Linear(20, 30),
+                   nn.ReLU()
+               ]
+               for i, layer in enumerate(layers):
+                   self.add_module(f'layer_{i}', layer)
+
+           def forward(self, x):
+               for name, module in self._modules.items():
+                   x = module(x)
+               return x
+       net = CustomModule().tpu()
+       input_tensor = torch.randn(1, 10).tpu()
+       output_tensor = net(input_tensor)
+       print(output_tensor.cpu())
+   * - torch.nn.Module.apply
+     - Y
+     - import torch.nn.init as init
+       class SimpleNeuralNetwork(nn.Module):
+           def __init__(self):
+               super(SimpleNeuralNetwork, self).__init__()
+               self.layer1 = nn.Linear(10, 20)
+               self.layer2 = nn.Linear(20, 30)
+               self.layer3 = nn.Linear(30, 40)
+           def forward(self, x):
+               x = torch.relu(self.layer1(x))
+               x = torch.relu(self.layer2(x))
+               x = self.layer3(x)
+               return x
+       def init_weights(m):
+           if type(m) == nn.Linear:
+               init.xavier_uniform_(m.weight)
+               m.bias.data.fill_(0.01)
+       net = SimpleNeuralNetwork().tpu()
+       net.apply(init_weights).cpu()
+       for name, param in net.named_parameters():
+           if param.requires_grad:
+               print(name, param.data)
+   * - torch.nn.Module.bfloat16
+     - Y
+     - import torch.nn.init as init
+       class SimpleNeuralNetwork(nn.Module):
+           def __init__(self):
+               super(SimpleNeuralNetwork, self).__init__()
+               self.layer1 = nn.Linear(10, 20)
+               self.layer2 = nn.Linear(20, 30)
+               self.layer3 = nn.Linear(30, 40)
+           def forward(self, x):
+               x = torch.relu(self.layer1(x))
+               x = torch.relu(self.layer2(x))
+               x = self.layer3(x)
+               return x
+       net = SimpleNeuralNetwork()
+       net.tpu().bfloat16()
+       for name, param in net.cpu().named_parameters():
+           if param.requires_grad:
+               print(name, param.data)
+   * - torch.nn.Module.buffers
+     - Y
+     - class SimpleNeuralNetwork(nn.Module):
+           def __init__(self):
+               super(SimpleNeuralNetwork, self).__init__()
+               self.layer1 = nn.Linear(10, 20)
+               self.batch_norm = nn.BatchNorm1d(20)
+               self.layer2 = nn.Linear(20, 30)
+          def forward(self, x):
+               x = self.layer1(x)
+               x = self.batch_norm(x)
+               x = torch.relu(x)
+               x = self.layer2(x)
+               return x
+       net = SimpleNeuralNetwork().tpu()
+       net.named_buffers()
+   * - torch.nn.Module.children
+     - Y
+     - class ComplexNeuralNetwork(nn.Module):
+           def __init__(self):
+               super(ComplexNeuralNetwork, self).__init__()
+               self.block1 = nn.Sequential(
+                   nn.Linear(10, 20),
+                   nn.ReLU(),
+                   nn.Linear(20, 30)
+               )
+               self.block2 = nn.Sequential(
+                   nn.Linear(30, 40),
+                   nn.ReLU(),
+                   nn.Linear(40, 50)
+               )
+               self.final_layer = nn.Linear(50, 10)
+           def forward(self, x):
+               x = self.block1(x)
+               x = self.block2(x)
+               x = self.final_layer(x)
+               return x
+       net = ComplexNeuralNetwork().tpu()
+       for child in net.children():
+           print(child)
+           print('------')
+   * - torch.nn.Module.compile
+     - 
+     - 
+   * - torch.nn.Module.cpu
+     - Y
+     - 
+   * - torch.nn.Module.cuda
+     - 
+     - 
+   * - torch.nn.Module.double
+     - Y
+     - class SimpleNet(nn.Module):
+           def __init__(self):
+               super(SimpleNet, self).__init__()
+               self.fc1 = nn.Linear(10, 5)
+               self.fc2 = nn.Linear(5, 2)
+           def forward(self, x):
+               x = torch.relu(self.fc1(x))
+               x = self.fc2(x)
+               return x
+       model = SimpleNet().tpu()
+       print("Initial parameter type:", next(model.parameters()).dtype)
+       model.double()
+       print("Parameter type after conversion:", next(model.parameters()).dtype)
+   * - torch.nn.Module.eval
+     - Y
+     - class SimpleNet(nn.Module):
+           def __init__(self):
+               super(SimpleNet, self).__init__()
+               self.fc1 = nn.Linear(10, 5)
+               self.bn1 = nn.BatchNorm1d(5)
+               self.dropout = nn.Dropout(0.5)
+               self.fc2 = nn.Linear(5, 2)
+           def forward(self, x):
+               x = self.fc1(x)
+               x = self.bn1(x)
+               x = torch.relu(x)
+               x = self.dropout(x)
+               x = self.fc2(x)
+               return x
+       model = SimpleNet().tpu()
+       print("Initial model training mode:", model.training)
+       model.eval()
+       print("Model evaluation mode:", model.training)
+   * - torch.nn.Module.extra_repr
+     - Y
+     - class SimpleNet(nn.Module):
+           def __init__(self, input_size, hidden_size, output_size):
+               super(SimpleNet, self).__init__()
+               self.input_size = input_size
+               self.hidden_size = hidden_size
+               self.output_size = output_size
+               self.fc1 = nn.Linear(input_size, hidden_size)
+               self.fc2 = nn.Linear(hidden_size, output_size)
+           def forward(self, x):
+               x = torch.relu(self.fc1(x))
+               x = self.fc2(x)
+               return x
+           def extra_repr(self):
+               return f'input_size={self.input_size}, hidden_size={self.hidden_size}, output_size={self.output_size}'
+       model = SimpleNet(input_size=10, hidden_size=5, output_size=2)
+       print(model)
+   * - torch.nn.Module.float
+     - Y
+     - class SimpleNet(nn.Module):
+           def __init__(self):
+               super(SimpleNet, self).__init__()
+               self.fc1 = nn.Linear(10, 5)
+               self.fc2 = nn.Linear(5, 2)
+           def forward(self, x):
+               x = torch.relu(self.fc1(x))
+               x = self.fc2(x)
+               return x
+       model = SimpleNet().tpu()
+       model.double()
+       print("Initial parameter data type:", next(model.parameters()).dtype)
+       model.float()
+       print("Parameter data type after float():", next(model.parameters()).dtype)
+   * - torch.nn.Module.forward
+     - Y
+     - class SimpleNet(nn.Module):
+           def __init__(self):
+               super(SimpleNet, self).__init__()
+               self.fc1 = nn.Linear(10, 5)  
+               self.fc2 = nn.Linear(5, 2)   
+           def forward(self, x):
+               x = F.relu(self.fc1(x))  
+               x = self.fc2(x)          
+               return x
+       model = SimpleNet().tpu()
+       input_tensor = torch.randn(1, 10).tpu()
+       output = model(input_tensor)
+       print(output.cpu())
+   * - torch.nn.Module.get_buffer
+     - Y
+     - 
+   * - torch.nn.Module.get_extra_state
+     - Y
+     - 
+   * - torch.nn.Module.get_parameter
+     - Y
+     - class SimpleNet(nn.Module):
+           def __init__(self):
+               super(SimpleNet, self).__init__()
+               self.fc = nn.Linear(10, 5)
+           def forward(self, x):
+               return self.fc(x)
+       model = SimpleNet().tpu()
+       param = model.get_parameter('fc.weight')
+       print(param.cpu())
+   * - torch.nn.Module.get_submodule
+     - Y
+     - class SubModule(nn.Module):
+           def __init__(self):
+               super(SubModule, self).__init__()
+               self.conv = nn.Conv2d(1, 20, 5)
+           def forward(self, x):
+               return self.conv(x)
+       class MainModule(nn.Module):
+           def __init__(self):
+               super(MainModule, self).__init__()
+               self.submodule1 = SubModule()
+               self.submodule2 = SubModule()
+           def forward(self, x):
+               x = self.submodule1(x)
+               x = self.submodule2(x)
+               return x
+       model = MainModule()
+       submodule1 = model.get_submodule('submodule1')
+       print(submodule1)
+   * - torch.nn.Module.half
+     - Y
+     - class SimpleNet(nn.Module):
+           def __init__(self):
+               super(SimpleNet, self).__init__()
+               self.fc = nn.Linear(10, 5)  # A simple fully connected layer
+           def forward(self, x):
+               return self.fc(x)
+       net = SimpleNet().tpu()
+       print("Before conversion:", net.fc.weight.dtype)
+       net.half()
+       print("After conversion:", net.fc.weight.dtype)
+   * - torch.nn.Module.ipu
+     - Y
+     - 
+   * - torch.nn.Module.load_state_dict
+     - Y
+     - class SimpleNet(nn.Module):
+           def __init__(self):
+               super(SimpleNet, self).__init__()
+               self.fc1 = nn.Linear(10, 5)
+               self.fc2 = nn.Linear(5, 2)
+           def forward(self, x):
+               x = torch.relu(self.fc1(x))
+               x = self.fc2(x)
+               return x
+       net = SimpleNet().tpu()
+       saved_state_dict = net.state_dict()
+       for key in saved_state_dict:
+           if "fc1.weight" in key:
+               saved_state_dict[key].zero_()
+       net.load_state_dict(saved_state_dict)
+       print("Modified state_dict:", net.cpu().state_dict())
+   * - torch.nn.Module.modules
+     - Y
+     - class SimpleNet(nn.Module):
+           def __init__(self):
+               super(SimpleNet, self).__init__()
+               self.conv1 = nn.Conv2d(1, 20, 5)
+               self.conv2 = nn.Conv2d(20, 50, 5)
+               self.fc1 = nn.Linear(4*4*50, 500)
+               self.fc2 = nn.Linear(500, 10)
+           def forward(self, x):
+               x = torch.relu(self.conv1(x))
+               x = torch.max_pool2d(x, 2, 2)
+               x = torch.relu(self.conv2(x))
+               x = torch.max_pool2d(x, 2, 2)
+               x = x.view(-1, 4*4*50)
+               x = torch.relu(self.fc1(x))
+               x = self.fc2(x)
+               return x
+       net = SimpleNet().tpu()
+       for module in net.modules():
+           print(module)
+   * - torch.nn.Module.named_buffers
+     - Y
+     - class SimpleNet(nn.Module):
+           def __init__(self):
+               super(SimpleNet, self).__init__()
+               self.conv1 = nn.Conv2d(1, 20, 5)
+               self.bn1 = nn.BatchNorm2d(20)
+               self.fc1 = nn.Linear(20, 10)
+           def forward(self, x):
+               x = self.conv1(x)
+               x = self.bn1(x)
+               x = torch.relu(x)
+               x = x.view(x.size(0), -1)
+               x = self.fc1(x)
+               return x
+       net = SimpleNet().tpu()
+       net.named_buffers()
+   * - torch.nn.Module.named_children
+     - Y
+     - class SimpleNet(nn.Module):
+           def __init__(self):
+               super(SimpleNet, self).__init__()
+               self.conv_block = nn.Sequential(
+                   nn.Conv2d(1, 20, 5),
+                   nn.ReLU(),
+                   nn.MaxPool2d(2, 2)
+               )
+               self.fc_block = nn.Sequential(
+                   nn.Linear(20 * 12 * 12, 50),
+                   nn.ReLU(),
+                   nn.Linear(50, 10)
+               )
+           def forward(self, x):
+               x = self.conv_block(x)
+               x = x.view(x.size(0), -1)
+               x = self.fc_block(x)
+               return x
+       net = SimpleNet().tpu()
+       for name, module in net.named_children():
+           print('Module name:', name)
+           print('Module:', module)
+   * - torch.nn.Module.named_modules
+     - Y
+     - class ComplexNet(nn.Module):
+           def __init__(self):
+               super(ComplexNet, self).__init__()
+               self.conv_block = nn.Sequential(
+                   nn.Conv2d(1, 20, 5),
+                   nn.BatchNorm2d(20),
+                   nn.ReLU(),
+                   nn.MaxPool2d(2, 2)
+               )
+               self.fc_block = nn.Sequential(
+                   nn.Linear(20 * 12 * 12, 50),
+                   nn.ReLU(),
+                   nn.Linear(50, 10)
+               )
+           def forward(self, x):
+               x = self.conv_block(x)
+               x = x.view(x.size(0), -1)
+               x = self.fc_block(x)
+               return x
+       net = ComplexNet().tpu()
+       for name, module in net.named_modules():
+           print('Module name:', name)
+           print('Module:', module)
+   * - torch.nn.Module.named_parameters
+     - Y
+     - class SimpleNet(nn.Module):
+           def __init__(self):
+               super(SimpleNet, self).__init__()
+               self.conv1 = nn.Conv2d(1, 10, kernel_size=5)
+               self.conv2 = nn.Conv2d(10, 20, kernel_size=5)
+               self.dropout = nn.Dropout2d()
+               self.fc1 = nn.Linear(320, 50)
+               self.fc2 = nn.Linear(50, 10)
+           def forward(self, x):
+               x = torch.relu(torch.max_pool2d(self.conv1(x), 2))
+               x = torch.relu(torch.max_pool2d(self.dropout(self.conv2(x)), 2))
+               x = x.view(-1, 320)
+               x = torch.relu(self.fc1(x))
+               x = self.fc2(x)
+               return torch.log_softmax(x, dim=1)
+       net = SimpleNet().tpu()
+       net.named_parameters()
+   * - torch.nn.Module.parameters
+     - Y
+     - class SimpleNet(nn.Module):
+           def __init__(self):
+               super(SimpleNet, self).__init__()
+               self.conv1 = nn.Conv2d(1, 10, kernel_size=5)
+               self.conv2 = nn.Conv2d(10, 20, kernel_size=5)
+               self.fc1 = nn.Linear(320, 50)
+               self.fc2 = nn.Linear(50, 10)
+           def forward(self, x):
+               x = torch.relu(torch.max_pool2d(self.conv1(x), 2))
+               x = torch.relu(torch.max_pool2d(self.conv2(x), 2))
+               x = x.view(-1, 320)
+               x = torch.relu(self.fc1(x))
+               x = self.fc2(x)
+               return torch.log_softmax(x, dim=1)
+       net = SimpleNet().tpu()
+       net.parameters()
+   * - torch.nn.Module.register_backward_hook
+     - Y
+     - class SimpleNet(nn.Module):
+           def __init__(self):
+               super(SimpleNet, self).__init__()
+               self.fc1 = nn.Linear(10, 5)
+               self.fc2 = nn.Linear(5, 2)
+           def forward(self, x):
+               x = torch.relu(self.fc1(x))
+               x = self.fc2(x)
+               return x
+       def backward_hook(module, grad_input, grad_output):
+           print(f"Inside {module.__class__.__name__}'s backward hook")
+           print(f"grad_input: {grad_input.cpu()}")
+           print(f"grad_output: {grad_output.cpu()}")
+       net = SimpleNet().tpu()
+       for module in net.children():
+           module.register_backward_hook(backward_hook)
+   * - torch.nn.Module.register_buffer
+     - Y
+     - 
+   * - torch.nn.Module.register_forward_hook
+     - Y
+     - class SimpleNet(nn.Module):
+           def __init__(self):
+               super(SimpleNet, self).__init__()
+               self.fc1 = nn.Linear(10, 5)
+               self.fc2 = nn.Linear(5, 2)
+           def forward(self, x):
+               x = torch.relu(self.fc1(x))
+               x = self.fc2(x)
+               return x
+       def forward_hook(module, input, output):
+           print(f"Inside {module.__class__.__name__}'s forward hook")
+           print(f"Input: {input}")
+           print(f"Output: {output}")
+       net = SimpleNet().tpu()
+       for module in net.children():
+           module.register_forward_hook(forward_hook)
+   * - torch.nn.Module.register_forward_pre_hook
+     - Y
+     - class SimpleNet(nn.Module):
+           def __init__(self):
+               super(SimpleNet, self).__init__()
+               self.fc1 = nn.Linear(10, 5)
+               self.fc2 = nn.Linear(5, 2)
+           def forward(self, x):
+               x = torch.relu(self.fc1(x))
+               x = self.fc2(x)
+               return x
+       def forward_pre_hook(module, input):
+           print(f"Inside {module.__class__.__name__}'s forward pre-hook")
+           print(f"Input: {input}")
+       net = SimpleNet().to('tpu')
+       for module in net.children():
+           module.register_forward_pre_hook(forward_pre_hook)
+   * - torch.nn.Module.register_full_backward_hook
+     - Y
+     - class SimpleNet(nn.Module):
+           def __init__(self):
+               super(SimpleNet, self).__init__()
+               self.fc1 = nn.Linear(10, 5)
+               self.fc2 = nn.Linear(5, 2)
+           def forward(self, x):
+               x = torch.relu(self.fc1(x))
+               x = self.fc2(x)
+               return x
+       def backward_hook(module, grad_input, grad_output):
+           print(f"Inside {module.__class__.__name__}'s backward hook")
+           print(f"Grad Input: {grad_input}")
+           print(f"Grad Output: {grad_output}")
+       net = SimpleNet().tpu()
+       for module in net.children():
+           module.register_full_backward_hook(backward_hook)
+   * - torch.nn.Module.register_full_backward_pre_hook
+     - Y
+     - class SimpleNet(nn.Module):
+           def __init__(self):
+               super(SimpleNet, self).__init__()
+               self.fc1 = nn.Linear(10, 5)
+               self.fc2 = nn.Linear(5, 2)
+           def forward(self, x):
+               x = torch.relu(self.fc1(x))
+               x = self.fc2(x)
+               return x
+       def backward_pre_hook(module, input):
+           print(f"Inside {module.__class__.__name__}'s backward pre-hook")
+           print(f"Input: {input}")
+       net = SimpleNet().tpu()
+       for module in net.children():
+           module.register_full_backward_pre_hook(backward_pre_hook)
+   * - torch.nn.Module.register_load_state_dict_post_hook
+     - Y
+     - class SimpleNet(nn.Module):
+           def __init__(self):
+               super(SimpleNet, self).__init__()
+               self.fc1 = nn.Linear(10, 5)
+               self.fc2 = nn.Linear(5, 2)
+           def forward(self, x):
+               x = torch.relu(self.fc1(x))
+               x = self.fc2(x)
+               return x
+       def load_state_dict_post_hook(module, state_dict, prefix, local_metadata, strict, missing_keys, unexpected_keys, error_msgs):
+           print(f"Loaded state_dict for module: {module.__class__.__name__}")
+       net = SimpleNet().tpu()
+       net.register_load_state_dict_post_hook(load_state_dict_post_hook)
+   * - torch.nn.Module.register_module
+     - Y
+     - 
+   * - torch.nn.Module.register_parameter
+     - Y
+     - class CustomModule(nn.Module):
+           def __init__(self):
+               super(CustomModule, self).__init__()
+               param = nn.Parameter(torch.randn(5, 5))
+               self.register_parameter('custom_param', param)
+           def forward(self, x):
+               return torch.matmul(x, self.custom_param)
+       module = CustomModule().tpu()
+       print(module.custom_param.cpu())
+   * - torch.nn.Module.register_state_dict_pre_hook
+     - Y
+     - class SimpleModule(nn.Module):
+           def __init__(self):
+               super(SimpleModule, self).__init__()
+               self.param = nn.Parameter(torch.ones(5))
+       def state_dict_pre_hook(module, state_dict, prefix, local_metadata):
+           key = prefix + 'param'
+           if key in state_dict:
+               state_dict[key] = torch.zeros_like(state_dict[key])
+       module = SimpleModule().tpu()
+       module.register_state_dict_pre_hook(state_dict_pre_hook)
+   * - torch.nn.Module.requires_grad_
+     - Y
+     - class SimpleModule(nn.Module):
+           def __init__(self):
+               super(SimpleModule, self).__init__()
+               self.param = nn.Parameter(torch.ones(5))
+       module = SimpleModule().tpu()
+       print(f"Before: {module.param.requires_grad}")
+       module.requires_grad_(False)
+       print(f"After freezing: {module.param.requires_grad}")
+       module.requires_grad_(True)
+       print(f"After unfreezing: {module.param.requires_grad}")
+   * - torch.nn.Module.set_extra_state
+     - Y
+     - class CustomModule(nn.Module):
+           def __init__(self):
+               super(CustomModule, self).__init__()
+               self.param = nn.Parameter(torch.ones(5))
+               self.custom_state = "active"
+           def get_extra_state(self):
+               return {"custom_state": self.custom_state}
+           def set_extra_state(self, state):
+               self.custom_state = state["custom_state"]
+       module = CustomModule().tpu()
+       state_dict = module.state_dict()
+       loaded_state_dict = state_dict.copy()  
+       loaded_state_dict['extra_state'] = module.get_extra_state()
+       loaded_module = CustomModule()
+       loaded_module.set_extra_state(loaded_state_dict['extra_state'])
+       print(f"Custom state after loading: {loaded_module.custom_state}")
+   * - torch.nn.Module.share_memory
+     - Y
+     - class SimpleModule(nn.Module):
+           def __init__(self):
+               super(SimpleModule, self).__init__()
+               self.param = nn.Parameter(torch.ones(5))
+       module = SimpleModule().tpu()
+       module.share_memory()
+       print(module.param.is_shared())
+   * - torch.nn.Module.state_dict
+     - Y
+     - class SimpleNet(nn.Module):
+           def __init__(self):
+               super(SimpleNet, self).__init__()
+               self.conv1 = nn.Conv2d(1, 20, 5)
+               self.pool = nn.MaxPool2d(2, 2)
+               self.conv2 = nn.Conv2d(20, 50, 5)
+               self.fc1 = nn.Linear(50 * 4 * 4, 500)
+               self.fc2 = nn.Linear(500, 10)
+           def forward(self, x):
+               x = self.pool(torch.relu(self.conv1(x)))
+               x = self.pool(torch.relu(self.conv2(x)))
+               x = x.view(-1, 50 * 4 * 4)
+               x = torch.relu(self.fc1(x))
+               x = self.fc2(x)
+               return x
+       model = SimpleNet().tpu()
+       state_dict = model.state_dict()
+       print("Model's state_dict:")
+       for param_tensor in state_dict:
+           print(param_tensor, "\t", state_dict[param_tensor].size())
+   * - torch.nn.Module.to
+     - Y
+     - 
+   * - torch.nn.Module.to_empty
+     - Y
+     - 
+   * - torch.nn.Module.train
+     - Y
+     - class SimpleNet(nn.Module):
+           def __init__(self):
+               super(SimpleNet, self).__init__()
+               self.fc1 = nn.Linear(10, 50)
+               self.dropout = nn.Dropout(p=0.5)
+               self.fc2 = nn.Linear(50, 10)
+           def forward(self, x):
+               x = torch.relu(self.fc1(x))
+               x = self.dropout(x)  
+               x = self.fc2(x)
+               return x
+       model = SimpleNet().tpu()
+       model.train()
+   * - torch.nn.Module.type
+     - Y
+     - class SimpleNet(nn.Module):
+           def __init__(self):
+               super(SimpleNet, self).__init__()
+               self.fc1 = nn.Linear(10, 20)
+               self.fc2 = nn.Linear(20, 5)
+           def forward(self, x):
+               x = torch.relu(self.fc1(x))
+               x = self.fc2(x)
+               return x
+       model = SimpleNet().tpu()
+       print("Before:", model.fc1.weight.dtype)
+       model.type(torch.double)
+       print("After:", model.fc1.weight.dtype)
+   * - torch.nn.Module.xpu
+     - Y
+     - 
+   * - torch.nn.Module.zero_grad
+     - 
+     - class SimpleModel(nn.Module):
+           def __init__(self):
+               super(SimpleModel, self).__init__()
+               self.fc1 = nn.Linear(10, 5)
+               self.fc2 = nn.Linear(5, 2)
+           def forward(self, x):
+               x = torch.relu(self.fc1(x))
+               x = self.fc2(x)
+               return x
+       model = SimpleModel().tpu()
+       criterion = nn.MSELoss()
+       optimizer = optim.SGD(model.parameters(), lr=0.01)
+       input_tensor = torch.randn(1, 10).tpu()
+       target = torch.randn(1, 2).tpu()
+       for epoch in range(5):
+           output = model(input_tensor)
+           loss = criterion(output, target)
+           print(f'Epoch {epoch+1}, Loss: {loss.item()}')
+           optimizer.zero_grad()   
+           loss.backward()
+           optimizer.step()
+   * - torch.nn.Sequential
+     - Y
+     - 
+   * - torch.nn.Sequential.append
+     - Y
+     - 
+   * - torch.nn.ModuleList
+     - Y
+     - 
+   * - torch.nn.ModuleList.append
+     - Y
+     - 
+   * - torch.nn.ModuleList.extend
+     - Y
+     - 
+   * - torch.nn.ModuleList.insert
+     - Y
+     - 
+   * - torch.nn.ModuleDict
+     - Y
+     - 
+   * - torch.nn.ModuleDict.clear
+     - Y
+     - 
+   * - torch.nn.ModuleDict.items
+     - Y
+     - 
+   * - torch.nn.ModuleDict.keys
+     - Y
+     - 
+   * - torch.nn.ModuleDict.pop
+     - Y
+     - 
+   * - torch.nn.ModuleDict.update
+     - Y
+     - 
+   * - torch.nn.ModuleDict.values
+     - Y
+     - 
+   * - torch.nn.ParameterList
+     - Y
+     - 
+   * - torch.nn.ParameterList.append
+     - Y
+     - 
+   * - torch.nn.ParameterList.extend
+     - Y
+     - 
+   * - torch.nn.ParameterDict
+     - Y
+     - 
+   * - torch.nn.ParameterDict.clear
+     - Y
+     - 
+   * - torch.nn.ParameterDict.copy
+     - Y
+     - 
+   * - torch.nn.ParameterDict.fromkeys
+     - Y
+     - 
+   * - torch.nn.ParameterDict.get
+     - Y
+     - 
+   * - torch.nn.ParameterDict.items
+     - Y
+     - 
+   * - torch.nn.ParameterDict.keys
+     - Y
+     - 
+   * - torch.nn.ParameterDict.pop
+     - Y
+     - 
+   * - torch.nn.ParameterDict.popitem
+     - Y
+     - 
+   * - torch.nn.ParameterDict.setdefault
+     - Y
+     - 
+   * - torch.nn.ParameterDict.update
+     - Y
+     - 
+   * - torch.nn.ParameterDict.values
+     - Y
+     - 
+   * - torch.nn.modules.module.register_module_forward_pre_hook
+     - 
+     - def print_input_hook(module, input):
+           print(f"Inside {module.__class__.__name__}'s forward pre-hook")
+           print(f"Input to the module: {input}")
+       class SimpleNet(nn.Module):
+           def __init__(self):
+               super(SimpleNet, self).__init__()
+               self.fc = nn.Linear(10, 5)
+           def forward(self, x):
+               x = self.fc(x)
+               return x
+       net = SimpleNet().tpu()
+       hook_handle = net.register_forward_pre_hook(print_input_hook)
+   * - torch.nn.modules.module.register_module_forward_hook
+     - 
+     - def print_output_hook(module, input, output):
+           print(f"Inside {module.__class__.__name__}'s forward hook")
+           print(f"Input to the module: {input}")
+           print(f"Output of the module: {output}")
+       class SimpleNet(nn.Module):
+           def __init__(self):
+               super(SimpleNet, self).__init__()
+               self.fc1 = nn.Linear(10, 5)
+               self.fc2 = nn.Linear(5, 2)
+           def forward(self, x):
+               x = self.fc1(x)
+               x = self.fc2(x)
+               return x
+       net = SimpleNet()
+       hook_handle = net.register_forward_hook(print_output_hook)
+   * - torch.nn.modules.module.register_module_backward_hook
+     - 
+     - def backward_hook(module, grad_input, grad_output):
+           print(f"{module.__class__.__name__} - Backward hook")
+           print(f"  grad_input: {grad_input}")
+           print(f"  grad_output: {grad_output}")
+       class SimpleNet(nn.Module):
+           def __init__(self):
+               super(SimpleNet, self).__init__()
+               self.fc1 = nn.Linear(2, 2)
+               self.relu = nn.ReLU()
+               self.fc2 = nn.Linear(2, 2)
+           def forward(self, x):
+               x = self.fc1(x)
+               x = self.relu(x)
+               x = self.fc2(x)
+               return x
+       net = SimpleNet().tpu()
+       hook_handle = net.fc1.register_backward_hook(backward_hook)
+   * - torch.nn.modules.module.register_module_full_backward_pre_hook
+     - 
+     - 
+   * - torch.nn.modules.module.register_module_full_backward_hook
+     - 
+     - def full_backward_hook(module, grad_input, grad_output):
+           print(f"{module.__class__.__name__} - Full Backward hook")
+           print(f"  grad_input: {grad_input}")
+           print(f"  grad_output: {grad_output}")
+           return None
+       class SimpleNet(nn.Module):
+           def __init__(self):
+               super(SimpleNet, self).__init__()
+               self.fc1 = nn.Linear(2, 2)
+               self.relu = nn.ReLU()
+               self.fc2 = nn.Linear(2, 2)
+           def forward(self, x):
+               x = self.fc1(x)
+               x = self.relu(x)
+               x = self.fc2(x)
+               return x
+       net = SimpleNet().tpu()
+       hook_handle = net.fc1.register_full_backward_hook(full_backward_hook)
+   * - torch.nn.modules.module.register_module_buffer_registration_hook
+     - 
+     - 
+   * - torch.nn.modules.module.register_module_module_registration_hook
+     - 
+     - 
+   * - torch.nn.modules.module.register_module_parameter_registration_hook
+     - 
+     - 
+   * - torch.nn.Conv1d
+     - 
+     - input_data = torch.randn(2, 8, 16).tpu()
+       conv1d_layer = nn.Conv1d(in_channels=8, out_channels=4, kernel_size=3, device='tpu')
+       output_data = conv1d_layer(input_data)
+   * - torch.nn.Conv2d
+     - 
+     - input_data = torch.randn(2, 3, 32, 32).tpu()
+        conv2d_layer = nn.Conv2d(in_channels=3, out_channels=6, kernel_size=5, device='tpu')
+        output_data = conv2d_layer(input_data)
+   * - torch.nn.Conv3d
+     - 
+     - input_data = torch.randn(2, 3, 16, 16, 16).tpu()
+       conv3d_layer = nn.Conv3d(in_channels=3, out_channels=6, kernel_size=3, device='tpu')
+       output_data = conv3d_layer(input_data)
+   * - torch.nn.ConvTranspose1d
+     - 
+     - input_data = torch.randn(2, 4, 10).tpu()
+       conv_transpose1d_layer = nn.ConvTranspose1d(in_channels=4, out_channels=2, kernel_size=3, stride=2, padding=1, output_padding=1, device='tpu')
+       output_data = conv_transpose1d_layer(input_data)
+   * - torch.nn.ConvTranspose2d
+     - 
+     - input_data = torch.randn(2, 4, 8, 8).tpu()
+       conv_transpose2d_layer = nn.ConvTranspose2d(in_channels=4, out_channels=2, kernel_size=3, stride=2, padding=1, output_padding=1,device='tpu')
+       output_data = conv_transpose2d_layer(input_data)
+   * - torch.nn.ConvTranspose3d
+     - 
+     - input_data = torch.randn(1, 4, 8, 8, 8).tpu()
+       conv_transpose3d = nn.ConvTranspose3d(in_channels=4, out_channels=2, kernel_size=3, stride=2, padding=1, output_padding=1, device='tpu')
+       output_data = conv_transpose3d(input_data)
+   * - torch.nn.LazyConv1d
+     - 
+     - input_data = torch.randn(1, 8, 10).tpu()
+       lazy_conv1d = nn.LazyConv1d(out_channels=16, kernel_size=3, device='tpu')
+       output_data = lazy_conv1d(input_data)
+   * - torch.nn.LazyConv1d.cls_to_become
+     - 
+     - 
+   * - torch.nn.LazyConv2d
+     - 
+     - dummy_input = torch.randn(1, 3, 64, 64).tpu()
+       lazy_conv2d = nn.LazyConv2d(out_channels=16, kernel_size=3, device='tpu')
+       output = lazy_conv2d(dummy_input)
+       print(f"Output shape: {output.shape}")
+   * - torch.nn.LazyConv2d.cls_to_become
+     - 
+     - 
+   * - torch.nn.LazyConv3d
+     - 
+     - dummy_input = torch.randn(1, 3, 32, 64, 64).tpu()
+       lazy_conv3d = nn.LazyConv3d(out_channels=16, kernel_size=3, device='tpu')
+       output = lazy_conv3d(dummy_input)
+       print(f"Output shape: {output.shape}")
+       print(f"Weight shape: {lazy_conv3d.weight.shape}")
+   * - torch.nn.LazyConv3d.cls_to_become
+     - 
+     - 
+   * - torch.nn.LazyConvTranspose1d
+     - 
+     - lazy_conv_transpose = nn.LazyConvTranspose1d(out_channels=16, kernel_size=3, device='tpu')
+       input_tensor = torch.randn(10, 1, 50).tpu()
+       output_tensor = lazy_conv_transpose(input_tensor)
+       print(f"Output shape: {output_tensor.shape}")
+       print(f"Weight shape: {lazy_conv_transpose.weight.shape}")
+   * - torch.nn.LazyConvTranspose1d.cls_to_become
+     - 
+     - 
+   * - torch.nn.LazyConvTranspose2d
+     - 
+     - lazy_conv_transpose2d = nn.LazyConvTranspose2d(out_channels=16, kernel_size=(3, 3), device='tpu')
+       input_tensor = torch.randn(10, 16, 50, 50).tpu()
+       output_tensor = lazy_conv_transpose2d(input_tensor)
+       print(f"Output shape: {output_tensor.shape}")
+       print(f"Weight shape: {lazy_conv_transpose2d.weight.shape}")
+   * - torch.nn.LazyConvTranspose2d.cls_to_become
+     - 
+     - 
+   * - torch.nn.LazyConvTranspose3d
+     - 
+     - lazy_conv_transpose3d = nn.LazyConvTranspose3d(out_channels=16, kernel_size=(3, 3, 3), device='tpu')
+       input_tensor = torch.randn(10, 1, 10, 50, 50).tpu()
+       output_tensor = lazy_conv_transpose3d(input_tensor)
+       print(f"Output shape: {output_tensor.shape}")  
+       print(f"Weight shape: {lazy_conv_transpose3d.weight.shape}") 
+   * - torch.nn.LazyConvTranspose3d.cls_to_become
+     - 
+     - 
+   * - torch.nn.Unfold
+     - 
+     - input_tensor = torch.randn(1, 3, 4, 4).tpu()
+       unfold = nn.Unfold(kernel_size=(2, 2), stride=(1, 1), padding=(0, 0))
+       unfolded_tensor = unfold(input_tensor)
+       print("Unfolded tensor shape:", unfolded_tensor.shape)
+   * - torch.nn.Fold
+     - 
+     - fold = nn.Fold(output_size=(4, 5), kernel_size=(2, 2))
+       input = torch.randn(1, 3 * 2 * 2, 12).tpu()
+       output = fold(input)
+   * - torch.nn.MaxPool1d
+     - 
+     - m = nn.MaxPool1d(3, stride=2)
+       input = torch.randn(20, 16, 50).tpu()
+       output = m(input)
+   * - torch.nn.MaxPool2d
+     - Y
+     - input_tensor = torch.randn(1, 3, 8, 8).tpu()
+       maxpool = nn.MaxPool2d(kernel_size=2, stride=2, padding=0)
+       output_tensor = maxpool(input_tensor)
+       print("Output tensor shape:", output_tensor.shape)
+   * - torch.nn.MaxPool3d
+     - 
+     - input_tensor = torch.randn(1, 3, 5, 5, 5).tpu()
+       maxpool3d = nn.MaxPool3d(kernel_size=2, stride=2, padding=0)
+       output_tensor = maxpool3d(input_tensor)
+       print("Output tensor shape:", output_tensor.shape)
+   * - torch.nn.MaxUnpool1d
+     - 
+     - input_tensor = torch.tensor([[[1, 2, 3, 4, 5, 6, 7, 8]]], dtype=torch.float32)
+       maxpool = nn.MaxPool1d(kernel_size=2, stride=2, return_indices=True)
+       output_tensor, indices = maxpool(input_tensor)
+       maxunpool = nn.MaxUnpool1d(kernel_size=2, stride=2)
+       unpooled_tensor = maxunpool(output_tensor.tpu(), indices.tpu())
+       print("Unpooled tensor:", unpooled_tensor)
+   * - torch.nn.MaxUnpool2d
+     - 
+     - input_tensor = torch.tensor([[[[1, 2, 3, 4],
+                               [5, 6, 7, 8],
+                               [9, 10, 11, 12],
+                               [13, 14, 15, 16]]]], dtype=torch.float32)
+       maxpool = nn.MaxPool2d(kernel_size=2, stride=2, return_indices=True)
+       output_tensor, indices = maxpool(input_tensor)
+       maxunpool = nn.MaxUnpool2d(kernel_size=2, stride=2)
+       unpooled_tensor = maxunpool(output_tensor.tpu(), indices.tpu(), output_size=input_tensor.size())
+   * - torch.nn.MaxUnpool3d
+     - 
+     - input_tensor = torch.tensor([[[[[1, 2], [3, 4]],
+                               [[5, 6], [7, 8]]]]], dtype=torch.float32)
+       maxpool = nn.MaxPool3d(kernel_size=2, stride=2, return_indices=True)
+       output_tensor, indices = maxpool(input_tensor)
+       maxunpool = nn.MaxUnpool3d(kernel_size=2, stride=2)
+       unpooled_tensor = maxunpool(output_tensor.tpu(), indices.tpu(), output_size=input_tensor.size())
+       print("Unpooled tensor:", unpooled_tensor.numpy())
+   * - torch.nn.AvgPool1d
+     - 
+     - input_tensor = torch.tensor([[[1, 2, 3, 4, 5, 6, 7, 8, 9, 10]]], dtype=torch.float32)
+       avgpool = nn.AvgPool1d(kernel_size=2, stride=1)
+       output_tensor = avgpool(input_tensor.tpu())
+   * - torch.nn.AvgPool2d
+     - 
+     - m = nn.AvgPool2d((3, 2), stride=(2, 1))
+       input = torch.randn(20, 16, 50, 32).tpu()
+       output = m(input)
+   * - torch.nn.AvgPool3d
+     - 
+     - m = nn.AvgPool3d((3, 2, 2), stride=(2, 1, 2))
+       input = torch.randn(20, 16, 50, 44, 31).tpu()
+       output = m(input)
+   * - torch.nn.FractionalMaxPool2d
+     - 
+     - m = nn.FractionalMaxPool2d(3, output_ratio=(0.5, 0.5))
+       input = torch.randn(20, 16, 50, 32).tpu()
+       output = m(input)
+   * - torch.nn.FractionalMaxPool3d
+     - 
+     - m = nn.FractionalMaxPool3d(3, output_ratio=(0.5, 0.5, 0.5))
+       input = torch.randn(20, 16, 50, 32, 16).tpu()
+       output = m(input)
+   * - torch.nn.LPPool1d
+     - 
+     - m = nn.LPPool1d(2, 3, stride=2)
+       input = torch.randn(20, 16, 50).tpu()
+       output = m(input)
+   * - torch.nn.LPPool2d
+     - 
+     - m = nn.LPPool2d(1.2, (3, 2), stride=(2, 1))
+       input = torch.randn(20, 16, 50, 32).tpu()
+       output = m(input)
+   * - torch.nn.AdaptiveMaxPool1d
+     - 
+     - m = nn.AdaptiveMaxPool1d(5)
+       input = torch.randn(1, 64, 8).tpu()
+       output = m(input)
+   * - torch.nn.AdaptiveMaxPool2d
+     - 
+     - m = nn.AdaptiveMaxPool2d((None, 7))
+       input = torch.randn(1, 64, 10, 9).tpu()
+       output = m(input)
+   * - torch.nn.AdaptiveMaxPool3d
+     - 
+     - m = nn.AdaptiveMaxPool3d((7, None, None))
+       input = torch.randn(1, 64, 10, 9, 8).tpu()
+       output = m(input)
+   * - torch.nn.AdaptiveAvgPool1d
+     - 
+     - m = nn.AdaptiveAvgPool1d(5)
+       input = torch.randn(1, 64, 8).tpu()
+       output = m(input)
+   * - torch.nn.AdaptiveAvgPool2d
+     - 
+     - m = nn.AdaptiveAvgPool2d((None, 7))
+       input = torch.randn(1, 64, 10, 9).tpu()
+       output = m(input)
+   * - torch.nn.AdaptiveAvgPool3d
+     - 
+     - m = nn.AdaptiveAvgPool3d((7, None, None))
+       input = torch.randn(1, 64, 10, 9, 8).tpu()
+       output = m(input)
+   * - torch.nn.ReflectionPad1d
+     - 
+     - m = nn.ReflectionPad1d(2)
+       input = torch.arange(8, dtype=torch.float).reshape(1, 2, 4).tpu()
+       m(input)
+   * - torch.nn.ReflectionPad2d
+     - 
+     - m = nn.ReflectionPad2d(2)
+       input = torch.arange(9, dtype=torch.float).reshape(1, 1, 3, 3).tpu()
+       m(input)
+   * - torch.nn.ReflectionPad3d
+     - 
+     - m = nn.ReflectionPad3d(1)
+       input = torch.arange(8, dtype=torch.float).reshape(1, 1, 2, 2, 2).tpu()
+       m(input)
+   * - torch.nn.ReplicationPad1d
+     - 
+     - m = nn.ReplicationPad1d(2)
+       input = torch.arange(8, dtype=torch.float).reshape(1, 2, 4).tpu()
+       m(input)
+   * - torch.nn.ReplicationPad2d
+     - 
+     - m = nn.ReplicationPad2d(2)
+       input = torch.arange(9, dtype=torch.float).reshape(1, 1, 3, 3).tpu()
+       m(input)
+   * - torch.nn.ReplicationPad3d
+     - 
+     - m = nn.ReplicationPad3d(3)
+       input = torch.randn(16, 3, 8, 320, 480).tpu()
+       output = m(input)
+   * - torch.nn.ZeroPad1d
+     - 
+     - m = nn.ZeroPad1d(2)
+       input = torch.randn(1, 2, 4).tpu()
+       m(input)
+   * - torch.nn.ZeroPad2d
+     - 
+     - m = nn.ZeroPad2d(2)
+       input = torch.randn(1, 1, 3, 3).tpu()
+       m(input)
+   * - torch.nn.ZeroPad3d
+     - 
+     - m = nn.ZeroPad3d(3)
+       input = torch.randn(16, 3, 10, 20, 30).tpu()
+       output = m(input)
+   * - torch.nn.ConstantPad1d
+     - 
+     - m = nn.ConstantPad1d(2, 3.5)
+       input = torch.randn(1, 2, 4).tpu()
+       m(input)
+   * - torch.nn.ConstantPad2d
+     - 
+     - m = nn.ConstantPad2d(2, 3.5)
+       input = torch.randn(1, 2, 2).tpu()
+       m(input)
+   * - torch.nn.ConstantPad3d
+     - 
+     - m = nn.ConstantPad3d(3, 3.5)
+       input = torch.randn(16, 3, 10, 20, 30).tpu()
+       output = m(input)
+   * - torch.nn.ELU
+     - 
+     - m = nn.ELU()
+       input = torch.randn(2).tpu()
+       output = m(input)
+   * - torch.nn.Hardshrink
+     - 
+     - m = nn.Hardshrink()
+       input = torch.randn(2).tpu()
+       output = m(input)
+   * - torch.nn.Hardsigmoid
+     - 
+     - m = nn.Hardsigmoid()
+       input = torch.randn(2).tpu()
+       output = m(input)
+   * - torch.nn.Hardtanh
+     - 
+     - m = nn.Hardtanh(-2, 2)
+       input = torch.randn(2).tpu()
+       output = m(input)
+   * - torch.nn.Hardswish
+     - 
+     - m = nn.Hardswish()
+       input = torch.randn(2).tpu()
+       output = m(input)
+   * - torch.nn.LeakyReLU
+     - 
+     - m = nn.LeakyReLU(0.1)
+       input = torch.randn(2).tpu()
+       output = m(input)
+   * - torch.nn.LogSigmoid
+     - 
+     - 
+   * - torch.nn.MultiheadAttention
+     - 
+     - 
+   * - torch.nn.MultiheadAttention.forward
+     - 
+     - 
+   * - torch.nn.MultiheadAttention.merge_masks
+     - 
+     - 
+   * - torch.nn.PReLU
+     - 
+     - 
+   * - torch.nn.ReLU
+     - 
+     - 
+   * - torch.nn.ReLU6
+     - 
+     - 
+   * - torch.nn.RReLU
+     - 
+     - 
+   * - torch.nn.SELU
+     - 
+     - 
+   * - torch.nn.CELU
+     - 
+     - 
+   * - torch.nn.GELU
+     - 
+     - 
+   * - torch.nn.Sigmoid
+     - 
+     - 
+   * - torch.nn.SiLU
+     - 
+     - 
+   * - torch.nn.Mish
+     - 
+     - 
+   * - torch.nn.Softplus
+     - 
+     - 
+   * - torch.nn.Softshrink
+     - 
+     - 
+   * - torch.nn.Softsign
+     - 
+     - 
+   * - torch.nn.Tanh
+     - 
+     - 
+   * - torch.nn.Conv2d
+     - 
+     - 

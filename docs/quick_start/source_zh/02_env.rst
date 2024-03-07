@@ -112,7 +112,17 @@ Docker环境配置
    >> out = In_net(inp)
    >> print(out.cpu())
 
-若运行正常，且能正常打印 out 参数值。
+若运行正常，且能正常打印 out 参数值（如下图所示），至此，torch-tpu环境配置完成。
+
+需要注意的是，下图示例只截取了一部分输出值，只要能够正常打印出类似的参数值，即可判定为测试正常通过。
+
+.. figure:: ../assets/2_environment_done.png
+   :width: 2200px
+   :height: 1000px
+   :scale: 50%
+   :align: center
+   :alt: SOPHGO LOGO
+
 
 若要更新torch-tpu，仅需获取新的torch-tpu包，重新pip install即可。至此，torch-tpu环境配置完成。
 
@@ -172,12 +182,87 @@ Anaconda安装（可选）
    $ wget https://mirrors.tuna.tsinghua.edu.cn/anaconda/miniconda/Miniconda3-py311_23.5.0-3-Linux-x86_64.sh
    $ bash Miniconda3-py311_23.5.0-3-Linux-x86_64.sh
 
+当执行完 bash 命令行后，会直接进入到 Anaconda 安装进程。可以参考以下步骤执行安装操作。(示例图片如下一页顺次所示)
+
+（1）如下图所示，观看许可信息阶段，按 Enter 键进行确认：
+
+（2）如下图所示，观看更多许可信息，按 Q 键跳过：
+
+（3）如下图所示，是否接受许可条款，输入 yes 后按 Enter 键进行确认：
+
+（4）如下图所示，确认是否将Anaconda安装在当前路径下，按 Enter 键进行确认，安装在默认路径下：
+
+（5）如下图所示，确认安装 Anaconda，输入 yes 后按 Enter 键进行确认：
+
+.. figure:: ../assets/2_anaconda_1.png
+   :width: 1800px
+   :height: 700px
+   :scale: 50%
+   :align: center
+   :alt: SOPHGO LOGO
+
+.. figure:: ../assets/2_anaconda_2.png
+   :width: 2200px
+   :height: 400px
+   :scale: 50%
+   :align: center
+   :alt: SOPHGO LOGO
+
+.. figure:: ../assets/2_anaconda_3.png
+   :width: 2200px
+   :height: 400px
+   :scale: 50%
+   :align: center
+   :alt: SOPHGO LOGO
+
+.. figure:: ../assets/2_anaconda_4.png
+   :width: 2200px
+   :height: 400px
+   :scale: 50%
+   :align: center
+   :alt: SOPHGO LOGO
+
+.. figure:: ../assets/2_anaconda_5.png
+   :width: 2200px
+   :height: 400px
+   :scale: 50%
+   :align: center
+   :alt: SOPHGO LOGO
+
+（6）至此，Anaconda 安装完成，执行如下命令激活 Anaconda:
+
+.. code-block:: shell
+
+   $ source ~/.bashrc 
+
+当出现如下图所示，命令行前有 (base) 标识后，即为 Anaconda 安装成功。
+
+
+.. figure:: ../assets/2_anaconda_done.png
+   :width: 600px
+   :height: 50px
+   :scale: 50%
+   :align: center
+   :alt: SOPHGO LOGO
+
+
 通过Conda，创建工作环境：
 
 .. code-block:: shell
 
    $ conda create -n SD python=3.10
    $ conda activate SD
+
+当出现如下图所示，命令行前有 (SD) 标识后，即为 conda 工作环境创建成功。
+
+
+.. figure:: ../assets/2_conda_done.png
+   :width: 600px
+   :height: 50px
+   :scale: 50%
+   :align: center
+   :alt: SOPHGO LOGO
+
 
 后续环境配置操作默认在Conda环境下执行，也可以自行通过pip指令进行如下环境包安装配置。
 
@@ -216,7 +301,15 @@ torch-tpu安装
    >> out = In_net(inp)
    >> print(out.cpu())
 
-若运行正常，且能正常打印 out 参数值，至此，torch-tpu环境配置完成。
+若运行正常，且能正常打印 out 参数值（如下图所示），至此，torch-tpu环境配置完成。
+需要注意的是，下图示例只截取了一部分输出值，只要能够正常打印出类似的参数值，即可判定为测试正常通过。
+
+.. figure:: ../assets/2_environment_done.png
+   :width: 2200px
+   :height: 1000px
+   :scale: 50%
+   :align: center
+   :alt: SOPHGO LOGO
 
 
 如果之前有过使用cuda版本的Pytorch进行训练的经验，那么tpu的使用与cuda设备的使用是基本一致的，将cuda换成tpu就可以。

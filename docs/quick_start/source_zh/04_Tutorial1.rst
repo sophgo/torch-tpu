@@ -50,6 +50,50 @@ Transformers提供了数以千计的预训练模型，支持 100 多种语言的
 
 在本节开始之前，首先检查Torch-TPU是否正常，如果异常请参考 开发环境配置 进行正确的环境配置。
 
+本节需要通过源码安装的方式对依赖库进行安装。用户在使用 git clone 命令获取源代码时，可能会遇到速度慢或者拉取失败的问题，请参考以下步骤解决：
+
+（1）通过该网站链接 https://www.ipaddress.com/ 获取 github.com 对应的 ip 地址。
+
+.. figure:: ../assets/4_git_0.png
+   :width: 2000px
+   :height: 600px
+   :scale: 50%
+   :align: center
+   :alt: SOPHGO LOGO
+
+（2）通过该网站链接 https://www.ipaddress.com/ 获取 github.global.ssl.fastly.net 对应的 IP 地址（有4个 IP ，任选其一）。
+
+.. figure:: ../assets/4_git_1.png
+   :width: 2000px
+   :height: 600px
+   :scale: 50%
+   :align: center
+   :alt: SOPHGO LOGO
+
+（3）执行下述命令，打开 hosts。
+
+.. code-block:: shell
+
+    $ sudo vim /etc/hosts
+
+（4）在文件末尾添加如下两行，对应的 IP 为以上两步查询获取到的 IP 地址，并保存退出。
+
+.. code-block:: shell
+
+    140.82.113.3 github.com
+    151.101.193.194 github.global.ssl.fastly.net    # 任意选个ip
+
+（5）最后执行下述命令，并重启机器。
+
+.. code-block:: shell
+
+    $ sudo /etc/init.d/network-manager restart
+    $ sudo reboot
+
+至此，使用 git clone 命令获取源代码失败的问题解决。
+
+接下来将介绍如何安装并配置特定版本的依赖库。
+
 请注意，下面 "Diffusers"、"Transformers"、"accelerate" 三个仓库，应放置在同级目录下。
 
 ”Transformers“若不采用源码安装则，无需下载。
@@ -65,6 +109,7 @@ Diffusers 采用源码安装的方式，目前支持版本为v0.20.0。可执行
     $ cd diffusers
     $ git checkout v0.20.0
     $ python setup.py build develop
+    $ cd ..
 
 
 安装 Transformers
@@ -78,6 +123,7 @@ Transformers 目前支持版本为v4.29.1。可以采用源码安装的方式，
     $ cd transformers
     $ git checkout v4.29.1
     $ python setup.py build develop
+    $ cd ..
 
 如果因为网络问题无法下载transformers进行源码安装，可以使用下面的命令进行安装：
 
@@ -125,12 +171,21 @@ accelerate 采用源码安装的方式，目前支持版本为v0.16.0。可执�
     kwargs = self.scaler_handler.to_kwargs() if self.scaler_handler is not None else {}
     if self.distributed_type == DistributedType.FSDP:
         from torch.distributed.fsdp.sharded_grad_scaler import ShardedGradScaler
-
         self.scaler = ShardedGradScaler(**kwargs)
     elif self.device.type == "tpu":
         self.scaler = torch_tpu.tpu.amp.GradScaler(**kwargs)
     else:
         self.scaler = torch.cuda.amp.GradScaler(**kwargs)
+
+这一步需要注意修改后代码的缩进格式，这将直接影响能否顺利通过接下来的安装步骤。推荐最好使用 VS Code 等代码编译软件进行修改。
+修改完成后，可对照下图所示，检查代码缩进格式是否有误。
+
+.. figure:: ../assets/4_accelerator.png
+   :width: 2200px
+   :height: 700px
+   :scale: 50%
+   :align: center
+   :alt: SOPHGO LOGO
 
 然后，执行下述命令完成安装：
 
@@ -176,6 +231,12 @@ accelerate 采用源码安装的方式，目前支持版本为v0.16.0。可执�
 
     prompt = "cute dragon creature"
 
+在执行代码前，为保证顺利进行，需要先执行以下命令：
+
+.. code-block:: shell
+
+    $ ulimit -n 65535
+
 该示例的完整代码如下：
 
 .. code-block:: python
@@ -205,14 +266,8 @@ accelerate 采用源码安装的方式，目前支持版本为v0.16.0。可执�
    :align: center
    :alt: SOPHGO LOGO
 
-执行如上示例代码成功执行后，会在当前的路径下生成一张名为 “pokemon.png” 的符合我们预设提示词的龙宝宝图片。
+执行如上示例代码成功执行后，会在当前的路径下生成一张名为 “pokemon.png” 的符合我们预设提示词的龙宝宝图片。该节测试结果图片，可参考本节末尾对比图。
 
-.. figure:: ../assets/without_lora.png
-   :width: 400px
-   :height: 400px
-   :scale: 50%
-   :align: center
-   :alt: SOPHGO LOGO
 
 使用预训练参数，加载 LoRA 参数进行文生图推理
 ------------------
@@ -258,9 +313,13 @@ accelerate 采用源码安装的方式，目前支持版本为v0.16.0。可执�
 
 执行如上示例代码后，会在当前的路径下生成一张名为 “pokemon_lora.png” 的图片。因为本示例加载的 LoRA 参数是在卡通风格的数据集上训练的，所以相较于未加载 LoRA 参数的示例生成的更贴近卡通形象。
 
-.. figure:: ../assets/lora.png
-   :width: 400px
-   :height: 400px
+使用预训练参数的前提下，是否加载 Lora 参数的两种推理结果如下图所示。
+
+这里需要注意一点，只要生成的图片有呈现出卡通形象即可判定上述步骤成功执行。
+
+.. figure:: ../assets/4_fp32_fp16.png
+   :width: 1600px
+   :height: 650px
    :scale: 50%
    :align: center
    :alt: SOPHGO LOGO
@@ -273,11 +332,11 @@ accelerate 采用源码安装的方式，目前支持版本为v0.16.0。可执�
 环境准备
 ------------------
 
-在实现 Finetune 训练前，我们需要根据环境配置需求文件进行相关库文件的安装。lorafinetune的代码位置在 diffusers/exampels/text_to_image ，进入该路径，首先进行环境配置。
+在实现 Finetune 训练前，我们需要根据环境配置需求文件进行相关库文件的安装。lorafinetune的代码位置在 diffusers/examples/text_to_image ，进入该路径，首先进行环境配置。
 
 .. code-block:: shell
 
-    $ pip install -r diffusers/exampels/text_to_image/requirements.txt
+    $ pip install -r requirements.txt
 
 Torch-TPU 支持
 ------------------
@@ -292,7 +351,7 @@ Torch-TPU 支持
 
     import torch_tpu
 
-（2）在训练过程中，需要将lora权重手动放置到tpu上。对应地将其 第519行 内容（如下所示）：
+（2）在训练过程中，需要将lora权重手动放置到tpu上。对应地将其 第518行 内容（如下所示）：
 
 .. code-block:: python
 
@@ -322,7 +381,7 @@ Torch-TPU 支持
 
 （3） 'DATASET_NAME'
 
-训练数据集，这里采用 lambdalabs/pokemon-blip-captions（https://huggingface.co/datasets/lambdalabs/pokemon-blip-captions），是一个宝可梦卡通动画的数据集，改数据集的每一个样本都由一张宝可梦图片和对应的描述构成。
+训练数据集，这里采用 lambdalabs/pokemon-blip-captions（https://huggingface.co/datasets/lambdalabs/pokemon-blip-captions），是一个宝可梦卡通动画的数据集，该数据集的每一个样本都由一张宝可梦图片和对应的描述构成。
 第一次训练时，会自动从huggingface下载。
 
 使用 FP32 精度进行训练
@@ -368,9 +427,9 @@ Torch-TPU 支持
    |—— checkpoint-*
    │    ├── optimizer.bin
    │    ├── pytorch_model.bin
-   │    ├── random_states_0.pkl
-   │    └── scaler.pt
+   │    └── random_states_0.pkl
    |—— logs
+   │    └── text2image-fine-tune
    └── pytorch_lora_weights.safetensors
 
 在完成上述 LoRA Finetune 训练任务后，可以执行以下推理脚本，加载训练好的 lora 参数进行 FP32 精度下的推理。
@@ -391,14 +450,7 @@ Torch-TPU 支持
     image = pipe(prompt, num_inference_steps=30, guidance_scale=7.5).images[0]
     image.save("pokemon_lora.png")
 
-执行如上示例代码后，会在当前的路径下生成一张名为 “pokemon_lora.png” 的图片。
-
-.. figure:: ../assets/lora_finetune.png
-   :width: 400px
-   :height: 400px
-   :scale: 50%
-   :align: center
-   :alt: SOPHGO LOGO
+执行如上示例代码后，会在当前的路径下生成一张名为 “pokemon_lora.png” 的图片。该节测试结果图片，可参考本节末尾，FP32与FP16的测试对比图。
 
 使用 FP16 精度进行训练
 ------------------
@@ -426,7 +478,19 @@ Torch-TPU 支持
         --output_dir="sd-pokemon-model-lora_fp16" \
         --validation_prompt="cute dragon creature"
 
-执行如上指令，训练完成后，如 FP32 精度训练一样，会在当前目录下生成名为 sd-pokemon-model-lora_fp16 的文件夹。
+执行如上指令，训练完成后，如 FP32 精度训练一样，会在当前目录下生成名为 sd-pokemon-model-lora_fp16 的文件夹。其中包含训练得到的lora参数、训练记录logs，以及checkpoint数据。文件结构如下。
+
+.. code-block:: shell
+
+   /text_to_image/sd-pokemon-model-lora_fp16/
+   |—— checkpoint-*
+   │    ├── optimizer.bin
+   │    ├── pytorch_model.bin
+   │    ├── random_states_0.pkl
+   │    └── scaler.pt
+   |—— logs
+   │    └── text2image-fine-tune
+   └── pytorch_lora_weights.safetensors
 
 在完成上述 LoRA Finetune 训练任务后，可以执行以下推理脚本，加载训练好的 lora 参数进行 FP16 精度下的推理。
 
@@ -448,3 +512,14 @@ Torch-TPU 支持
 
 
 执行如上示例代码后，也会在当前的路径下生成一张名为 “pokemon_lora.png” 的图片。
+
+FP32 和 FP16 两种精度模式下，推理结果如下图所示。左侧图片为 FP32 精度下生成的图片，右侧图片为 FP16 精度下生成的图片。
+
+这里需要注意一点，只要生成的图片有呈现出卡通形象即可判定上述步骤成功执行。
+
+.. figure:: ../assets/4_lora_fp32_fp16.png
+   :width: 1600px
+   :height: 650px
+   :scale: 50%
+   :align: center
+   :alt: SOPHGO LOGO
