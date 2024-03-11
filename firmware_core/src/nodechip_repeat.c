@@ -132,6 +132,29 @@ void nodechip_repeat(global_addr_t input_global_addr,
     }
   }
 }
+
+void nodechip_repeat_spec_for_last_dim(global_addr_t input_global_addr,
+                     global_addr_t output_global_addr, int rows, int cols,
+                     int repeats, data_type_t dtype) {
+  // only support repeat last dim
+  int dsize = tpu_data_type_size(dtype);
+  dim4 src_shape = {.n = 1, .c = 1, .h = rows, .w = cols};
+  dim4 dst_stride = {.w = 1, .h = src_shape.w * repeats, .c = src_shape.w * repeats * src_shape.h, .n = src_shape.w * repeats * src_shape.h * src_shape.c};
+  for (int i=0; i<repeats; ++i) {
+    tpu_gdma_cpy_S2S(output_global_addr + cols * i * dsize, input_global_addr, &src_shape, &dst_stride, NULL, dtype);
+  }
+}
+
+bool is_last_dim_spec(sg_api_repeat_t *api) {
+  if (api->repeat_dim != api->dim)
+    return false;
+  for (int i = 0; i < api->dim - 1; ++i) {
+    if (api->repeat_times[i] != 1)
+      return false;
+  }
+  return true;
+}
+
 void tpu_kernel_api_repeat(const void *args) {
   sg_api_repeat_t *api = (sg_api_repeat_t *)args;
 
@@ -151,8 +174,26 @@ void tpu_kernel_api_repeat_multi_core(const void *args) {
     tpu_sync_all();
 #endif
   int core_idx = tpu_core_index();
+  int core_num = tpu_core_num();
+  int dsize = tpu_data_type_size(api->dtype);
+  // multi-core opt only support repeatting last dim now
+  if (is_last_dim_spec(api)) {
+    int rows = 1, cols = api->shape[api->dim - 1];
+    for (int i = 0; i < api->dim - 1; ++i) {
+      rows *= api->shape[i];
+    }
+    int repeats = api->repeat_times[api->repeat_dim - 1];
+    int row_sp = DIV_UP(rows, core_num);
+    int core_slice = MIN(row_sp, rows - row_sp * core_idx);
+    if (core_slice > 0) {
+      nodechip_repeat_spec_for_last_dim(
+          api->input_global_addr + row_sp * cols * dsize * core_idx,
+          api->output_global_addr + row_sp * cols * repeats * dsize * core_idx, core_slice,
+          cols, repeats, api->dtype);
+    }
+  }
   // TODO: other op depends on repeat, just use core 0 to do
-  if (core_idx == 0)
+  else if (core_idx == 0)
     nodechip_repeat(api->input_global_addr, api->output_global_addr, api->shape,
                     api->repeat_times, api->dim, api->repeat_dim, api->dtype);
   tpu_poll();
