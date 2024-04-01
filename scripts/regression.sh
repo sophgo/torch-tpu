@@ -64,7 +64,7 @@ function link_libsophon() {
         popd
       fi
     else
-      echo "LATEST LIBSOHON IS ADAPATED from libsophon-file"
+      echo "local LIBSOHON IS ADAPATED from libsophon-file"
     fi
     echo "********************************************"
 }
@@ -134,6 +134,7 @@ function run_online_regression_test() {
   echo "********************************************"
   echo "[NOTE]Print_necessary_info"
   echo "[INFO]CURRENT_DIR:$CURRENT_DIR"
+  
   
   test_CHIP_ARCH=${1:-bm1684x}
   LIBSOPHON_LINK_PATTERN=${2:-local} #local or stable
@@ -238,18 +239,18 @@ function fast_build_bm1684x_stable() {
   run_online_regression_test bm1684x stable fast $DEB_PATH_STABLE 0.4.8
 }
 
-function fast_build_bm1684x_latest() {
+function fast_build_bm1684x_local() {
   run_online_regression_test bm1684x local fast
 }
 
-function fast_build_bm1684x_latest_and_libtorch_plugin() {
+function fast_build_bm1684x_local_and_libtorch_plugin() {
   run_online_regression_test bm1684x local fast
 }
 
-function fast_build_sg2260_latest() {
+function fast_build_sg2260_local() {
   run_online_regression_test sg2260 local fast
 }
 
-function fast_build_sg2260_latest_and_libtorch_plugin() {
+function fast_build_sg2260_local_and_libtorch_plugin() {
   run_online_regression_test sg2260 local fast
 }

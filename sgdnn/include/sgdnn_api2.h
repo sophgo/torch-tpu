@@ -199,7 +199,8 @@ tpuRtStatus_t sgdnnLayernormBackward ( tpuRtStream_t  stream,
                                      int start_dim,
                                      SgdnnTensor_t grad_input,
                                      SgdnnTensor_t grad_weight,
-                                     SgdnnTensor_t grad_bias , 
+                                     SgdnnTensor_t grad_bias ,
+                                     int requires_grad_input,
                                      bool non_blocking = true);
 
 /*

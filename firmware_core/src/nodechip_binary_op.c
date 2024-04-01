@@ -1336,8 +1336,8 @@ void nodechip_binary_scalar_div(global_addr_t input_global_addr,
   int dtype_size = tpu_data_type_size(dtype);
 
   const unsigned int max_m_dim = (tpu_gdma_shape_limit(TENSOR_C_DIM) + 1) >> 1;
-  const unsigned int w_dim = tpu_eu_num(DT_FP32);
-  const int n_dim = input_size * tpu_npu_num() / dtype_size / max_m_dim;
+  const unsigned int w_dim = tpu_eu_num(dtype);
+  const int n_dim = input_size * tpu_npu_num() / tpu_data_type_size(DT_FP32) / max_m_dim;
 
   local_addr_t in_local_addr[2] = {0, 1 * input_size};
   local_addr_t out_local_addr[2] = {2 * input_size,

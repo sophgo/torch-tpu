@@ -93,7 +93,7 @@ namespace at
 			tpu::TPUGenerateSgdnnTensor( grad_input ),
 			tpu::TPUGenerateSgdnnTensor( grad_gamma ),
 			tpu::TPUGenerateSgdnnTensor( grad_beta ),
-			true);
+			1);
 		TORCH_CHECK(status == tpuRtSuccess);
 #elif defined BACKEND_1684X
 		TORCH_CHECK(false);

@@ -12,6 +12,7 @@ option(USING_PERF_MODE       "Using performance mode"                          O
 
 option(USE_TPUv7_RUNTIME     "option for control use new runtime"              OFF)
 
+option(DUMP_INS              "option for control dump ins, cmodel only"        OFF)
 ######################################
 ### CHIP BACKEND
 ######################################
@@ -74,4 +75,9 @@ message(STATUS "BACKEND_CHIP : $ENV{CHIP_ARCH}")
 
 if(USING_PERF_MODE)
   add_definitions(-DUSING_PERF_MODE)
+endif()
+
+
+if(DUMP_INS)
+  add_definitions(-DDUMP_INS)
 endif()

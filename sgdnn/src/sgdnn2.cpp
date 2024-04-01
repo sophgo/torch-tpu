@@ -724,6 +724,7 @@ tpuRtStatus_t sgdnnLayernormBackward ( tpuRtStream_t stream,
                                      SgdnnTensor_t grad_input,
                                      SgdnnTensor_t grad_weight,
                                      SgdnnTensor_t grad_bias,
+                                     int requires_grad_input,
                                      bool non_blocking )
 {
   if ( weight.addr != 0 )
@@ -845,6 +846,7 @@ tpuRtStatus_t sgdnnLayernormBackward ( tpuRtStream_t stream,
     api.shape[i] = input.shape[i];
   }
   api.dim = input.dim;
+  api.requires_grad_input = requires_grad_input;
 #ifdef USING_PERF_MODE
   std::cout << "input_num\n" << 5 <<std::endl;
   std::cout << "output_num\n" << 3 <<std::endl;

@@ -10,6 +10,30 @@
 #define MAX_MSG_QUEUE_LENGTH 2048
 #define MAX_CORE_NUM 8
 
+#ifdef DUMP_INS
+#include <dlfcn.h>
+struct CmdDump
+{
+    void *handle;
+    typedef void (*Func)();
+    Func inc_file_dump_group_num = nullptr;
+    CmdDump()
+    {
+        char *fw_path = getenv("TPUKERNEL_FIRMWARE_PATH");
+        if (!fw_path)
+            return;
+        handle = dlopen(fw_path, RTLD_LAZY);
+        inc_file_dump_group_num = (Func)(dlsym(handle, "inc_file_dump_group_num"));
+    }
+
+    void operator()()
+    {
+        if (inc_file_dump_group_num)
+            inc_file_dump_group_num();
+    }
+} cmd_dump;
+#endif
+
 TPUKernelLauncher::TPUKernelLauncher()
 {
   _library_file = getenv("TPUKERNEL_FIRMWARE_PATH");
@@ -51,6 +75,10 @@ tpuRtStatus_t TPUKernelLauncher::launch_async(
     const char* func_name, const void* api, size_t api_size, tpuRtStream_t stream) {
   tpuRtKernelModule_t kernel_module = _stream_kernel_modules[stream];
   tpuRtStatus_t status = tpuRtKernelLaunchAsync(kernel_module, func_name, (void *)api, api_size, 1, _core_num, stream);
+#ifdef DUMP_INS
+  tpuRtStreamSynchronize(stream);
+  cmd_dump();
+#endif
   return status;
 }
 
@@ -58,6 +86,9 @@ tpuRtStatus_t TPUKernelLauncher::launch_sync(
     const char* func_name, const void* api, size_t api_size, tpuRtStream_t stream) {
   tpuRtKernelModule_t kernel_module = _stream_kernel_modules[stream];
   tpuRtStatus_t status = tpuRtKernelLaunch(kernel_module, func_name, (void*)api, api_size, 1, _core_num, stream );
+#ifdef DUMP_INS
+  cmd_dump();
+#endif
   return status;
 }
 
