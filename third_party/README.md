@@ -9,7 +9,7 @@
     commit 1c4644118773ed8294afb37310c654805d12a3d2
     libbm1684x.a libbmlib_cmodel.so libcmodel_firmware.so
 ### sg2260
-    [TPU1686] commit 28b7e403eab388f3943bfff9b1b55d3e45e9d40d
+    [TPU1686] commit 7951085d312f05501788429b8158f1abed30da89
     [libsophon] commit b9622adb89a712c1d2cadec9dd83eabc8850f000
     libbmlib.so.0 libcmodel_firmware.so
 

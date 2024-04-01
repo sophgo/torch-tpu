@@ -328,6 +328,7 @@ typedef struct
   int dim;
   int axis;
   int dtype;
+  int requires_grad_input;
 } WITH_PLATFORM(sg_api_layernorm_backward_t);
 
 typedef struct
@@ -1053,6 +1054,7 @@ typedef struct
   int axis;
   int affine;
   int dtype;
+  int requires_grad_input;
 } WITH_PLATFORM(sg_api_layernorm_backward_multi_core_t);
 
 typedef struct

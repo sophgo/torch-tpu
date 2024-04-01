@@ -879,7 +879,8 @@ bm_status_t sgdnnLayernormBackward ( bm_handle_t handle,
                                      int start_dim,
                                      SgdnnTensor_t grad_input,
                                      SgdnnTensor_t grad_weight,
-                                     SgdnnTensor_t grad_bias )
+                                     SgdnnTensor_t grad_bias,
+                                     int requires_grad_input)
 {
   if ( weight.addr != 0 )
   {
@@ -1000,6 +1001,7 @@ bm_status_t sgdnnLayernormBackward ( bm_handle_t handle,
     api.shape[i] = input.shape[i];
   }
   api.dim = input.dim;
+  api.requires_grad_input = requires_grad_input;
 #ifdef USING_PERF_MODE
   std::cout << "input_num\n" << 5 <<std::endl;
   std::cout << "output_num\n" << 3 <<std::endl;

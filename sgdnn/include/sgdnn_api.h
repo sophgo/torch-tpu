@@ -182,7 +182,8 @@ bm_status_t sgdnnLayernormBackward ( bm_handle_t handle,
                                      int start_dim,
                                      SgdnnTensor_t grad_input,
                                      SgdnnTensor_t grad_weight,
-                                     SgdnnTensor_t grad_bias );
+                                     SgdnnTensor_t grad_bias,
+                                     int requires_grad_input);
 
 /*
  * OUTPUT = POOLING ( INPUT, POOLING_DESC )

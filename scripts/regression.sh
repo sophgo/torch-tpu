@@ -18,6 +18,23 @@ function ops_utest() {
     return $cmd_utest_result
 }
 
+function gpt3block_test() {
+    start_time=$(date +%s) 
+    CURRENT_DIR=$(dirname ${BASH_SOURCE})
+    PYTHON_TEST_PATH=$CURRENT_DIR/../python/gen_ins/
+    echo "[INFO]PYTHON_TEST_PATH:$PYTHON_TEST_PATH"
+    pushd $PYTHON_TEST_PATH
+    export FORBID_CMD_EXECUTE=0
+    export CMODEL_FAST_EXEC=1
+    cmd_gpt3block_test="python3 gpt3block_TP16_fb.py"
+    $cmd_gpt3block_test; cmd_gpt3block_test_result=$?
+    echo "[INFO]cmd_gpt3block_test_result:$cmd_gpt3block_test_result"
+    popd
+    echo "*********** UTEST ENDED ***************"
+    end_time=$(date +%s)
+    echo "Time elapsed: $(($end_time - $start_time)) seconds"
+    return $cmd_gpt3block_test_result
+}
 
 export stable_libsophon_path="/workspace/libsophon_Release_20230605_025400"
 # function for online regression
@@ -25,7 +42,7 @@ function link_libsophon() {
     echo "********************************************"
     echo "[STEP]install libsophon"
     CURRENT_DIR=$(dirname ${BASH_SOURCE})
-    LIBSOPHON_LINK_PATTERN=${1:-latest}
+    LIBSOPHON_LINK_PATTERN=${1:-local}
     DEB_PATH_STABLE=${2:-none}
     VERSION_PATH_STABLE=${3:-0.4.8}
     if [ $LIBSOPHON_LINK_PATTERN = 'stable' ]; then
@@ -47,7 +64,7 @@ function link_libsophon() {
         popd
       fi
     else
-      echo "LATEST LIBSOHON IS ADAPATED from libsophon-file"
+      echo "local LIBSOHON IS ADAPATED from libsophon-file"
     fi
     echo "********************************************"
 }
@@ -118,10 +135,9 @@ function run_online_regression_test() {
   echo "[NOTE]Print_necessary_info"
   echo "[INFO]CURRENT_DIR:$CURRENT_DIR"
   
-  update_pytorch_to_2_1;
   
   test_CHIP_ARCH=${1:-bm1684x}
-  LIBSOPHON_LINK_PATTERN=${2:-latest} #latest or stable
+  LIBSOPHON_LINK_PATTERN=${2:-local} #local or stable
   TEST_PATTERN=${3:-online} #online,local, or fast
   DEB_PATH_STABLE=${4:-none} #none or given path
   VERSION_PATH_STABLE=${5:-0.4.8}
@@ -136,11 +152,11 @@ function run_online_regression_test() {
     if [ $LIBSOPHON_LINK_PATTERN = 'stable' ];then
       echo "[INFO]test_CHIP_ARCH:$test_CHIP_ARCH"
       build_kernel_module_real $test_CHIP_ARCH
-    elif [ $LIBSOPHON_LINK_PATTERN = 'latest' ];then
+    elif [ $LIBSOPHON_LINK_PATTERN = 'local' ];then
       echo "************** $LIBSOPHON_LINK_PATTERN-LIBSOPHON IS REAEDY *********"
-      source  $CURRENT_DIR/envsetup.sh $test_CHIP_ARCH
-      rebuild_all
-      TPU_TRAIN_CMODEL_PATH=$CURRENT_DIR/../build/firmware_core/libcmodel.so
+      source  $CURRENT_DIR/envsetup.sh $test_CHIP_ARCH $LIBSOPHON_LINK_PATTERN
+      new_clean; new_build
+      TPU_TRAIN_CMODEL_PATH=$CURRENT_DIR/../build/Release/firmware_core/libcmodel.so
       echo "[INFO]tpu_train_cmodel_path:$TPU_TRAIN_CMODEL_PATH"
       set_cmodel_firmware $TPU_TRAIN_CMODEL_PATH
       echo "*************** CMODEL IS SET *************"
@@ -165,18 +181,18 @@ function fast_build_bm1684x_stable() {
   run_online_regression_test bm1684x stable fast $DEB_PATH_STABLE 0.4.8
 }
 
-function fast_build_bm1684x_latest() {
-  run_online_regression_test bm1684x latest fast
+function fast_build_bm1684x_local() {
+  run_online_regression_test bm1684x local fast
 }
 
-function fast_build_bm1684x_latest_and_libtorch_plugin() {
-  run_online_regression_test bm1684x latest fast
+function fast_build_bm1684x_local_and_libtorch_plugin() {
+  run_online_regression_test bm1684x local fast
 }
 
-function fast_build_sg2260_latest() {
-  run_online_regression_test sg2260 latest fast
+function fast_build_sg2260_local() {
+  run_online_regression_test sg2260 local fast
 }
 
-function fast_build_sg2260_latest_and_libtorch_plugin() {
-  run_online_regression_test sg2260 latest fast
+function fast_build_sg2260_local_and_libtorch_plugin() {
+  run_online_regression_test sg2260 local fast
 }

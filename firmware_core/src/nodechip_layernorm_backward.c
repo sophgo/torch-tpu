@@ -15,6 +15,9 @@ int*          shape,
 int           dims,
 int           axis,
 int           affine,
+#ifdef FIRMWARE_BACKEND_2260
+int           requires_grad_input,
+#endif
 data_type_t   dtype );
 
 void tpu_kernel_api_layernorm_backward ( const void *args )
@@ -35,6 +38,9 @@ void tpu_kernel_api_layernorm_backward ( const void *args )
     api->dim,
     api->axis,
     api->grad_weight_global_addr && api->grad_bias_global_addr,
+#ifdef FIRMWARE_BACKEND_2260
+    api->requires_grad_input,
+#endif
     ( data_type_t ) api->dtype );
   tpu_poll();
 }
@@ -54,6 +60,7 @@ int*          shape,
 int           dims,
 int           axis,
 int           affine,
+int            requires_grad_input,
 data_type_t   dtype );
 
 void tpu_kernel_api_layernorm_backward_multi_core ( const void *args )
@@ -77,6 +84,7 @@ void tpu_kernel_api_layernorm_backward_multi_core ( const void *args )
     api->dim,
     api->axis,
     api->grad_weight_global_addr && api->grad_bias_global_addr,
+    api->requires_grad_input,
     ( data_type_t ) api->dtype );
   tpu_poll();
 }

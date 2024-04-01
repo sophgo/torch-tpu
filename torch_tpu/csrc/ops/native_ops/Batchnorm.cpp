@@ -298,11 +298,12 @@ std::array<bool, 3> output_mask )
                        axis,
                        output_mask[0] ? tpu::TPUGenerateSgdnnTensor ( grad_input ) : sgdnnUndefinedTensor(),
                        output_mask[1] ? tpu::TPUGenerateSgdnnTensor ( grad_weight ) : sgdnnUndefinedTensor(),
-                       output_mask[2] ? tpu::TPUGenerateSgdnnTensor ( grad_bias ) : sgdnnUndefinedTensor() );
+                       output_mask[2] ? tpu::TPUGenerateSgdnnTensor ( grad_bias ) : sgdnnUndefinedTensor(),
+                       output_mask[0] ? 1 : 0);
   TORCH_CHECK ( status == BM_SUCCESS );
   TIMING_END ( tpu::LAYERNORM_BACKWARD );
 
-  SHOW_TENSOR_OP(grad_out, input, mean, rstd, weight, bias);
+  SHOW_TENSOR_OP(grad_out, input, mean, rstd, grad_input, weight, bias);
   return std::tuple<Tensor, Tensor, Tensor> ( grad_input, grad_weight, grad_bias );
 #endif
 }

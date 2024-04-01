@@ -2,7 +2,9 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from transformers.models.gpt2.modeling_gpt2 import GPT2LMHeadModel
-from utils import ForwardHack, BackwardHack,DumpIns
+from utils import ForwardHack, BackwardHack,DumpIns, Dump_Data, TensorComparator
+from decorator import register_hook
+import sys
 
 torch.set_num_threads(1)
 
@@ -10,6 +12,27 @@ DI = DumpIns()
 torch.manual_seed(1000)
 TP = 16
 
+class GELU(nn.Module):
+    def __init__(self):
+        super(GELU, self).__init__()
+
+    def forward(self, x):
+        return F.gelu(x)
+
+class MatMul(nn.Module):
+    def __init__(self):
+        super(MatMul, self).__init__()
+
+    def forward(self, left, right):
+        return torch.matmul(left, right)
+
+class SoftMax(nn.Module):
+    def __init__(self, dim=None):
+        super(SoftMax, self).__init__()
+
+    def forward(self, x, dim):
+        return nn.Softmax(dim=dim)(x)
+    
 class Conv1D(nn.Module):
     """
     1D-convolutional layer as defined by Radford et al. for OpenAI GPT (and also used in GPT-2).
@@ -72,17 +95,18 @@ class GPT2Attention(nn.Module):
 
         self.pruned_heads = set()
 
+        self.matmul = MatMul()
+        self.softmax = SoftMax()
 
-    def _attn(self, query, key, value, attention_mask=None, head_mask=None):
+    def _attn(self, query, key, value, attention_mask=None, head_mask=None, device='cpu'):
         DI.dump("Matmul_QK")
-        attn_weights = torch.matmul(query, key.transpose(-1, -2))
+        attn_weights = self.matmul(query, key.transpose(-1, -2))
         attn_weights = BackwardHack.apply("Matmul_QK_dqk_", attn_weights)
 
         if self.scale_attn_weights:
             DI.dump("Norm_QK[Div]")
             attn_weights = attn_weights / (float(value.size(-1)) ** 0.5)
             attn_weights = BackwardHack.apply("Norm_QK[Div]_d_", attn_weights)
-
 
         if not self.is_cross_attention:
             query_length, key_length = query.size(-2), key.size(-2)
@@ -99,7 +123,7 @@ class GPT2Attention(nn.Module):
             attn_weights = attn_weights + attention_mask
         
         DI.dump("SOFTMAX_QK")
-        attn_weights = nn.Softmax(dim=-1)(attn_weights)
+        attn_weights = self.softmax(attn_weights, dim=-1)
         attn_weights = BackwardHack.apply("SOFTMAX_QK_d_", attn_weights)
 
         attn_weights = self.attn_dropout(attn_weights)
@@ -107,7 +131,7 @@ class GPT2Attention(nn.Module):
             attn_weights = attn_weights * head_mask
 
         DI.dump("Matmul_QKV")
-        attn_output = torch.matmul(attn_weights, value)
+        attn_output = self.matmul(attn_weights, value)
         attn_output = BackwardHack.apply("Matmul_QKV_dqkv_", attn_output)
 
         return attn_output, attn_weights
@@ -138,6 +162,7 @@ class GPT2Attention(nn.Module):
         encoder_attention_mask=None,
         use_cache=False,
         output_attentions=False,
+        device='cpu',
     ):
         if encoder_hidden_states is not None:
             if not hasattr(self, "q_attn"):
@@ -170,7 +195,7 @@ class GPT2Attention(nn.Module):
             present = (key, value)
         else:
             present = None
-        attn_output, attn_weights = self._attn(query, key, value, attention_mask, head_mask)
+        attn_output, attn_weights = self._attn(query, key, value, attention_mask, head_mask, device)
 
         DI.dump("Concat_heads")
         attn_output = self._merge_heads(attn_output, self.num_heads, self.head_dim)
@@ -195,7 +220,7 @@ class GPT2MLP(nn.Module):
         embed_dim = config.hidden_size
         self.c_fc = Conv1D(intermediate_size//TP, embed_dim)
         self.c_proj = Conv1D(embed_dim, intermediate_size//TP)
-        self.act = F.gelu
+        self.act = GELU()
         self.dropout = nn.Dropout(config.resid_pdrop)
 
     def forward(self, hidden_states):
@@ -229,7 +254,7 @@ class GPT2Block(nn.Module):
             self.ln_cross_attn = nn.LayerNorm(hidden_size, eps=config.layer_norm_epsilon)
 
         self.mlp = GPT2MLP(inner_dim, config)
-
+        self.device = 'cpu'
     def forward(
         self,
         hidden_states,
@@ -240,6 +265,7 @@ class GPT2Block(nn.Module):
         encoder_attention_mask=None,
         use_cache=False,
         output_attentions=False,
+        device='cpu',
     ):
         residual = hidden_states
         DI.dump("LayerNorm_embedded_input")
@@ -253,6 +279,7 @@ class GPT2Block(nn.Module):
             head_mask=head_mask,
             use_cache=use_cache,
             output_attentions=output_attentions,
+            device = device,
         )
         #t4 = time.time()
         #print("attetion time", t4 - t3)
@@ -326,12 +353,72 @@ if __name__ == "__main__":
     ########################################
     
     DI.dump("Copy_input")
-    inp = torch.rand(batch, sequence, configure.hidden_size).to("tpu:0").half()
-    ref = torch.ones((batch, sequence, configure.hidden_size)).to("tpu:0").half()
+    inp = torch.rand(batch, sequence, configure.hidden_size)
+    ref = torch.ones((batch, sequence, configure.hidden_size))
+
+    inp_tpu = copy.deepcopy(inp).to("tpu:0").half()
+    ref_tpu = copy.deepcopy(ref).to("tpu:0").half()
 
     DI.dump("Copy_model_weight")
-    net = GPT2Block(configure).to("tpu:0").half()
+    net = GPT2Block(configure)
+    net_tpu = copy.deepcopy(net)
+    net_tpu = net_tpu.to("tpu:0").half()
 
-    out_cpu = net(inp)
+    # Use hook if want to dump di/do/dw 
+    # net_tpu.apply(lambda net: register_hook(net, 'tpu'))
+    # net.apply(lambda net: register_hook(net, 'cpu'))
 
+    print("============ Forward ============")
+    out_cpu = net(inp, device='cpu')
+    out_tpu = net_tpu(inp_tpu, device='tpu')
+    # print("cpu",out_cpu[0].cpu())
+    # print("tpu",out_tpu[0].cpu())
+
+    print("============ Forward compare result start ============")
+    comparator = TensorComparator()
+    status = comparator.cmp_result(out_cpu[0].detach(), out_tpu[0].cpu().detach().float())
+    if status == -1 :
+        print(f"Forward output compare failed")
+        sys.exit(255)
+    print("============ Forward compare success ============")
+
+    print("============ Backward ============")
     out_cpu[0].backward(ref)
+    out_tpu[0].backward(ref_tpu)
+
+    print("============ Backward compare result ============")
+
+    grad_weight_dict = {
+        'CPU' : {
+            'ln_1_weight_grad': net.ln_1.weight.grad.cpu(),
+            'attn_c_attn_weight_grad': net.attn.c_attn.weight.grad.cpu(),
+            'attn_c_proj_weight_grad': net.attn.c_proj.weight.grad.cpu(),
+            'ln_2_weight_grad': net.ln_2.weight.grad.cpu(),
+            'mlp_c_fc_weight_grad': net.mlp.c_fc.weight.grad.cpu(),
+            'mlp_c_proj_weight_grad': net.mlp.c_proj.weight.grad.cpu()
+        },
+        'TPU' : {
+            'ln_1_weight_grad': net_tpu.ln_1.weight.grad.cpu(),
+            'attn_c_attn_weight_grad': net_tpu.attn.c_attn.weight.grad.cpu(),
+            'attn_c_proj_weight_grad': net_tpu.attn.c_proj.weight.grad.cpu(),
+            'ln_2_weight_grad': net_tpu.ln_2.weight.grad.cpu(),
+            'mlp_c_fc_weight_grad': net_tpu.mlp.c_fc.weight.grad.cpu(),
+            'mlp_c_proj_weight_grad': net_tpu.mlp.c_proj.weight.grad.cpu()
+        }
+    }
+
+    for tensor_name in grad_weight_dict['TPU']:
+        print(f"============ compare {tensor_name} ============")
+        grad_tpu = grad_weight_dict['TPU'][tensor_name]
+        grad_cpu = grad_weight_dict['CPU'][tensor_name]
+        status = comparator.cmp_result(grad_cpu, grad_tpu.float())
+        if status == -1 :
+            print(f"{tensor_name} compare failed")
+            sys.exit(255)
+    print("============ Backward compare success ============")
+    print("===== All test success =====")
+
+    # for key, value in weight_tpu_dict.items() :
+    #     Dump_Data(value, key, "tpu")
+    # for key, value in weight_cpu_dict.items() :
+    #     Dump_Data(value, key, "cpu")
