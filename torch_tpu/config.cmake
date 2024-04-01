@@ -7,6 +7,7 @@ option(TPU_OP_TIMING    "option for op timing"                            OFF)
 option(SHOW_OP_INFO     "option for op calls infomation, for debug only " OFF)
 option(SHOW_CPU_OP      "option for cpu op using "                        OFF)
 option(SHOW_MALLOC_INFO "option for memory usage info"                    OFF)
+option(SHOW_EACH_OP_TIME     "option for show op time"                    OFF)
 
 if(DEBUG OR "$ENV{TPUTRAIN_BUILD_TYPE}" STREQUAL "ON")
   set(CMAKE_BUILD_TYPE "Debug")
@@ -29,4 +30,8 @@ endif()
 
 if(SHOW_MALLOC_INFO)
   add_definitions(-DSHOW_MALLOC_INFO)
+endif()
+
+if(SHOW_EACH_OP_TIME)
+  add_definitions(-DSHOW_EACH_OP_TIME)
 endif()

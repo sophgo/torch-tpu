@@ -28,11 +28,30 @@ double eps )
   const Tensor & bias = c10::value_or_else ( bias_opt, [] { return Tensor(); } );
   const Tensor & running_mean = c10::value_or_else ( running_mean_opt, [] { return Tensor(); } );
   const Tensor & running_var = c10::value_or_else ( running_var_opt, [] { return Tensor(); } );
-  TORCH_CHECK ( training == true, "Batchnorm only supports training mode for now" );
   auto num_features = input.size ( 1 );
   CHECK_TENSOR_IN_DEVICE ( input );
   if ( weight.defined() )       { CHECK_TENSOR_IN_DEVICE ( weight ); }
   if ( bias.defined() )         { CHECK_TENSOR_IN_DEVICE ( bias ); }
+  if( !training ) { 
+    auto dtype = input.scalar_type();
+    // implement inference mode
+    auto running_mean_cpu = running_mean.defined() ? running_mean.cpu().to(torch::kFloat) : Tensor();
+    auto running_var_cpu  = running_var.defined() ? running_var.cpu().to(torch::kFloat) : Tensor();
+    auto outputs_cpu = native_batch_norm (
+                       input.cpu().to(torch::kFloat),
+                       c10::optional<Tensor> ( weight.defined() ? weight.cpu().to(torch::kFloat) : Tensor() ),
+                       c10::optional<Tensor> ( bias.defined() ? bias.cpu().to(torch::kFloat) : Tensor() ),
+                       c10::optional<Tensor> ( running_mean_cpu ),
+                       c10::optional<Tensor> ( running_var_cpu ),
+                       training,
+                       momentum,
+                       eps );
+    return std::tuple<Tensor, Tensor, Tensor> (
+            TENSOR_TO_TPU ( std::get<0> ( outputs_cpu ).to(dtype) ),
+            TENSOR_TO_TPU ( std::get<1> ( outputs_cpu ).to(dtype) ),
+            TENSOR_TO_TPU ( std::get<2> ( outputs_cpu ).to(dtype) ) );
+   }
+  TORCH_CHECK ( training == true, "Batchnorm only supports training mode for now" );
   if ( running_mean.defined() ) { CHECK_TENSOR_IN_DEVICE ( running_mean ); }
   if ( running_var.defined() )  { CHECK_TENSOR_IN_DEVICE ( running_var ); }
 #if 0

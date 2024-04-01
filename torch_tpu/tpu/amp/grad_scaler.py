@@ -114,7 +114,9 @@ class GradScaler:
                  growth_factor=2.0,
                  backoff_factor=0.5,
                  growth_interval=2000,
-                 enabled=True):
+                 enabled=True,
+                 allow_fp16=False):
+        self.allow_fp16 = allow_fp16
         if enabled:
             warnings.warn("torch_tpu.tpu.amp.GradScaler is enabled")
             self._enabled = enabled
@@ -278,7 +280,7 @@ class GradScaler:
         inv_scale = self._scale.reciprocal().float()
         found_inf = torch.full((1,), 0.0, dtype=torch.float32, device=self._scale.device)
 
-        optimizer_state["found_inf_per_device"] = self._unscale_grads_(optimizer, inv_scale, found_inf, False)
+        optimizer_state["found_inf_per_device"] = self._unscale_grads_(optimizer, inv_scale, found_inf, self.allow_fp16)
         optimizer_state["stage"] = OptState.UNSCALED
 
     def _maybe_opt_step(self, optimizer, optimizer_state, *args, **kwargs):
@@ -314,7 +316,6 @@ class GradScaler:
         if "closure" in kwargs:
             raise RuntimeError("Closure use is not currently supported if GradScaler is enabled.")
         self._check_scale_growth_tracker("step")
-
         optimizer_state = self._per_optimizer_states[id(optimizer)]
 
         if optimizer_state["stage"] is OptState.STEPPED:

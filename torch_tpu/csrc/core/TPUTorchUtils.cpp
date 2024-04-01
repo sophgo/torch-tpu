@@ -20,6 +20,7 @@ OpTimer & OpTimer::Start()
 {
   mutex_.lock();
   is_paused_ = false;
+  is_start_  = true;
   mutex_.unlock();
   return *this;
 }
@@ -28,6 +29,7 @@ OpTimer & OpTimer::Pause()
 {
   mutex_.lock();
   is_paused_ = true;
+  is_start_ = false;
   mutex_.unlock();
   return *this;
 }
@@ -38,6 +40,12 @@ OpTimer & OpTimer::AddTime ( OpType type, unsigned long time_us )
   if ( is_paused_ == false )
   {
     elapsed_time_us_[type] += time_us;
+    #ifdef SHOW_EACH_OP_TIME
+    if (is_start_)
+    {
+      std::cout << std::setw ( 42 ) << OpTypeStr[type] << " Elapsed: " << std::setw ( 12 ) << time_us << "us" << "\n";
+    }
+    #endif
   }
   mutex_.unlock();
   return *this;

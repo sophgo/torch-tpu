@@ -114,7 +114,8 @@ Tensor &upsample_nearest2d_backward_out_tpu(
     c10::optional<double> scales_w = c10::nullopt,
     at::Tensor &grad_input = input) {
   CHECK_TENSOR_IN_DEVICE(grad_input);
-  CHECK_TENSOR_IN_DEVICE(grad_output);
+  auto grad_output_ = grad_output.is_contiguous() ? grad_output : grad_output.contiguous(); 
+  CHECK_TENSOR_IN_DEVICE(grad_output_);
 #if 0
   CPU_IMPL_WARNING();
   auto input_type = grad_input.dtype();
@@ -142,14 +143,14 @@ Tensor &upsample_nearest2d_backward_out_tpu(
   TIMING_START
   bm_status_t status = sgdnnUpsampleNearest2dBackward (
                       tpu::TPUGetDeviceHandle(),
-                      tpu::TPUGenerateSgdnnTensor ( grad_output ),
+                      tpu::TPUGenerateSgdnnTensor ( grad_output_ ),
                       tpu::TPUGenerateSgdnnTensor ( grad_input ),
                       scales_h.value() * scales_w.value(),
                       pooling_desc );
   TORCH_CHECK ( status == BM_SUCCESS );
   TIMING_END(tpu::UPSAMPLING_NEAREST_BACKWARD)
 #endif
-  SHOW_TENSOR_OP(grad_output, grad_input);
+  SHOW_TENSOR_OP(grad_output_, grad_input);
   return grad_input;
 }
 
