@@ -52,7 +52,7 @@ I539eacf09883a0041bb3ee3a2de63bac791f067a
 ```shell
 mkdir build && cd build
 mkdir emulator && cd emulator
-cmake -DCMAKE_INSTALL_PREFIX=$PWD/../install  -DUSING_CMODEL=ON ../..
+cmake -DCMAKE_INSTALL_PREFIX=$PWD/../install  -DUSING_CMODEL=ON -DCMAKE_BUILD_TYPE=Debug ../..
 make -j4
 make install
 #### then  

@@ -13,7 +13,12 @@
 TPUKernelLauncher::TPUKernelLauncher()
 {
   _library_file = getenv("TPUKERNEL_FIRMWARE_PATH");
-  _core_num = 1;
+  const char* value_str = getenv("TPUTRAIN_CORE_NUM");
+  if (value_str) 
+    _core_num = atoi(value_str);
+  else
+    _core_num = MAX_CORE_NUM;
+  
   printf("[TPUKERNEL_FIRMWARE_PATH] : %s, [core_num] : %d \n",
           _library_file, _core_num);
 }
