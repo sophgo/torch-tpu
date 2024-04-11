@@ -36,8 +36,10 @@ build_en
 *.whl
 *.egg-info/
 *.zip
+*.npz
 Makefile
 *.marks
 python/**/*.so
 !python/gen_ins/*.py
+torch_tpu/tpu/backend.py
 toolchains_dir
