@@ -20,7 +20,7 @@ from setuptools.command.build_clib import build_clib
 from setuptools.command.build_ext import build_ext
 from setuptools.command.install import install
 from setuptools.command.egg_info import egg_info
-
+from wheel.bdist_wheel import bdist_wheel as _bdist_wheel
 
 BASE_DIR = os.path.dirname(os.path.realpath(__file__))
 SGDNN_PATH = os.path.join(BASE_DIR, "sgdnn")
@@ -29,6 +29,12 @@ THIRD_PARTY_PATH = os.path.join(BASE_DIR, "third_party")
 TPUV7_RUNTIME_PATH = os.path.join(THIRD_PARTY_PATH, "tpuv7_runtime")
 
 VERSION = '2.1.0.post1'
+SOC_CROSS = os.environ.get("SOC_CROSS_MODE", None)
+SOC_CROSS = True if SOC_CROSS == "ON" else False
+CROSS_TOOLCHAINS= os.environ.get("CROSS_TOOLCHAINS", None)
+if SOC_CROSS:
+    os.environ["CC"] = f"{CROSS_TOOLCHAINS}/gcc-arm-10.3-2021.07-x86_64-aarch64-none-linux-gnu/bin/aarch64-none-linux-gnu-gcc"
+    os.environ["CXX"] = f"{CROSS_TOOLCHAINS}/gcc-arm-10.3-2021.07-x86_64-aarch64-none-linux-gnu/bin/aarch64-none-linux-gnu-g++"
 
 def which(thefile):
     path = os.environ.get("PATH", os.defpath).split(os.pathsep)
@@ -70,7 +76,15 @@ def get_build_type():
 
     return build_type
 
+def python_path_dir():
+    if SOC_CROSS:
+        return os.path.join(CROSS_TOOLCHAINS, "Python-3.8.2/python_3.8.2/include/python3.8")
+    return get_paths()['include']
+
 def get_pytorch_dir():
+    if SOC_CROSS:
+        print(os.path.join(CROSS_TOOLCHAINS, "torchwhl/torch"))
+        return os.path.join(CROSS_TOOLCHAINS, "torchwhl/torch")
     try:
         import torch
         return os.path.dirname(os.path.realpath(torch.__file__))
@@ -87,10 +101,14 @@ def CppExtension(name, sources, *args, **kwargs):
     temp_include_dirs = kwargs.get('include_dirs', [])
     temp_include_dirs.append(os.path.join(pytorch_dir, 'include'))
     temp_include_dirs.append(os.path.join(pytorch_dir, 'include/torch/csrc/api/include'))
+    if SOC_CROSS:
+        temp_include_dirs.append(os.path.join(CROSS_TOOLCHAINS, "Python-3.8.2/python_3.8.2/include/python3.8"))
     kwargs['include_dirs'] = temp_include_dirs
 
     temp_library_dirs = kwargs.get('library_dirs', [])
     temp_library_dirs.append(os.path.join(pytorch_dir, 'lib'))
+    if SOC_CROSS:
+        temp_library_dirs.append(os.path.join(CROSS_TOOLCHAINS, "Python-3.8.2/python_3.8.2/lib/python3.8"))
     kwargs['library_dirs'] = temp_library_dirs
 
     temp_runtime_library_dirs = kwargs.get('runtime_library_dir', [])
@@ -126,7 +144,7 @@ class CPPLibBuild(build_clib, object):
 
         cmake_args = [
             '-DCMAKE_BUILD_TYPE=' + get_build_type(),
-            '-DPYTHON_INCLUDE_DIR=' + get_paths()['include'],
+            '-DPYTHON_INCLUDE_DIR=' + python_path_dir(),
             '-DPYTORCH_INSTALL_DIR=' + get_pytorch_dir(),
             '-DBUILD_LIBTORCH=0'
             ]
@@ -154,6 +172,17 @@ class Build(build_ext, object):
         self.library_dirs.append(
             os.path.relpath(os.path.join(BASE_DIR, f"build/{get_build_type()}/packages/torch_tpu/lib")))
         super(Build, self).run()
+
+    def finalize_options(self):
+        build_ext.finalize_options(self)
+        if SOC_CROSS:
+            self.plat_name = "aarch64"  # Example for ARM64
+
+    def get_ext_filename(self, ext_name):
+        filename = super().get_ext_filename(ext_name)
+        if 'x86_64-linux-gnu' in filename and SOC_CROSS:
+            return filename.replace('x86_64-linux-gnu', 'aarch64-linux-gnu')
+        return filename
 
 class InstallCmd(install):
 
@@ -272,6 +301,12 @@ class EggInfoBuild(egg_info, object):
             self.copy_file(src, dst)
         super(EggInfoBuild, self).finalize_options()
 
+class bdist_wheel(_bdist_wheel):
+    def finalize_options(self):
+        _bdist_wheel.finalize_options(self)
+        if SOC_CROSS:
+            self.plat_name = 'manylinux2014_aarch64'
+
 include_directories = [
     BASE_DIR,
     os.path.join(TPUV7_RUNTIME_PATH, "tpuv7-emulator_0.1.0", "include"),
@@ -325,7 +360,7 @@ setup(
                 extra_link_args=extra_link_args + ['-Wl,-rpath,$ORIGIN/lib'],
             ),
         ],
-        python_requires=">=3.10,<3.11",
+        python_requires=">=3.8",
         install_requires = [],
         dependency_links = [
             "https://download.pytorch.org/whl/cpu",
@@ -341,6 +376,7 @@ setup(
             'build_clib': CPPLibBuild,
             'build_ext': Build,
             'build_py': PythonPackageBuild,
+            'bdist_wheel': bdist_wheel,
             'egg_info': EggInfoBuild,
             'clean': Clean,
             'install': InstallCmd

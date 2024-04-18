@@ -2,6 +2,16 @@ cmake_minimum_required(VERSION 3.18 FATAL_ERROR)
 
 project(TORCH_TPU CXX)
 
+set(SOC_CROSS_MODE $ENV{SOC_CROSS_MODE})
+message(STATUS "SOC_CROSS_MODE: ${SOC_CROSS_MODE}")
+if(SOC_CROSS_MODE STREQUAL "ON")
+    set(CMAKE_C_COMPILER $ENV{CROSS_TOOLCHAINS}/gcc-arm-10.3-2021.07-x86_64-aarch64-none-linux-gnu/bin/aarch64-none-linux-gnu-gcc)
+    set(CMAKE_ASM_COMPILER $ENV{CROSS_TOOLCHAINS}/gcc-arm-10.3-2021.07-x86_64-aarch64-none-linux-gnu/bin/aarch64-none-linux-gnu-gcc)
+    set(CMAKE_CXX_COMPILER $ENV{CROSS_TOOLCHAINS}/gcc-arm-10.3-2021.07-x86_64-aarch64-none-linux-gnu/bin/aarch64-none-linux-gnu-g++)
+else()
+    message(STATUS "SOC_CROSS_MODE is not ON")
+endif()
+
 include(${CMAKE_CURRENT_SOURCE_DIR}/config.cmake)
 add_compile_options(-std=c++17 -Wno-attributes -Wall -fPIC)
 add_definitions("-D_GLIBCXX_USE_CXX11_ABI=0")

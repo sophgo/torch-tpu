@@ -119,3 +119,52 @@ TORCH-TPU会从安装的Pytorch包导入头文件和库文件，请确保Pytorch
    $ pushd python/test
    $ python bmm.py
    $ popd
+
+.. _crosscompile :
+
+SE7交叉编译
+--------------------
+
+SE7交叉编译是指在x86主机上编译出SE7平台上可安装执行的wheel包。SE7平台是一款基于BM1684X芯片的AI加速边缘设备，其架构为arm不同，因此需要在x86上交叉编译。  
+
+SE7环境为python3.8，因此需要在x86 docker上安装python3.8。
+
+首先安装python3.8，并创建python3.8的虚拟环境，这里命名为 `crossp`, 可以通过如下指令完成:
+
+.. code-block:: shell
+
+   $ apt update
+   $ apt install software-properties-common -y
+   $ add-apt-repository ppa:deadsnakes/ppa
+   $ apt update
+   $ apt install python3.8 -y
+   $ apt install python3.8-dev -y
+   $ apt install python3.8-venv -y
+   $ python3.8 -m venv crossp
+
+使用 `PCIE模式` , 
+
+.. code-block:: shell
+
+   $ cd tpu-train
+   $ source scripts/envsetup.sh bm1684x stable
+
+下载并检查必要的文件, 
+
+.. code-block:: shell
+
+   $ soc_build_env_prepare
+
+随后开启python3.8的虚拟环境，
+
+.. code-block:: shell
+
+   $ source crossp/bin/activate
+
+编译SE7的wheel包，
+
+.. code-block:: shell
+
+   $ soc_build
+
+编译完后可以在 `dist` 目录下找到编译好的wheel包。 

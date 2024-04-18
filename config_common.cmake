@@ -1,12 +1,9 @@
 #########################################################
 # General configuration
 #########################################################
-option(USING_CMODEL "option for using cmodel" OFF)
-option(PCIE_MODE "option for pcie mode" ON)
-option(SOC_MODE "run on soc platform" OFF)
-option(USING_PERF_MODE "Using performance mode" OFF)
-option(BACKEND_1684X   "Opt for 1684x"                                   OFF)
-option(BACKEND_SG2260    "Opt for 2260"                                    OFF)
+option(USING_PERF_MODE       "Using performance mode"                          OFF)
+option(BACKEND_1684X         "Opt for 1684x"                                   OFF)
+option(BACKEND_SG2260        "Opt for 2260"                                    OFF)
 
 option(USING_CMODEL          "option for using cmodel"                         OFF)
 option(PCIE_MODE             "option for pcie mode"                            OFF)
@@ -45,6 +42,10 @@ elseif($ENV{MODE_PATTERN} STREQUAL "stable")
   set(SOC_MODE            0)
 endif()
 
+######################################
+## HEADER/LIB PATH
+######################################
+set(SOC_CROSS_MODE $ENV{SOC_CROSS_MODE})
 if(USING_CMODEL)
   set(TPUv7_RUNTIME_PATH    ${CMAKE_CURRENT_SOURCE_DIR}/third_party/tpuv7_runtime/tpuv7-emulator_0.1.0)
   set(LIBSOPHON_PATH        ${CMAKE_CURRENT_SOURCE_DIR}/third_party/bmlib)
@@ -52,7 +53,12 @@ if(USING_CMODEL)
   message(STATUS "MODE : CMODEL" )
 elseif(PCIE_MODE)
   set(TPUv7_RUNTIME_PATH    ${CMAKE_CURRENT_SOURCE_DIR}/third_party/tpuv7_runtime/tpuv7_0.1.0)
-  set(LIBSOPHON_PATH        /opt/sophon/libsophon-current)
+  if(SOC_CROSS_MODE STREQUAL "ON")
+    set(LIBSOPHON_PATH        $ENV{CROSS_TOOLCHAINS}/libsophon_soc_0.5.0_aarch64/opt/sophon/libsophon-0.5.0/)
+    message(STATUS "SOC_CROSS_LIBSOPHON_PATH : ${LIBSOPHON_PATH}")
+  else()
+    set(LIBSOPHON_PATH        /opt/sophon/libsophon-current)
+  endif()
   add_definitions(-DPCIE_MODE)
   message(STATUS "MODE : PCIE" )
 elseif(SOC_MODE)

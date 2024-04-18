@@ -44,3 +44,12 @@ function new_clean()
   rm -rf dist
   popd
 }
+
+function soc_build()
+{
+  pushd ${TPUTRAIN_TOP}
+  export SOC_CROSS_MODE=ON
+  python setup.py build bdist_wheel --plat-name=aarch64
+  unset SOC_CROSS_MODE
+  popd
+}
