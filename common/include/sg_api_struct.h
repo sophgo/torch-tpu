@@ -1655,6 +1655,18 @@ typedef struct
 typedef struct
 {
   unsigned long long input_global_addr;
+  unsigned long long output_global_addr;
+  unsigned long long index_global_addr;
+  unsigned long long num_global_addr;
+  unsigned long long num_buffer_global_addr;
+  int shape[FW_MAX_SHAPE_DIMS];
+  int dim;
+  int dtype;
+} WITH_PLATFORM(sg_api_nonzero_multi_core_t);
+
+typedef struct
+{
+  unsigned long long input_global_addr;
   unsigned long long buffer_global_addr;
   unsigned long long output_global_addr;
   int shape[FW_MAX_SHAPE_DIMS];

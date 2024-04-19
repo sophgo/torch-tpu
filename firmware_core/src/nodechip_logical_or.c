@@ -34,6 +34,7 @@ void nodechip_logical_or(global_addr_t output_global_addr,
       npu_num);
   unsigned long long slice =
       MIN(length, (unsigned long long)npu_num * tensor_w);
+  slice = MIN(slice, 16384);
 
   unsigned long long cur_idx[3] = {0}, cur_len[3] = {0};
   int stage_idx = 0, draning_idx = 0;
@@ -67,20 +68,26 @@ void nodechip_logical_or(global_addr_t output_global_addr,
     // compute
     if (stage_idx > 0 && draning_idx < 2) {
       dim4 cur_shape = {1, DIV_UP(cur_len[1], tensor_w), 1, tensor_w};
-
+      scalar_t scalar_one = tpu_is_data_type_int(dtype) ? (scalar_t)1u : (scalar_t)1.0f;
       tpu_bdc_equal_C(input_local_addr0[(stage_idx - 1) & 0x1],
                       input_local_addr0[(stage_idx - 1) & 0x1], (scalar_t)0.0f,
-                      (scalar_t)1.0f, &cur_shape, NULL, NULL, dtype, dtype);
+                      scalar_one, &cur_shape, NULL, NULL, dtype, dtype);
       tpu_bdc_equal_C(input_local_addr1[(stage_idx - 1) & 0x1],
                       input_local_addr1[(stage_idx - 1) & 0x1], (scalar_t)0.0f,
-                      (scalar_t)1.0f, &cur_shape, NULL, NULL, dtype, dtype);
-      tpu_bdc_fp_mul(output_local_addr[(stage_idx - 1) & 0x1],
-                     input_local_addr0[(stage_idx - 1) & 0x1],
-                     input_local_addr1[(stage_idx - 1) & 0x1], &cur_shape, NULL,
-                     NULL, NULL, dtype);
+                      scalar_one, &cur_shape, NULL, NULL, dtype, dtype);
+      if (tpu_is_data_type_int(dtype))
+        tpu_bdc_int_mul(output_local_addr[(stage_idx - 1) & 0x1],
+                        input_local_addr0[(stage_idx - 1) & 0x1],
+                        input_local_addr1[(stage_idx - 1) & 0x1], &cur_shape, NULL,
+                        NULL, NULL, dtype, dtype, dtype, 0, RM_HALF_AWAY_FROM_ZERO, 1);
+      else
+        tpu_bdc_fp_mul(output_local_addr[(stage_idx - 1) & 0x1],
+                       input_local_addr0[(stage_idx - 1) & 0x1],
+                       input_local_addr1[(stage_idx - 1) & 0x1], &cur_shape, NULL,
+                       NULL, NULL, dtype);
       tpu_bdc_equal_C(output_local_addr[(stage_idx - 1) & 0x1],
                       output_local_addr[(stage_idx - 1) & 0x1], (scalar_t)0.0f,
-                      (scalar_t)1.0f, &cur_shape, NULL, NULL, dtype, dtype);
+                      scalar_one, &cur_shape, NULL, NULL, dtype, dtype);
     }
 
     tpu_parallel_end();
@@ -115,7 +122,7 @@ TPUKERNEL_FUNC_REGISTER(tpu_kernel_api_logical_or);
 void tpu_kernel_api_logical_or_multi_core(const void *args)
 {
   sg_api_logical_or_t * api = ( sg_api_logical_or_t * ) args;
-  TPUKERNEL_ASSERT(api->dtype == DT_FP32 || api->dtype == DT_FP16 || api->dtype == DT_BFP16);
+  // TPUKERNEL_ASSERT(api->dtype == DT_FP32 || api->dtype == DT_FP16 || api->dtype == DT_BFP16);
   int length = 1;
   for ( int i = 0; i < api->dim; ++i )
   {

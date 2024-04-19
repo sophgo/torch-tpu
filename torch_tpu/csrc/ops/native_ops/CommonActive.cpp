@@ -63,6 +63,12 @@ namespace at {
     return OP##_out_tpu(self, out);                                            \
   }
 
+#define IMP_ACTIVE_BOOL(OP)                                                         \
+  Tensor OP##_tpu(const Tensor &self) {                                        \
+    auto out = empty(self.sizes(), self.options().dtype(at::kBool));                            \
+    return OP##_out_tpu(self, out);                                            \
+  }
+
 #define IMP_ACTIVE_(OP)                                                        \
   Tensor &OP##__tpu(Tensor &self) { return OP##_out_tpu(self, self); }
 
@@ -167,9 +173,9 @@ TORCH_LIBRARY_IMPL(aten, TPU, m) {
 IMP_ACTIVE_OUT(isfinite, ACTIVE_IS_FINITE, tpu::ISFINITE)
 IMP_ACTIVE(isfinite)
 IMP_ACTIVE_OUT(isnan, ACTIVE_ISNAN, tpu::ISNAN)
-IMP_ACTIVE(isnan)
+IMP_ACTIVE_BOOL(isnan)
 IMP_ACTIVE_OUT(isinf, ACTIVE_ISINF, tpu::ISINF)
-IMP_ACTIVE(isinf)
+IMP_ACTIVE_BOOL(isinf)
 
 TORCH_LIBRARY_IMPL(aten, TPU, m) {
   m.impl("isfinite.out", isfinite_out_tpu);

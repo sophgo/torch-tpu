@@ -2100,7 +2100,8 @@ bm_status_t sgdnnActive(bm_handle_t handle, SgdnnTensor_t input,
    * BM1684X：ACTIVE_RELU、ACTIVE_ABSVAL、ACTIVE_ROUND、ACTIVE_CEIL、ACTIVE_FLOOR额外支持FLOAT16，其余同BM1684。
    *
    */
-  SGDNN_CHECK(input.dtype == output.dtype);
+  if (!(active_type == ACTIVE_ISINF || active_type == ACTIVE_ISNAN))
+    SGDNN_CHECK(input.dtype == output.dtype);
 
   SGDNN_CHECK(sgdnnIsSameShape(&input, &output));
   SGDNN_CHECK(sgdnnIsTensorContiguous(&input));
@@ -2285,9 +2286,9 @@ bm_status_t sgdnnLogicalOr ( bm_handle_t handle,
 {
   SGDNN_CHECK ( input.dtype == other.dtype );
   SGDNN_CHECK ( input.dtype == output.dtype );
-  SGDNN_CHECK ( input.dtype == SGDNN_DTYPE_FP32 ||
-                input.dtype == SGDNN_DTYPE_FP16 ||
-                input.dtype == SGDNN_DTYPE_BF16 );
+  // SGDNN_CHECK ( input.dtype == SGDNN_DTYPE_FP32 ||
+  //               input.dtype == SGDNN_DTYPE_FP16 ||
+  //               input.dtype == SGDNN_DTYPE_BF16 );
   SGDNN_CHECK ( sgdnnIsSameShape ( &input, &other ) );
   SGDNN_CHECK ( sgdnnIsSameShape ( &input, &output ) );
   SGDNN_CHECK ( sgdnnIsTensorContiguous ( &input ) );
@@ -6278,7 +6279,36 @@ bm_status_t sgdnnNonzero ( bm_handle_t handle,
 
   SAFE_CALL ( sgdnnTPUKernelLaunch ( handle, "tpu_kernel_api_nonzero", &api, sizeof ( api ) ) );
 #elif defined SGDNN_BACKEND_2260
-  SGDNN_CHECK ( false );
+  sg_api_nonzero_multi_core_t api;
+  api.input_global_addr = self.addr;
+  api.output_global_addr = out.addr;
+  api.num_global_addr = num.addr;
+  api.dim = self.dim;
+  int size = 1;
+  for ( int i = 0; i < self.dim; ++i )
+  {
+    api.shape[i] = self.shape[i];
+    size *= self.shape[i];
+  }
+  api.dtype = sgdnnTPUKernelDType ( self.dtype );
+  size *= sizeof(int);
+  bm_device_mem_t index_dev_mem;
+  bm_status_t status = bm_malloc_device_byte(handle, &index_dev_mem, size);
+  if(BM_SUCCESS != status){
+    printf("malloc device error \r\n");
+    return status;
+  }
+  api.index_global_addr = bm_mem_get_device_addr(index_dev_mem);
+
+  bm_device_mem_t num_buffer_dev_mem;
+  status = bm_malloc_device_byte(handle, &num_buffer_dev_mem, 8 * 64);; // buffer need align to 64 bytes
+  if(BM_SUCCESS != status){
+    printf("malloc device error \r\n");
+    return status;
+  }
+  api.num_buffer_global_addr = bm_mem_get_device_addr(num_buffer_dev_mem);
+
+  SAFE_CALL ( sgdnnTPUKernelLaunch ( handle, "tpu_kernel_api_nonzero_multicore", &api, sizeof ( api ) ) );
 #else
   SGDNN_CHECK ( false );
 #endif

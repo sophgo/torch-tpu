@@ -137,6 +137,9 @@ void nodechip_active_v2(global_addr_t in_global_addr,
 
   const unsigned int bank_bsize = tpu_local_mem_size_per_npu() / tpu_bank_num();
   int dtype_size = tpu_data_type_size(dtype);
+  data_type_t out_dtype = (active_type == ACTIVE_ISINF ||
+                     active_type == ACTIVE_ISNAN) ? DT_UINT8 : dtype;
+  int output_size = tpu_data_type_size(out_dtype);
   int tensor_num = 2 + 2; //  2 inputs, 2 outputs
 
   if (active_type == ACTIVE_ERFC) {
@@ -154,7 +157,12 @@ void nodechip_active_v2(global_addr_t in_global_addr,
     } else {
       tensor_num += 2 + 2; // extra 2 buffer, 2 coeff_buffer
     }
-
+  } else if (active_type == ACTIVE_ISNAN) {
+    // extra 3 buffers
+    tensor_num += 3;
+  } else if (active_type == ACTIVE_ISINF) {
+    // extra 1 buffer
+    tensor_num += 1;
   } else {
     // extra 1 buffer, 1 coeff_buffer (common active imp)
     tensor_num += 1 + 1;
@@ -217,11 +225,11 @@ void nodechip_active_v2(global_addr_t in_global_addr,
 
     // store output
     if (stage_idx > 1) {
-      tpu_gdma_matrix_L2S(out_global_addr + cur_idx[2] * dtype_size,
+      tpu_gdma_matrix_L2S(out_global_addr + cur_idx[2] * output_size,
                           out_local_addr[stage_idx & 0x1],
                           /**rows, cols, cols_per_channel, row_stride*/
                           cur_n_dim[2], cur_m_dim[2], w_dim, cur_m_dim[2],
-                          dtype);
+                          out_dtype);
     }
 
     // load input
@@ -351,6 +359,9 @@ TPUKERNEL_FUNC_REGISTER(tpu_kernel_api_active);
 void tpu_kernel_api_active_multi_core(const void *args) {
   sg_api_active_t *api = (sg_api_active_t *)args;
   data_type_t dtype = (data_type_t)api->dtype;
+  data_type_t out_dtype = (api->active_type == ACTIVE_ISINF ||
+                           api->active_type == ACTIVE_ISNAN) ? DT_UINT8 : dtype;
+  int output_size = tpu_data_type_size(out_dtype);
   TPUKERNEL_ASSERT(dtype == DT_FP32 || dtype == DT_FP16 || dtype == DT_BFP16);
   tpu_initialize();
   unsigned int slice_num = tpu_core_num();
@@ -373,7 +384,7 @@ void tpu_kernel_api_active_multi_core(const void *args) {
   const int dsize = tpu_data_type_size(dtype);
 
   nodechip_active_v2(api->input_global_addr + offset * dsize,
-                     api->output_global_addr + offset * dsize, real_slice,
+                     api->output_global_addr + offset * output_size, real_slice,
                      dtype, api->active_type, NULL);
   tpu_poll();
 }
