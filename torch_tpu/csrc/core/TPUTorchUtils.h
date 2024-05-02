@@ -441,6 +441,7 @@ private:
   OpTimer() {}
   unsigned long long elapsed_time_us_[OP_NUM];
   bool is_paused_ = false;
+  bool is_start_ = false;
   std::mutex mutex_;
   static OpTimer * instance_;
 };

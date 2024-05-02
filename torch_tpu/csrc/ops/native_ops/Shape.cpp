@@ -125,7 +125,7 @@ TORCH_LIBRARY_IMPL(aten, TPU, m) {
 Tensor expand_out_tpu(const Tensor &self, const IntArrayRef output_size)
 {
   CHECK_TENSOR_IN_DEVICE_NO_CONTIGUOUS(self);
-  TORCH_CHECK(self.dim() > 0 && self.dim() <= 4,
+  TORCH_CHECK(self.dim() <= 4,
               "The expand supports up to 4d tensors");
   TORCH_CHECK(
       static_cast<size_t>(self.dim()) <= output_size.size(),

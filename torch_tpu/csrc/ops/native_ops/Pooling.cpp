@@ -92,14 +92,15 @@ IntArrayRef dilation,
 bool ceil_mode,
 const Tensor & indices )
 {
-  CHECK_TENSOR_IN_DEVICE ( grad_output );
+  auto grad_output_ = grad_output.is_contiguous() ? grad_output : grad_output.contiguous();
+  CHECK_TENSOR_IN_DEVICE ( grad_output_ );
   CHECK_TENSOR_IN_DEVICE ( self );
   CHECK_TENSOR_IN_DEVICE ( indices );
   Tensor grad_input;
 #if 1
   CPU_IMPL_WARNING();
   TIMING_START;
-  auto grad_input_cpu = max_pool2d_with_indices_backward ( grad_output.to ( torch::kFloat32 ).cpu(), self.to ( torch::kFloat32 ).cpu(), kernel_size, stride, padding, dilation, ceil_mode, indices.cpu() );
+  auto grad_input_cpu = max_pool2d_with_indices_backward ( grad_output_.to ( torch::kFloat32 ).cpu(), self.to ( torch::kFloat32 ).cpu(), kernel_size, stride, padding, dilation, ceil_mode, indices.cpu() );
   grad_input = TENSOR_TO_TPU ( grad_input_cpu ).to ( self.dtype() );
   TIMING_END(tpu::CPU_LAYER);
 #else
@@ -176,7 +177,7 @@ const Tensor & indices )
   #endif
   TIMING_END(tpu::MAX_POOLING);
 #endif
-  SHOW_TENSOR_OP(grad_output, self, grad_input);
+  SHOW_TENSOR_OP(grad_output_, self, grad_input);
   return grad_input;
 }
 TORCH_LIBRARY_IMPL ( aten, TPU, m )

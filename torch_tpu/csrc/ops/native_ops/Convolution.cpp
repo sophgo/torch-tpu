@@ -19,6 +19,34 @@ static std::tuple<Tensor, bool> batchify ( const Tensor & input, const int64_t n
   return std::make_tuple ( is_batched ? input : input.unsqueeze ( 0 ), is_batched );
 }
 
+static bool check_output_shape_is_satified ( const Tensor & input, const Tensor & weight, IntArrayRef stride, IntArrayRef padding, IntArrayRef dilation, IntArrayRef output_padding, int64_t groups )
+{
+  // check dtype if f32 return true 
+  if ( input.scalar_type() == at::kFloat )
+  {
+    return true;
+  }
+  auto num_spatial_dims = weight.dim() - 2;
+  std::array<int64_t, 4> output_shape = {0, 0, 0, 0};
+  output_shape[0] = input.size(0);
+  output_shape[1] = weight.size(0);
+  // 计算 output shape
+  for (int64_t dim = 0; dim < num_spatial_dims; ++dim)
+  {
+      int64_t dim_size = (input.size(dim + 2) + 2 * padding[dim] - dilation[dim] * (weight.size(dim + 2) - 1) - 1) / stride[dim] + 1;
+      output_shape[dim + 2] = dim_size;
+  }
+  // if output kh*kw  >= 4*16*1024 then return false
+  // kh*kw need align to dtype size
+  auto dtype_size = input.element_size();
+  auto size = ((output_shape[0]-1)/64+1) * output_shape[2] * output_shape[3] * dtype_size;
+  if ( size > 4 * 16 * 1024 )
+  {
+    return false;
+  }
+  return true;
+}
+
 Tensor convolution_tpu (
 const Tensor & input_,
 const Tensor & weight,
@@ -130,6 +158,33 @@ std::array<bool, 3> output_mask )
   CHECK_TENSOR_IN_DEVICE ( grad_output_ );
   CHECK_TENSOR_IN_DEVICE ( input );
   CHECK_TENSOR_IN_DEVICE ( weight );
+  auto flag = check_output_shape_is_satified ( input, weight, stride, padding, dilation, output_padding, groups );
+  if ( flag == false )
+  {
+    CPU_IMPL_WARNING();
+    TIMING_START;
+    auto input_dtype = input.scalar_type();
+    // change dtype into f32
+    auto outputs_cpu = torch::convolution_backward (
+                       grad_output.cpu().to ( at::kFloat ),
+                       input.cpu().to ( at::kFloat ),
+                       weight.cpu().to ( at::kFloat ),
+                       at::OptionalIntArrayRef ( { weight.size ( 0 ) } ),
+                       stride,
+                       padding,
+                       dilation,
+                       transposed,
+                       output_padding,
+                       groups,
+                       output_mask );
+    TIMING_END ( tpu::CONVOLUTION_BACKWARD );
+    Tensor grad_input, grad_weight, grad_bias;
+    grad_input  = output_mask[0] ? TENSOR_TO_TPU ( std::get<0> ( outputs_cpu ).to ( input_dtype ) ) : Tensor();
+    grad_weight = output_mask[1] ? TENSOR_TO_TPU ( std::get<1> ( outputs_cpu ).to ( input_dtype ) ) : Tensor();
+    grad_bias   = output_mask[2] ? TENSOR_TO_TPU ( std::get<2> ( outputs_cpu ).to ( input_dtype ) ) : Tensor();
+    SHOW_TENSOR_OP(grad_output_, input, weight, grad_input, grad_weight, grad_bias);
+    return std::tuple<Tensor, Tensor, Tensor> ( grad_input, grad_weight, grad_bias);
+  }
 #if 0
   auto outputs_cpu =  torch::convolution_backward (
                       grad_output.cpu(),

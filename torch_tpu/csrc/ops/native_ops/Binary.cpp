@@ -63,16 +63,17 @@ Tensor &binary_op_tpu(const Tensor &self, const Tensor &other,
 
   if (tpu::TPUIsSameShape(self, other)) {
     TIMING_START;
+    auto other_ = other.dtype() == self.dtype() ? other : other.to(self.dtype());
     #if defined BACKEND_1684X
     auto status = sgdnnBinary(
         tpu::TPUGetDeviceHandle(), tpu::TPUGenerateSgdnnTensor(self),
-        tpu::TPUGenerateSgdnnTensor(other), alpha.toDouble(),
+        tpu::TPUGenerateSgdnnTensor(other_), alpha.toDouble(),
         tpu::TPUGenerateSgdnnTensor(out), binary_type);
     TORCH_CHECK(status == BM_SUCCESS);
     #elif defined BACKEND_SG2260
     auto status = sgdnnBinary(
         c10_tpu::getCurrentTPUStream(), tpu::TPUGenerateSgdnnTensor(self),
-        tpu::TPUGenerateSgdnnTensor(other), alpha.toDouble(),
+        tpu::TPUGenerateSgdnnTensor(other_), alpha.toDouble(),
         tpu::TPUGenerateSgdnnTensor(out), binary_type);
     TORCH_CHECK(status == tpuRtSuccess);
     #endif
@@ -100,9 +101,19 @@ Tensor &binary_op_tpu(const Tensor &self, const Tensor &other,
                   "(%d) at non-signleton dimension %d",
                   self_shape[i], other_shape[i], i)
     }
-
+    SgdnnTensor_t other_t;
+    if (self.dtype() != other.dtype()) {
+        // 创建一个新的 Tensor 对象，使用 self 的数据类型和 other 的大小和设备选项
+        at::Tensor other_new = at::empty_like(other, self.options());
+        other_new.copy_(other);
+        // 使用新的 Tensor 对象进行操作，而不修改原始的 const Tensor &
+        other_t = tpu::TPUGenerateSgdnnTensor(other_new);
+    }
+    else {
+        other_t = tpu::TPUGenerateSgdnnTensor(other);
+    }
     SgdnnTensor_t self_t = tpu::TPUGenerateSgdnnTensor(self);
-    SgdnnTensor_t other_t = tpu::TPUGenerateSgdnnTensor(other);
+    // SgdnnTensor_t other_t = tpu::TPUGenerateSgdnnTensor(other);
     SgdnnTensor_t out_t = tpu::TPUGenerateSgdnnTensor(out);
 
     if (self_dim != other_dim) {
@@ -462,22 +473,26 @@ Tensor &bitwise_and_out_tpu(const Tensor &self, const Tensor &other,
   } else {
     if (tpu::TPUIsSameShape(self, other)) {
       TIMING_START;
+      auto self_ = other.dtype() == self.dtype() ? self : self.to(other.dtype());
+      out  = out.dtype()   == other.dtype()? out : out.to(other.dtype());
       #if defined BACKEND_1684X
       auto status = sgdnnElementBitwise(
-          tpu::TPUGetDeviceHandle(), tpu::TPUGenerateSgdnnTensor(self),
+          tpu::TPUGetDeviceHandle(), tpu::TPUGenerateSgdnnTensor(self_),
           tpu::TPUGenerateSgdnnTensor(other),
           1, // 0 for xor, 1 for and, 2 for or
           tpu::TPUGenerateSgdnnTensor(out));
       TORCH_CHECK(status == BM_SUCCESS);
       #elif defined BACKEND_SG2260
       auto status = sgdnnElementBitwise(
-          c10_tpu::getCurrentTPUStream(), tpu::TPUGenerateSgdnnTensor(self),
+          c10_tpu::getCurrentTPUStream(), tpu::TPUGenerateSgdnnTensor(self_),
           tpu::TPUGenerateSgdnnTensor(other),
           1, // 0 for xor, 1 for and, 2 for or
           tpu::TPUGenerateSgdnnTensor(out));
       TORCH_CHECK(status == tpuRtSuccess);
       #endif
       TIMING_END(tpu::BITWISE_AND);
+      SHOW_TENSOR_OP(self, other, out);
+      return out;
     } else {
       TIMING_START;
       #if defined BACKEND_1684X
@@ -2227,15 +2242,16 @@ TORCH_LIBRARY_IMPL(aten, TPU, m) {
 
 Tensor &greater_scalar_out_tpu(const Tensor &self, const Scalar &other,
                                Tensor &out) {
+  auto self_ = self.is_contiguous() ? self : self.contiguous();
   if (self.dim() > 0) {
-    CHECK_TENSOR_IN_DEVICE(self);
+    CHECK_TENSOR_IN_DEVICE(self_);
   }
   CHECK_TENSOR_IN_DEVICE(out);
 
-  if (self.dim() == 0) {
+  if (self_.dim() == 0) {
     CPU_IMPL_WARNING();
     TIMING_START;
-    auto out_cpu = gt(self.cpu(), other);
+    auto out_cpu = gt(self_.cpu(), other);
     tpu::TPUCopyHostToDevice(out.data_ptr(), out_cpu.contiguous().data_ptr(),
                              out.nbytes());
     TIMING_END(tpu::CPU_LAYER);
@@ -2245,7 +2261,7 @@ Tensor &greater_scalar_out_tpu(const Tensor &self, const Scalar &other,
     // mode : 0 equal, 1 not equal, 2 greater, 3 greater or equal, 4 less than,
     // 5 less than or equal pos : 0 for self is scalar, 1 for other is scalar
     auto status = sgdnnComparisionC(
-        tpu::TPUGetDeviceHandle(), tpu::TPUGenerateSgdnnTensor(self),
+        tpu::TPUGetDeviceHandle(), tpu::TPUGenerateSgdnnTensor(self_),
         other.toFloat(), 2, 1, tpu::TPUGenerateSgdnnTensor(out));
     TORCH_CHECK(status == BM_SUCCESS);
     #elif defined BACKEND_SG2260
@@ -2256,7 +2272,7 @@ Tensor &greater_scalar_out_tpu(const Tensor &self, const Scalar &other,
     #endif
     TIMING_END(tpu::GREATER_C);
   }
-  SHOW_TENSOR_OP(self, out);
+  SHOW_TENSOR_OP(self_, out);
   return out;
 }
 TORCH_LIBRARY_IMPL(aten, TPU, m) {
