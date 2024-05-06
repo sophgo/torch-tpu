@@ -3,27 +3,12 @@ cmake_minimum_required(VERSION 3.18 FATAL_ERROR)
 project(TORCH_TPU CXX)
 
 include(${CMAKE_CURRENT_SOURCE_DIR}/config.cmake)
-add_compile_options(-std=c++17 -Wno-attributes)
+add_compile_options(-std=c++17 -Wno-attributes -Wall -fPIC)
 add_definitions("-D_GLIBCXX_USE_CXX11_ABI=0")
 
-## libsophon
-if($ENV{LIBSOPHON_PATTERN} MATCHES $ENV{LIBSOPHON_STABLE})
-  include_directories(/opt/sophon/libsophon-current/include)
-  link_directories(/opt/sophon/libsophon-current/lib)
-elseif($ENV{LIBSOPHON_PATTERN} MATCHES $ENV{LIBSOPHON_LATEST})
-  include_directories($ENV{LIBSOPHON_TOP}/bmlib/include)
-  if(NOT EXISTS "$ENV{LIBSOPHON_TOP}/build/bmlib/libbmlib.so")
-    message(WARNING 
-          " NOT FOUND $ENV{LIBSOPHON_TOP}/build/bmlib/libbmlib.so,
-            USE LOCAL BMLIB, Please Make Sure you want to build CModel Version")
-    link_directories(${PROJECT_ROOT}/third_party/$ENV{CHIP_ARCH})
-  else()
-    link_directories($ENV{LIBSOPHON_TOP}/build/bmlib)
-  endif()
-elseif($ENV{LIBSOPHON_PATTERN} MATCHES $ENV{LIBSOPHON_LOCAL})
-  include_directories($ENV{LIBSOPHON_TOP}/include)
-  link_directories($ENV{LIBSOPHON_TOP}/$ENV{CHIP_ARCH})
-endif()
+## runtime
+include_directories(${RUNTIME_INCLUDE_PATH})
+link_directories(${RUNTIME_LIB_PATH})
 
 ## pytorch
 if (DEFINED PYTORCH_INSTALL_DIR)
@@ -62,19 +47,21 @@ if(JIT_TRAIN_ENABLE)
   )
 else()
   file(GLOB_RECURSE SRCS
-    csrc/core/TPUGuardImpl.cpp
-    csrc/core/TPUAllocator.cpp
-    csrc/core/TPUDeviceManager.cpp
-    csrc/core/TPUTorchUtils.cpp
-    csrc/core/TPUCtypeApi.cpp
-    csrc/core/Daemon.cpp
+    csrc/core/*.cpp
+    csrc/core/Interface/*.cpp
     csrc/ops/native_ops/*.cpp
     csrc/ops/my_ops/*.cpp
     csrc/ops/autocast_ops/*.cpp
   )
 endif()
 
-if (DEFINED PYTHON_INCLUDE_DIR)
+if (BUILD_LIBTORCH)
+  message(STATUS "PYTHON API DISABLE, ONLY C INTERFACE")
+  file(GLOB_RECURSE CSRC_SRCS 
+    csrc/libtorch/*.cpp
+  )
+  LIST(APPEND SRCS ${CSRC_SRCS})
+else()
   include_directories(${PYTHON_INCLUDE_DIR})
   message(STATUS "PYTHON API ENABLE")
   file(GLOB_RECURSE CSRC_SRCS 
@@ -87,8 +74,15 @@ endif()
 
 add_library(torch_tpu SHARED ${SRCS})
 target_link_libraries(torch_tpu c10 torch_cpu)
-target_link_libraries(torch_tpu sgdnn bmlib)
 
+if(BACKEND_1684X)
+  target_link_libraries(torch_tpu sgdnn bmlib)
+elseif(BACKEND_SG2260)
+  target_link_libraries(torch_tpu sgdnn tpuv7_rt )
+  if (USING_CMODEL)
+    target_link_libraries(torch_tpu cdm_daemon_emulator pthread)
+  endif()
+endif()
 # Test
 #add_executable(test_conv2d test/conv2d.cpp)
 #target_link_libraries(test_conv2d torch_tpu)

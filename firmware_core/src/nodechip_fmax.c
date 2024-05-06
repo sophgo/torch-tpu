@@ -1,7 +1,7 @@
 #include "kernel_utils_func.h"
 #include "sg_api_struct.h"
 #include "tpu_kernel.h"
-#include "config.h"
+
 
 static void replaceWithNotNan(local_addr_t output_local_addr,
                               local_addr_t input_local_addr,
@@ -114,7 +114,7 @@ void tpu_kernel_api_fmaxc(const void *args) {
 }
 TPUKERNEL_FUNC_REGISTER(tpu_kernel_api_fmaxc);
 
-#ifdef FIRMWARE_BACKEND_2260
+#ifdef BACKEND_SG2260
 void tpu_kernel_api_fmaxc_multi_core(const void *args) {
   sg_api_fmaxc_t *api = (sg_api_fmaxc_t *)args;
   TPUKERNEL_ASSERT(api->dtype == DT_FP32 || api->dtype == DT_FP16 ||
@@ -255,7 +255,7 @@ void tpu_kernel_api_fmax(const void *args) {
 }
 TPUKERNEL_FUNC_REGISTER(tpu_kernel_api_fmax);
 
-#ifdef FIRMWARE_BACKEND_2260
+#ifdef BACKEND_SG2260
 void tpu_kernel_api_fmax_multi_core(const void *args) {
   sg_api_fmax_t *api = (sg_api_fmax_t *)args;
   TPUKERNEL_ASSERT(api->dtype == DT_FP32 || api->dtype == DT_FP16 ||
@@ -509,7 +509,7 @@ void tpu_kernel_api_fmax_bcast(const void *args) {
 }
 TPUKERNEL_FUNC_REGISTER(tpu_kernel_api_fmax_bcast);
 
-#ifdef FIRMWARE_BACKEND_2260
+#ifdef BACKEND_SG2260
 void tpu_kernel_api_fmax_bcast_multi_core(const void *args) {
   sg_api_fmax_bcast_t *api = (sg_api_fmax_bcast_t *)args;
   TPUKERNEL_ASSERT(api->output_dim > 0 && api->output_dim <= 4);

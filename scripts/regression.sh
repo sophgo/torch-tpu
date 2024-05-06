@@ -151,11 +151,12 @@ function run_online_regression_test() {
   else
     if [ $LIBSOPHON_LINK_PATTERN = 'stable' ];then
       echo "[INFO]test_CHIP_ARCH:$test_CHIP_ARCH"
-      build_kernel_module_real $test_CHIP_ARCH
+      source  $CURRENT_DIR/envsetup.sh $test_CHIP_ARCH $LIBSOPHON_LINK_PATTERN
+      new_clean;new_build
     elif [ $LIBSOPHON_LINK_PATTERN = 'local' ];then
       echo "************** $LIBSOPHON_LINK_PATTERN-LIBSOPHON IS REAEDY *********"
       source  $CURRENT_DIR/envsetup.sh $test_CHIP_ARCH $LIBSOPHON_LINK_PATTERN
-      new_clean; new_build
+      new_clean;new_build
       TPU_TRAIN_CMODEL_PATH=$CURRENT_DIR/../build/Release/firmware_core/libcmodel.so
       echo "[INFO]tpu_train_cmodel_path:$TPU_TRAIN_CMODEL_PATH"
       set_cmodel_firmware $TPU_TRAIN_CMODEL_PATH

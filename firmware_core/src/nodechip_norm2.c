@@ -1,6 +1,6 @@
 #include "sg_api_struct.h"
 #include "tpu_kernel.h"
-#include "config.h"
+
 
 void nodechip_norm2 (
 global_addr_t input_global_addr,
@@ -272,7 +272,7 @@ void tpu_kernel_api_norm2 ( const void * args )
 }
 TPUKERNEL_FUNC_REGISTER ( tpu_kernel_api_norm2 );
 
-#ifdef FIRMWARE_BACKEND_2260
+#ifdef BACKEND_SG2260
 void tpu_kernel_api_norm2_multi_core ( const void * args )
 {
   sg_api_norm2_multi_core_t * api = ( sg_api_norm2_multi_core_t * ) args;

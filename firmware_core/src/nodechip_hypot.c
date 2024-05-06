@@ -1,6 +1,6 @@
 #include "sg_api_struct.h"
 #include "tpu_kernel.h"
-#include "config.h"
+
 
 /*
  * output = sqrt(pow(input, 2) + pow(other, 2))

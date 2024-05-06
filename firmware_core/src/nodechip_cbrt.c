@@ -1,6 +1,6 @@
 #include "sg_api_struct.h"
 #include "tpu_kernel.h"
-#include "config.h"
+
 
 /*
  * output = pow(input, 1/3)
@@ -106,7 +106,7 @@ void tpu_kernel_api_cbrt(const void * args) {
 }
 TPUKERNEL_FUNC_REGISTER(tpu_kernel_api_cbrt);
 
-#ifdef FIRMWARE_BACKEND_2260
+#ifdef BACKEND_SG2260
 void tpu_kernel_api_cbrt_multi_core(const void *args) {
     sg_api_cbrt_t *api = (sg_api_cbrt_t*)args;
     

@@ -1,8 +1,8 @@
 #include <ATen/EmptyTensor.h>
 #include <ATen/core/TensorBase.h>
-#include <TPUDeviceManager.h>
-#include <TPUTorchUtils.h>
-#include <sgdnn_api.h>
+
+#include "TPUTorchUtils.h"
+
 #include <torch/library.h>
 #include <torch/torch.h>
 
@@ -51,11 +51,19 @@ Tensor &argmax_out_tpu(const Tensor &self, c10::optional<int64_t> dim,
   TensorOptions options = TensorOptions ( self.device() ).dtype ( self.dtype() );
   Tensor values = empty({out.sizes()}, options);
   TIMING_START;
-  bm_status_t status = sgdnnArg(
+  #if defined BACKEND_1684X
+  auto status = sgdnnArg(
       tpu::TPUGetDeviceHandle(), tpu::TPUGenerateSgdnnTensor(self),
       dim.has_value() ? dim.value() : self.dim(), ARGMAX_MODE,
       tpu::TPUGenerateSgdnnTensor(values), tpu::TPUGenerateSgdnnTensor(out));
   TORCH_CHECK(status == BM_SUCCESS);
+  #elif defined BACKEND_SG2260
+  auto status = sgdnnArg(
+      c10_tpu::getCurrentTPUStream(), tpu::TPUGenerateSgdnnTensor(self),
+      dim.has_value() ? dim.value() : self.dim(), ARGMAX_MODE,
+      tpu::TPUGenerateSgdnnTensor(values), tpu::TPUGenerateSgdnnTensor(out));
+  TORCH_CHECK(status == tpuRtSuccess);
+  #endif
   TIMING_END(tpu::ARGMAX);
 #endif
   SHOW_TENSOR_OP(self, out);
@@ -90,11 +98,19 @@ Tensor &argmin_out_tpu(const Tensor &self, c10::optional<int64_t> dim,
   TensorOptions options = TensorOptions ( self.device() ).dtype ( self.dtype() );
   Tensor values = empty({out.sizes()}, options);
   TIMING_START;
-  bm_status_t status = sgdnnArg(
+  #if defined BACKEND_1684X
+  auto status = sgdnnArg(
       tpu::TPUGetDeviceHandle(), tpu::TPUGenerateSgdnnTensor(self),
       dim.has_value() ? dim.value() : self.dim(), ARGMIN_MODE,
       tpu::TPUGenerateSgdnnTensor(values), tpu::TPUGenerateSgdnnTensor(out));
   TORCH_CHECK(status == BM_SUCCESS);
+  #elif defined BACKEND_SG2260
+  auto status = sgdnnArg(
+      c10_tpu::getCurrentTPUStream(), tpu::TPUGenerateSgdnnTensor(self),
+      dim.has_value() ? dim.value() : self.dim(), ARGMIN_MODE,
+      tpu::TPUGenerateSgdnnTensor(values), tpu::TPUGenerateSgdnnTensor(out));
+  TORCH_CHECK(status == tpuRtSuccess);
+  #endif
   TIMING_END(tpu::ARGMIN);
 #endif
   return out;
@@ -130,11 +146,19 @@ std::tuple<Tensor &, Tensor &> max_dim_max_out_tpu(const Tensor &self,
   }
   TORCH_CHECK(dim >= 0 || dim < self.dim());
   TIMING_START;
-  bm_status_t status =
+  #if defined BACKEND_1684X
+  auto status =
       sgdnnArg(tpu::TPUGetDeviceHandle(), tpu::TPUGenerateSgdnnTensor(self),
                dim, MAX_DIM_MODE, tpu::TPUGenerateSgdnnTensor(values),
                tpu::TPUGenerateSgdnnTensor(indices));
   TORCH_CHECK(status == BM_SUCCESS);
+  #elif defined BACKEND_SG2260
+  auto status =
+      sgdnnArg(c10_tpu::getCurrentTPUStream(), tpu::TPUGenerateSgdnnTensor(self),
+               dim, MAX_DIM_MODE, tpu::TPUGenerateSgdnnTensor(values),
+               tpu::TPUGenerateSgdnnTensor(indices));
+  TORCH_CHECK(status == tpuRtSuccess);
+  #endif
   TIMING_END(tpu::MAX_DIM);
 #endif
   return {values, indices};
@@ -170,11 +194,19 @@ std::tuple<Tensor &, Tensor &> min_dim_min_out_tpu(const Tensor &self,
   }
   TORCH_CHECK(dim >= 0 || dim < self.dim());
   TIMING_START;
-  bm_status_t status =
+  #if defined BACKEND_1684X
+  auto status =
       sgdnnArg(tpu::TPUGetDeviceHandle(), tpu::TPUGenerateSgdnnTensor(self),
                dim, MIN_DIM_MODE, tpu::TPUGenerateSgdnnTensor(values),
                tpu::TPUGenerateSgdnnTensor(indices));
   TORCH_CHECK(status == BM_SUCCESS);
+  #elif defined BACKEND_SG2260
+  auto status =
+      sgdnnArg(c10_tpu::getCurrentTPUStream(), tpu::TPUGenerateSgdnnTensor(self),
+               dim, MIN_DIM_MODE, tpu::TPUGenerateSgdnnTensor(values),
+               tpu::TPUGenerateSgdnnTensor(indices));
+  TORCH_CHECK(status == tpuRtSuccess);
+  #endif
   TIMING_END(tpu::MIN_DIM);
 #endif
   return {values, indices};

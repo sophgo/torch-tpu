@@ -99,7 +99,7 @@ TORCH-TPU会从安装的Pytorch包导入头文件和库文件，请确保Pytorch
 .. code-block:: shell
 
    $ cd tpu-train
-   $ source ./envsetup.sh bm1684x stable
+   $ source scripts/envsetup.sh bm1684x stable
    $ new_build
 
 如果使用`CMODEL模式`进行开发，
@@ -107,7 +107,7 @@ TORCH-TPU会从安装的Pytorch包导入头文件和库文件，请确保Pytorch
 .. code-block:: shell
 
    $ cd tpu-train
-   $ source ./envsetup.sh bm1684x local
+   $ source scripts/envsetup.sh bm1684x local
    $ new_build
    $ set_cmodel_firmware ./build/Release/firmware_core/libcmodel.so #path of libcmodel
 

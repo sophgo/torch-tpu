@@ -1,4 +1,3 @@
-#include "config.h"
 #include "sg_api_struct.h"
 #include "tpu_kernel.h"
 
@@ -112,9 +111,10 @@ void tpu_kernel_api_neg(const void *args) {
 }
 TPUKERNEL_FUNC_REGISTER(tpu_kernel_api_neg);
 
-#ifdef FIRMWARE_BACKEND_2260
-void tpu_kernel_api_neg_multi_core(const void *args) {
-  sg_api_neg_t *api = (sg_api_neg_t *)args;
+#ifdef BACKEND_SG2260
+void tpu_kernel_api_neg_multi_core ( const void * args )
+{
+  sg_api_neg_t * api = ( sg_api_neg_t * ) args;
 
   unsigned long long length = 1;
   for (int i = 0; i < api->dim; ++i) {

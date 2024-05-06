@@ -1,6 +1,6 @@
 #include "sg_api_struct.h"
 #include "tpu_kernel.h"
-#include "config.h"
+
 
 extern void nodechip_concat_nd (
 global_addr_t* input_global_addrs,
@@ -29,7 +29,7 @@ void tpu_kernel_api_concat ( const void * args )
 }
 TPUKERNEL_FUNC_REGISTER ( tpu_kernel_api_concat );
 
-#ifdef FIRMWARE_BACKEND_2260
+#ifdef BACKEND_SG2260
 static inline int count_numel(const int* shape, int beg_axis, int end_axis) {
   int count = 1;
   for (int i = beg_axis; i < end_axis; ++i)

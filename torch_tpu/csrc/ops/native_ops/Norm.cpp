@@ -3,9 +3,9 @@
 #include <ATen/core/TensorBase.h>
 #include <ATen/EmptyTensor.h>
 #include <ATen/native/ConvUtils.h>
-#include <TPUDeviceManager.h>
-#include <TPUTorchUtils.h>
-#include <sgdnn_api.h>
+
+#include "TPUTorchUtils.h"
+
 #include "common/config.h"
 
 namespace at
@@ -32,14 +32,23 @@ Tensor & norm_out_tpu ( const at::Tensor & self, const c10::optional<at::Scalar>
   else
   {
     TORCH_CHECK ( dim.size() == self.dim() || dim.size() == 0 ); // TODO: Support partial dims
-    for (int i = 0; i < dim.size(); i++) { TORCH_CHECK ( dim[i] == i ); }
+    for (int i = 0; i < (int)dim.size(); i++) { TORCH_CHECK ( dim[i] == i ); }
     TIMING_START;
-    bm_status_t status = sgdnnNorm2 (
+    #if defined BACKEND_1684X
+    auto status = sgdnnNorm2 (
                         tpu::TPUGetDeviceHandle(),
                         tpu::TPUGenerateSgdnnTensor ( self ),
                         keepdim,
                         tpu::TPUGenerateSgdnnTensor ( out ) );
     TORCH_CHECK ( status == BM_SUCCESS );
+    #elif defined BACKEND_SG2260
+    auto status = sgdnnNorm2 (
+                        c10_tpu::getCurrentTPUStream(),
+                        tpu::TPUGenerateSgdnnTensor ( self ),
+                        keepdim,
+                        tpu::TPUGenerateSgdnnTensor ( out ) );
+    TORCH_CHECK ( status == tpuRtSuccess );
+    #endif
     TIMING_END(tpu::NORM2);
   }
 #endif

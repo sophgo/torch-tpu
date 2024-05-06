@@ -1,6 +1,6 @@
 #include "sg_api_struct.h"
 #include "tpu_kernel.h"
-#include "config.h"
+
 
 inline static void pipeline_move(unsigned long long *array, int num)
 {
@@ -130,7 +130,7 @@ void tpu_kernel_api_shift_right_arithmetic ( const void * args )
 }
 TPUKERNEL_FUNC_REGISTER ( tpu_kernel_api_shift_right_arithmetic );
 
-#ifdef FIRMWARE_BACKEND_2260
+#ifdef BACKEND_SG2260
 void tpu_kernel_api_shift_right_arithmetic_multi_core(const void *args)
 {
   sg_api_shift_right_arithmetic_t * api = ( sg_api_shift_right_arithmetic_t * ) args;
@@ -272,7 +272,7 @@ void tpu_kernel_api_shift_right_arithmetic_c ( const void * args )
 }
 TPUKERNEL_FUNC_REGISTER ( tpu_kernel_api_shift_right_arithmetic_c );
 
-#ifdef FIRMWARE_BACKEND_2260
+#ifdef BACKEND_SG2260
 void tpu_kernel_api_shift_right_arithmetic_c_multi_core(const void *args)
 {
   sg_api_shift_right_arithmetic_c_t * api = ( sg_api_shift_right_arithmetic_c_t * ) args;

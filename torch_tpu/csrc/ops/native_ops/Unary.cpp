@@ -1,8 +1,8 @@
 #include <ATen/EmptyTensor.h>
 #include <ATen/core/TensorBase.h>
-#include <TPUDeviceManager.h>
-#include <TPUTorchUtils.h>
-#include <sgdnn_api.h>
+
+#include "TPUTorchUtils.h"
+
 #include <torch/library.h>
 #include <torch/torch.h>
 
@@ -24,10 +24,17 @@ Tensor &bitwise_not_out_tpu(const Tensor &self, Tensor &out) {
                              out.nbytes());
   } else if (IS_TPU_TENSOR(self)) {
     TIMING_START;
-    bm_status_t status = sgdnnBitwiseNot(tpu::TPUGetDeviceHandle(),
+    #if defined BACKEND_1684X
+    auto status = sgdnnBitwiseNot(tpu::TPUGetDeviceHandle(),
                                          tpu::TPUGenerateSgdnnTensor(self),
                                          tpu::TPUGenerateSgdnnTensor(out));
     TORCH_CHECK(status == BM_SUCCESS);
+    #elif defined BACKEND_SG2260
+    auto status = sgdnnBitwiseNot(c10_tpu::getCurrentTPUStream(),
+                                         tpu::TPUGenerateSgdnnTensor(self),
+                                         tpu::TPUGenerateSgdnnTensor(out));
+    TORCH_CHECK(status == tpuRtSuccess);
+    #endif
     TIMING_END(tpu::BITWISE_NOT);
   }
 #endif
@@ -58,10 +65,17 @@ Tensor &cbrt_out_tpu(const Tensor &self, Tensor &out) {
     tpu::TPUCopyHostToDevice(out.data_ptr(), &out_cpu, out.nbytes());
   } else if (IS_TPU_TENSOR(self)) {
     TIMING_START;
-    bm_status_t status =
+    #if defined BACKEND_1684X
+    auto status =
         sgdnnCbrt(tpu::TPUGetDeviceHandle(), tpu::TPUGenerateSgdnnTensor(self),
                   tpu::TPUGenerateSgdnnTensor(out));
     TORCH_CHECK(status == BM_SUCCESS);
+    #elif defined BACKEND_SG2260
+    auto status =
+        sgdnnCbrt(c10_tpu::getCurrentTPUStream(), tpu::TPUGenerateSgdnnTensor(self),
+                  tpu::TPUGenerateSgdnnTensor(out));
+    TORCH_CHECK(status == tpuRtSuccess);
+    #endif
     TIMING_END(tpu::CBRT);
   }
 #endif

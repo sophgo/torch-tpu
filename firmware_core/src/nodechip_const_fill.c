@@ -1,6 +1,6 @@
 #include "sg_api_struct.h"
 #include "tpu_kernel.h"
-#include "config.h"
+
 
 void nodechip_fill (
 global_addr_t out_global_addr,
@@ -42,7 +42,7 @@ void tpu_kernel_api_const_fill ( const void * args ) {
 }
 TPUKERNEL_FUNC_REGISTER ( tpu_kernel_api_const_fill );
 
-#ifdef FIRMWARE_BACKEND_2260
+#ifdef BACKEND_SG2260
 void nodechip_constant_fill_multi_core(
     global_addr_t out_global_addr,
     const int* shape,

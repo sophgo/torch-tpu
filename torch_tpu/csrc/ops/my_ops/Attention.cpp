@@ -2,9 +2,8 @@
 #include <torch/torch.h>
 #include <ATen/core/TensorBase.h>
 #include <ATen/EmptyTensor.h>
-#include <TPUDeviceManager.h>
-#include <TPUTorchUtils.h>
-#include <sgdnn_api.h>
+
+#include "TPUTorchUtils.h"
 
 #include "common/config.h"
 
@@ -38,8 +37,9 @@ namespace at
 		CHECK_TENSOR_IN_DEVICE(out);
 
 		TIMING_START;
-		bm_status_t status = sgdnnAttn(
-			tpu::TPUGetDeviceHandle(),
+#if defined BACKEND_SG2260
+		tpuRtStatus_t status = sgdnnAttn(
+			c10_tpu::getCurrentTPUStream(),
 			tpu::TPUGenerateSgdnnTensor(input),
 			tpu::TPUGenerateSgdnnTensor(w_attn),
 			tpu::TPUGenerateSgdnnTensor(w_proj),
@@ -51,7 +51,10 @@ namespace at
 			tpu::TPUGenerateSgdnnTensor(softmax_out),
 			tpu::TPUGenerateSgdnnTensor(soft_v),
 			tpu::TPUGenerateSgdnnTensor(out));
-		TORCH_CHECK(status == BM_SUCCESS);
+		TORCH_CHECK(status == tpuRtSuccess);
+#elif defined BACKEND_1684X
+		TORCH_CHECK(false);
+#endif
 		TIMING_END(tpu::ATTN_FORWARD);
 		return out;
 	}
@@ -92,8 +95,9 @@ namespace at
 			CHECK_TENSOR_IN_DEVICE(grad_b_proj.value());
 
 		TIMING_START;
-		bm_status_t status = sgdnnAttnBackward(
-			tpu::TPUGetDeviceHandle(),
+#if defined BACKEND_SG2260
+		tpuRtStatus_t status = sgdnnAttnBackward(
+			c10_tpu::getCurrentTPUStream(),
 			tpu::TPUGenerateSgdnnTensor(grad_output),
 			tpu::TPUGenerateSgdnnTensor(input),
 			tpu::TPUGenerateSgdnnTensor(w_attn),
@@ -109,7 +113,10 @@ namespace at
 			tpu::TPUGenerateSgdnnTensor(grad_w_proj),
 			grad_b_attn.has_value() ? tpu::TPUGenerateSgdnnTensor(grad_b_attn.value()) : sgdnnUndefinedTensor(),
 			grad_b_proj.has_value() ? tpu::TPUGenerateSgdnnTensor(grad_b_proj.value()) : sgdnnUndefinedTensor());
-		TORCH_CHECK(status == BM_SUCCESS);
+		TORCH_CHECK(status == tpuRtSuccess);
+#elif defined BACKEND_1684X
+		TORCH_CHECK(false);
+#endif
 		TIMING_END(tpu::ATTN_BACKWARD);
 		return std::tuple<Tensor, Tensor, Tensor, c10::optional<Tensor>, c10::optional<Tensor>>(grad_input, grad_w_attn, grad_w_proj, grad_b_attn, grad_b_proj);
 	}

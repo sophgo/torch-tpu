@@ -1,10 +1,9 @@
 #include "common/config.h"
 #include <ATen/EmptyTensor.h>
 #include <ATen/core/TensorBase.h>
-#include <ATen/native/ConvUtils.h>
-#include <TPUDeviceManager.h>
-#include <TPUTorchUtils.h>
-#include <sgdnn_api.h>
+
+#include "TPUTorchUtils.h"
+
 #include <torch/library.h>
 #include <torch/torch.h>
 
@@ -30,14 +29,20 @@ Tensor &fill__Scalar_tpu(Tensor &self, const Scalar &value) {
     TORCH_CHECK(false);
   }
   TIMING_START;
-  bm_status_t status = sgdnnFill(tpu::TPUGetDeviceHandle(), &value_,
+  #if defined BACKEND_1684X
+  auto status = sgdnnFill(tpu::TPUGetDeviceHandle(), &value_,
                                  tpu::TPUGenerateSgdnnTensor(self_));
   TORCH_CHECK(status == BM_SUCCESS);
+  #elif defined BACKEND_SG2260
+  auto status = sgdnnFill(c10_tpu::getCurrentTPUStream(), &value_,
+                                 tpu::TPUGenerateSgdnnTensor(self_));
+  TORCH_CHECK(status == tpuRtSuccess);
+  #endif
   TIMING_END(tpu::CONST_FILL);
   // unsqueeze may cause different address between self_ and self:
   if (self.data_ptr() != self_.data_ptr()) {
     tpu::TPUCopyDeviceToDevice(self.data_ptr(), self_.data_ptr(),
-                               self.nbytes());
+                               self.nbytes(), true);
   }
 #endif
   SHOW_TENSOR_OP(self);
@@ -75,12 +80,21 @@ Tensor &masked_fill_Scalar_tpu(Tensor &self, const Tensor &mask,
   Tensor maski = mask.clone().to(self.dtype());
   Tensor &mask_int = maski;
   TIMING_START;
-  bm_status_t status = sgdnnMaskedFill ( tpu::TPUGetDeviceHandle(),
+  #if defined BACKEND_1684X
+  auto status = sgdnnMaskedFill ( tpu::TPUGetDeviceHandle(),
                                          tpu:: TPUGenerateSgdnnTensor ( self ),
                                          tpu:: TPUGenerateSgdnnTensor ( mask_int ),
                                          value.toDouble(),
                                          tpu:: TPUGenerateSgdnnTensor(out) );
   TORCH_CHECK( status == BM_SUCCESS );
+  #elif defined BACKEND_SG2260
+  auto status = sgdnnMaskedFill ( c10_tpu::getCurrentTPUStream(),
+                                         tpu:: TPUGenerateSgdnnTensor ( self ),
+                                         tpu:: TPUGenerateSgdnnTensor ( mask_int ),
+                                         value.toDouble(),
+                                         tpu:: TPUGenerateSgdnnTensor(out) );
+  TORCH_CHECK( status == tpuRtSuccess );
+  #endif
   TIMING_END(tpu::MASKED_FILL);
   self = out.clone();
 #endif

@@ -1,4 +1,4 @@
-#include "config.h"
+
 #include "sg_api_struct.h"
 #include "tpu_kernel.h"
 
@@ -116,7 +116,7 @@ void nodechip_binary_div(global_addr_t input_global_addr,
     buffer_size = 2 * BANK_SIZE;
     buffer_num = 3;
     save_dtype = dtype;
-    // #ifdef FIRMWARE_BACKEND_2260
+    // #ifdef BACKEND_SG2260
     //     input_size = 2 * BANK_SIZE;
     //     output_size = 2 * BANK_SIZE;
     //     buffer_size = 0;
@@ -209,7 +209,7 @@ void nodechip_binary_div(global_addr_t input_global_addr,
                        other_local_addr[(stage_idx - 1) & 0x1], &cur_shape,
                        NULL, NULL, NULL, DT_FP32);
       } else if (dtype == DT_FP16 || dtype == DT_BFP16) {
-        // #ifdef FIRMWARE_BACKEND_1684X
+        // #ifdef BACKEND_1684X
         tpu_bdc_cast(buffer_fp32_local_addr[0],
                      input_local_addr[(stage_idx - 1) & 0x1], &cur_shape, NULL,
                      NULL, DT_FP32, dtype, RM_HALF_TO_EVEN);
@@ -223,7 +223,7 @@ void nodechip_binary_div(global_addr_t input_global_addr,
                      buffer_fp32_local_addr[2], &cur_shape, NULL, NULL, dtype,
                      DT_FP32, RM_HALF_TO_EVEN);
         // #endif
-        // #ifdef FIRMWARE_BACKEND_2260
+        // #ifdef BACKEND_SG2260
         //         tpu_bdc_fp_div(output_local_addr[(stage_idx - 1) & 0x1],
         //                        input_local_addr[(stage_idx - 1) & 0x1],
         //                        other_local_addr[(stage_idx - 1) & 0x1],
@@ -454,7 +454,7 @@ void tpu_kernel_api_binary(const void *args) {
 }
 TPUKERNEL_FUNC_REGISTER(tpu_kernel_api_binary);
 
-#ifdef FIRMWARE_BACKEND_2260
+#ifdef BACKEND_SG2260
 void tpu_kernel_api_binary_multi_core(const void *args) {
   sg_api_binary_t *api = (sg_api_binary_t *)args;
   tpu_initialize();
@@ -771,7 +771,7 @@ void nodechip_binary_bcast_div(global_addr_t input_global_addr,
                              output_global_stride, NULL, save_dtype);
           }
 
-          // #ifdef FIRMWARE_BACKEND_1684X
+          // #ifdef BACKEND_1684X
           if (dtype == DT_FP32) {
             tpu_bdc_fp32_div(output_local_addr[index], input_local_addr[index],
                              other_local_addr[index], &slice_shape, NULL,
@@ -1145,7 +1145,7 @@ void tpu_kernel_api_binary_bcast(const void *args) {
 }
 TPUKERNEL_FUNC_REGISTER(tpu_kernel_api_binary_bcast);
 
-#ifdef FIRMWARE_BACKEND_2260
+#ifdef BACKEND_SG2260
 void tpu_kernel_api_binary_bcast_multi_core(const void *args) {
   sg_api_binary_bcast_t *api = (sg_api_binary_bcast_t *)args;
   TPUKERNEL_ASSERT(api->dtype == DT_INT8 || api->dtype == DT_UINT8 ||
@@ -1578,7 +1578,7 @@ void tpu_kernel_api_binary_c(const void *args) {
 }
 TPUKERNEL_FUNC_REGISTER(tpu_kernel_api_binary_c);
 
-#ifdef FIRMWARE_BACKEND_2260
+#ifdef BACKEND_SG2260
 void tpu_kernel_api_binary_c_multi_core(const void *args) {
   sg_api_binary_c_t *api = (sg_api_binary_c_t *)args;
   tpu_initialize();

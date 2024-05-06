@@ -2,9 +2,9 @@
 #include <torch/torch.h>
 #include <ATen/core/TensorBase.h>
 #include <ATen/EmptyTensor.h>
-#include <TPUDeviceManager.h>
-#include <TPUTorchUtils.h>
-#include <sgdnn_api.h>
+
+#include "TPUTorchUtils.h"
+
 
 #include "common/config.h"
 
@@ -32,13 +32,23 @@ Tensor index_select_tpu ( const Tensor & self, int64_t dim, const Tensor & index
   IntArrayRef sizes ( sizes_vec.data(), sizes_vec.size() );
   auto out = torch::empty ( sizes, options );
   TIMING_START;
-  bm_status_t status = sgdnnIndexSelect (
+  #if defined BACKEND_1684X
+  auto status = sgdnnIndexSelect (
                        tpu::TPUGetDeviceHandle(),
                        tpu::TPUGenerateSgdnnTensor ( self ),
                        tpu::TPUGenerateSgdnnTensor ( index ),
                        dim,
                        tpu::TPUGenerateSgdnnTensor ( out ) );
   TORCH_CHECK ( status == BM_SUCCESS );
+  #elif defined BACKEND_SG2260
+  auto status = sgdnnIndexSelect (
+                       c10_tpu::getCurrentTPUStream(),
+                       tpu::TPUGenerateSgdnnTensor ( self ),
+                       tpu::TPUGenerateSgdnnTensor ( index ),
+                       dim,
+                       tpu::TPUGenerateSgdnnTensor ( out ) );
+  TORCH_CHECK ( status == tpuRtSuccess );
+  #endif
   TIMING_END ( tpu::INDEX_SELECT );
 #endif
   SHOW_TENSOR_OP(self, index, out);
@@ -60,13 +70,21 @@ Tensor embedding_dense_backward_tpu ( const Tensor & grad_output, const Tensor &
   TensorOptions out_option = TensorOptions ( grad_output.device() ).dtype ( grad_output.dtype() );
   torch::Tensor out = torch::empty ( {num_weights, grad_output.size ( grad_output.dim() - 1 ) }, out_option );
   TIMING_START;
-  bm_status_t status = sgdnnEmbeddingBackward (
+  #if defined BACKEND_1684X
+  auto status = sgdnnEmbeddingBackward (
                        tpu::TPUGetDeviceHandle(),
                        tpu::TPUGenerateSgdnnTensor ( grad_output ),
                        tpu::TPUGenerateSgdnnTensor ( indices ),
                        tpu::TPUGenerateSgdnnTensor ( out ) );
   TORCH_CHECK ( status == BM_SUCCESS );
-
+  #elif defined BACKEND_SG2260
+  auto status = sgdnnEmbeddingBackward (
+                       c10_tpu::getCurrentTPUStream(),
+                       tpu::TPUGenerateSgdnnTensor ( grad_output ),
+                       tpu::TPUGenerateSgdnnTensor ( indices ),
+                       tpu::TPUGenerateSgdnnTensor ( out ) );
+  TORCH_CHECK ( status == tpuRtSuccess );
+  #endif
   TIMING_END ( tpu::EMBEDDING_BACKWARD );
 #endif
   SHOW_TENSOR_OP(grad_output, indices, out);

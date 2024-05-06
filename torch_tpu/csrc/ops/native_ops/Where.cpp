@@ -2,9 +2,9 @@
 #include <torch/torch.h>
 #include <ATen/core/TensorBase.h>
 #include <ATen/EmptyTensor.h>
-#include <TPUDeviceManager.h>
-#include <TPUTorchUtils.h>
-#include <sgdnn_api.h>
+
+#include "TPUTorchUtils.h"
+
 
 #include "common/config.h"
 
@@ -46,13 +46,23 @@ Tensor where_self_tpu ( const Tensor & condition, const Tensor & self, const Ten
   IntArrayRef sizes ( sizes_vec.data(), sizes_vec.size() );
   auto out = torch::empty ( sizes, options );
   TIMING_START;
-  bm_status_t status = sgdnnWhere (
+  #if defined BACKEND_1684X
+  auto status = sgdnnWhere (
                        tpu::TPUGetDeviceHandle(),
                        tpu::TPUGenerateSgdnnTensor ( condition_ ),
                        tpu::TPUGenerateSgdnnTensor ( self ),
                        tpu::TPUGenerateSgdnnTensor ( other ),
                        tpu::TPUGenerateSgdnnTensor ( out ) );
   TORCH_CHECK ( status == BM_SUCCESS );
+  #elif defined BACKEND_SG2260
+  auto status = sgdnnWhere (
+                       c10_tpu::getCurrentTPUStream(),
+                       tpu::TPUGenerateSgdnnTensor ( condition_ ),
+                       tpu::TPUGenerateSgdnnTensor ( self ),
+                       tpu::TPUGenerateSgdnnTensor ( other ),
+                       tpu::TPUGenerateSgdnnTensor ( out ) );
+  TORCH_CHECK ( status == tpuRtSuccess );
+  #endif
   TIMING_END ( tpu::WHERE );
 
   SHOW_TENSOR_OP(condition, self, other, out);

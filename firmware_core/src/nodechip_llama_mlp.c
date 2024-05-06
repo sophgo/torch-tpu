@@ -1,8 +1,8 @@
 #include "sg_api_struct.h"
 #include "tpu_kernel.h"
-#include "config.h"
 
-#ifdef FIRMWARE_BACKEND_2260
+
+#ifdef BACKEND_SG2260
 extern
 void nodechip_llama_mlp_forward_multi_core(
     /*

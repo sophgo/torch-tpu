@@ -2,10 +2,9 @@
 #include <torch/torch.h>
 #include <ATen/core/TensorBase.h>
 #include <ATen/EmptyTensor.h>
-#include <ATen/native/ConvUtils.h>
-#include <TPUDeviceManager.h>
-#include <TPUTorchUtils.h>
-#include <sgdnn_api.h>
+
+#include "TPUTorchUtils.h"
+
 #include "common/config.h"
 
 namespace at
@@ -42,12 +41,21 @@ Tensor mse_loss_tpu(const at::Tensor & self, const at::Tensor & target, int64_t 
         out = torch::tensor( 0., self.options() );
     }
     TIMING_START;
-    bm_status_t status = sgdnnMseloss( tpu::TPUGetDeviceHandle(),
+    #if defined BACKEND_1684X
+    auto status = sgdnnMseloss( tpu::TPUGetDeviceHandle(),
                                         tpu::TPUGenerateSgdnnTensor ( self ),
                                         tpu::TPUGenerateSgdnnTensor ( target ),
                                         tpu::TPUGenerateSgdnnTensor ( out ),
                                         reduction );
     TORCH_CHECK ( status == BM_SUCCESS );
+    #elif defined BACKEND_SG2260
+    auto status = sgdnnMseloss( c10_tpu::getCurrentTPUStream(),
+                                        tpu::TPUGenerateSgdnnTensor ( self ),
+                                        tpu::TPUGenerateSgdnnTensor ( target ),
+                                        tpu::TPUGenerateSgdnnTensor ( out ),
+                                        reduction );
+    TORCH_CHECK ( status == tpuRtSuccess );
+    #endif
     TIMING_END(tpu::MSE_LOSS);
     SHOW_TENSOR_OP(self, target);
     return out;
@@ -92,8 +100,11 @@ Tensor mse_loss_backward_tpu( const Tensor & grad_output, const Tensor & self, c
     TORCH_CHECK( false );
   }
 
-  TIMING_START;
+  TIMING_START;  
   // TODO: use a kernel func =
+  #if defined BACKEND_1684X
+  #elif defined BACKEND_SG2260
+  #endif
   TIMING_END(tpu::MSE_LOSS_BACKWARD);
 #endif
   SHOW_TENSOR_OP(grad_output, self, target, grad_in);

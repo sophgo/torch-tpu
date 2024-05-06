@@ -1,6 +1,6 @@
 #include "sg_api_struct.h"
 #include "tpu_kernel.h"
-#include "config.h"
+
 
 inline static void pipeline_move(unsigned long long *array, int num) {
   for (int i = num - 1; i > 0; i--) {
@@ -217,7 +217,7 @@ void tpu_kernel_api_index_select ( const void * args )
 TPUKERNEL_FUNC_REGISTER ( tpu_kernel_api_index_select );
 
 
-#ifdef FIRMWARE_BACKEND_2260
+#ifdef BACKEND_SG2260
 static inline void compute_current_slice_info_multi_core(int total_num, int* expected_current_slice,
                                                          int* expected_avg_slice, int* expected_secs) {
   const int core_num = tpu_core_num();

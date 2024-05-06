@@ -2,9 +2,9 @@
 #include <torch/torch.h>
 #include <ATen/core/TensorBase.h>
 #include <ATen/EmptyTensor.h>
-#include <TPUDeviceManager.h>
-#include <TPUTorchUtils.h>
-#include <sgdnn_api.h>
+
+#include "TPUTorchUtils.h"
+
 #include <iostream>
 #include "common/config.h"
 
@@ -33,11 +33,19 @@ namespace at
         else if (IS_TPU_TENSOR(self))
         {
             TIMING_START;
-            bm_status_t status = sgdnnConj(
+            #if defined BACKEND_1684X
+            auto status = sgdnnConj(
                 tpu::TPUGetDeviceHandle(),
                 tpu::TPUGenerateSgdnnTensorforComplex64(self),
                 tpu::TPUGenerateSgdnnTensorforComplex64(out));
             TORCH_CHECK(status == BM_SUCCESS);
+            #elif defined BACKEND_SG2260
+            auto status = sgdnnConj(
+                c10_tpu::getCurrentTPUStream(),
+                tpu::TPUGenerateSgdnnTensorforComplex64(self),
+                tpu::TPUGenerateSgdnnTensorforComplex64(out));
+            TORCH_CHECK(status == tpuRtSuccess);
+            #endif
             TIMING_END(tpu::CONJ);
         }
         else

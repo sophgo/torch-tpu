@@ -1,17 +1,23 @@
 #pragma once
-
-#include <torch/library.h>
-#include <torch/torch.h>
-#include <ATen/core/TensorBase.h>
-#include <c10/util/Logging.h>
-#include <c10/util/Half.h>
-#include <sgdnn_api.h>
-#include <TPUDeviceManager.h>
 #include <sys/time.h>
 #include <cmath>
 #include <mutex>
 #include <fstream>
 #include <vector>
+#include <torch/library.h>
+#include <torch/torch.h>
+#include <ATen/core/TensorBase.h>
+#include <c10/util/Logging.h>
+#include <c10/util/Half.h>
+
+#include "TPUDeviceManager.h"
+#include "TPUGuard.h"
+#ifdef BACKEND_SG2260
+#include "TPUStream.h"
+#include <sgdnn_api2.h>
+#elif defined BACKEND_1684X
+#include <sgdnn_api.h>
+#endif
 
 #define DEBUG_SHOW(dtype, func, ...)                    \
 do{                                                     \
@@ -73,28 +79,8 @@ while ( 0 )
 #define IS_TPU_TENSOR(t)  ( ( t ).device().type() == DeviceType::TPU )
 #define IS_CPU_TENSOR(t)  ( ( t ).device().type() == DeviceType::CPU )
 
-#define TPU_DEVICE_INDEX_BITS 6
-#define TPU_GLOBAL_ADDR_BITS (64 - TPU_DEVICE_INDEX_BITS)
-
-
 namespace tpu
 {
-
-static inline unsigned long long UnifiedAddr( unsigned long long Addr, int Index)
-{
-  TORCH_CHECK ( Addr < ( 1UL << TPU_GLOBAL_ADDR_BITS ) );
-  return ( ( ( unsigned long long ) Index ) << TPU_GLOBAL_ADDR_BITS ) | Addr;
-}
-
-static inline unsigned long long GetDeviceIndexByUnifiedAddr ( unsigned long long Addr )
-{
-  return Addr >> TPU_GLOBAL_ADDR_BITS;
-}
-
-static inline unsigned long long GetAddrByUnifiedAddr ( unsigned long long Addr )
-{
-  return ( Addr << TPU_DEVICE_INDEX_BITS ) >> TPU_DEVICE_INDEX_BITS;
-}
 
 static inline at::Device TPUGetCurrentDevice()
 {
@@ -241,87 +227,10 @@ static inline bool TPUIsSameShape ( const at::Tensor & Tensor1, const at::Tensor
   return true;
 }
 
-static inline void TPUCompareResult ( const at::Tensor & Got,
-                                      const at::Tensor & Exp,
-                                      double Threshold = 1e-4,
-                                      double ErrScale = 1.0 )
-{
-  if ( Got.dtype() != Exp.dtype() )
-  {
-    LOG ( FATAL ) << "Tensor comparing failed: Got data type = "
-                  << Got.dtype() << ", Exp data type = " << Exp.dtype();
-  }
-  if ( Got.sizes() != Exp.sizes() )
-  {
-    LOG ( FATAL ) << "Tensor comparing failed: Got shape = "
-                  << Got.sizes() << ", Exp shape = " << Exp.sizes();
-  }
-  if ( Got.dtype() == caffe2::TypeMeta::Make<float>() )
-  {
-    int ErrCnt = 0;
-    const auto MaxErrCnt = 100;//Got.numel();
-    auto Err = torch::sub ( Got, Exp );
-    auto AbsErr = torch::abs ( Err );
-    auto AbsExp = torch::abs ( Exp );
-    auto RltAbsErr = torch::div ( AbsErr, AbsExp ) * ErrScale;
-    auto ErrPtr = Err.data_ptr<float>();
-    auto GotPtr = Got.data_ptr<float>();
-    auto ExpPtr = Exp.data_ptr<float>();
-    auto AbsErrPtr = AbsErr.data_ptr<float>();
-    auto RltAbsErrPtr = RltAbsErr.data_ptr<float>();
-    for ( auto i = 0; i < Got.numel(); ++i )
-    {
-      if ( std::isnan ( ExpPtr[i] ) == true && std::isnan ( GotPtr[i] ) == true )
-      {
-        continue;
-      }
-      if ( AbsErrPtr[i] < Threshold || RltAbsErrPtr[i] <= 1e-5 )
-      {
-        continue;
-      }
-FAILED:
-      if ( ErrCnt < MaxErrCnt )
-      {
-        LOG ( WARNING ) << "Compare failed: Got = " << GotPtr[i]
-                        << ", Exp = " << ExpPtr[i]
-                        << ", Err = " << ErrPtr[i]
-                        << ", index = " << i;
-      }
-      else
-      {
-        LOG ( WARNING ) << "<Skip the other compare errors>";
-        return;
-      }
-      ++ErrCnt;
-    }
-  }
-  else
-  {
-    LOG ( FATAL ) << "Unsupported data type " << Got.dtype();
-  }
-}
+void TPUCompareResult ( const at::Tensor & Got, const at::Tensor & Exp,
+                        double Threshold = 1e-4, double ErrScale = 1.0 );
 
-struct Timer
-{
-  Timer & Start()
-  {
-    gettimeofday ( &timer, NULL );
-    return *this;
-  }
-  unsigned long ElapsedUS() const
-  {
-    struct timeval end;
-    gettimeofday ( &end, NULL );
-    return ( end.tv_sec - timer.tv_sec ) * 1000000UL + ( end.tv_usec - timer.tv_usec );
-  }
-  unsigned long ElapsedMS() const
-  {
-    return ElapsedUS() / 1000;
-  }
-private:
-  struct timeval timer;
-};
-
+#ifdef TPU_OP_TIMING
 typedef enum
 {
   CDMA_D2S = 0,
@@ -515,204 +424,10 @@ typedef enum
   BINARYOP_BCAST,
   REAL,
   CONJ,
+  DUMMY,
   OP_NUM
 }
 OpType;
-
-static const char * OpTypeStr[OP_NUM] =
-{
-  "CDMA D2S",
-  "CDMA S2D",
-  "CDMA C2C",
-  "Copy",
-  "Cpu Layer",
-  "Convolution",
-  "Convolution Backward",
-  "BatchNorm",
-  "BatchNorm Backward",
-  "LayerNorm",
-  "LayerNorm Backward",
-  "Avg Pooling",
-  "Max Pooling",
-  "ReLU",
-  "ReLU Backward",
-  "GeLU",
-  "GeLU Backward",
-  "Leaky ReLU",
-  "MatMul",
-  "Add MatMul",
-  "Batch MatMul",
-  "Linear",
-  "Softmax",
-  "Softmax Backward",
-  "Log Softmax",
-  "Permute",
-  "Transpose",
-  "Add",
-  "Sub",
-  "Mul",
-  "Div",
-  "Add Bcast",
-  "Index Select",
-  "DType Convert",
-  "Reduce Mean",
-  "Reduce Sum",
-  "REDUCE_PROD",
-  "Reduce Max",
-  "Reduce Min",
-  "Reduce var",
-  "Where",
-  "Strided Copy",
-  "Concat",
-  "Const Fill",
-  "Masked Fill",
-  "Sqrt",
-  "Rsqrt",
-  "Sign",
-  "Addcdiv",
-  "Addcmul",
-  "Embedding Backward",
-  "Malloc",
-  "Free",
-  "Cross Entropy Loss",
-  "Cross Entropy Loss Backward",
-  "AddC",
-  "MulC",
-  "CSub",
-  "CDiv",
-  "Norm2",
-  "Native Group Norm",
-  "Groupnorm backward",
-  "Bcast Add",
-  "MLP Forward",
-  "MLP Backward",
-  "Attention Forward",
-  "Attention Backward",
-  "BITWISE_XOR",
-  "BITWISE_XOR_BCAST",
-  "BITWISE_XOR_C",
-  "Abs Forward",
-  "Cos Forward",
-  "Sin Forward",
-  "Tan Forward",
-  "Log Forward",
-  "ACosH Forward",
-  "ASinH Forward",
-  "ATanH Forward",
-  "SinH Forward",
-  "CosH Forward",
-  "TanH Forward",
-  "Exp Forward",
-  "Asin",
-  "Acos",
-  "Atan",
-  "Sinh",
-  "Cosh",
-  "Tanh",
-  "Ceil",
-  "Floor",
-  "Round",
-  "Neg",
-  "Exp2",
-  "EXPM1",
-  "Expand",
-  "Flip",
-  "Squeeze",
-  "Unsqueeze",
-  "Isfinite",
-  "Isinf",
-  "Isnan",
-  "Bitwise_Not",
-  "Minimum",
-  "Maximum",
-  "Fmin",
-  "Fmax",
-  "Atan2",
-  "Logical And",
-  "Logical Or",
-  "BITWISE_AND",
-  "BITWISE_AND_BCAST",
-  "BITWISE_AND_C",
-  "BITWISE_OR",
-  "BITWISE_OR_BCAST",
-  "BITWISE_OR_C",
-  "EQUAL",
-  "EQUAL_BCAST",
-  "EQUAL_C",
-  "GREATER_OR_EQUAL",
-  "GREATER_OR_EQUAL_BCAST",
-  "GREATER_OR_EQUAL_C",
-  "GREATER",
-  "GREATER_BCAST",
-  "GREATER_C",
-  "LESS_THAN_OR_EQUAL",
-  "LESS_THAN_OR_EQUAL_BCAST",
-  "LESS_THAN_OR_EQUAL_C",
-  "SHIFT_LEFT",
-  "SHIFT_LEFT_BCAST",
-  "SHIFT_LEFT_C",
-  "SHIFT_RIGHT_ARITHMETIC",
-  "SHIFT_RIGHT_ARITHMETIC_BCAST",
-  "SHIFT_RIGHT_ARITHMETIC_C",
-  "LESS_THAN",
-  "LESS_THAN_BCAST",
-  "LESS_THAN_C",
-  "NOT_EQUAL",
-  "NOT_EQUAL_BCAST",
-  "NOT_EQUAL_C",
-  "SIGNBIT",
-  "FULL",
-  "Logical Not",
-  "Upsampl Bilinear2d",
-  "Upsampl nearest",
-  "Upsampl nearest2d Backward",
-  "Arrange",
-  "SiLU",
-  "Sigmoid",
-  "CLAMP",
-  "layernorm Matmul",
-  "ERF",
-  "ERFC",
-  "Pow",
-  "Pow_bcast"
-  "POW SCALAR",
-  "SCALAR POW"
-  "Add Layernorm Matmul",
-  "RECIPROCAL",
-  "TRUNC",
-  "layernorm Matmul Backward",
-  "Add layernorm Matmul Backward",
-  "TOPK",
-  "NonZero",
-  "REPEAT",
-  "Argmax",
-  "Argmin",
-  "Max_dim",
-  "Min_dim",
-  "HARDTANH",
-  "HYPOT",
-  "Nextafter",
-  "Triu",
-  "Cbrt",
-  "Constant_pad",
-  "Reflection_pad2d",
-  "Replication_pad2d",
-  "Replication_pad3d",
-  "GATHER",
-  "BADDBMM",
-  "MSE Loss",
-  "MSE Loss Backward",
-  "Slice_scatter",
-  "Inf Check And Unscale",
-  "LLAMA_ATTENTION",
-  "LLAMA_MLP_FORWARD",
-  "RMSNORM_FORWARD",
-  "binary_op",
-  "binary_op_c",
-  "binary_op_bcast",
-  "real",
-  "Conj"
-};
 
 struct OpTimer
 {
@@ -729,6 +444,27 @@ private:
   bool is_start_ = false;
   std::mutex mutex_;
   static OpTimer * instance_;
+};
+
+struct Timer
+{
+  Timer & Start()
+  {
+    gettimeofday ( &timer, NULL );
+    return *this;
+  }
+  unsigned long ElapsedUS() const
+  {
+    struct timeval end;
+    gettimeofday ( &end, NULL );
+    return ( end.tv_sec - timer.tv_sec ) * 1000000UL + ( end.tv_usec - timer.tv_usec );
+  }
+  unsigned long ElapsedMS() const
+  {
+    return ElapsedUS() / 1000;
+  }
+private:
+  struct timeval timer;
 };
 
 struct GlobalTimer
@@ -754,4 +490,5 @@ private:
   static TensorWatcher * instance_;
 };
 
+#endif // TPU_OP_TIMING
 } // namespace tpu

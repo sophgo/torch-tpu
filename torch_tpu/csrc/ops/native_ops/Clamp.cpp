@@ -2,10 +2,9 @@
 #include <torch/torch.h>
 #include <ATen/core/TensorBase.h>
 #include <ATen/EmptyTensor.h>
-#include <ATen/native/ConvUtils.h>
-#include <TPUDeviceManager.h>
-#include <TPUTorchUtils.h>
-#include <sgdnn_api.h>
+
+#include "TPUTorchUtils.h"
+
 #include "common/config.h"
 
 namespace at {
@@ -28,13 +27,23 @@ Tensor & clamp_out_tpu( const at::Tensor & self, const c10::optional<at::Scalar>
     }
     else if (IS_TPU_TENSOR(self_)){
         TIMING_START;
-        bm_status_t status = sgdnnClamp(
+        #if defined BACKEND_1684X
+        auto status = sgdnnClamp(
             tpu::TPUGetDeviceHandle(),
             tpu::TPUGenerateSgdnnTensor(self_),
             min.has_value() ? min.value().to<float>() : -std::numeric_limits<float>::infinity(),
             max.has_value() ? max.value().to<float>() : std::numeric_limits<float>::infinity(),
             tpu::TPUGenerateSgdnnTensor(out));
         TORCH_CHECK(status == BM_SUCCESS);
+        #elif defined BACKEND_SG2260
+        auto status = sgdnnClamp(
+            c10_tpu::getCurrentTPUStream(),
+            tpu::TPUGenerateSgdnnTensor(self_),
+            min.has_value() ? min.value().to<float>() : -std::numeric_limits<float>::infinity(),
+            max.has_value() ? max.value().to<float>() : std::numeric_limits<float>::infinity(),
+            tpu::TPUGenerateSgdnnTensor(out));
+        TORCH_CHECK(status == tpuRtSuccess);
+        #endif
         TIMING_END(tpu::CLAMP);
     }
     else

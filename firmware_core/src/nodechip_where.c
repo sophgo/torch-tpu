@@ -1,6 +1,6 @@
 #include "sg_api_struct.h"
 #include "tpu_kernel.h"
-#include "config.h"
+
 
 static
 void nodechip_where_bcast (
@@ -264,7 +264,7 @@ void tpu_kernel_api_where ( const void * args )
 }
 TPUKERNEL_FUNC_REGISTER ( tpu_kernel_api_where );
 
-#ifdef FIRMWARE_BACKEND_2260
+#ifdef BACKEND_SG2260
 extern void nodechip_where_multi_core(
     global_addr_t out_global_addr,
     global_addr_t cond_global_addr,

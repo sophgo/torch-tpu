@@ -1,6 +1,6 @@
 #include "sg_api_struct.h"
 #include "tpu_kernel.h"
-#include "config.h"
+
 
 static
 void nodechip_bcbinary_fp(
@@ -237,7 +237,7 @@ void tpu_kernel_api_arithmetic_eltwise ( const void *args )
 
 // TPUKERNEL_FUNC_REGISTER (tpu_kernel_api_div_eltwise);
 
-#ifdef FIRMWARE_BACKEND_2260
+#ifdef BACKEND_SG2260
 void tpu_kernel_api_arithmetic_eltwise_multi_core(const void *args)
 {
   TPUKERNEL_ASSERT_INFO(false, "not implementated");

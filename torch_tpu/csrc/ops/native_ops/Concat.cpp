@@ -2,10 +2,8 @@
 #include <torch/torch.h>
 #include <ATen/core/TensorBase.h>
 #include <ATen/EmptyTensor.h>
-#include <TPUDeviceManager.h>
-#include <TPUTorchUtils.h>
-#include <sgdnn_api.h>
 
+#include "TPUTorchUtils.h"
 #include "common/config.h"
 
 #define TPU_MAX_CONCAT_NUM 10
@@ -50,12 +48,21 @@ Tensor & cat_out_tpu ( const ITensorListRef & tensors, int64_t dim, Tensor & out
     }
 
     TIMING_START;
+    #if defined BACKEND_1684X
     auto status = sgdnnConcat ( tpu::TPUGetDeviceHandle(),
                                 inputs.data(),
                                 inputs.size(),
                                 dim,
                                 tpu:: TPUGenerateSgdnnTensor ( out ) );
     TORCH_CHECK ( status == BM_SUCCESS );
+    #elif defined BACKEND_SG2260
+    auto status = sgdnnConcat ( c10_tpu::getCurrentTPUStream(),
+                                inputs.data(),
+                                inputs.size(),
+                                dim,
+                                tpu:: TPUGenerateSgdnnTensor ( out ) );
+    TORCH_CHECK ( status == tpuRtSuccess );
+    #endif
     TIMING_END ( tpu::CONCAT );
   }
   SHOW_TENSOR_OP(out);

@@ -2,9 +2,9 @@
 #include <torch/torch.h>
 #include <ATen/core/TensorBase.h>
 #include <ATen/EmptyTensor.h>
-#include <TPUDeviceManager.h>
-#include <TPUTorchUtils.h>
-#include <sgdnn_api.h>
+
+#include "TPUTorchUtils.h"
+
 
 #include "common/config.h"
 
@@ -30,12 +30,21 @@ Tensor & index_out_tpu( const Tensor & self, const c10::List<c10::optional<Tenso
       TIMING_START;
       auto idx = indices[0].value();
       auto idx_value = idx.scalar_type() == torch::kInt64 || idx.scalar_type() == torch::kInt32 ? idx : idx.to(torch::kInt32);
-      bm_status_t status = sgdnnIndexSelect(tpu::TPUGetDeviceHandle(),
+      #if defined BACKEND_1684X
+      auto status = sgdnnIndexSelect(tpu::TPUGetDeviceHandle(),
                                             tpu::TPUGenerateSgdnnTensor(self),
                                             tpu::TPUGenerateSgdnnTensor(idx_value),
                                             0,
                                             tpu::TPUGenerateSgdnnTensor(out));
       TORCH_CHECK ( status == BM_SUCCESS );
+      #elif defined BACKEND_SG2260
+      auto status = sgdnnIndexSelect(c10_tpu::getCurrentTPUStream(),
+                                            tpu::TPUGenerateSgdnnTensor(self),
+                                            tpu::TPUGenerateSgdnnTensor(idx_value),
+                                            0,
+                                            tpu::TPUGenerateSgdnnTensor(out));
+      TORCH_CHECK ( status == tpuRtSuccess );
+      #endif
       TIMING_END ( tpu::INDEX_SELECT );
     } else {
       int64_t index_size = -1;
@@ -44,7 +53,7 @@ Tensor & index_out_tpu( const Tensor & self, const c10::List<c10::optional<Tenso
       std::vector<int> no_broadcast_shape;
 
       std::vector<Tensor> indexes;
-      for (int i = 0; i < indices.size(); ++i) {
+      for (int i = 0; i < (int)indices.size(); ++i) {
         // check empty index (dim broadcast)
         auto size = indices[i].value().numel();
         if (!indices[i].has_value() or size == 0) {
@@ -96,20 +105,30 @@ Tensor & index_out_tpu( const Tensor & self, const c10::List<c10::optional<Tenso
         Tensor index_two_dim = matmul(strides, stack(indexes)).to(torch::kInt32).to(self.device());
         Tensor out_two_dim = broadcast[0] ? out.view({dim0, -1}) : out.view({-1, dim0});
         TIMING_START;
-        bm_status_t status = sgdnnIndexSelect(tpu::TPUGetDeviceHandle(),
+        #if defined BACKEND_1684X
+        auto status = sgdnnIndexSelect(tpu::TPUGetDeviceHandle(),
                                               tpu::TPUGenerateSgdnnTensor(self_two_dim),
                                               tpu::TPUGenerateSgdnnTensor(index_two_dim),
                                               (int)broadcast[0],
                                               tpu::TPUGenerateSgdnnTensor(out_two_dim));
 
         TORCH_CHECK ( status == BM_SUCCESS );
+        #elif defined BACKEND_SG2260
+        auto status = sgdnnIndexSelect(c10_tpu::getCurrentTPUStream(),
+                                              tpu::TPUGenerateSgdnnTensor(self_two_dim),
+                                              tpu::TPUGenerateSgdnnTensor(index_two_dim),
+                                              (int)broadcast[0],
+                                              tpu::TPUGenerateSgdnnTensor(out_two_dim));
+
+        TORCH_CHECK ( status == tpuRtSuccess );
+        #endif
         TIMING_END ( tpu::INDEX_SELECT );
       } else {
         // no support; use cpu impl
         CPU_IMPL_WARNING();
         TIMING_START;
         c10::List<c10::optional<Tensor>> indices_cpu;
-        for (int i = 0; i < indices.size(); i++)
+        for (int i = 0; i < (int)indices.size(); i++)
         {
             c10::optional<Tensor> indice = c10::nullopt;
             if ( indices[i].has_value() ) { indice = indices[i].value().cpu(); }
@@ -201,7 +220,7 @@ Tensor & index_put_tpu(Tensor & self, const torch::List<c10::optional<Tensor>>& 
     CPU_IMPL_WARNING();
     TIMING_START;
     c10::List<c10::optional<Tensor>> indices_cpu;
-    for (int i = 0; i < indices.size(); i++)
+    for (int i = 0; i < (int)indices.size(); i++)
     {
         c10::optional<Tensor> indice = c10::nullopt;
         if ( indices[i].has_value() ) { indice = indices[i].value().cpu(); }

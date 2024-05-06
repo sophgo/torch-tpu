@@ -1,6 +1,6 @@
 #include "sg_api_struct.h"
 #include "tpu_kernel.h"
-#include "config.h"
+
 
 void nodechip_cross_entropy_loss_backward (
 global_addr_t input_global_addr,

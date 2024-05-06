@@ -2,9 +2,9 @@
 #include <torch/torch.h>
 #include <ATen/core/TensorBase.h>
 #include <ATen/EmptyTensor.h>
-#include <TPUDeviceManager.h>
-#include <TPUTorchUtils.h>
-#include <sgdnn_api.h>
+
+#include "TPUTorchUtils.h"
+
 
 #include "common/config.h"
 
@@ -20,13 +20,22 @@ Tensor & triu_out_tpu( const Tensor & self, int64_t diagonal, Tensor & out)
     out = out_cpu.to(out.device());
 #else
     TIMING_START;
-    bm_status_t status = sgdnnTriangularize(  tpu::TPUGetDeviceHandle(), 
+    #if defined BACKEND_1684X
+    auto status = sgdnnTriangularize(  tpu::TPUGetDeviceHandle(), 
                                     tpu::TPUGenerateSgdnnTensor(self),
                                     1,
                                     diagonal,
                                     tpu::TPUGenerateSgdnnTensor(out));
-  TORCH_CHECK ( status == BM_SUCCESS );
-  TIMING_END ( tpu::TRIU );
+    TORCH_CHECK ( status == BM_SUCCESS );
+    #elif defined BACKEND_SG2260
+    auto status = sgdnnTriangularize(c10_tpu::getCurrentTPUStream(), 
+                                    tpu::TPUGenerateSgdnnTensor(self),
+                                    1,
+                                    diagonal,
+                                    tpu::TPUGenerateSgdnnTensor(out));
+    TORCH_CHECK ( status == tpuRtSuccess );
+    #endif
+    TIMING_END ( tpu::TRIU );
 #endif
     SHOW_TENSOR_OP(self, out);
     return out;

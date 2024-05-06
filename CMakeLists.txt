@@ -8,6 +8,7 @@ endif()
 set(CMAKE_INSTALL_PREFIX ${CMAKE_BINARY_DIR} CACHE PATH "Install prefix")
 message(STATUS "CMAKE PREFIX: " ${CMAKE_INSTALL_PREFIX})
 
+# ftp package
 string(TIMESTAMP BUILD_TIME "%Y%m%d")
 set(TORCHTPU_VERSION "${BUILD_TIME}" CACHE STRING "torch-tpu version" FORCE)
 message(STATUS "torch-tpu version: ${TORCHTPU_VERSION}")
@@ -20,5 +21,4 @@ set(PROJECT_ROOT ${PROJECT_SOURCE_DIR})
 add_subdirectory(firmware_core)
 add_subdirectory(sgdnn)
 add_dependencies(sgdnn firmware_core)
-
 add_subdirectory(torch_tpu)

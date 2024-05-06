@@ -133,7 +133,6 @@ class Tester_Basic():
       self.dump_flag = dump_flag
       self.case_name = case_name
       self.Dumper = Dumper(self.case_name, self.device_cpu)
-      # torch.ops.load_library("../../build/torch_tpu/libtorch_tpu.so")
 
       self.convert_table = {
                       'f32':torch.float32,

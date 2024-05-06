@@ -6,6 +6,11 @@
 #include "torch_tpu/csrc/tpu/OpTimer.h"
 #include "torch_tpu/csrc/utils/AutocastMode.h"
 
+#ifdef BACKEND_SG2260
+#include "torch_tpu/csrc/tpu/Stream.h"
+#include "torch_tpu/csrc/tpu/Event.h"
+#endif
+
 PyObject* module;
 static std::vector<PyMethodDef> methods;
 
@@ -41,7 +46,12 @@ PyObject* initModule() {
         methods.data()
     };
     module = PyModule_Create(&torchtpu_module);
-
+#ifdef BACKEND_SG2260
+    THPTStream_init(module);
+    THPTEvent_init(module);
+#endif
+    RegisterTPUDeviceProperties(module);
+    BindGetDeviceProperties(module);
     return module;
 }
 PyMODINIT_FUNC PyInit__C(void){

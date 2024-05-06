@@ -1,7 +1,7 @@
 #include "sg_api_struct.h"
 #include "tpu_kernel.h"
 #include "kernel_utils_func.h"
-#include "config.h"
+
 
 #define BOFFSET(index) buffer_addr + index *tensor_bsize_pnpu
 
@@ -70,7 +70,7 @@ void tpu_bdc_fp_sigmoid(local_addr_t dst_addr, local_addr_t src_addr,
 /**
  * tpu_bdc_fp_sqrt only support DT_FP32
  */
-#ifdef FIRMWARE_BACKEND_2260
+#ifdef BACKEND_SG2260
 void tpu_bdc_fp_sqrt_v2(local_addr_t dst_addr, local_addr_t src_addr,
                         local_addr_t dst_fp32_addr, local_addr_t src_fp32_addr,
                         const dim4 *shape, data_type_t dtype) {
@@ -355,7 +355,7 @@ void tpu_kernel_api_active(const void *args) {
 }
 TPUKERNEL_FUNC_REGISTER(tpu_kernel_api_active);
 
-#ifdef FIRMWARE_BACKEND_2260
+#ifdef BACKEND_SG2260
 void tpu_kernel_api_active_multi_core(const void *args) {
   sg_api_active_t *api = (sg_api_active_t *)args;
   data_type_t dtype = (data_type_t)api->dtype;

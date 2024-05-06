@@ -2,12 +2,10 @@
 #include <ATen/EmptyTensor.h>
 #include <ATen/OpMathType.h>
 #include <ATen/core/TensorBase.h>
-#include <ATen/native/ConvUtils.h>
 #include <ATen/native/cpu/mixed_data_type.h>
-#include <ATen/native/cpu/moments_utils.h>
-#include <TPUDeviceManager.h>
-#include <TPUTorchUtils.h>
-#include <sgdnn_api.h>
+
+#include "TPUTorchUtils.h"
+
 #include <torch/library.h>
 #include <torch/torch.h>
 
@@ -88,12 +86,21 @@ std::tuple<Tensor, Tensor, Tensor> native_group_norm_tpu(
   rstd = std::get<2>(result).cpu();
 #else
   TIMING_START;
-  bm_status_t status = sgdnnNativeGroupNorm(
+  #if defined BACKEND_1684X
+  auto status = sgdnnNativeGroupNorm(
       tpu::TPUGetDeviceHandle(), tpu::TPUGenerateSgdnnTensor(X_32),
       tpu::TPUGenerateSgdnnTensor(weight), tpu::TPUGenerateSgdnnTensor(bias),
       group, affine, eps, tpu::TPUGenerateSgdnnTensor(Y),
       tpu::TPUGenerateSgdnnTensor(mean), tpu::TPUGenerateSgdnnTensor(rstd));
   TORCH_CHECK(status == BM_SUCCESS);
+  #elif defined BACKEND_SG2260
+  auto status = sgdnnNativeGroupNorm(
+      c10_tpu::getCurrentTPUStream(), tpu::TPUGenerateSgdnnTensor(X_32),
+      tpu::TPUGenerateSgdnnTensor(weight), tpu::TPUGenerateSgdnnTensor(bias),
+      group, affine, eps, tpu::TPUGenerateSgdnnTensor(Y),
+      tpu::TPUGenerateSgdnnTensor(mean), tpu::TPUGenerateSgdnnTensor(rstd));
+  TORCH_CHECK(status == tpuRtSuccess);
+  #endif
   TIMING_END(tpu::NATIVE_GROUP_NORM);
 #endif
   return std::make_tuple(Y, mean, rstd);
@@ -166,7 +173,7 @@ native_group_norm_backward_tpu(const at::Tensor &grad_out, const at::Tensor &X,
   }
   // TODO:FIX BUG
   // TIMING_START;
-  // bm_status_t status = sgdnnNativeGroupNormBackward(
+  // auto status = sgdnnNativeGroupNormBackward(
   //     tpu::TPUGetDeviceHandle(), tpu::TPUGenerateSgdnnTensor(grad_out),
   //     tpu::TPUGenerateSgdnnTensor(X),
   //     weight.defined() ? tpu::TPUGenerateSgdnnTensor(weight)

@@ -1,6 +1,6 @@
 #include "sg_api_struct.h"
 #include "tpu_kernel.h"
-#include "config.h"
+
 
 void nodechip_hardtanh(global_addr_t input_global_addr, global_addr_t output_global_addr,
                        scalar_t min_value, scalar_t max_value, int length, data_type_t dtype) {
@@ -95,7 +95,7 @@ void tpu_kernel_api_hardtanh(const void *args) {
 }
 TPUKERNEL_FUNC_REGISTER(tpu_kernel_api_hardtanh);
 
-#ifdef FIRMWARE_BACKEND_2260
+#ifdef BACKEND_SG2260
 void tpu_kernel_api_hardtanh_multi_core(const void *args) {
     sg_api_hardtanh_t *api = (sg_api_hardtanh_t*)args;
     scalar_t min_value, max_value;

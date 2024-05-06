@@ -1,6 +1,6 @@
 #include "sg_api_struct.h"
 #include "tpu_kernel.h"
-#include "config.h"
+
 
 #define DEFAULT_LOCAL_ADDR 0xFFFFFFFF
 

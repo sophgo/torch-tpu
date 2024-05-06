@@ -1,13 +1,13 @@
 
-#include "config_sgdnn_backend.h"
+
 #include "sg_api_struct.h"
 #include "sgdnn_api.h"
 #include <stdio.h>
 #include <algorithm>
 
-#if defined SGDNN_BACKEND_1684X
+#if defined BACKEND_1684X
 #include "kernel_module_data.h"
-#elif defined SGDNN_BACKEND_2260
+#elif defined BACKEND_SG2260
 #include "tpukernel_multicore.hpp"
 #endif
 
@@ -171,7 +171,7 @@ static inline bool sgdnnDtypeIsInt64 (SgdnnDataType_t dtype)
 
 static inline int sgdnnTPUKernelDType ( SgdnnDataType_t dtype )
 {
-#if defined SGDNN_BACKEND_1684X
+#if defined BACKEND_1684X
   if ( dtype == SGDNN_DTYPE_INT8 )        { return ( 0 << 1 ) | 1; }
   else if ( dtype == SGDNN_DTYPE_UINT8 )  { return ( 0 << 1 ) | 0; }
   else if ( dtype == SGDNN_DTYPE_INT16 )  { return ( 3 << 1 ) | 1; }
@@ -181,7 +181,7 @@ static inline int sgdnnTPUKernelDType ( SgdnnDataType_t dtype )
   else if ( dtype == SGDNN_DTYPE_INT32 )  { return ( 4 << 1 ) | 1; }
   else if ( dtype == SGDNN_DTYPE_UINT32 ) { return ( 4 << 1 ) | 0; }
   else if ( dtype == SGDNN_DTYPE_FP32 )   { return ( 2 << 1 ) | 1; }
-#elif defined SGDNN_BACKEND_2260
+#elif defined BACKEND_SG2260
   if ( dtype == SGDNN_DTYPE_INT8 )        { return ( 0 << 1 ) | 1; }
   else if ( dtype == SGDNN_DTYPE_UINT8 )  { return ( 0 << 1 ) | 0; }
   else if ( dtype == SGDNN_DTYPE_INT16 )  { return ( 3 << 1 ) | 1; }
@@ -198,14 +198,14 @@ static inline int sgdnnTPUKernelDType ( SgdnnDataType_t dtype )
   SGDNN_CHECK ( false );
 }
 
-#if defined SGDNN_BACKEND_1684X
+#if defined BACKEND_1684X
 static std::map<bm_handle_t, tpu_kernel_module_t> tpu_kernel_module;
-#elif defined SGDNN_BACKEND_2260
+#elif defined BACKEND_SG2260
 #endif
 
 bm_status_t sgdnnInitialize ( bm_handle_t handle )
 {
-#if defined SGDNN_BACKEND_1684X
+#if defined BACKEND_1684X
   if ( tpu_kernel_module.find ( handle ) != tpu_kernel_module.end() )
   {
     return BM_SUCCESS;
@@ -214,7 +214,7 @@ bm_status_t sgdnnInitialize ( bm_handle_t handle )
   size_t length = sizeof ( kernel_module_data );
   tpu_kernel_module_t tpu_module = tpu_kernel_load_module ( handle, ( const char * ) p, length );
   tpu_kernel_module.insert ( std::pair<bm_handle_t, tpu_kernel_module_t> ( handle, tpu_module ) );
-#elif defined SGDNN_BACKEND_2260
+#elif defined BACKEND_SG2260
 #else
   SGDNN_CHECK ( false );
 #endif
@@ -223,13 +223,13 @@ bm_status_t sgdnnInitialize ( bm_handle_t handle )
 
 bm_status_t sgdnnDeinitialize ( bm_handle_t handle )
 {
-#if defined SGDNN_BACKEND_1684X
+#if defined BACKEND_1684X
   if ( tpu_kernel_module.find ( handle ) == tpu_kernel_module.end() )
   {
     return BM_SUCCESS;
   }
   SGDNN_CHECK ( tpu_kernel_module.erase ( handle ) );
-#elif defined SGDNN_BACKEND_2260
+#elif defined BACKEND_SG2260
 #else
   SGDNN_CHECK ( false );
 #endif
@@ -242,12 +242,12 @@ const char * func_name,
 const void * api,
 size_t api_size )
 {
-#if defined SGDNN_BACKEND_1684X
+#if defined BACKEND_1684X
   tpu_kernel_function_t func_id;
   tpu_kernel_module_t tpu_module = tpu_kernel_module[handle];
   func_id = tpu_kernel_get_function ( handle, tpu_module, func_name );
   return tpu_kernel_launch ( handle, func_id, ( void * ) api, api_size );
-#elif defined SGDNN_BACKEND_2260
+#elif defined BACKEND_SG2260
   TPUKernelLauncher launcher ( handle );
   return launcher.all_cores().launch_sync ( func_name, api, api_size );
 #else
@@ -312,7 +312,7 @@ bm_status_t sgdnnConv2d ( bm_handle_t handle,
     SGDNN_CHECK ( sgdnnIsTensorContiguous ( &bias ) );
   }
   SGDNN_CHECK ( sgdnnIsTensorContiguous ( &output ) );
-#if defined SGDNN_BACKEND_1684X
+#if defined BACKEND_1684X
   bm_device_mem_t weight_reordered_mem, bias_fp32_mem;
   if ( weight.dtype == SGDNN_DTYPE_FP16 || weight.dtype == SGDNN_DTYPE_BF16 )
   {
@@ -370,7 +370,7 @@ bm_status_t sgdnnConv2d ( bm_handle_t handle,
       bm_free_device ( handle, bias_fp32_mem );
     }
   }
-#elif defined SGDNN_BACKEND_2260
+#elif defined BACKEND_SG2260
   SGDNN_CHECK ( false );
 #else
   SGDNN_CHECK ( false );
@@ -452,7 +452,7 @@ bm_status_t sgdnnConv2dBackward ( bm_handle_t handle,
   {
     SGDNN_CHECK ( sgdnnIsTensorContiguous ( &grad_bias ) );
   }
-#if defined SGDNN_BACKEND_1684X
+#if defined BACKEND_1684X
   if ( grad_input.addr != 0 || grad_weight.addr != 0 || grad_bias.addr != 0 )
   {
     bm_device_mem_t buffer_mem;
@@ -506,7 +506,7 @@ bm_status_t sgdnnConv2dBackward ( bm_handle_t handle,
       bm_free_device ( handle, buffer_mem );
     }
   }
-#elif defined SGDNN_BACKEND_2260
+#elif defined BACKEND_SG2260
   SGDNN_CHECK ( false );
 #else
   SGDNN_CHECK ( false );
@@ -607,7 +607,7 @@ bm_status_t sgdnnBatchnorm2d ( bm_handle_t handle,
   SGDNN_CHECK ( sgdnnIsTensorContiguous ( &output ) );
   SGDNN_CHECK ( sgdnnIsTensorContiguous ( &saved_mean ) );
   SGDNN_CHECK ( sgdnnIsTensorContiguous ( &saved_invstd ) );
-#if defined SGDNN_BACKEND_1684X
+#if defined BACKEND_1684X
   sg_api_batchnorm2d_t api;
   api.input_global_addr = input.addr;
   api.running_mean_global_addr = running_mean.addr;
@@ -629,7 +629,7 @@ bm_status_t sgdnnBatchnorm2d ( bm_handle_t handle,
     api.shape[3] = 1;
   }
   SAFE_CALL ( sgdnnTPUKernelLaunch ( handle, "tpu_kernel_api_batchnorm2d", &api, sizeof ( api ) ) );
-#elif defined SGDNN_BACKEND_2260
+#elif defined BACKEND_SG2260
   SGDNN_CHECK ( false );
 #else
   SGDNN_CHECK ( false );
@@ -727,7 +727,7 @@ bm_status_t sgdnnBatchnorm2dBackward ( bm_handle_t handle,
   SGDNN_CHECK ( sgdnnIsTensorContiguous ( &grad_output ) );
   SGDNN_CHECK ( sgdnnIsTensorContiguous ( &saved_mean ) );
   SGDNN_CHECK ( sgdnnIsTensorContiguous ( &saved_invstd ) );
-#if defined SGDNN_BACKEND_1684X
+#if defined BACKEND_1684X
   sg_api_batchnorm2d_backward_t api;
   api.grad_output_global_addr = grad_output.addr;
   api.input_global_addr = input.addr;
@@ -747,7 +747,7 @@ bm_status_t sgdnnBatchnorm2dBackward ( bm_handle_t handle,
     api.shape[3] = 1;
   }
   SAFE_CALL ( sgdnnTPUKernelLaunch ( handle, "tpu_kernel_api_batchnorm2d_backward", &api, sizeof ( api ) ) );
-#elif defined SGDNN_BACKEND_2260
+#elif defined BACKEND_SG2260
   SGDNN_CHECK ( false );
 #else
   SGDNN_CHECK ( false );
@@ -860,9 +860,9 @@ bm_status_t sgdnnLayernorm ( bm_handle_t handle,
     api.shape[i] = input.shape[i];
   }
   api.dim = input.dim;
-#if defined SGDNN_BACKEND_1684X
+#if defined BACKEND_1684X
   SAFE_CALL ( sgdnnTPUKernelLaunch ( handle, "tpu_kernel_api_layernorm", &api, sizeof ( api ) ) );
-#elif defined SGDNN_BACKEND_2260
+#elif defined BACKEND_SG2260
   SAFE_CALL ( sgdnnTPUKernelLaunch ( handle, "tpu_kernel_api_layernorm_multi_core", &api, sizeof ( api ) ) );
 #else
   SGDNN_CHECK ( false );
@@ -1022,9 +1022,9 @@ bm_status_t sgdnnLayernormBackward ( bm_handle_t handle,
   std::cout << "output_addr2\n" << api.grad_bias_global_addr << std::endl;
   std::cout << "output_size2\n" << sgdnnTensorBytes(&grad_bias) << std::endl;
 #endif
-#if defined SGDNN_BACKEND_1684X
+#if defined BACKEND_1684X
   SAFE_CALL ( sgdnnTPUKernelLaunch ( handle, "tpu_kernel_api_layernorm_backward", &api, sizeof ( api ) ) );
-#elif defined SGDNN_BACKEND_2260
+#elif defined BACKEND_SG2260
   SAFE_CALL ( sgdnnTPUKernelLaunch ( handle, "tpu_kernel_api_layernorm_backward_multi_core", &api, sizeof ( api ) ) );
 #else
   SGDNN_CHECK ( false );
@@ -1059,7 +1059,7 @@ bm_status_t sgdnnReorderConv2dWeight ( bm_handle_t handle,
   }
   SGDNN_CHECK ( sgdnnIsTensorContiguous ( &input ) );
   SGDNN_CHECK ( sgdnnIsTensorContiguous ( &output ) );
-#if defined SGDNN_BACKEND_1684X
+#if defined BACKEND_1684X
   sg_api_conv_weight_reorder_t api;
   api.input_global_addr = input.addr;
   api.output_global_addr = output.addr;
@@ -1069,7 +1069,7 @@ bm_status_t sgdnnReorderConv2dWeight ( bm_handle_t handle,
   }
   api.mode = mode;
   SAFE_CALL ( sgdnnTPUKernelLaunch ( handle, "tpu_kernel_api_conv_weight_reorder", &api, sizeof ( api ) ) );
-#elif defined SGDNN_BACKEND_2260
+#elif defined BACKEND_SG2260
   SGDNN_CHECK ( false );
 #else
   SGDNN_CHECK ( false );
@@ -1104,10 +1104,10 @@ bm_status_t sgdnnGather(bm_handle_t handle,
   api.axis = axis;
   api.is_index_int64 = index.dtype == SGDNN_DTYPE_INT64;
   api.dtype = sgdnnTPUKernelDType(input.dtype);
-#if defined SGDNN_BACKEND_1684X
+#if defined BACKEND_1684X
   SAFE_CALL(
       sgdnnTPUKernelLaunch(handle, "tpu_kernel_api_gather", &api, sizeof(api)));
-#elif defined SGDNN_BACKEND_2260
+#elif defined BACKEND_SG2260
   SAFE_CALL(sgdnnTPUKernelLaunch(handle, "tpu_kernel_api_gather_multi_core",
                                  &api, sizeof(api)));
 #else
@@ -1143,9 +1143,9 @@ bm_status_t sgdnnSoftmax ( bm_handle_t handle,
   }
   api.axis = dim;
   api.dtype = sgdnnTPUKernelDType ( input.dtype );
-#if defined SGDNN_BACKEND_1684X
+#if defined BACKEND_1684X
   SAFE_CALL ( sgdnnTPUKernelLaunch ( handle, "tpu_kernel_api_softmax", &api, sizeof ( api ) ) );
-#elif defined SGDNN_BACKEND_2260
+#elif defined BACKEND_SG2260
   SAFE_CALL ( sgdnnTPUKernelLaunch ( handle, "tpu_kernel_api_softmax_multi_core", &api, sizeof ( api ) ) );
 #else
   SGDNN_CHECK ( false );
@@ -1185,9 +1185,9 @@ bm_status_t sgdnnSoftmaxBackward ( bm_handle_t handle,
   }
   api.axis = dim;
   api.dtype = sgdnnTPUKernelDType ( grad_output.dtype );
-#if defined SGDNN_BACKEND_1684X
+#if defined BACKEND_1684X
   SAFE_CALL ( sgdnnTPUKernelLaunch ( handle, "tpu_kernel_api_softmax_backward", &api, sizeof ( api ) ) );
-#elif defined SGDNN_BACKEND_2260
+#elif defined BACKEND_SG2260
   SAFE_CALL ( sgdnnTPUKernelLaunch ( handle, "tpu_kernel_api_softmax_backward_multi_core", &api, sizeof ( api ) ) );
 #else
   SGDNN_CHECK ( false );
@@ -1222,9 +1222,9 @@ bm_status_t sgdnnLogSoftmax ( bm_handle_t handle,
   }
   api.axis = dim;
   api.dtype = sgdnnTPUKernelDType ( input.dtype );
-#if defined SGDNN_BACKEND_1684X
+#if defined BACKEND_1684X
   SAFE_CALL ( sgdnnTPUKernelLaunch ( handle, "tpu_kernel_api_log_softmax", &api, sizeof ( api ) ) );
-#elif defined SGDNN_BACKEND_2260
+#elif defined BACKEND_SG2260
   SAFE_CALL ( sgdnnTPUKernelLaunch ( handle, "tpu_kernel_api_log_softmax_multi_core", &api, sizeof ( api ) ) );
 #else
   SGDNN_CHECK ( false );
@@ -1256,9 +1256,9 @@ bm_status_t sgdnnClamp (bm_handle_t handle,
   api.min = min;
   api.max = max;
   api.dtype = sgdnnTPUKernelDType ( input.dtype );
-#if defined SGDNN_BACKEND_1684X
+#if defined BACKEND_1684X
   SAFE_CALL ( sgdnnTPUKernelLaunch ( handle, "tpu_kernel_api_clamp", &api, sizeof ( api ) ) );
-#elif defined SGDNN_BACKEND_2260
+#elif defined BACKEND_SG2260
   SAFE_CALL ( sgdnnTPUKernelLaunch ( handle, "tpu_kernel_api_clamp_multi_core", &api, sizeof ( api ) ) );
 #else
   SGDNN_CHECK ( false );
@@ -1326,7 +1326,7 @@ bm_status_t sgdnnReduce ( bm_handle_t handle,
       }
     }
   }
-#if defined SGDNN_BACKEND_1684X
+#if defined BACKEND_1684X
   SGDNN_CHECK ( start_dim == 0 || end_dim == input.dim );
   sg_api_reduce_t api;
   api.input_global_addr = input.addr;
@@ -1341,7 +1341,7 @@ bm_status_t sgdnnReduce ( bm_handle_t handle,
   api.dtype = sgdnnTPUKernelDType ( input.dtype );
   api.mode = mode;
   SAFE_CALL ( sgdnnTPUKernelLaunch ( handle, "tpu_kernel_api_reduce", &api, sizeof ( api ) ) );
-#elif defined SGDNN_BACKEND_2260
+#elif defined BACKEND_SG2260
   SGDNN_CHECK ( start_dim == 0 || end_dim == input.dim );
   sg_api_reduce_t api;
   api.input_global_addr = input.addr;
@@ -1383,7 +1383,7 @@ bm_status_t sgdnnReduceProd ( bm_handle_t handle,
   SGDNN_CHECK ( axis >= 0 );
   SGDNN_CHECK ( axis < input.dim );
 
-#if defined SGDNN_BACKEND_1684X
+#if defined BACKEND_1684X
   sg_api_reduce_prod_t api;
   api.input_global_addr = input.addr;
   api.output_global_addr = output.addr;
@@ -1410,7 +1410,7 @@ bm_status_t sgdnnReduceProd ( bm_handle_t handle,
   api.axis = axis;
   api.dtype = sgdnnTPUKernelDType ( input.dtype );
   SAFE_CALL ( sgdnnTPUKernelLaunch ( handle, "tpu_kernel_api_reduce_prod", &api, sizeof ( api ) ) );
-#elif defined SGDNN_BACKEND_2260
+#elif defined BACKEND_SG2260
   sg_api_reduce_prod_t api;
   api.input_global_addr = input.addr;
   api.output_global_addr = output.addr;
@@ -1450,7 +1450,7 @@ bm_status_t sgdnnStridedCopy ( bm_handle_t handle,
   SGDNN_CHECK ( input.dtype == output.dtype );
   SGDNN_CHECK ( input.dtype != SGDNN_DTYPE_INT64 );
   SGDNN_CHECK ( sgdnnIsSameShape ( &input, &output ) );
-#if defined SGDNN_BACKEND_1684X
+#if defined BACKEND_1684X
   sg_api_strided_copy_t api;
   api.input_global_addr = input.addr;
   api.output_global_addr = output.addr;
@@ -1463,7 +1463,7 @@ bm_status_t sgdnnStridedCopy ( bm_handle_t handle,
   }
   api.dtype = sgdnnTPUKernelDType ( input.dtype );
   SAFE_CALL ( sgdnnTPUKernelLaunch ( handle, "tpu_kernel_api_strided_copy", &api, sizeof ( api ) ) );
-#elif defined SGDNN_BACKEND_2260
+#elif defined BACKEND_SG2260
   sg_api_strided_copy_t api;
   api.input_global_addr = input.addr;
   api.output_global_addr = output.addr;
@@ -1497,7 +1497,7 @@ bm_status_t sgdnnConvert ( bm_handle_t handle,
   SGDNN_CHECK ( sgdnnIsSameShape ( &input, &output ) );
   SGDNN_CHECK ( sgdnnIsTensorContiguous ( &input ) );
   SGDNN_CHECK ( sgdnnIsTensorContiguous ( &output ) );
-#if defined SGDNN_BACKEND_1684X
+#if defined BACKEND_1684X
   sg_api_dtype_convert_t api;
   api.input_global_addr = input.addr;
   api.output_global_addr = output.addr;
@@ -1509,7 +1509,7 @@ bm_status_t sgdnnConvert ( bm_handle_t handle,
   api.input_dtype = sgdnnTPUKernelDType ( input.dtype );
   api.output_dtype = sgdnnTPUKernelDType ( output.dtype );
   SAFE_CALL ( sgdnnTPUKernelLaunch ( handle, "tpu_kernel_api_dtype_convert", &api, sizeof ( api ) ) );
-#elif defined SGDNN_BACKEND_2260
+#elif defined BACKEND_SG2260
   sg_api_dtype_convert_t api;
   api.input_global_addr = input.addr;
   api.output_global_addr = output.addr;
@@ -1568,7 +1568,7 @@ bm_status_t sgdnnWhere ( bm_handle_t handle,
   SGDNN_CHECK ( sgdnnIsTensorContiguous ( &self ) );
   SGDNN_CHECK ( sgdnnIsTensorContiguous ( &other ) );
   SGDNN_CHECK ( sgdnnIsTensorContiguous ( &output ) );
-#if defined SGDNN_BACKEND_1684X
+#if defined BACKEND_1684X
   sg_api_where_t api;
   api.cond_global_addr = cond.addr;
   api.self_global_addr = self.addr;
@@ -1614,7 +1614,7 @@ bm_status_t sgdnnWhere ( bm_handle_t handle,
     api.output_shape[i] = output.shape[i];
   }
   SAFE_CALL ( sgdnnTPUKernelLaunch ( handle, "tpu_kernel_api_where", &api, sizeof ( api ) ) );
-#elif defined SGDNN_BACKEND_2260
+#elif defined BACKEND_SG2260
   sg_api_where_multi_core_t api;
   api.output_addr = output.addr;
   api.cond_addr = cond.addr;
@@ -1710,7 +1710,7 @@ bm_status_t sgdnnConcat ( bm_handle_t handle,
     SGDNN_CHECK ( sgdnnIsTensorContiguous ( &inputs[i] ) );
   }
   SGDNN_CHECK ( sgdnnIsTensorContiguous ( &output ) );
-#if defined SGDNN_BACKEND_1684X
+#if defined BACKEND_1684X
   SGDNN_CHECK ( input_num <= FW_MAX_CONCAT_NUM );
   sg_api_concat_t api;
   for ( int i = 0; i < input_num; ++i )
@@ -1730,7 +1730,7 @@ bm_status_t sgdnnConcat ( bm_handle_t handle,
   api.axis = dim;
   api.dtype = sgdnnTPUKernelDType ( output.dtype );
   SAFE_CALL ( sgdnnTPUKernelLaunch ( handle, "tpu_kernel_api_concat", &api, sizeof ( api ) ) );
-#elif defined SGDNN_BACKEND_2260
+#elif defined BACKEND_SG2260
   SGDNN_CHECK ( input_num <= FW_MAX_CONCAT_NUM );
   sg_api_concat_t api;
   for ( int i = 0; i < input_num; ++i )
@@ -1775,7 +1775,7 @@ bm_status_t sgdnnPoolingForward ( bm_handle_t handle,
   //constrainst need to to checked
   SGDNN_CHECK ( sgdnnIsTensorContiguous ( &input ) );
   SGDNN_CHECK ( sgdnnIsTensorContiguous ( &output ) );
-#if defined SGDNN_BACKEND_1684X
+#if defined BACKEND_1684X
   sg_api_pooling_t api;
   api.input_global_addr = input.addr;
   api.output_global_addr = output.addr;
@@ -1799,7 +1799,7 @@ bm_status_t sgdnnPoolingForward ( bm_handle_t handle,
   else{
     SGDNN_CHECK ( false );
   }
-#elif defined SGDNN_BACKEND_2260
+#elif defined BACKEND_SG2260
   //constrainst need to to checked
   sg_api_pooling_t api;
   api.input_global_addr = input.addr;
@@ -1853,7 +1853,7 @@ bm_status_t sgdnnIndexSelect ( bm_handle_t handle,
   SGDNN_CHECK ( sgdnnIsTensorContiguous ( &input ) );
   SGDNN_CHECK ( sgdnnIsTensorContiguous ( &indices ) );
   SGDNN_CHECK ( sgdnnIsTensorContiguous ( &output ) );
-#if defined SGDNN_BACKEND_1684X
+#if defined BACKEND_1684X
   SgdnnTensor_t indices_ = indices;
   bm_device_mem_t indices_mem;
   if (indices.dtype == SGDNN_DTYPE_INT64)
@@ -1887,7 +1887,7 @@ bm_status_t sgdnnIndexSelect ( bm_handle_t handle,
     bm_free_device ( handle, indices_mem );
   }
 
-#elif defined SGDNN_BACKEND_2260
+#elif defined BACKEND_SG2260
   sg_api_index_select_t api;
   api.input_global_addr = input.addr;
   api.index_global_addr = indices.addr;
@@ -1973,7 +1973,7 @@ bm_status_t sgdnnFill ( bm_handle_t handle,
                         SgdnnTensor_t output )
 {
   SGDNN_CHECK ( sgdnnIsTensorContiguous ( &output ) );
-#if defined SGDNN_BACKEND_1684X
+#if defined BACKEND_1684X
   sg_api_constant_fill_t api;
   api.output_global_addr = output.addr;
   api.dim = output.dim;
@@ -1988,7 +1988,7 @@ bm_status_t sgdnnFill ( bm_handle_t handle,
     ( ( char * ) &api.value ) [i] = ( ( const char * ) scalar_ptr ) [i];
   }
   SAFE_CALL ( sgdnnTPUKernelLaunch ( handle, "tpu_kernel_api_const_fill", &api, sizeof ( api ) ) );
-#elif defined SGDNN_BACKEND_2260
+#elif defined BACKEND_SG2260
   sg_api_constant_fill_t api;
   api.output_global_addr = output.addr;
   api.dim = output.dim;
@@ -2015,7 +2015,7 @@ bm_status_t sgdnnUpsampling(bm_handle_t handle, SgdnnTensor_t input,
                             sg_resize_mode_t upsampling_type) {
   SGDNN_CHECK(sgdnnIsTensorContiguous(&output));
 
-#if defined SGDNN_BACKEND_1684X
+#if defined BACKEND_1684X
   sg_api_upsampling2d_t api;
   api.input_global_addr = input.addr;
   api.output_global_addr = output.addr;
@@ -2050,7 +2050,7 @@ bm_status_t sgdnnUpsampling(bm_handle_t handle, SgdnnTensor_t input,
   SAFE_CALL(sgdnnTPUKernelLaunch(handle, "tpu_kernel_api_interp", &api,
                                  sizeof(api)));
   bm_free_device(handle, buffer_mem);
-#elif defined SGDNN_BACKEND_2260
+#elif defined BACKEND_SG2260
   SGDNN_CHECK(false);
 #else
   SGDNN_CHECK(false);
@@ -2064,7 +2064,7 @@ bm_status_t sgdnnUpsampleNearest2dBackward(bm_handle_t handle, SgdnnTensor_t gra
                             PoolingDescriptor_t pooling_desc) {
   SGDNN_CHECK(sgdnnIsTensorContiguous(&grad_output));
   SGDNN_CHECK(sgdnnIsTensorContiguous(&grad_input));
-#if defined SGDNN_BACKEND_1684X
+#if defined BACKEND_1684X
   sg_api_upsample2d_backward_t api;
   api.input_global_addr = grad_output.addr;
   api.output_global_addr = grad_input.addr;
@@ -2082,7 +2082,7 @@ bm_status_t sgdnnUpsampleNearest2dBackward(bm_handle_t handle, SgdnnTensor_t gra
     SGDNN_CHECK ( false );
   }
 
-#elif defined SGDNN_BACKEND_2260
+#elif defined BACKEND_SG2260
   SGDNN_CHECK(false);
 #else
   SGDNN_CHECK(false);
@@ -2117,7 +2117,7 @@ bm_status_t sgdnnActive(bm_handle_t handle, SgdnnTensor_t input,
   api.dtype = sgdnnTPUKernelDType(input.dtype);
   api.active_type = active_type;
 
-#if defined SGDNN_BACKEND_1684X
+#if defined BACKEND_1684X
   if (active_type == ACTIVE_ABSVAL) {
     SGDNN_CHECK(
         input.dtype == SGDNN_DTYPE_FP32 || input.dtype == SGDNN_DTYPE_FP16 ||
@@ -2137,7 +2137,7 @@ bm_status_t sgdnnActive(bm_handle_t handle, SgdnnTensor_t input,
   }
   SAFE_CALL(
       sgdnnTPUKernelLaunch(handle, "tpu_kernel_api_active", &api, sizeof(api)));
-#elif defined SGDNN_BACKEND_2260
+#elif defined BACKEND_SG2260
   SAFE_CALL(sgdnnTPUKernelLaunch(handle, "tpu_kernel_api_active_multi_core",
                                  &api, sizeof(api)));
 #else
@@ -2166,10 +2166,10 @@ bm_status_t sgdnnLog(bm_handle_t handle, SgdnnTensor_t input,
   }
   api.dtype = sgdnnTPUKernelDType(input.dtype);
   api.log_type = log_type;
-#if defined SGDNN_BACKEND_1684X
+#if defined BACKEND_1684X
   SAFE_CALL(
       sgdnnTPUKernelLaunch(handle, "tpu_kernel_api_log", &api, sizeof(api)));
-#elif defined SGDNN_BACKEND_2260
+#elif defined BACKEND_SG2260
   SAFE_CALL(sgdnnTPUKernelLaunch(handle, "tpu_kernel_api_log_multi_core", &api,
                                  sizeof(api)));
 #else
@@ -2195,10 +2195,10 @@ bm_status_t sgdnnSqueeze(bm_handle_t handle, SgdnnTensor_t input,
     api.shape[i] = input.shape[i];
   }
   api.dtype = sgdnnTPUKernelDType(input.dtype);
-#if defined SGDNN_BACKEND_1684X
+#if defined BACKEND_1684X
   SAFE_CALL(
       sgdnnTPUKernelLaunch(handle, "tpu_kernel_api_squeeze", &api, sizeof(api)));
-#elif defined SGDNN_BACKEND_2260
+#elif defined BACKEND_SG2260
   SAFE_CALL(sgdnnTPUKernelLaunch(handle, "tpu_kernel_api_squeeze_multi_core", &api,
                                  sizeof(api)));
 #else
@@ -2231,10 +2231,10 @@ bm_status_t sgdnnNativeGroupNorm(bm_handle_t handle, SgdnnTensor_t input,
     api.shape[i] = input.shape[i];
   }
   api.dtype = sgdnnTPUKernelDType(input.dtype);
-#if defined SGDNN_BACKEND_1684X
+#if defined BACKEND_1684X
   SAFE_CALL(
       sgdnnTPUKernelLaunch(handle, "tpu_kernel_api_native_group_norm", &api, sizeof(api)));
-#elif defined SGDNN_BACKEND_2260
+#elif defined BACKEND_SG2260
   SAFE_CALL(sgdnnTPUKernelLaunch(handle, "tpu_kernel_api_native_group_norm_multi_core", &api,
                                  sizeof(api)));
 #else
@@ -2267,10 +2267,10 @@ bm_status_t sgdnnNativeGroupNormBackward(bm_handle_t handle, SgdnnTensor_t grad_
     api.shape[i] = input.shape[i];
   }
   api.dtype = sgdnnTPUKernelDType(input.dtype);
-#if defined SGDNN_BACKEND_1684X
+#if defined BACKEND_1684X
   SAFE_CALL(
       sgdnnTPUKernelLaunch(handle, "tpu_kernel_api_groupnorm2d_backward", &api, sizeof(api)));
-#elif defined SGDNN_BACKEND_2260
+#elif defined BACKEND_SG2260
   SAFE_CALL(sgdnnTPUKernelLaunch(handle, "tpu_kernel_api_native_group_norm_multi_core", &api,
                                  sizeof(api)));
 #else
@@ -2294,7 +2294,7 @@ bm_status_t sgdnnLogicalOr ( bm_handle_t handle,
   SGDNN_CHECK ( sgdnnIsTensorContiguous ( &input ) );
   SGDNN_CHECK ( sgdnnIsTensorContiguous ( &other ) );
   SGDNN_CHECK ( sgdnnIsTensorContiguous ( &output ) );
-#if defined SGDNN_BACKEND_1684X
+#if defined BACKEND_1684X
   sg_api_logical_or_t api;
   api.input_global_addr = input.addr;
   api.other_global_addr = other.addr;
@@ -2306,7 +2306,7 @@ bm_status_t sgdnnLogicalOr ( bm_handle_t handle,
   }
   api.dtype = sgdnnTPUKernelDType ( input.dtype );
   SAFE_CALL ( sgdnnTPUKernelLaunch ( handle, "tpu_kernel_api_logical_or", &api, sizeof ( api ) ) );
-#elif defined SGDNN_BACKEND_2260
+#elif defined BACKEND_SG2260
   sg_api_logical_or_t api;
   api.input_global_addr = input.addr;
   api.other_global_addr = other.addr;
@@ -2333,7 +2333,7 @@ bm_status_t sgdnnFlip ( bm_handle_t handle,
                 input.dtype == SGDNN_DTYPE_FP16 ||
                 input.dtype == SGDNN_DTYPE_BF16 );
   SGDNN_CHECK ( sgdnnIsTensorContiguous ( &input ) );
-#if defined SGDNN_BACKEND_1684X
+#if defined BACKEND_1684X
   sg_api_flip_t api;
   api.input_global_addr = input.addr;
   api.output_global_addr = output.addr;
@@ -2345,7 +2345,7 @@ bm_status_t sgdnnFlip ( bm_handle_t handle,
   }
   api.dtype = sgdnnTPUKernelDType ( input.dtype );
   SAFE_CALL ( sgdnnTPUKernelLaunch ( handle, "tpu_kernel_api_flip", &api, sizeof ( api ) ) );
-#elif defined SGDNN_BACKEND_2260
+#elif defined BACKEND_SG2260
   sg_api_flip_t api;
   api.input_global_addr = input.addr;
   api.output_global_addr = output.addr;
@@ -2378,7 +2378,7 @@ bm_status_t sgdnnLogicalAnd ( bm_handle_t handle,
   SGDNN_CHECK ( sgdnnIsTensorContiguous ( &input ) );
   SGDNN_CHECK ( sgdnnIsTensorContiguous ( &other ) );
   SGDNN_CHECK ( sgdnnIsTensorContiguous ( &output ) );
-#if defined SGDNN_BACKEND_1684X
+#if defined BACKEND_1684X
   sg_api_logical_and_t api;
   api.input_global_addr = input.addr;
   api.other_global_addr = other.addr;
@@ -2390,7 +2390,7 @@ bm_status_t sgdnnLogicalAnd ( bm_handle_t handle,
   }
   api.dtype = sgdnnTPUKernelDType ( input.dtype );
   SAFE_CALL ( sgdnnTPUKernelLaunch ( handle, "tpu_kernel_api_logical_and", &api, sizeof ( api ) ) );
-#elif defined SGDNN_BACKEND_2260
+#elif defined BACKEND_SG2260
   sg_api_logical_and_t api;
   api.input_global_addr = input.addr;
   api.other_global_addr = other.addr;
@@ -2418,7 +2418,7 @@ bm_status_t sgdnnLogicalNot ( bm_handle_t handle,
   SGDNN_CHECK ( sgdnnIsSameShape ( &input, &output ) );
   SGDNN_CHECK ( sgdnnIsTensorContiguous ( &input ) );
   SGDNN_CHECK ( sgdnnIsTensorContiguous ( &output ) );
-#if defined SGDNN_BACKEND_1684X
+#if defined BACKEND_1684X
   sg_api_logical_not_t api;
   api.input_global_addr = input.addr;
   api.output_global_addr = output.addr;
@@ -2429,7 +2429,7 @@ bm_status_t sgdnnLogicalNot ( bm_handle_t handle,
   }
   api.dtype = sgdnnTPUKernelDType ( input.dtype );
   SAFE_CALL ( sgdnnTPUKernelLaunch ( handle, "tpu_kernel_api_logical_not", &api, sizeof ( api ) ) );
-#elif defined SGDNN_BACKEND_2260
+#elif defined BACKEND_SG2260
   sg_api_logical_not_t api;
   api.input_global_addr = input.addr;
   api.output_global_addr = output.addr;
@@ -2482,9 +2482,9 @@ bm_status_t sgdnnBinary ( bm_handle_t handle,
   std::cout << "output_addr0\n" << api.output_global_addr << std::endl;
   std::cout << "output_size0\n" << sgdnnTensorBytes(&output) << std::endl;
 #endif
-#if defined SGDNN_BACKEND_1684X
+#if defined BACKEND_1684X
   SAFE_CALL ( sgdnnTPUKernelLaunch ( handle, "tpu_kernel_api_binary", &api, sizeof ( api ) ) );
-#elif defined SGDNN_BACKEND_2260
+#elif defined BACKEND_SG2260
   SAFE_CALL ( sgdnnTPUKernelLaunch ( handle, "tpu_kernel_api_binary_multi_core", &api, sizeof ( api ) ) );
 #else
   SGDNN_CHECK ( false );
@@ -2532,9 +2532,9 @@ bm_status_t sgdnnBinaryBcast (  bm_handle_t handle,
   api.dtype = sgdnnTPUKernelDType ( input.dtype );
   api.value = scalar;
   api.binary_type = binary_type;
-#if defined SGDNN_BACKEND_1684X
+#if defined BACKEND_1684X
   SAFE_CALL ( sgdnnTPUKernelLaunch ( handle, "tpu_kernel_api_binary_bcast", &api, sizeof ( api ) ) );
-#elif defined SGDNN_BACKEND_2260
+#elif defined BACKEND_SG2260
   SAFE_CALL ( sgdnnTPUKernelLaunch ( handle, "tpu_kernel_api_binary_bcast_multi_core", &api, sizeof ( api ) ) );
 #else
   SGDNN_CHECK ( false );
@@ -2566,9 +2566,9 @@ bm_status_t sgdnnBinaryC ( bm_handle_t handle,
   api.value = scalar;
   api.binary_type = binary_type;
   api.inversed = inversed;
-#if defined SGDNN_BACKEND_1684X
+#if defined BACKEND_1684X
   SAFE_CALL ( sgdnnTPUKernelLaunch ( handle, "tpu_kernel_api_binary_c", &api, sizeof ( api ) ) );
-#elif defined SGDNN_BACKEND_2260
+#elif defined BACKEND_SG2260
   SAFE_CALL ( sgdnnTPUKernelLaunch ( handle, "tpu_kernel_api_binary_c_multi_core", &api, sizeof ( api ) ) );
 #else
   SGDNN_CHECK ( false );
@@ -2598,7 +2598,7 @@ bm_status_t sgdnnCrossEntropyLoss ( bm_handle_t handle,
   SGDNN_CHECK ( sgdnnIsTensorContiguous ( &target ) );
   SGDNN_CHECK ( sgdnnIsTensorContiguous ( &output ) );
   SGDNN_CHECK ( reduction == 0 || reduction == 1 );
-#if defined SGDNN_BACKEND_1684X
+#if defined BACKEND_1684X
   sg_api_cross_entropy_loss_t api;
   api.input_global_addr = input.addr;
   api.target_global_addr = target.addr;
@@ -2610,7 +2610,7 @@ bm_status_t sgdnnCrossEntropyLoss ( bm_handle_t handle,
   api.dtype = sgdnnTPUKernelDType ( input.dtype );
   api.is_target_int64 = target.dtype == SGDNN_DTYPE_INT64;
   SAFE_CALL ( sgdnnTPUKernelLaunch ( handle, "tpu_kernel_api_cross_entropy_loss", &api, sizeof ( api ) ) );
-#elif defined SGDNN_BACKEND_2260
+#elif defined BACKEND_SG2260
   SGDNN_CHECK ( false );
 #else
   SGDNN_CHECK ( false );
@@ -2645,7 +2645,7 @@ SgdnnTensor_t grad_input )
   SGDNN_CHECK ( sgdnnIsTensorContiguous ( &grad_output ) );
   SGDNN_CHECK ( sgdnnIsTensorContiguous ( &grad_input ) );
   SGDNN_CHECK ( reduction == 0 || reduction == 1 );
-#if defined SGDNN_BACKEND_1684X
+#if defined BACKEND_1684X
   sg_api_cross_entropy_loss_backward_t api;
   api.input_global_addr = input.addr;
   api.target_global_addr = target.addr;
@@ -2658,7 +2658,7 @@ SgdnnTensor_t grad_input )
   api.dtype = sgdnnTPUKernelDType ( input.dtype );
   api.is_target_int64 = target.dtype == SGDNN_DTYPE_INT64;
   SAFE_CALL ( sgdnnTPUKernelLaunch ( handle, "tpu_kernel_api_cross_entropy_loss_backward", &api, sizeof ( api ) ) );
-#elif defined SGDNN_BACKEND_2260
+#elif defined BACKEND_SG2260
   SGDNN_CHECK ( false );
 #else
   SGDNN_CHECK ( false );
@@ -2702,7 +2702,7 @@ bm_status_t sgdnnMatmul ( bm_handle_t handle,
   {
     SGDNN_CHECK ( sgdnnIsTensorContiguous ( &bias ) );
   }
-#if defined SGDNN_BACKEND_1684X
+#if defined BACKEND_1684X
   bm_device_mem_t left_contiguous_mem;
   if ( sgdnnIsTensorTransposed ( &left ) )
   {
@@ -2734,7 +2734,7 @@ bm_status_t sgdnnMatmul ( bm_handle_t handle,
   {
     bm_free_device ( handle, left_contiguous_mem );
   }
-#elif defined SGDNN_BACKEND_2260
+#elif defined BACKEND_SG2260
   sg_api_matmul_multi_core_t api;
   api.left_global_addr = left.addr;
   api.right_global_addr = right.addr;
@@ -2815,7 +2815,7 @@ bm_status_t sgdnnBatchMatmul ( bm_handle_t handle,
   SGDNN_CHECK ( sgdnnIsTensorContiguous ( &left ) || sgdnnIsTensorTransposed ( &left ) );
   SGDNN_CHECK ( sgdnnIsTensorContiguous ( &right ) || sgdnnIsTensorTransposed ( &right ) );
   SGDNN_CHECK ( sgdnnIsTensorContiguous ( &output ) );
-#if defined SGDNN_BACKEND_1684X
+#if defined BACKEND_1684X
   bm_device_mem_t left_contiguous_mem;
   if ( sgdnnIsTensorTransposed ( &left ) )
   {
@@ -2849,7 +2849,7 @@ bm_status_t sgdnnBatchMatmul ( bm_handle_t handle,
   {
     bm_free_device ( handle, left_contiguous_mem );
   }
-#elif defined SGDNN_BACKEND_2260
+#elif defined BACKEND_SG2260
   sg_api_matmul_multi_core_t api;
   api.left_global_addr = left.addr;
   api.right_global_addr = right.addr;
@@ -2923,7 +2923,7 @@ bm_status_t sgdnnEmbeddingBackward ( bm_handle_t handle,
   SGDNN_CHECK ( indices.dtype == SGDNN_DTYPE_INT32 || indices.dtype == SGDNN_DTYPE_INT64 );
   SGDNN_CHECK ( grad_input.dim == 2 );
   SGDNN_CHECK ( grad_output.shape[grad_output.dim - 1] == grad_input.shape[1] );
-#if defined SGDNN_BACKEND_1684X
+#if defined BACKEND_1684X
   sg_api_embedding_backward_t api;
   const int window_size = 64;
   SGDNN_CHECK ( window_size % 64 == 0 );
@@ -2967,7 +2967,7 @@ bm_status_t sgdnnEmbeddingBackward ( bm_handle_t handle,
   bm_free_device ( handle, sorted_index_index );
   bm_free_device ( handle, from_index );
   bm_free_device ( handle, to_index );
-#elif defined SGDNN_BACKEND_2260
+#elif defined BACKEND_SG2260
   sg_api_embedding_backward_t api;
   int indices_num = 1;
   for ( int i = 0; i < indices.dim; ++i )
@@ -3049,7 +3049,7 @@ bm_status_t sgdnnNorm2 ( bm_handle_t handle,
   }
   SGDNN_CHECK ( sgdnnIsTensorContiguous ( &input ) );
   SGDNN_CHECK ( sgdnnIsTensorContiguous ( &output ) );
-#if defined SGDNN_BACKEND_1684X
+#if defined BACKEND_1684X
   sg_api_norm2_t api;
   api.input_global_addr = input.addr;
   api.output_global_addr = output.addr;
@@ -3060,7 +3060,7 @@ bm_status_t sgdnnNorm2 ( bm_handle_t handle,
   }
   api.dtype = sgdnnTPUKernelDType ( input.dtype );
   SAFE_CALL ( sgdnnTPUKernelLaunch ( handle, "tpu_kernel_api_norm2", &api, sizeof ( api ) ) );
-#elif defined SGDNN_BACKEND_2260
+#elif defined BACKEND_SG2260
   sg_api_norm2_multi_core_t api;
   api.input_global_addr = input.addr;
   api.output_global_addr = output.addr;
@@ -3116,9 +3116,9 @@ bm_status_t sgdnnGELU ( bm_handle_t handle,
   std::cout << "output_addr0\n" << api.output_global_addr << std::endl;
   std::cout << "output_size0\n" << sgdnnTensorBytes(&output) << std::endl;
 #endif
-#if defined SGDNN_BACKEND_1684X
+#if defined BACKEND_1684X
   SAFE_CALL ( sgdnnTPUKernelLaunch ( handle, "tpu_kernel_api_gelu", &api, sizeof ( api ) ) );
-#elif defined SGDNN_BACKEND_2260
+#elif defined BACKEND_SG2260
   SAFE_CALL ( sgdnnTPUKernelLaunch ( handle, "tpu_kernel_api_gelu_multi_core", &api, sizeof ( api ) ) );
 #else
   SGDNN_CHECK ( false );
@@ -3141,7 +3141,7 @@ bm_status_t sgdnnReLUBackward ( bm_handle_t handle,
   SGDNN_CHECK ( sgdnnIsTensorContiguous ( &input ) );
   SGDNN_CHECK ( sgdnnIsTensorContiguous ( &grad_output ) );
   SGDNN_CHECK ( sgdnnIsTensorContiguous ( &grad_input ) );
-#if defined SGDNN_BACKEND_1684X
+#if defined BACKEND_1684X
   sg_api_relu_backward_t api;
   api.input_global_addr = input.addr;
   api.grad_output_global_addr = grad_output.addr;
@@ -3153,7 +3153,7 @@ bm_status_t sgdnnReLUBackward ( bm_handle_t handle,
   }
   api.dtype = sgdnnTPUKernelDType ( input.dtype );
   SAFE_CALL ( sgdnnTPUKernelLaunch ( handle, "tpu_kernel_api_relu_backward", &api, sizeof ( api ) ) );
-#elif defined SGDNN_BACKEND_2260
+#elif defined BACKEND_SG2260
   SGDNN_CHECK ( false );
 #else
   SGDNN_CHECK ( false );
@@ -3196,9 +3196,9 @@ bm_status_t sgdnnGELUBackward ( bm_handle_t handle,
   std::cout << "output_addr0\n" << api.grad_input_global_addr << std::endl;
   std::cout << "output_size0\n" << sgdnnTensorBytes(&grad_input) << std::endl;
 #endif
-#if defined SGDNN_BACKEND_1684X
+#if defined BACKEND_1684X
   SAFE_CALL ( sgdnnTPUKernelLaunch ( handle, "tpu_kernel_api_gelu_backward", &api, sizeof ( api ) ) );
-#elif defined SGDNN_BACKEND_2260
+#elif defined BACKEND_SG2260
   SAFE_CALL ( sgdnnTPUKernelLaunch ( handle, "tpu_kernel_api_gelu_backward_multi_core", &api, sizeof ( api ) ) );
 #else
   SGDNN_CHECK ( false );
@@ -3215,7 +3215,7 @@ bm_status_t sgdnnLeakyReLU ( bm_handle_t handle,
                 input.dtype == SGDNN_DTYPE_FP16 ||
                 input.dtype == SGDNN_DTYPE_BF16 );
   SGDNN_CHECK ( sgdnnIsTensorContiguous ( &input ) );
-#if defined SGDNN_BACKEND_1684X
+#if defined BACKEND_1684X
   sg_api_leakyrelu_t api;
   api.input_global_addr = input.addr;
   api.output_global_addr = output.addr;
@@ -3227,7 +3227,7 @@ bm_status_t sgdnnLeakyReLU ( bm_handle_t handle,
   api.dtype = sgdnnTPUKernelDType ( input.dtype );
   api.negative_slope = negative_slope;
   SAFE_CALL ( sgdnnTPUKernelLaunch ( handle, "tpu_kernel_api_leakyrelu", &api, sizeof ( api ) ) );
-#elif defined SGDNN_BACKEND_2260
+#elif defined BACKEND_SG2260
   sg_api_leakyrelu_t api;
   api.input_global_addr = input.addr;
   api.output_global_addr = output.addr;
@@ -3256,7 +3256,7 @@ bm_status_t sgdnnSign ( bm_handle_t handle,
   SGDNN_CHECK ( sgdnnIsSameShape ( &input, &output ) );
   SGDNN_CHECK ( sgdnnIsTensorContiguous ( &input ) );
   SGDNN_CHECK ( sgdnnIsTensorContiguous ( &output ) );
-#if defined SGDNN_BACKEND_1684X
+#if defined BACKEND_1684X
   sg_api_sign_t api;
   api.input_global_addr = input.addr;
   api.output_global_addr = output.addr;
@@ -3267,7 +3267,7 @@ bm_status_t sgdnnSign ( bm_handle_t handle,
   }
   api.dtype = sgdnnTPUKernelDType ( input.dtype );
   SAFE_CALL ( sgdnnTPUKernelLaunch ( handle, "tpu_kernel_api_sign", &api, sizeof ( api ) ) );
-#elif defined SGDNN_BACKEND_2260
+#elif defined BACKEND_SG2260
   sg_api_active_t api;
   api.input_global_addr = input.addr;
   api.output_global_addr = output.addr;
@@ -3302,7 +3302,7 @@ bm_status_t sgdnnAddCMulBcast ( bm_handle_t handle,
   SGDNN_CHECK ( sgdnnIsTensorContiguous ( &tensor1 ) );
   SGDNN_CHECK ( sgdnnIsTensorContiguous ( &tensor2 ) );
   SGDNN_CHECK ( sgdnnIsTensorContiguous ( &output ) );
-#if defined SGDNN_BACKEND_1684X
+#if defined BACKEND_1684X
   sg_api_bcast_addcmul_t api;
   api.input_global_addr = input.addr;
   api.tensor1_global_addr = tensor1.addr;
@@ -3326,7 +3326,7 @@ bm_status_t sgdnnAddCMulBcast ( bm_handle_t handle,
   api.dtype = sgdnnTPUKernelDType ( input.dtype );
   api.value = scalar;
   SAFE_CALL ( sgdnnTPUKernelLaunch ( handle, "tpu_kernel_api_addcmul_bcast", &api, sizeof ( api ) ) );
-#elif defined SGDNN_BACKEND_2260
+#elif defined BACKEND_SG2260
   //SGDNN_CHECK ( false );
   sg_api_addcmul_t api;
   api.input_global_addr = input.addr;
@@ -3367,7 +3367,7 @@ bm_status_t sgdnnAddCMul ( bm_handle_t handle,
   SGDNN_CHECK ( sgdnnIsTensorContiguous ( &tensor1 ) );
   SGDNN_CHECK ( sgdnnIsTensorContiguous ( &tensor2 ) );
   SGDNN_CHECK ( sgdnnIsTensorContiguous ( &output ) );
-#if defined SGDNN_BACKEND_1684X
+#if defined BACKEND_1684X
   sg_api_addcmul_t api;
   api.input_global_addr = input.addr;
   api.tensor1_global_addr = tensor1.addr;
@@ -3381,7 +3381,7 @@ bm_status_t sgdnnAddCMul ( bm_handle_t handle,
   api.dtype = sgdnnTPUKernelDType ( input.dtype );
   api.value = scalar;
   SAFE_CALL ( sgdnnTPUKernelLaunch ( handle, "tpu_kernel_api_addcmul", &api, sizeof ( api ) ) );
-#elif defined SGDNN_BACKEND_2260
+#elif defined BACKEND_SG2260
   //SGDNN_CHECK ( false );
   sg_api_addcmul_t api;
   api.input_global_addr = input.addr;
@@ -3422,7 +3422,7 @@ bm_status_t sgdnnAddCDiv ( bm_handle_t handle,
   SGDNN_CHECK ( sgdnnIsTensorContiguous ( &tensor1 ) );
   SGDNN_CHECK ( sgdnnIsTensorContiguous ( &tensor2 ) );
   SGDNN_CHECK ( sgdnnIsTensorContiguous ( &output ) );
-#if defined SGDNN_BACKEND_1684X
+#if defined BACKEND_1684X
   sg_api_addcdiv_t api;
   api.input_global_addr = input.addr;
   api.tensor1_global_addr = tensor1.addr;
@@ -3436,7 +3436,7 @@ bm_status_t sgdnnAddCDiv ( bm_handle_t handle,
   api.dtype = sgdnnTPUKernelDType ( input.dtype );
   api.value = scalar;
   SAFE_CALL ( sgdnnTPUKernelLaunch ( handle, "tpu_kernel_api_addcdiv", &api, sizeof ( api ) ) );
-#elif defined SGDNN_BACKEND_2260
+#elif defined BACKEND_SG2260
   sg_api_addcdiv_t api;
   api.input_global_addr = input.addr;
   api.tensor1_global_addr = tensor1.addr;
@@ -3471,7 +3471,7 @@ bm_status_t sgdnnMaskedFill ( bm_handle_t handle,
   {
     SGDNN_CHECK ( input.shape[i] == mask.shape[i] || mask.shape[i] == 1);
   }
-#if defined SGDNN_BACKEND_1684X
+#if defined BACKEND_1684X
   sg_api_masked_fill_t api;
   api.input_global_addr = input.addr;
   api.mask_global_addr = mask.addr;
@@ -3486,7 +3486,7 @@ bm_status_t sgdnnMaskedFill ( bm_handle_t handle,
   api.value = value;
   api.dtype = sgdnnTPUKernelDType ( SGDNN_DTYPE_FP32 );;
   SAFE_CALL ( sgdnnTPUKernelLaunch ( handle, "tpu_kernel_api_masked_fill", &api, sizeof ( api ) ) );
-#elif defined SGDNN_BACKEND_2260
+#elif defined BACKEND_SG2260
   sg_api_masked_fill_t api;
   api.input_global_addr = input.addr;
   api.mask_global_addr = mask.addr;
@@ -3530,7 +3530,7 @@ bm_status_t sgdnnDropout ( bm_handle_t handle,
   {
     SGDNN_CHECK ( sgdnnIsTensorContiguous ( &mask ) );
   }
-#if defined SGDNN_BACKEND_1684X
+#if defined BACKEND_1684X
   SGDNN_CHECK ( false ); // TODO
   sg_api_dropout_t api;
   api.input_global_addr = input.addr;
@@ -3615,9 +3615,9 @@ bm_status_t sgdnnMlp ( bm_handle_t handle,
     SGDNN_CHECK ( sgdnnIsTensorContiguous ( &b2 ) );
   }
   SGDNN_CHECK ( sgdnnIsTensorContiguous ( &output ) );
-#if defined SGDNN_BACKEND_1684X
+#if defined BACKEND_1684X
   SGDNN_CHECK ( false );
-#elif defined SGDNN_BACKEND_2260
+#elif defined BACKEND_SG2260
   sg_api_mlp_multi_core_t api;
   api.input_addr    = input.addr;
   api.weight0_addr  = w1.addr;
@@ -3736,7 +3736,7 @@ bm_status_t sgdnnMlpBackward ( bm_handle_t handle,
     SGDNN_CHECK ( sgdnnIsTensorContiguous ( &grad_b2 ) );
   }
 
-#if defined SGDNN_BACKEND_2260
+#if defined BACKEND_SG2260
   SGDNN_CHECK ( false );
 #else
   SGDNN_CHECK ( false );
@@ -3774,9 +3774,9 @@ bm_status_t sgdnnLLamaMlp ( bm_handle_t handle,
   SGDNN_CHECK ( sgdnnIsTensorContiguous ( &weight2 ) );
   SGDNN_CHECK ( sgdnnIsTensorContiguous ( &output ) );
 
-#if defined SGDNN_BACKEND_1684X
+#if defined BACKEND_1684X
   SGDNN_CHECK ( false );
-#elif defined SGDNN_BACKEND_2260
+#elif defined BACKEND_SG2260
   sg_api_llama_mlp_multi_core_t api;
   api.input_addr    = input.addr;
   api.weight0_addr  = weight0.addr;
@@ -3841,9 +3841,9 @@ bm_status_t sgdnnLlamaAttention ( bm_handle_t handle,
   SGDNN_CHECK ( sgdnnIsTensorContiguous ( &Vcache ) );
   SGDNN_CHECK ( sgdnnIsTensorContiguous ( &Y ) );
 
-#if defined SGDNN_BACKEND_1684X
+#if defined BACKEND_1684X
   SGDNN_CHECK ( false );
-#elif defined SGDNN_BACKEND_2260
+#elif defined BACKEND_SG2260
   sg_api_llama2_qkv_multi_core_t api;
   int batch = Q.shape[0];
   int num_attention_heads = Q.shape[1];
@@ -3897,9 +3897,9 @@ bm_status_t sgdnnRMSNorm ( bm_handle_t  handle,
   SGDNN_CHECK ( sgdnnIsTensorContiguous ( &input ) );
   SGDNN_CHECK ( sgdnnIsTensorContiguous ( &output ) );
 
-#if defined SGDNN_BACKEND_1684X
+#if defined BACKEND_1684X
   SGDNN_CHECK ( false );
-#elif defined SGDNN_BACKEND_2260
+#elif defined BACKEND_SG2260
   sg_api_rmsnorm_multi_core_t api;
   api.input_addr    = input.addr;
   api.weight_addr   = weight.addr;
@@ -4004,9 +4004,9 @@ bm_status_t sgdnnAttn ( bm_handle_t handle,
     SGDNN_CHECK ( sgdnnIsTensorContiguous ( &b_proj ) );
   }
   SGDNN_CHECK ( sgdnnIsTensorContiguous ( &out ) );
-#if defined SGDNN_BACKEND_1684X
+#if defined BACKEND_1684X
   SGDNN_CHECK ( false );
-#elif defined SGDNN_BACKEND_2260
+#elif defined BACKEND_SG2260
   SGDNN_CHECK ( false );
 #else
   SGDNN_CHECK ( false );
@@ -4103,7 +4103,7 @@ bm_status_t sgdnnAttnBackward ( bm_handle_t handle,
     SGDNN_CHECK ( sgdnnIsTensorContiguous ( &grad_b_proj ) );
   }
 
-#if defined SGDNN_BACKEND_2260
+#if defined BACKEND_SG2260
   SGDNN_CHECK ( false );
 #else
   SGDNN_CHECK ( false );
@@ -4118,7 +4118,7 @@ bm_status_t sgdnnArange ( bm_handle_t handle,
                                 SgdnnTensor_t out)
 {
   SGDNN_CHECK ( sgdnnIsTensorContiguous ( &out ) );
-#if defined SGDNN_BACKEND_1684X
+#if defined BACKEND_1684X
   SGDNN_CHECK( out.dim == 1);  // arange just need 1 dimension.
   SGDNN_CHECK( out.dtype == SGDNN_DTYPE_INT32 || out.dtype == SGDNN_DTYPE_INT64 || out.dtype == SGDNN_DTYPE_FP32 );
   sg_api_arange_t api;
@@ -4172,9 +4172,9 @@ bm_status_t sgdnnElementBitwise ( bm_handle_t handle,
   api.mode = mode;
   api.dtype = sgdnnTPUKernelDType ( input.dtype );
 
-#if defined SGDNN_BACKEND_1684X
+#if defined BACKEND_1684X
    SAFE_CALL ( sgdnnTPUKernelLaunch ( handle, "tpu_kernel_api_element_bitwise", &api, sizeof ( api ) ) );
-#elif defined SGDNN_BACKEND_2260
+#elif defined BACKEND_SG2260
   SAFE_CALL ( sgdnnTPUKernelLaunch ( handle, "tpu_kernel_api_element_bitwise_multi_core", &api, sizeof ( api ) ) );
 #else
   SGDNN_CHECK ( false );
@@ -4215,9 +4215,9 @@ bm_status_t sgdnnElementBitwiseBcast ( bm_handle_t handle,
   api.mode = mode;
   api.dtype = sgdnnTPUKernelDType ( input.dtype );
 
-#if defined SGDNN_BACKEND_1684X
+#if defined BACKEND_1684X
   SAFE_CALL ( sgdnnTPUKernelLaunch ( handle, "tpu_kernel_api_element_bitwise_bcast", &api, sizeof ( api ) ) );
-#elif defined SGDNN_BACKEND_2260
+#elif defined BACKEND_SG2260
   SAFE_CALL ( sgdnnTPUKernelLaunch ( handle, "tpu_kernel_api_element_bitwise_bcast_multi_core", &api, sizeof ( api ) ) );
 #else
   SGDNN_CHECK ( false );
@@ -4254,9 +4254,9 @@ bm_status_t sgdnnElementBitwiseC ( bm_handle_t handle,
   api.value = scalar;
   api.mode = mode;
 
-#if defined SGDNN_BACKEND_1684X
+#if defined BACKEND_1684X
   SAFE_CALL( sgdnnTPUKernelLaunch ( handle, "tpu_kernel_api_element_bitwise_c", &api, sizeof( api ) ) );
-#elif defined SGDNN_BACKEND_2260
+#elif defined BACKEND_SG2260
   SAFE_CALL ( sgdnnTPUKernelLaunch ( handle, "tpu_kernel_api_element_bitwise_c_multi_core", &api, sizeof ( api ) ) );
 #else
   SGDNN_CHECK ( false );
@@ -4275,7 +4275,7 @@ bm_status_t sgdnnNeg ( bm_handle_t handle,
   SGDNN_CHECK ( sgdnnIsSameShape ( &input, &output ) );
   SGDNN_CHECK ( sgdnnIsTensorContiguous ( &input ) );
   SGDNN_CHECK ( sgdnnIsTensorContiguous ( &output ) );
-#if defined SGDNN_BACKEND_1684X
+#if defined BACKEND_1684X
   sg_api_neg_t api;
   api.input_global_addr = input.addr;
   api.output_global_addr = output.addr;
@@ -4286,7 +4286,7 @@ bm_status_t sgdnnNeg ( bm_handle_t handle,
   }
   api.dtype = sgdnnTPUKernelDType ( input.dtype );
    SAFE_CALL ( sgdnnTPUKernelLaunch ( handle, "tpu_kernel_api_neg", &api, sizeof ( api ) ) );
-#elif defined SGDNN_BACKEND_2260
+#elif defined BACKEND_SG2260
   sg_api_neg_t api;
   api.input_global_addr = input.addr;
   api.output_global_addr = output.addr;
@@ -4311,7 +4311,7 @@ bm_status_t sgdnnBitwiseNot(bm_handle_t handle, SgdnnTensor_t input,
   SGDNN_CHECK(sgdnnIsSameShape(&input, &output));
   SGDNN_CHECK(sgdnnIsTensorContiguous(&input));
   SGDNN_CHECK(sgdnnIsTensorContiguous(&output));
-#if defined SGDNN_BACKEND_1684X
+#if defined BACKEND_1684X
   sg_api_bitwise_not_t api;
   api.input_global_addr = input.addr;
   api.output_global_addr = output.addr;
@@ -4322,7 +4322,7 @@ bm_status_t sgdnnBitwiseNot(bm_handle_t handle, SgdnnTensor_t input,
   api.dtype = sgdnnTPUKernelDType(input.dtype);
   SAFE_CALL(sgdnnTPUKernelLaunch(handle, "tpu_kernel_api_bitwise_not", &api,
                                  sizeof(api)));
-#elif defined SGDNN_BACKEND_2260
+#elif defined BACKEND_SG2260
   sg_api_bitwise_not_t api;
   api.input_global_addr = input.addr;
   api.output_global_addr = output.addr;
@@ -4374,9 +4374,9 @@ bm_status_t sgdnnComparision ( bm_handle_t handle,
   }
   api.mode = mode;
   api.dtype = sgdnnTPUKernelDType(input_.dtype);
-#if defined SGDNN_BACKEND_1684X
+#if defined BACKEND_1684X
   SAFE_CALL(sgdnnTPUKernelLaunch(handle, "tpu_kernel_api_comparision", &api, sizeof(api)));
-#elif defined SGDNN_BACKEND_2260
+#elif defined BACKEND_SG2260
   SAFE_CALL(sgdnnTPUKernelLaunch(handle, "tpu_kernel_api_comparision_multi_core", &api, sizeof(api)));
 #else
   SGDNN_CHECK ( false );
@@ -4413,9 +4413,9 @@ bm_status_t sgdnnComparisionBcast ( bm_handle_t handle,
   api.mode = mode;
   api.dtype = sgdnnTPUKernelDType ( input.dtype );
 
-#if defined SGDNN_BACKEND_1684X
+#if defined BACKEND_1684X
   SAFE_CALL ( sgdnnTPUKernelLaunch ( handle, "tpu_kernel_api_comparision_bcast", &api, sizeof ( api ) ) );
-#elif defined SGDNN_BACKEND_2260
+#elif defined BACKEND_SG2260
   SAFE_CALL ( sgdnnTPUKernelLaunch ( handle, "tpu_kernel_api_comparision_bcast_multi_core", &api, sizeof ( api ) ) );
 #else
   SGDNN_CHECK ( false );
@@ -4446,9 +4446,9 @@ bm_status_t sgdnnComparisionC ( bm_handle_t handle,
   api.scalar_pos = scalar_pos;
   api.dtype = sgdnnTPUKernelDType(input.dtype);
 
-#if defined SGDNN_BACKEND_1684X
+#if defined BACKEND_1684X
   SAFE_CALL(sgdnnTPUKernelLaunch(handle, "tpu_kernel_api_comparision_c", &api, sizeof(api)));
-#elif defined SGDNN_BACKEND_2260
+#elif defined BACKEND_SG2260
   SAFE_CALL(sgdnnTPUKernelLaunch(handle, "tpu_kernel_api_comparision_c_multi_core", &api, sizeof(api)));
 #else
   SGDNN_CHECK ( false );
@@ -4465,7 +4465,7 @@ bm_status_t sgdnnShiftLeftC ( bm_handle_t handle,
   SGDNN_CHECK ( sgdnnIsTensorContiguous ( &input ) );
   SGDNN_CHECK ( sgdnnIsTensorContiguous ( &output ) );
 
-#if defined SGDNN_BACKEND_1684X
+#if defined BACKEND_1684X
   sg_api_shift_left_c_t api;
   api.input_global_addr = input.addr;
   api.output_global_addr = output.addr;
@@ -4478,7 +4478,7 @@ bm_status_t sgdnnShiftLeftC ( bm_handle_t handle,
   api.dst_dtype = sgdnnTPUKernelDType(output.dtype);
   api.other_dtype = sgdnnTPUKernelDType(output.dtype);
   SAFE_CALL(sgdnnTPUKernelLaunch(handle, "tpu_kernel_api_shift_left_c", &api, sizeof(api)));
-#elif defined SGDNN_BACKEND_2260
+#elif defined BACKEND_SG2260
   sg_api_shift_left_c_t api;
   api.input_global_addr = input.addr;
   api.output_global_addr = output.addr;
@@ -4508,7 +4508,7 @@ bm_status_t sgdnnShiftLeft ( bm_handle_t handle,
   SGDNN_CHECK ( sgdnnIsTensorContiguous ( &input ) );
   SGDNN_CHECK ( sgdnnIsTensorContiguous ( &other ) );
   SGDNN_CHECK ( sgdnnIsTensorContiguous ( &output ) );
-#if defined SGDNN_BACKEND_1684X
+#if defined BACKEND_1684X
   sg_api_shift_left_t api;
   api.input_global_addr = input.addr;
   api.other_global_addr = other.addr;
@@ -4521,7 +4521,7 @@ bm_status_t sgdnnShiftLeft ( bm_handle_t handle,
   api.dst_dtype = sgdnnTPUKernelDType(output.dtype);
   api.other_dtype = sgdnnTPUKernelDType(output.dtype);
   SAFE_CALL(sgdnnTPUKernelLaunch(handle, "tpu_kernel_api_shift_left", &api, sizeof(api)));
-#elif defined SGDNN_BACKEND_2260
+#elif defined BACKEND_SG2260
   sg_api_shift_left_t api;
   api.input_global_addr = input.addr;
   api.other_global_addr = other.addr;
@@ -4561,7 +4561,7 @@ bm_status_t sgdnnShiftLeftBcast ( bm_handle_t handle,
   SGDNN_CHECK ( sgdnnIsTensorContiguous ( &other ) );
   SGDNN_CHECK ( sgdnnIsTensorContiguous ( &output ) );
 
-#if defined SGDNN_BACKEND_1684X
+#if defined BACKEND_1684X
   sg_api_shift_left_bcast_t api;
   api.input_global_addr = input.addr;
   api.other_global_addr = other.addr;
@@ -4577,7 +4577,7 @@ bm_status_t sgdnnShiftLeftBcast ( bm_handle_t handle,
   api.dst_dtype = sgdnnTPUKernelDType(output.dtype);
   api.other_dtype = sgdnnTPUKernelDType(output.dtype);
   SAFE_CALL ( sgdnnTPUKernelLaunch ( handle, "tpu_kernel_api_shift_left_bcast", &api, sizeof ( api ) ) );
-#elif defined SGDNN_BACKEND_2260
+#elif defined BACKEND_SG2260
   sg_api_shift_left_bcast_t api;
   api.input_global_addr = input.addr;
   api.other_global_addr = other.addr;
@@ -4610,7 +4610,7 @@ bm_status_t sgdnnShiftRightArithmetic ( bm_handle_t handle,
   SGDNN_CHECK ( sgdnnIsTensorContiguous ( &input ) );
   SGDNN_CHECK ( sgdnnIsTensorContiguous ( &other ) );
   SGDNN_CHECK ( sgdnnIsTensorContiguous ( &output ) );
-#if defined SGDNN_BACKEND_1684X
+#if defined BACKEND_1684X
   sg_api_shift_right_arithmetic_t api;
   api.input_global_addr = input.addr;
   api.other_global_addr = other.addr;
@@ -4623,7 +4623,7 @@ bm_status_t sgdnnShiftRightArithmetic ( bm_handle_t handle,
   api.dst_dtype = sgdnnTPUKernelDType(output.dtype);
   api.other_dtype = sgdnnTPUKernelDType(output.dtype);
   SAFE_CALL(sgdnnTPUKernelLaunch(handle, "tpu_kernel_api_shift_right_arithmetic", &api, sizeof(api)));
-#elif defined SGDNN_BACKEND_2260
+#elif defined BACKEND_SG2260
   sg_api_shift_right_arithmetic_t api;
   api.input_global_addr = input.addr;
   api.other_global_addr = other.addr;
@@ -4651,7 +4651,7 @@ bm_status_t sgdnnShiftRightArithmeticC ( bm_handle_t handle,
   SGDNN_CHECK ( sgdnnIsTensorContiguous ( &input ) );
   SGDNN_CHECK ( sgdnnIsTensorContiguous ( &output ) );
 
-#if defined SGDNN_BACKEND_1684X
+#if defined BACKEND_1684X
   sg_api_shift_right_arithmetic_c_t api;
   api.input_global_addr = input.addr;
   api.output_global_addr = output.addr;
@@ -4664,7 +4664,7 @@ bm_status_t sgdnnShiftRightArithmeticC ( bm_handle_t handle,
   api.dst_dtype = sgdnnTPUKernelDType(output.dtype);
   api.other_dtype = sgdnnTPUKernelDType(output.dtype);
   SAFE_CALL(sgdnnTPUKernelLaunch(handle, "tpu_kernel_api_shift_right_arithmetic_c", &api, sizeof(api)));
-#elif defined SGDNN_BACKEND_2260
+#elif defined BACKEND_SG2260
   sg_api_shift_right_arithmetic_c_t api;
   api.input_global_addr = input.addr;
   api.output_global_addr = output.addr;
@@ -4693,7 +4693,7 @@ bm_status_t sgdnnMinimumC(bm_handle_t handle, SgdnnTensor_t input, float scalar,
   SGDNN_CHECK(sgdnnIsSameShape(&input, &output));
   SGDNN_CHECK(sgdnnIsTensorContiguous(&input));
   SGDNN_CHECK(sgdnnIsTensorContiguous(&output));
-#if defined SGDNN_BACKEND_1684X
+#if defined BACKEND_1684X
   sg_api_minimumc_t api;
   api.input_global_addr = input.addr;
   api.output_global_addr = output.addr;
@@ -4705,7 +4705,7 @@ bm_status_t sgdnnMinimumC(bm_handle_t handle, SgdnnTensor_t input, float scalar,
   api.dtype = sgdnnTPUKernelDType(input.dtype);
   SAFE_CALL(sgdnnTPUKernelLaunch(handle, "tpu_kernel_api_minimumc", &api,
                                  sizeof(api)));
-#elif defined SGDNN_BACKEND_2260
+#elif defined BACKEND_SG2260
   sg_api_minimumc_t api;
   api.input_global_addr = input.addr;
   api.output_global_addr = output.addr;
@@ -4735,7 +4735,7 @@ bm_status_t sgdnnMinimum(bm_handle_t handle, SgdnnTensor_t input,
   SGDNN_CHECK(sgdnnIsTensorContiguous(&input));
   SGDNN_CHECK(sgdnnIsTensorContiguous(&other));
   SGDNN_CHECK(sgdnnIsTensorContiguous(&output));
-#if defined SGDNN_BACKEND_1684X
+#if defined BACKEND_1684X
   sg_api_minimum_t api;
   api.input_global_addr = input.addr;
   api.other_global_addr = other.addr;
@@ -4747,7 +4747,7 @@ bm_status_t sgdnnMinimum(bm_handle_t handle, SgdnnTensor_t input,
   api.dtype = sgdnnTPUKernelDType(input.dtype);
   SAFE_CALL(sgdnnTPUKernelLaunch(handle, "tpu_kernel_api_minimum", &api,
                                  sizeof(api)));
-#elif defined SGDNN_BACKEND_2260
+#elif defined BACKEND_SG2260
   sg_api_minimum_t api;
   api.input_global_addr = input.addr;
   api.other_global_addr = other.addr;
@@ -4775,7 +4775,7 @@ bm_status_t sgdnnMinimumBcast(bm_handle_t handle, SgdnnTensor_t input,
   SGDNN_CHECK(sgdnnIsTensorContiguous(&input));
   SGDNN_CHECK(sgdnnIsTensorContiguous(&other));
   SGDNN_CHECK(sgdnnIsTensorContiguous(&output));
-#if defined SGDNN_BACKEND_1684X
+#if defined BACKEND_1684X
   sg_api_minimum_bcast_t api;
   api.input_global_addr = input.addr;
   api.other_global_addr = other.addr;
@@ -4796,7 +4796,7 @@ bm_status_t sgdnnMinimumBcast(bm_handle_t handle, SgdnnTensor_t input,
   api.dtype = sgdnnTPUKernelDType(other.dtype);
   SAFE_CALL(sgdnnTPUKernelLaunch(handle, "tpu_kernel_api_minimum_bcast", &api,
                                  sizeof(api)));
-#elif defined SGDNN_BACKEND_2260
+#elif defined BACKEND_SG2260
   sg_api_minimum_bcast_t api;
   api.input_global_addr = input.addr;
   api.other_global_addr = other.addr;
@@ -4832,7 +4832,7 @@ bm_status_t sgdnnMaximumC(bm_handle_t handle, SgdnnTensor_t input, float scalar,
   SGDNN_CHECK(sgdnnIsSameShape(&input, &output));
   SGDNN_CHECK(sgdnnIsTensorContiguous(&input));
   SGDNN_CHECK(sgdnnIsTensorContiguous(&output));
-#if defined SGDNN_BACKEND_1684X
+#if defined BACKEND_1684X
   sg_api_maximumc_t api;
   api.input_global_addr = input.addr;
   api.output_global_addr = output.addr;
@@ -4844,7 +4844,7 @@ bm_status_t sgdnnMaximumC(bm_handle_t handle, SgdnnTensor_t input, float scalar,
   api.dtype = sgdnnTPUKernelDType(input.dtype);
   SAFE_CALL(sgdnnTPUKernelLaunch(handle, "tpu_kernel_api_maximumc", &api,
                                  sizeof(api)));
-#elif defined SGDNN_BACKEND_2260
+#elif defined BACKEND_SG2260
   sg_api_maximumc_t api;
   api.input_global_addr = input.addr;
   api.output_global_addr = output.addr;
@@ -4874,7 +4874,7 @@ bm_status_t sgdnnMaximum(bm_handle_t handle, SgdnnTensor_t input,
   SGDNN_CHECK(sgdnnIsTensorContiguous(&input));
   SGDNN_CHECK(sgdnnIsTensorContiguous(&other));
   SGDNN_CHECK(sgdnnIsTensorContiguous(&output));
-#if defined SGDNN_BACKEND_1684X
+#if defined BACKEND_1684X
   sg_api_maximum_t api;
   api.input_global_addr = input.addr;
   api.other_global_addr = other.addr;
@@ -4886,7 +4886,7 @@ bm_status_t sgdnnMaximum(bm_handle_t handle, SgdnnTensor_t input,
   api.dtype = sgdnnTPUKernelDType(input.dtype);
   SAFE_CALL(sgdnnTPUKernelLaunch(handle, "tpu_kernel_api_maximum", &api,
                                  sizeof(api)));
-#elif defined SGDNN_BACKEND_2260
+#elif defined BACKEND_SG2260
   sg_api_maximum_t api;
   api.input_global_addr = input.addr;
   api.other_global_addr = other.addr;
@@ -4914,7 +4914,7 @@ bm_status_t sgdnnMaximumBcast(bm_handle_t handle, SgdnnTensor_t input,
   SGDNN_CHECK(sgdnnIsTensorContiguous(&input));
   SGDNN_CHECK(sgdnnIsTensorContiguous(&other));
   SGDNN_CHECK(sgdnnIsTensorContiguous(&output));
-#if defined SGDNN_BACKEND_1684X
+#if defined BACKEND_1684X
   sg_api_maximum_bcast_t api;
   api.input_global_addr = input.addr;
   api.other_global_addr = other.addr;
@@ -4935,7 +4935,7 @@ bm_status_t sgdnnMaximumBcast(bm_handle_t handle, SgdnnTensor_t input,
   api.dtype = sgdnnTPUKernelDType(other.dtype);
   SAFE_CALL(sgdnnTPUKernelLaunch(handle, "tpu_kernel_api_maximum_bcast", &api,
                                  sizeof(api)));
-#elif defined SGDNN_BACKEND_2260
+#elif defined BACKEND_SG2260
   sg_api_maximum_bcast_t api;
   api.input_global_addr = input.addr;
   api.other_global_addr = other.addr;
@@ -4971,7 +4971,7 @@ bm_status_t sgdnnAtan2C(bm_handle_t handle, float scalar, SgdnnTensor_t other,
   SGDNN_CHECK(sgdnnIsSameShape(&other, &output));
   SGDNN_CHECK(sgdnnIsTensorContiguous(&other));
   SGDNN_CHECK(sgdnnIsTensorContiguous(&output));
-#if defined SGDNN_BACKEND_1684X
+#if defined BACKEND_1684X
   sg_api_atan2c_t api;
   api.other_global_addr = other.addr;
   api.output_global_addr = output.addr;
@@ -4983,7 +4983,7 @@ bm_status_t sgdnnAtan2C(bm_handle_t handle, float scalar, SgdnnTensor_t other,
   api.dtype = sgdnnTPUKernelDType(output.dtype);
   SAFE_CALL(
       sgdnnTPUKernelLaunch(handle, "tpu_kernel_api_atan2c", &api, sizeof(api)));
-#elif defined SGDNN_BACKEND_2260
+#elif defined BACKEND_SG2260
   sg_api_atan2c_t api;
   api.other_global_addr = other.addr;
   api.output_global_addr = output.addr;
@@ -5010,7 +5010,7 @@ bm_status_t sgdnnAtan2_C(bm_handle_t handle, SgdnnTensor_t input, float scalar,
   SGDNN_CHECK(sgdnnIsSameShape(&input, &output));
   SGDNN_CHECK(sgdnnIsTensorContiguous(&input));
   SGDNN_CHECK(sgdnnIsTensorContiguous(&output));
-#if defined SGDNN_BACKEND_1684X
+#if defined BACKEND_1684X
   sg_api_atan2_c_t api;
   api.input_global_addr = input.addr;
   api.output_global_addr = output.addr;
@@ -5022,7 +5022,7 @@ bm_status_t sgdnnAtan2_C(bm_handle_t handle, SgdnnTensor_t input, float scalar,
   api.dtype = sgdnnTPUKernelDType(output.dtype);
   SAFE_CALL(sgdnnTPUKernelLaunch(handle, "tpu_kernel_api_atan2_c", &api,
                                  sizeof(api)));
-#elif defined SGDNN_BACKEND_2260
+#elif defined BACKEND_SG2260
   sg_api_atan2_c_t api;
   api.input_global_addr = input.addr;
   api.output_global_addr = output.addr;
@@ -5052,7 +5052,7 @@ bm_status_t sgdnnAtan2(bm_handle_t handle, SgdnnTensor_t input,
   SGDNN_CHECK(sgdnnIsTensorContiguous(&input));
   SGDNN_CHECK(sgdnnIsTensorContiguous(&other));
   SGDNN_CHECK(sgdnnIsTensorContiguous(&output));
-#if defined SGDNN_BACKEND_1684X
+#if defined BACKEND_1684X
   sg_api_atan2_t api;
   api.input_global_addr = input.addr;
   api.other_global_addr = other.addr;
@@ -5064,7 +5064,7 @@ bm_status_t sgdnnAtan2(bm_handle_t handle, SgdnnTensor_t input,
   api.dtype = sgdnnTPUKernelDType(output.dtype);
   SAFE_CALL(
       sgdnnTPUKernelLaunch(handle, "tpu_kernel_api_atan2", &api, sizeof(api)));
-#elif defined SGDNN_BACKEND_2260
+#elif defined BACKEND_SG2260
   sg_api_atan2_t api;
   api.input_global_addr = input.addr;
   api.other_global_addr = other.addr;
@@ -5093,7 +5093,7 @@ bm_status_t sgdnnAtan2Bcast(bm_handle_t handle, SgdnnTensor_t input,
   SGDNN_CHECK(sgdnnIsTensorContiguous(&input));
   SGDNN_CHECK(sgdnnIsTensorContiguous(&other));
   SGDNN_CHECK(sgdnnIsTensorContiguous(&output));
-#if defined SGDNN_BACKEND_1684X
+#if defined BACKEND_1684X
   sg_api_atan2_bcast_t api;
   api.input_global_addr = input.addr;
   api.other_global_addr = other.addr;
@@ -5114,7 +5114,7 @@ bm_status_t sgdnnAtan2Bcast(bm_handle_t handle, SgdnnTensor_t input,
   api.dtype = sgdnnTPUKernelDType(output.dtype);
   SAFE_CALL(sgdnnTPUKernelLaunch(handle, "tpu_kernel_api_atan2_bcast", &api,
                                  sizeof(api)));
-#elif defined SGDNN_BACKEND_2260
+#elif defined BACKEND_SG2260
   sg_api_atan2_bcast_t api;
   api.input_global_addr = input.addr;
   api.other_global_addr = other.addr;
@@ -5171,7 +5171,7 @@ bm_status_t sgdnnBaddbmm ( bm_handle_t handle,
   // input1 must can be broadcast to batch_out_shape
   SGDNN_CHECK ( sgdnnIsTensorContiguous ( &input1 ) );
   SGDNN_CHECK ( sgdnnIsTensorContiguous ( &out ) );
-#if defined SGDNN_BACKEND_1684X
+#if defined BACKEND_1684X
   // need malloc buffer to store input1
   bm_device_mem_t input1_buffer, left_contiguous_mem;
   SgdnnTensor_t left_contiguous;
@@ -5232,7 +5232,7 @@ bm_status_t sgdnnBaddbmm ( bm_handle_t handle,
     bm_free_device ( handle, left_contiguous_mem );
   }
 
-#elif defined SGDNN_BACKEND_2260
+#elif defined BACKEND_SG2260
   SGDNN_CHECK ( false );
 #else
   SGDNN_CHECK ( false );
@@ -5254,7 +5254,7 @@ bm_status_t sgdnnMseloss( bm_handle_t handle,
   SGDNN_CHECK ( sgdnnIsTensorContiguous ( &self ) );
   SGDNN_CHECK ( sgdnnIsTensorContiguous ( &target ) );
 
-  #if defined SGDNN_BACKEND_1684X
+  #if defined BACKEND_1684X
     sg_api_mse_loss_t api;
     api.input1_global_addr = self.addr;
     api.input2_global_addr = target.addr;
@@ -5266,7 +5266,7 @@ bm_status_t sgdnnMseloss( bm_handle_t handle,
   }
   api.dtype = sgdnnTPUKernelDType(self.dtype);
   SAFE_CALL(sgdnnTPUKernelLaunch(handle, "tpu_kernel_api_mse_loss", &api, sizeof(api)));
-  #elif defined SGDNN_BACKEND_2260
+  #elif defined BACKEND_SG2260
   SGDNN_CHECK ( false );
   #else
   SGDNN_CHECK ( false );
@@ -5341,9 +5341,9 @@ bm_status_t sgdnnLnMm ( bm_handle_t handle,
   }
 
   SGDNN_CHECK ( sgdnnIsTensorContiguous ( &output ) );
-#if defined SGDNN_BACKEND_1684X
+#if defined BACKEND_1684X
   SGDNN_CHECK ( false );
-#elif defined SGDNN_BACKEND_2260
+#elif defined BACKEND_SG2260
   sg_api_ln_mm_multi_core_t api;
   api.input_addr    = input.addr;
   api.weight_addr   = w.addr;
@@ -5384,7 +5384,7 @@ bm_status_t sgdnnFmaxC(bm_handle_t handle, SgdnnTensor_t input, float scalar,
   SGDNN_CHECK(sgdnnIsSameShape(&input, &output));
   SGDNN_CHECK(sgdnnIsTensorContiguous(&input));
   SGDNN_CHECK(sgdnnIsTensorContiguous(&output));
-#if defined SGDNN_BACKEND_1684X
+#if defined BACKEND_1684X
   sg_api_fmaxc_t api;
   api.input_global_addr = input.addr;
   api.output_global_addr = output.addr;
@@ -5396,7 +5396,7 @@ bm_status_t sgdnnFmaxC(bm_handle_t handle, SgdnnTensor_t input, float scalar,
   api.dtype = sgdnnTPUKernelDType(input.dtype);
   SAFE_CALL(
       sgdnnTPUKernelLaunch(handle, "tpu_kernel_api_fmaxc", &api, sizeof(api)));
-#elif defined SGDNN_BACKEND_2260
+#elif defined BACKEND_SG2260
   sg_api_fmaxc_t api;
   api.input_global_addr = input.addr;
   api.output_global_addr = output.addr;
@@ -5426,7 +5426,7 @@ bm_status_t sgdnnFmax(bm_handle_t handle, SgdnnTensor_t input,
   SGDNN_CHECK(sgdnnIsTensorContiguous(&input));
   SGDNN_CHECK(sgdnnIsTensorContiguous(&other));
   SGDNN_CHECK(sgdnnIsTensorContiguous(&output));
-#if defined SGDNN_BACKEND_1684X
+#if defined BACKEND_1684X
   sg_api_fmax_t api;
   api.input_global_addr = input.addr;
   api.other_global_addr = other.addr;
@@ -5438,7 +5438,7 @@ bm_status_t sgdnnFmax(bm_handle_t handle, SgdnnTensor_t input,
   api.dtype = sgdnnTPUKernelDType(input.dtype);
   SAFE_CALL(
       sgdnnTPUKernelLaunch(handle, "tpu_kernel_api_fmax", &api, sizeof(api)));
-#elif defined SGDNN_BACKEND_2260
+#elif defined BACKEND_SG2260
   sg_api_fmax_t api;
   api.input_global_addr = input.addr;
   api.other_global_addr = other.addr;
@@ -5466,7 +5466,7 @@ bm_status_t sgdnnFmaxBcast(bm_handle_t handle, SgdnnTensor_t input,
   SGDNN_CHECK(sgdnnIsTensorContiguous(&input));
   SGDNN_CHECK(sgdnnIsTensorContiguous(&other));
   SGDNN_CHECK(sgdnnIsTensorContiguous(&output));
-#if defined SGDNN_BACKEND_1684X
+#if defined BACKEND_1684X
   sg_api_fmax_bcast_t api;
   api.input_global_addr = input.addr;
   api.other_global_addr = other.addr;
@@ -5487,7 +5487,7 @@ bm_status_t sgdnnFmaxBcast(bm_handle_t handle, SgdnnTensor_t input,
   api.dtype = sgdnnTPUKernelDType(other.dtype);
   SAFE_CALL(sgdnnTPUKernelLaunch(handle, "tpu_kernel_api_fmax_bcast", &api,
                                  sizeof(api)));
-#elif defined SGDNN_BACKEND_2260
+#elif defined BACKEND_SG2260
   sg_api_fmax_bcast_t api;
   api.input_global_addr = input.addr;
   api.other_global_addr = other.addr;
@@ -5523,7 +5523,7 @@ bm_status_t sgdnnFminC(bm_handle_t handle, SgdnnTensor_t input, float scalar,
   SGDNN_CHECK(sgdnnIsSameShape(&input, &output));
   SGDNN_CHECK(sgdnnIsTensorContiguous(&input));
   SGDNN_CHECK(sgdnnIsTensorContiguous(&output));
-#if defined SGDNN_BACKEND_1684X
+#if defined BACKEND_1684X
   sg_api_fminc_t api;
   api.input_global_addr = input.addr;
   api.output_global_addr = output.addr;
@@ -5535,7 +5535,7 @@ bm_status_t sgdnnFminC(bm_handle_t handle, SgdnnTensor_t input, float scalar,
   api.dtype = sgdnnTPUKernelDType(input.dtype);
   SAFE_CALL(
       sgdnnTPUKernelLaunch(handle, "tpu_kernel_api_fminc", &api, sizeof(api)));
-#elif defined SGDNN_BACKEND_2260
+#elif defined BACKEND_SG2260
   sg_api_fminc_t api;
   api.input_global_addr = input.addr;
   api.output_global_addr = output.addr;
@@ -5565,7 +5565,7 @@ bm_status_t sgdnnFmin(bm_handle_t handle, SgdnnTensor_t input,
   SGDNN_CHECK(sgdnnIsTensorContiguous(&input));
   SGDNN_CHECK(sgdnnIsTensorContiguous(&other));
   SGDNN_CHECK(sgdnnIsTensorContiguous(&output));
-#if defined SGDNN_BACKEND_1684X
+#if defined BACKEND_1684X
   sg_api_fmin_t api;
   api.input_global_addr = input.addr;
   api.other_global_addr = other.addr;
@@ -5577,7 +5577,7 @@ bm_status_t sgdnnFmin(bm_handle_t handle, SgdnnTensor_t input,
   api.dtype = sgdnnTPUKernelDType(input.dtype);
   SAFE_CALL(
       sgdnnTPUKernelLaunch(handle, "tpu_kernel_api_fmin", &api, sizeof(api)));
-#elif defined SGDNN_BACKEND_2260
+#elif defined BACKEND_SG2260
   sg_api_fmin_t api;
   api.input_global_addr = input.addr;
   api.other_global_addr = other.addr;
@@ -5605,7 +5605,7 @@ bm_status_t sgdnnFminBcast(bm_handle_t handle, SgdnnTensor_t input,
   SGDNN_CHECK(sgdnnIsTensorContiguous(&input));
   SGDNN_CHECK(sgdnnIsTensorContiguous(&other));
   SGDNN_CHECK(sgdnnIsTensorContiguous(&output));
-#if defined SGDNN_BACKEND_1684X
+#if defined BACKEND_1684X
   sg_api_fmin_bcast_t api;
   api.input_global_addr = input.addr;
   api.other_global_addr = other.addr;
@@ -5626,7 +5626,7 @@ bm_status_t sgdnnFminBcast(bm_handle_t handle, SgdnnTensor_t input,
   api.dtype = sgdnnTPUKernelDType(other.dtype);
   SAFE_CALL(sgdnnTPUKernelLaunch(handle, "tpu_kernel_api_fmin_bcast", &api,
                                  sizeof(api)));
-#elif defined SGDNN_BACKEND_2260
+#elif defined BACKEND_SG2260
   sg_api_fmin_bcast_t api;
   api.input_global_addr = input.addr;
   api.other_global_addr = other.addr;
@@ -5728,9 +5728,9 @@ bm_status_t sgdnnAddLnMm ( bm_handle_t handle,
     SGDNN_CHECK ( sgdnnIsTensorContiguous ( &b ) );
   }
 
-#if defined SGDNN_BACKEND_1684X
+#if defined BACKEND_1684X
   SGDNN_CHECK ( false );
-#elif defined SGDNN_BACKEND_2260
+#elif defined BACKEND_SG2260
   sg_api_add_ln_mm_multi_core_t api;
   api.input0_addr   = input0.addr;
   api.input1_addr   = input1.addr;
@@ -5777,7 +5777,7 @@ bm_status_t sgdnnSignbit ( bm_handle_t handle,
   SGDNN_CHECK ( sgdnnIsSameShape ( &input, &output ) );
   SGDNN_CHECK ( sgdnnIsTensorContiguous ( &input ) );
   SGDNN_CHECK ( sgdnnIsTensorContiguous ( &output ) );
-#if defined SGDNN_BACKEND_1684X
+#if defined BACKEND_1684X
   sg_api_signbit_t api;
   api.input_global_addr = input.addr;
   api.output_global_addr = output.addr;
@@ -5788,7 +5788,7 @@ bm_status_t sgdnnSignbit ( bm_handle_t handle,
   }
   api.dtype = sgdnnTPUKernelDType ( input.dtype );
   SAFE_CALL ( sgdnnTPUKernelLaunch ( handle, "tpu_kernel_api_signbit", &api, sizeof ( api ) ) );
-#elif defined SGDNN_BACKEND_2260
+#elif defined BACKEND_SG2260
   sg_api_signbit_t api;
   api.input_global_addr = input.addr;
   api.output_global_addr = output.addr;
@@ -5823,7 +5823,7 @@ bm_status_t sgdnnPow ( bm_handle_t handle,
   SGDNN_CHECK ( sgdnnIsTensorContiguous ( &input ) );
   SGDNN_CHECK ( sgdnnIsTensorContiguous ( &other ) );
   SGDNN_CHECK ( sgdnnIsTensorContiguous ( &output ) );
-#if defined SGDNN_BACKEND_1684X
+#if defined BACKEND_1684X
   sg_api_pow_t api;
   api.input_global_addr = input.addr;
   api.other_global_addr = other.addr;
@@ -5837,7 +5837,7 @@ bm_status_t sgdnnPow ( bm_handle_t handle,
   api.other_dtype = sgdnnTPUKernelDType ( other.dtype );
   api.output_dtype = sgdnnTPUKernelDType ( output.dtype );
   SAFE_CALL ( sgdnnTPUKernelLaunch ( handle, "tpu_kernel_api_pow", &api, sizeof ( api ) ) );
-#elif defined SGDNN_BACKEND_2260
+#elif defined BACKEND_SG2260
   sg_api_pow_t api;
   api.input_global_addr = input.addr;
   api.other_global_addr = other.addr;
@@ -5883,7 +5883,7 @@ bm_status_t sgdnnPowBcast ( bm_handle_t handle,
   SGDNN_CHECK ( sgdnnIsTensorContiguous ( &input ) );
   SGDNN_CHECK ( sgdnnIsTensorContiguous ( &other ) );
   SGDNN_CHECK ( sgdnnIsTensorContiguous ( &output ) );
-#if defined SGDNN_BACKEND_1684X
+#if defined BACKEND_1684X
   sg_api_pow_bcast_t api;
   api.input_global_addr = input.addr;
   api.other_global_addr = other.addr;
@@ -5901,7 +5901,7 @@ bm_status_t sgdnnPowBcast ( bm_handle_t handle,
   api.other_dtype = sgdnnTPUKernelDType ( other.dtype );
   api.output_dtype = sgdnnTPUKernelDType ( output.dtype );
   SAFE_CALL ( sgdnnTPUKernelLaunch ( handle, "tpu_kernel_api_pow_bcast", &api, sizeof ( api ) ) );
-#elif defined SGDNN_BACKEND_2260
+#elif defined BACKEND_SG2260
   sg_api_pow_bcast_t api;
   api.input_global_addr = input.addr;
   api.other_global_addr = other.addr;
@@ -5954,9 +5954,9 @@ bm_status_t sgdnnPowC ( bm_handle_t handle,
   api.value = scalar;
   api.dtype = sgdnnTPUKernelDType ( self.dtype );
   api.out_is_int = (out.dtype == SGDNN_DTYPE_INT32);
-#if defined SGDNN_BACKEND_1684X
+#if defined BACKEND_1684X
   SAFE_CALL ( sgdnnTPUKernelLaunch ( handle, "tpu_kernel_api_pow_c", &api, sizeof ( api ) ) );
-#elif defined SGDNN_BACKEND_2260
+#elif defined BACKEND_SG2260
   SAFE_CALL ( sgdnnTPUKernelLaunch ( handle, "tpu_kernel_api_pow_c_multi_core", &api, sizeof ( api ) ) );
 #else
   SGDNN_CHECK ( false );
@@ -5994,9 +5994,9 @@ bm_status_t sgdnnCPow ( bm_handle_t handle,
   api.value = scalar;
   api.dtype = sgdnnTPUKernelDType ( self.dtype );
   api.out_is_int = (out.dtype == SGDNN_DTYPE_INT32);
-#if defined SGDNN_BACKEND_1684X
+#if defined BACKEND_1684X
   SAFE_CALL ( sgdnnTPUKernelLaunch ( handle, "tpu_kernel_api_c_pow", &api, sizeof ( api ) ) );
-#elif defined SGDNN_BACKEND_2260
+#elif defined BACKEND_SG2260
   SAFE_CALL ( sgdnnTPUKernelLaunch ( handle, "tpu_kernel_api_c_pow_multi_core", &api, sizeof ( api ) ) );
 #else
   SGDNN_CHECK ( false );
@@ -6012,7 +6012,7 @@ bm_status_t sgdnnReal ( bm_handle_t handle,
                 input.dtype == SGDNN_DTYPE_FP16 ||
                 input.dtype == SGDNN_DTYPE_BF16 );
   // SGDNN_CHECK ( sgdnnIsTensorContiguous ( &input ) );
-#if defined SGDNN_BACKEND_1684X
+#if defined BACKEND_1684X
   sg_api_real_t api;
   api.input_global_addr = input.addr;
   api.output_global_addr = output.addr;
@@ -6028,7 +6028,7 @@ bm_status_t sgdnnReal ( bm_handle_t handle,
   }
   api.dtype = sgdnnTPUKernelDType ( input.dtype );
   SAFE_CALL ( sgdnnTPUKernelLaunch ( handle, "tpu_kernel_api_real", &api, sizeof ( api ) ) );
-#elif defined SGDNN_BACKEND_2260
+#elif defined BACKEND_SG2260
   sg_api_real_t api;
   api.input_global_addr = input.addr;
   api.output_global_addr = output.addr;
@@ -6052,7 +6052,7 @@ bm_status_t sgdnnConj ( bm_handle_t handle,
                 input.dtype == SGDNN_DTYPE_FP16 ||
                 input.dtype == SGDNN_DTYPE_BF16 );
   // SGDNN_CHECK ( sgdnnIsTensorContiguous ( &input ) );
-#if defined SGDNN_BACKEND_1684X
+#if defined BACKEND_1684X
   sg_api_real_t api;
   api.input_global_addr = input.addr;
   api.output_global_addr = output.addr;
@@ -6068,7 +6068,7 @@ bm_status_t sgdnnConj ( bm_handle_t handle,
   }
   api.dtype = sgdnnTPUKernelDType ( input.dtype );
   SAFE_CALL ( sgdnnTPUKernelLaunch ( handle, "tpu_kernel_api_conj", &api, sizeof ( api ) ) );
-#elif defined SGDNN_BACKEND_2260
+#elif defined BACKEND_SG2260
   sg_api_real_t api;
   api.input_global_addr = input.addr;
   api.output_global_addr = output.addr;
@@ -6094,7 +6094,7 @@ bm_status_t sgdnnPermute ( bm_handle_t handle,
   // SGDNN_CHECK ( sgdnnIsTensorContiguous ( &input ) );
   // SGDNN_CHECK ( sgdnnIsTensorContiguous ( &output ) );
 
-#if defined SGDNN_BACKEND_1684X
+#if defined BACKEND_1684X
   sg_api_permute_t api;
   api.dim = input.dim;
   int size = 1;
@@ -6118,7 +6118,7 @@ bm_status_t sgdnnPermute ( bm_handle_t handle,
   api.input_global_addr = input.addr;
   api.output_global_addr = output.addr;
   SAFE_CALL ( sgdnnTPUKernelLaunch ( handle, "tpu_kernel_api_permute", &api, sizeof( api ) ) );
-#elif defined SGDNN_BACKEND_2260
+#elif defined BACKEND_SG2260
   sg_api_permute_t api;
   api.dim = input.dim;
   int size = 1;
@@ -6177,9 +6177,9 @@ bm_status_t sgdnnTopk ( bm_handle_t handle,
   api.value_global_addr = value.addr;
   api.index_global_addr = index.addr;
   api.dtype = sgdnnTPUKernelDType( input.dtype );
-#if defined SGDNN_BACKEND_1684X
+#if defined BACKEND_1684X
   SAFE_CALL ( sgdnnTPUKernelLaunch ( handle, "tpu_kernel_api_topk", &api, sizeof( api ) ) );
-#elif defined SGDNN_BACKEND_2260
+#elif defined BACKEND_SG2260
   SAFE_CALL ( sgdnnTPUKernelLaunch ( handle, "tpu_kernel_api_topk_multi_core", &api, sizeof( api ) ) );
 #else
   SGDNN_CHECK ( false );
@@ -6199,7 +6199,7 @@ bm_status_t sgdnnReduceMaxOrMin(bm_handle_t handle, SgdnnTensor_t input,
   SGDNN_CHECK(reduction_dim_length > 0 || reduction_dim_length <= input.dim);
   SGDNN_CHECK(mode == 0 || mode == 1);
 
-#if defined SGDNN_BACKEND_1684X
+#if defined BACKEND_1684X
   sg_api_reduce_max_or_min_t api;
   api.input_global_addr = input.addr;
   api.output_global_addr = output.addr;
@@ -6218,7 +6218,7 @@ bm_status_t sgdnnReduceMaxOrMin(bm_handle_t handle, SgdnnTensor_t input,
   api.dtype = sgdnnTPUKernelDType(input.dtype);
   SAFE_CALL(sgdnnTPUKernelLaunch(handle, "tpu_kernel_api_reduce_max_or_min",
                                  &api, sizeof(api)));
-#elif defined SGDNN_BACKEND_2260
+#elif defined BACKEND_SG2260
   sg_api_reduce_max_or_min_t api;
   api.input_global_addr = input.addr;
   api.output_global_addr = output.addr;
@@ -6255,7 +6255,7 @@ bm_status_t sgdnnNonzero ( bm_handle_t handle,
   SGDNN_CHECK ( sgdnnIsTensorContiguous ( &self ) );
   SGDNN_CHECK ( sgdnnIsTensorContiguous ( &out ) );
 
-  #if defined SGDNN_BACKEND_1684X
+  #if defined BACKEND_1684X
   sg_api_nonzero_t api;
   api.input_global_addr = self.addr;
   api.output_global_addr = out.addr;
@@ -6278,7 +6278,7 @@ bm_status_t sgdnnNonzero ( bm_handle_t handle,
   api.index_global_addr = bm_mem_get_device_addr(index_dev_mem);
 
   SAFE_CALL ( sgdnnTPUKernelLaunch ( handle, "tpu_kernel_api_nonzero", &api, sizeof ( api ) ) );
-#elif defined SGDNN_BACKEND_2260
+#elif defined BACKEND_SG2260
   sg_api_nonzero_multi_core_t api;
   api.input_global_addr = self.addr;
   api.output_global_addr = out.addr;
@@ -6325,7 +6325,7 @@ bm_status_t sgdnnRepeat ( bm_handle_t handle,
   SGDNN_CHECK ( sgdnnIsTensorContiguous ( &input ) );
   SGDNN_CHECK ( sgdnnIsTensorContiguous ( &output ) );
 
-#if defined SGDNN_BACKEND_1684X
+#if defined BACKEND_1684X
   sg_api_repeat_t api;
   api.dim = input.dim;
   api.repeat_dim = repeat_dim;
@@ -6344,7 +6344,7 @@ bm_status_t sgdnnRepeat ( bm_handle_t handle,
     api.dtype = sgdnnTPUKernelDType( input.dtype );
   }
   SAFE_CALL ( sgdnnTPUKernelLaunch ( handle, "tpu_kernel_api_repeat", &api, sizeof( api ) ) );
-#elif defined SGDNN_BACKEND_2260
+#elif defined BACKEND_SG2260
   sg_api_repeat_t api;
   api.dim = input.dim;
   api.repeat_dim = repeat_dim;
@@ -6371,7 +6371,7 @@ bm_status_t sgdnnArg(bm_handle_t handle, SgdnnTensor_t input, int axis,
   SGDNN_CHECK(sgdnnIsSameShape(&values, &indices));
   SGDNN_CHECK(mode == 0 || mode == 1 || mode == 2 || mode == 3);
 
-#if defined SGDNN_BACKEND_1684X
+#if defined BACKEND_1684X
   sg_api_reduce_arg_t api;
   api.input_global_addr = input.addr;
   api.values_global_addr = values.addr;
@@ -6405,7 +6405,7 @@ bm_status_t sgdnnArg(bm_handle_t handle, SgdnnTensor_t input, int axis,
   SAFE_CALL(
       sgdnnTPUKernelLaunch(handle, "tpu_kernel_api_arg", &api, sizeof(api)));
   bm_free_device(handle, dev_mem);
-#elif defined SGDNN_BACKEND_2260
+#elif defined BACKEND_SG2260
   sg_api_reduce_arg_t api;
   api.input_global_addr = input.addr;
   api.values_global_addr = values.addr;
@@ -6467,9 +6467,9 @@ bm_status_t sgdnnHardtanh ( bm_handle_t handle,
   api.output_global_addr = output.addr;
   api.dtype = sgdnnTPUKernelDType( input.dtype );
 
-#if defined SGDNN_BACKEND_1684X
+#if defined BACKEND_1684X
   SAFE_CALL ( sgdnnTPUKernelLaunch ( handle, "tpu_kernel_api_hardtanh", &api, sizeof( api ) ) );
-#elif defined SGDNN_BACKEND_2260
+#elif defined BACKEND_SG2260
   SAFE_CALL ( sgdnnTPUKernelLaunch ( handle, "tpu_kernel_api_hardtanh_multi_core", &api, sizeof( api ) ) );
 #else
   SGDNN_CHECK ( false );
@@ -6491,7 +6491,7 @@ bm_status_t sgdnnHypot ( bm_handle_t handle,
   SGDNN_CHECK ( sgdnnIsTensorContiguous ( &other ) );
   SGDNN_CHECK ( sgdnnIsTensorContiguous ( &output ) );
 
-#if defined SGDNN_BACKEND_1684X
+#if defined BACKEND_1684X
   sg_api_hypot_t api;
   api.input_global_addr = input.addr;
   api.other_global_addr = other.addr;
@@ -6502,7 +6502,7 @@ bm_status_t sgdnnHypot ( bm_handle_t handle,
   }
   api.dtype = sgdnnTPUKernelDType ( input.dtype );
    SAFE_CALL ( sgdnnTPUKernelLaunch ( handle, "tpu_kernel_api_hypot", &api, sizeof ( api ) ) );
-#elif defined SGDNN_BACKEND_2260
+#elif defined BACKEND_SG2260
   SGDNN_CHECK ( false );
 #else
   SGDNN_CHECK ( false );
@@ -6522,7 +6522,7 @@ bm_status_t sgdnnHypotBcast ( bm_handle_t handle,
   SGDNN_CHECK ( sgdnnIsTensorContiguous ( &other ) );
   SGDNN_CHECK ( sgdnnIsTensorContiguous ( &output ) );
 
-#if defined SGDNN_BACKEND_1684X
+#if defined BACKEND_1684X
   sg_api_hypot_bcast_t api;
   api.input_global_addr = input.addr;
   api.other_global_addr = other.addr;
@@ -6537,7 +6537,7 @@ bm_status_t sgdnnHypotBcast ( bm_handle_t handle,
   }
   api.dtype = sgdnnTPUKernelDType ( input.dtype );
   SAFE_CALL ( sgdnnTPUKernelLaunch ( handle, "tpu_kernel_api_hypot_bcast", &api, sizeof ( api ) ) );
-#elif defined SGDNN_BACKEND_2260
+#elif defined BACKEND_SG2260
   SGDNN_CHECK ( false );
 #else
   SGDNN_CHECK ( false );
@@ -6557,7 +6557,7 @@ bm_status_t sgdnnHypotC ( bm_handle_t handle,
   SGDNN_CHECK ( sgdnnIsTensorContiguous ( &input ) );
   SGDNN_CHECK ( sgdnnIsTensorContiguous ( &output ) );
 
-#if defined SGDNN_BACKEND_1684X
+#if defined BACKEND_1684X
   sg_api_hypot_c_t api;
   api.input_global_addr = input.addr;
   api.output_global_addr = output.addr;
@@ -6568,7 +6568,7 @@ bm_status_t sgdnnHypotC ( bm_handle_t handle,
   api.dtype = sgdnnTPUKernelDType ( input.dtype );
   api.scalar = scalar;
   SAFE_CALL( sgdnnTPUKernelLaunch ( handle, "tpu_kernel_api_hypot_c", &api, sizeof( api ) ) );
-#elif defined SGDNN_BACKEND_2260
+#elif defined BACKEND_SG2260
   SGDNN_CHECK ( false );
 #else
   SGDNN_CHECK ( false );
@@ -6585,7 +6585,7 @@ bm_status_t sgdnnNextafterC(bm_handle_t handle, float scalar,
   SGDNN_CHECK(sgdnnIsSameShape(&other, &output));
   SGDNN_CHECK(sgdnnIsTensorContiguous(&other));
   SGDNN_CHECK(sgdnnIsTensorContiguous(&output));
-#if defined SGDNN_BACKEND_1684X
+#if defined BACKEND_1684X
   sg_api_nextafterc_t api;
   api.other_global_addr = other.addr;
   api.output_global_addr = output.addr;
@@ -6597,7 +6597,7 @@ bm_status_t sgdnnNextafterC(bm_handle_t handle, float scalar,
   api.dtype = sgdnnTPUKernelDType(output.dtype);
   SAFE_CALL(sgdnnTPUKernelLaunch(handle, "tpu_kernel_api_nextafterc", &api,
                                  sizeof(api)));
-#elif defined SGDNN_BACKEND_2260
+#elif defined BACKEND_SG2260
   sg_api_nextafterc_t api;
   api.other_global_addr = other.addr;
   api.output_global_addr = output.addr;
@@ -6623,7 +6623,7 @@ bm_status_t sgdnnNextafter_C(bm_handle_t handle, SgdnnTensor_t input,
   SGDNN_CHECK(sgdnnIsSameShape(&input, &output));
   SGDNN_CHECK(sgdnnIsTensorContiguous(&input));
   SGDNN_CHECK(sgdnnIsTensorContiguous(&output));
-#if defined SGDNN_BACKEND_1684X
+#if defined BACKEND_1684X
   sg_api_nextafter_c_t api;
   api.input_global_addr = input.addr;
   api.output_global_addr = output.addr;
@@ -6635,7 +6635,7 @@ bm_status_t sgdnnNextafter_C(bm_handle_t handle, SgdnnTensor_t input,
   api.dtype = sgdnnTPUKernelDType(output.dtype);
   SAFE_CALL(sgdnnTPUKernelLaunch(handle, "tpu_kernel_api_nextafter_c", &api,
                                  sizeof(api)));
-#elif defined SGDNN_BACKEND_2260
+#elif defined BACKEND_SG2260
   sg_api_nextafter_c_t api;
   api.input_global_addr = input.addr;
   api.output_global_addr = output.addr;
@@ -6664,7 +6664,7 @@ bm_status_t sgdnnNextafter(bm_handle_t handle, SgdnnTensor_t input,
   SGDNN_CHECK(sgdnnIsTensorContiguous(&input));
   SGDNN_CHECK(sgdnnIsTensorContiguous(&other));
   SGDNN_CHECK(sgdnnIsTensorContiguous(&output));
-#if defined SGDNN_BACKEND_1684X
+#if defined BACKEND_1684X
   sg_api_nextafter_t api;
   api.input_global_addr = input.addr;
   api.other_global_addr = other.addr;
@@ -6676,7 +6676,7 @@ bm_status_t sgdnnNextafter(bm_handle_t handle, SgdnnTensor_t input,
   api.dtype = sgdnnTPUKernelDType(output.dtype);
   SAFE_CALL(sgdnnTPUKernelLaunch(handle, "tpu_kernel_api_nextafter", &api,
                                  sizeof(api)));
-#elif defined SGDNN_BACKEND_2260
+#elif defined BACKEND_SG2260
   sg_api_nextafter_t api;
   api.input_global_addr = input.addr;
   api.other_global_addr = other.addr;
@@ -6703,7 +6703,7 @@ bm_status_t sgdnnNextafterBcast(bm_handle_t handle, SgdnnTensor_t input,
   SGDNN_CHECK(sgdnnIsTensorContiguous(&input));
   SGDNN_CHECK(sgdnnIsTensorContiguous(&other));
   SGDNN_CHECK(sgdnnIsTensorContiguous(&output));
-#if defined SGDNN_BACKEND_1684X
+#if defined BACKEND_1684X
   sg_api_nextafter_bcast_t api;
   api.input_global_addr = input.addr;
   api.other_global_addr = other.addr;
@@ -6724,7 +6724,7 @@ bm_status_t sgdnnNextafterBcast(bm_handle_t handle, SgdnnTensor_t input,
   api.dtype = sgdnnTPUKernelDType(other.dtype);
   SAFE_CALL(sgdnnTPUKernelLaunch(handle, "tpu_kernel_api_nextafter_bcast", &api,
                                  sizeof(api)));
-#elif defined SGDNN_BACKEND_2260
+#elif defined BACKEND_SG2260
   sg_api_nextafter_bcast_t api;
   api.input_global_addr = input.addr;
   api.other_global_addr = other.addr;
@@ -6764,7 +6764,7 @@ bm_status_t sgdnnReduceVar ( bm_handle_t handle,
   SGDNN_CHECK ( sgdnnIsTensorContiguous ( &input ) );
   SGDNN_CHECK ( sgdnnIsTensorContiguous ( &output ) );
 
-#if defined SGDNN_BACKEND_1684X
+#if defined BACKEND_1684X
   sg_api_reduce_var_t api;
   api.input_global_addr = input.addr;
   api.output_global_addr = output.addr;
@@ -6817,7 +6817,7 @@ bm_status_t sgdnnReduceVar ( bm_handle_t handle,
   api.keepdim = keepdim;
   api.dtype = sgdnnTPUKernelDType ( input.dtype );
   SAFE_CALL( sgdnnTPUKernelLaunch ( handle, "tpu_kernel_api_reduce_var", &api, sizeof( api ) ) );
-#elif defined SGDNN_BACKEND_2260
+#elif defined BACKEND_SG2260
   SGDNN_CHECK ( false );
 #else
   SGDNN_CHECK ( false );
@@ -6836,7 +6836,7 @@ bm_status_t sgdnnReduceVarAll ( bm_handle_t handle,
   SGDNN_CHECK ( sgdnnIsTensorContiguous ( &input ) );
   SGDNN_CHECK ( sgdnnIsTensorContiguous ( &output ) );
 
-#if defined SGDNN_BACKEND_1684X
+#if defined BACKEND_1684X
   sg_api_reduce_var_t api;
   api.input_global_addr = input.addr;
   api.output_global_addr = output.addr;
@@ -6866,7 +6866,7 @@ bm_status_t sgdnnReduceVarAll ( bm_handle_t handle,
   api.keepdim = keepdim;
   api.dtype = sgdnnTPUKernelDType ( input.dtype );
   SAFE_CALL( sgdnnTPUKernelLaunch ( handle, "tpu_kernel_api_reduce_var_all", &api, sizeof( api ) ) );
-#elif defined SGDNN_BACKEND_2260
+#elif defined BACKEND_SG2260
   SGDNN_CHECK ( false );
 #else
   SGDNN_CHECK ( false );
@@ -6899,9 +6899,9 @@ bm_status_t sgdnnTriangularize ( bm_handle_t handle,
   api.diagonal = diagonal;
   api.is_upper = is_upper;
   api.dtype = sgdnnTPUKernelDType ( self.dtype );
-#if defined SGDNN_BACKEND_1684X
+#if defined BACKEND_1684X
   SAFE_CALL ( sgdnnTPUKernelLaunch ( handle, "tpu_kernel_api_triangularize", &api, sizeof ( api ) ) );
-#elif defined SGDNN_BACKEND_2260
+#elif defined BACKEND_SG2260
   SAFE_CALL ( sgdnnTPUKernelLaunch ( handle, "tpu_kernel_api_triangularize_multi_core", &api, sizeof ( api ) ) );
 #else
   SGDNN_CHECK ( false );
@@ -6927,9 +6927,9 @@ bm_status_t sgdnnCbrt ( bm_handle_t handle,
   }
   api.dtype = sgdnnTPUKernelDType ( input.dtype );
 
-#if defined SGDNN_BACKEND_1684X
+#if defined BACKEND_1684X
   SAFE_CALL ( sgdnnTPUKernelLaunch ( handle, "tpu_kernel_api_cbrt", &api, sizeof ( api ) ) );
-#elif defined SGDNN_BACKEND_2260
+#elif defined BACKEND_SG2260
   SAFE_CALL ( sgdnnTPUKernelLaunch ( handle, "tpu_kernel_api_cbrt_multi_core", &api, sizeof ( api ) ) );
 #else
   SGDNN_CHECK ( false );
@@ -6950,7 +6950,7 @@ bm_status_t sgdnnPad(bm_handle_t handle, SgdnnTensor_t input, int* pad,
   SGDNN_CHECK(sgdnnIsTensorContiguous(&input));
   SGDNN_CHECK(sgdnnIsTensorContiguous(&output));
 
-#if defined SGDNN_BACKEND_1684X
+#if defined BACKEND_1684X
   sg_api_pad_t api;
   api.input_global_addr = input.addr;
   api.output_global_addr = output.addr;
@@ -6980,7 +6980,7 @@ bm_status_t sgdnnPad(bm_handle_t handle, SgdnnTensor_t input, int* pad,
   api.dtype = sgdnnTPUKernelDType(input.dtype);
   SAFE_CALL(
       sgdnnTPUKernelLaunch(handle, "tpu_kernel_api_pad", &api, sizeof(api)));
-#elif defined SGDNN_BACKEND_2260
+#elif defined BACKEND_SG2260
   sg_api_pad_t api;
   api.input_global_addr = input.addr;
   api.output_global_addr = output.addr;
@@ -7028,7 +7028,7 @@ bm_status_t sgdnnSliceScatter(bm_handle_t handle, SgdnnTensor_t input,
   SGDNN_CHECK(input.dim == src.dim);
   SGDNN_CHECK(sgdnnIsSameShape(&input, &output));
 
-#if defined SGDNN_BACKEND_1684X
+#if defined BACKEND_1684X
   sg_api_slice_scatter_t api;
   api.input_global_addr = input.addr;
   api.src_global_addr = src.addr;
@@ -7045,7 +7045,7 @@ bm_status_t sgdnnSliceScatter(bm_handle_t handle, SgdnnTensor_t input,
   api.dtype = sgdnnTPUKernelDType(input.dtype);
   SAFE_CALL(
       sgdnnTPUKernelLaunch(handle, "tpu_kernel_api_slice_scatter", &api, sizeof(api)));
-#elif defined SGDNN_BACKEND_2260
+#elif defined BACKEND_SG2260
   sg_api_slice_scatter_t api;
   api.input_global_addr = input.addr;
   api.src_global_addr = src.addr;
@@ -7127,13 +7127,13 @@ bm_status_t sgdnnInfCheckAndUnscale( bm_handle_t handle,
                                     SgdnnTensor_t found_inf,
                                     float inv_scale )
 {
-#if defined SGDNN_BACKEND_1684X
+#if defined BACKEND_1684X
   for (auto& input : inputs){
     if (!_sgdnnInfCheckAndUnscale(handle, input, found_inf, inv_scale)){
       break;
     }
   }
-#elif defined SGDNN_BACKEND_2260
+#elif defined BACKEND_SG2260
   for (auto& input : inputs){
     if (!_sgdnnInfCheckAndUnscale_multi_core(handle, input, found_inf, inv_scale)){
       break;

@@ -1,6 +1,6 @@
 #include "sg_api_struct.h"
 #include "tpu_kernel.h"
-#include "config.h"
+
 
 void nodechip_comparision(
 global_addr_t input_global_addr,
@@ -174,7 +174,7 @@ void tpu_kernel_api_comparision(const void *args) {
 }
 TPUKERNEL_FUNC_REGISTER(tpu_kernel_api_comparision);
 
-#ifdef FIRMWARE_BACKEND_2260
+#ifdef BACKEND_SG2260
 void tpu_kernel_api_comparision_multi_core(const void *args) {
     sg_api_comparision_t *api = (sg_api_comparision_t*) args;
     int length = 1;
@@ -486,7 +486,7 @@ void tpu_kernel_api_comparision_bcast(const void *args) {
 }
 TPUKERNEL_FUNC_REGISTER(tpu_kernel_api_comparision_bcast);
 
-#ifdef FIRMWARE_BACKEND_2260
+#ifdef BACKEND_SG2260
 void tpu_kernel_api_comparision_bcast_multi_core(const void *args) {
     sg_api_comparision_bcast_t *api = (sg_api_comparision_bcast_t*) args;
     TPUKERNEL_ASSERT(api->input_dim > 0 && api->input_dim <= 4 &&
@@ -774,7 +774,7 @@ void tpu_kernel_api_comparision_c(const void *args) {
 }
 TPUKERNEL_FUNC_REGISTER(tpu_kernel_api_comparision_c);
 
-#ifdef FIRMWARE_BACKEND_2260
+#ifdef BACKEND_SG2260
 void tpu_kernel_api_comparision_c_multi_core(const void *args) {
     sg_api_comparision_c_t *api = (sg_api_comparision_c_t*)args;
     scalar_t value;

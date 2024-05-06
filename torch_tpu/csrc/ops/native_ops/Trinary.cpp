@@ -2,9 +2,9 @@
 #include <torch/torch.h>
 #include <ATen/core/TensorBase.h>
 #include <ATen/EmptyTensor.h>
-#include <TPUDeviceManager.h>
-#include <TPUTorchUtils.h>
-#include <sgdnn_api.h>
+
+#include "TPUTorchUtils.h"
+
 
 #include "common/config.h"
 
@@ -24,7 +24,8 @@ Tensor & addcmul_out_tpu ( const Tensor & self, const Tensor & tensor1, const Te
   if ( tpu::TPUIsSameShape(self, tensor1) && tpu::TPUIsSameShape(self, tensor2) )
   {
   TIMING_START;
-  bm_status_t status = sgdnnAddCMul (
+  #if defined BACKEND_1684X
+  auto status = sgdnnAddCMul (
                        tpu::TPUGetDeviceHandle(),
                        tpu::TPUGenerateSgdnnTensor ( self ),
                        tpu::TPUGenerateSgdnnTensor ( tensor1 ),
@@ -32,6 +33,16 @@ Tensor & addcmul_out_tpu ( const Tensor & self, const Tensor & tensor1, const Te
                        value.toDouble(),
                        tpu::TPUGenerateSgdnnTensor ( out ) );
   TORCH_CHECK ( status == BM_SUCCESS );
+  #elif defined BACKEND_SG2260
+  auto status = sgdnnAddCMul (
+                       c10_tpu::getCurrentTPUStream(),
+                       tpu::TPUGenerateSgdnnTensor ( self ),
+                       tpu::TPUGenerateSgdnnTensor ( tensor1 ),
+                       tpu::TPUGenerateSgdnnTensor ( tensor2 ),
+                       value.toDouble(),
+                       tpu::TPUGenerateSgdnnTensor ( out ) );
+  TORCH_CHECK ( status == tpuRtSuccess );
+  #endif
   TIMING_END ( tpu::ADDCMUL );
   }
   else
@@ -84,7 +95,8 @@ Tensor & addcmul_out_tpu ( const Tensor & self, const Tensor & tensor1, const Te
     }
 
     TIMING_START;
-    bm_status_t status = sgdnnAddCMulBcast (
+    #if defined BACKEND_1684X
+    auto status = sgdnnAddCMulBcast (
                         tpu::TPUGetDeviceHandle(),
                         self_t,
                         tensor1_t,
@@ -92,6 +104,16 @@ Tensor & addcmul_out_tpu ( const Tensor & self, const Tensor & tensor1, const Te
                         value.toDouble(),
                         tpu::TPUGenerateSgdnnTensor ( out ) );
     TORCH_CHECK ( status == BM_SUCCESS );
+    #elif defined BACKEND_SG2260
+    auto status = sgdnnAddCMulBcast (
+                        c10_tpu::getCurrentTPUStream(),
+                        self_t,
+                        tensor1_t,
+                        tensor2_t,
+                        value.toDouble(),
+                        tpu::TPUGenerateSgdnnTensor ( out ) );
+    TORCH_CHECK ( status == tpuRtSuccess );
+    #endif
     TIMING_END ( tpu::ADDCMUL );
   }
 #endif
@@ -110,7 +132,8 @@ Tensor & addcdiv_out_tpu ( const Tensor & self, const Tensor & tensor1, const Te
   CHECK_TENSOR_IN_DEVICE ( tensor2 );
   CHECK_TENSOR_IN_DEVICE ( out );
   TIMING_START;
-  bm_status_t status = sgdnnAddCDiv (
+  #if defined BACKEND_1684X
+  auto status = sgdnnAddCDiv (
                        tpu::TPUGetDeviceHandle(),
                        tpu::TPUGenerateSgdnnTensor ( self ),
                        tpu::TPUGenerateSgdnnTensor ( tensor1 ),
@@ -118,6 +141,16 @@ Tensor & addcdiv_out_tpu ( const Tensor & self, const Tensor & tensor1, const Te
                        value.toDouble(),
                        tpu::TPUGenerateSgdnnTensor ( out ) );
   TORCH_CHECK ( status == BM_SUCCESS );
+  #elif defined BACKEND_SG2260
+  auto status = sgdnnAddCDiv (
+                       c10_tpu::getCurrentTPUStream(),
+                       tpu::TPUGenerateSgdnnTensor ( self ),
+                       tpu::TPUGenerateSgdnnTensor ( tensor1 ),
+                       tpu::TPUGenerateSgdnnTensor ( tensor2 ),
+                       value.toDouble(),
+                       tpu::TPUGenerateSgdnnTensor ( out ) );
+  TORCH_CHECK ( status == tpuRtSuccess );
+  #endif
   TIMING_END ( tpu::ADDCDIV );
   SHOW_TENSOR_OP(self, tensor1, tensor2, out);
   return out;

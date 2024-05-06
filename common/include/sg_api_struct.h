@@ -1878,6 +1878,7 @@ typedef struct
   float inv_scale;
   int idtype;
   int found_inf_dtype;
+  int need_clear_found_inf;
 } WITH_PLATFORM(sg_api_inf_check_unscale_multi_core_t);
 
 #pragma pack(pop)

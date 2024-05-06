@@ -1,7 +1,10 @@
 import os
 import subprocess
 import sys
+import time
 GLOBAL_FAILED = "fail"
+GLOBAL_FAILED2 = "f2ail"  #TODO:FIX bmlib bug
+
 from top_utest import Tester_Basic
 def runcmd(command):
     try:
@@ -14,7 +17,7 @@ def runcmd(command):
             return ret.stdout + GLOBAL_FAILED
     except subprocess.CalledProcessError as e:
         print(e.output)
-        return  "error:"+command +GLOBAL_FAILED
+        return  "error:"+command +GLOBAL_FAILED2
 
 class Global_Regression_Tester():
     # control top file must be skipped
@@ -146,9 +149,14 @@ class Global_Regression_Tester():
         self.prepare_utests()
 
         succeed_result,failed_result = [], []
-
+        i = 0
         for single_utest in self.utest_files_list:
+            print(single_utest)
+            print(f'{i}/{len(self.utest_files_list)}')
+            i += 1
             info = runcmd(single_utest)
+            time.sleep(2)
+
             #this function will gather static info about not-tested dtype for every utest
             self.dtype_check_all_test(info, single_utest)
             if self.search_skip_utest_chip_arch(info, single_utest):

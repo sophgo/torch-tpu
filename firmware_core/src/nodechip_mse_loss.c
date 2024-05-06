@@ -1,6 +1,6 @@
 #include "sg_api_struct.h"
 #include "tpu_kernel.h"
-#include "config.h"
+
 
 void nodechip_mse_loss_forward (
 global_addr_t input_global_addr,
@@ -22,8 +22,8 @@ data_type_t dtype)
   dim4 reduce_shape = { .c = 1, .n = 1, .h = 1, .w = 1 };
   local_addr_t input_local_addrs[2], target_local_addrs[2], output_local_addrs[2];
   // used in dtype != FP32
-  local_addr_t input_local_addrs_temp, output_local_addrs_temp, reduce_total_local_addrs_temp;
-  local_addr_t reduce_split_local_addrs, transpose_reduce_split_local_addrs, reduce_total_local_addrs;
+  local_addr_t input_local_addrs_temp = 0, output_local_addrs_temp = 0, reduce_total_local_addrs_temp = 0;
+  local_addr_t reduce_split_local_addrs = 0, transpose_reduce_split_local_addrs = 0, reduce_total_local_addrs = 0;
   local_addr_t next = 0;
   while ( true )
   {

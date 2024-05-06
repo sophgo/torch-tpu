@@ -1,3 +1,5 @@
+this doc is out of date, Please refer to `docs/developer_manual`
+===========
 [1]PrePare:
 1) Link host device to your docker:
     sudo docker pull  sophgo/tpuc_dev:latest

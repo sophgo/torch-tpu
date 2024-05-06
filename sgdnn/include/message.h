@@ -1,5 +1,10 @@
 #ifndef _MESSAGE_H_
 #define _MESSAGE_H_
+/*
+ * this file contians struct defination in TPU1686.
+ * DO NOT MODIFY IT, UNLESS TPU1686 change that file.
+ * check if same with "TPU1686/common/include/api/message.h"
+ */
 
 #ifdef __cplusplus
 extern "C" {

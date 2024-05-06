@@ -1,6 +1,6 @@
 #include "sg_api_struct.h"
 #include "tpu_kernel.h"
-#include "config.h"
+
 
 inline static void pipeline_move(unsigned long long *array, int num)
 {
@@ -116,7 +116,7 @@ void tpu_kernel_api_logical_not(const void *args)
 }
 TPUKERNEL_FUNC_REGISTER(tpu_kernel_api_logical_not);
 
-#ifdef FIRMWARE_BACKEND_2260
+#ifdef BACKEND_SG2260
 void tpu_kernel_api_logical_not_multi_core(const void *args)
 {
   sg_api_logical_not_t * api = ( sg_api_logical_not_t * ) args;

@@ -1,6 +1,6 @@
 #include <stdlib.h>
 
-#include "config.h"
+
 #include "sg_api_struct.h"
 #include "tpu_kernel.h"
 
@@ -67,7 +67,7 @@ void tpu_kernel_api_topk(const void *args) {
 }
 TPUKERNEL_FUNC_REGISTER(tpu_kernel_api_topk);
 
-#ifdef FIRMWARE_BACKEND_2260
+#ifdef BACKEND_SG2260
 void tpu_kernel_api_topk_multi_core(const void *args) {
   sg_api_topk_t *api = (sg_api_topk_t *)args;
   TPUKERNEL_ASSERT(api->dtype == DT_FP32 || api->dtype == DT_INT32 ||

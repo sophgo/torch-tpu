@@ -3,9 +3,9 @@
 #include <ATen/core/TensorBase.h>
 #include <ATen/native/Pool.h>
 #include <ATen/EmptyTensor.h>
-#include <TPUDeviceManager.h>
-#include <TPUTorchUtils.h>
-#include <sgdnn_api.h>
+
+#include "TPUTorchUtils.h"
+
 
 #include "common/config.h"
 
@@ -48,7 +48,8 @@ bool ceil_mode )
   int output_w = at::native::pooling_output_shape ( self.size ( 3 ), kernel_size[1], padding[1], stride[1], dilation[1], ceil_mode );
   auto output = empty ( { self.size ( 0 ), self.size ( 1 ), output_h, output_w }, self.options() );
   TIMING_START;
-  bm_status_t status = sgdnnPoolingForward (
+  #if defined BACKEND_1684X
+  auto status = sgdnnPoolingForward (
                        tpu::TPUGetDeviceHandle(),
                        pooling_desc,
                        &alpha,
@@ -58,6 +59,18 @@ bool ceil_mode )
                        tpu::TPUGenerateSgdnnTensor ( output ),
                        ADDR_IN_DEVICE ( output ) );
   TORCH_CHECK ( status == BM_SUCCESS );
+  #elif defined BACKEND_SG2260
+  auto status = sgdnnPoolingForward (
+                       tpu::TPUGetDeviceHandle(),
+                       pooling_desc,
+                       &alpha,
+                       tpu::TPUGenerateSgdnnTensor ( self ),
+                       ADDR_IN_DEVICE ( self ),
+                       &beta,
+                       tpu::TPUGenerateSgdnnTensor ( output ),
+                       ADDR_IN_DEVICE ( output ) );
+  TORCH_CHECK ( status == BM_SUCCESS );
+  #endif
   TIMING_END(tpu::MAX_POOLING);
   outputs = std::tuple<Tensor, Tensor> ( output, Tensor() );
   SHOW_TENSOR_OP(self, output);
@@ -108,8 +121,11 @@ const Tensor & indices )
   int output_h = at::native::pooling_output_shape ( self.size ( 2 ), kernel_size[0], padding[0], stride[0], dilation[0], ceil_mode );
   int output_w = at::native::pooling_output_shape ( self.size ( 3 ), kernel_size[1], padding[1], stride[1], dilation[1], ceil_mode );
   auto output = empty ( { self.size ( 0 ), self.size ( 1 ), output_h, output_w }, self.options() );
+  grad_input = empty ( self.sizes(), self.options() );
+
   TIMING_START;
-  bm_status_t status = sgdnn_pooling_forward (
+  #if defined BACKEND_1684X
+  auto status = sgdnn_pooling_forward (
                        tpu::TPUGetDeviceHandle(),
                        pooling_desc,
                        &alpha,
@@ -119,7 +135,6 @@ const Tensor & indices )
                        tpu::TPUGenerateSgdnnTensor ( output ),
                        ADDR_IN_DEVICE ( output ) );
   TORCH_CHECK ( status == BM_SUCCESS );
-  grad_input = empty ( self.sizes(), self.options() );
   status = sgdnn_pooling_backward (
            tpu::TPUGetDeviceHandle(),
            pooling_desc,
@@ -134,6 +149,32 @@ const Tensor & indices )
            tpu::TPUGenerateSgdnnTensor ( grad_input ),
            ADDR_IN_DEVICE ( grad_input ) );
   TORCH_CHECK ( status == BM_SUCCESS );
+  #elif defined BACKEND_SG2260
+  auto status = sgdnn_pooling_forward (
+                       tpu::TPUGetDeviceHandle(),
+                       pooling_desc,
+                       &alpha,
+                       tpu::TPUGenerateSgdnnTensor ( self ),
+                       ADDR_IN_DEVICE ( self ),
+                       &beta,
+                       tpu::TPUGenerateSgdnnTensor ( output ),
+                       ADDR_IN_DEVICE ( output ) );
+  TORCH_CHECK ( status == BM_SUCCESS );
+  status = sgdnn_pooling_backward (
+           tpu::TPUGetDeviceHandle(),
+           pooling_desc,
+           &alpha,
+           tpu::TPUGenerateSgdnnTensor ( output ),
+           ADDR_IN_DEVICE ( output ),
+           tpu::TPUGenerateSgdnnTensor ( grad_output ),
+           ADDR_IN_DEVICE ( grad_output ),
+           tpu::TPUGenerateSgdnnTensor ( self ),
+           ADDR_IN_DEVICE ( self ),
+           &beta,
+           tpu::TPUGenerateSgdnnTensor ( grad_input ),
+           ADDR_IN_DEVICE ( grad_input ) );
+  TORCH_CHECK ( status == BM_SUCCESS );
+  #endif
   TIMING_END(tpu::MAX_POOLING);
 #endif
   SHOW_TENSOR_OP(grad_output_, self, grad_input);
@@ -175,12 +216,21 @@ Tensor & output ){
     .mode = POOLING_AVG
   };
   TIMING_START;
-  bm_status_t status = sgdnnPoolingForward (
+  #if defined BACKEND_1684X
+  auto status = sgdnnPoolingForward (
                        tpu::TPUGetDeviceHandle(),
                        tpu::TPUGenerateSgdnnTensor ( self ),
                        tpu::TPUGenerateSgdnnTensor ( output ),
                        pooling_desc);
   TORCH_CHECK ( status == BM_SUCCESS );
+  #elif defined BACKEND_SG2260
+  auto status = sgdnnPoolingForward (
+                       c10_tpu::getCurrentTPUStream(),
+                       tpu::TPUGenerateSgdnnTensor ( self ),
+                       tpu::TPUGenerateSgdnnTensor ( output ),
+                       pooling_desc);
+  TORCH_CHECK ( status == tpuRtSuccess );
+  #endif
   TIMING_END(tpu::AVG_POOLING);
 #endif
   SHOW_TENSOR_OP(self, output);
@@ -227,12 +277,21 @@ IntArrayRef output_size){
   };
 
   TIMING_START;
-  bm_status_t status = sgdnnPoolingForward (
+  #if defined BACKEND_1684X
+  auto status = sgdnnPoolingForward (
                        tpu::TPUGetDeviceHandle(),
                        tpu::TPUGenerateSgdnnTensor ( self ),
                        tpu::TPUGenerateSgdnnTensor ( output ),
                        pooling_desc);
   TORCH_CHECK ( status == BM_SUCCESS );
+  #elif defined BACKEND_SG2260
+  auto status = sgdnnPoolingForward (
+                       c10_tpu::getCurrentTPUStream(),
+                       tpu::TPUGenerateSgdnnTensor ( self ),
+                       tpu::TPUGenerateSgdnnTensor ( output ),
+                       pooling_desc);
+  TORCH_CHECK ( status == tpuRtSuccess );
+  #endif
   TIMING_END(tpu::AVG_POOLING);
 #endif
   SHOW_TENSOR_OP(self, output);
