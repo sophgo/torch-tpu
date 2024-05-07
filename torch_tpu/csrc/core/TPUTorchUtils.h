@@ -230,7 +230,6 @@ static inline bool TPUIsSameShape ( const at::Tensor & Tensor1, const at::Tensor
 void TPUCompareResult ( const at::Tensor & Got, const at::Tensor & Exp,
                         double Threshold = 1e-4, double ErrScale = 1.0 );
 
-#ifdef TPU_OP_TIMING
 typedef enum
 {
   CDMA_D2S = 0,
@@ -478,6 +477,7 @@ private:
   static GlobalTimer * instance_;
 };
 
+#ifdef TPU_OP_TIMING
 struct TensorWatcher
 {
   void AddTensor ( const at::Tensor & Tensor );

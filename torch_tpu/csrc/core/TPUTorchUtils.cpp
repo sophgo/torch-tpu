@@ -61,7 +61,7 @@ FAILED:
   }
 }
 
-#ifdef TPU_OP_TIMING
+
 
 static const char * OpTypeStr[OP_NUM] =
 {
@@ -360,6 +360,7 @@ GlobalTimer & GlobalTimer::Instance()
   return *instance_;
 }
 
+#ifdef TPU_OP_TIMING
 
 TensorWatcher * TensorWatcher::instance_ = nullptr;
 
