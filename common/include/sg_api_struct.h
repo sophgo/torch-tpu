@@ -1187,13 +1187,22 @@ typedef struct {
 typedef struct {
   unsigned long long input_addr;
   unsigned long long weight0_addr;
+  unsigned long long zp0_addr;
+  unsigned long long scale0_addr;
   unsigned long long weight1_addr;
+  unsigned long long zp1_addr;
+  unsigned long long scale1_addr;
   unsigned long long weight2_addr;
+  unsigned long long zp2_addr;
+  unsigned long long scale2_addr;
   unsigned long long output_addr;
   int batch;
   int input_w;
   int middle_w;
   int dtype;
+  int quantized;
+  int group_size;
+  int weight_bits;
 #ifndef WIN32
 } __attribute__((packed)) sg_api_llama_mlp_multi_core_t;
 #else

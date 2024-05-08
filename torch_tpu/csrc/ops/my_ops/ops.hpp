@@ -44,6 +44,21 @@ namespace at
 		int8_t weight_bits,
 		Tensor &output);
 
+	Tensor a16_llama_mlp_forward(
+		Tensor &input,
+		Tensor &weight0,
+		Tensor &zp0,
+		Tensor &sale0,
+		Tensor &weight1,
+		Tensor &zp1,
+		Tensor &sale1,
+		Tensor &weight2,
+		Tensor &zp2,
+		Tensor &sale2,
+		int64_t group_size,
+		int64_t weight_bits,
+		Tensor &output);
+
 	Tensor rmsnorm_forward(
 		Tensor &input,
 		const c10::optional<Tensor> &scale,

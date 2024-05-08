@@ -1124,6 +1124,32 @@ tpu_status_t sgdnnLLamaMlp ( tpu_resource_t  stream,
                           bool non_blocking = true);
 
 /*
+ * OUTPUT = MLP ( INPUT, WEIGHT0, ZP0, SCALE0, WEIGHT1, ZP1, SCALE1, WEIGHT2, ZP2, SCALE2, OUTPUT )
+ * Note:
+ * 1. The data types of INPUT, SCALE/0/1/2, OUTPUT must be the same and support FP16 only
+ * 2. The data types of WEIGHT0/1/2 and ZP/0/1/2 must be the same and must be UINT8
+ * 3. The dimensions of INPUT, WEIGHT0/1/2, ZP0/1/2, SCALE0/1/2, OUTPUT must be 2
+ * 4. ZP0/1/2 and SCALE0/1/2 are used for dequantization, while GROUP_SIZE and WEIGHT_BITS are parameters set according to the specific quantization method
+ * 5. INPUT, WEIGHT0/1/2, ZP0/1/2, SCALE0/1/2 OUTPUT must be contiguous
+ * 6. formula: matmul(mul(matmul(INPUT, (WEIGHT0-(ZP0+1))*SCALE0), mul(matmul(INPUT, (WEIGHT1-(ZP1+1))*SCALE1), sigmoid(matmul(INPUT, (WEIGHT1-(ZP1+1))*SCALE1)))), (WEIGHT2-(ZP2+1))*SCALE2)
+ */
+tpu_status_t sgdnnLLamaA16Mlp ( tpu_resource_t stream,
+                          SgdnnTensor_t input,
+                          SgdnnTensor_t weight0,
+                          SgdnnTensor_t zp0,
+                          SgdnnTensor_t scale0,
+                          SgdnnTensor_t weight1,
+                          SgdnnTensor_t zp1,
+                          SgdnnTensor_t scale1,
+                          SgdnnTensor_t weight2,
+                          SgdnnTensor_t zp2,
+                          SgdnnTensor_t scale2,
+                          int group_size,
+                          int weight_bits,
+                          SgdnnTensor_t output,
+                          bool non_blocking = true);
+
+/*
  * OUTPUT = RMSNorm ( INPUT, WEIGHT, BIAS, OUTPUT )
  * Note:
  * 1. The data types of INPUT, WEIGHT, BIAS, OUTPUT  must be the same and one of FP32, FP16 and BF16

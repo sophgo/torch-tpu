@@ -250,6 +250,7 @@ static const char * OpTypeStr[OP_NUM] =
   "Inf Check And Unscale",
   "LLAMA_ATTENTION",
   "LLAMA_MLP_FORWARD",
+  "LLAMA_A16_MLP_FORWARD",
   "RMSNORM_FORWARD",
   "binary_op",
   "binary_op_c",
