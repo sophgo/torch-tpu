@@ -19,7 +19,7 @@ namespace at
         }
         CHECK_TENSOR_IN_DEVICE(out);
 #if 0
- 
+
   auto self_cpu = logical_not ( self.cpu());
   tpu::TPUCopyHostToDevice ( self.data_ptr(),self.contiguous().data_ptr(), self.nbytes() );
 #else
@@ -33,20 +33,13 @@ namespace at
         else if (IS_TPU_TENSOR(self))
         {
             TIMING_START;
-            #if defined BACKEND_1684X
+
             auto status = sgdnnLogicalNot(
-                tpu::TPUGetDeviceHandle(),
+                tpu::TPUGetDeviceResource(),
                 tpu::TPUGenerateSgdnnTensor(self),
                 tpu::TPUGenerateSgdnnTensor(out));
-            TORCH_CHECK(status == BM_SUCCESS);
-            #elif defined BACKEND_SG2260
-            auto status = sgdnnLogicalNot(
-                c10_tpu::getCurrentTPUStream(),
-                tpu::TPUGenerateSgdnnTensor(self),
-                tpu::TPUGenerateSgdnnTensor(out));
-            TORCH_CHECK(status == tpuRtSuccess);
-            #endif
-            TIMING_END(tpu::LOGICAL_NOT);
+            TORCH_CHECK(status == SG_SUCCESS);
+                        TIMING_END(tpu::LOGICAL_NOT);
         }
         else
         {

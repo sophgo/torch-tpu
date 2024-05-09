@@ -20,20 +20,13 @@ Tensor & neg_out_tpu ( const Tensor & self, Tensor & out )
   tpu::TPUCopyHostToDevice ( out.data_ptr(), out_cpu.contiguous().data_ptr(), out.nbytes() );
 #else
   TIMING_START;
-  #if defined BACKEND_1684X
+
   auto status = sgdnnNeg(
-                       tpu::TPUGetDeviceHandle(),
+                       tpu::TPUGetDeviceResource(),
                        tpu::TPUGenerateSgdnnTensor ( self ),
                        tpu::TPUGenerateSgdnnTensor ( out ) );
-  TORCH_CHECK ( status == BM_SUCCESS );
-  #elif defined BACKEND_SG2260
-  auto status = sgdnnNeg(
-                       c10_tpu::getCurrentTPUStream(),
-                       tpu::TPUGenerateSgdnnTensor ( self ),
-                       tpu::TPUGenerateSgdnnTensor ( out ) );
-  TORCH_CHECK ( status == tpuRtSuccess );
-  #endif
-  TIMING_END ( tpu::NEG );
+  TORCH_CHECK ( status == SG_SUCCESS );
+    TIMING_END ( tpu::NEG );
 #endif
   SHOW_TENSOR_OP(self, out);
   return out;

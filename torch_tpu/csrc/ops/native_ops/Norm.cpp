@@ -34,22 +34,14 @@ Tensor & norm_out_tpu ( const at::Tensor & self, const c10::optional<at::Scalar>
     TORCH_CHECK ( dim.size() == self.dim() || dim.size() == 0 ); // TODO: Support partial dims
     for (int i = 0; i < (int)dim.size(); i++) { TORCH_CHECK ( dim[i] == i ); }
     TIMING_START;
-    #if defined BACKEND_1684X
+
     auto status = sgdnnNorm2 (
-                        tpu::TPUGetDeviceHandle(),
+                        tpu::TPUGetDeviceResource(),
                         tpu::TPUGenerateSgdnnTensor ( self ),
                         keepdim,
                         tpu::TPUGenerateSgdnnTensor ( out ) );
-    TORCH_CHECK ( status == BM_SUCCESS );
-    #elif defined BACKEND_SG2260
-    auto status = sgdnnNorm2 (
-                        c10_tpu::getCurrentTPUStream(),
-                        tpu::TPUGenerateSgdnnTensor ( self ),
-                        keepdim,
-                        tpu::TPUGenerateSgdnnTensor ( out ) );
-    TORCH_CHECK ( status == tpuRtSuccess );
-    #endif
-    TIMING_END(tpu::NORM2);
+    TORCH_CHECK ( status == SG_SUCCESS );
+        TIMING_END(tpu::NORM2);
   }
 #endif
   SHOW_TENSOR_OP(self, out);

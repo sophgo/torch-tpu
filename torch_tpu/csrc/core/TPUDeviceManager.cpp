@@ -264,7 +264,7 @@ void TPUSetDeviceIndex ( int Index )
   TPUDeviceManager::GetInstance().get_handle_mutex(kIndex).unlock();
 }
 
-bm_handle_t TPUGetDeviceHandle()
+bm_handle_t TPUGetDeviceResource()
 {
   return TPUDeviceManager::GetInstance().GetDeviceHandle ( kIndex );
 }

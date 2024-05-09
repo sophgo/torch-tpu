@@ -30,26 +30,16 @@ Tensor &flip_out_tpu(const Tensor &self, const c10::ArrayRef<int64_t> dims,
                            out.nbytes());
 #else
   TIMING_START;
-  #if defined BACKEND_1684X
+
   auto temp_result = self;
   for (uint i = 0; i < dims.size(); i++) {
-    auto status = sgdnnFlip(tpu::TPUGetDeviceHandle(),
+    auto status = sgdnnFlip(tpu::TPUGetDeviceResource(),
                                    tpu::TPUGenerateSgdnnTensor(temp_result),
                                    dims[i], tpu::TPUGenerateSgdnnTensor(out));
-    TORCH_CHECK(status == BM_SUCCESS);
+    TORCH_CHECK(status == SG_SUCCESS);
     temp_result = out;
   }
-  #elif defined BACKEND_SG2260
-  auto temp_result = self;
-  for (uint i = 0; i < dims.size(); i++) {
-    auto status = sgdnnFlip(c10_tpu::getCurrentTPUStream(),
-                                   tpu::TPUGenerateSgdnnTensor(temp_result),
-                                   dims[i], tpu::TPUGenerateSgdnnTensor(out));
-    TORCH_CHECK(status == tpuRtSuccess);
-    temp_result = out;
-  }
-  #endif
-  TIMING_END(tpu::FLIP);
+    TIMING_END(tpu::FLIP);
 #endif
   SHOW_TENSOR_OP(self, out);
   return out;

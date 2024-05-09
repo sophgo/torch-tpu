@@ -21,7 +21,7 @@ namespace at
 		TIMING_START;
 #if defined BACKEND_SG2260
 		tpuRtStatus_t status = sgdnnRMSNorm(
-			c10_tpu::getCurrentTPUStream(),
+			tpu::TPUGetDeviceResource(),
 			tpu::TPUGenerateSgdnnTensor(input),
 			scale.has_value() ? tpu::TPUGenerateSgdnnTensor(scale.value()) : sgdnnUndefinedTensor(),
 			bias.has_value() ? tpu::TPUGenerateSgdnnTensor(bias.value()) : sgdnnUndefinedTensor(),

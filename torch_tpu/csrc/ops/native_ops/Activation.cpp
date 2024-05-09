@@ -25,19 +25,11 @@ Tensor &threshold_backward_grad_input_tpu(const Tensor &grad_output,
   TIMING_END(tpu::CPU_LAYER);
 #else
   TIMING_START;
-  #if defined BACKEND_1684X
   auto status = sgdnnReLUBackward(
-      tpu::TPUGetDeviceHandle(), tpu::TPUGenerateSgdnnTensor(grad_output),
+      tpu::TPUGetDeviceResource(), tpu::TPUGenerateSgdnnTensor(grad_output),
       tpu::TPUGenerateSgdnnTensor(input),
       tpu::TPUGenerateSgdnnTensor(grad_input));
-  TORCH_CHECK(status == BM_SUCCESS);
-  #elif defined BACKEND_SG2260
-  auto status = sgdnnReLUBackward(
-      c10_tpu::getCurrentTPUStream(), tpu::TPUGenerateSgdnnTensor(grad_output),
-      tpu::TPUGenerateSgdnnTensor(input),
-      tpu::TPUGenerateSgdnnTensor(grad_input));
-  TORCH_CHECK(status == tpuRtSuccess);
-  #endif
+  TORCH_CHECK(status == SG_SUCCESS);
   TIMING_END(tpu::RELU_BACKWARD);
 #endif
   SHOW_TENSOR_OP(grad_output, input, grad_input);
@@ -54,22 +46,14 @@ Tensor &gelu_out_tpu(const Tensor &self, c10::string_view approximate,
 #if 0
   auto out_cpu = gelu ( self.cpu(), approximate );
   tpu::TPUCopyHostToDevice ( out.data_ptr(), out_cpu.contiguous().data_ptr(), out.nbytes() );
-#else  
+#else
   auto self_ = self.contiguous();
   out = out.contiguous();
   TIMING_START;
-  #if defined BACKEND_1684X
   auto status =
-      sgdnnGELU(tpu::TPUGetDeviceHandle(), tpu::TPUGenerateSgdnnTensor(self_),
+      sgdnnGELU(tpu::TPUGetDeviceResource(), tpu::TPUGenerateSgdnnTensor(self_),
                 tpu::TPUGenerateSgdnnTensor(out));
-  TORCH_CHECK(status == BM_SUCCESS);
-  #elif defined BACKEND_SG2260
-  auto status = 
-        sgdnnGELU ( c10_tpu::getCurrentTPUStream(),
-                    tpu::TPUGenerateSgdnnTensor(self_),
-                    tpu::TPUGenerateSgdnnTensor(out) );
-  TORCH_CHECK(status == tpuRtSuccess);
-  #endif
+  TORCH_CHECK(status == SG_SUCCESS);
   TIMING_END(tpu::GELU);
 #endif
   SHOW_TENSOR_OP(self, out);
@@ -90,19 +74,11 @@ Tensor &gelu_backward_grad_input_tpu(const Tensor &grad_output,
 #else
   auto self_ = self.contiguous();
   TIMING_START;
-  #if defined BACKEND_1684X
   auto status = sgdnnGELUBackward(
-      tpu::TPUGetDeviceHandle(), tpu::TPUGenerateSgdnnTensor(grad_output),
+      tpu::TPUGetDeviceResource(), tpu::TPUGenerateSgdnnTensor(grad_output),
       tpu::TPUGenerateSgdnnTensor(self_),
       tpu::TPUGenerateSgdnnTensor(grad_input));
-  TORCH_CHECK(status == BM_SUCCESS);
-  #elif defined BACKEND_SG2260
-  auto status = sgdnnGELUBackward(
-      c10_tpu::getCurrentTPUStream(), tpu::TPUGenerateSgdnnTensor(grad_output),
-      tpu::TPUGenerateSgdnnTensor(self_),
-      tpu::TPUGenerateSgdnnTensor(grad_input));
-  TORCH_CHECK(status == tpuRtSuccess);
-  #endif
+  TORCH_CHECK(status == SG_SUCCESS);
   TIMING_END(tpu::GELU_BACKWARD);
 #endif
   SHOW_TENSOR_OP(grad_output, self, grad_input);
@@ -121,17 +97,10 @@ Tensor &silu_out_tpu(const Tensor &self, Tensor &out) {
   out = out_cpu.to(out.device()).to(out.dtype());
 #else
   TIMING_START;
-  #if defined BACKEND_1684X
   auto status =
-      sgdnnActive(tpu::TPUGetDeviceHandle(), tpu::TPUGenerateSgdnnTensor(self),
+      sgdnnActive(tpu::TPUGetDeviceResource(), tpu::TPUGenerateSgdnnTensor(self),
                   tpu::TPUGenerateSgdnnTensor(out), ACTIVE_SILU);
-  TORCH_CHECK(status == BM_SUCCESS);
-  #elif defined BACKEND_SG2260
-  auto status =
-      sgdnnActive(c10_tpu::getCurrentTPUStream(), tpu::TPUGenerateSgdnnTensor(self),
-                  tpu::TPUGenerateSgdnnTensor(out), ACTIVE_SILU);
-  TORCH_CHECK(status == tpuRtSuccess);
-  #endif
+  TORCH_CHECK(status == SG_SUCCESS);
   TIMING_END(tpu::SILU);
 #endif
   SHOW_TENSOR_OP(self, out);
@@ -148,17 +117,10 @@ Tensor &leakyrelu__tpu(Tensor &self, Scalar negative_slope) {
   return self;
 #else
   TIMING_START;
-  #if defined BACKEND_1684X
   auto status = sgdnnLeakyReLU(
-      tpu::TPUGetDeviceHandle(), tpu::TPUGenerateSgdnnTensor(self),
+      tpu::TPUGetDeviceResource(), tpu::TPUGenerateSgdnnTensor(self),
       tpu::TPUGenerateSgdnnTensor(self), negative_slope.to<double>());
-  TORCH_CHECK(status == BM_SUCCESS);
-  #elif defined BACKEND_SG2260
-  auto status = sgdnnLeakyReLU(
-      c10_tpu::getCurrentTPUStream(), tpu::TPUGenerateSgdnnTensor(self),
-      tpu::TPUGenerateSgdnnTensor(self), negative_slope.to<double>());
-  TORCH_CHECK(status == tpuRtSuccess);
-  #endif
+  TORCH_CHECK(status == SG_SUCCESS);
   TIMING_END(tpu::LEAKY_RELU);
   SHOW_TENSOR_OP(self);
   return self;
@@ -176,17 +138,10 @@ Tensor &leakyrelu_tpu(const Tensor &self, const Scalar &negative_slope,
   return self;
 #else
   TIMING_START;
-  #if defined BACKEND_1684X
   auto status = sgdnnLeakyReLU(
-      tpu::TPUGetDeviceHandle(), tpu::TPUGenerateSgdnnTensor(self),
+      tpu::TPUGetDeviceResource(), tpu::TPUGenerateSgdnnTensor(self),
       tpu::TPUGenerateSgdnnTensor(out), negative_slope.to<double>());
-  TORCH_CHECK(status == BM_SUCCESS);
-  #elif defined BACKEND_SG2260
-  auto status = sgdnnLeakyReLU(
-      c10_tpu::getCurrentTPUStream(), tpu::TPUGenerateSgdnnTensor(self),
-      tpu::TPUGenerateSgdnnTensor(out), negative_slope.to<double>());
-  TORCH_CHECK(status == tpuRtSuccess);
-  #endif
+  TORCH_CHECK(status == SG_SUCCESS);
   TIMING_END(tpu::LEAKY_RELU);
   SHOW_TENSOR_OP(self, out);
   return out;
@@ -208,17 +163,10 @@ Tensor & hardtanh_out_tpu(const Tensor &self, const Scalar &min_value,
   }
   else {
     TIMING_START;
-    #if defined BACKEND_1684X
     auto status = sgdnnHardtanh(
-                            tpu::TPUGetDeviceHandle(), tpu::TPUGenerateSgdnnTensor(self),
+                            tpu::TPUGetDeviceResource(), tpu::TPUGenerateSgdnnTensor(self),
                             min_value.toFloat(), max_value.toFloat(), tpu::TPUGenerateSgdnnTensor(out));
-    TORCH_CHECK(status == BM_SUCCESS);
-    #elif defined BACKEND_SG2260
-    auto status = sgdnnHardtanh(
-                          c10_tpu::getCurrentTPUStream(), tpu::TPUGenerateSgdnnTensor(self),
-                          min_value.toFloat(), max_value.toFloat(), tpu::TPUGenerateSgdnnTensor(out));
-    TORCH_CHECK(status == tpuRtSuccess);
-    #endif
+    TORCH_CHECK(status == SG_SUCCESS);
     TIMING_END(tpu::HARDTANH);
   }
   SHOW_TENSOR_OP(self, out);

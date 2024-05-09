@@ -61,20 +61,13 @@ Tensor &slice_scatter_out_tpu(const Tensor &self, const Tensor &src,
                        .expand({1, num_c, -1, 1})
                        .to(self.device());
   TIMING_START;
-  #if defined BACKEND_1684X
+
   auto status = sgdnnSliceScatter(
-      tpu::TPUGetDeviceHandle(), tpu::TPUGenerateSgdnnTensor(self),
+      tpu::TPUGetDeviceResource(), tpu::TPUGenerateSgdnnTensor(self),
       tpu::TPUGenerateSgdnnTensor(src), tpu::TPUGenerateSgdnnTensor(indices),
       dim, tpu::TPUGenerateSgdnnTensor(out));
-  TORCH_CHECK(status == BM_SUCCESS);
-  #elif defined BACKEND_SG2260
-  auto status = sgdnnSliceScatter(
-      c10_tpu::getCurrentTPUStream(), tpu::TPUGenerateSgdnnTensor(self),
-      tpu::TPUGenerateSgdnnTensor(src), tpu::TPUGenerateSgdnnTensor(indices),
-      dim, tpu::TPUGenerateSgdnnTensor(out));
-  TORCH_CHECK(status == tpuRtSuccess);
-  #endif
-  TIMING_END(tpu::SLICE_SCATTER);
+  TORCH_CHECK(status == SG_SUCCESS);
+    TIMING_END(tpu::SLICE_SCATTER);
 #endif
   SHOW_TENSOR_OP(self, out);
   return out;

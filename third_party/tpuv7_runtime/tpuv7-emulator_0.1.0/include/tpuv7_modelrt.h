@@ -78,16 +78,13 @@ typedef struct tpu_net_info_s {
 typedef void* tpuRtNet_t;
 typedef void* tpuRtNetContext_t;
 
-void * tpuRtInitNet(void);
 tpuRtStatus_t tpuRtCreateNetContext(tpuRtNetContext_t *context);
 tpuRtStatus_t tpuRtDestroyNetContext(tpuRtNetContext_t context);
 tpuRtStatus_t tpuRtLoadNet(const char* net_path, tpuRtNetContext_t context, tpuRtNet_t *net);
-tpuRtStatus_t tpuRtLoadNetFromMem(void* net_data, size_t size, tpuRtNet_t *net);
+tpuRtStatus_t tpuRtLoadNetFromMem(const void* net_data, size_t size, tpuRtNetContext_t context, tpuRtNet_t *net);
 tpuRtStatus_t tpuRtUnloadNet(tpuRtNet_t *net);
 tpuRtNetInfo_t tpuRtGetNetInfo(tpuRtNet_t *net);
-//tpuRtStatus_t tpuRtGetNetInfo(tpuRtNet_t *net, tpuRtNetInfo_t *info);
-//tpuRtNetInfo_t tpuRtGetNetInfo(tpuRtNet_t *net, tpuRtNetContext_t context);
-tpuRtStatus_t tpuRtLaunchNetAsync(tpuRtNet_t* net, const tpuRtTensor_t input[], tpuRtTensor_t output[], const char*net_name, tpuRtStream_t stream);
-tpuRtStatus_t tpuRtLaunchNet(tpuRtNet_t* net, const tpuRtTensor_t input[], tpuRtTensor_t output[], tpuRtStream_t stream);
+tpuRtStatus_t tpuRtLaunchNetAsync(tpuRtNet_t* net, const tpuRtTensor_t input[], tpuRtTensor_t output[], const char* net_name, tpuRtStream_t stream);
+tpuRtStatus_t tpuRtLaunchNet(tpuRtNet_t* net, const tpuRtTensor_t input[], tpuRtTensor_t output[], const char* net_name, tpuRtStream_t stream);
 
 #endif  //end of __TPU_NET__

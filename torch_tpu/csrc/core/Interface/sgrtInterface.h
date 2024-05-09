@@ -2,7 +2,7 @@
 
 #include <c10/core/Device.h>
 #include "torch_tpu/csrc/core/TPULog.h"
-#include <sgdnn_api2.h>
+#include <sgdnn_api.h>
 #include <tpuv7_rt.h>
 
 #define tpuStreamNonBlocking 0x01 /**< Stream does not synchronize with stream 0 (the NULL stream) */
@@ -10,9 +10,9 @@
 namespace c10_tpu {
 namespace sgrt {
 /********************************************************
- * 
+ *
  *               DEVICE RPOPRITYE RELATED
- * 
+ *
 **********************************************************/
 enum MemType
 {
@@ -32,9 +32,9 @@ tpuRtStatus_t SgrtGetMemInfo(MemType mem_type, size_t* free_size, size_t* total_
 }
 
 /********************************************************
- * 
+ *
  *    DEVICE OPERATION RELATED
- * 
+ *
 **********************************************************/
 enum sgrtStreamStatus {
     SG_STREAM_STATUS_COMPLETE  = 0,

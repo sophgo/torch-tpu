@@ -43,7 +43,7 @@ typedef int (*pTpuRtStreamCallback)(void *);
 void sgTimeRecord(tpuRtTimeRecord *time);
 uint32_t sgTimeCalculate(tpuRtTimeRecord time_start, tpuRtTimeRecord time_end);
 
-tpuRtStatus_t tpuRtDeviceInit(void);
+tpuRtStatus_t tpuRtInit(void);
 tpuRtStatus_t tpuRtGetDeviceCount(int *count);
 tpuRtStatus_t tpuRtGetDevice(int *device);
 tpuRtStatus_t tpuRtSetDevice(int device);

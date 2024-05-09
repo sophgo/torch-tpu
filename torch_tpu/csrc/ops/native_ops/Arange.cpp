@@ -7,9 +7,9 @@
 
 #include "common/config.h"
 
-namespace at 
+namespace at
 {
-Tensor & arange_start_out_tpu( const at::Scalar & start, const at::Scalar & end, const at::Scalar & step, at::Tensor & out) 
+Tensor & arange_start_out_tpu( const at::Scalar & start, const at::Scalar & end, const at::Scalar & step, at::Tensor & out)
 {
     CHECK_TENSOR_IN_DEVICE ( out );
 #if 0
@@ -21,21 +21,12 @@ Tensor & arange_start_out_tpu( const at::Scalar & start, const at::Scalar & end,
         int empty_length = (end.toInt()-start.toInt() - 1) / step.toInt() + 1;
         out = empty({empty_length},out.options());
         TIMING_START;
-        #if defined BACKEND_1684X
-        auto status = sgdnnArange ( tpu::TPUGetDeviceHandle(),
+        auto status = sgdnnArange ( tpu::TPUGetDeviceResource(),
                                             start.toInt(),
                                             end.toInt(),
                                             step.toInt(),
                                             tpu::TPUGenerateSgdnnTensor ( out ));
-        TORCH_CHECK ( status == BM_SUCCESS );
-        #elif defined BACKEND_SG2260
-        auto status = sgdnnArange ( c10_tpu::getCurrentTPUStream(),
-                                            start.toInt(),
-                                            end.toInt(),
-                                            step.toInt(),
-                                            tpu::TPUGenerateSgdnnTensor ( out ));
-        TORCH_CHECK ( status == tpuRtSuccess );
-        #endif
+        TORCH_CHECK ( status == SG_SUCCESS );
         TIMING_END(tpu::ARANGE)
     }else{
         CPU_IMPL_WARNING();

@@ -34,15 +34,13 @@
 //         IntArrayRef out_shape_arr(out_shape_vec);
 //         out = out.reshape(out_shape_arr);
 //         TIMING_START;
-//         #if defined BACKEND_1684X
-//         auto status = sgdnnPermute( tpu::TPUGetDeviceHandle(),
+//
+//         auto status = sgdnnPermute( tpu::TPUGetDeviceResource(),
 //                                            tpu::TPUGenerateSgdnnTensor(self),
 //                                            dim_order_vec.data(),
 //                                            tpu::TPUGenerateSgdnnTensor(out));
-//         TORCH_CHECK(status == BM_SUCCESS);
-//         #elif defined BACKEND_SG2260
-//         #endif
-//         TIMING_END(tpu::PERMUTE);
+//         TORCH_CHECK(status == SG_SUCCESS);
+//         //         TIMING_END(tpu::PERMUTE);
 //     }
 // #endif
 //     SHOW_TENSOR_OP(self);

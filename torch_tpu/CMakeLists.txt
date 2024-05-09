@@ -57,14 +57,14 @@ endif()
 
 if (BUILD_LIBTORCH)
   message(STATUS "PYTHON API DISABLE, ONLY C INTERFACE")
-  file(GLOB_RECURSE CSRC_SRCS 
+  file(GLOB_RECURSE CSRC_SRCS
     csrc/libtorch/*.cpp
   )
   LIST(APPEND SRCS ${CSRC_SRCS})
 else()
   include_directories(${PYTHON_INCLUDE_DIR})
   message(STATUS "PYTHON API ENABLE")
-  file(GLOB_RECURSE CSRC_SRCS 
+  file(GLOB_RECURSE CSRC_SRCS
     csrc/aten/*.cpp
     csrc/tpu/*.cpp
     csrc/utils/*.cpp

@@ -3,9 +3,7 @@
 
 #include "torch_tpu/csrc/common/config.h"
 #include "torch_tpu/csrc/core/TPULog.h"
-#ifdef BACKEND_1684X
-#include <bmlib_runtime.h>
-#endif
+#include "sgdnn_runtime.h"
 
 #define TPU_DEVICE_INDEX_BITS 6
 #define TPU_GLOBAL_ADDR_BITS (64 - TPU_DEVICE_INDEX_BITS)
@@ -83,11 +81,13 @@ void TPUCopyDeviceToHost ( void * Dst, const void * Src, size_t Size, bool non_b
 
 void TPUCopyDeviceToDevice ( void * Dst, const void * Src, size_t Size, bool non_blocking = false);
 
-#ifdef BACKEND_1684X
+#if defined BACKEND_1684X
 /**
  * Get the current TPU device handle.
  */
-bm_handle_t TPUGetDeviceHandle ( void );
+bm_handle_t TPUGetDeviceResource ( void );
+#elif defined(BACKEND_SG2260)
+tpuRtStream_t TPUGetDeviceResource ( void );
 #endif
 
 } // namespace tpu

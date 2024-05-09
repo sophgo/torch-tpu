@@ -24,17 +24,11 @@ Tensor &bitwise_not_out_tpu(const Tensor &self, Tensor &out) {
                              out.nbytes());
   } else if (IS_TPU_TENSOR(self)) {
     TIMING_START;
-    #if defined BACKEND_1684X
-    auto status = sgdnnBitwiseNot(tpu::TPUGetDeviceHandle(),
-                                         tpu::TPUGenerateSgdnnTensor(self),
-                                         tpu::TPUGenerateSgdnnTensor(out));
-    TORCH_CHECK(status == BM_SUCCESS);
-    #elif defined BACKEND_SG2260
-    auto status = sgdnnBitwiseNot(c10_tpu::getCurrentTPUStream(),
-                                         tpu::TPUGenerateSgdnnTensor(self),
-                                         tpu::TPUGenerateSgdnnTensor(out));
-    TORCH_CHECK(status == tpuRtSuccess);
-    #endif
+
+    auto status = sgdnnBitwiseNot(tpu::TPUGetDeviceResource(),
+                                  tpu::TPUGenerateSgdnnTensor(self),
+                                  tpu::TPUGenerateSgdnnTensor(out));
+    TORCH_CHECK(status == SG_SUCCESS);
     TIMING_END(tpu::BITWISE_NOT);
   }
 #endif
@@ -65,17 +59,11 @@ Tensor &cbrt_out_tpu(const Tensor &self, Tensor &out) {
     tpu::TPUCopyHostToDevice(out.data_ptr(), &out_cpu, out.nbytes());
   } else if (IS_TPU_TENSOR(self)) {
     TIMING_START;
-    #if defined BACKEND_1684X
-    auto status =
-        sgdnnCbrt(tpu::TPUGetDeviceHandle(), tpu::TPUGenerateSgdnnTensor(self),
-                  tpu::TPUGenerateSgdnnTensor(out));
-    TORCH_CHECK(status == BM_SUCCESS);
-    #elif defined BACKEND_SG2260
-    auto status =
-        sgdnnCbrt(c10_tpu::getCurrentTPUStream(), tpu::TPUGenerateSgdnnTensor(self),
-                  tpu::TPUGenerateSgdnnTensor(out));
-    TORCH_CHECK(status == tpuRtSuccess);
-    #endif
+
+    auto status = sgdnnCbrt(tpu::TPUGetDeviceResource(),
+                            tpu::TPUGenerateSgdnnTensor(self),
+                            tpu::TPUGenerateSgdnnTensor(out));
+    TORCH_CHECK(status == SG_SUCCESS);
     TIMING_END(tpu::CBRT);
   }
 #endif
@@ -88,8 +76,9 @@ Tensor cbrt_tpu(const Tensor &self) {
 }
 // TORCH_LIBRARY_IMPL ( aten, TPU, m )
 // {
-//   m.impl ( "bitwise_not", cbrt_tpu );    // pytorch2.0.1版本库没有cbrt接口，借用bitwise_not接口实现
-//   m.impl ( "bitwise_not.out", cbrt_out_tpu );
+//   m.impl ( "bitwise_not", cbrt_tpu );    //
+//   pytorch2.0.1版本库没有cbrt接口，借用bitwise_not接口实现 m.impl (
+//   "bitwise_not.out", cbrt_out_tpu );
 // }
 // TORCH_LIBRARY_IMPL ( aten, TPU, m )     // 换成pytorch2.1以上版本后可使用？
 // {
@@ -97,4 +86,4 @@ Tensor cbrt_tpu(const Tensor &self) {
 //   m.impl ( "cbrt.out", cbrt_out_tpu );
 // }
 
-}  // namespace at
+} // namespace at

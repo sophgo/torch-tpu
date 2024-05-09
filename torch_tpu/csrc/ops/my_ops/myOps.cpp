@@ -14,8 +14,8 @@ Tensor& dummy(Tensor& in)
 	CHECK_TENSOR_IN_DEVICE ( in );
   	TIMING_START;
 #ifdef BACKEND_SG2260
-  	tpuRtStatus_t status = 
-        sgdnnDummy( c10_tpu::getCurrentTPUStream(),
+  	tpuRtStatus_t status =
+        sgdnnDummy( tpu::TPUGetDeviceResource(),
                     true );
 #endif
   	TIMING_END(tpu::DUMMY);
@@ -26,8 +26,8 @@ Tensor& dummy_no_kernel_launch(Tensor& in)
 	CHECK_TENSOR_IN_DEVICE ( in );
   	TIMING_START;
 #ifdef BACKEND_SG2260
-  	tpuRtStatus_t status = 
-        sgdnnDummy_WO_KERNEL_LAUNCH( c10_tpu::getCurrentTPUStream(),
+  	tpuRtStatus_t status =
+        sgdnnDummy_WO_KERNEL_LAUNCH( tpu::TPUGetDeviceResource(),
                     true );
 #endif
   	TIMING_END(tpu::DUMMY);

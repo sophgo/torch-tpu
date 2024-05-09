@@ -27,24 +27,15 @@ Tensor & clamp_out_tpu( const at::Tensor & self, const c10::optional<at::Scalar>
     }
     else if (IS_TPU_TENSOR(self_)){
         TIMING_START;
-        #if defined BACKEND_1684X
+
         auto status = sgdnnClamp(
-            tpu::TPUGetDeviceHandle(),
+            tpu::TPUGetDeviceResource(),
             tpu::TPUGenerateSgdnnTensor(self_),
             min.has_value() ? min.value().to<float>() : -std::numeric_limits<float>::infinity(),
             max.has_value() ? max.value().to<float>() : std::numeric_limits<float>::infinity(),
             tpu::TPUGenerateSgdnnTensor(out));
-        TORCH_CHECK(status == BM_SUCCESS);
-        #elif defined BACKEND_SG2260
-        auto status = sgdnnClamp(
-            c10_tpu::getCurrentTPUStream(),
-            tpu::TPUGenerateSgdnnTensor(self_),
-            min.has_value() ? min.value().to<float>() : -std::numeric_limits<float>::infinity(),
-            max.has_value() ? max.value().to<float>() : std::numeric_limits<float>::infinity(),
-            tpu::TPUGenerateSgdnnTensor(out));
-        TORCH_CHECK(status == tpuRtSuccess);
-        #endif
-        TIMING_END(tpu::CLAMP);
+        TORCH_CHECK(status == SG_SUCCESS);
+                TIMING_END(tpu::CLAMP);
     }
     else
     {

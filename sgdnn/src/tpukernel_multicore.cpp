@@ -36,7 +36,7 @@ bm_status_t bm_get_tpu_scalar_num(bm_handle_t handle, unsigned int *core_num);
 int tpukernel_get_core_num(bm_handle_t handle) {
   unsigned int num = 0;
   auto status = bm_get_tpu_scalar_num(handle, &num);
-  assert(status == BM_SUCCESS);
+  assert(status == SG_SUCCESS);
   return num;
 }
 

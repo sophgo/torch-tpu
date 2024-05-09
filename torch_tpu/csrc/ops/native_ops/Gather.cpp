@@ -36,24 +36,15 @@ namespace at
         {
         //need to consider broadcast later
             TIMING_START;
-            #if defined BACKEND_1684X
+
             auto status = sgdnnGather(
-                tpu::TPUGetDeviceHandle(),
+                tpu::TPUGetDeviceResource(),
                 tpu::TPUGenerateSgdnnTensor(self),
                 tpu::TPUGenerateSgdnnTensor(other),
                 tpu::TPUGenerateSgdnnTensor(out),
                 axis);
-            TORCH_CHECK(status == BM_SUCCESS);
-            #elif defined BACKEND_SG2260
-            auto status = sgdnnGather(
-                c10_tpu::getCurrentTPUStream(),
-                tpu::TPUGenerateSgdnnTensor(self),
-                tpu::TPUGenerateSgdnnTensor(other),
-                tpu::TPUGenerateSgdnnTensor(out),
-                axis);
-            TORCH_CHECK(status == tpuRtSuccess);
-            #endif
-            TIMING_END(tpu::GATHER);
+            TORCH_CHECK(status == SG_SUCCESS);
+                        TIMING_END(tpu::GATHER);
         }
         else
         {

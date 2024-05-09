@@ -106,7 +106,7 @@ Tensor as_strided_tpu(const Tensor &self, IntArrayRef size, IntArrayRef stride,
   //SHOW_TENSOR_OP(self, out);
   return out;
 }
-TORCH_LIBRARY_IMPL(aten, TPU, m) { 
+TORCH_LIBRARY_IMPL(aten, TPU, m) {
   m.impl("as_strided", as_strided_tpu);
 }
 
@@ -117,7 +117,7 @@ Tensor reshape_tpu(const Tensor &self, IntArrayRef proposed_shape) {
   auto stride = at::detail::computeStride(self.sizes(), self.strides(), shape);
   return alias_with_sizes_and_strides(self, shape, *stride);
 }
-TORCH_LIBRARY_IMPL(aten, TPU, m) { 
+TORCH_LIBRARY_IMPL(aten, TPU, m) {
   m.impl("reshape_symint", reshape_tpu);
 }
 
@@ -215,10 +215,10 @@ TORCH_LIBRARY_IMPL(aten, TPU, m) {
 //   TIMING_START
 //   // 0 for constant pad
 //   auto status =
-//       sgdnnPad(tpu::TPUGetDeviceHandle(), tpu::TPUGenerateSgdnnTensor(self),
+//       sgdnnPad(tpu::TPUGetDeviceResource(), tpu::TPUGenerateSgdnnTensor(self),
 //                pad_vec.data(), pad_vec.size(), value.toFloat(), CONSTANT, false,
 //                tpu::TPUGenerateSgdnnTensor(out));
-//   TORCH_CHECK(status == BM_SUCCESS);
+//   TORCH_CHECK(status == SG_SUCCESS);
 //   TIMING_END(tpu::CONSTANT_PAD)
 //   // SHOW_TENSOR_OP(self, out);
 //   return out;
@@ -239,23 +239,21 @@ TORCH_LIBRARY_IMPL(aten, TPU, m) {
 //   if (self.dim() == 0) {
 //     CPU_IMPL_WARNING();
 //     TIMING_START;
-//   #if defined BACKEND_1684X
+//
 //     auto out_cpu = reflection_pad2d(self.cpu(), padding);
 //     tpu::TPUCopyDeviceToDevice(out.data_ptr(), out_cpu.data_ptr(),
 //                                out.nbytes());
-//     #elif defined BACKEND_SG2260
-//     #endif
-//     TIMING_END(tpu::CPU_LAYER);
+//     //     TIMING_END(tpu::CPU_LAYER);
 //     return out;
 //   }
 //   std::vector<int> pad(padding.begin(), padding.end());
 
 //   TIMING_START;
-//   #if defined BACKEND_1684X
+//
 //   auto status = sgdnnPad(
-//       tpu::TPUGetDeviceHandle(), tpu::TPUGenerateSgdnnTensor(self), pad.data(),
+//       tpu::TPUGetDeviceResource(), tpu::TPUGenerateSgdnnTensor(self), pad.data(),
 //       pad.size(), 0, REFLECT, false, tpu::TPUGenerateSgdnnTensor(out));
-//   TORCH_CHECK(status == BM_SUCCESS);
+//   TORCH_CHECK(status == SG_SUCCESS);
 //   TIMING_END(tpu::REFLECTION_PAD2D);
 // #endif
 //   // SHOW_TENSOR_OP(self, out);
@@ -299,14 +297,12 @@ TORCH_LIBRARY_IMPL(aten, TPU, m) {
 //   std::vector<int> pad(padding.begin(), padding.end());
 
 //   TIMING_START;
-//   #if defined BACKEND_1684X
+//
 //   auto status = sgdnnPad(
-//       tpu::TPUGetDeviceHandle(), tpu::TPUGenerateSgdnnTensor(self), pad.data(),
+//       tpu::TPUGetDeviceResource(), tpu::TPUGenerateSgdnnTensor(self), pad.data(),
 //       pad.size(), 0, REPLICATE, false, tpu::TPUGenerateSgdnnTensor(out));
-//   TORCH_CHECK(status == BM_SUCCESS);
-//   #elif defined BACKEND_SG2260
-//   #endif
-//   TIMING_END(tpu::REPLICATION_PAD2D);
+//   TORCH_CHECK(status == SG_SUCCESS);
+//   //   TIMING_END(tpu::REPLICATION_PAD2D);
 // #endif
 //   // SHOW_TENSOR_OP(self, out);
 //   return out;
@@ -336,14 +332,12 @@ TORCH_LIBRARY_IMPL(aten, TPU, m) {
 
 //   std::vector<int> pad(padding.begin(), padding.end());
 //   TIMING_START;
-//   #if defined BACKEND_1684X
+//
 //   auto status = sgdnnPad(
-//       tpu::TPUGetDeviceHandle(), tpu::TPUGenerateSgdnnTensor(self), pad.data(),
+//       tpu::TPUGetDeviceResource(), tpu::TPUGenerateSgdnnTensor(self), pad.data(),
 //       pad.size(), 0, REPLICATE, true, tpu::TPUGenerateSgdnnTensor(out));
-//   TORCH_CHECK(status == BM_SUCCESS);
-//   #elif defined BACKEND_SG2260
-//   #endif
-//   TIMING_END(tpu::REPLICATION_PAD3D);
+//   TORCH_CHECK(status == SG_SUCCESS);
+//   //   TIMING_END(tpu::REPLICATION_PAD3D);
 // #endif
 //   // SHOW_TENSOR_OP(self, out);
 //   return out;

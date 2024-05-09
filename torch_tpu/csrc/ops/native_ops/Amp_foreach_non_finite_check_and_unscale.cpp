@@ -7,7 +7,7 @@
 
 
 #include "common/config.h"
-namespace at 
+namespace at
 {
 void _amp_foreach_non_finite_check_and_unscale_tpu(at::TensorList self, at::Tensor & found_inf, const at::Tensor & inv_scale) {
     CHECK_TENSOR_IN_DEVICE ( found_inf );
@@ -18,25 +18,16 @@ void _amp_foreach_non_finite_check_and_unscale_tpu(at::TensorList self, at::Tens
 
     Tensor inv_scale_cpu = inv_scale.cpu();
     std::vector<SgdnnTensor_t> inputs;
-    for (const auto & s : self){ 
+    for (const auto & s : self){
         CHECK_TENSOR_IN_DEVICE ( s );
         inputs.push_back( tpu::TPUGenerateSgdnnTensor(s) ); }
     TIMING_START;
-    #if defined BACKEND_1684X
     auto status = sgdnnInfCheckAndUnscale(
-        tpu::TPUGetDeviceHandle(),
+        tpu::TPUGetDeviceResource(),
         inputs,
         tpu::TPUGenerateSgdnnTensor(found_inf),
         *inv_scale_cpu.data_ptr<float>());
-    TORCH_CHECK(status == BM_SUCCESS, "_amp_foreach_non_finite_check_and_unscale_ failed.");
-    #elif defined BACKEND_SG2260
-    auto status = sgdnnInfCheckAndUnscale(
-        c10_tpu::getCurrentTPUStream(),
-        inputs,
-        tpu::TPUGenerateSgdnnTensor(found_inf),
-        *inv_scale_cpu.data_ptr<float>());
-    TORCH_CHECK(status == tpuRtSuccess, "_amp_foreach_non_finite_check_and_unscale_ failed.");
-    #endif
+    TORCH_CHECK(status == SG_SUCCESS, "_amp_foreach_non_finite_check_and_unscale_ failed.");\
     TIMING_END(tpu::InfCheckAndUnscale);
     SHOW_TENSOR_OP( found_inf, inv_scale);
 }

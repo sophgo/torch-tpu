@@ -48,22 +48,14 @@ Tensor & cat_out_tpu ( const ITensorListRef & tensors, int64_t dim, Tensor & out
     }
 
     TIMING_START;
-    #if defined BACKEND_1684X
-    auto status = sgdnnConcat ( tpu::TPUGetDeviceHandle(),
+
+    auto status = sgdnnConcat ( tpu::TPUGetDeviceResource(),
                                 inputs.data(),
                                 inputs.size(),
                                 dim,
                                 tpu:: TPUGenerateSgdnnTensor ( out ) );
-    TORCH_CHECK ( status == BM_SUCCESS );
-    #elif defined BACKEND_SG2260
-    auto status = sgdnnConcat ( c10_tpu::getCurrentTPUStream(),
-                                inputs.data(),
-                                inputs.size(),
-                                dim,
-                                tpu:: TPUGenerateSgdnnTensor ( out ) );
-    TORCH_CHECK ( status == tpuRtSuccess );
-    #endif
-    TIMING_END ( tpu::CONCAT );
+    TORCH_CHECK ( status == SG_SUCCESS );
+        TIMING_END ( tpu::CONCAT );
   }
   SHOW_TENSOR_OP(out);
   return out;

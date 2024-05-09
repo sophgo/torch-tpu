@@ -33,20 +33,13 @@ namespace at
         else if (IS_TPU_TENSOR(self))
         {
             TIMING_START;
-            #if defined BACKEND_1684X
+
             auto status = sgdnnReal(
-                tpu::TPUGetDeviceHandle(),
+                tpu::TPUGetDeviceResource(),
                 tpu::TPUGenerateSgdnnTensorforComplex64(self),
                 tpu::TPUGenerateSgdnnTensorforComplex64(out));
-            TORCH_CHECK(status == BM_SUCCESS);
-            #elif defined BACKEND_SG2260
-            auto status = sgdnnReal(
-                c10_tpu::getCurrentTPUStream(),
-                tpu::TPUGenerateSgdnnTensorforComplex64(self),
-                tpu::TPUGenerateSgdnnTensorforComplex64(out));
-            TORCH_CHECK(status == tpuRtSuccess);
-            #endif
-            TIMING_END(tpu::REAL);
+            TORCH_CHECK(status == SG_SUCCESS);
+                        TIMING_END(tpu::REAL);
         }
         else
         {
@@ -70,4 +63,3 @@ namespace at
 
 } // namespace at
 
-    

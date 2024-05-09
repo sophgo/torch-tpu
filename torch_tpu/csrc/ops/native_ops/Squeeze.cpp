@@ -34,18 +34,12 @@ Tensor &squeeze_out_tpu(const Tensor &self, Tensor &out) {
       }
     }
     TIMING_START;
-    #if defined BACKEND_1684X
-    auto status = sgdnnSqueeze(tpu::TPUGetDeviceHandle(),
+
+    auto status = sgdnnSqueeze(tpu::TPUGetDeviceResource(),
                                       tpu::TPUGenerateSgdnnTensor(self),
                                       tpu::TPUGenerateSgdnnTensor(out));
-    TORCH_CHECK(status == BM_SUCCESS);
-    #elif defined BACKEND_SG2260
-    auto status = sgdnnSqueeze(c10_tpu::getCurrentTPUStream(),
-                                      tpu::TPUGenerateSgdnnTensor(self),
-                                      tpu::TPUGenerateSgdnnTensor(out));
-    TORCH_CHECK(status == tpuRtSuccess);
-    #endif
-    TIMING_END(tpu::SQUEEZE);
+    TORCH_CHECK(status == SG_SUCCESS);
+        TIMING_END(tpu::SQUEEZE);
   } else {
     TORCH_CHECK(false, "At least one input is required in TPU device");
   }
@@ -78,19 +72,13 @@ Tensor &unsqueeze_out_tpu(const Tensor &self, Tensor &out, int64_t &dim) {
       }
     }
     TIMING_START;
-    #if defined BACKEND_1684X
+
     // same as squeeze
-    auto status = sgdnnSqueeze(tpu::TPUGetDeviceHandle(),
+    auto status = sgdnnSqueeze(tpu::TPUGetDeviceResource(),
                                       tpu::TPUGenerateSgdnnTensor(self),
                                       tpu::TPUGenerateSgdnnTensor(out));
-    TORCH_CHECK(status == BM_SUCCESS);
-    #elif defined BACKEND_SG2260
-    auto status = sgdnnSqueeze(c10_tpu::getCurrentTPUStream(),
-                                      tpu::TPUGenerateSgdnnTensor(self),
-                                      tpu::TPUGenerateSgdnnTensor(out));
-    TORCH_CHECK(status == tpuRtSuccess);
-    #endif
-    TIMING_END(tpu::UNSQUEEZE);
+    TORCH_CHECK(status == SG_SUCCESS);
+        TIMING_END(tpu::UNSQUEEZE);
   } else {
     TORCH_CHECK(false, "At least one input is required in TPU device");
   }

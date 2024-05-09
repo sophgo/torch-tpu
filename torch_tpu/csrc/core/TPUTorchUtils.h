@@ -14,7 +14,7 @@
 #include "TPUGuard.h"
 #ifdef BACKEND_SG2260
 #include "TPUStream.h"
-#include <sgdnn_api2.h>
+#include <sgdnn_api.h>
 #elif defined BACKEND_1684X
 #include <sgdnn_api.h>
 #endif
@@ -43,7 +43,7 @@ do{                                                     \
 #define SHOW_TENSOR_OP(...) DEBUG_SHOW(Tensor, tpu::GetTensorInfo, __VA_ARGS__)
 #define SHOW_EMPTY_INFO(Tensor) std::cout << __func__ << ": " << Tensor.data_ptr() << std::endl;
 #else
-#define SHOW_TENSOR_OP(...) 
+#define SHOW_TENSOR_OP(...)
 #define SHOW_EMPTY_INFO(Tensor)
 #endif
 

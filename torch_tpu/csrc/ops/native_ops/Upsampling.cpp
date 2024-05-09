@@ -40,27 +40,16 @@ Tensor upsample_bilinear2d_tpu(const at::Tensor &self,
   auto out = empty(output_shape_ref, self.options());
 
   TIMING_START;
-  #if defined BACKEND_1684X
+
   auto status = sgdnnUpsampling(
-      tpu::TPUGetDeviceHandle(), tpu::TPUGenerateSgdnnTensor(self),
+      tpu::TPUGetDeviceResource(), tpu::TPUGenerateSgdnnTensor(self),
       tpu::TPUGenerateSgdnnTensor(out), align_corners, UPSAMPLING_BILINEAR);
 
   if (scales_h.has_value() && scales_w.has_value()) {
     out = out.slice(2, c10::nullopt, size_ref[0])
               .slice(3, c10::nullopt, size_ref[1]);
   }
-  TORCH_CHECK(status == BM_SUCCESS);
-  #elif defined BACKEND_SG2260
-  auto status = sgdnnUpsampling(
-      c10_tpu::getCurrentTPUStream(), tpu::TPUGenerateSgdnnTensor(self),
-      tpu::TPUGenerateSgdnnTensor(out), align_corners, UPSAMPLING_BILINEAR);
-
-  if (scales_h.has_value() && scales_w.has_value()) {
-    out = out.slice(2, c10::nullopt, size_ref[0])
-              .slice(3, c10::nullopt, size_ref[1]);
-  }
-  TORCH_CHECK(status == tpuRtSuccess);
-  #endif
+  TORCH_CHECK(status == SG_SUCCESS);
   TIMING_END(tpu::UPSAMPLING_BILINEAR)
 #endif
   SHOW_TENSOR_OP(self, out);
@@ -97,21 +86,19 @@ Tensor upsample_nearest2d_tpu(const at::Tensor &self,
     output_shape[2] = (int64_t)(scales_h.value() * self.size(2));
     output_shape[3] = (int64_t)(scales_w.value() * self.size(3));
   }
-  auto self_ = self.is_contiguous() ? self : self.contiguous(); 
+  auto self_ = self.is_contiguous() ? self : self.contiguous();
   TIMING_START;
-  #if defined BACKEND_1684X
-  auto status = sgdnnUpsampling(
-      tpu::TPUGetDeviceHandle(), tpu::TPUGenerateSgdnnTensor(self_),
-      tpu::TPUGenerateSgdnnTensor(out), true /*align_corners*/,
-      UPSAMPLING_NEAREST);
+
+  auto status = sgdnnUpsampling(tpu::TPUGetDeviceResource(),
+                                tpu::TPUGenerateSgdnnTensor(self_),
+                                tpu::TPUGenerateSgdnnTensor(out),
+                                true /*align_corners*/, UPSAMPLING_NEAREST);
 
   if (scales_h.has_value() && scales_w.has_value()) {
     out = out.slice(2, c10::nullopt, size_ref[0])
               .slice(3, c10::nullopt, size_ref[1]);
   }
-  TORCH_CHECK(status == BM_SUCCESS);
-  #elif defined BACKEND_SG2260
-  #endif
+  TORCH_CHECK(status == SG_SUCCESS);
   TIMING_END(tpu::UPSAMPLING_NEAREST)
 #endif
   SHOW_TENSOR_OP(self, out);
@@ -129,7 +116,8 @@ Tensor &upsample_nearest2d_backward_out_tpu(
     c10::optional<double> scales_w = c10::nullopt,
     at::Tensor &grad_input = input) {
   CHECK_TENSOR_IN_DEVICE(grad_input);
-  auto grad_output_ = grad_output.is_contiguous() ? grad_output : grad_output.contiguous();
+  auto grad_output_ =
+      grad_output.is_contiguous() ? grad_output : grad_output.contiguous();
   CHECK_TENSOR_IN_DEVICE(grad_output_);
 #if 0
   CPU_IMPL_WARNING();
@@ -143,29 +131,23 @@ Tensor &upsample_nearest2d_backward_out_tpu(
                            grad_input.nbytes());
   grad_input = grad_input.contiguous();
 #else
-  PoolingDescriptor_t pooling_desc =
-  {
-    .kh = int(scales_h.value()),
-    .kw = int(scales_w.value()),
-    .pad_h = 0,
-    .pad_w = 0,
-    .stride_h = int(scales_h.value()),
-    .stride_w = int(scales_w.value()),
-    .output_h = static_cast<int>(output_size[0]),
-    .output_w = static_cast<int>(output_size[1]),
-    .mode = POOLING_AVG
-  };
+  PoolingDescriptor_t pooling_desc = {
+      .kh = int(scales_h.value()),
+      .kw = int(scales_w.value()),
+      .pad_h = 0,
+      .pad_w = 0,
+      .stride_h = int(scales_h.value()),
+      .stride_w = int(scales_w.value()),
+      .output_h = static_cast<int>(output_size[0]),
+      .output_w = static_cast<int>(output_size[1]),
+      .mode = POOLING_AVG};
   TIMING_START;
-  #if defined BACKEND_1684X
-  auto status = sgdnnUpsampleNearest2dBackward (
-                      tpu::TPUGetDeviceHandle(),
-                      tpu::TPUGenerateSgdnnTensor ( grad_output_ ),
-                      tpu::TPUGenerateSgdnnTensor ( grad_input ),
-                      scales_h.value() * scales_w.value(),
-                      pooling_desc );
-  TORCH_CHECK ( status == BM_SUCCESS );
-  #elif defined BACKEND_SG2260
-  #endif
+
+  auto status = sgdnnUpsampleNearest2dBackward(
+      tpu::TPUGetDeviceResource(), tpu::TPUGenerateSgdnnTensor(grad_output_),
+      tpu::TPUGenerateSgdnnTensor(grad_input),
+      scales_h.value() * scales_w.value(), pooling_desc);
+  TORCH_CHECK(status == SG_SUCCESS);
   TIMING_END(tpu::UPSAMPLING_NEAREST_BACKWARD)
 #endif
   SHOW_TENSOR_OP(grad_output_, grad_input);

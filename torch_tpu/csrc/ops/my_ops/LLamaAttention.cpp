@@ -37,7 +37,7 @@ namespace at
 		TIMING_START;
 		#if defined BACKEND_SG2260
 		tpuRtStatus_t status = sgdnnLlamaAttention(
-			c10_tpu::getCurrentTPUStream(),
+			tpu::TPUGetDeviceResource(),
 			tpu::TPUGenerateSgdnnTensor(Q),
 			tpu::TPUGenerateSgdnnTensor(K),
 			tpu::TPUGenerateSgdnnTensor(V),

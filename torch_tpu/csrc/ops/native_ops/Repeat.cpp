@@ -28,18 +28,12 @@ Tensor &repeat_out_tpu(const Tensor &self, const IntArrayRef repeats,
     }
 
     TIMING_START;
-    #if defined BACKEND_1684X
+
     auto status = sgdnnRepeat(
-        tpu::TPUGetDeviceHandle(), tpu::TPUGenerateSgdnnTensor(contiguous_self),
+        tpu::TPUGetDeviceResource(), tpu::TPUGenerateSgdnnTensor(contiguous_self),
         repeat_times.data(), repeats.size(), tpu::TPUGenerateSgdnnTensor(out));
-    TORCH_CHECK(status == BM_SUCCESS);
-    #elif defined BACKEND_SG2260
-    auto status = sgdnnRepeat(
-        c10_tpu::getCurrentTPUStream(), tpu::TPUGenerateSgdnnTensor(contiguous_self),
-        repeat_times.data(), repeats.size(), tpu::TPUGenerateSgdnnTensor(out));
-    TORCH_CHECK(status == tpuRtSuccess);
-    #endif
-    TIMING_END(tpu::REPEAT)
+    TORCH_CHECK(status == SG_SUCCESS);
+        TIMING_END(tpu::REPEAT)
   }
   SHOW_TENSOR_OP(self, out);
   return out;

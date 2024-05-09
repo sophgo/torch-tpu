@@ -37,7 +37,7 @@ namespace at
 		TIMING_START;
 #ifdef BACKEND_SG2260
 		tpuRtStatus_t status = sgdnnAddLnMm(
-			 c10_tpu::getCurrentTPUStream(),
+			 tpu::TPUGetDeviceResource(),
 			tpu::TPUGenerateSgdnnTensor(input0),
             tpu::TPUGenerateSgdnnTensor(input1),
 			tpu::TPUGenerateSgdnnTensor(w),
@@ -83,7 +83,7 @@ namespace at
 		TIMING_START;
 #ifdef BACKEND_SG2260
 		tpuRtStatus_t status = sgdnnLayernormBackward (
-			c10_tpu::getCurrentTPUStream(),
+			tpu::TPUGetDeviceResource(),
 			tpu::TPUGenerateSgdnnTensor ( grad_out_ln ),
 			tpu::TPUGenerateSgdnnTensor ( input ),
 			tpu::TPUGenerateSgdnnTensor ( gamma ),

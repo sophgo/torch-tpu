@@ -21,7 +21,7 @@ static std::tuple<Tensor, bool> batchify ( const Tensor & input, const int64_t n
 
 static bool check_output_shape_is_satified ( const Tensor & input, const Tensor & weight, IntArrayRef stride, IntArrayRef padding, IntArrayRef dilation, IntArrayRef output_padding, int64_t groups )
 {
-  // check dtype if f32 return true 
+  // check dtype if f32 return true
   if ( input.scalar_type() == at::kFloat )
   {
     return true;
@@ -112,25 +112,14 @@ int64_t groups )
     };
 
     TIMING_START;
-    #if defined BACKEND_1684X
     auto status = sgdnnConv2d (
-                         tpu::TPUGetDeviceHandle(),
+                         tpu::TPUGetDeviceResource(),
                          tpu::TPUGenerateSgdnnTensor ( input ),
                          tpu::TPUGenerateSgdnnTensor ( weight ),
                          bias.defined() ? tpu::TPUGenerateSgdnnTensor ( bias ) : sgdnnUndefinedTensor(),
                          conv_param,
                          tpu::TPUGenerateSgdnnTensor ( output ) );
-    TORCH_CHECK ( status == BM_SUCCESS );
-    #elif defined BACKEND_SG2260
-    auto status = sgdnnConv2d (
-                         c10_tpu::getCurrentTPUStream(),
-                         tpu::TPUGenerateSgdnnTensor ( input ),
-                         tpu::TPUGenerateSgdnnTensor ( weight ),
-                         bias.defined() ? tpu::TPUGenerateSgdnnTensor ( bias ) : sgdnnUndefinedTensor(),
-                         conv_param,
-                         tpu::TPUGenerateSgdnnTensor ( output ) );
-    TORCH_CHECK ( status == tpuRtSuccess );
-    #endif
+    TORCH_CHECK ( status == SG_SUCCESS );
     TIMING_END ( tpu::CONVOLUTION );
   }
   SHOW_TENSOR_OP(input_, weight, bias, output);
@@ -243,9 +232,8 @@ std::array<bool, 3> output_mask )
       .groups = ( int ) groups,
     };
     TIMING_START;
-    #if defined BACKEND_1684X
     auto status = sgdnnConv2dBackward (
-                         tpu::TPUGetDeviceHandle(),
+                         tpu::TPUGetDeviceResource(),
                          tpu::TPUGenerateSgdnnTensor ( grad_output_ ),
                          tpu::TPUGenerateSgdnnTensor ( input ),
                          tpu::TPUGenerateSgdnnTensor ( weight ),
@@ -253,19 +241,7 @@ std::array<bool, 3> output_mask )
                          output_mask[0] ? tpu::TPUGenerateSgdnnTensor ( grad_input ) : sgdnnUndefinedTensor(),
                          output_mask[1] ? tpu::TPUGenerateSgdnnTensor ( grad_weight ) : sgdnnUndefinedTensor(),
                          output_mask[2] ? tpu::TPUGenerateSgdnnTensor ( grad_bias ) : sgdnnUndefinedTensor() );
-    TORCH_CHECK ( status == BM_SUCCESS );
-    #elif defined BACKEND_SG2260
-    auto status = sgdnnConv2dBackward (
-                         c10_tpu::getCurrentTPUStream(),
-                         tpu::TPUGenerateSgdnnTensor ( grad_output_ ),
-                         tpu::TPUGenerateSgdnnTensor ( input ),
-                         tpu::TPUGenerateSgdnnTensor ( weight ),
-                         conv_param,
-                         output_mask[0] ? tpu::TPUGenerateSgdnnTensor ( grad_input ) : sgdnnUndefinedTensor(),
-                         output_mask[1] ? tpu::TPUGenerateSgdnnTensor ( grad_weight ) : sgdnnUndefinedTensor(),
-                         output_mask[2] ? tpu::TPUGenerateSgdnnTensor ( grad_bias ) : sgdnnUndefinedTensor() );
-    TORCH_CHECK ( status == tpuRtSuccess );
-    #endif
+    TORCH_CHECK ( status == SG_SUCCESS );
     TIMING_END ( tpu::CONVOLUTION_BACKWARD );
   }
   SHOW_TENSOR_OP(grad_output_, input, weight, grad_input, grad_weight, grad_bias);

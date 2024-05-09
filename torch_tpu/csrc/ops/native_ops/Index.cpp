@@ -8,7 +8,7 @@
 
 #include "common/config.h"
 
-namespace at 
+namespace at
 {
 Tensor & index_out_tpu( const Tensor & self, const c10::List<c10::optional<Tensor>> & indices, Tensor & out)
 {
@@ -30,22 +30,14 @@ Tensor & index_out_tpu( const Tensor & self, const c10::List<c10::optional<Tenso
       TIMING_START;
       auto idx = indices[0].value();
       auto idx_value = idx.scalar_type() == torch::kInt64 || idx.scalar_type() == torch::kInt32 ? idx : idx.to(torch::kInt32);
-      #if defined BACKEND_1684X
-      auto status = sgdnnIndexSelect(tpu::TPUGetDeviceHandle(),
+
+      auto status = sgdnnIndexSelect(tpu::TPUGetDeviceResource(),
                                             tpu::TPUGenerateSgdnnTensor(self),
                                             tpu::TPUGenerateSgdnnTensor(idx_value),
                                             0,
                                             tpu::TPUGenerateSgdnnTensor(out));
-      TORCH_CHECK ( status == BM_SUCCESS );
-      #elif defined BACKEND_SG2260
-      auto status = sgdnnIndexSelect(c10_tpu::getCurrentTPUStream(),
-                                            tpu::TPUGenerateSgdnnTensor(self),
-                                            tpu::TPUGenerateSgdnnTensor(idx_value),
-                                            0,
-                                            tpu::TPUGenerateSgdnnTensor(out));
-      TORCH_CHECK ( status == tpuRtSuccess );
-      #endif
-      TIMING_END ( tpu::INDEX_SELECT );
+      TORCH_CHECK ( status == SG_SUCCESS );
+            TIMING_END ( tpu::INDEX_SELECT );
     } else {
       int64_t index_size = -1;
       std::vector<bool> broadcast;
@@ -86,11 +78,11 @@ Tensor & index_out_tpu( const Tensor & self, const c10::List<c10::optional<Tenso
           ++change;
           if (broadcast[i])
             start = i + 1;
-          else 
+          else
             end = i + 1;
         }
       }
-      if (change <= 1) { 
+      if (change <= 1) {
         std::vector<int64_t> stride_data;
         for (auto i = start; i < end; ++i) {
           stride_data.push_back(std::accumulate(self.sizes().begin() + i + 1, self.sizes().begin() + end, 1, std::multiplies<int64_t>()));
@@ -105,24 +97,15 @@ Tensor & index_out_tpu( const Tensor & self, const c10::List<c10::optional<Tenso
         Tensor index_two_dim = matmul(strides, stack(indexes)).to(torch::kInt32).to(self.device());
         Tensor out_two_dim = broadcast[0] ? out.view({dim0, -1}) : out.view({-1, dim0});
         TIMING_START;
-        #if defined BACKEND_1684X
-        auto status = sgdnnIndexSelect(tpu::TPUGetDeviceHandle(),
+
+        auto status = sgdnnIndexSelect(tpu::TPUGetDeviceResource(),
                                               tpu::TPUGenerateSgdnnTensor(self_two_dim),
                                               tpu::TPUGenerateSgdnnTensor(index_two_dim),
                                               (int)broadcast[0],
                                               tpu::TPUGenerateSgdnnTensor(out_two_dim));
 
-        TORCH_CHECK ( status == BM_SUCCESS );
-        #elif defined BACKEND_SG2260
-        auto status = sgdnnIndexSelect(c10_tpu::getCurrentTPUStream(),
-                                              tpu::TPUGenerateSgdnnTensor(self_two_dim),
-                                              tpu::TPUGenerateSgdnnTensor(index_two_dim),
-                                              (int)broadcast[0],
-                                              tpu::TPUGenerateSgdnnTensor(out_two_dim));
-
-        TORCH_CHECK ( status == tpuRtSuccess );
-        #endif
-        TIMING_END ( tpu::INDEX_SELECT );
+        TORCH_CHECK ( status == SG_SUCCESS );
+                TIMING_END ( tpu::INDEX_SELECT );
       } else {
         // no support; use cpu impl
         CPU_IMPL_WARNING();

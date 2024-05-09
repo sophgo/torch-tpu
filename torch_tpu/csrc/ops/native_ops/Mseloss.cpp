@@ -41,22 +41,14 @@ Tensor mse_loss_tpu(const at::Tensor & self, const at::Tensor & target, int64_t 
         out = torch::tensor( 0., self.options() );
     }
     TIMING_START;
-    #if defined BACKEND_1684X
-    auto status = sgdnnMseloss( tpu::TPUGetDeviceHandle(),
+
+    auto status = sgdnnMseloss( tpu::TPUGetDeviceResource(),
                                         tpu::TPUGenerateSgdnnTensor ( self ),
                                         tpu::TPUGenerateSgdnnTensor ( target ),
                                         tpu::TPUGenerateSgdnnTensor ( out ),
                                         reduction );
-    TORCH_CHECK ( status == BM_SUCCESS );
-    #elif defined BACKEND_SG2260
-    auto status = sgdnnMseloss( c10_tpu::getCurrentTPUStream(),
-                                        tpu::TPUGenerateSgdnnTensor ( self ),
-                                        tpu::TPUGenerateSgdnnTensor ( target ),
-                                        tpu::TPUGenerateSgdnnTensor ( out ),
-                                        reduction );
-    TORCH_CHECK ( status == tpuRtSuccess );
-    #endif
-    TIMING_END(tpu::MSE_LOSS);
+    TORCH_CHECK ( status == SG_SUCCESS );
+        TIMING_END(tpu::MSE_LOSS);
     SHOW_TENSOR_OP(self, target);
     return out;
 #endif
@@ -68,8 +60,8 @@ TORCH_LIBRARY_IMPL ( aten, TPU, m )
 }
 
 /*
-* x ->      "-"        -> z1     ->  "pow"       -> z2     -> "reduce"     -> L 
-* Y -> 
+* x ->      "-"        -> z1     ->  "pow"       -> z2     -> "reduce"     -> L
+* Y ->
 * ==backward
 * dC/dx <- "x dz1/dx " <- dC/dz1 <- "x dz2/dz1 " <- dC/dz2 <- "x (dL/dz2)" <- dC/dL
 */
@@ -89,10 +81,10 @@ Tensor mse_loss_backward_tpu( const Tensor & grad_output, const Tensor & self, c
     grad_in = grad_output * dz2_dz1;
   }
   else if ( reduction == 1) //mean
-  {    
+  {
     grad_in = (grad_output / self.numel()) * dz2_dz1;
   }
-  else if ( reduction == 2) //sum 
+  else if ( reduction == 2) //sum
   {
     grad_in = grad_output * dz2_dz1;
   }
@@ -100,12 +92,10 @@ Tensor mse_loss_backward_tpu( const Tensor & grad_output, const Tensor & self, c
     TORCH_CHECK( false );
   }
 
-  TIMING_START;  
+  TIMING_START;
   // TODO: use a kernel func =
-  #if defined BACKEND_1684X
-  #elif defined BACKEND_SG2260
-  #endif
-  TIMING_END(tpu::MSE_LOSS_BACKWARD);
+
+    TIMING_END(tpu::MSE_LOSS_BACKWARD);
 #endif
   SHOW_TENSOR_OP(grad_output, self, target, grad_in);
   return grad_in;

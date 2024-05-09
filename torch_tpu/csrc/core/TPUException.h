@@ -15,6 +15,6 @@ do {                                                              \
 #define C10_TPU_CHECK( EXPR )                                     \
 do {                                                              \
     auto status = EXPR;                                \
-    TORCH_CHECK ( status == BM_SUCCESS, __FILE__ ,":" ,__func__ ); \
+    TORCH_CHECK ( status == SG_SUCCESS, __FILE__ ,":" ,__func__ ); \
 } while (0)
 #endif

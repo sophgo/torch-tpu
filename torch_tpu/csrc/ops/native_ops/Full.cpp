@@ -54,20 +54,13 @@ namespace at
                 TORCH_CHECK(false);
             }
             TIMING_START;
-            #if defined BACKEND_1684X
+
             auto status = sgdnnFill(
-                tpu::TPUGetDeviceHandle(),
+                tpu::TPUGetDeviceResource(),
                 &value_,
                 tpu::TPUGenerateSgdnnTensor(self));
-            TORCH_CHECK(status == BM_SUCCESS);
-            #elif defined BACKEND_SG2260
-            auto status = sgdnnFill(
-                c10_tpu::getCurrentTPUStream(),
-                &value_,
-                tpu::TPUGenerateSgdnnTensor(self));
-            TORCH_CHECK(status == tpuRtSuccess);
-            #endif
-            TIMING_END(tpu::FULL);
+            TORCH_CHECK(status == SG_SUCCESS);
+                        TIMING_END(tpu::FULL);
         }
         else
         {

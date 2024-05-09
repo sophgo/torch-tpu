@@ -27,20 +27,14 @@ Tensor &reciprocal_out_tpu(const at::Tensor &self, at::Tensor &out) {
      * common implemented active (CommonActive.cpp) call cpu function when
      * self.dim() == 0, but when the op is reciprocal, 1 / tensor meet the
      * self.dim() == 0 condition, which should be handled separately.
-     */    
+     */
     TIMING_START;
-    #if defined BACKEND_1684X
+
     auto status = sgdnnActive(
-        tpu::TPUGetDeviceHandle(), tpu::TPUGenerateSgdnnTensor(self),
+        tpu::TPUGetDeviceResource(), tpu::TPUGenerateSgdnnTensor(self),
         tpu::TPUGenerateSgdnnTensor(out), ACTIVE_RECIPROCAL);
-    TORCH_CHECK(status == BM_SUCCESS);
-    #elif defined BACKEND_SG2260
-    auto status = sgdnnActive(
-        c10_tpu::getCurrentTPUStream(), tpu::TPUGenerateSgdnnTensor(self),
-        tpu::TPUGenerateSgdnnTensor(out), ACTIVE_RECIPROCAL);
-    TORCH_CHECK(status == tpuRtSuccess);
-    #endif
-    TIMING_END(tpu::RECIPROCAL)
+    TORCH_CHECK(status == SG_SUCCESS);
+        TIMING_END(tpu::RECIPROCAL)
   }
   SHOW_TENSOR_OP(self, out);
   return out;

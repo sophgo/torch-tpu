@@ -29,16 +29,11 @@ Tensor &fill__Scalar_tpu(Tensor &self, const Scalar &value) {
     TORCH_CHECK(false);
   }
   TIMING_START;
-  #if defined BACKEND_1684X
-  auto status = sgdnnFill(tpu::TPUGetDeviceHandle(), &value_,
+
+  auto status = sgdnnFill(tpu::TPUGetDeviceResource(), &value_,
                                  tpu::TPUGenerateSgdnnTensor(self_));
-  TORCH_CHECK(status == BM_SUCCESS);
-  #elif defined BACKEND_SG2260
-  auto status = sgdnnFill(c10_tpu::getCurrentTPUStream(), &value_,
-                                 tpu::TPUGenerateSgdnnTensor(self_));
-  TORCH_CHECK(status == tpuRtSuccess);
-  #endif
-  TIMING_END(tpu::CONST_FILL);
+  TORCH_CHECK(status == SG_SUCCESS);
+    TIMING_END(tpu::CONST_FILL);
   // unsqueeze may cause different address between self_ and self:
   if (self.data_ptr() != self_.data_ptr()) {
     tpu::TPUCopyDeviceToDevice(self.data_ptr(), self_.data_ptr(),
@@ -80,22 +75,14 @@ Tensor &masked_fill_Scalar_tpu(Tensor &self, const Tensor &mask,
   Tensor maski = mask.clone().to(self.dtype());
   Tensor &mask_int = maski;
   TIMING_START;
-  #if defined BACKEND_1684X
-  auto status = sgdnnMaskedFill ( tpu::TPUGetDeviceHandle(),
+
+  auto status = sgdnnMaskedFill ( tpu::TPUGetDeviceResource(),
                                          tpu:: TPUGenerateSgdnnTensor ( self ),
                                          tpu:: TPUGenerateSgdnnTensor ( mask_int ),
                                          value.toDouble(),
                                          tpu:: TPUGenerateSgdnnTensor(out) );
-  TORCH_CHECK( status == BM_SUCCESS );
-  #elif defined BACKEND_SG2260
-  auto status = sgdnnMaskedFill ( c10_tpu::getCurrentTPUStream(),
-                                         tpu:: TPUGenerateSgdnnTensor ( self ),
-                                         tpu:: TPUGenerateSgdnnTensor ( mask_int ),
-                                         value.toDouble(),
-                                         tpu:: TPUGenerateSgdnnTensor(out) );
-  TORCH_CHECK( status == tpuRtSuccess );
-  #endif
-  TIMING_END(tpu::MASKED_FILL);
+  TORCH_CHECK( status == SG_SUCCESS );
+    TIMING_END(tpu::MASKED_FILL);
   self = out.clone();
 #endif
   SHOW_TENSOR_OP(self, mask);

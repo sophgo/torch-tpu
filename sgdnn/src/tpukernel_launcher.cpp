@@ -38,20 +38,13 @@ TPUKernelLauncher::TPUKernelLauncher()
 {
   _library_file = getenv("TPUKERNEL_FIRMWARE_PATH");
   const char* value_str = getenv("TPUTRAIN_CORE_NUM");
-  if (value_str) 
+  if (value_str)
     _core_num = atoi(value_str);
   else
-    _core_num = MAX_CORE_NUM;
-  
+    _core_num = 1; //TODO multi-core support
+
   printf("[TPUKERNEL_FIRMWARE_PATH] : %s, [core_num] : %d \n",
           _library_file, _core_num);
-}
-
-TPUKernelLauncher::~TPUKernelLauncher()
-{
-  for ( auto it : _stream_kernel_modules){
-    tpuRtKernelUnloadModule(it.second, it.first);
-  }
 }
 
 bool TPUKernelLauncher::stream_registered(tpuRtStream_t stream)
@@ -71,6 +64,13 @@ tpuRtStatus_t TPUKernelLauncher::register_kernel_module(tpuRtStream_t stream){
   return tpuRtSuccess;
 }
 
+tpuRtStatus_t TPUKernelLauncher::unload_kernel_module(tpuRtStream_t stream) {
+  for ( auto it : _stream_kernel_modules){
+    tpuRtKernelUnloadModule(it.second, it.first);
+  }
+  return tpuRtSuccess;
+}
+
 tpuRtStatus_t TPUKernelLauncher::launch_async(
     const char* func_name, const void* api, size_t api_size, tpuRtStream_t stream) {
   tpuRtKernelModule_t kernel_module = _stream_kernel_modules[stream];
@@ -86,6 +86,9 @@ tpuRtStatus_t TPUKernelLauncher::launch_sync(
     const char* func_name, const void* api, size_t api_size, tpuRtStream_t stream) {
   tpuRtKernelModule_t kernel_module = _stream_kernel_modules[stream];
   tpuRtStatus_t status = tpuRtKernelLaunch(kernel_module, func_name, (void*)api, api_size, 1, _core_num, stream );
+  //TODO v7runtime issue: sync launch is async
+  if (status != tpuRtSuccess) return status;
+  status = tpuRtStreamSynchronize(stream);
 #ifdef DUMP_INS
   cmd_dump();
 #endif
@@ -161,12 +164,12 @@ tpuRtStatus_t Cached_DevMem_Mgr::cache_free(void* dev_ptr, tpuRtStream_t stream)
 
 bool Cached_DevMem_Mgr::malloc_cached_mem(void** p_to_malloc, void* cached_mem){
   std::lock_guard<std::mutex> lock(_cache_mem_mtx);
-  if (mem_in_use(cached_mem)) { 
-    return false; 
+  if (mem_in_use(cached_mem)) {
+    return false;
   } else {
-    *p_to_malloc = cached_mem; 
+    *p_to_malloc = cached_mem;
     set_mem_in_use(cached_mem);
-    return true; 
+    return true;
   }
 }
 
@@ -180,7 +183,7 @@ bool Cached_DevMem_Mgr::mem_in_use(void* dev_ptr){
 
 void Cached_DevMem_Mgr::set_mem_in_use(void* dev_ptr){
   _used_mem.emplace(dev_ptr);
-} 
+}
 
 void Cached_DevMem_Mgr::set_mem_no_use(void* dev_ptr){
   _used_mem.erase(dev_ptr);

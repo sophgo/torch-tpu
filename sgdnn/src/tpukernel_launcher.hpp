@@ -48,9 +48,10 @@ private:
 class TPUKernelLauncher {
 public:
   TPUKernelLauncher();
-  ~TPUKernelLauncher();
 
   tpuRtStatus_t register_kernel_module(tpuRtStream_t stream);
+
+  tpuRtStatus_t unload_kernel_module(tpuRtStream_t stream);
 
   tpuRtStatus_t launch_async(const char* func_name, const void* api, size_t api_size, tpuRtStream_t stream);
 

@@ -29,10 +29,8 @@ public:
     at::Tensor mask = mask_cpu.to(self.device()).to(self.dtype());
     TIMING_END(tpu::CPU_LAYER);
 #else
-    #if defined BACKEND_1684X
-    #elif defined BACKEND_SG2260
+
     #endif
-#endif
     ctx->save_for_backward( {mask} );
     auto out = mask * self * (1/(1-p));
     SHOW_TENSOR_OP(self, out);
@@ -61,7 +59,7 @@ public:
 
 namespace at
 {
-Tensor dropout_tpu(const at::Tensor & input, double p, bool train) {  
+Tensor dropout_tpu(const at::Tensor & input, double p, bool train) {
   return torch::autograd::DropOutFunction::apply(input, p, train);
 }
 

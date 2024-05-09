@@ -18,20 +18,13 @@ Tensor nonzero_tpu(const Tensor &self) {
   Tensor out_temp = empty({size, self.dim()}, self.options().dtype(kInt));
   Tensor num = empty({1}, self.options().dtype(kInt));
   TIMING_START;
-  #if defined BACKEND_1684X
-  auto status = sgdnnNonzero(tpu::TPUGetDeviceHandle(), 
+
+  auto status = sgdnnNonzero(tpu::TPUGetDeviceResource(),
                                     tpu::TPUGenerateSgdnnTensor(self),
                                     tpu::TPUGenerateSgdnnTensor(out_temp),
                                     tpu::TPUGenerateSgdnnTensor(num));
-  TORCH_CHECK(status == BM_SUCCESS);
-  #elif defined BACKEND_SG2260
-  auto status = sgdnnNonzero(c10_tpu::getCurrentTPUStream(), 
-                                    tpu::TPUGenerateSgdnnTensor(self),
-                                    tpu::TPUGenerateSgdnnTensor(out_temp),
-                                    tpu::TPUGenerateSgdnnTensor(num));
-  TORCH_CHECK(status == tpuRtSuccess);
-  #endif
-  TIMING_END(tpu::NONZERO);
+  TORCH_CHECK(status == SG_SUCCESS);
+    TIMING_END(tpu::NONZERO);
 
   Tensor out = empty({num.item().toInt(), self.dim()}, self.options().dtype(kInt));
   for (int i=0; i<num.item().toInt(); ++i){

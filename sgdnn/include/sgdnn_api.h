@@ -1,10 +1,11 @@
 #ifndef SGDNN_API_H
 #define SGDNN_API_H
 
-#include "bmlib_runtime.h"
 #include "sg_api_struct.h"
+#include "sgdnn_runtime.h"
 #include <map>
 #include <vector>
+
 
 #if defined(__cplusplus)
 extern "C" {
@@ -56,18 +57,48 @@ static inline SgdnnTensor_t sgdnnUndefinedTensor()
   return tensor;
 }
 
-bm_status_t sgdnnInitialize ( bm_handle_t handle );
+tpu_status_t sgdnnInitialize( tpu_resource_t resource );
 
-bm_status_t sgdnnDeinitialize ( bm_handle_t handle );
+tpu_status_t sgdnnDeinitialize( tpu_resource_t resource );
 
-bm_status_t sgdnnReorderConv2dWeight ( bm_handle_t handle,
-                                       SgdnnTensor_t input,
-                                       int mode,
-                                       SgdnnTensor_t output );
+#if defined BACKEND_SG2260
+//must implement non_blocking
+tpu_status_t sgdnnTPUKernelLaunch (
+            tpu_resource_t resource,
+            const char * func_name,
+            const void * api,
+            size_t api_size,
+            bool non_blocking);
+#else
+tpu_status_t sgdnnTPUKernelLaunch (
+            tpu_resource_t resource,
+            const char * func_name,
+            const void * api,
+            size_t api_size,
+            bool non_blocking = false);
+#endif
 
-bm_status_t sgdnnConvertInt64toInt32 ( bm_handle_t handle, 
-                                      SgdnnTensor_t input,
-                                      SgdnnTensor_t output);
+tpu_status_t sgdnnReorderConv2dWeight ( tpu_resource_t resource,
+                                         SgdnnTensor_t input,
+                                         int mode,
+                                         SgdnnTensor_t output,
+                                         bool non_blocking = true );
+
+tpu_status_t sgdnnConvertInt64toInt32 ( tpu_resource_t resource,
+                                         SgdnnTensor_t input,
+                                         SgdnnTensor_t output,
+                                         bool non_blocking = true );
+
+/**
+ * ONLY USED FOR TEST KERNEL LAUNCH
+*/
+tpu_status_t sgdnnDummy ( tpu_resource_t  stream,
+                           bool non_blocking );
+/**
+ * ONLY USED FOR TEST HOST CPU TIME
+*/
+tpu_status_t sgdnnDummy_WO_KERNEL_LAUNCH ( tpu_resource_t  stream,
+                           bool non_blocking );
 
 /*
  * OUTPUT = CONV2D ( INPUT, WEIGHT, BIAS )
@@ -78,12 +109,13 @@ bm_status_t sgdnnConvertInt64toInt32 ( bm_handle_t handle,
  * 4. INPUT, WEIGHT, BIAS and OUTPUT must be contiguous
  * 5. BIAS is optional
  */
-bm_status_t sgdnnConv2d ( bm_handle_t handle,
+tpu_status_t sgdnnConv2d ( tpu_resource_t  stream,
                           SgdnnTensor_t input,
                           SgdnnTensor_t weight,
                           SgdnnTensor_t bias,
                           SgdnnConv2dParam_t param,
-                          SgdnnTensor_t output );
+                          SgdnnTensor_t output,
+                          bool non_blocking = true );
 
 /*
  * [ GRAD_INPUT, GRAD_WEIGHT, GRAD_BIAS ] = CONV2D BACKWARD ( GRAD_OUTPUT, INPUT, WEIGHT )
@@ -94,14 +126,15 @@ bm_status_t sgdnnConv2d ( bm_handle_t handle,
  * 4. All the tensors must be contiguous
  * 5. GRAD_INPUT, GRAD_WEIGHT, GRAD_BIAS are optional
  */
-bm_status_t sgdnnConv2dBackward ( bm_handle_t handle,
+tpu_status_t sgdnnConv2dBackward ( tpu_resource_t  stream,
                                   SgdnnTensor_t grad_output,
                                   SgdnnTensor_t input,
                                   SgdnnTensor_t weight,
                                   SgdnnConv2dParam_t param,
                                   SgdnnTensor_t grad_input,
                                   SgdnnTensor_t grad_weight,
-                                  SgdnnTensor_t grad_bias );
+                                  SgdnnTensor_t grad_bias,
+                                  bool non_blocking = true);
 
 /*
  * [ OUTPUT, SAVED_MEAN, SAVED_INVSTD, RUNNING_MEAN, RUNNING_VAR ] = BATCHNORM2D ( INPUT, WEIGHT, BIAS, EPS, RUNNING_MEAN, RUNNING_VAR, MOMENTUM )
@@ -113,7 +146,7 @@ bm_status_t sgdnnConv2dBackward ( bm_handle_t handle,
  * 5. All the tensors must be contiguous
  * 6. WEIGHT, BIAS, RUNNING_MEAN, RUNNING_VAR, SAVED_MEAN and SAVED_INVSTD are optional
  */
-bm_status_t sgdnnBatchnorm2d ( bm_handle_t handle,
+tpu_status_t sgdnnBatchnorm2d ( tpu_resource_t  stream,
                                SgdnnTensor_t input,
                                SgdnnTensor_t weight,
                                SgdnnTensor_t bias,
@@ -123,7 +156,8 @@ bm_status_t sgdnnBatchnorm2d ( bm_handle_t handle,
                                float momentum,
                                SgdnnTensor_t output,
                                SgdnnTensor_t saved_mean,
-                               SgdnnTensor_t saved_invstd );
+                               SgdnnTensor_t saved_invstd ,
+                               bool non_blocking = true);
 
 /*
  * [ GRAD_INPUT, GRAD_WEIGHT, GRAD_BIAS ] = BATCHNORM2D BACKWARD ( GRAD_OUTPUT, INPUT, WEIGHT, SAVED_MEAN, SAVED_INVSTD )
@@ -135,7 +169,7 @@ bm_status_t sgdnnBatchnorm2d ( bm_handle_t handle,
  * 5. All the tensors must be contiguous
  * 6. WEIGHT, GRAD_INPUT, GRAD_WEIGHT and GRAD_BIAS are optional
  */
-bm_status_t sgdnnBatchnorm2dBackward ( bm_handle_t handle,
+tpu_status_t sgdnnBatchnorm2dBackward ( tpu_resource_t  stream,
                                        SgdnnTensor_t grad_output,
                                        SgdnnTensor_t input,
                                        SgdnnTensor_t weight,
@@ -143,7 +177,8 @@ bm_status_t sgdnnBatchnorm2dBackward ( bm_handle_t handle,
                                        SgdnnTensor_t saved_invstd,
                                        SgdnnTensor_t grad_input,
                                        SgdnnTensor_t grad_weight,
-                                       SgdnnTensor_t grad_bias );
+                                       SgdnnTensor_t grad_bias ,
+                                       bool non_blocking = true);
 
 /*
  * [ OUTPUT, MEAN, RSTD ] = LAYERNORM ( INPUT, WEIGHT, BIAS, START_DIM, EPS )
@@ -154,7 +189,7 @@ bm_status_t sgdnnBatchnorm2dBackward ( bm_handle_t handle,
  * 5. All the tensors must be contiguous
  * 6. WEIGHT and BIAS are optional
  */
-bm_status_t sgdnnLayernorm ( bm_handle_t handle,
+tpu_status_t sgdnnLayernorm ( tpu_resource_t  stream,
                              SgdnnTensor_t input,
                              SgdnnTensor_t weight,
                              SgdnnTensor_t bias,
@@ -162,7 +197,8 @@ bm_status_t sgdnnLayernorm ( bm_handle_t handle,
                              float eps,
                              SgdnnTensor_t output,
                              SgdnnTensor_t mean,
-                             SgdnnTensor_t rstd );
+                             SgdnnTensor_t rstd ,
+                             bool non_blocking = true);
 
 /*
  * [ GRAD_INPUT, GRAD_WEIGHT, GRAD_BIAS ] = LAYERNORM BACKWARD ( GRAD_OUTPUT, INPUT, WEIGHT, MEAN, RSTD, START_DIM )
@@ -173,7 +209,7 @@ bm_status_t sgdnnLayernorm ( bm_handle_t handle,
  * 5. All the tensors must be contiguous
  * 6. WEIGHT, GRAD_INPUT, GRAD_WEIGHT and GRAD_BIAS are optional
  */
-bm_status_t sgdnnLayernormBackward ( bm_handle_t handle,
+tpu_status_t sgdnnLayernormBackward ( tpu_resource_t  stream,
                                      SgdnnTensor_t grad_output,
                                      SgdnnTensor_t input,
                                      SgdnnTensor_t weight,
@@ -182,18 +218,20 @@ bm_status_t sgdnnLayernormBackward ( bm_handle_t handle,
                                      int start_dim,
                                      SgdnnTensor_t grad_input,
                                      SgdnnTensor_t grad_weight,
-                                     SgdnnTensor_t grad_bias,
-                                     int requires_grad_input);
+                                     SgdnnTensor_t grad_bias ,
+                                     int requires_grad_input,
+                                     bool non_blocking = true);
 
 /*
  * OUTPUT = POOLING ( INPUT, POOLING_DESC )
  * Note:
  *
  */
-bm_status_t sgdnnPoolingForward ( bm_handle_t handle,
+tpu_status_t sgdnnPoolingForward ( tpu_resource_t  stream,
                                SgdnnTensor_t input,
                                SgdnnTensor_t output,
-                               PoolingDescriptor_t pooling_desc);
+                               PoolingDescriptor_t pooling_desc,
+                               bool non_blocking = true);
 
 /*
  * OUTPUT = LEFT * RIGHT + BIAS, where " * " is matrix multiplication
@@ -208,11 +246,12 @@ bm_status_t sgdnnPoolingForward ( bm_handle_t handle,
  * 5. BIAS is optional
  */
 
-bm_status_t sgdnnMatmul ( bm_handle_t handle,
+tpu_status_t sgdnnMatmul ( tpu_resource_t  stream,
                           SgdnnTensor_t left,
                           SgdnnTensor_t right,
                           SgdnnTensor_t bias,
-                          SgdnnTensor_t output );
+                          SgdnnTensor_t output ,
+                          bool non_blocking = true);
 
 /*
  * OUTPUT ( batch ) = LEFT ( batch ) * RIGHT ( batch ), where " * " is matrix multiplication
@@ -224,10 +263,11 @@ bm_status_t sgdnnMatmul ( bm_handle_t handle,
  *    RIGHT is allowed to be contiguous or transposed, meaning that the stride is ( N * K, N, 1 ) or ( N * K, 1, K )
  *    OUTPUT is only allowed to be contiguous, meaning that the stride is ( M * N, N, 1 )
  */
-bm_status_t sgdnnBatchMatmul ( bm_handle_t handle,
+tpu_status_t sgdnnBatchMatmul ( tpu_resource_t  stream,
                                SgdnnTensor_t left,
                                SgdnnTensor_t right,
-                               SgdnnTensor_t output );
+                               SgdnnTensor_t output ,
+                               bool non_blocking = true);
 
 /*
  * OUTPUT = GATHER ( INPUT, AXIS, INDEX )
@@ -237,29 +277,31 @@ bm_status_t sgdnnBatchMatmul ( bm_handle_t handle,
  * 3. Output have the same shape as index, and do not broadcast against each other
  */
 
-bm_status_t sgdnnGather ( bm_handle_t handle,
+tpu_status_t sgdnnGather ( tpu_resource_t  stream,
                           SgdnnTensor_t input,
                           SgdnnTensor_t index,
                           SgdnnTensor_t output,
-                          int axis );
+                          int axis ,
+                          bool non_blocking = true);
 /*
  * OUTPUT = Active(INPUT)
  * Note:
  * 1. The data types of INPUT must be the same and one of FP32, FP16 and BF16
 * 2. INPUT must be contiguous
  */
-bm_status_t sgdnnActive(bm_handle_t handle, SgdnnTensor_t input,
-                        SgdnnTensor_t output, sg_active_type_t active_type);
+tpu_status_t sgdnnActive(tpu_resource_t  stream, SgdnnTensor_t input,
+                        SgdnnTensor_t output, sg_active_type_t active_type, bool non_blocking = true);
 /*
  * OUTPUT = log(INPUT)
  * Note:
  * 1. The data types of INPUT must be the same and one of FP32, FP16 and BF16
  * 2. INPUT must be contiguous
  */
-bm_status_t sgdnnLog ( bm_handle_t handle,
+tpu_status_t sgdnnLog ( tpu_resource_t  stream,
                        SgdnnTensor_t input,
                        SgdnnTensor_t output,
-                       sg_log_type_t log_type);
+                       sg_log_type_t log_type,
+                       bool non_blocking = true);
 
 /*
  * OUTPUT = squeeze(INPUT)
@@ -267,24 +309,25 @@ bm_status_t sgdnnLog ( bm_handle_t handle,
  * 1. The data types of INPUT must be the same and one of FP32, FP16 and BF16
  * 2. INPUT must be contiguous
  */
-bm_status_t sgdnnSqueeze ( bm_handle_t handle,
+tpu_status_t sgdnnSqueeze ( tpu_resource_t  stream,
                        SgdnnTensor_t input,
-                       SgdnnTensor_t output);
+                       SgdnnTensor_t output,
+                       bool non_blocking = true);
 
 /*
  * OUTPUT = native_group_norm(INPUT)
  * Note:
  */
-bm_status_t sgdnnNativeGroupNorm ( bm_handle_t handle, SgdnnTensor_t input,
+tpu_status_t sgdnnNativeGroupNorm ( tpu_resource_t  stream, SgdnnTensor_t input,
                      SgdnnTensor_t gamma, SgdnnTensor_t beta,
                      int group, int affine, float eps, SgdnnTensor_t output,
-                     SgdnnTensor_t mean, SgdnnTensor_t rstd);
+                     SgdnnTensor_t mean, SgdnnTensor_t rstd, bool non_blocking = true);
 
-bm_status_t sgdnnNativeGroupNormBackward(bm_handle_t handle, SgdnnTensor_t grad_output,
+tpu_status_t sgdnnNativeGroupNormBackward(tpu_resource_t  stream, SgdnnTensor_t grad_output,
                      SgdnnTensor_t input, SgdnnTensor_t weight,
                      SgdnnTensor_t mean, SgdnnTensor_t rstd,
                      int group, SgdnnTensor_t out0,
-                     SgdnnTensor_t out1, SgdnnTensor_t out2);
+                     SgdnnTensor_t out1, SgdnnTensor_t out2, bool non_blocking = true);
 
 /*
  * OUTPUT = INPUT || OTHER
@@ -293,10 +336,11 @@ bm_status_t sgdnnNativeGroupNormBackward(bm_handle_t handle, SgdnnTensor_t grad_
  * INPUT and OTHER must be contiguous
  */
 
-bm_status_t sgdnnLogicalOr ( bm_handle_t handle,
+tpu_status_t sgdnnLogicalOr ( tpu_resource_t  stream,
                        SgdnnTensor_t input,
                        SgdnnTensor_t other,
-                       SgdnnTensor_t output );
+                       SgdnnTensor_t output ,
+                       bool non_blocking = true);
 
 /*
  *  OUTPUT  = SHIFT_LEFT ( INPUT, OTHER)
@@ -305,10 +349,11 @@ bm_status_t sgdnnLogicalOr ( bm_handle_t handle,
  *  2. input and output must be the same shape.
  *  3. input and other must be the same dim.
  */
-bm_status_t sgdnnShiftLeft ( bm_handle_t handle,
+tpu_status_t sgdnnShiftLeft ( tpu_resource_t  stream,
                          SgdnnTensor_t input,
                          SgdnnTensor_t other,
-                         SgdnnTensor_t output );
+                         SgdnnTensor_t output ,
+                         bool non_blocking = true);
 /*
  *  OUTPUT  = SHIFT_LEFT ( INPUT, OTHER)
  *  Note:
@@ -316,10 +361,11 @@ bm_status_t sgdnnShiftLeft ( bm_handle_t handle,
  *  2. input and output must be the same shape.
  *  3. input and other must be the same dim.
  */
-bm_status_t sgdnnShiftLeftBcast ( bm_handle_t handle,
+tpu_status_t sgdnnShiftLeftBcast ( tpu_resource_t  stream,
                               SgdnnTensor_t input,
                               SgdnnTensor_t other,
-                              SgdnnTensor_t output );
+                              SgdnnTensor_t output ,
+                              bool non_blocking = true);
 /*
  *  OUTPUT  = SHIFT_LEFT ( INPUT, OTHER)
  *  Note:
@@ -327,10 +373,11 @@ bm_status_t sgdnnShiftLeftBcast ( bm_handle_t handle,
  *  2. one of input and other must be a scalar.
  *  3. input and output must be in the same shape.
  */
-bm_status_t sgdnnShiftLeftC ( bm_handle_t handle,
+tpu_status_t sgdnnShiftLeftC ( tpu_resource_t  stream,
                           SgdnnTensor_t input,
                           char scalar,
-                          SgdnnTensor_t output );
+                          SgdnnTensor_t output ,
+                          bool non_blocking = true);
 
 /*
  *  OUTPUT  = SHIFT_RIGHT_ARITHMETIC ( INPUT, OTHER)
@@ -339,10 +386,11 @@ bm_status_t sgdnnShiftLeftC ( bm_handle_t handle,
  *  2. input and output must be the same shape.
  *  3. input and other must be the same dim.
  */
-bm_status_t sgdnnShiftRightArithmetic ( bm_handle_t handle,
+tpu_status_t sgdnnShiftRightArithmetic ( tpu_resource_t  stream,
                          SgdnnTensor_t input,
                          SgdnnTensor_t other,
-                         SgdnnTensor_t output );
+                         SgdnnTensor_t output ,
+                         bool non_blocking = true);
 /*
  *  OUTPUT  = SHIFT_RIGHT_ARITHMETIC ( INPUT, OTHER)
  *  Note:
@@ -350,10 +398,11 @@ bm_status_t sgdnnShiftRightArithmetic ( bm_handle_t handle,
  *  2. input and output must be the same shape.
  *  3. input and other must be the same dim.
  */
-bm_status_t sgdnnShiftRightArithmeticBcast ( bm_handle_t handle,
+tpu_status_t sgdnnShiftRightArithmeticBcast ( tpu_resource_t  stream,
                               SgdnnTensor_t input,
                               SgdnnTensor_t other,
-                              SgdnnTensor_t output );
+                              SgdnnTensor_t output ,
+                              bool non_blocking = true);
 /*
  *  OUTPUT  = SHIFT_RIGHT_ARITHMETIC ( INPUT, OTHER)
  *  Note:
@@ -361,10 +410,11 @@ bm_status_t sgdnnShiftRightArithmeticBcast ( bm_handle_t handle,
  *  2. one of input and other must be a scalar.
  *  3. input and output must be in the same shape.
  */
-bm_status_t sgdnnShiftRightArithmeticC ( bm_handle_t handle,
+tpu_status_t sgdnnShiftRightArithmeticC ( tpu_resource_t  stream,
                           SgdnnTensor_t input,
                           int scalar,
-                          SgdnnTensor_t output );
+                          SgdnnTensor_t output ,
+                          bool non_blocking = true);
 
 /*
  * OUTPUT = logical_not(INPUT)
@@ -373,9 +423,10 @@ bm_status_t sgdnnShiftRightArithmeticC ( bm_handle_t handle,
  * 2. INPUT must be contiguous
  */
 
-bm_status_t sgdnnLogicalNot ( bm_handle_t handle,
+tpu_status_t sgdnnLogicalNot ( tpu_resource_t  stream,
                        SgdnnTensor_t input,
-                       SgdnnTensor_t output );
+                       SgdnnTensor_t output ,
+                       bool non_blocking = true);
 
 /*
  * OUTPUT = math.flip(INPUT, DIMS)
@@ -384,10 +435,11 @@ bm_status_t sgdnnLogicalNot ( bm_handle_t handle,
  * 2. INPUT must be contiguous
  */
 
-bm_status_t sgdnnFlip ( bm_handle_t handle,
+tpu_status_t sgdnnFlip ( tpu_resource_t  stream,
                         SgdnnTensor_t input,
                         int axis,
-                        SgdnnTensor_t output );
+                        SgdnnTensor_t output ,
+                        bool non_blocking = true);
 /*
  * OUTPUT = INPUT && OTHER
  * Note:
@@ -395,10 +447,11 @@ bm_status_t sgdnnFlip ( bm_handle_t handle,
  * INPUT and OTHER must be contiguous
  */
 
-bm_status_t sgdnnLogicalAnd ( bm_handle_t handle,
+tpu_status_t sgdnnLogicalAnd ( tpu_resource_t  stream,
                               SgdnnTensor_t input,
                               SgdnnTensor_t other,
-                              SgdnnTensor_t output );
+                              SgdnnTensor_t output ,
+                              bool non_blocking = true);
 /*
  * OUTPUT = math.pow (INPUT, OTHER)
  * Note:
@@ -406,10 +459,11 @@ bm_status_t sgdnnLogicalAnd ( bm_handle_t handle,
  * 2. The shapes of INPUT, OTHER and OUTPUT must be the same
  * 3. INPUT, OTHER and OUTPUT must be contiguous
  */
-bm_status_t sgdnnPow ( bm_handle_t handle,
+tpu_status_t sgdnnPow ( tpu_resource_t  stream,
                        SgdnnTensor_t input,
                        SgdnnTensor_t other,
-                       SgdnnTensor_t output );
+                       SgdnnTensor_t output ,
+                       bool non_blocking = true);
 
 /*
  * OUTPUT = math.pow (INPUT, OTHER)
@@ -418,10 +472,11 @@ bm_status_t sgdnnPow ( bm_handle_t handle,
  * 2. The shapes of INPUT, OTHER must can be broadcast
  * 3. INPUT, OTHER and OUTPUT must be contiguous
  */
-bm_status_t sgdnnPowBcast ( bm_handle_t handle,
+tpu_status_t sgdnnPowBcast ( tpu_resource_t  stream,
                             SgdnnTensor_t input,
                             SgdnnTensor_t other,
-                            SgdnnTensor_t output );
+                            SgdnnTensor_t output,
+                            bool non_blocking = true );
 
 /*
  * OUTPUT = INPUT - SCALAR * OTHER
@@ -430,11 +485,12 @@ bm_status_t sgdnnPowBcast ( bm_handle_t handle,
  * 2. The shapes of INPUT, OTHER and OUTPUT must be the same, broadcasting is not allowed
  * 3. INPUT, OTHER and OUTPUT must be contiguous
  */
-bm_status_t sgdnnSub ( bm_handle_t handle,
+tpu_status_t sgdnnSub ( tpu_resource_t  stream,
                        SgdnnTensor_t input,
                        SgdnnTensor_t other,
                        float scalar,
-                       SgdnnTensor_t output );
+                       SgdnnTensor_t output ,
+                       bool non_blocking = true);
 
 /*
  * OUTPUT = INPUT * OTHER
@@ -443,10 +499,11 @@ bm_status_t sgdnnSub ( bm_handle_t handle,
  * 2. The shapes of INPUT, OTHER and OUTPUT must be the same, broadcasting is not allowed
  * 3. INPUT, OTHER and OUTPUT must be contiguous
  */
-bm_status_t sgdnnMul ( bm_handle_t handle,
+tpu_status_t sgdnnMul ( tpu_resource_t  stream,
                        SgdnnTensor_t input,
                        SgdnnTensor_t other,
-                       SgdnnTensor_t output );
+                       SgdnnTensor_t output ,
+                       bool non_blocking = true);
 
 /*
  * OUTPUT = INPUT / OTHER
@@ -455,10 +512,11 @@ bm_status_t sgdnnMul ( bm_handle_t handle,
  * 2. The shapes of INPUT, OTHER and OUTPUT must be the same, broadcasting is not allowed
  * 3. INPUT, OTHER and OUTPUT must be contiguous
  */
-bm_status_t sgdnnDiv ( bm_handle_t handle,
+tpu_status_t sgdnnDiv ( tpu_resource_t  stream,
                        SgdnnTensor_t input,
                        SgdnnTensor_t other,
-                       SgdnnTensor_t output );
+                       SgdnnTensor_t output ,
+                       bool non_blocking = true);
 
 /*
  * OUTPUT = INPUT + SCALAR * OTHER
@@ -468,12 +526,13 @@ bm_status_t sgdnnDiv ( bm_handle_t handle,
  * 3. INPUT, OTHER and OUTPUT must be contiguous
  */
 
-bm_status_t sgdnnBinary ( bm_handle_t handle,
+tpu_status_t sgdnnBinary ( tpu_resource_t  stream,
                             SgdnnTensor_t input,
                             SgdnnTensor_t other,
                             float scalar,
                             SgdnnTensor_t output,
-                            int binary_type );
+                            int binary_type ,
+                            bool non_blocking = true);
 
 /*
  * OUTPUT = INPUT + SCALAR * OTHER
@@ -483,12 +542,13 @@ bm_status_t sgdnnBinary ( bm_handle_t handle,
  * 3. INPUT and OTHER are allowed broadcasting
  * 4. INPUT, OTHER and OUTPUT must be contiguous
  */
-bm_status_t sgdnnBinaryBcast (  bm_handle_t handle,
+tpu_status_t sgdnnBinaryBcast (  tpu_resource_t  stream,
                                   SgdnnTensor_t input,
                                   SgdnnTensor_t other,
                                   float scalar,
                                   SgdnnTensor_t output,
-                                  int binary_type );
+                                  int binary_type ,
+                                  bool non_blocking = true);
 
 /*
  * OUTPUT = INPUT + SCALAR
@@ -497,12 +557,13 @@ bm_status_t sgdnnBinaryBcast (  bm_handle_t handle,
  * 2. The shapes of INPUT and OUTPUT must be the same
  * 3. INPUT and OUTPUT must be contiguous
  */
-bm_status_t sgdnnBinaryC (  bm_handle_t handle,
+tpu_status_t sgdnnBinaryC (  tpu_resource_t  stream,
                               SgdnnTensor_t input,
                               float scalar,
                               SgdnnTensor_t output,
                               int binary_type,
-                              bool inversed );
+                              bool inversed ,
+                              bool non_blocking = true);
 
 /*
  * OUTPUT = SCALAR - INPUT
@@ -511,10 +572,11 @@ bm_status_t sgdnnBinaryC (  bm_handle_t handle,
  * 2. The shapes of INPUT and OUTPUT must be the same
  * 3. INPUT and OUTPUT must be contiguous
  */
-bm_status_t sgdnnCSub ( bm_handle_t handle,
+tpu_status_t sgdnnCSub ( tpu_resource_t  stream,
                         SgdnnTensor_t input,
                         float scalar,
-                        SgdnnTensor_t output );
+                        SgdnnTensor_t output ,
+                        bool non_blocking = true);
 
 /*
  * OUTPUT = INPUT * SCALAR
@@ -523,10 +585,11 @@ bm_status_t sgdnnCSub ( bm_handle_t handle,
  * 2. The shapes of INPUT and OUTPUT must be the same
  * 3. INPUT and OUTPUT must be contiguous
  */
-bm_status_t sgdnnMulC ( bm_handle_t handle,
+tpu_status_t sgdnnMulC ( tpu_resource_t  stream,
                         SgdnnTensor_t input,
                         float scalar,
-                        SgdnnTensor_t output );
+                        SgdnnTensor_t output ,
+                        bool non_blocking = true);
 
 /*
  * OUTPUT = SCALAR / INPUT
@@ -535,10 +598,11 @@ bm_status_t sgdnnMulC ( bm_handle_t handle,
  * 2. The shapes of INPUT and OUTPUT must be the same
  * 3. INPUT and OUTPUT must be contiguous
  */
-bm_status_t sgdnnCDiv ( bm_handle_t handle,
+tpu_status_t sgdnnCDiv ( tpu_resource_t  stream,
                         SgdnnTensor_t input,
                         float scalar,
-                        SgdnnTensor_t output );
+                        SgdnnTensor_t output ,
+                        bool non_blocking = true);
 
 /*
  * OUTPUT = INPUT + SCALAR * ( TENSOR1 * TENSOR2 )
@@ -548,12 +612,13 @@ bm_status_t sgdnnCDiv ( bm_handle_t handle,
  * 3. INPUT, TENSOR1, TENSOR2 and OUTPUT must be contiguous
  */
 
-bm_status_t sgdnnAddCMulBcast ( bm_handle_t handle,
+tpu_status_t sgdnnAddCMulBcast ( tpu_resource_t  stream,
                                 SgdnnTensor_t input,
                                 SgdnnTensor_t tensor1,
                                 SgdnnTensor_t tensor2,
                                 float scalar,
-                                SgdnnTensor_t output );
+                                SgdnnTensor_t output ,
+                                bool non_blocking = true);
 
 /*
  * OUTPUT = INPUT + SCALAR * ( TENSOR1 * TENSOR2 )
@@ -562,12 +627,13 @@ bm_status_t sgdnnAddCMulBcast ( bm_handle_t handle,
  * 2. The shapes of INPUT, TENSOR1, TENSOR2 and OUTPUT must be the same, broadcasting is not allowed
  * 3. INPUT, TENSOR1, TENSOR2 and OUTPUT must be contiguous
  */
-bm_status_t sgdnnAddCMul ( bm_handle_t handle,
+tpu_status_t sgdnnAddCMul ( tpu_resource_t  stream,
                            SgdnnTensor_t input,
                            SgdnnTensor_t tensor1,
                            SgdnnTensor_t tensor2,
                            float scalar,
-                           SgdnnTensor_t output );
+                           SgdnnTensor_t output ,
+                           bool non_blocking = true);
 
 /*
  * OUTPUT = INPUT + SCALAR * ( TENSOR1 / TENSOR2 )
@@ -576,12 +642,13 @@ bm_status_t sgdnnAddCMul ( bm_handle_t handle,
  * 2. The shapes of INPUT, TENSOR1, TENSOR2 and OUTPUT must be the same, broadcasting is not allowed
  * 3. INPUT, TENSOR1, TENSOR2 and OUTPUT must be contiguous
  */
-bm_status_t sgdnnAddCDiv ( bm_handle_t handle,
+tpu_status_t sgdnnAddCDiv ( tpu_resource_t  stream,
                            SgdnnTensor_t input,
                            SgdnnTensor_t tensor1,
                            SgdnnTensor_t tensor2,
                            float scalar,
-                           SgdnnTensor_t output );
+                           SgdnnTensor_t output ,
+                           bool non_blocking = true);
 
 
 
@@ -592,10 +659,11 @@ bm_status_t sgdnnAddCDiv ( bm_handle_t handle,
  * 2. The shapes of GRAD_OUTPUT, INPUT and GRAD_INPUT must be the same
  * 3. GRAD_OUTPUT, INPUT and GRAD_INPUT must be contiguous
  */
-bm_status_t sgdnnReLUBackward ( bm_handle_t handle,
+tpu_status_t sgdnnReLUBackward ( tpu_resource_t  stream,
                                 SgdnnTensor_t grad_output,
                                 SgdnnTensor_t input,
-                                SgdnnTensor_t grad_input );
+                                SgdnnTensor_t grad_input ,
+                                bool non_blocking = true);
 
 /*
  * OUTPUT = GELU ( INPUT )
@@ -604,9 +672,10 @@ bm_status_t sgdnnReLUBackward ( bm_handle_t handle,
  * 2. The shapes of INPUT and OUTPUT must be the same
  * 3. INPUT and OUTPUT must be contiguous
  */
-bm_status_t sgdnnGELU ( bm_handle_t handle,
+tpu_status_t sgdnnGELU (   tpu_resource_t  stream,
                         SgdnnTensor_t input,
-                        SgdnnTensor_t output );
+                        SgdnnTensor_t output,
+                        bool non_blocking = true );
 
 /*
  * GRAD_INPUT = GELU BACKWARD ( GRAD_OUTPUT, INPUT )
@@ -615,10 +684,11 @@ bm_status_t sgdnnGELU ( bm_handle_t handle,
  * 2. The shapes of GRAD_OUTPUT, INPUT and GRAD_INPUT must be the same
  * 3. GRAD_OUTPUT, INPUT and GRAD_INPUT must be contiguous
  */
-bm_status_t sgdnnGELUBackward ( bm_handle_t handle,
+tpu_status_t sgdnnGELUBackward ( tpu_resource_t  stream,
                                 SgdnnTensor_t grad_output,
                                 SgdnnTensor_t input,
-                                SgdnnTensor_t grad_input );
+                                SgdnnTensor_t grad_input ,
+                                bool non_blocking = true);
 
 
 /*
@@ -628,11 +698,11 @@ bm_status_t sgdnnGELUBackward ( bm_handle_t handle,
  * 2. INPUT must be contiguous
  */
 
-bm_status_t sgdnnLeakyReLU ( bm_handle_t handle,
+tpu_status_t sgdnnLeakyReLU ( tpu_resource_t  stream,
                        SgdnnTensor_t input,
                        SgdnnTensor_t output,
-                       float negative_slope );
-
+                       float negative_slope ,
+                       bool non_blocking = true);
 /*
  * OUTPUT = COPY ( INPUT )
  * Note:
@@ -640,20 +710,20 @@ bm_status_t sgdnnLeakyReLU ( bm_handle_t handle,
  * 2. The shapes of INPUT and OUTPUT must be the same
  * 3. INPUT and OUTPUT are allowed to be NOT contiguous
  */
-bm_status_t sgdnnStridedCopy ( bm_handle_t handle,
-                               SgdnnTensor_t input,
-                               SgdnnTensor_t output );
-
+tpu_status_t sgdnnStridedCopy ( tpu_resource_t resource,
+                             SgdnnTensor_t input,
+                             SgdnnTensor_t output,
+                             bool non_blocking = true );
 /*
  * OUTPUT = CONVERT ( INPUT )
  * Note:
  * 1. The shapes of INPUT and OUTPUT must be the same
  * 2. INPUT and OUTPUT must be contiguous
  */
-bm_status_t sgdnnConvert ( bm_handle_t handle,
-                           SgdnnTensor_t input,
-                           SgdnnTensor_t output );
-
+tpu_status_t sgdnnConvert ( tpu_resource_t resource,
+                         SgdnnTensor_t input,
+                         SgdnnTensor_t output,
+                         bool non_blocking = true );
 /*
  * OUTPUT = SQRT ( INPUT )
  * Note:
@@ -669,11 +739,12 @@ bm_status_t sgdnnConvert ( bm_handle_t handle,
  * 2. The shapes of INPUT and OUTPUT must be the same
  * 3. INPUT and OUTPUT must be contiguous
  */
-bm_status_t sgdnnClamp ( bm_handle_t handle,
+tpu_status_t sgdnnClamp ( tpu_resource_t  stream,
                          SgdnnTensor_t input,
                          float min,
                          float max,
-                         SgdnnTensor_t output );
+                         SgdnnTensor_t output ,
+                         bool non_blocking = true);
 
 /*
  * OUTPUT = SIGN ( INPUT )
@@ -682,9 +753,10 @@ bm_status_t sgdnnClamp ( bm_handle_t handle,
  * 2. The shapes of INPUT and OUTPUT must be the same
  * 3. INPUT and OUTPUT must be contiguous
  */
-bm_status_t sgdnnSign ( bm_handle_t handle,
+tpu_status_t sgdnnSign ( tpu_resource_t  stream,
                         SgdnnTensor_t input,
-                        SgdnnTensor_t output );
+                        SgdnnTensor_t output ,
+                        bool non_blocking = true);
 /*
  * OUTPUT = SOFTMAX ( INPUT, DIM )
  * Note:
@@ -692,10 +764,11 @@ bm_status_t sgdnnSign ( bm_handle_t handle,
  * 2. The shapes of INPUT and OUTPUT must be the same
  * 3. INPUT and OUTPUT must be contiguous
  */
-bm_status_t sgdnnSoftmax ( bm_handle_t handle,
+tpu_status_t sgdnnSoftmax ( tpu_resource_t  stream,
                            SgdnnTensor_t input,
                            int dim,
-                           SgdnnTensor_t output );
+                           SgdnnTensor_t output ,
+                           bool non_blocking = true);
 
 /*
  * GRAD_INPUT = SOFTMAX BACKWARD ( GRAD_OUTPUT, OUTPUT, DIM )
@@ -704,11 +777,12 @@ bm_status_t sgdnnSoftmax ( bm_handle_t handle,
  * 2. The shapes of GRAD_OUTPUT, OUTPUT and GRAD_INPUT must be the same
  * 3. GRAD_OUTPUT, OUTPUT and GRAD_INPUT must be contiguous
  */
-bm_status_t sgdnnSoftmaxBackward ( bm_handle_t handle,
+tpu_status_t sgdnnSoftmaxBackward ( tpu_resource_t  stream,
                                    SgdnnTensor_t grad_output,
                                    SgdnnTensor_t output,
                                    int dim,
-                                   SgdnnTensor_t grad_input );
+                                   SgdnnTensor_t grad_input ,
+                                   bool non_blocking = true);
 
 /*
  * OUTPUT = LOGSOFTMAX ( INPUT, DIM )
@@ -717,10 +791,11 @@ bm_status_t sgdnnSoftmaxBackward ( bm_handle_t handle,
  * 2. The shapes of INPUT and OUTPUT must be the same
  * 3. INPUT and OUTPUT must be contiguous
  */
-bm_status_t sgdnnLogSoftmax ( bm_handle_t handle,
+tpu_status_t sgdnnLogSoftmax ( tpu_resource_t resource,
                               SgdnnTensor_t input,
                               int dim,
-                              SgdnnTensor_t output );
+                              SgdnnTensor_t output,
+                              bool non_blocking = true );
 
 /*
  * OUTPUT = NORM2 ( INPUT, KEEPDIM )
@@ -730,10 +805,11 @@ bm_status_t sgdnnLogSoftmax ( bm_handle_t handle,
  * 3. If keepdim is FALSE, the dimension of OUTPUT must be zero
  * 4. INPUT and OUTPUT must be contiguous
  */
-bm_status_t sgdnnNorm2 ( bm_handle_t handle,
+tpu_status_t sgdnnNorm2 ( tpu_resource_t  stream,
                          SgdnnTensor_t input,
                          int keepdim,
-                         SgdnnTensor_t output );
+                         SgdnnTensor_t output ,
+                         bool non_blocking = true);
 
 /*
  * OUTPUT = CROSS ENTROPY LOSS ( INPUT, TARGET, REDUCTION, LABEL_SMOOTHING )
@@ -745,12 +821,13 @@ bm_status_t sgdnnNorm2 ( bm_handle_t handle,
  * 5. INPUT, TARGET and OUTPUT must be contiguous
  * 6. REDUCTION must be 0 ( mean ) or 1 ( sum )
  */
-bm_status_t sgdnnCrossEntropyLoss ( bm_handle_t handle,
+tpu_status_t sgdnnCrossEntropyLoss ( tpu_resource_t  stream,
                                     SgdnnTensor_t input,
                                     SgdnnTensor_t target,
                                     int reduction,
                                     float label_smoothing,
-                                    SgdnnTensor_t output );
+                                    SgdnnTensor_t output ,
+                                    bool non_blocking = true);
 
 /*
  * GRAD_INPUT = CROSS ENTROPY LOSS BACKWARD ( INPUT, TARGET, GRAD_OUTPUT, REDUCTION, LABEL_SMOOTHING )
@@ -762,14 +839,15 @@ bm_status_t sgdnnCrossEntropyLoss ( bm_handle_t handle,
  * 5. INPUT, TARGET, GRAD_OUTPUT and GRAD_INPUT must be contiguous
  * 6. REDUCTION must be 0 ( mean ) or 1 ( sum )
  */
-bm_status_t sgdnnCrossEntropyLossBackward (
-bm_handle_t handle,
+tpu_status_t sgdnnCrossEntropyLossBackward (
+tpu_resource_t  stream,
 SgdnnTensor_t input,
 SgdnnTensor_t target,
 SgdnnTensor_t grad_output,
 int reduction,
 float label_smoothing,
-SgdnnTensor_t grad_input );
+SgdnnTensor_t grad_input ,
+bool non_blocking = true);
 
 /*
  * OUTPUT = FILL ( SCALAR ), the elements of OUTPUT are all set SCALAR
@@ -778,9 +856,10 @@ SgdnnTensor_t grad_input );
  * 2. SCALAR_PTR is a host pointer
  * 3. OUTPUT must be contiguous
  */
-bm_status_t sgdnnFill ( bm_handle_t handle,
+tpu_status_t sgdnnFill ( tpu_resource_t  stream,
                         const void * scalar_ptr,
-                        SgdnnTensor_t output );
+                        SgdnnTensor_t output ,
+                        bool non_blocking = true);
 
 /*
  * OUTPUT = REDUCE ( INPUT, START_DIM, END_DIM, KEEPDIM, MODE )
@@ -791,13 +870,14 @@ bm_status_t sgdnnFill ( bm_handle_t handle,
  * 3. INPUT and OUTPUT must be contiguous
  * 4. MODE must be 0 ( mean ) or 1 ( sum )
  */
-bm_status_t sgdnnReduce ( bm_handle_t handle,
+tpu_status_t sgdnnReduce ( tpu_resource_t  stream,
                           SgdnnTensor_t input,
                           int start_dim,
                           int end_dim,
                           int keepdim,
                           int mode,
-                          SgdnnTensor_t output );
+                          SgdnnTensor_t output ,
+                          bool non_blocking = true);
 
 /*
  * OUTPUT = REDUCE_PROD ( INPUT, START_DIM, END_DIM, KEEPDIM, MODE )
@@ -808,11 +888,12 @@ bm_status_t sgdnnReduce ( bm_handle_t handle,
  * 3. INPUT and OUTPUT must be contiguous
  * 4. MODE must be 0 ( prod ) or 1 ( sum )
  */
-bm_status_t sgdnnReduceProd ( bm_handle_t handle,
+tpu_status_t sgdnnReduceProd ( tpu_resource_t  stream,
                               SgdnnTensor_t input,
                               int axis,
                               int keepdim,
-                              SgdnnTensor_t output );
+                              SgdnnTensor_t output ,
+                              bool non_blocking = true);
 
 /*
  * OUTPUT = CONCAT ( INPUTS, DIM )
@@ -822,11 +903,12 @@ bm_status_t sgdnnReduceProd ( bm_handle_t handle,
  *    where DA0, DA1, ... are the "DIM" dimension of the corresponding tensors, the shape of OUTPUT is ( D0, D1, ..., D(A-1), ( DA0 + DA1 + ... ), D(A+1), ... )
  * 3. INPUTS and OUTPUT must be contiguous
  */
-bm_status_t sgdnnConcat ( bm_handle_t handle,
+tpu_status_t sgdnnConcat ( tpu_resource_t  stream,
                           const SgdnnTensor_t * inputs,
                           int input_num,
                           int dim,
-                          SgdnnTensor_t output );
+                          SgdnnTensor_t output ,
+                          bool non_blocking = true);
 /*
  * OUTPUT = Upsampling ( INPUTS, align_corners, output_size)
  * Note:
@@ -835,14 +917,16 @@ bm_status_t sgdnnConcat ( bm_handle_t handle,
  *    where DA0, DA1, ... are the "DIM" dimension of the corresponding tensors, the shape of OUTPUT is ( D0, D1, ..., D(A-1), ( DA0 + DA1 + ... ), D(A+1), ... )
  * 3. INPUTS and OUTPUT must be contiguous
  */
-bm_status_t sgdnnUpsampling(bm_handle_t handle, SgdnnTensor_t input,
+tpu_status_t sgdnnUpsampling(tpu_resource_t  stream, SgdnnTensor_t input,
                             SgdnnTensor_t output,
                             bool align_corners,
-                            sg_resize_mode_t upsampling_type);
+                            sg_resize_mode_t upsampling_type,
+                            bool non_blocking = true);
 
-bm_status_t sgdnnUpsampleNearest2dBackward(bm_handle_t handle, SgdnnTensor_t grad_output,
+tpu_status_t sgdnnUpsampleNearest2dBackward(tpu_resource_t  stream, SgdnnTensor_t grad_output,
                             SgdnnTensor_t grad_input, int scale,
-                            PoolingDescriptor_t pooling_desc);
+                            PoolingDescriptor_t pooling_desc,
+                            bool non_blocking = true);
 
 /*
  * OUTPUT = WHERE ( COND, SELF, OTHER ) = COND ? SELF : OTHER
@@ -852,11 +936,12 @@ bm_status_t sgdnnUpsampleNearest2dBackward(bm_handle_t handle, SgdnnTensor_t gra
  * 3. COND, SELF, OTHER and OUTPUT must be contiguous
  * 4. COND, SELF and OTHER are allowed broadcastable, SELF and OTHER are allowed scalar
  */
-bm_status_t sgdnnWhere ( bm_handle_t handle,
+tpu_status_t sgdnnWhere ( tpu_resource_t  stream,
                          SgdnnTensor_t cond,
                          SgdnnTensor_t self,
                          SgdnnTensor_t other,
-                         SgdnnTensor_t output );
+                         SgdnnTensor_t output ,
+                         bool non_blocking = true);
 
 /*
  * OUTPUT = INDEX SELECT ( INPUT, INDICES, DIM )
@@ -866,35 +951,39 @@ bm_status_t sgdnnWhere ( bm_handle_t handle,
  *    then OUTPUT is ( D0, ..., D(D-1), [X+1], D(D+1), ...  )
  * 3. INPUT, INDICES and OUTPUT must be contiguous
  */
-bm_status_t sgdnnIndexSelect ( bm_handle_t handle,
+tpu_status_t sgdnnIndexSelect ( tpu_resource_t  stream,
                                SgdnnTensor_t input,
                                SgdnnTensor_t indices,
                                int dim,
-                               SgdnnTensor_t output );
+                               SgdnnTensor_t output ,
+                               bool non_blocking = true);
 
-bm_status_t sgdnnEmbeddingBackward ( bm_handle_t handle,
+tpu_status_t sgdnnEmbeddingBackward ( tpu_resource_t  stream,
                                      SgdnnTensor_t grad_output,
                                      SgdnnTensor_t indices,
-                                     SgdnnTensor_t grad_input );
+                                     SgdnnTensor_t grad_input ,
+                                     bool non_blocking = true);
 /*
  * OUPUT = INPUT[indices]
  *   indices's size <= INPUT.dim
  *   OUTPUT[0] = INPUT[indices[0]] and so on ...
 */
-bm_status_t sgdnnMulIndexSelect ( bm_handle_t handle,
+tpu_status_t sgdnnMulIndexSelect ( tpu_resource_t  stream,
                                   SgdnnTensor_t input,
                                   SgdnnTensor_t output,
-                                  std::vector<SgdnnTensor_t>& indices);
+                                  std::vector<SgdnnTensor_t>& indices,
+                                  bool non_blocking = true);
 
 
 /*
   OUTPUT = MASKE_FILL ( INPUT, MASK, VALUE )
 */
-bm_status_t sgdnnMaskedFill ( bm_handle_t handle,
+tpu_status_t sgdnnMaskedFill ( tpu_resource_t  stream,
                               SgdnnTensor_t input,
                               SgdnnTensor_t mask,
                               float value,
-                              SgdnnTensor_t out );
+                              SgdnnTensor_t out ,
+                              bool non_blocking = true);
 
 /*
  * [ OUTPUT, MASK ] = DROPOUT ( INPUT, SEED, THRESHOLD )
@@ -907,12 +996,13 @@ bm_status_t sgdnnMaskedFill ( bm_handle_t handle,
  * 4. The random values are uniformly distributed in 0 ~ 1
  * 5. MASK is optional
  */
-bm_status_t sgdnnDropout ( bm_handle_t handle,
+tpu_status_t sgdnnDropout ( tpu_resource_t  stream,
                            SgdnnTensor_t input,
                            unsigned long long seed,
                            float threshold,
                            SgdnnTensor_t output,
-                           SgdnnTensor_t mask );
+                           SgdnnTensor_t mask ,
+                           bool non_blocking = true);
 
 /*
  * OUTPUT = MLP ( INPUT, W1, W2, B1, B2, OUT1, P )
@@ -924,7 +1014,7 @@ bm_status_t sgdnnDropout ( bm_handle_t handle,
  * 5. W1 B1 represents the weight and bias of first layer, OUT1 represents the output of first layer, P represents output of activation function,
  * W2 B2 represents the weight and bias of second layer
  */
-bm_status_t sgdnnMlp ( bm_handle_t handle,
+tpu_status_t sgdnnMlp ( tpu_resource_t  stream,
                           SgdnnTensor_t input,
                           SgdnnTensor_t w1,
                           SgdnnTensor_t w2,
@@ -932,7 +1022,8 @@ bm_status_t sgdnnMlp ( bm_handle_t handle,
                           SgdnnTensor_t b2,
                           SgdnnTensor_t out1,
                           SgdnnTensor_t p,
-                          SgdnnTensor_t output );
+                          SgdnnTensor_t output ,
+                          bool non_blocking = true);
 
 /*
  * Calc process:
@@ -952,7 +1043,7 @@ bm_status_t sgdnnMlp ( bm_handle_t handle,
     * Y : ( batch, attention_heads, 1, d )
  *
  */
-bm_status_t sgdnnLlamaAttention ( bm_handle_t handle,
+tpu_status_t sgdnnLlamaAttention ( tpu_resource_t  stream,
                           SgdnnTensor_t Q,
                           SgdnnTensor_t K,
                           SgdnnTensor_t V,
@@ -964,19 +1055,20 @@ bm_status_t sgdnnLlamaAttention ( bm_handle_t handle,
                           SgdnnTensor_t Y,
                           int embeddings,
                           int attention_mode,
-                          float C);
+                          float C,
+                          bool non_blocking = true);
 
 /*
  * [ GRAD_INPUT, GRAD_W1, GRAD_W2, GRAD_B1, GRAD_B2 ] = MLP BACKWARD ( GRAD_OUTPUT, INPUT, W1, W2, OUT1, P )
  * Note:
  * 1. The data types of all the tensors must be the same and one of FP32, FP16 and BF16
  * 2. The dimensions of INPUT, GRAD_OUTPUT, OUT1, P and GRAD_INPUT must be 3; W1, W2, GRAD_W1 and GRAD_W2 must be 2; GRAD_B1, GRAD_B2 must be 1
- * 3. The shape of INPUT and GRAD_INPUT is ( B, M, N ); W1 and GRAD_W1 is ( N, D1 ); W2 and GRAD_W2 is ( D1, D2 ); OUT1, P is ( B, M, D1 ); GRAD_B1 is ( D1 ); GRAD_B2 is ( D2 ); GRAD_OUTPUT is ( B, M, D2 )
+ * 3. The shape of INPUT and GRAD_INPUT is ( B, M, N , bool non_blocking = true); W1 and GRAD_W1 is ( N, D1 , bool non_blocking = true); W2 and GRAD_W2 is ( D1, D2 , bool non_blocking = true); OUT1, P is ( B, M, D1 , bool non_blocking = true); GRAD_B1 is ( D1 , bool non_blocking = true); GRAD_B2 is ( D2 , bool non_blocking = true); GRAD_OUTPUT is ( B, M, D2 )
  * 4. All the tensors must be contiguous
  * 5. W1 B1 represents the weight and bias of first layer, OUT1 represents the output of first layer, P represents output of activation function,
  *    W2 B2 represents the weight and bias of second layer, GRAD_x means the gradient of tensor x
  */
-bm_status_t sgdnnMlpBackward ( bm_handle_t handle,
+tpu_status_t sgdnnMlpBackward ( tpu_resource_t  stream,
                                   SgdnnTensor_t grad_output,
                                   SgdnnTensor_t input,
                                   SgdnnTensor_t w1,
@@ -987,7 +1079,8 @@ bm_status_t sgdnnMlpBackward ( bm_handle_t handle,
                                   SgdnnTensor_t grad_w1,
                                   SgdnnTensor_t grad_w2,
                                   SgdnnTensor_t grad_b1,
-                                  SgdnnTensor_t grad_b2);
+                                  SgdnnTensor_t grad_b2,
+                                  bool non_blocking = true);
 
 /*
  * OUTPUT = MLP ( INPUT, WEIGHT0, WEIGHT1, WEIGHT2, OUTPUT )
@@ -998,12 +1091,13 @@ bm_status_t sgdnnMlpBackward ( bm_handle_t handle,
  * 4. INPUT, WEIGHT0, WEIGHT1, WEIGHT2, OUTPUT must be contiguous
  * 5. formula: matmul(mul(matmul(INPUT, WEIGHT0), mul(matmul(INPUT, WEIGHT1), sigmoid(matmul(INPUT, WEIGHT1))), WEIGHT2)
  */
-bm_status_t sgdnnLLamaMlp ( bm_handle_t handle,
+tpu_status_t sgdnnLLamaMlp ( tpu_resource_t  stream,
                           SgdnnTensor_t input,
                           SgdnnTensor_t weight0,
                           SgdnnTensor_t weight1,
                           SgdnnTensor_t weight2,
-                          SgdnnTensor_t output);
+                          SgdnnTensor_t output,
+                          bool non_blocking = true);
 
 /*
  * OUTPUT = RMSNorm ( INPUT, WEIGHT, BIAS, OUTPUT )
@@ -1011,7 +1105,7 @@ bm_status_t sgdnnLLamaMlp ( bm_handle_t handle,
  * 1. The data types of INPUT, WEIGHT, BIAS, OUTPUT  must be the same and one of FP32, FP16 and BF16
  * 2. All the tensors must be contiguous
  */
-bm_status_t sgdnnRMSNorm (  bm_handle_t handle,
+tpu_status_t sgdnnRMSNorm (  tpu_resource_t  stream,
                           SgdnnTensor_t input,
                           SgdnnTensor_t weight,
                           SgdnnTensor_t bias,
@@ -1020,7 +1114,8 @@ bm_status_t sgdnnRMSNorm (  bm_handle_t handle,
                           float         eps,
                           float         partial,
                           int           with_scale,
-                          int           with_bias);
+                          int           with_bias,
+                          bool non_blocking = true);
 
 
 /*
@@ -1034,7 +1129,7 @@ bm_status_t sgdnnRMSNorm (  bm_handle_t handle,
  * 5. W_ATTN B_ATTN represents the weight and bias of attention layer (which generates Q K V), W_PROJ B_PROJ represents the weight and bias of projection layer
  * 6. SOFT_V = SOFTMAX_OUT * V
  */
-bm_status_t sgdnnAttn ( bm_handle_t handle,
+tpu_status_t sgdnnAttn ( tpu_resource_t  stream,
                           SgdnnTensor_t input,
                           SgdnnTensor_t w_attn,
                           SgdnnTensor_t w_proj,
@@ -1045,7 +1140,8 @@ bm_status_t sgdnnAttn ( bm_handle_t handle,
                           SgdnnTensor_t v,
                           SgdnnTensor_t softmax_out,
                           SgdnnTensor_t soft_v,
-                          SgdnnTensor_t out );
+                          SgdnnTensor_t out ,
+                          bool non_blocking = true);
 
 /*
  * [ GRAD_INPUT, GRAD_W_ATTN, GRAD_W_PROJ, GRAD_B_ATTN, GRAD_B_PROJ ] = ATTENTION BACKWARD ( GRAD_OUTPUT, INPUT, W_ATTN, W_PROJ, Q, K, V, SOFTMAX_OUT, SOFT_V, BIAS )
@@ -1053,14 +1149,14 @@ bm_status_t sgdnnAttn ( bm_handle_t handle,
  * 1. The data types of all the tensors must be the same and one of FP32, FP16 and BF16
  * 2. The dimensions of INPUT, GRAD_OUTPUT, Q, K, V and GRAD_INPUT must be 3; W_ATTN, W_PROJ, GRAD_W_ATTN and GRAD_W_PROJ must be 2; GRAD_B_ATTN, GRAD_B_PROJ must be 1,
  *    SOFTMAX_OUT, SOFT_V and BIAS must be 4
- * 3. The shape of INPUT and GRAD_INPUT is ( B, M, N ); W_ATTN and GRAD_W_ATTN is ( N, D_attn ); W_PROJ and GRAD_W_PROJ is ( D_attn/3, N );
- *    Q K V is ( B, M, D_attn/3 ); SOFTMAX_OUT is ( B, H, M, M ); SOFT_V is ( B, H, M, D_attn/3 );  BIAS is ( 1, 1, M, M );
- *    GRAD_B_ATTN is ( D_attn ); GRAD_B_PROJ is ( N ); GRAD_OUTPUT is ( B, M, N )
+ * 3. The shape of INPUT and GRAD_INPUT is ( B, M, N , bool non_blocking = true); W_ATTN and GRAD_W_ATTN is ( N, D_attn , bool non_blocking = true); W_PROJ and GRAD_W_PROJ is ( D_attn/3, N , bool non_blocking = true);
+ *    Q K V is ( B, M, D_attn/3 , bool non_blocking = true); SOFTMAX_OUT is ( B, H, M, M , bool non_blocking = true); SOFT_V is ( B, H, M, D_attn/3 , bool non_blocking = true);  BIAS is ( 1, 1, M, M , bool non_blocking = true);
+ *    GRAD_B_ATTN is ( D_attn , bool non_blocking = true); GRAD_B_PROJ is ( N , bool non_blocking = true); GRAD_OUTPUT is ( B, M, N )
  * 4. All the tensors must be contiguous
  * 5. W_ATTN B_ATTN represents the weight and bias of attention layer (which generates Q K V), W_PROJ B_PROJ represents the weight and bias of projection layer,
  *    GRAD_x means the gradient of tensor x, BIAS represents triangular matrix (mask).
  */
-bm_status_t sgdnnAttnBackward ( bm_handle_t handle,
+tpu_status_t sgdnnAttnBackward ( tpu_resource_t  stream,
                                   SgdnnTensor_t grad_output,
                                   SgdnnTensor_t input,
                                   SgdnnTensor_t w_attn,
@@ -1075,7 +1171,8 @@ bm_status_t sgdnnAttnBackward ( bm_handle_t handle,
                                   SgdnnTensor_t grad_w_attn,
                                   SgdnnTensor_t grad_w_proj,
                                   SgdnnTensor_t grad_b_attn,
-                                  SgdnnTensor_t grad_b_proj);
+                                  SgdnnTensor_t grad_b_proj,
+                                  bool non_blocking = true);
 
 
 /*
@@ -1083,11 +1180,12 @@ bm_status_t sgdnnAttnBackward ( bm_handle_t handle,
  *  Note:
  *  1. START, END and STEP only support int dtype.
  */
-bm_status_t sgdnnArange ( bm_handle_t handle,
+tpu_status_t sgdnnArange ( tpu_resource_t  stream,
                                 int start,
                                 int end,
                                 int step,
-                                SgdnnTensor_t out);
+                                SgdnnTensor_t out,
+                                bool non_blocking = true);
 
 /*
  *  OUTPUT  = ELEMENT_BITWISE ( input, other, output )
@@ -1096,11 +1194,12 @@ bm_status_t sgdnnArange ( bm_handle_t handle,
  *  2. input, other and output must be the same shape.
  *  3. mode : 0 for xor, 1 for and, 2 for or
  */
-bm_status_t sgdnnElementBitwise ( bm_handle_t handle,
+tpu_status_t sgdnnElementBitwise ( tpu_resource_t  stream,
                                   SgdnnTensor_t input,
                                   SgdnnTensor_t other,
                                   int mode,
-                                  SgdnnTensor_t output );
+                                  SgdnnTensor_t output ,
+                                  bool non_blocking = true);
 
 /*
  *  OUTPUT  = ELEMENT_BITWISE ( input, other, output )
@@ -1110,11 +1209,12 @@ bm_status_t sgdnnElementBitwise ( bm_handle_t handle,
  *  3. input and other must be the same dim.
  *  4. mode : 0 for xor, 1 for and, 2 for or
  */
-bm_status_t sgdnnElementBitwiseBcast ( bm_handle_t handle,
+tpu_status_t sgdnnElementBitwiseBcast ( tpu_resource_t  stream,
                                        SgdnnTensor_t input,
                                        SgdnnTensor_t other,
                                        int mode,
-                                       SgdnnTensor_t output );
+                                       SgdnnTensor_t output ,
+                                       bool non_blocking = true);
 /*
  *  OUTPUT  = ELEMENT_BITWISE ( input, other, output )
  *  Note:
@@ -1122,11 +1222,12 @@ bm_status_t sgdnnElementBitwiseBcast ( bm_handle_t handle,
  *  2. input and output must be the same shape.
  *  3. mode : 0 for xor, 1 for and, 2 for or
  */
-bm_status_t sgdnnElementBitwiseC ( bm_handle_t handle,
+tpu_status_t sgdnnElementBitwiseC ( tpu_resource_t  stream,
                                    SgdnnTensor_t input,
                                    int scalar,
                                    int mode,
-                                   SgdnnTensor_t output );
+                                   SgdnnTensor_t output ,
+                                   bool non_blocking = true);
 
 /*
  * OUTPUT = ROUND(INPUT)
@@ -1135,9 +1236,10 @@ bm_status_t sgdnnElementBitwiseC ( bm_handle_t handle,
  * 2. The shapes of INPUT and OUTPUT must be the same
  * 3. INPUT and OUTPUT must be contiguous
  */
-bm_status_t sgdnnRound (bm_handle_t handle,
+tpu_status_t sgdnnRound (tpu_resource_t  stream,
                        SgdnnTensor_t input,
-                       SgdnnTensor_t output );
+                       SgdnnTensor_t output ,
+                       bool non_blocking = true);
 
 /*
  * OUTPUT = NEG(INPUT)
@@ -1147,9 +1249,10 @@ bm_status_t sgdnnRound (bm_handle_t handle,
  * 3. INPUT and OUTPUT must be contiguous
  */
 
-bm_status_t sgdnnNeg (bm_handle_t handle,
+tpu_status_t sgdnnNeg (tpu_resource_t  stream,
                        SgdnnTensor_t input,
-                       SgdnnTensor_t output );
+                       SgdnnTensor_t output ,
+                       bool non_blocking = true);
 
 /*
  * OUTPUT = BITWISE_NOT(INPUT)
@@ -1158,9 +1261,10 @@ bm_status_t sgdnnNeg (bm_handle_t handle,
  * 2. The shapes of INPUT and OUTPUT must be the same
  * 3. INPUT and OUTPUT must be contiguous
  */
-bm_status_t sgdnnBitwiseNot (bm_handle_t handle,
+tpu_status_t sgdnnBitwiseNot (tpu_resource_t  stream,
                        SgdnnTensor_t input,
-                       SgdnnTensor_t output );
+                       SgdnnTensor_t output ,
+                       bool non_blocking = true);
 
 
 /*
@@ -1170,11 +1274,12 @@ bm_status_t sgdnnBitwiseNot (bm_handle_t handle,
  *  2. input, other and output must be the same shape.
  *  3. 0 equal, 1 not equal, 2 greater, 3 greater or equal, 4 less than, 5 less than or equal
  */
-bm_status_t sgdnnComparision ( bm_handle_t handle,
+tpu_status_t sgdnnComparision ( tpu_resource_t  stream,
                                SgdnnTensor_t input,
                                SgdnnTensor_t other,
                                int mode,
-                               SgdnnTensor_t output );
+                               SgdnnTensor_t output ,
+                               bool non_blocking = true);
 /*
  *  OUTPUT  = COMPARISION ( input, other, output )
  *  Note:
@@ -1183,11 +1288,12 @@ bm_status_t sgdnnComparision ( bm_handle_t handle,
  *  3. input and other must be the same dim.
  *  4. 0 equal, 1 not equal, 2 greater, 3 greater or equal, 4 less than, 5 less than or equal
  */
-bm_status_t sgdnnComparisionBcast ( bm_handle_t handle,
+tpu_status_t sgdnnComparisionBcast ( tpu_resource_t  stream,
                                     SgdnnTensor_t input,
                                     SgdnnTensor_t other,
                                     int mode,
-                                    SgdnnTensor_t output );
+                                    SgdnnTensor_t output ,
+                                    bool non_blocking = true);
 /*
  *  OUTPUT  = COMPARISION ( input, other, output )
  *  Note:
@@ -1196,12 +1302,13 @@ bm_status_t sgdnnComparisionBcast ( bm_handle_t handle,
  *  3. input and output must be in the same shape.
  *  4. 0 equal, 1 not equal, 2 greater, 3 greater or equal, 4 less than, 5 less than or equal
  */
-bm_status_t sgdnnComparisionC ( bm_handle_t handle,
+tpu_status_t sgdnnComparisionC ( tpu_resource_t  stream,
                                 SgdnnTensor_t input,
                                 float scalar,
                                 int mode,
                                 int scalar_pos,
-                                SgdnnTensor_t output );
+                                SgdnnTensor_t output ,
+                                bool non_blocking = true);
 
 /*
  * OUTPUT = MINIMUMC(INPUT,SCALAR)
@@ -1209,10 +1316,11 @@ bm_status_t sgdnnComparisionC ( bm_handle_t handle,
  * 1. The data types of INPUT and OUTPUT must be the same and one of FP32, FP16, BF16 and INT32
  * 2. INPUT and OUTPUT must be contiguous
  */
-bm_status_t sgdnnMinimumC ( bm_handle_t handle,
+tpu_status_t sgdnnMinimumC ( tpu_resource_t  stream,
                         SgdnnTensor_t input,
                         float scalar,
-                        SgdnnTensor_t output );
+                        SgdnnTensor_t output ,
+                        bool non_blocking = true);
 
 /*
  * OUTPUT = MINIMUM(INPUT,OTHER)
@@ -1221,10 +1329,11 @@ bm_status_t sgdnnMinimumC ( bm_handle_t handle,
  * 2. The shapes of INPUT ,OTHER and OUTPUT must be the same
  * 3. INPUT ,OTHER and OUTPUT must be contiguous
  */
-bm_status_t sgdnnMinimum ( bm_handle_t handle,
+tpu_status_t sgdnnMinimum ( tpu_resource_t  stream,
                         SgdnnTensor_t input,
                         SgdnnTensor_t other,
-                        SgdnnTensor_t output );
+                        SgdnnTensor_t output ,
+                        bool non_blocking = true);
 
 /*
  * OUTPUT = MINIMUMBCAST(INPUT,OTHER)
@@ -1232,20 +1341,22 @@ bm_status_t sgdnnMinimum ( bm_handle_t handle,
  * 1. The data types of INPUT ,OTHER and OUTPUT must be the same and one of FP32, FP16 ,BF16 and INT32
  * 2. INPUT, OTHER, OUTPUT must be contiguous
  */
-bm_status_t sgdnnMinimumBcast ( bm_handle_t handle,
+tpu_status_t sgdnnMinimumBcast ( tpu_resource_t  stream,
                         SgdnnTensor_t input,
                         SgdnnTensor_t other,
-                        SgdnnTensor_t output );
+                        SgdnnTensor_t output ,
+                        bool non_blocking = true);
 /*
  * OUTPUT = MAXIMUMC(INPUT,SCALAR)
  * Note:
  * 1. The data types of INPUT and OUTPUT must be the same and one of FP32, FP16, BF16 and INT32
  * 2. INPUT and OUTPUT must be contiguous
  */
-bm_status_t sgdnnMaximumC ( bm_handle_t handle,
+tpu_status_t sgdnnMaximumC ( tpu_resource_t  stream,
                         SgdnnTensor_t input,
                         float scalar,
-                        SgdnnTensor_t output );
+                        SgdnnTensor_t output ,
+                        bool non_blocking = true);
 
 /*
  * OUTPUT = MAXIMUM(INPUT,OTHER)
@@ -1254,10 +1365,11 @@ bm_status_t sgdnnMaximumC ( bm_handle_t handle,
  * 2. The shapes of INPUT ,OTHER and OUTPUT must be the same
  * 3. INPUT ,OTHER and OUTPUT must be contiguous
  */
-bm_status_t sgdnnMaximum ( bm_handle_t handle,
+tpu_status_t sgdnnMaximum ( tpu_resource_t  stream,
                         SgdnnTensor_t input,
                         SgdnnTensor_t other,
-                        SgdnnTensor_t output );
+                        SgdnnTensor_t output ,
+                        bool non_blocking = true);
 
 /*
  * OUTPUT = MINIMUMBCAST(INPUT,OTHER)
@@ -1265,10 +1377,11 @@ bm_status_t sgdnnMaximum ( bm_handle_t handle,
  * 1. The data types of INPUT ,OTHER and OUTPUT must be the same and one of FP32, FP16 ,BF16 and INT32
  * 2. INPUT, OTHER, OUTPUT must be contiguous
  */
-bm_status_t sgdnnMaximumBcast ( bm_handle_t handle,
+tpu_status_t sgdnnMaximumBcast ( tpu_resource_t  stream,
                         SgdnnTensor_t input,
                         SgdnnTensor_t other,
-                        SgdnnTensor_t output );
+                        SgdnnTensor_t output ,
+                        bool non_blocking = true);
 
 /*
  * OUTPUT = ATAN2C(SCALAR,OTHER)
@@ -1277,10 +1390,11 @@ bm_status_t sgdnnMaximumBcast ( bm_handle_t handle,
  * 2. The shapes of OTHER and OUTPUT must be the same
  * 3. OTHER, OUTPUT must be contiguous
  */
-bm_status_t sgdnnAtan2C ( bm_handle_t handle,
+tpu_status_t sgdnnAtan2C ( tpu_resource_t  stream,
                         float scalar,
                         SgdnnTensor_t other,
-                        SgdnnTensor_t output );
+                        SgdnnTensor_t output ,
+                        bool non_blocking = true);
 
 /*
  * OUTPUT = ATAN2_C(INPUT,SCALAR)
@@ -1289,10 +1403,11 @@ bm_status_t sgdnnAtan2C ( bm_handle_t handle,
  * 2. The shapes of INPUT and OUTPUT must be the same
  * 3. INPUT, OUTPUT must be contiguous
  */
-bm_status_t sgdnnAtan2_C ( bm_handle_t handle,
+tpu_status_t sgdnnAtan2_C ( tpu_resource_t  stream,
                         SgdnnTensor_t input,
                         float scalar,
-                        SgdnnTensor_t output );
+                        SgdnnTensor_t output ,
+                        bool non_blocking = true);
 
 /*
  * OUTPUT = ATAN2(INPUT,OTHER)
@@ -1301,10 +1416,11 @@ bm_status_t sgdnnAtan2_C ( bm_handle_t handle,
  * 2. The shapes of INPUT, OTHER and OUTPUT must be the same
  * 3. INPUT, OTHER, OUTPUT must be contiguous
  */
-bm_status_t sgdnnAtan2 ( bm_handle_t handle,
+tpu_status_t sgdnnAtan2 ( tpu_resource_t  stream,
                         SgdnnTensor_t input,
                         SgdnnTensor_t other,
-                        SgdnnTensor_t output );
+                        SgdnnTensor_t output ,
+                        bool non_blocking = true);
 
 /*
  * OUTPUT = ATAN2BCAST(INPUT,OTHER)
@@ -1312,10 +1428,11 @@ bm_status_t sgdnnAtan2 ( bm_handle_t handle,
  * 1. The data types of INPUT and OTHER must be FP32 and data type of OUTPUT must be one of FP32, FP16 and F16
  * 2. INPUT, OTHER, OUTPUT must be contiguous
  */
-bm_status_t sgdnnAtan2Bcast ( bm_handle_t handle,
+tpu_status_t sgdnnAtan2Bcast ( tpu_resource_t  stream,
                         SgdnnTensor_t input,
                         SgdnnTensor_t other,
-                        SgdnnTensor_t output );
+                        SgdnnTensor_t output ,
+                        bool non_blocking = true);
 
 /*
  * OUTPUT  = Badddbmm ( INPUT1, BATCH1, BATCH2, OUT, ALPHA, BETA )
@@ -1324,13 +1441,14 @@ bm_status_t sgdnnAtan2Bcast ( bm_handle_t handle,
  * 2. The dimensions of BATCH1, BATCH2 and OUT must be 3
  * 3. The shape of INPUT1 is ( B, M, D2 ), BATCH1 is ( B, M, D1 ), BATCH2 is ( B, D1, D2 ), OUT is ( B, M, D2 )
 */
-bm_status_t sgdnnBaddbmm ( bm_handle_t handle,
+tpu_status_t sgdnnBaddbmm ( tpu_resource_t  stream,
                           SgdnnTensor_t input1,
                           SgdnnTensor_t batch1,
                           SgdnnTensor_t batch2,
                           SgdnnTensor_t out,
                           double alpha,
-                          double beta);
+                          double beta,
+                          bool non_blocking = true);
 
 /*
  *  OUTPUT  = MSE_LOSS ( SELF, TARGET, OUT, REDUCTION )
@@ -1341,11 +1459,12 @@ bm_status_t sgdnnBaddbmm ( bm_handle_t handle,
  * 4. REDUCTION = 1, 'mean' model, OUT = REDUCE_MEAN( ( SELF - TARGET )^2 ), the shape of OUT is (1,).
  * 5. REDUCTION = 2, 'sum' model, OUT = REDUCE_SUM( ( SELF - TARGET )^2 ), the shape of OUT is (1,).
  */
-bm_status_t sgdnnMseloss( bm_handle_t handle,
+tpu_status_t sgdnnMseloss( tpu_resource_t  stream,
                                     SgdnnTensor_t self,
                                     SgdnnTensor_t target,
                                     SgdnnTensor_t out,
-                                    int reduction );
+                                    int reduction ,
+                                    bool non_blocking = true);
 
 /*
  * OUTPUT = LAYERNORM_MATMUL ( INPUT, W, B, GAMMA, BETA, EPS, MEAN, RSTD, OUTPUT )
@@ -1357,7 +1476,7 @@ bm_status_t sgdnnMseloss( bm_handle_t handle,
  * 5. GAMMA BETA represents the elementwise affine in LayerNorm, MEAN RSTD represents mean and rstd of LayerNorm
  * 6. W B represents the weight and bias of first layer
  */
-bm_status_t sgdnnLnMm ( bm_handle_t handle,
+tpu_status_t sgdnnLnMm ( tpu_resource_t  stream,
                           SgdnnTensor_t input,
                           SgdnnTensor_t w,
                           SgdnnTensor_t b,
@@ -1366,7 +1485,8 @@ bm_status_t sgdnnLnMm ( bm_handle_t handle,
                           float eps,
                           SgdnnTensor_t mean,
                           SgdnnTensor_t rstd,
-                          SgdnnTensor_t output );
+                          SgdnnTensor_t output ,
+                          bool non_blocking = true);
 
 /*
  * OUTPUT = FMAXC(INPUT,SCALAR)
@@ -1374,10 +1494,11 @@ bm_status_t sgdnnLnMm ( bm_handle_t handle,
  * 1. The data types of INPUT and OUTPUT must be the same and one of FP32, FP16, BF16 and INT32
  * 2. INPUT and OUTPUT must be contiguous
  */
-bm_status_t sgdnnFmaxC ( bm_handle_t handle,
+tpu_status_t sgdnnFmaxC ( tpu_resource_t  stream,
                         SgdnnTensor_t input,
                         float scalar,
-                        SgdnnTensor_t output );
+                        SgdnnTensor_t output ,
+                        bool non_blocking = true);
 
 /*
  * OUTPUT = FMAX(INPUT,OTHER)
@@ -1386,10 +1507,11 @@ bm_status_t sgdnnFmaxC ( bm_handle_t handle,
  * 2. The shapes of INPUT ,OTHER and OUTPUT must be the same
  * 3. INPUT ,OTHER and OUTPUT must be contiguous
  */
-bm_status_t sgdnnFmax ( bm_handle_t handle,
+tpu_status_t sgdnnFmax ( tpu_resource_t  stream,
                         SgdnnTensor_t input,
                         SgdnnTensor_t other,
-                        SgdnnTensor_t output );
+                        SgdnnTensor_t output ,
+                        bool non_blocking = true);
 
 /*
  * OUTPUT = FMAXBCAST(INPUT,OTHER)
@@ -1397,10 +1519,11 @@ bm_status_t sgdnnFmax ( bm_handle_t handle,
  * 1. The data types of INPUT ,OTHER and OUTPUT must be the same and one of FP32, FP16 ,BF16 and INT32
  * 2. INPUT, OTHER, OUTPUT must be contiguous
  */
-bm_status_t sgdnnFmaxBcast ( bm_handle_t handle,
+tpu_status_t sgdnnFmaxBcast ( tpu_resource_t  stream,
                         SgdnnTensor_t input,
                         SgdnnTensor_t other,
-                        SgdnnTensor_t output );
+                        SgdnnTensor_t output ,
+                        bool non_blocking = true);
 
 /*
  * OUTPUT = FMINC(INPUT,SCALAR)
@@ -1408,10 +1531,11 @@ bm_status_t sgdnnFmaxBcast ( bm_handle_t handle,
  * 1. The data types of INPUT and OUTPUT must be the same and one of FP32, FP16, BF16 and INT32
  * 2. INPUT and OUTPUT must be contiguous
  */
-bm_status_t sgdnnFminC ( bm_handle_t handle,
+tpu_status_t sgdnnFminC ( tpu_resource_t  stream,
                         SgdnnTensor_t input,
                         float scalar,
-                        SgdnnTensor_t output );
+                        SgdnnTensor_t output ,
+                        bool non_blocking = true);
 
 /*
  * OUTPUT = FMIN(INPUT,OTHER)
@@ -1420,10 +1544,11 @@ bm_status_t sgdnnFminC ( bm_handle_t handle,
  * 2. The shapes of INPUT ,OTHER and OUTPUT must be the same
  * 3. INPUT ,OTHER and OUTPUT must be contiguous
  */
-bm_status_t sgdnnFmin ( bm_handle_t handle,
+tpu_status_t sgdnnFmin ( tpu_resource_t  stream,
                         SgdnnTensor_t input,
                         SgdnnTensor_t other,
-                        SgdnnTensor_t output );
+                        SgdnnTensor_t output ,
+                        bool non_blocking = true);
 
 /*
  * OUTPUT = FMINBCAST(INPUT,OTHER)
@@ -1431,10 +1556,11 @@ bm_status_t sgdnnFmin ( bm_handle_t handle,
  * 1. The data types of INPUT ,OTHER and OUTPUT must be the same and one of FP32, FP16 ,BF16 and INT32
  * 2. INPUT, OTHER, OUTPUT must be contiguous
  */
-bm_status_t sgdnnFminBcast ( bm_handle_t handle,
+tpu_status_t sgdnnFminBcast ( tpu_resource_t  stream,
                         SgdnnTensor_t input,
                         SgdnnTensor_t other,
-                        SgdnnTensor_t output );
+                        SgdnnTensor_t output ,
+                        bool non_blocking = true);
 
 /*
  * OUTPUT = LAYERNORM_MATMUL ( INPUT0, INPUT1, W, B, GAMMA, BETA, EPS, OUT_ADDR, MEAN, RSTD, OUTPUT )
@@ -1447,7 +1573,7 @@ bm_status_t sgdnnFminBcast ( bm_handle_t handle,
  * 6. W B represents the weight and bias of first layer
  * 7. OUT_ADDR represents the result of INPUT0 + INPUT1
  */
-bm_status_t sgdnnAddLnMm ( bm_handle_t handle,
+tpu_status_t sgdnnAddLnMm ( tpu_resource_t  stream,
                           SgdnnTensor_t input0,
                           SgdnnTensor_t input1,
                           SgdnnTensor_t w,
@@ -1458,7 +1584,8 @@ bm_status_t sgdnnAddLnMm ( bm_handle_t handle,
                           SgdnnTensor_t out_add,
                           SgdnnTensor_t mean,
                           SgdnnTensor_t rstd,
-                          SgdnnTensor_t output );
+                          SgdnnTensor_t output ,
+                          bool non_blocking = true);
 
 /*
  * OUTPUT = SIGNBIT(INPUT)
@@ -1467,22 +1594,24 @@ bm_status_t sgdnnAddLnMm ( bm_handle_t handle,
  * 2. The shapes of INPUT and OUTPUT must be the same
  * 3. INPUT and OUTPUT must be contiguous
  */
-bm_status_t sgdnnSignbit(bm_handle_t handle,
+tpu_status_t sgdnnSignbit(tpu_resource_t  stream,
                        SgdnnTensor_t input,
-                       SgdnnTensor_t output );
+                       SgdnnTensor_t output ,
+                       bool non_blocking = true);
 
 
 /*
  * OUTPUT = POWC(INPUT, EXPONENT)
- * 1. The data types of INPUT and OUTPUT must be one of FP32, FP16, BF16 and INT32
+ * 1. The data types of INPUT and OUTPUT must be the same and one of FP32, FP16 and BF16
  * 2. The shapes of INPUT and OUTPUT must be the same
  * 3. INPUT and OUTPUT must be contiguous
  * 4. EXPONENT is a single float number.
 */
-bm_status_t sgdnnPowC ( bm_handle_t handle,
+tpu_status_t sgdnnPowC ( tpu_resource_t  stream,
                       SgdnnTensor_t self,
                       float scalar,
-                      SgdnnTensor_t out );
+                      SgdnnTensor_t out ,
+                      bool non_blocking = true);
 
 /*
  * OUTPUT = POWC(EXPONENT, INPUT)
@@ -1491,10 +1620,11 @@ bm_status_t sgdnnPowC ( bm_handle_t handle,
  * 3. INPUT and OUTPUT must be contiguous
  * 4. EXPONENT is a single float number.
 */
-bm_status_t sgdnnCPow ( bm_handle_t handle,
+tpu_status_t sgdnnCPow ( tpu_resource_t  stream,
                       SgdnnTensor_t self,
                       float scalar,
-                      SgdnnTensor_t out );
+                      SgdnnTensor_t out,
+                      bool non_blocking = true);
 
 /*
  * OUTPUT = Real(INPUT)
@@ -1502,12 +1632,14 @@ bm_status_t sgdnnCPow ( bm_handle_t handle,
  * 1. The data types of INPUT must be the same and one of FP32, FP16 and BF16
  * 2. INPUT must be contiguous
  */
-bm_status_t sgdnnReal ( bm_handle_t handle,
+tpu_status_t sgdnnReal ( tpu_resource_t  stream,
                        SgdnnTensor_t input,
-                       SgdnnTensor_t output);
-bm_status_t sgdnnConj ( bm_handle_t handle,
+                       SgdnnTensor_t output,
+                       bool non_blocking = true);
+tpu_status_t sgdnnConj ( tpu_resource_t  stream,
                        SgdnnTensor_t input,
-                       SgdnnTensor_t output);
+                       SgdnnTensor_t output,
+                       bool non_blocking = true);
 /*
  * OUTPUT = PERMUTE ( INPUT, DIM_ORDER )
  * Node:
@@ -1516,10 +1648,11 @@ bm_status_t sgdnnConj ( bm_handle_t handle,
  * 3. the number of dim_order must be the same with input's dim
  * 4. input and output must be contiguous
  */
-bm_status_t sgdnnPermute ( bm_handle_t handle,
+tpu_status_t sgdnnPermute ( tpu_resource_t  stream,
                            SgdnnTensor_t input,
                            int *dim_order,
-                           SgdnnTensor_t output );
+                           SgdnnTensor_t output ,
+                           bool non_blocking = true);
 
 /*
  * value, index = TOPK ( input, k, dim, largest, sorted )
@@ -1528,14 +1661,15 @@ bm_status_t sgdnnPermute ( bm_handle_t handle,
  * 2. only support in FP32, INT32, UINT32
  * 3. input, value and index must be contiguous
  */
-bm_status_t sgdnnTopk ( bm_handle_t handle,
+tpu_status_t sgdnnTopk ( tpu_resource_t  stream,
                         SgdnnTensor_t input,
                         int k,
                         int dim,
                         bool largest,
                         bool sorted,
                         SgdnnTensor_t value,
-                        SgdnnTensor_t index );
+                        SgdnnTensor_t index ,
+                        bool non_blocking = true);
 
 /*
  * OUTPUT = NONZERO (INPUT)
@@ -1544,10 +1678,11 @@ bm_status_t sgdnnTopk ( bm_handle_t handle,
  * 2.only support in UINT8, INT8, INT32
  * 3.the dtype of output is INT32
 */
-bm_status_t sgdnnNonzero ( bm_handle_t handle,
+tpu_status_t sgdnnNonzero ( tpu_resource_t  stream,
                       SgdnnTensor_t self,
                       SgdnnTensor_t out,
-                      SgdnnTensor_t num);
+                      SgdnnTensor_t num,
+                      bool non_blocking = true);
 
 /*
  * OUTPUT = REDUCE_MAX_OR_MIN ( INPUT, REDUCTION_DIM, REDUCTION_DIM_LENGTH, KEEPDIM, MODE )
@@ -1556,13 +1691,14 @@ bm_status_t sgdnnNonzero ( bm_handle_t handle,
  * 2. INPUT and OUTPUT must be contiguous
  * 3. MODE must be 0 ( max ) or 1 ( min )
  */
-bm_status_t sgdnnReduceMaxOrMin ( bm_handle_t handle,
+tpu_status_t sgdnnReduceMaxOrMin ( tpu_resource_t  stream,
                               SgdnnTensor_t input,
                               int *reduction_dim,
                               int reduction_dim_length,
                               int keepdim,
                               int mode,
-                              SgdnnTensor_t output );
+                              SgdnnTensor_t output ,
+                              bool non_blocking = true);
 /*
  * { VALUES,INDICES } = ARG ( INPUT, AXIS, MODE )
  * Note:
@@ -1571,12 +1707,13 @@ bm_status_t sgdnnReduceMaxOrMin ( bm_handle_t handle,
  * 3. The shape of VALUES and INDICES must be the same
  * 3. MODE must be 0 ( argmax ) or 1 ( argmin ) or 2 ( max.dim ) or 3 ( min.dim )
  */
-bm_status_t sgdnnArg( bm_handle_t handle,
+tpu_status_t sgdnnArg( tpu_resource_t  stream,
                               SgdnnTensor_t input,
                               int axis,
                               int mode,
                               SgdnnTensor_t values,
-                              SgdnnTensor_t indices);
+                              SgdnnTensor_t indices,
+                              bool non_blocking = true);
 
 
 /*
@@ -1586,11 +1723,12 @@ bm_status_t sgdnnArg( bm_handle_t handle,
  * 2. dim <= 4 && dim <= repeat_dim
  * 3. input and output must be contiguous
  */
-bm_status_t sgdnnRepeat ( bm_handle_t handle,
+tpu_status_t sgdnnRepeat ( tpu_resource_t  stream,
                           SgdnnTensor_t input,
                           int *repeat_times,
                           int repeat_dim,
-                          SgdnnTensor_t output );
+                          SgdnnTensor_t output ,
+                          bool non_blocking = true);
 
 /*
  * out = HARDTANH ( input, output )
@@ -1600,11 +1738,12 @@ bm_status_t sgdnnRepeat ( bm_handle_t handle,
  * 3. input and output must be contiguous
  * 4. dim <= 4
  */
-bm_status_t sgdnnHardtanh ( bm_handle_t handle,
+tpu_status_t sgdnnHardtanh ( tpu_resource_t  stream,
                             SgdnnTensor_t input,
                             float min_value,
                             float max_value,
-                            SgdnnTensor_t output );
+                            SgdnnTensor_t output ,
+                            bool non_blocking = true);
 
 /*
  *  OUTPUT  = HYPOT ( input, other )
@@ -1613,10 +1752,11 @@ bm_status_t sgdnnHardtanh ( bm_handle_t handle,
  *  2. input, other and output must be the same shape.
  *  3. input, other and output must be contiguous
  */
-bm_status_t sgdnnHypot ( bm_handle_t handle,
+tpu_status_t sgdnnHypot ( tpu_resource_t  stream,
                          SgdnnTensor_t input,
                          SgdnnTensor_t other,
-                         SgdnnTensor_t output );
+                         SgdnnTensor_t output ,
+                         bool non_blocking = true);
 
 /*
  *  OUTPUT  = HYPOT ( input, other )
@@ -1625,10 +1765,11 @@ bm_status_t sgdnnHypot ( bm_handle_t handle,
  *  2. input and other must be the same dim.
  *  3. input, other and output must be contiguous
  */
-bm_status_t sgdnnHypotBcast ( bm_handle_t handle,
+tpu_status_t sgdnnHypotBcast ( tpu_resource_t  stream,
                               SgdnnTensor_t input,
                               SgdnnTensor_t other,
-                              SgdnnTensor_t output );
+                              SgdnnTensor_t output ,
+                              bool non_blocking = true);
 /*
  *  OUTPUT  = HYPOT ( input, other )
  *  Note:
@@ -1636,10 +1777,11 @@ bm_status_t sgdnnHypotBcast ( bm_handle_t handle,
  *  2. input and output must be the same shape.
  *  3. input and output must be contiguous
  */
-bm_status_t sgdnnHypotC ( bm_handle_t handle,
+tpu_status_t sgdnnHypotC ( tpu_resource_t  stream,
                           SgdnnTensor_t input,
                           float scalar,
-                          SgdnnTensor_t output );
+                          SgdnnTensor_t output ,
+                          bool non_blocking = true);
 
 /*
  * OUTPUT = NEXTAFTERC(SCALAR,OTHER)
@@ -1648,10 +1790,11 @@ bm_status_t sgdnnHypotC ( bm_handle_t handle,
  * 2. The shapes of OTHER and OUTPUT must be the same
  * 3. OTHER and OUTPUT must be contiguous
  */
-bm_status_t sgdnnNextafterC ( bm_handle_t handle,
+tpu_status_t sgdnnNextafterC ( tpu_resource_t  stream,
                         float scalar,
                         SgdnnTensor_t other,
-                        SgdnnTensor_t output );
+                        SgdnnTensor_t output ,
+                        bool non_blocking = true);
 
 /*
  * OUTPUT = NEXTAFTER_C(INPUT,SCALAR)
@@ -1660,10 +1803,11 @@ bm_status_t sgdnnNextafterC ( bm_handle_t handle,
  * 2. The shapes of INPUT and OUTPUT must be the same
  * 3. OUTPUT must be contiguous
  */
-bm_status_t sgdnnNextafter_C ( bm_handle_t handle,
+tpu_status_t sgdnnNextafter_C ( tpu_resource_t  stream,
                         SgdnnTensor_t input,
                         float scalar,
-                        SgdnnTensor_t output );
+                        SgdnnTensor_t output ,
+                        bool non_blocking = true);
 
 /*
  * OUTPUT = NEXTAFTER(INPUT,OTHER)
@@ -1672,10 +1816,11 @@ bm_status_t sgdnnNextafter_C ( bm_handle_t handle,
  * 2. The shapes of INPUT and OUTPUT must be the same
  * 3. INPUT ,OTHER and OUTPUT must be contiguous
  */
-bm_status_t sgdnnNextafter ( bm_handle_t handle,
+tpu_status_t sgdnnNextafter ( tpu_resource_t  stream,
                         SgdnnTensor_t input,
                         SgdnnTensor_t other,
-                        SgdnnTensor_t output );
+                        SgdnnTensor_t output ,
+                        bool non_blocking = true);
 
 /*
  * OUTPUT = NEXTAFTERBCAST(INPUT,OTHER)
@@ -1683,10 +1828,11 @@ bm_status_t sgdnnNextafter ( bm_handle_t handle,
  * 1. The data types of INPUT and OUTPUT must be the same and one of FP32 and BF16
  * 2. INPUT ,OTHER and OUTPUT must be contiguous
  */
-bm_status_t sgdnnNextafterBcast ( bm_handle_t handle,
+tpu_status_t sgdnnNextafterBcast ( tpu_resource_t  stream,
                         SgdnnTensor_t input,
                         SgdnnTensor_t other,
-                        SgdnnTensor_t output );
+                        SgdnnTensor_t output ,
+                        bool non_blocking = true);
 
 /*
  *  OUTPUT  = VAR ( input, reduce_list, correction, keepdim )
@@ -1695,13 +1841,14 @@ bm_status_t sgdnnNextafterBcast ( bm_handle_t handle,
  *  2. input and output must be contiguous
  *  3. reduce_dims less than or equal to dim of input
  */
-bm_status_t sgdnnReduceVar ( bm_handle_t handle,
+tpu_status_t sgdnnReduceVar ( tpu_resource_t  stream,
                              SgdnnTensor_t input,
                              int *reduce_list,
                              int reduce_dim,
                              int correction,
                              bool keepdim,
-                             SgdnnTensor_t output );
+                             SgdnnTensor_t output ,
+                             bool non_blocking = true);
 
 /*
  *  OUTPUT  = VAR ( input, correction, keepdim )
@@ -1710,11 +1857,12 @@ bm_status_t sgdnnReduceVar ( bm_handle_t handle,
  *  2. input and output must be contiguous
  *  3. reduce_dims less than or equal to dim of input
  */
-bm_status_t sgdnnReduceVarAll ( bm_handle_t handle,
+tpu_status_t sgdnnReduceVarAll ( tpu_resource_t  stream,
                                 SgdnnTensor_t input,
                                 int correction,
                                 bool keepdim,
-                                SgdnnTensor_t output );
+                                SgdnnTensor_t output ,
+                                bool non_blocking = true);
 /*
  *  OUTPUT = TRIANGULARIZE(SELF, IS_UPPER, DIAGONAL)
  *  NOTE:
@@ -1722,11 +1870,12 @@ bm_status_t sgdnnReduceVarAll ( bm_handle_t handle,
  *  2. The data types of SELF and OUT must be the same and one of FP32, FP16 and BF16
  *  3. The shapes of SELF and OUT must be the same
 */
-bm_status_t sgdnnTriangularize ( bm_handle_t handle,
+tpu_status_t sgdnnTriangularize ( tpu_resource_t  stream,
                       SgdnnTensor_t self,
                       int is_upper,
                       int diagonal,
-                      SgdnnTensor_t out );
+                      SgdnnTensor_t out ,
+                      bool non_blocking = true);
 
 /*
  *  output  = CBRT ( input )
@@ -1734,9 +1883,10 @@ bm_status_t sgdnnTriangularize ( bm_handle_t handle,
  *  1. input and output must be the same shape.
  *  2. input and output must be contiguous
  */
-bm_status_t sgdnnCbrt ( bm_handle_t handle,
+tpu_status_t sgdnnCbrt ( tpu_resource_t  stream,
                         SgdnnTensor_t input,
-                        SgdnnTensor_t output );
+                        SgdnnTensor_t output ,
+                        bool non_blocking = true);
 
 /*
  *  OUTPUT  = PAD ( INPUT, PAD, VALUE )
@@ -1746,14 +1896,15 @@ bm_status_t sgdnnCbrt ( bm_handle_t handle,
  *  3. input and output must be contiguous
  *  4. pad size must less than or equal to twice the number of the input dimensions
  */
-bm_status_t sgdnnPad ( bm_handle_t handle,
+tpu_status_t sgdnnPad ( tpu_resource_t  stream,
                        SgdnnTensor_t input,
                        int *pad,
                        int pad_size,
                        float value,
                        int mode,
                        bool pad3d,
-                       SgdnnTensor_t output );
+                       SgdnnTensor_t output ,
+                       bool non_blocking = true);
 
 /*
  *  OUTPUT  = SLICE_SCATTER ( INPUT, SRC ,INDICES,dim)
@@ -1762,12 +1913,13 @@ bm_status_t sgdnnPad ( bm_handle_t handle,
  *  2. input and output must be the same dtype.
  *  3. input and output must be contiguous
  */
-bm_status_t sgdnnSliceScatter ( bm_handle_t handle,
+tpu_status_t sgdnnSliceScatter ( tpu_resource_t  stream,
                        SgdnnTensor_t input,
                        SgdnnTensor_t src,
                        SgdnnTensor_t indices,
                        int dim,
-                       SgdnnTensor_t output );
+                       SgdnnTensor_t output ,
+                       bool non_blocking = true);
 
 /*
 *  Found_inf = inf in input ? 1 : 0;
@@ -1775,14 +1927,13 @@ bm_status_t sgdnnSliceScatter ( bm_handle_t handle,
 *  Note:
 *  1. the dim of found_inf = 1
 */
-bm_status_t sgdnnInfCheckAndUnscale( bm_handle_t handle,
+tpu_status_t sgdnnInfCheckAndUnscale( tpu_resource_t  stream,
                                     std::vector<SgdnnTensor_t>& input,
                                     SgdnnTensor_t found_inf,
-                                    float inv_scale );
-
+                                    float inv_scale ,
+                                    bool non_blocking = true);
 #if defined(__cplusplus)
 }
 #endif
 
 #endif /* SGDNN_API_H */
-

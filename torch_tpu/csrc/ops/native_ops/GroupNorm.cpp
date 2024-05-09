@@ -86,22 +86,14 @@ std::tuple<Tensor, Tensor, Tensor> native_group_norm_tpu(
   rstd = std::get<2>(result).cpu();
 #else
   TIMING_START;
-  #if defined BACKEND_1684X
+
   auto status = sgdnnNativeGroupNorm(
-      tpu::TPUGetDeviceHandle(), tpu::TPUGenerateSgdnnTensor(X_32),
+      tpu::TPUGetDeviceResource(), tpu::TPUGenerateSgdnnTensor(X_32),
       tpu::TPUGenerateSgdnnTensor(weight), tpu::TPUGenerateSgdnnTensor(bias),
       group, affine, eps, tpu::TPUGenerateSgdnnTensor(Y),
       tpu::TPUGenerateSgdnnTensor(mean), tpu::TPUGenerateSgdnnTensor(rstd));
-  TORCH_CHECK(status == BM_SUCCESS);
-  #elif defined BACKEND_SG2260
-  auto status = sgdnnNativeGroupNorm(
-      c10_tpu::getCurrentTPUStream(), tpu::TPUGenerateSgdnnTensor(X_32),
-      tpu::TPUGenerateSgdnnTensor(weight), tpu::TPUGenerateSgdnnTensor(bias),
-      group, affine, eps, tpu::TPUGenerateSgdnnTensor(Y),
-      tpu::TPUGenerateSgdnnTensor(mean), tpu::TPUGenerateSgdnnTensor(rstd));
-  TORCH_CHECK(status == tpuRtSuccess);
-  #endif
-  TIMING_END(tpu::NATIVE_GROUP_NORM);
+  TORCH_CHECK(status == SG_SUCCESS);
+    TIMING_END(tpu::NATIVE_GROUP_NORM);
 #endif
   return std::make_tuple(Y, mean, rstd);
 }
@@ -174,7 +166,7 @@ native_group_norm_backward_tpu(const at::Tensor &grad_out, const at::Tensor &X,
   // TODO:FIX BUG
   // TIMING_START;
   // auto status = sgdnnNativeGroupNormBackward(
-  //     tpu::TPUGetDeviceHandle(), tpu::TPUGenerateSgdnnTensor(grad_out),
+  //     tpu::TPUGetDeviceResource(), tpu::TPUGenerateSgdnnTensor(grad_out),
   //     tpu::TPUGenerateSgdnnTensor(X),
   //     weight.defined() ? tpu::TPUGenerateSgdnnTensor(weight)
   //                      : sgdnnUndefinedTensor(),
@@ -186,7 +178,7 @@ native_group_norm_backward_tpu(const at::Tensor &grad_out, const at::Tensor &X,
   //                    : sgdnnUndefinedTensor(),
   //     output_mask[1] ? tpu::TPUGenerateSgdnnTensor(grad_bias)
   //                    : sgdnnUndefinedTensor());
-  // TORCH_CHECK(status == BM_SUCCESS);
+  // TORCH_CHECK(status == SG_SUCCESS);
   // TIMING_END(tpu::GROUPNORM_BACKWARD)
   // SHOW_TENSOR_OP(grad_out, X, mean, rstd, weight, grad_input, grad_weight, grad_bias);
   return std::tuple<Tensor, Tensor, Tensor>(grad_input, grad_weight, grad_bias);

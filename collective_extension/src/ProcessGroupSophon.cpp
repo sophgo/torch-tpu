@@ -729,7 +729,7 @@ public:
     opts.setTag(tag);
     GENERATE_ALL_TYPES(scalarType, setOutput, opts, tensor);
 
-    bm_handle_t handle_ = tpu::TPUGetDeviceHandle();
+    bm_handle_t handle_ = tpu::TPUGetDeviceResource();
     size_t bytes_ = tensor.nbytes();
     bm_device_mem_t buff_dev =
         bm_mem_from_device((unsigned long long)tensor.data_ptr(), bytes_);
@@ -874,7 +874,7 @@ public:
     opts.setTag(tag);
     GENERATE_ALL_TYPES(scalarType, setOutputs, opts, tensors);
 
-    bm_handle_t handle_ = tpu::TPUGetDeviceHandle();
+    bm_handle_t handle_ = tpu::TPUGetDeviceResource();
     size_t bytes_ = tensors[0].nbytes();
     bm_device_mem_t buff =
         bm_mem_from_device((unsigned long long)tensors[0].data_ptr(), bytes_);
@@ -1080,7 +1080,7 @@ public:
     opts.setReduceFunction(getFunction(scalarType, reduceOp));
     GENERATE_ALL_TYPES(scalarType, setOutput, opts, tensors[0]);
 
-    bm_handle_t handle_ = tpu::TPUGetDeviceHandle();
+    bm_handle_t handle_ = tpu::TPUGetDeviceResource();
     size_t bytes_ = tensors[0].nbytes();
     bm_device_mem_t send_buff =
         bm_mem_from_device((unsigned long long)tensors[0].data_ptr(), bytes_);

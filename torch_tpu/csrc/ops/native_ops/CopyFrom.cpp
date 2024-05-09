@@ -42,19 +42,12 @@ Tensor _copy_from_tpu(const Tensor &self, const Tensor &dst,
         TIMING_END(tpu::COPY);
       } else {
         TIMING_START;
-        #if defined BACKEND_1684X
-        auto status = sgdnnStridedCopy(tpu::TPUGetDeviceHandle(),
+
+        auto status = sgdnnStridedCopy(tpu::TPUGetDeviceResource(),
                                               tpu::TPUGenerateSgdnnTensor(self),
                                               tpu::TPUGenerateSgdnnTensor(dst));
-        TORCH_CHECK(status == BM_SUCCESS);
-        #elif defined BACKEND_SG2260
-        auto status = sgdnnStridedCopy(c10_tpu::getCurrentTPUStream(),
-                                              tpu::TPUGenerateSgdnnTensor(self),
-                                              tpu::TPUGenerateSgdnnTensor(dst),
-                                              non_blocking);
-        TORCH_CHECK(status == tpuRtSuccess);
-        #endif
-        TIMING_END(tpu::STRIDED_COPY);
+        TORCH_CHECK(status == SG_SUCCESS);
+                TIMING_END(tpu::STRIDED_COPY);
       }
     } else {
       TORCH_CHECK(false, "Unsupported copy from device ", self.device(),
@@ -83,23 +76,16 @@ Tensor _copy_from_tpu(const Tensor &self, const Tensor &dst,
         auto self_ = self.contiguous();
         if (dst.is_contiguous()) {
           TIMING_START;
-          #if defined BACKEND_1684X
-          auto status = sgdnnConvert(tpu::TPUGetDeviceHandle(),
+
+          auto status = sgdnnConvert(tpu::TPUGetDeviceResource(),
                                     tpu::TPUGenerateSgdnnTensor(self_),
                                     tpu::TPUGenerateSgdnnTensor(dst));
-          TORCH_CHECK(status == BM_SUCCESS);
-          #elif defined BACKEND_SG2260
-          auto status = sgdnnConvert(c10_tpu::getCurrentTPUStream(),
-                                    tpu::TPUGenerateSgdnnTensor(self_),
-                                    tpu::TPUGenerateSgdnnTensor(dst),
-                                    non_blocking);
-          TORCH_CHECK(status == tpuRtSuccess);
-          #endif
-          TIMING_END(tpu::DTYPE_CONVERT);
+          TORCH_CHECK(status == SG_SUCCESS);
+                    TIMING_END(tpu::DTYPE_CONVERT);
           SHOW_TENSOR_OP(self_, dst);
         } else {
           dst.copy_(self_.to(dst.dtype()), non_blocking);
-        }        
+        }
       }
 
 #endif

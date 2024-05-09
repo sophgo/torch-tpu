@@ -42,24 +42,15 @@ Tensor & addmm_out_tpu ( const Tensor & self, const Tensor & mat1, const Tensor 
     auto mat2_ = mat2.is_contiguous() == false && is_transposed ( mat2 ) == false ? mat2.contiguous() : mat2;
 
     TIMING_START;
-    #if defined BACKEND_1684X
+
     auto status = sgdnnMatmul (
-                  tpu::TPUGetDeviceHandle(),
+                  tpu::TPUGetDeviceResource(),
                   tpu::TPUGenerateSgdnnTensor ( mat1_ ),
                   tpu::TPUGenerateSgdnnTensor ( mat2_ ),
                   tpu::TPUGenerateSgdnnTensor ( self ),
                   tpu::TPUGenerateSgdnnTensor ( out ) );
-    TORCH_CHECK ( status == BM_SUCCESS );
-    #elif defined BACKEND_SG2260
-    auto status = sgdnnMatmul (
-                  c10_tpu::getCurrentTPUStream(),
-                  tpu::TPUGenerateSgdnnTensor ( mat1_ ),
-                  tpu::TPUGenerateSgdnnTensor ( mat2_ ),
-                  tpu::TPUGenerateSgdnnTensor ( self ),
-                  tpu::TPUGenerateSgdnnTensor ( out ) );
-    TORCH_CHECK ( status == tpuRtSuccess );
-    #endif
-    TIMING_END( tpu::MM );
+    TORCH_CHECK ( status == SG_SUCCESS );
+        TIMING_END( tpu::MM );
   }
   else
   {
@@ -87,24 +78,15 @@ Tensor & mm_out_tpu ( const Tensor & self, const Tensor & mat2, Tensor & out )
   auto mat2_ = mat2.is_contiguous() == false && is_transposed ( mat2 ) == false ? mat2.contiguous() : mat2;
 
   TIMING_START;
-  #if defined BACKEND_1684X
+
   auto status = sgdnnMatmul (
-                tpu::TPUGetDeviceHandle(),
+                tpu::TPUGetDeviceResource(),
                 tpu::TPUGenerateSgdnnTensor ( self_ ),
                 tpu::TPUGenerateSgdnnTensor ( mat2_ ),
                 sgdnnUndefinedTensor(),
                 tpu::TPUGenerateSgdnnTensor ( out ) );
-  TORCH_CHECK ( status == BM_SUCCESS );
-  #elif defined BACKEND_SG2260
-  auto status = sgdnnMatmul (
-                c10_tpu::getCurrentTPUStream(),
-                tpu::TPUGenerateSgdnnTensor ( self_ ),
-                tpu::TPUGenerateSgdnnTensor ( mat2_ ),
-                sgdnnUndefinedTensor(),
-                tpu::TPUGenerateSgdnnTensor ( out ) );
-  TORCH_CHECK ( status == tpuRtSuccess );
-  #endif
-  TIMING_END( tpu::MM );
+  TORCH_CHECK ( status == SG_SUCCESS );
+    TIMING_END( tpu::MM );
 #endif
   SHOW_TENSOR_OP(self, mat2, out);
   return out;
@@ -127,22 +109,14 @@ Tensor & bmm_out_tpu ( const Tensor & self, const Tensor & mat2, Tensor & out )
   auto mat2_ = mat2.is_contiguous() == false && is_transposed ( mat2 ) == false ? mat2.contiguous() : mat2;
 
   TIMING_START;
-  #if defined BACKEND_1684X
+
   auto status = sgdnnBatchMatmul (
-                tpu::TPUGetDeviceHandle(),
+                tpu::TPUGetDeviceResource(),
                 tpu::TPUGenerateSgdnnTensor ( self_ ),
                 tpu::TPUGenerateSgdnnTensor ( mat2_ ),
                 tpu::TPUGenerateSgdnnTensor ( out ) );
-  TORCH_CHECK ( status == BM_SUCCESS );
-  #elif defined BACKEND_SG2260
-  auto status = sgdnnBatchMatmul (
-                c10_tpu::getCurrentTPUStream(),
-                tpu::TPUGenerateSgdnnTensor ( self_ ),
-                tpu::TPUGenerateSgdnnTensor ( mat2_ ),
-                tpu::TPUGenerateSgdnnTensor ( out ) );
-  TORCH_CHECK ( status == tpuRtSuccess );
-  #endif
-  TIMING_END( tpu::BMM );
+  TORCH_CHECK ( status == SG_SUCCESS );
+    TIMING_END( tpu::BMM );
 #endif
   SHOW_TENSOR_OP(self, mat2, out);
   return out;
@@ -173,19 +147,17 @@ Tensor & baddbmm_out_tpu(const at::Tensor & self, const at::Tensor & batch1, con
     out = alpha * bmm(batch1_, batch2_);
 
   // TIMING_START;
-  // #if defined BACKEND_1684X
+  //
   // // TODO: imple this op, current has bugs
   // auto status = sgdnnBaddbmm(
-  //               tpu::TPUGetDeviceHandle(),
+  //               tpu::TPUGetDeviceResource(),
   //               tpu::TPUGenerateSgdnnTensor ( self_ ),
   //               tpu::TPUGenerateSgdnnTensor ( batch1_ ),
   //               tpu::TPUGenerateSgdnnTensor ( batch2_ ),
   //               tpu::TPUGenerateSgdnnTensor ( out ),
   //               alpha.toDouble(),
   //               beta.toDouble() );
-  // #elif defined BACKEND_SG2260
-  // #endif
-  // TIMING_END( tpu::BADDBMM );
+  //   // TIMING_END( tpu::BADDBMM );
 #endif
   SHOW_TENSOR_OP(self, batch1, batch2, out);
   return out;

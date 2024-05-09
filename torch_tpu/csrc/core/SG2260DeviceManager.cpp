@@ -8,7 +8,7 @@
 
 #ifdef BACKEND_SG2260
 #include "TPUStream.h"
-#include <sgdnn_api2.h>
+#include <sgdnn_api.h>
 #include <tpuv7_rt.h>
 namespace tpu
 {
@@ -20,6 +20,10 @@ public:
   TPUDeviceManager() : init_flag_(false) {}
 
   ~TPUDeviceManager() {
+    auto stream_ = c10_tpu::getCurrentTPUStream();
+    sgdnnDeinitialize(stream_);
+    tpuRtStreamSynchronize(stream_);
+    tpuRtStreamDestroy(stream_);
     if (instance_) delete instance_;
   }
 
@@ -28,13 +32,17 @@ public:
   TPUMgrStatus initialize()
   {
     if (init_flag_) return INIT_SUCCESS;
-    tpuRtDeviceInit();
     int DeviceCount = 0;
     tpuRtStatus_t Status = tpuRtGetDeviceCount ( &DeviceCount );
     if (DeviceCount == 0) {
       std::cout << "Device Count:" << DeviceCount << "\n";
       DeviceCount = 1;
     }
+    // TODO multi-device
+    TORCH_CHECK ( DeviceCount == 1 );
+    tpuRtInit();
+    tpuRtSetDevice(0);
+
     TORCH_CHECK ( Status == tpuRtSuccess, "Failed to get TPU device count" );
     if ( DeviceCount > 0 )
     {
@@ -186,7 +194,7 @@ TPUMgrStatus DestoryTpuMgr()
 TPUMgrStatus IsTPUMgrInited()
 {
   return TPUGetInstance()->Initialized();
-} 
+}
 
 TPUMgrStatus TPUDeviceInitialize( int Index ) {
   InitTPUMgr();
@@ -203,7 +211,7 @@ int TPUGetDeviceIndex ( void )
   int DevIndex;
   tpuRtStatus_t Status = tpuRtGetDevice( &DevIndex );
   if (Status = tpuRtErrorNoDevice) {
-    InitTPUMgr();  
+    InitTPUMgr();
     DevIndex = 0;
   } else
   {
@@ -258,6 +266,10 @@ void TPUCopyDeviceToDevice ( void * Dst, const void * Src, size_t Size, bool non
   unsigned long long dst_ptr = GetAddrByUnifiedAddr((unsigned long long)Dst);
   TORCH_CHECK ( dst_index == src_index, "D2D copy must in same device");
   TPUDeviceManager::GetInstance()->CopyDeviceToDevice ( (void*)dst_ptr, (void*)src_ptr, Size, dst_index, non_blocking );
+}
+
+tpuRtStream_t TPUGetDeviceResource ( void ) {
+  return c10_tpu::getCurrentTPUStream();
 }
 
 } // namespace tpu
