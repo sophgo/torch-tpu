@@ -33,6 +33,7 @@ function new_build()
 {
   pushd ${TPUTRAIN_TOP}
   python setup.py build bdist_wheel
+  if [ $? -ne 0 ]; then popd; return -1; fi
   pip install dist/* --force-reinstall
   popd
 }

@@ -54,7 +54,7 @@ tpuRtStatus_t SgrtCreateEvent(sgrtEvent_t* pEvent) {
 
 tpuRtStatus_t SgrtCreateEventWithFlag(sgrtEvent_t* pEvent, uint32_t flag) {
   // TODO flag
-  SOPHON_LOGW("flag is no use", flag);
+  SOPHON_LOGW("flag is no use:%d\n", flag);
   return tpuRtEventCreate( pEvent );
 }
 

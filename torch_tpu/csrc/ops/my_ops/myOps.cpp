@@ -8,32 +8,26 @@
 #include "common/config.h"
 #include "ops.hpp"
 
-namespace at{
-Tensor& dummy(Tensor& in)
-{
-	CHECK_TENSOR_IN_DEVICE ( in );
-  	TIMING_START;
+namespace at {
+Tensor &dummy(Tensor &in) {
+  CHECK_TENSOR_IN_DEVICE(in);
+  TIMING_START;
 #ifdef BACKEND_SG2260
-  	tpuRtStatus_t status =
-        sgdnnDummy( tpu::TPUGetDeviceResource(),
-                    true );
+  SGDNN_CHECK(sgdnnDummy(tpu::TPUGetDeviceResource(), true));
 #endif
-  	TIMING_END(tpu::DUMMY);
-	return in;
+  TIMING_END(tpu::DUMMY);
+  return in;
 }
-Tensor& dummy_no_kernel_launch(Tensor& in)
-{
-	CHECK_TENSOR_IN_DEVICE ( in );
-  	TIMING_START;
+Tensor &dummy_no_kernel_launch(Tensor &in) {
+  CHECK_TENSOR_IN_DEVICE(in);
+  TIMING_START;
 #ifdef BACKEND_SG2260
-  	tpuRtStatus_t status =
-        sgdnnDummy_WO_KERNEL_LAUNCH( tpu::TPUGetDeviceResource(),
-                    true );
+  SGDNN_CHECK(sgdnnDummy_WO_KERNEL_LAUNCH(tpu::TPUGetDeviceResource(), true));
 #endif
-  	TIMING_END(tpu::DUMMY);
-	return in;
+  TIMING_END(tpu::DUMMY);
+  return in;
 }
-}// namespace at
+} // namespace at
 
 namespace at
 {

@@ -205,7 +205,6 @@ IntArrayRef output_size){
   output = output_cpu.to(output.device()).to(output.dtype());
 #else
   //padding need to be checked
-  auto input_shape = self.sizes();
   std::vector<int32_t> strides(2, 0);
   std::vector<int32_t> kernel_shape(2, 0);
   std::vector<int32_t> pads(2, 0);

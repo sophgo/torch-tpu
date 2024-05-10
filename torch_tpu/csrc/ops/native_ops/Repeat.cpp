@@ -47,13 +47,13 @@ Tensor repeat_tpu(const Tensor &self, const IntArrayRef repeats) {
 
   IntArrayRef size(repeats);
   std::vector<int64_t> size_vec(size.begin(), size.end());
-  if (repeats.size() == self.dim()) {
+  if (repeats.size() == (size_t)self.dim()) {
     for (int i = 0; i < self.dim(); ++i) {
       size_vec[i] = repeats[i] * self.size(i);
     }
   } else {
     int dist = repeats.size() - self.dim();
-    for (int i = 0; i < repeats.size(); ++i) {
+    for (int i = 0; i < (int)repeats.size(); ++i) {
       if (i < dist) {
         continue;
       } else {

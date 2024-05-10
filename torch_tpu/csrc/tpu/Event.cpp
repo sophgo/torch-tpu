@@ -17,7 +17,7 @@ static PyObject* THPTEvent_pynew(PyTypeObject *type, PyObject *args, PyObject *k
   unsigned char blocking = 0;
   unsigned char interprocess = 0;
 
-  char *kwlist[] = {"enable_timing", "blocking", "interprocess", nullptr};
+  char *kwlist[] = {(char*)"enable_timing", (char*)"blocking", (char*)"interprocess", nullptr};
   if (!PyArg_ParseTupleAndKeywords(args, kwargs, "|bbb", kwlist,
       &enable_timing, &blocking, &interprocess)) {
     return nullptr;

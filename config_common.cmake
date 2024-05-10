@@ -85,3 +85,7 @@ endif()
 if(DUMP_INS)
   add_definitions(-DDUMP_INS)
 endif()
+
+set(SAFETY_FLAGS "-Wall -Wno-error=deprecated-declarations -ffunction-sections -fdata-sections -fPIC -Wno-unused-function -funwind-tables -fno-short-enums -Werror")
+set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} ${SAFETY_FLAGS}")
+set(CMAKE_CXX_FLAGS "${CMAKE_C_FLAGS} ${SAFETY_FLAGS} -Wno-invalid-offsetof")

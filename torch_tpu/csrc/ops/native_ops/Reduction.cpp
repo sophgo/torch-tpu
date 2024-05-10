@@ -34,7 +34,7 @@ Tensor &mean_out_tpu(const Tensor &self, OptionalIntArrayRef dim_opt,
       reduction_dim_vec.push_back(i);
     }
   }
-  for (auto i = 0; i < reduction_dim_vec.size() - 1; ++i) {
+  for (size_t i = 0; i < reduction_dim_vec.size() - 1; ++i) {
     TORCH_CHECK(reduction_dim_vec[i] + 1 == reduction_dim_vec[i + 1],
                 "Reduction only supports contiguous reduction dimension now");
   }
@@ -84,7 +84,7 @@ Tensor &sum_IntList_out_tpu(const Tensor &self, OptionalIntArrayRef dim_opt,
       reduction_dim_vec.push_back(i);
     }
   }
-  for (auto i = 0; i < reduction_dim_vec.size() - 1; ++i) {
+  for (size_t i = 0; i < reduction_dim_vec.size() - 1; ++i) {
     TORCH_CHECK(reduction_dim_vec[i] + 1 == reduction_dim_vec[i + 1],
                 "Reduction only supports contiguous reduction dimension now");
   }
@@ -206,7 +206,7 @@ Tensor var_correction_tpu(const Tensor &self, OptionalIntArrayRef dims,
     CHECK_TENSOR_IN_DEVICE(self);
   }
   auto reduce_list = dims.value_or(IntArrayRef{});
-  TORCH_CHECK(reduce_list.size() <= self.dim());
+  TORCH_CHECK(reduce_list.size() <= (size_t)self.dim());
 
   Tensor out;
   torch::Device device(torch::kPrivateUse1);

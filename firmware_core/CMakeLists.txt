@@ -2,9 +2,6 @@ project(FIRMWARE C)
 
 include(config.cmake)
 
-set(SAFETY_FLAGS "-Wall -Wno-error=deprecated-declarations -ffunction-sections -fdata-sections -fPIC -Wno-unused-function -funwind-tables -fno-short-enums")
-set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} ${SAFETY_FLAGS}")
-
 add_definitions(-Wno-address-of-packed-member
                 -fno-builtin-memcpy 
                 -fno-builtin-memset 

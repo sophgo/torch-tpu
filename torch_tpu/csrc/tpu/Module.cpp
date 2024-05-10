@@ -39,8 +39,7 @@ void RegisterTPUDeviceProperties(PyObject* module) {
 
 TPUDeviceProp* GetDeviceProperties(int64_t deviceid) {
   const char* device_name;
-  size_t device_free;
-  size_t device_total;
+  size_t device_total = 0;
 #ifdef BACKEND_1684X
   device_name = "BM1684X";
 #elif defined BACKEND_SG2260
@@ -169,7 +168,6 @@ PyObject* THPTModule_tpuCanDeviceAccessPeer_wrap(PyObject* self, PyObject* args)
 PyObject* THPTModule_getDeviceUtilizationRate_wrap(PyObject* self, PyObject* device_index) {
   HANDLE_TH_ERRORS
   THPUtils_assert(THPUtils_checkLong(device_index), "invalid argument to getDeviceUtilizationRate");
-  int32_t device = static_cast<int32_t>(THPUtils_unpackUInt32(device_index));
   //TODO: complete
   int64_t util_rate = 0;
   THPUtils_assert(util_rate <=100 && util_rate >= 0, "invalid result to util_rate");
@@ -257,16 +255,18 @@ PyObject* THPTModule_setStream_wrap(
 // e.g. allocate a new tensor which will cause a deadlock. It's enough to have a
 // single global, because it can be only set once (npuMutex is not recursive)
 // by the thread that owns the mutex (obviously there can be only one such thread).
-static PyGILState_STATE tpuMutexGILState;
+// static PyGILState_STATE tpuMutexGILState;
 
 PyObject* THPTModule_tpuLockMutex(PyObject *module, PyObject *noargs)
 {
   //TODO
+  return nullptr;
 }
 
 PyObject* THPTModule_tpuUnlockMutex(PyObject *module, PyObject *noargs)
 {
   //TODO
+  return nullptr;
 }
 
 
@@ -299,6 +299,7 @@ PyObject* THPTModule_tpu_set_sync_debug_mode(PyObject* _unused, PyObject* arg) {
     // c10_tpu::warning_state().set_sync_debug_mode(level);
     Py_RETURN_NONE;
     END_HANDLE_TH_ERRORS
+    return nullptr;
 }
 
 PyObject* THPTModule_tpu_get_sync_debug_mode(PyObject* self, PyObject* noargs) {
@@ -315,6 +316,7 @@ PyObject* THPTModule_tpu_get_sync_debug_mode(PyObject* self, PyObject* noargs) {
     //         return THPUtils_packInt32(-1); // can't happen
     // }
     END_HANDLE_TH_ERRORS
+    return nullptr;
 }
 #endif
 

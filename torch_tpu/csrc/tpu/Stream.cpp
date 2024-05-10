@@ -16,7 +16,6 @@ static PyObject* THPTStream_pynew(
     PyTypeObject *type, PyObject *args, PyObject *kwargs) {
   HANDLE_TH_ERRORS
 
-  int current_device = c10_tpu::current_device();
 
   int priority = 0;
   int64_t stream_id = 0;

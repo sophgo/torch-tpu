@@ -147,6 +147,7 @@ tpuRtStatus_t Cached_DevMem_Mgr::cache_malloc(
         set_mem_in_use(*p_dev_ptr);
       }
     }
+    return tpuRtSuccess;
 }
 
 tpuRtStatus_t Cached_DevMem_Mgr::cache_free(void* dev_ptr, tpuRtStream_t stream)

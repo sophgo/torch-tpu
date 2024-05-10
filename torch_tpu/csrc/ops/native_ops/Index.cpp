@@ -17,7 +17,7 @@ Tensor & index_out_tpu( const Tensor & self, const c10::List<c10::optional<Tenso
 #if 1
     CPU_IMPL_WARNING();
     c10::List<c10::optional<Tensor>> indices_cpu;
-    for (int i = 0; i < indices.size(); i++)
+    for (size_t i = 0; i < indices.size(); i++)
     {
         c10::optional<Tensor> indice = c10::nullopt;
         if ( indices[i].has_value() ) { indice = indices[i].value().cpu(); }
@@ -232,7 +232,7 @@ Tensor & index_put_impl_tpu(Tensor & self, const torch::List<c10::optional<Tenso
 #if 1
   CPU_IMPL_WARNING();
   c10::List<c10::optional<Tensor>> indices_cpu;
-  for (int i = 0; i < indices.size(); i++)
+  for (size_t i = 0; i < indices.size(); i++)
   {
       c10::optional<Tensor> indice = c10::nullopt;
       if ( indices[i].has_value() ) { indice = indices[i].value().cpu(); }

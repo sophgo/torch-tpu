@@ -23,7 +23,7 @@ Tensor & norm_out_tpu ( const at::Tensor & self, const c10::optional<at::Scalar>
     TORCH_CHECK ( p.value().toDouble() == 2., "Only support 2-Norm now" );
   }
   // not support case, use cpu impl
-  if (dim.size() != self.dim() && dim.size() != 0 )
+  if (dim.size() != (size_t)self.dim() && dim.size() != 0 )
   {
     CPU_IMPL_WARNING();
     auto out_cpu = norm ( self.to(torch::kFloat).cpu(), p, dim, keepdim );
@@ -31,7 +31,7 @@ Tensor & norm_out_tpu ( const at::Tensor & self, const c10::optional<at::Scalar>
   }
   else
   {
-    TORCH_CHECK ( dim.size() == self.dim() || dim.size() == 0 ); // TODO: Support partial dims
+    TORCH_CHECK ( (int)dim.size() == self.dim() || dim.size() == 0 ); // TODO: Support partial dims
     for (int i = 0; i < (int)dim.size(); i++) { TORCH_CHECK ( dim[i] == i ); }
     TIMING_START;
 

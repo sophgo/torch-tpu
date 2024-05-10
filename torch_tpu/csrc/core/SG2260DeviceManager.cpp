@@ -210,7 +210,7 @@ int TPUGetDeviceIndex ( void )
 {
   int DevIndex;
   tpuRtStatus_t Status = tpuRtGetDevice( &DevIndex );
-  if (Status = tpuRtErrorNoDevice) {
+  if (Status == tpuRtErrorNoDevice) {
     InitTPUMgr();
     DevIndex = 0;
   } else

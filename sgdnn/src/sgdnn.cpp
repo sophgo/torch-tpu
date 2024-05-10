@@ -285,7 +285,7 @@ tpu_status_t sgdnnStridedCopy (   tpu_resource_t  resource ,
 tpu_status_t sgdnnDummy ( tpu_resource_t  resource ,
                           bool non_blocking )
 {
-  sg_api_gelu_t api; // no use
+  sg_api_gelu_t api = {0}; // no use
   sgdnnTPUKernelLaunch ( resource , "tpu_kernel_api_dummy", &api, sizeof ( api ), non_blocking );
   return SG_SUCCESS;
 }

@@ -128,7 +128,7 @@ static void initGlobalStreamState() {
       C10_COMPILE_TIME_MAX_TPUS,
       "). Increase that and recompile.");
   for (int i = 0; i < num_tpus; i++){
-    TPUGuard device_guard{i};
+    TPUGuard device_guard{(signed char)i};
     C10_TPU_CHECK(sgrt::SgrtCreateStream(&default_streams[i]));
     std::cout << "stream : " << default_streams[i] << std::endl;
   }
@@ -239,7 +239,6 @@ TPUStream getStreamFromPool(
 
   auto pri_idx = -priority;
   const auto idx = get_idx(priority_counters[pri_idx][device_index]);
-  StreamIdType id_type = StreamIdType(pri_idx + 1);
   return TPUStreamForId(device_index, makeStreamId(StreamIdType(StreamIdType::DEFAULT), idx));
 }
 

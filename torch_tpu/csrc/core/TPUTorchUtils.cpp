@@ -39,7 +39,7 @@ void TPUCompareResult ( const at::Tensor & Got, const at::Tensor & Exp,
       {
         continue;
       }
-FAILED:
+// FAILED:
       if ( ErrCnt < MaxErrCnt )
       {
         LOG ( WARNING ) << "Compare failed: Got = " << GotPtr[i]
