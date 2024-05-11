@@ -53,9 +53,16 @@ namespace at
 		Tensor &sin,
 		const c10::optional<Tensor> &mask,
 		Tensor &Y,
+		Tensor &Input_length,
+		Tensor &Save_slots,
+		Tensor &Fetch_slots,
+		const c10::optional<Tensor> &Q_buffer,
+		Tensor &K_buffer,
+		Tensor &V_buffer,
 		int64_t embeddings,
 		int64_t attention_mode,
-		double C);
+		double C,
+		int64_t max_s);
 
 	Tensor attn_forward(
 		Tensor &input,

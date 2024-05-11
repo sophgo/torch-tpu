@@ -1198,23 +1198,32 @@ typedef struct {
 #endif
 
 typedef struct {
-  unsigned long long Q_global_addr; // local mem data
-  unsigned long long K_global_addr;
-  unsigned long long V_global_addr; // reserved
-  unsigned long long Kcache_global_addr;
-  unsigned long long Vcache_global_addr;
-  unsigned long long cos_global_addr;
-  unsigned long long sin_global_addr;
-  unsigned long long mask_global_addr;
-  unsigned long long Y_global_addr;
-  int batch;
-  float C;
-  int hidden_size;
-  int num_attention_heads;
-  int num_k_v_heads;
-  int embeddings;
-  int attention_mode;
-  int dtype;
+    unsigned long long Q_global_addr;
+    unsigned long long K_global_addr;
+    unsigned long long V_global_addr;
+    unsigned long long Qbuffer_global_addr;
+    unsigned long long Kbuffer_global_addr;
+    unsigned long long Vbuffer_global_addr;
+    unsigned long long Kcache_global_addr;
+    unsigned long long Vcache_global_addr;
+    unsigned long long RoPE_cos_global_addr;
+    unsigned long long RoPE_sin_global_addr;
+    unsigned long long Mask_global_addr;
+    unsigned long long Y_global_addr;
+    unsigned long long input_length_global_addr;
+    unsigned long long save_slots_global_addr;
+    unsigned long long fetch_slots_global_addr;
+    int slots_size;
+    float C;
+    int batch;
+    int mask_max;
+    int hidden_size;
+    int num_attention_heads;
+    int num_k_v_heads;
+    int embeddings;
+    int attention_mode;
+    int block_size;
+    int dtype;
 #ifndef WIN32
 } __attribute__((packed)) sg_api_llama2_qkv_multi_core_t;
 #else

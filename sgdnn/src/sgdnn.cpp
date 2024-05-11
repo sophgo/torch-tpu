@@ -3816,7 +3816,7 @@ tpu_status_t sgdnnLLamaMlp ( tpu_resource_t resource ,
   return SG_SUCCESS;
 }
 
-tpu_status_t sgdnnLlamaAttention ( tpu_resource_t resource ,
+tpu_status_t sgdnnLlamaAttention ( tpu_resource_t stream,
                           SgdnnTensor_t Q,
                           SgdnnTensor_t K,
                           SgdnnTensor_t V,
@@ -3826,9 +3826,16 @@ tpu_status_t sgdnnLlamaAttention ( tpu_resource_t resource ,
                           SgdnnTensor_t sin,
                           SgdnnTensor_t mask,
                           SgdnnTensor_t Y,
+                          SgdnnTensor_t Input_length,
+                          SgdnnTensor_t Save_slots,
+                          SgdnnTensor_t Fetch_slots,
+                          SgdnnTensor_t Q_buffer,
+                          SgdnnTensor_t K_buffer,
+                          SgdnnTensor_t V_buffer,
                           int embeddings,
                           int attention_mode,
                           float C,
+                          int max_s,
                           bool non_blocking )
 {
   SGDNN_CHECK ( Q.dtype == K.dtype );
@@ -3841,20 +3848,26 @@ tpu_status_t sgdnnLlamaAttention ( tpu_resource_t resource ,
   SGDNN_CHECK ( Q.dtype == SGDNN_DTYPE_FP32 ||
                 Q.dtype == SGDNN_DTYPE_FP16 ||
                 Q.dtype == SGDNN_DTYPE_BF16 );
+  SGDNN_CHECK ( Input_length.dtype == SGDNN_DTYPE_INT32);
+  SGDNN_CHECK ( Save_slots.dtype == SGDNN_DTYPE_INT32);
+  SGDNN_CHECK ( Fetch_slots.dtype == SGDNN_DTYPE_INT32);
 
   SGDNN_CHECK ( sgdnnIsSameShape( &Q, &Y ) );
   SGDNN_CHECK ( sgdnnIsSameShape( &cos, &sin ) );
-  SGDNN_CHECK ( Q.dim == 4 );
-  SGDNN_CHECK ( K.dim == 4 );
-  SGDNN_CHECK ( V.dim == 4 );
-  SGDNN_CHECK ( Kcache.dim == 4 );
-  SGDNN_CHECK ( Vcache.dim == 4 );
-  SGDNN_CHECK ( cos.dim == 3 );
-  SGDNN_CHECK ( sin.dim == 3 );
+  SGDNN_CHECK ( Q.dim == 3 );
+  SGDNN_CHECK ( K.dim == 3 );
+  SGDNN_CHECK ( V.dim == 3 );
+  SGDNN_CHECK ( Kcache.dim == 3 );
+  SGDNN_CHECK ( Vcache.dim == 3 );
+  SGDNN_CHECK ( cos.dim == 2 );
+  SGDNN_CHECK ( sin.dim == 2 );
   if (mask.addr != 0){
     SGDNN_CHECK ( Q.dtype == mask.dtype );
     SGDNN_CHECK ( mask.dim == 2 );
   }
+  SGDNN_CHECK ( Input_length.dim = 1);
+  SGDNN_CHECK ( Save_slots.dim = 2);
+  SGDNN_CHECK ( Fetch_slots.dim = 2);
 
   SGDNN_CHECK ( sgdnnIsTensorContiguous ( &Q ) );
   SGDNN_CHECK ( sgdnnIsTensorContiguous ( &K ) );
@@ -3862,38 +3875,61 @@ tpu_status_t sgdnnLlamaAttention ( tpu_resource_t resource ,
   SGDNN_CHECK ( sgdnnIsTensorContiguous ( &Kcache ) );
   SGDNN_CHECK ( sgdnnIsTensorContiguous ( &Vcache ) );
   SGDNN_CHECK ( sgdnnIsTensorContiguous ( &Y ) );
+  if (mask.addr != 0){
+    SGDNN_CHECK ( sgdnnIsTensorContiguous ( &Q_buffer ) );
+  }
+  SGDNN_CHECK ( sgdnnIsTensorContiguous ( &K_buffer ) );
+  SGDNN_CHECK ( sgdnnIsTensorContiguous ( &V_buffer ) );
 
-#if defined BACKEND_1684X
-  SGDNN_CHECK ( false );
-#elif defined BACKEND_SG2260
-  sg_api_llama2_qkv_multi_core_t api;
-  int batch = Q.shape[0];
+  int batch = Input_length.shape[0];
   int num_attention_heads = Q.shape[1];
-  int d = Q.shape[3];
+  int d = Q.shape[2];
+  int num_k_v_heads = K.shape[1];
+  int mask_max = max_s;
+  int block_size = 16; // set _PARTITION_SIZE
+  int slots_size = DIV_UP(max_s , block_size);
+  SGDNN_CHECK ( num_k_v_heads == num_attention_heads / 8 );
   int hidden_size = d * num_attention_heads;
-  int num_k_v_heads = num_attention_heads / 8;
+
+  sg_api_llama2_qkv_multi_core_t api;
+
+  if (attention_mode == 0){ // prefill
+    api.Qbuffer_global_addr = (Q_buffer.addr);
+    api.Kbuffer_global_addr = (K_buffer.addr);
+    api.Vbuffer_global_addr = (V_buffer.addr);
+    api.Mask_global_addr = mask.addr;
+
+  }else if(attention_mode == 1){ // decode
+    api.Qbuffer_global_addr = 0;
+    api.Kbuffer_global_addr = (K_buffer.addr);
+    api.Vbuffer_global_addr = (V_buffer.addr);
+    api.Mask_global_addr = 0;
+  }
+  api.input_length_global_addr = Input_length.addr;
+  api.save_slots_global_addr = Save_slots.addr;
+  api.fetch_slots_global_addr = Fetch_slots.addr;
+
   api.Q_global_addr    = Q.addr;
   api.K_global_addr  = K.addr;
   api.V_global_addr  = V.addr;
   api.Kcache_global_addr  = Kcache.addr;
   api.Vcache_global_addr   = Vcache.addr;
   api.Y_global_addr = Y.addr;
-  api.cos_global_addr = cos.addr;
-  api.sin_global_addr = sin.addr;
-  api.mask_global_addr = mask.addr;
+  api.RoPE_cos_global_addr = cos.addr;
+  api.RoPE_sin_global_addr = sin.addr;
+
   api.batch         = batch;
   api.hidden_size       = hidden_size;
   api.num_attention_heads      = num_attention_heads;
   api.num_k_v_heads = num_k_v_heads;
   api.embeddings = embeddings;
   api.C = C;
-  api.attention_mode = attention_mode;
+  api.attention_mode = attention_mode==1 ? 3 : 2;
+  api.mask_max = mask_max;
+  api.block_size = block_size;
+  api.slots_size = slots_size;
   api.dtype         = sgdnnTPUKernelDType ( Q.dtype );
-
-  SAFE_CALL ( sgdnnTPUKernelLaunch ( resource , "tpu_kernel_llama_attention_multi_core", &api, sizeof ( api ) , non_blocking) );
-#else
-  SGDNN_CHECK ( false );
-#endif
+  SAFE_CALL ( sgdnnTPUKernelLaunch ( stream, "tpu_kernel_llama_attention_multi_core", &api, sizeof ( api ), non_blocking) );
   return SG_SUCCESS;
 }
 

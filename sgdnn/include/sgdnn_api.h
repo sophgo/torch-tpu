@@ -1053,9 +1053,16 @@ tpu_status_t sgdnnLlamaAttention ( tpu_resource_t  stream,
                           SgdnnTensor_t sin,
                           SgdnnTensor_t mask,
                           SgdnnTensor_t Y,
+                          SgdnnTensor_t Input_length,
+                          SgdnnTensor_t Save_slots,
+                          SgdnnTensor_t Fetch_slots,
+                          SgdnnTensor_t Q_buffer,
+                          SgdnnTensor_t K_buffer,
+                          SgdnnTensor_t V_buffer,
                           int embeddings,
                           int attention_mode,
                           float C,
+                          int max_s,
                           bool non_blocking = true);
 
 /*
