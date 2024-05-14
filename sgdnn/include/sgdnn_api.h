@@ -68,14 +68,26 @@ tpu_status_t sgdnnTPUKernelLaunch (
             const char * func_name,
             const void * api,
             size_t api_size,
-            bool non_blocking);
+            bool non_blocking,
+            bool use_multi_core = false);
+
+static inline tpu_status_t sgdnnTPUKernelLaunchMultiCore (
+                            tpu_resource_t resource,
+                            const char * func_name,
+                            const void * api,
+                            size_t api_size,
+                            bool non_blocking) {
+  return sgdnnTPUKernelLaunch(resource, func_name, api, api_size, non_blocking, true);
+}
+
 #else
 tpu_status_t sgdnnTPUKernelLaunch (
             tpu_resource_t resource,
             const char * func_name,
             const void * api,
             size_t api_size,
-            bool non_blocking = false);
+            bool non_blocking = false,
+            bool use_multi_core = false);
 #endif
 
 tpu_status_t sgdnnReorderConv2dWeight ( tpu_resource_t resource,

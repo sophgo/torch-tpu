@@ -4481,6 +4481,10 @@ void tpu_print_local_mem_data(local_addr_t local_offset, int start_idx, const di
 // query core info
 int tpu_core_num();
 int tpu_core_index();
+int tpu_workitem_num();
+int tpu_workitem_index();
+int tpu_group_num();
+int tpu_group_index();
 
 // high level sync func
 void tpu_sync_core();
@@ -4493,6 +4497,7 @@ void tpu_sync_finish();
 int tpu_next_msg_id();
 void tpu_set_base_msg_id(int base_msg_id);
 void tpu_core_context_setup(int core_idx, int core_num, int core_msg_id);
+void tpu_core_context_initialize();
 
 void tpu_bdc_send_msg(int msg_id, int wait_cnt);
 void tpu_bdc_wait_msg(int msg_id, int send_cnt);

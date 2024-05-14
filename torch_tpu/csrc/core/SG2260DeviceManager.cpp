@@ -20,7 +20,7 @@ public:
   TPUDeviceManager() : init_flag_(false) {}
 
   ~TPUDeviceManager() {
-    auto stream_ = c10_tpu::getCurrentTPUStream();
+    auto stream_ = c10_tpu::getDefaultTPUStream();
     sgdnnDeinitialize(stream_);
     tpuRtStreamSynchronize(stream_);
     tpuRtStreamDestroy(stream_);
@@ -41,14 +41,13 @@ public:
     // TODO multi-device
     TORCH_CHECK ( DeviceCount == 1 );
     tpuRtInit();
-    tpuRtSetDevice(0);
 
     TORCH_CHECK ( Status == tpuRtSuccess, "Failed to get TPU device count" );
     if ( DeviceCount > 0 )
     {
       Mutexes_ = std::vector<std::mutex> ( DeviceCount );
       AddrMemMaps_ = std::vector<std::unordered_set<Devptr>> ( DeviceCount );
-      devices_init_ = std::vector<std::atomic<bool>> (DeviceCount);
+      devices_init_ = std::vector<std::atomic<bool>> ( DeviceCount );
       devices_init_[0] = 1; // tpuRtDeviceInit will default set idx = 0 device. that not a good idea.
     }
     SOPHON_LOG("TPU Device Manager init successfully");
@@ -57,6 +56,7 @@ public:
   }
 
   TPUMgrStatus InitDevice(int Index ){
+    TORCH_CHECK ( Index == 0 ); //TODO multi-device
     tpuRtStatus_t Status = tpuRtSetDevice( Index );
     TORCH_CHECK (Status == tpuRtSuccess, " sgSetDevice failed! Error Code : #", Status);
     return INIT_SUCCESS;
@@ -85,7 +85,7 @@ public:
       return nullptr;
     }
     Devptr dev_ptr;
-    tpuRtStatus_t Status = tpuRtMalloc((void **)(&dev_ptr), Size);
+    tpuRtStatus_t Status = tpuRtMalloc((void **)(&dev_ptr), Size, NO_USE);
     TORCH_CHECK ( Status == tpuRtSuccess, "Failed to allocate memory on TPU device #", Index, " size = ", Size, "bytes" );
     AddrMemMaps_[Index].insert ( dev_ptr );
 
@@ -104,7 +104,7 @@ public:
     auto Iter = AddrMemMaps_[Index].find ( ( Devptr ) Ptr );
     TORCH_CHECK ( Iter != AddrMemMaps_[Index].end(), "Memory of address = ", Ptr, " is not found" );
     AddrMemMaps_[Index].erase ( (Devptr) Ptr );
-    tpuRtFree((Devptr) Ptr);
+    tpuRtFree((void **)&Ptr, NO_USE);
     Mutexes_[Index].unlock();
   }
 
@@ -222,6 +222,7 @@ int TPUGetDeviceIndex ( void )
 
 void TPUSetDeviceIndex ( int Index )
 {
+  TORCH_CHECK ( Index == 0 ); //TODO multi-device
   tpuRtStatus_t Status = tpuRtSetDevice( Index );
   TORCH_CHECK (Status == tpuRtSuccess, " sgSetDevice failed! Error Code : #", Status);
 }

@@ -41,9 +41,9 @@ TPUKernelLauncher::TPUKernelLauncher()
   if (value_str)
     _core_num = atoi(value_str);
   else
-    _core_num = 1; //TODO multi-core support
+    _core_num = MAX_CORE_NUM;
 
-  printf("[TPUKERNEL_FIRMWARE_PATH] : %s, [core_num] : %d \n",
+  printf("[TPUKERNEL_FIRMWARE_PATH] : %s, [max_core_num] : %d \n",
           _library_file, _core_num);
 }
 
@@ -72,9 +72,10 @@ tpuRtStatus_t TPUKernelLauncher::unload_kernel_module(tpuRtStream_t stream) {
 }
 
 tpuRtStatus_t TPUKernelLauncher::launch_async(
-    const char* func_name, const void* api, size_t api_size, tpuRtStream_t stream) {
+    const char* func_name, const void* api, size_t api_size, tpuRtStream_t stream, bool use_multi_core) {
   tpuRtKernelModule_t kernel_module = _stream_kernel_modules[stream];
-  tpuRtStatus_t status = tpuRtKernelLaunchAsync(kernel_module, func_name, (void *)api, api_size, 1, _core_num, stream);
+  auto use_core_num = use_multi_core ? _core_num : 1;
+  tpuRtStatus_t status = tpuRtKernelLaunchAsync(kernel_module, func_name, (void *)api, api_size, 1, use_core_num, stream);
 #ifdef DUMP_INS
   tpuRtStreamSynchronize(stream);
   cmd_dump();
@@ -83,12 +84,10 @@ tpuRtStatus_t TPUKernelLauncher::launch_async(
 }
 
 tpuRtStatus_t TPUKernelLauncher::launch_sync(
-    const char* func_name, const void* api, size_t api_size, tpuRtStream_t stream) {
+    const char* func_name, const void* api, size_t api_size, tpuRtStream_t stream, bool use_multi_core) {
   tpuRtKernelModule_t kernel_module = _stream_kernel_modules[stream];
-  tpuRtStatus_t status = tpuRtKernelLaunch(kernel_module, func_name, (void*)api, api_size, 1, _core_num, stream );
-  //TODO v7runtime issue: sync launch is async
-  if (status != tpuRtSuccess) return status;
-  status = tpuRtStreamSynchronize(stream);
+  auto use_core_num = use_multi_core ? _core_num : 1;
+  tpuRtStatus_t status = tpuRtKernelLaunch(kernel_module, func_name, (void*)api, api_size, 1, use_core_num, stream );
 #ifdef DUMP_INS
   cmd_dump();
 #endif
@@ -129,7 +128,7 @@ Cached_DevMem_Mgr::~Cached_DevMem_Mgr()
 tpuRtStatus_t Cached_DevMem_Mgr::cache_malloc(
   void** p_dev_ptr, int64_t size ) {
     if (_cache_dev_mem.find(size) == _cache_dev_mem.end()){
-      tpuRtStatus_t status = tpuRtMalloc(p_dev_ptr, size);
+      tpuRtStatus_t status = tpuRtMalloc(p_dev_ptr, size, NO_USE);
       if (status != tpuRtSuccess) { throw; }
       _cache_dev_mem[size] = {*p_dev_ptr};
       return tpuRtSuccess;
@@ -139,7 +138,7 @@ tpuRtStatus_t Cached_DevMem_Mgr::cache_malloc(
       for (auto& dev_mem : dev_mems){
         if (malloc_cached_mem(p_dev_ptr, dev_mem)){ return tpuRtSuccess; }
       }
-      tpuRtStatus_t status = tpuRtMalloc(p_dev_ptr, size);
+      tpuRtStatus_t status = tpuRtMalloc(p_dev_ptr, size, NO_USE);
       if (status != tpuRtSuccess) { throw; }
       _cache_dev_mem[size].push_back(*p_dev_ptr);
       {

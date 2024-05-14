@@ -8,6 +8,10 @@
 #endif
 #include <stdio.h>
 
+#ifndef NO_USE
+#define NO_USE 0
+#endif
+
 #if defined BACKEND_SG2260
 typedef tpuRtStream_t tpu_resource_t;
 typedef tpuRtStatus_t tpu_status_t;
@@ -57,7 +61,7 @@ static inline tpu_status_t sgdnnMallocDeviceByte(tpu_resource_t tpu_resource,
 #if defined BACKEND_1684X
   return bm_malloc_device_byte(tpu_resource, pmem, size);
 #elif defined BACKEND_SG2260
-  return tpuRtMalloc(pmem, size);
+  return tpuRtMalloc(pmem, size, NO_USE);
 #else
   SGDNN_CHECK ( false );
 #endif
@@ -77,7 +81,7 @@ static inline void sgdnnFreeDevice(tpu_resource_t tpu_resource, tpu_device_mem_t
 #if defined BACKEND_1684X
   bm_free_device(tpu_resource, device_mem);
 #elif defined BACKEND_SG2260
-  tpuRtFree(device_mem);
+  tpuRtFree(&device_mem, NO_USE);
 #else
   SGDNN_CHECK ( false );
 #endif

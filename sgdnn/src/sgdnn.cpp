@@ -8,7 +8,6 @@
 
 #if defined BACKEND_1684X
 #include "kernel_module_data.h"
-#include "tpukernel_multicore.hpp"
 #elif defined BACKEND_SG2260
 #include "tpukernel_launcher.hpp"
 #endif
@@ -224,7 +223,8 @@ tpu_status_t sgdnnTPUKernelLaunch (
             const char * func_name,
             const void * api,
             size_t api_size,
-            bool non_blocking )
+            bool non_blocking,
+            bool use_multi_core )
 {
 #if defined BACKEND_1684X
   tpu_kernel_function_t func_id;
@@ -233,9 +233,9 @@ tpu_status_t sgdnnTPUKernelLaunch (
   return tpu_kernel_launch ( resource , func_id, ( void * ) api, api_size );
 #elif defined BACKEND_SG2260
   if (non_blocking)
-    return kernel_launcher.launch_async( func_name, api, api_size, resource );
+    return kernel_launcher.launch_async( func_name, api, api_size, resource, use_multi_core );
   else
-    return kernel_launcher.launch_sync( func_name, api, api_size, resource );
+    return kernel_launcher.launch_sync( func_name, api, api_size, resource, use_multi_core );
 #else
   SGDNN_CHECK ( false );
 #endif
@@ -275,7 +275,7 @@ tpu_status_t sgdnnStridedCopy (   tpu_resource_t  resource ,
 #if defined BACKEND_1684X
   SAFE_CALL ( sgdnnTPUKernelLaunch ( resource, "tpu_kernel_api_strided_copy", &api, sizeof ( api ) ) );
 #elif defined BACKEND_SG2260
-  sgdnnTPUKernelLaunch ( resource , "tpu_kernel_api_strided_copy_multi_core", &api, sizeof ( api ), non_blocking);
+  sgdnnTPUKernelLaunchMultiCore ( resource , "tpu_kernel_api_strided_copy_multi_core", &api, sizeof ( api ), non_blocking);
 #else
   SGDNN_CHECK ( false );
 #endif
@@ -910,7 +910,7 @@ tpu_status_t sgdnnLayernorm ( tpu_resource_t resource ,
 #if defined BACKEND_1684X
   SAFE_CALL ( sgdnnTPUKernelLaunch ( resource , "tpu_kernel_api_layernorm", &api, sizeof ( api ) ) );
 #elif defined BACKEND_SG2260
-  SAFE_CALL ( sgdnnTPUKernelLaunch ( resource , "tpu_kernel_api_layernorm_multi_core", &api, sizeof ( api ) , non_blocking) );
+  SAFE_CALL ( sgdnnTPUKernelLaunchMultiCore ( resource , "tpu_kernel_api_layernorm_multi_core", &api, sizeof ( api ) , non_blocking) );
 #else
   SGDNN_CHECK ( false );
 #endif
@@ -1073,7 +1073,7 @@ tpu_status_t sgdnnLayernormBackward ( tpu_resource_t resource ,
 #if defined BACKEND_1684X
   SAFE_CALL ( sgdnnTPUKernelLaunch ( resource , "tpu_kernel_api_layernorm_backward", &api, sizeof ( api ) ) );
 #elif defined BACKEND_SG2260
-  SAFE_CALL ( sgdnnTPUKernelLaunch ( resource , "tpu_kernel_api_layernorm_backward_multi_core", &api, sizeof ( api ) , non_blocking) );
+  SAFE_CALL ( sgdnnTPUKernelLaunchMultiCore ( resource , "tpu_kernel_api_layernorm_backward_multi_core", &api, sizeof ( api ) , non_blocking) );
 #else
   SGDNN_CHECK ( false );
 #endif
@@ -1158,7 +1158,7 @@ tpu_status_t sgdnnGather(tpu_resource_t resource ,
   SAFE_CALL(
       sgdnnTPUKernelLaunch(resource , "tpu_kernel_api_gather", &api, sizeof(api)));
 #elif defined BACKEND_SG2260
-  SAFE_CALL(sgdnnTPUKernelLaunch(resource , "tpu_kernel_api_gather_multi_core",
+  SAFE_CALL(sgdnnTPUKernelLaunchMultiCore(resource , "tpu_kernel_api_gather_multi_core",
                                  &api, sizeof(api), non_blocking));
 #else
   SGDNN_CHECK(false);
@@ -1197,7 +1197,7 @@ tpu_status_t sgdnnSoftmax ( tpu_resource_t resource ,
 #if defined BACKEND_1684X
   SAFE_CALL ( sgdnnTPUKernelLaunch ( resource , "tpu_kernel_api_softmax", &api, sizeof ( api ) ) );
 #elif defined BACKEND_SG2260
-  SAFE_CALL ( sgdnnTPUKernelLaunch ( resource , "tpu_kernel_api_softmax_multi_core", &api, sizeof ( api ) , non_blocking) );
+  SAFE_CALL ( sgdnnTPUKernelLaunchMultiCore ( resource , "tpu_kernel_api_softmax_multi_core", &api, sizeof ( api ) , non_blocking) );
 #else
   SGDNN_CHECK ( false );
 #endif
@@ -1240,7 +1240,7 @@ tpu_status_t sgdnnSoftmaxBackward ( tpu_resource_t resource ,
 #if defined BACKEND_1684X
   SAFE_CALL ( sgdnnTPUKernelLaunch ( resource , "tpu_kernel_api_softmax_backward", &api, sizeof ( api ) ) );
 #elif defined BACKEND_SG2260
-  SAFE_CALL ( sgdnnTPUKernelLaunch ( resource , "tpu_kernel_api_softmax_backward_multi_core", &api, sizeof ( api ), non_blocking) );
+  SAFE_CALL ( sgdnnTPUKernelLaunchMultiCore ( resource , "tpu_kernel_api_softmax_backward_multi_core", &api, sizeof ( api ), non_blocking) );
 #else
   SGDNN_CHECK ( false );
 #endif
@@ -1278,7 +1278,7 @@ tpu_status_t sgdnnLogSoftmax ( tpu_resource_t resource ,
 #if defined BACKEND_1684X
   SAFE_CALL ( sgdnnTPUKernelLaunch ( resource , "tpu_kernel_api_log_softmax", &api, sizeof ( api ) ) );
 #elif defined BACKEND_SG2260
-  SAFE_CALL ( sgdnnTPUKernelLaunch ( resource , "tpu_kernel_api_log_softmax_multi_core", &api, sizeof ( api ) , non_blocking ));
+  SAFE_CALL ( sgdnnTPUKernelLaunchMultiCore ( resource , "tpu_kernel_api_log_softmax_multi_core", &api, sizeof ( api ) , non_blocking ));
 #else
   SGDNN_CHECK ( false );
 #endif
@@ -1313,7 +1313,7 @@ tpu_status_t sgdnnClamp (tpu_resource_t resource ,
 #if defined BACKEND_1684X
   SAFE_CALL ( sgdnnTPUKernelLaunch ( resource , "tpu_kernel_api_clamp", &api, sizeof ( api ) ) );
 #elif defined BACKEND_SG2260
-  SAFE_CALL ( sgdnnTPUKernelLaunch ( resource , "tpu_kernel_api_clamp_multi_core", &api, sizeof ( api ) , non_blocking) );
+  SAFE_CALL ( sgdnnTPUKernelLaunchMultiCore ( resource , "tpu_kernel_api_clamp_multi_core", &api, sizeof ( api ) , non_blocking) );
 #else
   SGDNN_CHECK ( false );
 #endif
@@ -1418,8 +1418,7 @@ tpu_status_t sgdnnReduce ( tpu_resource_t resource ,
   std::cout << "output_addr0\n" << api.output_global_addr << std::endl;
   std::cout << "output_size0\n" << sgdnnTensorBytes(&output) << std::endl;
 #endif
-  //TODO v7runtime issue, need use async
-  SAFE_CALL ( sgdnnTPUKernelLaunch ( resource , "tpu_kernel_api_reduce_multi_core", &api, sizeof ( api ) , false) );
+  SAFE_CALL ( sgdnnTPUKernelLaunchMultiCore ( resource , "tpu_kernel_api_reduce_multi_core", &api, sizeof ( api ) , non_blocking) );
 #else
   SGDNN_CHECK ( false );
 #endif
@@ -1508,7 +1507,7 @@ tpu_status_t sgdnnConvert ( tpu_resource_t resource ,
   std::cout << "output_addr0\n" << api.output_global_addr << std::endl;
   std::cout << "output_size0\n" << sgdnnTensorBytes(&output) << std::endl;
 #endif
-  SAFE_CALL ( sgdnnTPUKernelLaunch ( resource , "tpu_kernel_api_dtype_convert_multi_core", &api, sizeof ( api ) , non_blocking) );
+  SAFE_CALL ( sgdnnTPUKernelLaunchMultiCore ( resource , "tpu_kernel_api_dtype_convert_multi_core", &api, sizeof ( api ) , non_blocking) );
 #else
   SGDNN_CHECK ( false );
 #endif
@@ -1644,7 +1643,7 @@ tpu_status_t sgdnnWhere ( tpu_resource_t resource ,
   {
     api.out_shape[i] = output.shape[i];
   }
-  SAFE_CALL ( sgdnnTPUKernelLaunch ( resource , "tpu_kernel_api_where_multi_core", &api, sizeof ( api ) , non_blocking) );
+  SAFE_CALL ( sgdnnTPUKernelLaunchMultiCore ( resource , "tpu_kernel_api_where_multi_core", &api, sizeof ( api ) , non_blocking ) );
 #else
   SGDNN_CHECK ( false );
 #endif
@@ -1742,7 +1741,7 @@ tpu_status_t sgdnnConcat ( tpu_resource_t resource ,
     std::cout << "output_addr0\n" << api.output_global_addr << std::endl;
     std::cout << "output_size0\n" << sgdnnTensorBytes(&output) << std::endl;
 #endif
-  SAFE_CALL ( sgdnnTPUKernelLaunch ( resource , "tpu_kernel_api_concat_multi_core", &api, sizeof ( api ) , non_blocking) );
+  SAFE_CALL ( sgdnnTPUKernelLaunchMultiCore ( resource , "tpu_kernel_api_concat_multi_core", &api, sizeof ( api ) , non_blocking) );
 #else
   SGDNN_CHECK ( false );
 #endif
@@ -1795,7 +1794,7 @@ tpu_status_t sgdnnPoolingForward ( tpu_resource_t resource ,
   api.pooling_desc = pooling_desc;
   api.dtype = sgdnnTPUKernelDType ( input.dtype );
   if(pooling_desc.mode == POOLING_AVG ){
-    SAFE_CALL ( sgdnnTPUKernelLaunch ( resource , "tpu_kernel_api_avg_pooling_multi_core", &api, sizeof ( api ) , non_blocking) );
+    SAFE_CALL ( sgdnnTPUKernelLaunchMultiCore ( resource , "tpu_kernel_api_avg_pooling_multi_core", &api, sizeof ( api ) , non_blocking) );
   }
   // to be implemented
   // else if(pooling_desc.mode == POOLING_MIN ){
@@ -1889,7 +1888,7 @@ tpu_status_t sgdnnIndexSelect ( tpu_resource_t resource ,
   api.axis = dim;
   api.dtype = sgdnnTPUKernelDType ( input.dtype );
   api.is_index_int64 = indices.dtype == SGDNN_DTYPE_INT64;
-  SAFE_CALL ( sgdnnTPUKernelLaunch ( resource , "tpu_kernel_api_index_select_multi_core", &api, sizeof ( api ) , non_blocking) );
+  SAFE_CALL ( sgdnnTPUKernelLaunchMultiCore ( resource , "tpu_kernel_api_index_select_multi_core", &api, sizeof ( api ) , non_blocking) );
 #else
   SGDNN_CHECK ( false );
 #endif
@@ -1988,7 +1987,7 @@ tpu_status_t sgdnnFill ( tpu_resource_t resource ,
   {
     ( ( char * ) &api.value ) [i] = ( ( const char * ) scalar_ptr ) [i];
   }
-  SAFE_CALL ( sgdnnTPUKernelLaunch ( resource , "tpu_kernel_api_const_fill_multi_core", &api, sizeof ( api ) , non_blocking) );
+  SAFE_CALL ( sgdnnTPUKernelLaunchMultiCore ( resource , "tpu_kernel_api_const_fill_multi_core", &api, sizeof ( api ) , non_blocking) );
 #else
   SGDNN_CHECK ( false );
 #endif
@@ -2127,9 +2126,8 @@ tpu_status_t sgdnnActive(tpu_resource_t resource , SgdnnTensor_t input,
   SAFE_CALL(
       sgdnnTPUKernelLaunch(resource , "tpu_kernel_api_active", &api, sizeof(api)));
 #elif defined BACKEND_SG2260
-  //TODO v7runtime issue, need use async
-  SAFE_CALL(sgdnnTPUKernelLaunch(resource , "tpu_kernel_api_active_multi_core",
-                                 &api, sizeof(api), false));
+  SAFE_CALL(sgdnnTPUKernelLaunchMultiCore(resource , "tpu_kernel_api_active_multi_core",
+                                 &api, sizeof(api), non_blocking));
 #else
   SGDNN_CHECK(false);
 #endif
@@ -2161,7 +2159,7 @@ tpu_status_t sgdnnLog(tpu_resource_t resource , SgdnnTensor_t input,
   SAFE_CALL(
       sgdnnTPUKernelLaunch(resource , "tpu_kernel_api_log", &api, sizeof(api)));
 #elif defined BACKEND_SG2260
-  SAFE_CALL(sgdnnTPUKernelLaunch(resource , "tpu_kernel_api_log_multi_core", &api,
+  SAFE_CALL(sgdnnTPUKernelLaunchMultiCore(resource , "tpu_kernel_api_log_multi_core", &api,
                                  sizeof(api), non_blocking));
 #else
   SGDNN_CHECK(false);
@@ -2191,7 +2189,7 @@ tpu_status_t sgdnnSqueeze(tpu_resource_t resource , SgdnnTensor_t input,
   SAFE_CALL(
       sgdnnTPUKernelLaunch(resource , "tpu_kernel_api_squeeze", &api, sizeof(api)));
 #elif defined BACKEND_SG2260
-  SAFE_CALL(sgdnnTPUKernelLaunch(resource , "tpu_kernel_api_squeeze_multi_core", &api,
+  SAFE_CALL(sgdnnTPUKernelLaunchMultiCore(resource , "tpu_kernel_api_squeeze_multi_core", &api,
                                  sizeof(api), non_blocking));
 #else
   SGDNN_CHECK(false);
@@ -2228,7 +2226,7 @@ tpu_status_t sgdnnNativeGroupNorm(tpu_resource_t resource , SgdnnTensor_t input,
   SAFE_CALL(
       sgdnnTPUKernelLaunch(resource , "tpu_kernel_api_native_group_norm", &api, sizeof(api)));
 #elif defined BACKEND_SG2260
-  SAFE_CALL(sgdnnTPUKernelLaunch(resource , "tpu_kernel_api_native_group_norm_multi_core", &api,
+  SAFE_CALL(sgdnnTPUKernelLaunchMultiCore(resource , "tpu_kernel_api_native_group_norm_multi_core", &api,
                                  sizeof(api), non_blocking));
 #else
   SGDNN_CHECK(false);
@@ -2265,7 +2263,7 @@ tpu_status_t sgdnnNativeGroupNormBackward(tpu_resource_t resource , SgdnnTensor_
   SAFE_CALL(
       sgdnnTPUKernelLaunch(resource , "tpu_kernel_api_groupnorm2d_backward", &api, sizeof(api)));
 #elif defined BACKEND_SG2260
-  SAFE_CALL(sgdnnTPUKernelLaunch(resource , "tpu_kernel_api_native_group_norm_multi_core", &api,
+  SAFE_CALL(sgdnnTPUKernelLaunchMultiCore(resource , "tpu_kernel_api_native_group_norm_multi_core", &api,
                                  sizeof(api), non_blocking));
 #else
   SGDNN_CHECK(false);
@@ -2312,7 +2310,7 @@ tpu_status_t sgdnnLogicalOr ( tpu_resource_t resource ,
     api.shape[i] = input.shape[i];
   }
   api.dtype = sgdnnTPUKernelDType ( input.dtype );
-  SAFE_CALL ( sgdnnTPUKernelLaunch ( resource , "tpu_kernel_api_logical_or_multi_core", &api, sizeof ( api ), non_blocking ) );
+  SAFE_CALL ( sgdnnTPUKernelLaunchMultiCore ( resource , "tpu_kernel_api_logical_or_multi_core", &api, sizeof ( api ), non_blocking ) );
 #else
   SGDNN_CHECK ( false );
 #endif
@@ -2352,7 +2350,7 @@ tpu_status_t sgdnnFlip ( tpu_resource_t resource ,
     api.shape[i] = input.shape[i];
   }
   api.dtype = sgdnnTPUKernelDType ( input.dtype );
-  SAFE_CALL ( sgdnnTPUKernelLaunch ( resource , "tpu_kernel_api_flip_multi_core", &api, sizeof ( api ), non_blocking ) );
+  SAFE_CALL ( sgdnnTPUKernelLaunchMultiCore ( resource , "tpu_kernel_api_flip_multi_core", &api, sizeof ( api ), non_blocking ) );
 #else
   SGDNN_CHECK ( false );
 #endif
@@ -2398,7 +2396,7 @@ tpu_status_t sgdnnLogicalAnd ( tpu_resource_t resource ,
     api.shape[i] = input.shape[i];
   }
   api.dtype = sgdnnTPUKernelDType ( input.dtype );
-  SAFE_CALL ( sgdnnTPUKernelLaunch ( resource , "tpu_kernel_api_logical_and_multi_core", &api, sizeof ( api ), non_blocking ) );
+  SAFE_CALL ( sgdnnTPUKernelLaunchMultiCore ( resource , "tpu_kernel_api_logical_and_multi_core", &api, sizeof ( api ), non_blocking ) );
 #else
   SGDNN_CHECK ( false );
 #endif
@@ -2437,7 +2435,7 @@ tpu_status_t sgdnnLogicalNot ( tpu_resource_t resource ,
     api.shape[i] = input.shape[i];
   }
   api.dtype = sgdnnTPUKernelDType ( input.dtype );
-  SAFE_CALL ( sgdnnTPUKernelLaunch ( resource , "tpu_kernel_api_logical_not_multi_core", &api, sizeof ( api ), non_blocking ) );
+  SAFE_CALL ( sgdnnTPUKernelLaunchMultiCore ( resource , "tpu_kernel_api_logical_not_multi_core", &api, sizeof ( api ), non_blocking ) );
 #else
   SGDNN_CHECK ( false );
 #endif
@@ -2484,8 +2482,7 @@ tpu_status_t sgdnnBinary ( tpu_resource_t resource ,
 #if defined BACKEND_1684X
   SAFE_CALL ( sgdnnTPUKernelLaunch ( resource , "tpu_kernel_api_binary", &api, sizeof ( api ) ) );
 #elif defined BACKEND_SG2260
-  //TODO v7runtime issue, need use async
-  SAFE_CALL ( sgdnnTPUKernelLaunch ( resource , "tpu_kernel_api_binary_multi_core", &api, sizeof ( api ), false ) );
+  SAFE_CALL ( sgdnnTPUKernelLaunchMultiCore ( resource , "tpu_kernel_api_binary_multi_core", &api, sizeof ( api ), non_blocking ) );
 #else
   SGDNN_CHECK ( false );
 #endif
@@ -2536,7 +2533,7 @@ tpu_status_t sgdnnBinaryBcast (  tpu_resource_t resource ,
 #if defined BACKEND_1684X
   SAFE_CALL ( sgdnnTPUKernelLaunch ( resource , "tpu_kernel_api_binary_bcast", &api, sizeof ( api ) ) );
 #elif defined BACKEND_SG2260
-  SAFE_CALL ( sgdnnTPUKernelLaunch ( resource , "tpu_kernel_api_binary_bcast_multi_core", &api, sizeof ( api ), non_blocking ) );
+  SAFE_CALL ( sgdnnTPUKernelLaunchMultiCore ( resource , "tpu_kernel_api_binary_bcast_multi_core", &api, sizeof ( api ), non_blocking ) );
 #else
   SGDNN_CHECK ( false );
 #endif
@@ -2571,7 +2568,7 @@ tpu_status_t sgdnnBinaryC ( tpu_resource_t resource ,
 #if defined BACKEND_1684X
   SAFE_CALL ( sgdnnTPUKernelLaunch ( resource , "tpu_kernel_api_binary_c", &api, sizeof ( api ) ) );
 #elif defined BACKEND_SG2260
-  SAFE_CALL ( sgdnnTPUKernelLaunch ( resource , "tpu_kernel_api_binary_c_multi_core", &api, sizeof ( api ), non_blocking ) );
+  SAFE_CALL ( sgdnnTPUKernelLaunchMultiCore ( resource , "tpu_kernel_api_binary_c_multi_core", &api, sizeof ( api ), non_blocking ) );
 #else
   SGDNN_CHECK ( false );
 #endif
@@ -2792,7 +2789,7 @@ tpu_status_t sgdnnMatmul ( tpu_resource_t resource ,
   std::cout << "output_addr0\n" << api.output_global_addr << std::endl;
   std::cout << "output_size0\n" << sgdnnTensorBytes(&output) << std::endl;
 #endif
-  SAFE_CALL ( sgdnnTPUKernelLaunch ( resource , "tpu_kernel_api_matmul_multi_core", &api, sizeof ( api ), non_blocking ) );
+  SAFE_CALL ( sgdnnTPUKernelLaunchMultiCore ( resource , "tpu_kernel_api_matmul_multi_core", &api, sizeof ( api ), non_blocking ) );
 #else
   SGDNN_CHECK ( false );
 #endif
@@ -2910,7 +2907,7 @@ tpu_status_t sgdnnBatchMatmul ( tpu_resource_t resource ,
   std::cout << "output_addr0\n" << api.output_global_addr << std::endl;
   std::cout << "output_size0\n" << sgdnnTensorBytes(&output) << std::endl;
 #endif
-  SAFE_CALL ( sgdnnTPUKernelLaunch ( resource , "tpu_kernel_api_matmul_multi_core", &api, sizeof ( api ), non_blocking ) );
+  SAFE_CALL ( sgdnnTPUKernelLaunchMultiCore ( resource , "tpu_kernel_api_matmul_multi_core", &api, sizeof ( api ), non_blocking ) );
 #else
   SGDNN_CHECK ( false );
 #endif
@@ -3022,7 +3019,7 @@ tpu_status_t sgdnnEmbeddingBackward ( tpu_resource_t resource ,
   api.window_size = 1;
   api.grad_output_dtype = sgdnnTPUKernelDType ( grad_output.dtype );
   api.is_index_int64 = indices.dtype == SGDNN_DTYPE_INT64;
-  SAFE_CALL ( sgdnnTPUKernelLaunch ( resource , "tpu_kernel_api_embedding_backward_multi_core", &api, sizeof ( api ) , non_blocking) );
+  SAFE_CALL ( sgdnnTPUKernelLaunchMultiCore ( resource , "tpu_kernel_api_embedding_backward_multi_core", &api, sizeof ( api ) , non_blocking) );
   sgdnnFreeDevice ( resource , sorted_index );
   sgdnnFreeDevice ( resource , sorted_index_index );
   sgdnnFreeDevice ( resource , from_index );
@@ -3088,7 +3085,7 @@ tpu_status_t sgdnnNorm2 ( tpu_resource_t resource ,
   }
   api.buffer_global_addr = sgdnnGetDeviceAddr(dev_mem);
   api.dtype = sgdnnTPUKernelDType ( input.dtype );
-  SAFE_CALL ( sgdnnTPUKernelLaunch ( resource , "tpu_kernel_api_norm2_multi_core", &api, sizeof ( api ) , non_blocking) );
+  SAFE_CALL ( sgdnnTPUKernelLaunchMultiCore ( resource , "tpu_kernel_api_norm2_multi_core", &api, sizeof ( api ) , non_blocking) );
 
 #else
   SGDNN_CHECK ( false );
@@ -3128,7 +3125,7 @@ tpu_status_t sgdnnGELU ( tpu_resource_t resource ,
 #if defined BACKEND_1684X
   SAFE_CALL ( sgdnnTPUKernelLaunch ( resource , "tpu_kernel_api_gelu", &api, sizeof ( api ) ) );
 #elif defined BACKEND_SG2260
-  SAFE_CALL ( sgdnnTPUKernelLaunch ( resource , "tpu_kernel_api_gelu_multi_core", &api, sizeof ( api ) , non_blocking) );
+  SAFE_CALL ( sgdnnTPUKernelLaunchMultiCore ( resource , "tpu_kernel_api_gelu_multi_core", &api, sizeof ( api ) , non_blocking) );
 #else
   SGDNN_CHECK ( false );
 #endif
@@ -3210,7 +3207,7 @@ tpu_status_t sgdnnGELUBackward ( tpu_resource_t resource ,
 #if defined BACKEND_1684X
   SAFE_CALL ( sgdnnTPUKernelLaunch ( resource , "tpu_kernel_api_gelu_backward", &api, sizeof ( api ) ) );
 #elif defined BACKEND_SG2260
-  SAFE_CALL ( sgdnnTPUKernelLaunch ( resource , "tpu_kernel_api_gelu_backward_multi_core", &api, sizeof ( api ) , non_blocking) );
+  SAFE_CALL ( sgdnnTPUKernelLaunchMultiCore ( resource , "tpu_kernel_api_gelu_backward_multi_core", &api, sizeof ( api ) , non_blocking) );
 #else
   SGDNN_CHECK ( false );
 #endif
@@ -3250,7 +3247,7 @@ tpu_status_t sgdnnLeakyReLU ( tpu_resource_t resource ,
   }
   api.dtype = sgdnnTPUKernelDType ( input.dtype );
   api.negative_slope = negative_slope;
-  SAFE_CALL ( sgdnnTPUKernelLaunch ( resource , "tpu_kernel_api_leakyrelu_multi_core", &api, sizeof ( api ) , non_blocking) );
+  SAFE_CALL ( sgdnnTPUKernelLaunchMultiCore ( resource , "tpu_kernel_api_leakyrelu_multi_core", &api, sizeof ( api ) , non_blocking) );
 #else
   SGDNN_CHECK ( false );
 #endif
@@ -3291,7 +3288,7 @@ tpu_status_t sgdnnSign ( tpu_resource_t resource ,
   }
   api.dtype = sgdnnTPUKernelDType ( input.dtype );
   api.active_type = ACTIVE_SIGN;
-  SAFE_CALL ( sgdnnTPUKernelLaunch ( resource , "active_multi_core", &api, sizeof ( api ) , non_blocking) );
+  SAFE_CALL ( sgdnnTPUKernelLaunchMultiCore ( resource , "active_multi_core", &api, sizeof ( api ) , non_blocking) );
 #else
   SGDNN_CHECK ( false );
 #endif
@@ -3354,7 +3351,7 @@ tpu_status_t sgdnnAddCMulBcast ( tpu_resource_t resource ,
   }
   api.dtype = sgdnnTPUKernelDType ( input.dtype );
   api.value = scalar;
-  SAFE_CALL ( sgdnnTPUKernelLaunch ( resource , "addcmul_multi_core", &api, sizeof ( api ) , non_blocking) );
+  SAFE_CALL ( sgdnnTPUKernelLaunchMultiCore ( resource , "addcmul_multi_core", &api, sizeof ( api ) , non_blocking) );
 #else
   SGDNN_CHECK ( false );
 #endif
@@ -3410,7 +3407,7 @@ tpu_status_t sgdnnAddCMul ( tpu_resource_t resource ,
   }
   api.dtype = sgdnnTPUKernelDType ( input.dtype );
   api.value = scalar;
-  SAFE_CALL ( sgdnnTPUKernelLaunch ( resource , "addcmul_multi_core", &api, sizeof ( api ) , non_blocking) );
+  SAFE_CALL ( sgdnnTPUKernelLaunchMultiCore ( resource , "addcmul_multi_core", &api, sizeof ( api ) , non_blocking) );
 #else
   SGDNN_CHECK ( false );
 #endif
@@ -3465,7 +3462,7 @@ tpu_status_t sgdnnAddCDiv ( tpu_resource_t resource ,
   }
   api.dtype = sgdnnTPUKernelDType ( input.dtype );
   api.value = scalar;
-  SAFE_CALL ( sgdnnTPUKernelLaunch ( resource , "addcdiv_multi_core", &api, sizeof ( api ) , non_blocking) );
+  SAFE_CALL ( sgdnnTPUKernelLaunchMultiCore ( resource , "addcdiv_multi_core", &api, sizeof ( api ) , non_blocking) );
 #else
   SGDNN_CHECK ( false );
 #endif
@@ -3517,7 +3514,7 @@ tpu_status_t sgdnnMaskedFill ( tpu_resource_t resource ,
   }
   api.value = value;
   api.dtype = sgdnnTPUKernelDType(input.dtype);//sgdnnTPUKernelDType ( SGDNN_DTYPE_FP32 );;
-  SAFE_CALL ( sgdnnTPUKernelLaunch ( resource , "tpu_kernel_api_masked_fill_multi_core", &api, sizeof ( api ) , non_blocking) );
+  SAFE_CALL ( sgdnnTPUKernelLaunchMultiCore ( resource , "tpu_kernel_api_masked_fill_multi_core", &api, sizeof ( api ) , non_blocking) );
 #else
   SGDNN_CHECK(false);
 #endif
@@ -3664,7 +3661,7 @@ tpu_status_t sgdnnMlp ( tpu_resource_t resource ,
   {
     api.w1_shape[i] = w2.shape[i];
   }
-  SAFE_CALL ( sgdnnTPUKernelLaunch ( resource , "tpu_kernel_mlp_multi_core", &api, sizeof ( api ) , non_blocking) );
+  SAFE_CALL ( sgdnnTPUKernelLaunchMultiCore ( resource , "tpu_kernel_mlp_multi_core", &api, sizeof ( api ) , non_blocking) );
 #else
   SGDNN_CHECK ( false );
 #endif
@@ -3809,13 +3806,14 @@ tpu_status_t sgdnnLLamaMlp ( tpu_resource_t resource ,
   api.middle_w      = weight0.shape[1];
   api.dtype         = sgdnnTPUKernelDType ( input.dtype );
 
-  SAFE_CALL ( sgdnnTPUKernelLaunch ( resource , "tpu_kernel_llama_mlp_multi_core", &api, sizeof ( api ) , non_blocking) );
+  SAFE_CALL ( sgdnnTPUKernelLaunchMultiCore ( resource , "tpu_kernel_llama_mlp_multi_core", &api, sizeof ( api ) , non_blocking) );
 #else
   SGDNN_CHECK ( false );
 #endif
   return SG_SUCCESS;
 }
 
+#if defined BACKEND_SG2260
 tpu_status_t sgdnnLlamaAttention ( tpu_resource_t stream,
                           SgdnnTensor_t Q,
                           SgdnnTensor_t K,
@@ -3929,9 +3927,10 @@ tpu_status_t sgdnnLlamaAttention ( tpu_resource_t stream,
   api.block_size = block_size;
   api.slots_size = slots_size;
   api.dtype         = sgdnnTPUKernelDType ( Q.dtype );
-  SAFE_CALL ( sgdnnTPUKernelLaunch ( stream, "tpu_kernel_llama_attention_multi_core", &api, sizeof ( api ), non_blocking) );
+  SAFE_CALL ( sgdnnTPUKernelLaunchMultiCore ( stream, "tpu_kernel_llama_attention_multi_core", &api, sizeof ( api ), non_blocking) );
   return SG_SUCCESS;
 }
+#endif
 
 tpu_status_t sgdnnRMSNorm ( tpu_resource_t  resource ,
                           SgdnnTensor_t input,
@@ -3973,7 +3972,7 @@ tpu_status_t sgdnnRMSNorm ( tpu_resource_t  resource ,
   api.partial       = partial;
   api.dtype         = sgdnnTPUKernelDType ( input.dtype );
 
-  SAFE_CALL ( sgdnnTPUKernelLaunch ( resource , "tpu_kernel_rmsnorm_multi_core", &api, sizeof ( api ) , non_blocking) );
+  SAFE_CALL ( sgdnnTPUKernelLaunchMultiCore ( resource , "tpu_kernel_rmsnorm_multi_core", &api, sizeof ( api ) , non_blocking) );
 #else
   SGDNN_CHECK ( false );
 #endif
@@ -4238,7 +4237,7 @@ tpu_status_t sgdnnElementBitwise ( tpu_resource_t resource ,
 #if defined BACKEND_1684X
    SAFE_CALL ( sgdnnTPUKernelLaunch ( resource , "tpu_kernel_api_element_bitwise", &api, sizeof ( api ) ) );
 #elif defined BACKEND_SG2260
-  SAFE_CALL ( sgdnnTPUKernelLaunch ( resource , "tpu_kernel_api_element_bitwise_multi_core", &api, sizeof ( api ) , non_blocking) );
+  SAFE_CALL ( sgdnnTPUKernelLaunchMultiCore ( resource , "tpu_kernel_api_element_bitwise_multi_core", &api, sizeof ( api ) , non_blocking) );
 #else
   SGDNN_CHECK ( false );
 #endif
@@ -4282,7 +4281,7 @@ tpu_status_t sgdnnElementBitwiseBcast ( tpu_resource_t resource ,
 #if defined BACKEND_1684X
   SAFE_CALL ( sgdnnTPUKernelLaunch ( resource , "tpu_kernel_api_element_bitwise_bcast", &api, sizeof ( api ) ) );
 #elif defined BACKEND_SG2260
-  SAFE_CALL ( sgdnnTPUKernelLaunch ( resource , "tpu_kernel_api_element_bitwise_bcast_multi_core", &api, sizeof ( api ) , non_blocking) );
+  SAFE_CALL ( sgdnnTPUKernelLaunchMultiCore ( resource , "tpu_kernel_api_element_bitwise_bcast_multi_core", &api, sizeof ( api ) , non_blocking) );
 #else
   SGDNN_CHECK ( false );
 #endif
@@ -4322,7 +4321,7 @@ tpu_status_t sgdnnElementBitwiseC ( tpu_resource_t resource ,
 #if defined BACKEND_1684X
   SAFE_CALL( sgdnnTPUKernelLaunch ( resource , "tpu_kernel_api_element_bitwise_c", &api, sizeof( api ) ) );
 #elif defined BACKEND_SG2260
-  SAFE_CALL ( sgdnnTPUKernelLaunch ( resource , "tpu_kernel_api_element_bitwise_c_multi_core", &api, sizeof ( api ) , non_blocking) );
+  SAFE_CALL ( sgdnnTPUKernelLaunchMultiCore ( resource , "tpu_kernel_api_element_bitwise_c_multi_core", &api, sizeof ( api ) , non_blocking) );
 #else
   SGDNN_CHECK ( false );
 #endif
@@ -4362,7 +4361,7 @@ tpu_status_t sgdnnNeg ( tpu_resource_t resource ,
     api.shape[i] = input.shape[i];
   }
   api.dtype = sgdnnTPUKernelDType ( input.dtype );
-   SAFE_CALL ( sgdnnTPUKernelLaunch ( resource , "tpu_kernel_api_neg_multi_core", &api, sizeof ( api ) , non_blocking) );
+   SAFE_CALL ( sgdnnTPUKernelLaunchMultiCore ( resource , "tpu_kernel_api_neg_multi_core", &api, sizeof ( api ) , non_blocking) );
 #else
   SGDNN_CHECK ( false );
 #endif
@@ -4398,7 +4397,7 @@ tpu_status_t sgdnnBitwiseNot(tpu_resource_t resource , SgdnnTensor_t input,
     api.shape[i] = input.shape[i];
   }
   api.dtype = sgdnnTPUKernelDType(input.dtype);
-  SAFE_CALL(sgdnnTPUKernelLaunch(
+  SAFE_CALL(sgdnnTPUKernelLaunchMultiCore(
       resource , "tpu_kernel_api_bitwise_not_multi_core", &api, sizeof(api), non_blocking));
 #else
   SGDNN_CHECK(false);
@@ -4445,7 +4444,7 @@ tpu_status_t sgdnnComparision ( tpu_resource_t resource ,
 #if defined BACKEND_1684X
   SAFE_CALL(sgdnnTPUKernelLaunch(resource , "tpu_kernel_api_comparision", &api, sizeof(api)));
 #elif defined BACKEND_SG2260
-  SAFE_CALL(sgdnnTPUKernelLaunch(resource , "tpu_kernel_api_comparision_multi_core", &api, sizeof(api), non_blocking));
+  SAFE_CALL(sgdnnTPUKernelLaunchMultiCore(resource , "tpu_kernel_api_comparision_multi_core", &api, sizeof(api), non_blocking));
 #else
   SGDNN_CHECK ( false );
 #endif
@@ -4485,7 +4484,7 @@ tpu_status_t sgdnnComparisionBcast ( tpu_resource_t resource ,
 #if defined BACKEND_1684X
   SAFE_CALL ( sgdnnTPUKernelLaunch ( resource , "tpu_kernel_api_comparision_bcast", &api, sizeof ( api ) ) );
 #elif defined BACKEND_SG2260
-  SAFE_CALL ( sgdnnTPUKernelLaunch ( resource , "tpu_kernel_api_comparision_bcast_multi_core", &api, sizeof ( api ) , non_blocking) );
+  SAFE_CALL ( sgdnnTPUKernelLaunchMultiCore ( resource , "tpu_kernel_api_comparision_bcast_multi_core", &api, sizeof ( api ) , non_blocking) );
 #else
   SGDNN_CHECK ( false );
 #endif
@@ -4519,7 +4518,7 @@ tpu_status_t sgdnnComparisionC ( tpu_resource_t resource ,
 #if defined BACKEND_1684X
   SAFE_CALL(sgdnnTPUKernelLaunch(resource , "tpu_kernel_api_comparision_c", &api, sizeof(api)));
 #elif defined BACKEND_SG2260
-  SAFE_CALL(sgdnnTPUKernelLaunch(resource , "tpu_kernel_api_comparision_c_multi_core", &api, sizeof(api), non_blocking));
+  SAFE_CALL(sgdnnTPUKernelLaunchMultiCore(resource , "tpu_kernel_api_comparision_c_multi_core", &api, sizeof(api), non_blocking));
 #else
   SGDNN_CHECK ( false );
 #endif
@@ -4701,7 +4700,7 @@ tpu_status_t sgdnnMinimumC(tpu_resource_t resource , SgdnnTensor_t input, float 
     api.shape[i] = input.shape[i];
   }
   api.dtype = sgdnnTPUKernelDType(input.dtype);
-  SAFE_CALL(sgdnnTPUKernelLaunch(resource , "tpu_kernel_api_minimumc_multi_core",
+  SAFE_CALL(sgdnnTPUKernelLaunchMultiCore(resource , "tpu_kernel_api_minimumc_multi_core",
                                  &api, sizeof(api), non_blocking));
 #else
   SGDNN_CHECK(false);
@@ -4744,7 +4743,7 @@ tpu_status_t sgdnnMinimum(tpu_resource_t resource , SgdnnTensor_t input,
     api.shape[i] = input.shape[i];
   }
   api.dtype = sgdnnTPUKernelDType(input.dtype);
-  SAFE_CALL(sgdnnTPUKernelLaunch(resource , "tpu_kernel_api_minimum_multi_core",
+  SAFE_CALL(sgdnnTPUKernelLaunchMultiCore(resource , "tpu_kernel_api_minimum_multi_core",
                                  &api, sizeof(api), non_blocking));
 #else
   SGDNN_CHECK(false);
@@ -4803,7 +4802,7 @@ tpu_status_t sgdnnMinimumBcast(tpu_resource_t resource , SgdnnTensor_t input,
     api.output_shape[i] = output.shape[i];
   }
   api.dtype = sgdnnTPUKernelDType(other.dtype);
-  SAFE_CALL(sgdnnTPUKernelLaunch(
+  SAFE_CALL(sgdnnTPUKernelLaunchMultiCore(
       resource , "tpu_kernel_api_minimum_bcast_multi_core", &api, sizeof(api), non_blocking));
 #else
   SGDNN_CHECK(false);
@@ -4843,7 +4842,7 @@ tpu_status_t sgdnnMaximumC(tpu_resource_t resource , SgdnnTensor_t input, float 
     api.shape[i] = input.shape[i];
   }
   api.dtype = sgdnnTPUKernelDType(input.dtype);
-  SAFE_CALL(sgdnnTPUKernelLaunch(resource , "tpu_kernel_api_maximumc_multi_core",
+  SAFE_CALL(sgdnnTPUKernelLaunchMultiCore(resource , "tpu_kernel_api_maximumc_multi_core",
                                  &api, sizeof(api), non_blocking));
 #else
   SGDNN_CHECK(false);
@@ -4886,7 +4885,7 @@ tpu_status_t sgdnnMaximum(tpu_resource_t resource , SgdnnTensor_t input,
     api.shape[i] = input.shape[i];
   }
   api.dtype = sgdnnTPUKernelDType(input.dtype);
-  SAFE_CALL(sgdnnTPUKernelLaunch(resource , "tpu_kernel_api_maximum_multi_core",
+  SAFE_CALL(sgdnnTPUKernelLaunchMultiCore(resource , "tpu_kernel_api_maximum_multi_core",
                                  &api, sizeof(api), non_blocking));
 #else
   SGDNN_CHECK(false);
@@ -4945,7 +4944,7 @@ tpu_status_t sgdnnMaximumBcast(tpu_resource_t resource , SgdnnTensor_t input,
     api.output_shape[i] = output.shape[i];
   }
   api.dtype = sgdnnTPUKernelDType(other.dtype);
-  SAFE_CALL(sgdnnTPUKernelLaunch(
+  SAFE_CALL(sgdnnTPUKernelLaunchMultiCore(
       resource , "tpu_kernel_api_maximum_bcast_multi_core", &api, sizeof(api), non_blocking));
 #else
   SGDNN_CHECK(false);
@@ -4985,7 +4984,7 @@ tpu_status_t sgdnnAtan2C(tpu_resource_t resource , float scalar, SgdnnTensor_t o
     api.shape[i] = other.shape[i];
   }
   api.dtype = sgdnnTPUKernelDType(output.dtype);
-  SAFE_CALL(sgdnnTPUKernelLaunch(resource , "tpu_kernel_api_atan2c_multi_core",
+  SAFE_CALL(sgdnnTPUKernelLaunchMultiCore(resource , "tpu_kernel_api_atan2c_multi_core",
                                  &api, sizeof(api), non_blocking));
 #else
   SGDNN_CHECK(false);
@@ -5025,7 +5024,7 @@ tpu_status_t sgdnnAtan2_C(tpu_resource_t resource , SgdnnTensor_t input, float s
     api.shape[i] = input.shape[i];
   }
   api.dtype = sgdnnTPUKernelDType(output.dtype);
-  SAFE_CALL(sgdnnTPUKernelLaunch(resource , "tpu_kernel_api_atan2_c_multi_core",
+  SAFE_CALL(sgdnnTPUKernelLaunchMultiCore(resource , "tpu_kernel_api_atan2_c_multi_core",
                                  &api, sizeof(api), non_blocking));
 #else
   SGDNN_CHECK(false);
@@ -5068,7 +5067,7 @@ tpu_status_t sgdnnAtan2(tpu_resource_t resource , SgdnnTensor_t input,
     api.shape[i] = input.shape[i];
   }
   api.dtype = sgdnnTPUKernelDType(output.dtype);
-  SAFE_CALL(sgdnnTPUKernelLaunch(resource , "tpu_kernel_api_atan2_multi_core",
+  SAFE_CALL(sgdnnTPUKernelLaunchMultiCore(resource , "tpu_kernel_api_atan2_multi_core",
                                  &api, sizeof(api), non_blocking));
 #else
   SGDNN_CHECK(false);
@@ -5128,7 +5127,7 @@ tpu_status_t sgdnnAtan2Bcast(tpu_resource_t resource , SgdnnTensor_t input,
     api.output_shape[i] = output.shape[i];
   }
   api.dtype = sgdnnTPUKernelDType(output.dtype);
-  SAFE_CALL(sgdnnTPUKernelLaunch(
+  SAFE_CALL(sgdnnTPUKernelLaunchMultiCore(
       resource , "tpu_kernel_api_atan2_bcast_multi_core", &api, sizeof(api), non_blocking));
 #else
   SGDNN_CHECK(false);
@@ -5366,7 +5365,7 @@ tpu_status_t sgdnnLnMm ( tpu_resource_t resource ,
     api.w_shape[i] = w.shape[i];
   }
 
-  SAFE_CALL ( sgdnnTPUKernelLaunch ( resource , "tpu_kernel_ln_mm_multi_core", &api, sizeof ( api ) , non_blocking) );
+  SAFE_CALL ( sgdnnTPUKernelLaunchMultiCore ( resource , "tpu_kernel_ln_mm_multi_core", &api, sizeof ( api ) , non_blocking) );
 #else
   SGDNN_CHECK ( false );
 #endif
@@ -5405,7 +5404,7 @@ tpu_status_t sgdnnFmaxC(tpu_resource_t resource , SgdnnTensor_t input, float sca
     api.shape[i] = input.shape[i];
   }
   api.dtype = sgdnnTPUKernelDType(input.dtype);
-  SAFE_CALL(sgdnnTPUKernelLaunch(resource , "tpu_kernel_api_fmaxc_multi_core",
+  SAFE_CALL(sgdnnTPUKernelLaunchMultiCore(resource , "tpu_kernel_api_fmaxc_multi_core",
                                  &api, sizeof(api), non_blocking));
 #else
   SGDNN_CHECK(false);
@@ -5448,7 +5447,7 @@ tpu_status_t sgdnnFmax(tpu_resource_t resource , SgdnnTensor_t input,
     api.shape[i] = input.shape[i];
   }
   api.dtype = sgdnnTPUKernelDType(input.dtype);
-  SAFE_CALL(sgdnnTPUKernelLaunch(resource , "tpu_kernel_api_fmax_multi_core", &api,
+  SAFE_CALL(sgdnnTPUKernelLaunchMultiCore(resource , "tpu_kernel_api_fmax_multi_core", &api,
                                  sizeof(api), non_blocking));
 #else
   SGDNN_CHECK(false);
@@ -5507,7 +5506,7 @@ tpu_status_t sgdnnFmaxBcast(tpu_resource_t resource , SgdnnTensor_t input,
     api.output_shape[i] = output.shape[i];
   }
   api.dtype = sgdnnTPUKernelDType(other.dtype);
-  SAFE_CALL(sgdnnTPUKernelLaunch(resource , "tpu_kernel_api_fmax_bcast_multi_core",
+  SAFE_CALL(sgdnnTPUKernelLaunchMultiCore(resource , "tpu_kernel_api_fmax_bcast_multi_core",
                                  &api, sizeof(api), non_blocking));
 #else
   SGDNN_CHECK(false);
@@ -5547,7 +5546,7 @@ tpu_status_t sgdnnFminC(tpu_resource_t resource , SgdnnTensor_t input, float sca
     api.shape[i] = input.shape[i];
   }
   api.dtype = sgdnnTPUKernelDType(input.dtype);
-  SAFE_CALL(sgdnnTPUKernelLaunch(resource , "tpu_kernel_api_fminc_multi_core",
+  SAFE_CALL(sgdnnTPUKernelLaunchMultiCore(resource , "tpu_kernel_api_fminc_multi_core",
                                  &api, sizeof(api), non_blocking));
 #else
   SGDNN_CHECK(false);
@@ -5590,7 +5589,7 @@ tpu_status_t sgdnnFmin(tpu_resource_t resource , SgdnnTensor_t input,
     api.shape[i] = input.shape[i];
   }
   api.dtype = sgdnnTPUKernelDType(input.dtype);
-  SAFE_CALL(sgdnnTPUKernelLaunch(resource , "tpu_kernel_api_fmin_multi_core", &api,
+  SAFE_CALL(sgdnnTPUKernelLaunchMultiCore(resource , "tpu_kernel_api_fmin_multi_core", &api,
                                  sizeof(api), non_blocking));
 #else
   SGDNN_CHECK(false);
@@ -5649,7 +5648,7 @@ tpu_status_t sgdnnFminBcast(tpu_resource_t resource , SgdnnTensor_t input,
     api.output_shape[i] = output.shape[i];
   }
   api.dtype = sgdnnTPUKernelDType(other.dtype);
-  SAFE_CALL(sgdnnTPUKernelLaunch(resource , "tpu_kernel_api_fmin_bcast_multi_core",
+  SAFE_CALL(sgdnnTPUKernelLaunchMultiCore(resource , "tpu_kernel_api_fmin_bcast_multi_core",
                                  &api, sizeof(api), non_blocking));
 #else
   SGDNN_CHECK(false);
@@ -5763,7 +5762,7 @@ tpu_status_t sgdnnAddLnMm ( tpu_resource_t resource ,
     api.w_shape[i] = w.shape[i];
   }
 
-  SAFE_CALL ( sgdnnTPUKernelLaunch ( resource , "tpu_kernel_add_ln_mm_multi_core", &api, sizeof ( api ) , non_blocking) );
+  SAFE_CALL ( sgdnnTPUKernelLaunchMultiCore ( resource , "tpu_kernel_add_ln_mm_multi_core", &api, sizeof ( api ) , non_blocking) );
 #else
   SGDNN_CHECK ( false );
 #endif
@@ -5804,7 +5803,7 @@ tpu_status_t sgdnnSignbit ( tpu_resource_t resource ,
     api.shape[i] = input.shape[i];
   }
   api.dtype = sgdnnTPUKernelDType ( input.dtype );
-  SAFE_CALL ( sgdnnTPUKernelLaunch ( resource , "tpu_kernel_api_signbit_multi_core", &api, sizeof ( api ) , non_blocking) );
+  SAFE_CALL ( sgdnnTPUKernelLaunchMultiCore ( resource , "tpu_kernel_api_signbit_multi_core", &api, sizeof ( api ) , non_blocking) );
 #else
   SGDNN_CHECK ( false );
 #endif
@@ -5857,7 +5856,7 @@ tpu_status_t sgdnnPow ( tpu_resource_t resource ,
   api.input_dtype = sgdnnTPUKernelDType ( input.dtype );
   api.other_dtype = sgdnnTPUKernelDType ( other.dtype );
   api.output_dtype = sgdnnTPUKernelDType ( output.dtype );
-  SAFE_CALL ( sgdnnTPUKernelLaunch ( resource , "tpu_kernel_api_pow_multi_core", &api, sizeof ( api ) , non_blocking) );
+  SAFE_CALL ( sgdnnTPUKernelLaunchMultiCore ( resource , "tpu_kernel_api_pow_multi_core", &api, sizeof ( api ) , non_blocking) );
 #else
   SGDNN_CHECK ( false );
 #endif
@@ -5926,7 +5925,7 @@ tpu_status_t sgdnnPowBcast ( tpu_resource_t resource ,
   api.input_dtype = sgdnnTPUKernelDType ( input.dtype );
   api.other_dtype = sgdnnTPUKernelDType ( other.dtype );
   api.output_dtype = sgdnnTPUKernelDType ( output.dtype );
-  SAFE_CALL ( sgdnnTPUKernelLaunch ( resource , "tpu_kernel_api_pow_bcast_multi_core", &api, sizeof ( api ) , non_blocking) );
+  SAFE_CALL ( sgdnnTPUKernelLaunchMultiCore ( resource , "tpu_kernel_api_pow_bcast_multi_core", &api, sizeof ( api ) , non_blocking) );
 #else
   SGDNN_CHECK ( false );
 #endif
@@ -5966,7 +5965,7 @@ tpu_status_t sgdnnPowC ( tpu_resource_t resource ,
 #if defined BACKEND_1684X
   SAFE_CALL ( sgdnnTPUKernelLaunch ( resource , "tpu_kernel_api_pow_c", &api, sizeof ( api ) ) );
 #elif defined BACKEND_SG2260
-  SAFE_CALL ( sgdnnTPUKernelLaunch ( resource , "tpu_kernel_api_pow_c_multi_core", &api, sizeof ( api ) , non_blocking) );
+  SAFE_CALL ( sgdnnTPUKernelLaunchMultiCore ( resource , "tpu_kernel_api_pow_c_multi_core", &api, sizeof ( api ) , non_blocking) );
 #else
   SGDNN_CHECK ( false );
 #endif
@@ -6007,7 +6006,7 @@ tpu_status_t sgdnnCPow ( tpu_resource_t resource ,
 #if defined BACKEND_1684X
   SAFE_CALL ( sgdnnTPUKernelLaunch ( resource , "tpu_kernel_api_c_pow", &api, sizeof ( api ) ) );
 #elif defined BACKEND_SG2260
-  SAFE_CALL ( sgdnnTPUKernelLaunch ( resource , "tpu_kernel_api_c_pow_multi_core", &api, sizeof ( api ) , non_blocking) );
+  SAFE_CALL ( sgdnnTPUKernelLaunchMultiCore ( resource , "tpu_kernel_api_c_pow_multi_core", &api, sizeof ( api ) , non_blocking) );
 #else
   SGDNN_CHECK ( false );
 #endif
@@ -6049,7 +6048,7 @@ tpu_status_t sgdnnReal ( tpu_resource_t resource ,
     api.shape[i] = input.shape[i];
   }
   api.dtype = sgdnnTPUKernelDType ( input.dtype );
-  SAFE_CALL ( sgdnnTPUKernelLaunch ( resource , "tpu_kernel_api_real_multi_core", &api, sizeof ( api ) , non_blocking) );
+  SAFE_CALL ( sgdnnTPUKernelLaunchMultiCore ( resource , "tpu_kernel_api_real_multi_core", &api, sizeof ( api ) , non_blocking) );
 #else
   SGDNN_CHECK ( false );
 #endif
@@ -6090,7 +6089,7 @@ tpu_status_t sgdnnConj ( tpu_resource_t resource ,
     api.shape[i] = input.shape[i];
   }
   api.dtype = sgdnnTPUKernelDType ( input.dtype );
-  SAFE_CALL ( sgdnnTPUKernelLaunch ( resource , "tpu_kernel_api_conj_multi_core", &api, sizeof ( api ) , non_blocking) );
+  SAFE_CALL ( sgdnnTPUKernelLaunchMultiCore ( resource , "tpu_kernel_api_conj_multi_core", &api, sizeof ( api ) , non_blocking) );
 #else
   SGDNN_CHECK ( false );
 #endif
@@ -6168,7 +6167,7 @@ tpu_status_t sgdnnTopk ( tpu_resource_t resource ,
 #if defined BACKEND_1684X
   SAFE_CALL ( sgdnnTPUKernelLaunch ( resource , "tpu_kernel_api_topk", &api, sizeof( api ) ) );
 #elif defined BACKEND_SG2260
-  SAFE_CALL ( sgdnnTPUKernelLaunch ( resource , "tpu_kernel_api_topk_multi_core", &api, sizeof( api ) , non_blocking) );
+  SAFE_CALL ( sgdnnTPUKernelLaunchMultiCore ( resource , "tpu_kernel_api_topk_multi_core", &api, sizeof( api ) , non_blocking) );
 #else
   SGDNN_CHECK ( false );
 #endif
@@ -6224,7 +6223,7 @@ tpu_status_t sgdnnReduceMaxOrMin(tpu_resource_t resource , SgdnnTensor_t input,
   api.dim = input.dim;
   api.mode = mode;
   api.dtype = sgdnnTPUKernelDType(input.dtype);
-  SAFE_CALL(sgdnnTPUKernelLaunch(resource ,
+  SAFE_CALL(sgdnnTPUKernelLaunchMultiCore(resource ,
                                  "tpu_kernel_api_reduce_max_or_min_multi_core",
                                  &api, sizeof(api), non_blocking));
 #else
@@ -6348,7 +6347,7 @@ tpu_status_t sgdnnRepeat ( tpu_resource_t resource ,
   api.input_global_addr = input.addr;
   api.output_global_addr = output.addr;
   api.dtype = sgdnnTPUKernelDType( input.dtype );
-  SAFE_CALL ( sgdnnTPUKernelLaunch ( resource , "tpu_kernel_api_repeat_multi_core", &api, sizeof( api ) , non_blocking) );
+  SAFE_CALL ( sgdnnTPUKernelLaunchMultiCore ( resource , "tpu_kernel_api_repeat_multi_core", &api, sizeof( api ) , non_blocking) );
 #else
   SGDNN_CHECK ( false );
 #endif
@@ -6463,7 +6462,7 @@ tpu_status_t sgdnnHardtanh ( tpu_resource_t resource ,
 #if defined BACKEND_1684X
   SAFE_CALL ( sgdnnTPUKernelLaunch ( resource , "tpu_kernel_api_hardtanh", &api, sizeof( api ) ) );
 #elif defined BACKEND_SG2260
-  SAFE_CALL ( sgdnnTPUKernelLaunch ( resource , "tpu_kernel_api_hardtanh_multi_core", &api, sizeof( api ) , non_blocking) );
+  SAFE_CALL ( sgdnnTPUKernelLaunchMultiCore ( resource , "tpu_kernel_api_hardtanh_multi_core", &api, sizeof( api ) , non_blocking) );
 #else
   SGDNN_CHECK ( false );
 #endif
@@ -6604,7 +6603,7 @@ tpu_status_t sgdnnNextafterC(tpu_resource_t resource , float scalar,
     api.shape[i] = other.shape[i];
   }
   api.dtype = sgdnnTPUKernelDType(output.dtype);
-  SAFE_CALL(sgdnnTPUKernelLaunch(resource , "tpu_kernel_api_nextafterc_multi_core",
+  SAFE_CALL(sgdnnTPUKernelLaunchMultiCore(resource , "tpu_kernel_api_nextafterc_multi_core",
                                  &api, sizeof(api), non_blocking));
 #else
   SGDNN_CHECK(false);
@@ -6643,7 +6642,7 @@ tpu_status_t sgdnnNextafter_C(tpu_resource_t resource , SgdnnTensor_t input,
     api.shape[i] = input.shape[i];
   }
   api.dtype = sgdnnTPUKernelDType(output.dtype);
-  SAFE_CALL(sgdnnTPUKernelLaunch(
+  SAFE_CALL(sgdnnTPUKernelLaunchMultiCore(
       resource , "tpu_kernel_api_nextafter_c_multi_core", &api, sizeof(api), non_blocking));
 #else
   SGDNN_CHECK(false);
@@ -6685,7 +6684,7 @@ tpu_status_t sgdnnNextafter(tpu_resource_t resource , SgdnnTensor_t input,
     api.shape[i] = input.shape[i];
   }
   api.dtype = sgdnnTPUKernelDType(output.dtype);
-  SAFE_CALL(sgdnnTPUKernelLaunch(resource , "tpu_kernel_api_nextafter_multi_core",
+  SAFE_CALL(sgdnnTPUKernelLaunchMultiCore(resource , "tpu_kernel_api_nextafter_multi_core",
                                  &api, sizeof(api), non_blocking));
 #else
   SGDNN_CHECK(false);
@@ -6743,7 +6742,7 @@ tpu_status_t sgdnnNextafterBcast(tpu_resource_t resource , SgdnnTensor_t input,
     api.output_shape[i] = output.shape[i];
   }
   api.dtype = sgdnnTPUKernelDType(other.dtype);
-  SAFE_CALL(sgdnnTPUKernelLaunch(
+  SAFE_CALL(sgdnnTPUKernelLaunchMultiCore(
       resource , "tpu_kernel_api_nextafter_bcast_multi_core", &api, sizeof(api), non_blocking));
 #else
   SGDNN_CHECK(false);
@@ -6905,7 +6904,7 @@ tpu_status_t sgdnnTriangularize ( tpu_resource_t resource ,
 #if defined BACKEND_1684X
   SAFE_CALL ( sgdnnTPUKernelLaunch ( resource , "tpu_kernel_api_triangularize", &api, sizeof ( api ) ) );
 #elif defined BACKEND_SG2260
-  SAFE_CALL ( sgdnnTPUKernelLaunch ( resource , "tpu_kernel_api_triangularize_multi_core", &api, sizeof ( api ) , non_blocking) );
+  SAFE_CALL ( sgdnnTPUKernelLaunchMultiCore ( resource , "tpu_kernel_api_triangularize_multi_core", &api, sizeof ( api ) , non_blocking) );
 #else
   SGDNN_CHECK ( false );
 #endif
@@ -6934,7 +6933,7 @@ tpu_status_t sgdnnCbrt ( tpu_resource_t resource ,
 #if defined BACKEND_1684X
   SAFE_CALL ( sgdnnTPUKernelLaunch ( resource , "tpu_kernel_api_cbrt", &api, sizeof ( api ) ) );
 #elif defined BACKEND_SG2260
-  SAFE_CALL ( sgdnnTPUKernelLaunch ( resource , "tpu_kernel_api_cbrt_multi_core", &api, sizeof ( api ) , non_blocking) );
+  SAFE_CALL ( sgdnnTPUKernelLaunchMultiCore ( resource , "tpu_kernel_api_cbrt_multi_core", &api, sizeof ( api ) , non_blocking) );
 #else
   SGDNN_CHECK ( false );
 #endif
@@ -7013,7 +7012,7 @@ tpu_status_t sgdnnPad(tpu_resource_t resource , SgdnnTensor_t input, int* pad,
   api.value = value;
   api.mode = mode;
   api.dtype = sgdnnTPUKernelDType(input.dtype);
-  SAFE_CALL(sgdnnTPUKernelLaunch(resource , "tpu_kernel_api_pad_multi_core", &api,
+  SAFE_CALL(sgdnnTPUKernelLaunchMultiCore(resource , "tpu_kernel_api_pad_multi_core", &api,
                                  sizeof(api), non_blocking));
 #else
   SGDNN_CHECK(false);
@@ -7067,7 +7066,7 @@ tpu_status_t sgdnnSliceScatter(tpu_resource_t resource , SgdnnTensor_t input,
   api.dim = dim;
   api.dtype = sgdnnTPUKernelDType(input.dtype);
   SAFE_CALL(
-      sgdnnTPUKernelLaunch(resource , "tpu_kernel_api_slice_scatter_multi_core", &api, sizeof(api), non_blocking));
+      sgdnnTPUKernelLaunchMultiCore(resource , "tpu_kernel_api_slice_scatter_multi_core", &api, sizeof(api), non_blocking));
 #else
   SGDNN_CHECK(false);
 #endif
@@ -7097,6 +7096,7 @@ bool _sgdnnInfCheckAndUnscale( tpu_resource_t resource ,
   return found == 0.0;
 }
 
+#if defined BACKEND_SG2260
 bool _sgdnnInfCheckAndUnscale_multi_core( tpu_resource_t resource ,
                               SgdnnTensor_t& input,
                               SgdnnTensor_t& found_inf,
@@ -7122,13 +7122,14 @@ bool _sgdnnInfCheckAndUnscale_multi_core( tpu_resource_t resource ,
   }
   api.found_inf_buffer_global_addr = sgdnnGetDeviceAddr(dev_mem);
 
-  SAFE_CALL( sgdnnTPUKernelLaunch ( resource , "tpu_kernel_api_inf_check_and_unscale_multi_core", &api, sizeof(api) , non_blocking) );
+  SAFE_CALL( sgdnnTPUKernelLaunchMultiCore ( resource , "tpu_kernel_api_inf_check_and_unscale_multi_core", &api, sizeof(api) , non_blocking) );
 
   tpu_device_mem_t SrcMem = sgdnnMemFromDevice ( found_inf.addr, sgdnnDataSize(found_inf.dtype) );
   float found = 0;
   SAFE_CALL (sgdnnMemcpyD2S ( resource , &found, SrcMem, sgdnnDataSize(found_inf.dtype)));
   return found == 0.0;
 }
+#endif
 
 tpu_status_t sgdnnInfCheckAndUnscale( tpu_resource_t resource ,
                                     std::vector<SgdnnTensor_t>& inputs,

@@ -1,10 +1,10 @@
 ### tpuv7 runtime
 
 ## commit id
-- tpuv7_runtime   
-ccc8c880b797fa5db7b209808c5e88477d29e1de
-- TPU1686  
-I539eacf09883a0041bb3ee3a2de63bac791f067a
+- tpuv7_runtime
+feea0f1577793b9f974c9dd8b536ea9d67332b6f
+- TPU1686
+1607fc8ad38c6750aaceaceae1b0db0b4bb2ed74
 
 ## intro
 `tpuv7_runtime` 是TPUv7.0的异步运行时库。其中，
@@ -23,14 +23,14 @@ I539eacf09883a0041bb3ee3a2de63bac791f067a
 - - - libcdm_daemon_emulator.so : chip daemon emulator. generated from cdmlib/ap/daemon
 - - - libtpuv7_emulator.so : tpu's runtime and firmware emulator.
 - - - libtpuv7_modelrt.so : bmodel's runtime.
-- - - libtpuv7_rt.so : runtime api lib for users. 
+- - - libtpuv7_rt.so : runtime api lib for users.
 
 
 - `tpuv7_0.1.0` 芯片ASIC版本的device runtime， bmodel runtime。
 包含的工具和内容与上述类似。
 
 - `sg2260_firmware` 是芯片ASIC版本的firmware。
- 
+
 
 ## how to update
 
@@ -46,8 +46,8 @@ I539eacf09883a0041bb3ee3a2de63bac791f067a
    $source scripts/envsetup.sh sg2260
    $export EXTRA_CONFIG=-DDEBUG=ON
    $rebuild_firmware_cmodel
-   ``` 
-  3) compile others   
+   ```
+  3) compile others
     YOU CAN FOUND IN `tpuv7-runtime/README` generate `tpuv7-emulator_0.1.0`.
 ```shell
 mkdir build && cd build
@@ -55,7 +55,7 @@ mkdir emulator && cd emulator
 cmake -DCMAKE_INSTALL_PREFIX=$PWD/../install  -DUSING_CMODEL=ON -DCMAKE_BUILD_TYPE=Debug ../..
 make -j4
 make install
-#### then  
+#### then
 cp -r PATH/of/build/install/tpuv7-emulator_0.1.0 .
 ```
 注意：因为`tpuv7-emulator`在编译时会将TPU1686的cmodel版本的固件库打包，所以需要提前编译TPU1686的cmodel固件库。
@@ -76,7 +76,7 @@ refer to tpuv7-runtime/README generate asic version `tpuv7_0.1.0`.
 
 更新`sg2260_firmware`
 ----
-现在暂时需要 modify some cmakelist.txt of TPU1686. 
+现在暂时需要 modify some cmakelist.txt of TPU1686.
 Can refer to commit id: Ia2863ed631fbc266b5c844e533d6ad801f491d32.
 ```shell
 $ source scripts/envsetup.sh sg2260

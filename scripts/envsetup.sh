@@ -36,6 +36,19 @@ function get_pytorch_install_dir(){
      export PYTORCH_INSTALL_DIR=${pytorch_path}
 }
 
+function set_v7runtime_env() {
+     local root_path=$1
+     local v7_lib_path=${root_path}/third_party/tpuv7_runtime/tpuv7-emulator_0.1.0/lib
+     export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:${v7_lib_path}
+     export TPU_EMULATOR_PATH=${v7_lib_path}/libtpuv7_emulator.so
+     export TPU_SCALAR_EMULATOR_PATH=${v7_lib_path}/libtpuv7_scalar_emulator.so
+
+     echo 1 > /proc/sys/vm/overcommit_memory
+     sysctl -w vm.overcommit_memory=1
+     export TPU_KERNEL_PATH=${root_path}/build/Release/firmware_core/
+     export TPUKERNEL_FIRMWARE_PATH=${root_path}/build/Release/firmware_core/libcmodel.so
+}
+
 ################ MODE CHOICE ###################
 export MODE_ASIC=stable        # stable: asic
 export MODE_CMODEL=local       # local: cmodel
@@ -64,3 +77,7 @@ source ${TPUTRAIN_TOP}/scripts/build_helper.sh
 source ${TPUTRAIN_TOP}/scripts/regression.sh
 
 export LD_LIBRARY_PATH=$TPUTRAIN_TOP/third_party/oneDNN/lib:$LD_LIBRARY_PATH
+
+if [ "${CHIP_ARCH}" == "sg2260" ]; then
+     set_v7runtime_env ${TPUTRAIN_TOP}
+fi

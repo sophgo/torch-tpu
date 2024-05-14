@@ -1148,6 +1148,7 @@ TPUKERNEL_FUNC_REGISTER(tpu_kernel_api_binary_bcast);
 #ifdef BACKEND_SG2260
 void tpu_kernel_api_binary_bcast_multi_core(const void *args) {
   sg_api_binary_bcast_t *api = (sg_api_binary_bcast_t *)args;
+  tpu_initialize();
   TPUKERNEL_ASSERT(api->dtype == DT_INT8 || api->dtype == DT_UINT8 ||
                    api->dtype == DT_INT16 || api->dtype == DT_UINT16 ||
                    api->dtype == DT_INT32 || api->dtype == DT_UINT32 ||
@@ -1261,7 +1262,6 @@ void tpu_kernel_api_binary_bcast_multi_core(const void *args) {
   size_t output_offset = ((int *)&output_stride)[split_dim] * dsize;
   size_t div_output_offset = ((int *)&output_stride)[split_dim] * div_out_dsize;
 
-  tpu_initialize();
   if (core_idx < allocate_core) {
     if ((sg_binary_type_t)api->binary_type == BINARY_DIV) {
       nodechip_binary_bcast_div(
