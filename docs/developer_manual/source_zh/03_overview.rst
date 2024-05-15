@@ -60,4 +60,11 @@ kernel算子（又被称为nodechip）是一个c语言写的函数，里面会�
 CompileMode模式
 --------------------
 
-TODO
+CompileMode模式具有较高的可扩展性，支持自定义编译器实现模型计算图优化。
+
+CompileMode模式下，通过PyTorch的AOTAutograd功能捕获模型的计算图，并将计算图传入tpu-mlir编译器执行编译优化。
+
+在编译器中，计算图的节点node会被逐一翻译成IR语句，经过一系列的PASS转换，将模型翻译成一个MLIR文件。
+
+MLIR文件最终通过Codegen将IR语句转换为芯片可执行的二进制指令文件bmodel，并把指令下发到TPU设备上完成计算。
+

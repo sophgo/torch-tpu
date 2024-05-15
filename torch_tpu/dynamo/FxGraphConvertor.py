@@ -15,7 +15,7 @@ from TpuMlirModule import TpuMlirModule
 from tpu_mlir.python.utils.mlir_shell import mlir_opt_for_top, mlir_lowering, mlir_to_model, f32_blobs_compare
 from tpu_mlir.python.tools.model_runner import mlir_inference, free_mlir_module, model_inference
 from tpu_mlir.python.numpy_helper.npz_compare import npz_compare
-from FxMlirImporter import FxMIIRImportor
+from FxMlirImportor import FxMIIRImportor
 from tpu_mlir.python import pyruntime_bm
 
 def bmodel_inference(model_file, input_dict):

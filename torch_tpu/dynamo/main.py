@@ -5,6 +5,7 @@ import argparse
 from tpu_mlir_jit import aot_backend
 import tpu_mlir_jit as tpu_mlir_jit
 import pdb
+import torch_tpu
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument("--chip", default="bm1684x", choices=['bm1684x', 'bm1690'],
@@ -20,10 +21,8 @@ if __name__ == '__main__':
   
     args = parser.parse_args()
     tpu_mlir_jit.args = args
-    tpu_dev = "privateuseone:0"
+    tpu_dev = "tpu:0"
     device = torch.device(tpu_dev)
-    PLUGIN_PATH = "/workspace/tpu_1010/tpu-train_master/build/torch_tpu/libtorch_tpu.so"
-    torch.ops.load_library(PLUGIN_PATH)
     if args.model == "resnet50":
         input = torch.randn((1, 3, 224, 224))
         import torchvision.models as models
