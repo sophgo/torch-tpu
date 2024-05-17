@@ -53,8 +53,8 @@ class LLamaMlpBlock(nn.Module):
 
 def check_mlp():
     batch_size = 16
-    embed_dim = 128
-    intermediate_size = 256
+    embed_dim = 8192
+    intermediate_size = 3584
     net_cpu = LLamaMlp(embed_dim, intermediate_size)
 
     w0 = net_cpu.state_dict()['mm0.weight'].clone().detach().transpose(0,1).contiguous().requires_grad_(False).to(device).half()
@@ -72,7 +72,6 @@ def check_mlp():
     status = comparator.cmp_result(out_cpu.detach(), out_tpu.cpu().detach().float())
     # out_diff = out_cpu - out_tpu.float().to("cpu")
     # print (torch.max(abs(out_diff)))
-
     return status
 
 if __name__ == "__main__":
@@ -80,3 +79,5 @@ if __name__ == "__main__":
     if status == -1:
         print(f"[Failed] llama_mlp compare failed!")
         sys.exit(255)
+    else:
+        print(f"[Success] llama_mlp compare succeed!")

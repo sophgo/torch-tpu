@@ -39,10 +39,10 @@ def check_llama_matmul(B, M, K, N):
 if __name__ == "__main__":
     #This example shows all  [], [[]] is acceptable
     test_dict = {
-         'MM_QKV' : [1, 16, 8192, 1280],
-         'Attention_FC' : [1, 16, 1024, 8192],
-        # 'Input Embedding' : [1, 16, 32000, 8192],
-        # 'Output Embedding' : [1, 16, 8192, 32000]
+        'MM_QKV' : [1, 16, 8192, 1280],
+        'Attention_FC' : [1, 16, 1024, 8192],
+        'Input Embedding' : [1, 16, 32000, 8192],
+        'Output Embedding' : [1, 16, 8192, 32000]
     }
 
     for case_name in test_dict:

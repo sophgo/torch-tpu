@@ -92,5 +92,7 @@ def check_rmsnorm():
 if __name__=="__main__":
     status = check_rmsnorm()
     if status == -1:
-        print(f"[Failed] llama_mlp compare failed!")
+        print(f"[Failed] llama_rmsnorm compare failed!")
         sys.exit(255)
+    else:
+        print(f"[Success] llama_rmsnorm compare succeed!")
