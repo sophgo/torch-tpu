@@ -2,7 +2,7 @@
 
 ## commit id
 - tpuv7_runtime
-4a73f8665dae67b6c002a182b40af971c3683d7d
+bdfa3f2769f0b2d1f244a28e8ea8e55ea1d6e749
 - TPU1686
 6a6e2e6e30fd0f105a8ec02497600a05a6b12bc2
 

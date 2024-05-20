@@ -8,7 +8,7 @@ import numpy as np
 
 top=os.path.dirname(__file__)
 if  os.environ.get('FORBID_CMD_EXECUTE') is None:
-    os.environ['FORBID_CMD_EXECUTE']=str(1)
+    os.environ['FORBID_CMD_EXECUTE']=str(0)
 elif os.environ.get('FORBID_CMD_EXECUTE')=='0':
     del os.environ['FORBID_CMD_EXECUTE']
 
@@ -16,7 +16,7 @@ os.environ['FILE_DUMP_CMD'] ="ins"
 os.environ['CMODEL_GLOBAL_MEM_SIZE'] = "34359738368"
 
 class DumpIns:
-    def __init__(self, lib_path = os.path.join(top, "../../third_party/sg2260/libcmodel_firmware.so")) -> None:
+    def __init__(self, lib_path = os.path.join(top, "../../third_party/firmware/sg2260/libcmodel_firmware.so")) -> None:
         self.libpath = lib_path
         self._lib = ct.cdll.LoadLibrary(lib_path)
     def dump(self, path):
