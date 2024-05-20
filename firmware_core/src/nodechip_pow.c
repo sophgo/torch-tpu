@@ -529,7 +529,7 @@ void tpu_kernel_api_pow_bcast(const void *args) {
 }
 TPUKERNEL_FUNC_REGISTER(tpu_kernel_api_pow_bcast);
 
-#ifdef FIRMWARE_BACKEND_2260
+#ifdef BACKEND_SG2260
 void tpu_kernel_api_pow_bcast_multi_core(const void *args) {
   sg_api_pow_bcast_t *api = (sg_api_pow_bcast_t *)args;
   TPUKERNEL_ASSERT(api->input_dtype == DT_FP32 || api->input_dtype == DT_FP16 ||
@@ -932,7 +932,7 @@ void tpu_kernel_api_pow_c(const void *args) {
 }
 TPUKERNEL_FUNC_REGISTER(tpu_kernel_api_pow_c);
 
-#ifdef FIRMWARE_BACKEND_2260
+#ifdef BACKEND_SG2260
 void tpu_kernel_api_pow_c_multi_core(const void *args) {
   sg_api_pow_tensor_scalar_t *api = (sg_api_pow_tensor_scalar_t *)args;
   TPUKERNEL_ASSERT(api->dtype == DT_FP32 || api->dtype == DT_FP16 ||
@@ -1163,7 +1163,7 @@ void tpu_kernel_api_c_pow(const void *args) {
 }
 TPUKERNEL_FUNC_REGISTER(tpu_kernel_api_c_pow);
 
-#ifdef FIRMWARE_BACKEND_2260
+#ifdef BACKEND_SG2260
 void tpu_kernel_api_c_pow_multi_core(const void *args) {
   sg_api_pow_tensor_scalar_t *api = (sg_api_pow_tensor_scalar_t *)args;
   TPUKERNEL_ASSERT(api->dtype == DT_FP32 || api->dtype == DT_FP16 ||

@@ -976,7 +976,7 @@ void tpu_kernel_api_log_softmax(const void *args) {
 }
 TPUKERNEL_FUNC_REGISTER(tpu_kernel_api_log_softmax);
 
-#ifdef FIRMWARE_BACKEND_2260
+#ifdef BACKEND_SG2260
 void tpu_kernel_api_log_softmax_multi_core(const void *args) {
   sg_api_log_softmax_t *api = (sg_api_log_softmax_t *)args;
   TPUKERNEL_ASSERT(api->dtype == DT_FP32 || api->dtype == DT_FP16 ||

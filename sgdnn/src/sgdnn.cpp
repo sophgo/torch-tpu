@@ -4179,7 +4179,6 @@ tpu_status_t sgdnnArange ( tpu_resource_t resource ,
                                 bool non_blocking )
 {
   SGDNN_CHECK ( sgdnnIsTensorContiguous ( &out ) );
-#if defined BACKEND_1684X
   SGDNN_CHECK( out.dim == 1);  // arange just need 1 dimension.
   SGDNN_CHECK( out.dtype == SGDNN_DTYPE_INT32 || out.dtype == SGDNN_DTYPE_INT64 || out.dtype == SGDNN_DTYPE_FP32 );
   sg_api_arange_t api;
@@ -4196,10 +4195,7 @@ tpu_status_t sgdnnArange ( tpu_resource_t resource ,
     api.dtype =  sgdnnTPUKernelDType ( out.dtype );
     api.isint64 = 0;
   }
-  SAFE_CALL ( sgdnnTPUKernelLaunch ( resource , "tpu_kernel_api_arange", &api, sizeof ( api ) ) );
-#else
-  SGDNN_CHECK ( false );
-#endif
+  SAFE_CALL ( sgdnnTPUKernelLaunch ( resource , "tpu_kernel_api_arange", &api, sizeof ( api ) , non_blocking) );
   return SG_SUCCESS;
 }
 
