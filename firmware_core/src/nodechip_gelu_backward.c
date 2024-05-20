@@ -295,7 +295,13 @@ extern void nodechip_gelu_backward_multi_core (
   global_addr_t input_global_addr,
   int*          shape,
   int           dims,
-  data_type_t   dtype );
+  data_type_t   dtype,
+  int           enable_8ch,
+  int           input_slice_dim,
+  int           output_slice_dim,
+  global_addr_t* grad_input_8ch_global_addr,
+  global_addr_t* grad_output_8ch_global_addr,
+  global_addr_t* input_8ch_global_addr);
 
 void tpu_kernel_api_gelu_backward_multi_core ( const void * args )
 {
@@ -311,7 +317,8 @@ void tpu_kernel_api_gelu_backward_multi_core ( const void * args )
     api->input_global_addr,
     api->shape,
     api->dim,
-    ( data_type_t ) api->dtype );
+    ( data_type_t ) api->dtype,
+    0, 0, 0, 0, 0, 0);
   tpu_poll();
 }
 TPUKERNEL_FUNC_REGISTER ( tpu_kernel_api_gelu_backward_multi_core );

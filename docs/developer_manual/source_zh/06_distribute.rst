@@ -1,7 +1,17 @@
 分布式的支持
 ============
 
-待补充
+本节介绍对分布式训练的支持。
+
+TORCH-TPU支持DeepSpeed与Megatron-DeepSpeed框架的分布式训练。
+支持分布式训练需要安装MegatronDeepSpeedTpu插件，该插件包含了DeepSpeed与Megatron-DeepSpeed框架的分布式训练的支持。
+针对DeepSpeed，该插件支持DeepSpeed的Zero-1和Zero-2 CPU-Offload优化策略。
+针对Megatron-DeepSpeed，该插件支持TensorParallel优化策略。
+该插件还提供了bert与gpt模型的分布式训练的示例，用户可以参考这些示例来使用分布式训练。
+
+安装插件请参考MegatronDeepSpeedTpu文件夹下的安装文档。
+----
+
 
 .. Lowering将Top层OP下沉到Tpu层OP, 它支持的类型有F32/F16/BF16/INT8对称/INT8非对称。
 
