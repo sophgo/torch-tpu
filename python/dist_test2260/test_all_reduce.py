@@ -4,8 +4,8 @@ import torch.distributed as dist
 import logging
 import os
 from helper import init_logger, is_master, is_slave
-import sccl_collectives
 import torch_tpu
+import sccl_collectives
 TPU = "tpu"
 
 # get rank and world_size from env
@@ -23,7 +23,7 @@ def case1():
     logging.info("rank: {}".format(rank))
 
     # init tensor
-    tensor = torch.rand(tensor_len)
+    tensor = torch.rand(tensor_len).float()
     logging.info("rank: {}, {}".format(rank, tensor))
     tensor = tensor.to(TPU)
 

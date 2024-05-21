@@ -14,9 +14,8 @@
 #include <sys/socket.h>
 #include <unistd.h>
 #endif
-#include <ATen/SparseTensorUtils.h>
+#include <ATen/SparseCsrTensorUtils.h>
 #include <ATen/ThreadLocalState.h>
-#include <TPUDeviceManager.h>
 #include <c10/util/StringUtil.h>
 #include <c10/util/intrusive_ptr.h>
 #include <c10/util/irange.h>
@@ -41,7 +40,6 @@
 // #include "../include/ProcessGroupSophon.hpp"
 #include "ProcessGroupSophon.hpp"
 #include "SophonDeviceFactory.hpp"
-#include "bmlib_runtime.h"
 #include "common_def.h" // for sg_data_type_t defines
 
 #ifdef _WIN32
@@ -729,45 +727,36 @@ public:
     opts.setTag(tag);
     GENERATE_ALL_TYPES(scalarType, setOutput, opts, tensor);
 
-    bm_handle_t handle_ = tpu::TPUGetDeviceResource();
+    tpudnnHandle_t handle_ = tpudnnCreate();
     size_t bytes_ = tensor.nbytes();
-    bm_device_mem_t buff_dev =
-        bm_mem_from_device((unsigned long long)tensor.data_ptr(), bytes_);
+    void* buff_dev = tensor.data_ptr();
 
     // for dev mem
     switch (scalarType) {
     case ::at::ScalarType::Float:
-      opts.setOutputSophon(SG_DTYPE_FP32, handle_, bytes_, buff_dev);
+      opts.setOutputSophon(handle_, buff_dev, bytes_, SG_DTYPE_FP32);
       break;
     case ::at::ScalarType::Half:
-      opts.setOutputSophon(SG_DTYPE_FP16, handle_, bytes_, buff_dev);
+      opts.setOutputSophon(handle_, buff_dev, bytes_, SG_DTYPE_FP16);
       break;
     case ::at::ScalarType::Char:
-      opts.setOutputSophon(SG_DTYPE_INT8, handle_, bytes_, buff_dev);
+      opts.setOutputSophon(handle_, buff_dev, bytes_, SG_DTYPE_INT8);
       break;
     case ::at::ScalarType::Byte:
-      opts.setOutputSophon(SG_DTYPE_UINT8, handle_, bytes_, buff_dev);
+      opts.setOutputSophon(handle_, buff_dev, bytes_, SG_DTYPE_UINT8);
       break;
     case ::at::ScalarType::Int:
-      opts.setOutputSophon(SG_DTYPE_INT32, handle_, bytes_, buff_dev);
+      opts.setOutputSophon(handle_, buff_dev, bytes_, SG_DTYPE_INT32);
       break;
     default:
       TORCH_CHECK(false, "Invalid scalar type");
     }
 
-    sophon::broadcast2260(opts); // 2260通信接口
+    sophon::broadcast2260(opts);
   }
 
   void run() override {
     broadcast(inputs[rootTensor]);
-
-    // Copy to non-root tensors
-    for (const auto i : c10::irange(inputs.size())) {
-      if (i == static_cast<size_t>(rootTensor)) {
-        continue;
-      }
-      inputs[i].copy_(inputs[rootTensor]);
-    }
   }
   void finishWorkSophon() override { finish(); }
 };
@@ -874,10 +863,10 @@ public:
     opts.setTag(tag);
     GENERATE_ALL_TYPES(scalarType, setOutputs, opts, tensors);
 
-    bm_handle_t handle_ = tpu::TPUGetDeviceResource();
+    tpudnnHandle_t handle_ = tpudnnCreate();
     size_t bytes_ = tensors[0].nbytes();
-    bm_device_mem_t buff =
-        bm_mem_from_device((unsigned long long)tensors[0].data_ptr(), bytes_);
+    void* send_buff = tensors[0].data_ptr();
+    void* recv_buff = tensors[0].data_ptr();
     sg_reduce_method_t reduce_method = SG_REDUCE_SUM;
 
     switch (reduceOp) {
@@ -905,6 +894,9 @@ public:
     case ReduceOp::PREMUL_SUM:
       TORCH_CHECK(false, "Cannot use ReduceOp.PREMUL_SUM with Sophon");
       break;
+    case ReduceOp::AVG:
+      TORCH_CHECK(false, "Cannot use ReduceOp.AVG with Sophon");
+      break;
     case ReduceOp::UNUSED:
       break;
     }
@@ -912,21 +904,13 @@ public:
     // for dev mem
     switch (scalarType) {
     case ::at::ScalarType::Float:
-      opts.setOutputSophon(SG_DTYPE_FP32, handle_, bytes_, buff, reduce_method);
+      opts.setOutputSophon(handle_, send_buff, recv_buff, bytes_, SG_DTYPE_FP32, reduce_method);
       break;
     case ::at::ScalarType::Half:
-      opts.setOutputSophon(SG_DTYPE_FP16, handle_, bytes_, buff, reduce_method);
-      break;
-    case ::at::ScalarType::Char:
-      opts.setOutputSophon(SG_DTYPE_INT8, handle_, bytes_, buff, reduce_method);
-      break;
-    case ::at::ScalarType::Byte:
-      opts.setOutputSophon(SG_DTYPE_UINT8, handle_, bytes_, buff,
-                           reduce_method);
+      opts.setOutputSophon(handle_, send_buff, recv_buff, bytes_, SG_DTYPE_FP16, reduce_method);
       break;
     case ::at::ScalarType::Int:
-      opts.setOutputSophon(SG_DTYPE_INT32, handle_, bytes_, buff,
-                           reduce_method);
+      opts.setOutputSophon(handle_, send_buff, recv_buff, bytes_, SG_DTYPE_INT32, reduce_method);
       break;
     default:
       TORCH_CHECK(false, "Invalid scalar type");
@@ -1059,15 +1043,15 @@ protected:
 class AsyncReduceTPUWork : public ProcessGroupSophon::AsyncWork {
 public:
   AsyncReduceTPUWork(const std::shared_ptr<sophon::Context> &context,
-                     std::vector<at::Tensor> &inputs, int rootRank,
+                     std::vector<at::Tensor> &inputs, int root,
                      int rootTensor, ReduceOp reduceOp, uint32_t tag)
       : ProcessGroupSophon::AsyncWork({inputs}, "sophon:reduce", inputs),
-        context(context), inputs(inputs), rootRank(rootRank),
+        context(context), inputs(inputs), root(root),
         rootTensor(rootTensor), reduceOp(reduceOp), tag(tag) {}
 
   std::shared_ptr<sophon::Context> context;
   std::vector<at::Tensor> inputs;
-  const int rootRank;
+  const int root;
   const int rootTensor;
   const ReduceOp reduceOp;
   const uint32_t tag;
@@ -1075,17 +1059,27 @@ public:
   void reduce(std::vector<at::Tensor> &tensors) {
     const auto &scalarType = tensors[0].scalar_type();
     sophon::ReduceOptions opts(context);
-    opts.setRoot(rootRank);
+    opts.setRoot(root);
     opts.setTag(tag);
     opts.setReduceFunction(getFunction(scalarType, reduceOp));
-    GENERATE_ALL_TYPES(scalarType, setOutput, opts, tensors[0]);
 
-    bm_handle_t handle_ = tpu::TPUGetDeviceResource();
+    at::Tensor flatOutputTensor;
+    if (context->rank == root) {
+      GENERATE_ALL_TYPES(scalarType, setOutput, opts, tensors[0]);
+    } else {
+      flatOutputTensor = newLikeFlat(tensors);
+      GENERATE_ALL_TYPES(scalarType, setOutput, opts, flatOutputTensor);
+    }
+
+    tpudnnHandle_t handle_ = tpudnnCreate();
     size_t bytes_ = tensors[0].nbytes();
-    bm_device_mem_t send_buff =
-        bm_mem_from_device((unsigned long long)tensors[0].data_ptr(), bytes_);
-    bm_device_mem_t rec_buff =
-        bm_mem_from_device((unsigned long long)tensors[0].data_ptr(), bytes_);
+    void* send_buff = tensors[0].data_ptr();
+    void* recv_buff;
+    if (context->rank == root) {
+      recv_buff = tensors[0].data_ptr();
+    } else {
+      recv_buff = flatOutputTensor.data_ptr();
+    }
     sg_reduce_method_t reduce_method = SG_REDUCE_SUM;
 
     switch (reduceOp) {
@@ -1113,6 +1107,9 @@ public:
     case ReduceOp::PREMUL_SUM:
       TORCH_CHECK(false, "Cannot use ReduceOp.PREMUL_SUM with Sophon");
       break;
+    case ReduceOp::AVG:
+      TORCH_CHECK(false, "Cannot use ReduceOp.AVG with Sophon");
+      break;
     case ReduceOp::UNUSED:
       break;
     }
@@ -1120,24 +1117,13 @@ public:
     // for dev mem
     switch (scalarType) {
     case ::at::ScalarType::Float:
-      opts.setOutputSophon(SG_DTYPE_FP32, handle_, bytes_, send_buff, rec_buff,
-                           reduce_method);
+      opts.setOutputSophon(handle_, send_buff, recv_buff, bytes_, SG_DTYPE_FP32, reduce_method);
       break;
     case ::at::ScalarType::Half:
-      opts.setOutputSophon(SG_DTYPE_FP16, handle_, bytes_, send_buff, rec_buff,
-                           reduce_method);
-      break;
-    case ::at::ScalarType::Char:
-      opts.setOutputSophon(SG_DTYPE_INT8, handle_, bytes_, send_buff, rec_buff,
-                           reduce_method);
-      break;
-    case ::at::ScalarType::Byte:
-      opts.setOutputSophon(SG_DTYPE_UINT8, handle_, bytes_, send_buff, rec_buff,
-                           reduce_method);
+      opts.setOutputSophon(handle_, send_buff, recv_buff, bytes_, SG_DTYPE_FP16, reduce_method);
       break;
     case ::at::ScalarType::Int:
-      opts.setOutputSophon(SG_DTYPE_INT32, handle_, bytes_, send_buff, rec_buff,
-                           reduce_method);
+      opts.setOutputSophon(handle_, send_buff, recv_buff, bytes_, SG_DTYPE_INT32, reduce_method);
       break;
     default:
       TORCH_CHECK(false, "Invalid scalar type");
@@ -1289,7 +1275,35 @@ public:
     // so copying into the actual output later is easy.
     at::Tensor flatOutputTensor = newLikeFlat(outputs[0]);
     GENERATE_ALL_TYPES(scalarType, setOutput, opts, flatOutputTensor);
-    sophon::allgather(opts);
+
+    tpudnnHandle_t handle_ = tpudnnCreate();
+    size_t send_bytes_ = inputs[0].nbytes();
+    void* send_buff = flatInputTensor[0].data_ptr();
+    size_t recv_bytes_ = outputs[0][0].nbytes();
+    void* recv_buff = flatOutputTensor[0].data_ptr();
+
+    // for dev mem
+    switch (scalarType) {
+    case ::at::ScalarType::Float:
+      opts.setOutputSophon(handle_, send_buff, send_bytes_, recv_buff, recv_bytes_, SG_DTYPE_FP32);
+      break;
+    case ::at::ScalarType::Half:
+      opts.setOutputSophon(handle_, send_buff, send_bytes_, recv_buff, recv_bytes_, SG_DTYPE_FP16);
+      break;
+    case ::at::ScalarType::Char:
+      opts.setOutputSophon(handle_, send_buff, send_bytes_, recv_buff, recv_bytes_, SG_DTYPE_INT8);
+      break;
+    case ::at::ScalarType::Byte:
+      opts.setOutputSophon(handle_, send_buff, send_bytes_, recv_buff, recv_bytes_, SG_DTYPE_UINT8);
+      break;
+    case ::at::ScalarType::Int:
+      opts.setOutputSophon(handle_, send_buff, send_bytes_, recv_buff, recv_bytes_, SG_DTYPE_INT32);
+      break;
+    default:
+      TORCH_CHECK(false, "Invalid scalar type");
+    }
+
+    sophon::allgather2260(opts);
 
     // Unflatten into output tensors.
     for (auto &outputgroup : outputs) {
@@ -1300,9 +1314,8 @@ public:
   }
 
   void run() override { allgather(outputs, inputs); }
-  void finishWorkSophon() override {
-    // TODO
-  }
+
+  void finishWorkSophon() override { finish(); }
 };
 
 } // namespace
@@ -1450,17 +1463,47 @@ public:
     opts.setRoot(root);
     opts.setTag(tag);
 
-    // Set single temporary tensor on root process.
-    // This is later scattered to the separate output tensors.
+    // Set single input tensor on all processes.
+    GENERATE_ALL_TYPES(scalarType, setInput, opts, inputs[0]);
+
     at::Tensor flatOutputTensor;
     if (context->rank == root) {
       flatOutputTensor = newLikeFlat(outputs[0]);
       GENERATE_ALL_TYPES(scalarType, setOutput, opts, flatOutputTensor);
+    } else {
+      flatOutputTensor = newLikeFlat(inputs);
+      GENERATE_ALL_TYPES(scalarType, setOutput, opts, flatOutputTensor);
     }
 
-    // Set single input tensor on all processes.
-    GENERATE_ALL_TYPES(scalarType, setInput, opts, inputs[0]);
-    sophon::gather(opts);
+    tpudnnHandle_t handle_ = tpudnnCreate();
+    size_t send_bytes_ = inputs[0].nbytes();
+    void* send_buff = inputs[0].data_ptr();
+
+    size_t recv_bytes_ = inputs[0].nbytes();
+    void* recv_buff = flatOutputTensor.data_ptr();
+
+    // for dev mem
+    switch (scalarType) {
+    case ::at::ScalarType::Float:
+      opts.setOutputSophon(handle_, send_buff, send_bytes_, recv_buff, recv_bytes_, SG_DTYPE_FP32);
+      break;
+    case ::at::ScalarType::Half:
+      opts.setOutputSophon(handle_, send_buff, send_bytes_, recv_buff, recv_bytes_, SG_DTYPE_FP16);
+      break;
+    case ::at::ScalarType::Char:
+      opts.setOutputSophon(handle_, send_buff, send_bytes_, recv_buff, recv_bytes_, SG_DTYPE_INT8);
+      break;
+    case ::at::ScalarType::Byte:
+      opts.setOutputSophon(handle_, send_buff, send_bytes_, recv_buff, recv_bytes_, SG_DTYPE_UINT8);
+      break;
+    case ::at::ScalarType::Int:
+      opts.setOutputSophon(handle_, send_buff, send_bytes_, recv_buff, recv_bytes_, SG_DTYPE_INT32);
+      break;
+    default:
+      TORCH_CHECK(false, "Invalid scalar type");
+    }
+
+    sophon::gather2260(opts);
 
     // Unflatten into output tensors on root process.
     if (context->rank == root) {
@@ -1471,9 +1514,8 @@ public:
   }
 
   void run() override { gather(outputs, inputs); }
-  void finishWorkSophon() override {
-    // TODO
-  }
+
+  void finishWorkSophon() override { finish(); }
 };
 } // namespace
 
@@ -1569,8 +1611,13 @@ public:
     opts.setTag(tag);
 
     // Set list of input tensors on root process
+    // if (context->rank == root) {
+    //   GENERATE_ALL_TYPES(scalarType, setInputs, opts, inputs[0]);
+    // }
+    at::Tensor flatInputTensor;
     if (context->rank == root) {
-      GENERATE_ALL_TYPES(scalarType, setInputs, opts, inputs[0]);
+      flatInputTensor = newLikeFlat(inputs[0]);
+      GENERATE_ALL_TYPES(scalarType, setInput, opts, flatInputTensor);
     }
 
     // Set single output tensor on all processes
@@ -1612,19 +1659,53 @@ public:
     opts.setTag(tag);
 
     // Set list of input tensors on root process
+    at::Tensor flatInputTensor;
     if (context->rank == root) {
-      GENERATE_ALL_TYPES(scalarType, setInputs, opts, inputs[0]);
+      flatInputTensor = newLikeFlat(inputs[0]);
+      for (const auto i : c10::irange(inputs[0].size())) {
+        flatInputTensor[i].copy_(inputs[0][i]);
+      }
+      GENERATE_ALL_TYPES(scalarType, setInput, opts, flatInputTensor);
+    } else {
+      flatInputTensor = newLikeFlat(outputs);
+      GENERATE_ALL_TYPES(scalarType, setInput, opts, flatInputTensor);
     }
 
     // Set single output tensor on all processes
     GENERATE_ALL_TYPES(scalarType, setOutput, opts, outputs[0]);
-    sophon::scatter(opts);
+
+    tpudnnHandle_t handle_ = tpudnnCreate();
+    size_t send_bytes_ = outputs[0].nbytes();
+    void* send_buff = flatInputTensor.data_ptr();
+    size_t recv_bytes_ = outputs[0].nbytes();
+    void*  recv_buff = outputs[0].data_ptr();
+
+    // for dev mem
+    switch (scalarType) {
+    case ::at::ScalarType::Float:
+      opts.setOutputSophon(handle_, send_buff, send_bytes_, recv_buff, recv_bytes_, SG_DTYPE_FP32);
+      break;
+    case ::at::ScalarType::Half:
+      opts.setOutputSophon(handle_, send_buff, send_bytes_, recv_buff, recv_bytes_, SG_DTYPE_FP16);
+      break;
+    case ::at::ScalarType::Char:
+      opts.setOutputSophon(handle_, send_buff, send_bytes_, recv_buff, recv_bytes_, SG_DTYPE_INT8);
+      break;
+    case ::at::ScalarType::Byte:
+      opts.setOutputSophon(handle_, send_buff, send_bytes_, recv_buff, recv_bytes_, SG_DTYPE_UINT8);
+      break;
+    case ::at::ScalarType::Int:
+      opts.setOutputSophon(handle_, send_buff, send_bytes_, recv_buff, recv_bytes_, SG_DTYPE_INT32);
+      break;
+    default:
+      TORCH_CHECK(false, "Invalid scalar type");
+    }
+
+    sophon::scatter2260(opts);
   }
 
   void run() override { scatter(outputs, inputs); }
-  void finishWorkSophon() override {
-    // TODO
-  }
+  void finishWorkSophon() override { finish(); }
 };
 
 } // namespace
@@ -1782,7 +1863,34 @@ public:
       opts.setTag(tag);
       GENERATE_ALL_TYPES(scalarType, setInput, opts, inputTensor);
       GENERATE_ALL_TYPES(scalarType, setOutput, opts, outputTensor);
-      sophon::alltoall(opts);
+
+      tpudnnHandle_t handle_ = tpudnnCreate();
+      size_t bytes_ = inputTensor[0].nbytes();
+      void* send_buff = inputTensor[0].data_ptr();
+      void* recv_buff = outputTensor[0].data_ptr();
+
+      // for dev mem
+      switch (scalarType) {
+      case ::at::ScalarType::Float:
+        opts.setOutputSophon(handle_, send_buff, recv_buff, bytes_, SG_DTYPE_FP32);
+        break;
+      case ::at::ScalarType::Half:
+        opts.setOutputSophon(handle_, send_buff, recv_buff, bytes_, SG_DTYPE_FP16);
+        break;
+      case ::at::ScalarType::Char:
+        opts.setOutputSophon(handle_, send_buff, recv_buff, bytes_, SG_DTYPE_INT8);
+        break;
+      case ::at::ScalarType::Byte:
+        opts.setOutputSophon(handle_, send_buff, recv_buff, bytes_, SG_DTYPE_UINT8);
+        break;
+      case ::at::ScalarType::Int:
+        opts.setOutputSophon(handle_, send_buff, recv_buff, bytes_, SG_DTYPE_INT32);
+        break;
+      default:
+        TORCH_CHECK(false, "Invalid scalar type");
+      }
+
+      sophon::alltoall2260(opts);
     } else {
       // sophon alltoallv
       c10d::checkSplitSizes(inputCounts, inputTensor, context->size);
@@ -1804,9 +1912,7 @@ public:
   }
 
   void run() override { alltoall(outputTensor, inputTensor); }
-  void finishWorkSophon() override {
-    // TODO
-  }
+  void finishWorkSophon() override { finish(); }
 };
 
 } // namespace
@@ -1956,9 +2062,7 @@ public:
     opts.setTag(tag);
     sophon::barrier(opts);
   }
-  void finishWorkSophon() override {
-    // TODO
-  }
+  void finishWorkSophon() override { finish(); }
 };
 
 } // namespace
@@ -2065,7 +2169,7 @@ void ProcessGroupSophon::monitoredBarrier(const BarrierOptions &opts,
     // some ranks have not responded.
     // Ensure all ranks from 1, ... WORLD_SIZE -1 have been successfully
     // processed.
-    auto rankFailure = (processedRanks.size() != size_ - 1);
+    auto rankFailure = (processedRanks.size() != (long unsigned int)(size_ - 1));
     if (waitAllRanks && rankFailure) {
       std::vector<int> failedRanks;
       for (const auto i : c10::irange(1, size_)) {

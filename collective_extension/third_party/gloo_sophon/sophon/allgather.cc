@@ -96,4 +96,18 @@ void allgather(AllgatherOptions& opts) {
   }
 }
 
+void allgather2260(AllgatherOptions &opts) {
+  // call tpudnnC2CAllGather
+  sccl_args_t sccl_args;
+  sccl_args.nranks = atoi(getenv("OMPI_COMM_WORLD_SIZE"));
+  sccl_args.rank = atoi(getenv("OMPI_COMM_WORLD_RANK"));
+  printf("nranks: %d, rank: %d\n", sccl_args.nranks, sccl_args.rank);
+  for (int i = 0; i < sccl_args.nranks; i++) {
+    sccl_args.chip_map[i] = i;
+  }
+  tpudnnStatus_t ret =
+      tpudnnC2CAllGather(opts.handle_, opts.send_buff_, opts.input_elements, opts.recv_buff_, opts.output_elements, opts.dtype_, sccl_args);
+  return;
+}
+
 } // namespace sophon

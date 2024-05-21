@@ -11,6 +11,7 @@
 #include "sophon/common/logging.h"
 #include "sophon/context.h"
 #include "sophon/transport/unbound_buffer.h"
+#include "sophon_defines_2260.h"
 
 namespace sophon {
 
@@ -21,27 +22,40 @@ class AlltoallOptions {
 
   template <typename T>
   void setInput(std::unique_ptr<transport::UnboundBuffer> buf) {
-    elementSize = sizeof(T);
-    in = std::move(buf);
+    this->elements = buf->size / sizeof(T);
+    this->elementSize = sizeof(T);
+    this->in = std::move(buf);
   }
 
   template <typename T>
   void setInput(T* ptr, size_t elements) {
-    elementSize = sizeof(T);
-    in = context->createUnboundBuffer(ptr, elements * sizeof(T));
+    this->elements = elements;
+    this->elementSize = sizeof(T);
+    this->in = context->createUnboundBuffer(ptr, elements * sizeof(T));
   }
 
   template <typename T>
   void setOutput(std::unique_ptr<transport::UnboundBuffer> buf) {
-    elementSize = sizeof(T);
-    out = std::move(buf);
+    this->elements = buf->size / sizeof(T);
+    this->elementSize = sizeof(T);
+    this->out = std::move(buf);
   }
 
   template <typename T>
   void setOutput(T* ptr, size_t elements) {
-    elementSize = sizeof(T);
-    out = context->createUnboundBuffer(ptr, elements * sizeof(T));
+    this->elements = elements;    
+    this->elementSize = sizeof(T);
+    this->out = context->createUnboundBuffer(ptr, elements * sizeof(T));
   }
+
+  void setOutputSophon(tpudnnHandle_t handle, void* send_buff, 
+                       void* recv_buff, size_t bytes, sg_data_type_t sg_type) {
+    this->handle_ = handle;
+    this->send_buff_ = send_buff;
+    this->recv_buff_ = recv_buff;
+    this->bytes_ = bytes;
+    this->sg_type_ = sg_type;
+  } 
 
   void setTag(uint32_t tag) {
     this->tag = tag;
@@ -57,6 +71,15 @@ class AlltoallOptions {
   std::unique_ptr<transport::UnboundBuffer> in;
   std::unique_ptr<transport::UnboundBuffer> out;
 
+  tpudnnHandle_t handle_;
+  void* send_buff_;
+  void* recv_buff_;
+  size_t bytes_;
+  sg_data_type_t sg_type_;
+
+  // Number of elements.
+  size_t elements = 0;
+
   // Number of bytes per element.
   size_t elementSize = 0;
 
@@ -67,9 +90,12 @@ class AlltoallOptions {
   // End-to-end timeout for this operation.
   std::chrono::milliseconds timeout;
 
-  friend void alltoall(AlltoallOptions&);
+  friend void alltoall( AlltoallOptions&);
+
+  friend void alltoall2260( AlltoallOptions&);
 };
 
-void alltoall(AlltoallOptions& opts);
+void alltoall(AlltoallOptions &opts);
 
+void alltoall2260( AlltoallOptions &opts);
 } // namespace sophon

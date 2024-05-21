@@ -5,19 +5,20 @@ from torch.utils import cpp_extension
 
 sources = ["src/ProcessGroupSophon.cpp", "src/SophonDeviceFactory.cpp"]
 include_dirs = [f"{os.path.dirname(os.path.abspath(__file__))}/include/",
-                f"{os.path.dirname(os.path.abspath(__file__))}/../libtorch_plugin/tpu",
-                f"{os.path.dirname(os.path.abspath(__file__))}/../libtorch_plugin",
-                f"{os.path.dirname(os.path.abspath(__file__))}/../../libsophon/bmlib/include",
+                f"{os.path.dirname(os.path.abspath(__file__))}/../torch_tpu/csrc/core",
+                f"{os.path.dirname(os.path.abspath(__file__))}/../",
                 f"{os.path.dirname(os.path.abspath(__file__))}/third_party/gloo_sophon/",
+                f"{os.path.dirname(os.path.abspath(__file__))}/third_party/tpudnn/include",
                 f"{os.path.dirname(os.path.abspath(__file__))}/../common/include"
                 ]
-library_dirs = [f"{os.path.dirname(os.path.abspath(__file__))}/../libtorch/lib",
-                f"{os.path.dirname(os.path.abspath(__file__))}/../libtorch_plugin/build",
+library_dirs = [f"{os.path.dirname(os.path.realpath(torch.__file__))}/lib",
+                f"{os.path.dirname(os.path.realpath(__file__))}/lib",
+                f"{os.path.dirname(os.path.abspath(__file__))}/../build/Release/torch_tpu",
                 f"{os.path.dirname(os.path.abspath(__file__))}/third_party/gloo_sophon/build/sophon",
-                f"{os.path.dirname(os.path.abspath(__file__))}/../../TPU1686/build/sgdnn_tmp/",
+                f"{os.path.dirname(os.path.abspath(__file__))}/third_party/tpudnn/lib",
                 ]
 
-libraries = ["libtorch_plugin", "sophon", "sgdnn"]
+libraries = ["torch_tpu", "sophon", "tpudnn"]
 
 module = cpp_extension.CppExtension(
     name="sccl_collectives",

@@ -131,12 +131,13 @@ public:
     }
   }
 
-  void setOutputSophon(sg_data_type_t sg_type, bm_handle_t handle, size_t bytes,
-                       bm_device_mem_t buff, sg_reduce_method_t reduce_method) {
+  void setOutputSophon(tpudnnHandle_t handle, void* send_buff, void* recv_buff, 
+                       size_t bytes, sg_data_type_t sg_type, sg_reduce_method_t reduce_method) {
     this->handle_ = handle;
+    this->send_buff_ = send_buff;
+    this->recv_buff_ = recv_buff;
     this->bytes_ = bytes;
     this->dtype_ = sg_type;
-    this->buff_ = buff;
     this->reduce_method_ = reduce_method;
   }
 
@@ -190,11 +191,12 @@ public:
 protected:
   detail::AllreduceOptionsImpl impl_;
 
-  bm_handle_t handle_;
-  bm_device_mem_t buff_;
-  sg_reduce_method_t reduce_method_;
+  tpudnnHandle_t handle_;
+  void* send_buff_;
+  void* recv_buff_;
   size_t bytes_;
   sg_data_type_t dtype_;
+  sg_reduce_method_t reduce_method_;
 
   friend void allreduce(const AllreduceOptions &);
 

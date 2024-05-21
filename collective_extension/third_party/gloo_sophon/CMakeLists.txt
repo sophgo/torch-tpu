@@ -6,9 +6,6 @@ if(DEFINED ENV{CHIP_ARCH})
   add_definitions(-D__$ENV{CHIP_ARCH}__)
 endif()
 
-# include(${CMAKE_CURRENT_SOURCE_DIR}/toolchain-cmodel.cmake)
-# include(${CMAKE_CURRENT_SOURCE_DIR}/config_common.cmake)
-
 set(SOPHON_VERSION_MAJOR 0)
 set(SOPHON_VERSION_MINOR 5)
 set(SOPHON_VERSION_PATCH 0)

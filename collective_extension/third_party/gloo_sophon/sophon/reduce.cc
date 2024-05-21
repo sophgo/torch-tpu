@@ -16,17 +16,16 @@
 #include "sophon/math.h"
 #include "sophon/types.h"
 
-#include "sgdnn_api.h"
-
 namespace sophon {
 
 // extern constexpr const int chips2260;
 
 void reduce2260(ReduceOptions &opts) {
-  // call sgdnn_c2c_reduce
-  bm_status_t ret = sgdnn_c2c_reduce(opts.handle_, opts.send_buff_,
-                                     opts.rec_buff_, opts.elements, opts.dtype_,
-                                     opts.root, opts.reduce_method_);
+  // call tpudnnC2CReduce
+  sccl_args_t sccl_args;
+  tpudnnStatus_t ret = tpudnnC2CReduce(opts.handle_, opts.send_buff_,
+                                     opts.recv_buff_, opts.elements, opts.dtype_,
+                                     opts.reduce_method_, opts.root, sccl_args);
   return;
 }
 

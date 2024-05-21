@@ -4,10 +4,10 @@ import torch.distributed as dist
 import logging
 import os
 from helper import init_logger, is_master, is_slave
+import time
 import torch_tpu
 import sccl_collectives
 TPU = "tpu"
-
 
 rank = os.environ.get("OMPI_COMM_WORLD_RANK", None)
 world_size = os.environ.get("OMPI_COMM_WORLD_SIZE", None)
@@ -18,32 +18,34 @@ dist.init_process_group(backend="SOPHON", rank=int(rank), world_size=int(world_s
 init_logger()
 
 def case1():
-    logging.info("rank: {}".format(rank))
     master_results = None
     slave_results = None
 
-    if is_master():
-        tensor = torch.rand(tensor_len)
-        logging.info("rank: {}, {}".format(rank, tensor))
-        tensor = tensor.to(TPU)
-
-    if is_slave():
-        tensor = torch.rand(tensor_len)
-        logging.info("rank: {}, {}".format(rank, tensor))
-        tensor = tensor.to(TPU)
-
-    dist.reduce(tensor, dst=0, op=dist.ReduceOp.SUM)
+    input_tensor = torch.rand(tensor_len)
+    logging.info("rank: {}, {}".format(rank, input_tensor))
+    input_tensor = input_tensor.to(TPU)
 
     if is_master():
-        master_results = tensor.cpu()
+        output_list = [torch.zeros(tensor_len) for _ in range(int(world_size))]
+        logging.info("rank: {}, {}".format(rank, output_list))
+        output_list = [tensor.to(TPU) for tensor in output_list]
+
+    if is_master():
+        dist.gather(input_tensor, output_list, dst=0)
+
+    else:
+        dist.gather(input_tensor, dst=0)
+
+    if is_master():
+        master_results = [tensor.cpu() for tensor in output_list]
         logging.info("rank: {}, master_results: {}".format(rank, master_results))
-
+    
     if is_slave():
-        slave_results = tensor.cpu()
+        slave_results = input_tensor.cpu()
         logging.info("rank: {}, slave_results: {}".format(rank, slave_results))
 
 
 if __name__ == "__main__":
     case1()
 
-# mpirun --allow-run-as-root -n 8 -output-filename log python test_reduce.py 2>&1 | tee 1.log
+# mpirun --allow-run-as-root -n 8 -output-filename log python test_gather.py 2>&1 | tee 1.log

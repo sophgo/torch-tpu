@@ -15,16 +15,14 @@
 #include "sophon/math.h"
 #include "sophon/types.h"
 
-// #include "sgdnn_dist_api.h"
-#include "sgdnn_api.h"
-
 namespace sophon {
 
 // extern constexpr const int chips2260;
 
 void broadcast2260(BroadcastOptions &opts) {
-    // call sgdnn_c2c_broadcast
-    bm_status_t ret = sgdnn_c2c_broadcast(opts.handle_, opts.buff_, opts.elements, opts.dtype_, opts.root);
+    // call tpudnnC2CBroadcast
+    sccl_args_t sccl_args;
+    tpudnnStatus_t ret = tpudnnC2CBroadcast(opts.handle_, opts.buff_, opts.elements, opts.dtype_, opts.root, sccl_args);
   return;
 }
 

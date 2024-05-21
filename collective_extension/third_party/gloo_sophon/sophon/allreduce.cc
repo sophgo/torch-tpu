@@ -16,8 +16,6 @@
 #include "sophon/math.h"
 #include "sophon/types.h"
 
-#include "sgdnn_api.h"
-
 namespace sophon {
 
 namespace {
@@ -649,10 +647,11 @@ void bcube(const detail::AllreduceOptionsImpl &opts,
 } // namespace
 
 void allreduce2260(const AllreduceOptions &opts) {
-  // call sgdnn_c2c_all_reduce
-  bm_status_t ret =
-      sgdnn_c2c_all_reduce(opts.handle_, opts.buff_, opts.impl_.elements,
-                           opts.dtype_, opts.reduce_method_);
+  // call tpudnnC2CAllReduce
+  sccl_args_t sccl_args;
+  tpudnnStatus_t ret =
+      tpudnnC2CAllReduce(opts.handle_, opts.send_buff_, opts.recv_buff_,
+                           opts.impl_.elements, opts.dtype_, opts.reduce_method_, sccl_args);
   return;
 }
 

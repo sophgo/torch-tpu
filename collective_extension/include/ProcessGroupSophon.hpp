@@ -8,6 +8,7 @@
 #include <sophon/rendezvous/store.h>
 #include <sophon/transport/device.h>
 #include <torch/python.h>
+#include "tpuDNN.h"
 
 #include <condition_variable>
 #include <deque>

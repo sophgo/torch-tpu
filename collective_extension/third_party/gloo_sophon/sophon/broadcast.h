@@ -41,7 +41,7 @@ class BroadcastOptions {
     this->out = std::move(buf);
   }
 
-  void setOutputSophon(sg_data_type_t sg_type, bm_handle_t handle, size_t bytes, bm_device_mem_t buff) {
+  void setOutputSophon(tpudnnHandle_t handle, void* buff, size_t bytes, sg_data_type_t sg_type) {
     this->handle_ = handle;
     this->bytes_ = bytes;
     this->dtype_ = sg_type;
@@ -70,8 +70,8 @@ class BroadcastOptions {
  protected:
   std::shared_ptr<Context> context;
 
-  bm_handle_t handle_;
-  bm_device_mem_t buff_;
+  tpudnnHandle_t handle_;
+  void* buff_;
   size_t bytes_;
   sg_data_type_t dtype_;
 

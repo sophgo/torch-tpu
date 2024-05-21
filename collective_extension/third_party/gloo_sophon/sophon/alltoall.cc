@@ -53,4 +53,13 @@ void alltoall(AlltoallOptions& opts) {
   }
 }
 
+void alltoall2260( AlltoallOptions &opts) {
+  // call tpudnnC2CAllToAll
+  sccl_args_t sccl_args;
+  tpudnnStatus_t ret =
+      tpudnnC2CAllToAll(opts.handle_, opts.send_buff_, opts.elements, opts.sg_type_, 
+                                       opts.recv_buff_, opts.elements, opts.sg_type_, sccl_args);
+  return;
+}
+
 } // namespace sophon

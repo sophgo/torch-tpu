@@ -10,6 +10,7 @@
 
 #include "sophon/context.h"
 #include "sophon/transport/unbound_buffer.h"
+#include "sophon_defines_2260.h"
 
 namespace sophon {
 
@@ -20,26 +21,41 @@ class AllgatherOptions {
 
   template <typename T>
   void setInput(std::unique_ptr<transport::UnboundBuffer> buf) {
-    elementSize = sizeof(T);
-    in = std::move(buf);
+    this->input_elements = buf->size / sizeof(T);
+    this->elementSize = sizeof(T);
+    this->in = std::move(buf);
   }
 
   template <typename T>
   void setInput(T* ptr, size_t elements) {
-    elementSize = sizeof(T);
-    in = context->createUnboundBuffer(ptr, elements * sizeof(T));
+    this->input_elements = elements;
+    this->elementSize = sizeof(T);
+    this->in = context->createUnboundBuffer(ptr, input_elements * sizeof(T));
+  }
+
+  void setOutputSophon(tpudnnHandle_t handle, void* send_buff,
+                       size_t send_bytes, void* recv_buff,
+                       size_t recv_bytes, sg_data_type_t sg_type) {
+    this->handle_ = handle;
+    this->send_buff_ = send_buff;
+    this->send_bytes_ = send_bytes;
+    this->recv_buff_ = recv_buff;
+    this->recv_bytes_ = recv_bytes;
+    this->dtype_ = sg_type;
   }
 
   template <typename T>
   void setOutput(std::unique_ptr<transport::UnboundBuffer> buf) {
-    elementSize = sizeof(T);
-    out = std::move(buf);
+    this->output_elements = buf->size / sizeof(T);
+    this->elementSize = sizeof(T);
+    this->out = std::move(buf);
   }
 
   template <typename T>
   void setOutput(T* ptr, size_t elements) {
-    elementSize = sizeof(T);
-    out = context->createUnboundBuffer(ptr, elements * sizeof(T));
+    this->output_elements = elements;
+    this->elementSize = sizeof(T);
+    this->out = context->createUnboundBuffer(ptr, output_elements * sizeof(T));
   }
 
   void setTag(uint32_t tag) {
@@ -55,6 +71,10 @@ class AllgatherOptions {
   std::unique_ptr<transport::UnboundBuffer> in;
   std::unique_ptr<transport::UnboundBuffer> out;
 
+  // Number of elements.
+  size_t input_elements = 0;
+  size_t output_elements = 0;
+
   // Number of bytes per element.
   size_t elementSize = 0;
 
@@ -65,9 +85,20 @@ class AllgatherOptions {
   // End-to-end timeout for this operation.
   std::chrono::milliseconds timeout;
 
+  tpudnnHandle_t handle_;
+  void* send_buff_;
+  size_t send_bytes_;
+  void* recv_buff_;
+  size_t recv_bytes_;
+  sg_data_type_t dtype_;
+
   friend void allgather(AllgatherOptions&);
+
+  friend void allgather2260(AllgatherOptions &);
 };
 
 void allgather(AllgatherOptions& opts);
+
+void allgather2260(AllgatherOptions &opts);
 
 } // namespace sophon

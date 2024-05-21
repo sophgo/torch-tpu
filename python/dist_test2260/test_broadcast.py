@@ -4,8 +4,8 @@ import torch.distributed as dist
 import logging
 import os
 from helper import init_logger, is_master, is_slave
-import sccl_collectives
 import torch_tpu
+import sccl_collectives
 TPU = "tpu"
 
 rank = os.environ.get("OMPI_COMM_WORLD_RANK", None)

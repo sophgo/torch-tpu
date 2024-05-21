@@ -17,7 +17,7 @@ void sum(void* c_, const void* a_, const void* b_, size_t n) {
   T* c = static_cast<T*>(c_);
   const T* a = static_cast<const T*>(a_);
   const T* b = static_cast<const T*>(b_);
-  for (auto i = 0; i < n; i++) {
+  for (size_t i = 0; i < n; i++) {
     c[i] = a[i] + b[i];
   }
 }
@@ -32,7 +32,7 @@ void product(void* c_, const void* a_, const void* b_, size_t n) {
   T* c = static_cast<T*>(c_);
   const T* a = static_cast<const T*>(a_);
   const T* b = static_cast<const T*>(b_);
-  for (auto i = 0; i < n; i++) {
+  for (size_t i = 0; i < n; i++) {
     c[i] = a[i] * b[i];
   }
 }
@@ -47,7 +47,7 @@ void max(void* c_, const void* a_, const void* b_, size_t n) {
   T* c = static_cast<T*>(c_);
   const T* a = static_cast<const T*>(a_);
   const T* b = static_cast<const T*>(b_);
-  for (auto i = 0; i < n; i++) {
+  for (size_t i = 0; i < n; i++) {
     c[i] = std::max(a[i], b[i]);
   }
 }
@@ -62,7 +62,7 @@ void min(void* c_, const void* a_, const void* b_, size_t n) {
   T* c = static_cast<T*>(c_);
   const T* a = static_cast<const T*>(a_);
   const T* b = static_cast<const T*>(b_);
-  for (auto i = 0; i < n; i++) {
+  for (size_t i = 0; i < n; i++) {
     c[i] = std::min(a[i], b[i]);
   }
 }

@@ -1,6 +1,8 @@
 # SOPHON_SRCS is the list of source files that we need to build libsophon.
 set(SOPHON_SRCS)
 
+set(CMAKE_CXX_STANDARD 17)
+
 # SOPHON_HDRS is the list of header files that we need to install.
 set(SOPHON_HDRS)
 
@@ -161,30 +163,16 @@ configure_file(config.h.in config.h)
 # link sgdnn
 set(PROJECT_ROOT ${CMAKE_SOURCE_DIR}/../../../ CACHE PATH "default project root")
 add_library(sophon ${SOPHON_STATIC_OR_SHARED} ${SOPHON_SRCS})
-# target_link_libraries(sophon PRIVATE ${CMAKE_SOURCE_DIR}/../../../sgdnn_dist/build/libsgdnn.a)
-target_link_libraries(sophon PRIVATE ${CMAKE_SOURCE_DIR}/../../../../TPU1686/build/sgdnn_tmp/libsgdnn.a)
-# target_include_directories(sophon PRIVATE ${CMAKE_SOURCE_DIR}/../../../sgdnn_dist/include)
-target_include_directories(sophon PRIVATE ${CMAKE_SOURCE_DIR}/../../../../TPU1686/sgdnn_tmp/include)
-target_include_directories(sophon PRIVATE ${CMAKE_SOURCE_DIR}/../../../../TPU1686/common/include)
-target_include_directories(sophon PRIVATE ${CMAKE_SOURCE_DIR}/../../../../TPU1686/common/include/api)
-
-# include_directories(${PROJECT_ROOT}/common/include)
+include_directories($ENV{PYTORCH_INSTALL_DIR}/include/torch/csrc/api/include)
+include_directories($ENV{PYTORCH_INSTALL_DIR}/include)
+link_directories($ENV{PYTORCH_INSTALL_DIR}/lib)
 include_directories(${PROJECT_ROOT}/third_party/include)
-include_directories(${PROJECT_ROOT}/libtorch_plugin/tpu)
-include_directories(${PROJECT_ROOT}/libtorch_plugin)
-# include_directories(${CMAKE_CURRENT_SOURCE_DIR}/include)
-include_directories($ENV{LIBSOPHON_TOP}/bmlib/include)
-include_directories($ENV{LIBSOPHON_TOP}/bmlib/src)
-
-# use bmlib
-# if(USE_SOPHGO)
-find_package(libsophon REQUIRED)
-include_directories(${LIBSOPHON_INCLUDE_DIRS})
-link_directories(${LIBSOPHON_LIB_DIRS})
-set(BM_LIBS bmlib bmrt)
-list(APPEND sophon_DEPENDENCY_LIBS ${BM_LIBS})
-  # target_link_libraries(sophon ${BM_LIBS})
-# endif()
+include_directories(${PROJECT_ROOT}/torch_tpu/csrc/core)
+include_directories(${PROJECT_ROOT})
+find_package(tpurt REQUIRED)
+target_link_libraries(sophon PUBLIC tpurt::tpurt)
+find_package(tpudnn REQUIRED)
+target_link_libraries(sophon PUBLIC tpudnn::tpudnn)
 
 # if(USE_CUDA)
 #   if(SOPHON_USE_CUDA_TOOLKIT)

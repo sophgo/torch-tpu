@@ -13,6 +13,7 @@
 
 #include "sophon/context.h"
 #include "sophon/transport/unbound_buffer.h"
+#include "sophon_defines_2260.h"
 
 namespace sophon {
 
@@ -22,36 +23,42 @@ class ScatterOptions {
       : context(context), timeout(context->getTimeout()) {}
 
   template <typename T>
-  void setInputs(std::vector<std::unique_ptr<transport::UnboundBuffer>> bufs) {
+  void setInput(std::unique_ptr<transport::UnboundBuffer> buf) {
+    this->input_elements = buf->size / sizeof(T);
     this->elementSize = sizeof(T);
-    this->in = std::move(bufs);
+    this->in = std::move(buf);
   }
 
   template <typename T>
-  void setInputs(std::vector<T*> ptrs, size_t elements) {
-    setInputs(ptrs.data(), ptrs.size(), elements);
+  void setInput(T* ptr, size_t elements) {
+    this->input_elements = elements;
+    this->elementSize = sizeof(T);
+    this->in = context->createUnboundBuffer(ptr, input_elements * sizeof(T));
   }
 
-  template <typename T>
-  void setInputs(T** ptrs, size_t len, size_t elements) {
-    this->elementSize = sizeof(T);
-    this->in.reserve(len);
-    for (size_t i = 0; i < len; i++) {
-      this->in.push_back(
-          context->createUnboundBuffer(ptrs[i], elements * sizeof(T)));
-    }
+  void setOutputSophon(tpudnnHandle_t handle, void* send_buff,
+                       size_t send_bytes, void* recv_buff,
+                       size_t recv_bytes, sg_data_type_t sg_type) {
+    this->handle_ = handle;
+    this->send_buff_ = send_buff;
+    this->send_bytes_ = send_bytes;
+    this->recv_buff_ = recv_buff;
+    this->recv_bytes_ = recv_bytes;
+    this->dtype_ = sg_type;
   }
 
   template <typename T>
   void setOutput(std::unique_ptr<transport::UnboundBuffer> buf) {
+    this->output_elements = buf->size / sizeof(T);
     this->elementSize = sizeof(T);
     this->out = std::move(buf);
   }
 
   template <typename T>
   void setOutput(T* ptr, size_t elements) {
+    this->output_elements = elements;
     this->elementSize = sizeof(T);
-    this->out = context->createUnboundBuffer(ptr, elements * sizeof(T));
+    this->out = context->createUnboundBuffer(ptr, output_elements * sizeof(T));
   }
 
   void setRoot(int root) { this->root = root; }
@@ -64,14 +71,12 @@ class ScatterOptions {
 
  protected:
   std::shared_ptr<Context> context;
-
-  // Scatter has N input buffers where each one in its
-  // entirety gets sent to a rank. The input(s) only need to
-  // be set on the root process.
-  std::vector<std::unique_ptr<transport::UnboundBuffer>> in;
-
-  // Scatter only has a single output buffer per rank.
+  std::unique_ptr<transport::UnboundBuffer> in;
   std::unique_ptr<transport::UnboundBuffer> out;
+
+  // Number of elements.
+  size_t input_elements = 0;
+  size_t output_elements = 0;
 
   // Number of bytes per element.
   size_t elementSize = 0;
@@ -86,9 +91,20 @@ class ScatterOptions {
   // End-to-end timeout for this operation.
   std::chrono::milliseconds timeout;
 
+  tpudnnHandle_t handle_;
+  void* send_buff_;
+  size_t send_bytes_;
+  void* recv_buff_;
+  size_t recv_bytes_;
+  sg_data_type_t dtype_;
+
   friend void scatter(ScatterOptions&);
+
+  friend void scatter2260(ScatterOptions &);
 };
 
 void scatter(ScatterOptions& opts);
+
+void scatter2260(ScatterOptions& opts);
 
 }  // namespace sophon
