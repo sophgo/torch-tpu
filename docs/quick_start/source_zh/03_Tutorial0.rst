@@ -272,3 +272,43 @@
   Accuracy: 64.9%, Avg loss: 1.076614 
   Total execution time = 53.047 sec
   """
+
+模型训练实例_YOLOV5S
+===================
+
+本章节介绍了如何在使用Torch-TPU的前提下，微调YOLOV5S的具体训练流程。
+
+本节分别给出不同精度（FP16、FP32、混合精度）下的训练代码示例。
+
+本节默认使用者已经按照第2章说明完成torch-tpu环境配置安装。
+
+项目示例代码可以从 torch-tpu*.whl包中的 torch_tpu/demo/yolov5s/yolov5s 获取。(解压whl包即可看到)
+
+安装必要环境，`pip3 install -r requirements.txt`
+
+模型训练_FP32
+------------------
+
+本示例是在默认的FP32精度下实现的模型训练。
+
+执行如下命令，即可开始fp32训练：
+
+.. code-block :: bash
+
+    python3 train_fp16.py --img 640 --epoch 3 --data coco128.yaml --weights yolov5s.pt --workers 1 --batch-size 2 --device tpu --optimizer SGD
+
+
+注意命令会自动下载数据集和模型文件。
+
+模型训练_FP16
+------------------
+
+本示例是在默认的FP16精度下实现的模型训练。
+
+执行如下命令，即可开始fp16训练：
+
+.. code-block :: bash
+
+    python3 train_fp16.py --img 640 --epoch 3 --data coco128.yaml --weights yolov5s.pt --workers 1 --batch-size 2 --device tpu --optimizer SGD
+
+注意命令会自动下载数据集和模型文件。
