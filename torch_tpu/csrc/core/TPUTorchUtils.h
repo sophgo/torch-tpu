@@ -250,6 +250,7 @@ typedef enum
   GELU,
   GELU_BACKWARD,
   LEAKY_RELU,
+  LLama2A16MATMUL,
   MM,
   ADDMM,
   BMM,

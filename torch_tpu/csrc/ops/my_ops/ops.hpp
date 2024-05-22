@@ -35,6 +35,15 @@ namespace at
 		Tensor &weight2,
 		Tensor &output);
 
+	Tensor a16_matmul_forward(
+		Tensor &active,
+		Tensor &weight,
+		Tensor &scale,
+		Tensor &zp,
+        int8_t group_size,
+		int8_t weight_bits,
+		Tensor &output);
+
 	Tensor rmsnorm_forward(
 		Tensor &input,
 		const c10::optional<Tensor> &scale,

@@ -283,6 +283,16 @@ tpu_status_t sgdnnBatchMatmul ( tpu_resource_t  stream,
                                SgdnnTensor_t output ,
                                bool non_blocking = true);
 
+tpu_status_t sgdnnLLamaA16Matmul ( tpu_resource_t handle,
+                             SgdnnTensor_t left,
+                             SgdnnTensor_t right,
+                             SgdnnTensor_t scale,
+                             SgdnnTensor_t zp,
+                             int group_size,
+                             int weight_bits,
+                             SgdnnTensor_t output,
+                             bool non_blocking = true );
+
 /*
  * OUTPUT = GATHER ( INPUT, AXIS, INDEX )
  * Note:

@@ -2796,6 +2796,48 @@ tpu_status_t sgdnnMatmul ( tpu_resource_t resource ,
   return SG_SUCCESS;
 }
 
+tpu_status_t sgdnnLLamaA16Matmul ( tpu_resource_t handle,
+                             SgdnnTensor_t left,
+                             SgdnnTensor_t right,
+                             SgdnnTensor_t scale,
+                             SgdnnTensor_t zp,
+                             int group_size,
+                             int weight_bits,
+                             SgdnnTensor_t output,
+                             bool non_blocking )
+{
+#if defined BACKEND_SG2260
+  if ( left.dtype == SGDNN_DTYPE_FP16 )
+  {
+    sg_api_a16_matmul_t api;
+    api.input_global_addr = left.addr;
+    api.weight_global_addr = right.addr;
+    api.bias_global_addr = 0;
+    api.scale_global_addr = scale.addr;
+    api.zp_global_addr = zp.addr;
+    api.output_global_addr = output.addr;
+    api.R_trans = true;
+    api.sign = true;
+    api.has_bias = false;
+    api.has_zp = true;
+    api.final_row_num = left.shape[2];
+    api.inner_num = left.shape[3];
+    api.final_col_num = right.shape[2];
+    api.q_group_size = abs(group_size);
+    api.weight_bits = weight_bits;
+    api.io_dtype = sgdnnTPUKernelDType ( left.dtype );
+    api.weight_dtype = sgdnnTPUKernelDType (right.dtype);
+    api.bias_dtype = 0;
+    SAFE_CALL ( sgdnnTPUKernelLaunchMultiCore ( handle, "tpu_kernel_api_llama_a16_matmul", &api, sizeof ( api ), non_blocking ) );
+    return SG_SUCCESS;
+  } else {
+    SGDNN_CHECK ( false );
+  }
+#else
+  SGDNN_CHECK ( false );
+#endif
+}
+
 tpu_status_t sgdnnBatchMatmul ( tpu_resource_t resource ,
                                SgdnnTensor_t left,
                                SgdnnTensor_t right,

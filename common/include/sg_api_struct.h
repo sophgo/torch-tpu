@@ -386,6 +386,28 @@ typedef struct
 
 typedef struct
 {
+  unsigned long long input_global_addr;
+  unsigned long long weight_global_addr;
+  unsigned long long bias_global_addr;
+  unsigned long long scale_global_addr;
+  unsigned long long zp_global_addr;
+  unsigned long long output_global_addr;
+  int final_row_num;
+  int inner_num;
+  int final_col_num;
+  int has_bias;
+  int has_zp;
+  int q_group_size;
+  int weight_dtype;
+  int bias_dtype;
+  int R_trans;
+  int sign;
+  int weight_bits;
+  int io_dtype;
+} WITH_PLATFORM(sg_api_a16_matmul_t);
+
+typedef struct
+{
   unsigned long long left_global_addr;
   unsigned long long right_global_addr;
   unsigned long long bias_global_addr;
