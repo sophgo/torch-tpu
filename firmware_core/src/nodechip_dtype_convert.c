@@ -80,11 +80,11 @@ void tpu_kernel_api_dtype_convert_multi_core ( const void* args ) {
   if (api->dim > 0) {
     compute_current_slice_info_multi_core(outer_num, &outer_num_real, &outer_num_avg, &min_cores_needed);
     new_shape[0] = outer_num_real;
-  } 
+  }
   if (core_idx < min_cores_needed) {
     nodechip_cast (
-      api->input_global_addr + core_idx * outer_num_avg * inner_num *  tpu_data_type_size(api->input_dtype),
-      api->output_global_addr + core_idx * outer_num_avg * inner_num *  tpu_data_type_size(api->output_dtype),
+      api->input_global_addr + (unsigned long long)core_idx * outer_num_avg * inner_num *  tpu_data_type_size(api->input_dtype),
+      api->output_global_addr + (unsigned long long)core_idx * outer_num_avg * inner_num *  tpu_data_type_size(api->output_dtype),
       new_shape,
       new_dim,
       ( data_type_t ) api->input_dtype,

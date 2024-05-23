@@ -48,7 +48,7 @@ static void nodechip_gather(
     tpu_continuous_stride(&input_global_stride, &ishape);
     tpu_continuous_stride(&output_global_stride, &oshape);
     dim4 index_stride = {
-        .n = 0,
+        .n = 1,
         .c = index_ishape.h * index_ishape.w,
         .h = 1,
         .w = 1};
@@ -75,6 +75,7 @@ static void nodechip_gather(
             &input_global_stride,
             &index_stride,
             dtype);
+        // tpu_poll();
 
         widx += wslice;
         if (widx >= ishape.w)
@@ -99,55 +100,39 @@ void cast_index_int64_to_int32(
   data_type_t src_dtype = DT_INT32;
   data_type_t dst_dtype = DT_INT32;
 
-  dim4 bottom_global_shape ;
-  bottom_global_shape.n = dim>3 ? index_shape[dim-3] : 1;
-  bottom_global_shape.c = dim>2 ? index_shape[dim-2] : 1;
-  bottom_global_shape.h = dim>1 ? index_shape[dim-2] : 1;
-  bottom_global_shape.w = dim>0 ? index_shape[dim-1] : 1;
-  for (int i = 4; i < dim; ++i)
-  {
-    bottom_global_shape.n *= index_shape[dim-i];
+  unsigned long long ele_num = 1;
+  for (int i=0; i<dim; ++i) {
+    ele_num *= index_shape[i];
   }
-  
-  dim4 src_global_stride;
-  src_global_stride.w = 2;//2
-  src_global_stride.h = bottom_global_shape.w * src_global_stride.w;//w
-  src_global_stride.c = bottom_global_shape.h * src_global_stride.h;//h*w
-  src_global_stride.n = bottom_global_shape.c * src_global_stride.c;//c*h*w
-  
-  tpu_poll();
+  dim4 in_shape = {.n = 1, .c = 1, .h = 1, .w=ele_num};
 
-  // tpu_gdma_general_cpy_S2L(
-  //     in_local_addr,
-  //     in_global_addr,
-  //     &bottom_global_shape,
-  //     &bottom_global_shape,
-  //     NULL,
-  //     &src_global_stride,
-  //     src_dtype);
-  tpu_gdma_cpy_S2L(
-      in_local_addr,
-      in_global_addr,
-      &bottom_global_shape,
-      NULL,
-      &src_global_stride,
-      src_dtype);
+  if (ele_num > 0) {
+    dim4 src_stride;
+    tpu_continuous_stride(&src_stride, &in_shape);
+    src_stride.n *= 2;
+    src_stride.c *= 2;
+    src_stride.h *= 2;
+    src_stride.w *= 2;
+    tpu_gdma_cpy_S2L(
+        in_local_addr,
+        in_global_addr,
+        &in_shape,
+        NULL,
+        &src_stride,
+        src_dtype);
+  }
+  tpu_sync_all();
 
-  dim4 top_global_stride;
-  // tpu_continuous_stride(&top_global_stride, &bottom_global_shape);
-  top_global_stride.w = 1;//1
-  top_global_stride.h = bottom_global_shape.w * top_global_stride.w;//w
-  top_global_stride.c = bottom_global_shape.h * top_global_stride.h;//h*w
-  top_global_stride.n = bottom_global_shape.c * top_global_stride.c;//c*h*w
-
-  tpu_gdma_cpy_L2S(
-      out_global_addr,
-      in_local_addr,
-      &bottom_global_shape,
-      &top_global_stride,
-      NULL,
-      dst_dtype);
-  tpu_poll();
+  if (ele_num > 0) {
+    tpu_gdma_cpy_L2S(
+        out_global_addr,
+        in_local_addr,
+        &in_shape,
+        NULL,
+        NULL,
+        dst_dtype);
+  }
+  tpu_sync_all();
 }
 void tpu_kernel_api_gather ( const void *args )
 {
@@ -188,7 +173,50 @@ TPUKERNEL_FUNC_REGISTER ( tpu_kernel_api_gather );
 #ifdef BACKEND_SG2260
 void tpu_kernel_api_gather_multi_core ( const void *args )
 {
-  TPUKERNEL_ASSERT_INFO(false, "not implementated");
+  sg_api_gather_t *api = ( sg_api_gather_t * ) args;
+  tpu_initialize();
+  long long int inner_num = 1, gather_num = 1, gathered_num = 1, outer_num = 1;
+  for (int i = 0; i < api->axis; ++i) {
+    inner_num *= api->input_shape[i];
+  }
+  gather_num = api->input_shape[api->axis];
+  gathered_num = api->index_shape[api->axis];
+  for (int i=api->axis+1; i<api->dim; ++i) {
+    outer_num *= api->input_shape[i];
+  }
+  int new_input_shape[3] = {inner_num, gather_num, outer_num};
+  int new_index_shape[3] = {inner_num, gathered_num, outer_num};
+
+
+  // only support slice inner_num now
+  int core_num = tpu_core_num();
+  int core_idx = tpu_core_index();
+  int slice = DIV_UP(inner_num, core_num);
+  if (slice * (core_idx + 1) > inner_num) {
+    slice = MAX(0, inner_num - slice * core_idx);
+  }
+  new_input_shape[0] = slice;
+  new_index_shape[0] = slice;
+  if(api->is_index_int64){
+    cast_index_int64_to_int32(
+      api->index_global_addr + slice * core_idx * gathered_num * outer_num * 8,
+      api->index_global_addr + slice * core_idx * gathered_num * outer_num * 4,
+      3,
+      new_index_shape);
+  }
+  if (slice > 0) {
+    nodechip_gather (
+      api->input_global_addr + slice * core_idx * gather_num * outer_num * tpu_data_type_size(api->dtype),
+      api->index_global_addr + slice * core_idx * gathered_num * outer_num * 4,
+      api->output_global_addr  + slice * core_idx * gathered_num * outer_num * tpu_data_type_size(api->dtype),
+      new_input_shape,
+      new_index_shape,
+      3,
+      1,
+      api->dtype );
+  }
+
+  tpu_poll();
 }
 TPUKERNEL_FUNC_REGISTER ( tpu_kernel_api_gather_multi_core );
 #endif

@@ -14,7 +14,7 @@ const dim4  * output_shape
 {
   // fill 0
   if( isint64 ){
-      dim4 fill_shape = {.n = output_shape->n, 
+      dim4 fill_shape = {.n = output_shape->n,
                          .c = output_shape->c,
                          .h = output_shape->h,
                          .w = 2 };
@@ -79,3 +79,28 @@ void tpu_kernel_api_arange ( const void * args )
 }
 
 TPUKERNEL_FUNC_REGISTER ( tpu_kernel_api_arange );
+
+
+#ifdef BACKEND_2260
+void tpu_kernel_api_arange_multi_core ( const void *args )
+{
+  sg_api_arange_t * api = ( sg_api_arange_t * ) args;
+  if ( api->isint64 ) {
+    TPUKERNEL_ASSERT(api->dtype == DT_INT32);
+  } else {
+    TPUKERNEL_ASSERT ( api->dtype == DT_INT32 || api->dtype == DT_FP32);
+  }
+  tpu_initialize();
+  dim4 shape = { .n = 1, .c = api->shape[0], .h = 1, .w = 1 };
+  nodechip_arange (
+  api->start,
+  api->end,
+  api->step,
+  api->output_global_addr,
+  api->dtype,
+  api->isint64,
+  &shape);
+  tpu_poll();
+}
+TPUKERNEL_FUNC_REGISTER ( tpu_kernel_api_arange_multi_core );
+#endif

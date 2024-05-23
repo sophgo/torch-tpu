@@ -48,7 +48,7 @@ TPUKERNEL_FUNC_REGISTER(tpu_kernel_api_arg);
 #ifdef BACKEND_SG2260
 void tpu_kernel_api_arg_muti_core(const void *args) {
   sg_api_reduce_arg_t *api = (sg_api_reduce_arg_t *)args;
-  TPUKERNEL_ASSERT(api->dtype == DT_FP32);
+  // TPUKERNEL_ASSERT(api->dtype == DT_FP32);
   tpu_initialize();
 
   unsigned int slice_num = tpu_core_num();

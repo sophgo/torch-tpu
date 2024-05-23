@@ -1137,7 +1137,7 @@ tpu_status_t sgdnnGather(tpu_resource_t resource ,
     input.dtype == SGDNN_DTYPE_FP32 || input.dtype == SGDNN_DTYPE_FP16 ||
     input.dtype == SGDNN_DTYPE_INT8 || input.dtype == SGDNN_DTYPE_UINT8 ||
     input.dtype == SGDNN_DTYPE_INT16 || input.dtype == SGDNN_DTYPE_UINT16);
-  SGDNN_CHECK(sgdnnIsSameShape(&input, &output));
+  // SGDNN_CHECK(sgdnnIsSameShape(&input, &output));
   SGDNN_CHECK(sgdnnIsTensorContiguous(&input));
   SGDNN_CHECK(sgdnnIsTensorContiguous(&index));
   SGDNN_CHECK(sgdnnIsTensorContiguous(&output));
@@ -4195,7 +4195,13 @@ tpu_status_t sgdnnArange ( tpu_resource_t resource ,
     api.dtype =  sgdnnTPUKernelDType ( out.dtype );
     api.isint64 = 0;
   }
+#if defined BACKEND_1684X
   SAFE_CALL ( sgdnnTPUKernelLaunch ( resource , "tpu_kernel_api_arange", &api, sizeof ( api ) , non_blocking) );
+#elif defined BACKEND_SG2260
+  SAFE_CALL ( sgdnnTPUKernelLaunchMultiCore ( resource, "tpu_kernel_api_arange_multi_core", &api, sizeof ( api ) , non_blocking) );
+#else
+  SGDNN_CHECK ( false );
+#endif
   return SG_SUCCESS;
 }
 
@@ -6353,7 +6359,7 @@ tpu_status_t sgdnnRepeat ( tpu_resource_t resource ,
 tpu_status_t sgdnnArg(tpu_resource_t resource , SgdnnTensor_t input, int axis,
                      int mode, SgdnnTensor_t values, SgdnnTensor_t indices,
                      bool non_blocking ) {
-  SGDNN_CHECK(input.dtype == SGDNN_DTYPE_FP32);
+  // SGDNN_CHECK(input.dtype == SGDNN_DTYPE_FP32);
   SGDNN_CHECK(input.dtype == values.dtype);
   SGDNN_CHECK(sgdnnIsSameShape(&values, &indices));
   SGDNN_CHECK(mode == 0 || mode == 1 || mode == 2 || mode == 3);
