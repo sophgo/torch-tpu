@@ -13,7 +13,7 @@ Tensor &dummy(Tensor &in) {
   CHECK_TENSOR_IN_DEVICE(in);
   TIMING_START;
 #ifdef BACKEND_SG2260
-  SGDNN_CHECK(sgdnnDummy(tpu::TPUGetDeviceResource(), true));
+  SAFE_CALL(sgdnnDummy(tpu::TPUGetDeviceResource(), true));
 #endif
   TIMING_END(tpu::DUMMY);
   return in;
@@ -22,7 +22,7 @@ Tensor &dummy_no_kernel_launch(Tensor &in) {
   CHECK_TENSOR_IN_DEVICE(in);
   TIMING_START;
 #ifdef BACKEND_SG2260
-  SGDNN_CHECK(sgdnnDummy_WO_KERNEL_LAUNCH(tpu::TPUGetDeviceResource(), true));
+  SAFE_CALL(sgdnnDummy_WO_KERNEL_LAUNCH(tpu::TPUGetDeviceResource(), true));
 #endif
   TIMING_END(tpu::DUMMY);
   return in;
