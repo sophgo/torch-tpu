@@ -104,6 +104,8 @@ public:
     auto Iter = AddrMemMaps_[Index].find ( ( Devptr ) Ptr );
     TORCH_CHECK ( Iter != AddrMemMaps_[Index].end(), "Memory of address = ", Ptr, " is not found" );
     AddrMemMaps_[Index].erase ( (Devptr) Ptr );
+    auto stream = c10_tpu::getDefaultTPUStream();
+    tpuRtStreamSynchronize(stream);
     tpuRtFree((void **)&Ptr, NO_USE);
     Mutexes_[Index].unlock();
   }

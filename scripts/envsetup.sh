@@ -43,8 +43,6 @@ function set_v7runtime_env() {
      export TPU_EMULATOR_PATH=${v7_lib_path}/libtpuv7_emulator.so
      export TPU_SCALAR_EMULATOR_PATH=${v7_lib_path}/libtpuv7_scalar_emulator.so
 
-     echo 1 > /proc/sys/vm/overcommit_memory
-     sysctl -w vm.overcommit_memory=1
      export TPU_KERNEL_PATH=${root_path}/build/Release/firmware_core/
      export TPUKERNEL_FIRMWARE_PATH=${root_path}/build/Release/firmware_core/libcmodel.so
 }
