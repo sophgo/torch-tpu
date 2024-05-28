@@ -119,10 +119,7 @@ PyObject* THPTModule_setDevice_wrap(PyObject* self, PyObject* arg) {
     auto status = tpu::InitTPUMgr();
     if (status != tpu::INIT_SUCCESS){  SOPHON_LOGE( "INIT Device Failed"); }
   }
-  int pre_device = tpu::TPUGetDeviceIndex();
-  if (pre_device != device) {
-      tpu::TPUSetDeviceIndex(pre_device);
-  }
+  tpu::TPUSetDeviceIndex(device);
 
   Py_RETURN_NONE;
   END_HANDLE_TH_ERRORS

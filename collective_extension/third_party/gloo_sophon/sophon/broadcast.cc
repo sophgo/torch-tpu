@@ -20,9 +20,15 @@ namespace sophon {
 // extern constexpr const int chips2260;
 
 void broadcast2260(BroadcastOptions &opts) {
-    // call tpudnnC2CBroadcast
-    sccl_args_t sccl_args;
-    tpudnnStatus_t ret = tpudnnC2CBroadcast(opts.handle_, opts.buff_, opts.elements, opts.dtype_, opts.root, sccl_args);
+  // call tpudnnC2CBroadcast
+  sccl_args_t sccl_args;
+  sccl_args.nranks = opts.context->size;
+  sccl_args.rank = opts.context->rank;
+  for (int i = 0; i < sccl_args.nranks; i++) {
+    sccl_args.chip_map[i] = i;
+  }
+  tpudnnStatus_t ret = tpudnnC2CBroadcast(opts.handle_, tpudnnPhysToVirt(opts.handle_, (uint64_t)opts.buff_),
+      opts.elements, opts.dtype_, opts.root, sccl_args);
   return;
 }
 

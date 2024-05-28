@@ -20,10 +20,11 @@ public:
   TPUDeviceManager() : init_flag_(false) {}
 
   ~TPUDeviceManager() {
-    auto stream_ = c10_tpu::getDefaultTPUStream();
-    sgdnnDeinitialize(stream_);
-    tpuRtStreamSynchronize(stream_);
-    tpuRtStreamDestroy(stream_);
+    if (auto stream_ = c10_tpu::getDefaultTPUStream()) {
+      sgdnnDeinitialize(stream_);
+      tpuRtStreamSynchronize(stream_);
+      tpuRtStreamDestroy(stream_);
+    }
     if (instance_) delete instance_;
   }
 
@@ -40,6 +41,10 @@ public:
     }
     // TODO multi-device
     TORCH_CHECK ( DeviceCount == 1 );
+    char* size = getenv("OMPI_COMM_WORLD_SIZE");
+    if(size != nullptr) {
+      DeviceCount = atoi(size);
+    }
     tpuRtInit();
 
     TORCH_CHECK ( Status == tpuRtSuccess, "Failed to get TPU device count" );
@@ -50,13 +55,12 @@ public:
       devices_init_ = std::vector<std::atomic<bool>> ( DeviceCount );
       devices_init_[0] = 1; // tpuRtDeviceInit will default set idx = 0 device. that not a good idea.
     }
-    SOPHON_LOG("TPU Device Manager init successfully");
+    SOPHON_LOG("TPU Device Manager init successfully\n");
     init_flag_ = true;
     return INIT_SUCCESS;
   }
 
   TPUMgrStatus InitDevice(int Index ){
-    TORCH_CHECK ( Index == 0 ); //TODO multi-device
     tpuRtStatus_t Status = tpuRtSetDevice( Index );
     TORCH_CHECK (Status == tpuRtSuccess, " sgSetDevice failed! Error Code : #", Status);
     return INIT_SUCCESS;
@@ -224,7 +228,6 @@ int TPUGetDeviceIndex ( void )
 
 void TPUSetDeviceIndex ( int Index )
 {
-  TORCH_CHECK ( Index == 0 ); //TODO multi-device
   tpuRtStatus_t Status = tpuRtSetDevice( Index );
   TORCH_CHECK (Status == tpuRtSuccess, " sgSetDevice failed! Error Code : #", Status);
 }

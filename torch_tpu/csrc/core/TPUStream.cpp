@@ -35,7 +35,7 @@ static std::atomic<uint32_t>
 static sgrt::sgrtStream_t 
         streams[c10_tpu::max_compile_time_stream_priorities][C10_COMPILE_TIME_MAX_TPUS][kStreamsPerPool];
 static sgrt::sgrtStream_t
-        default_streams[C10_COMPILE_TIME_MAX_TPUS];
+        default_streams[C10_COMPILE_TIME_MAX_TPUS] = {nullptr};
 
 // Note [StreamId assignment]
 // ~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -127,11 +127,6 @@ static void initGlobalStreamState() {
       "max number of tpus expected (",
       C10_COMPILE_TIME_MAX_TPUS,
       "). Increase that and recompile.");
-  for (int i = 0; i < num_tpus; i++){
-    TPUGuard device_guard{(signed char)i};
-    C10_TPU_CHECK(sgrt::SgrtCreateStream(&default_streams[i]));
-    std::cout << "stream : " << default_streams[i] << std::endl;
-  }
 }
 
 // Creates the low and high priority stream pools for the specified device
@@ -155,6 +150,14 @@ static void initDeviceStreamState(c10::DeviceIndex device_index) {
 static void initTPUStreamsOnce() {
   // Inits default and secondary streams (once, globally)
   c10::call_once(init_flag, initGlobalStreamState);
+
+  DeviceIndex dev_index = current_device();
+  TPUGuard device_guard{dev_index};
+  if (!default_streams[dev_index]) {
+    C10_TPU_CHECK(sgrt::SgrtCreateStream(&default_streams[dev_index]));
+    std::cout << "stream : " << default_streams[dev_index] << std::endl;
+  }
+
   if (current_streams) {
     return;
   }

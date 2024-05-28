@@ -23,12 +23,12 @@ export TPURT_TOP=$TPUTRAIN_TOP/../tpuv7-runtime
 # export TORCH_TPU_PATH=$TPUTRAIN_TOP/torch_tpu/
 export GLOO_SOPHON_PATH=$TPUTRAIN_TOP/collective_extension/third_party/gloo_sophon/
 export LD_LIBRARY_PATH=$TPUTRAIN_TOP/build/Release/sgdnn:/usr/local/lib/python3.10/dist-packages/torch/lib:$TPUDNN_PATH/lib:$LD_LIBRARY_PATH
-export TPU_KERNEL_MODULE_PATH=$SG1684X_TOP/build/firmware_core/libcmodel_firmware.so
+export TPU_KERNEL_MODULE_PATH=$TPUTRAIN_TOP/build/Release/firmware_core/libcmodel.so
 
 # These envs are here for the naughty tpurt
-export TPU_KERNEL_PATH=${SG1684X_TOP}/build/firmware_core
-export TPU_EMULATOR_PATH=${SG1684X_TOP}/build/firmware_core/libcmodel_firmware.so
-export TPU_SCALAR_EMULATOR_PATH=${TPURT_TOP}/build/cdmlib/tp/daemon/libtpuv7_scalar_emulator.so
+# export TPU_KERNEL_PATH=${SG1684X_TOP}/build/firmware_core
+# export TPU_EMULATOR_PATH=${SG1684X_TOP}/build/firmware_core/libcmodel_firmware.so
+# export TPU_SCALAR_EMULATOR_PATH=${TPURT_TOP}/build/cdmlib/tp/daemon/libtpuv7_scalar_emulator.so
 
 export MASTER_ADDR=127.0.0.1
 export MASTER_PORT=6000

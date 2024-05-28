@@ -649,9 +649,15 @@ void bcube(const detail::AllreduceOptionsImpl &opts,
 void allreduce2260(const AllreduceOptions &opts) {
   // call tpudnnC2CAllReduce
   sccl_args_t sccl_args;
+  sccl_args.nranks = opts.impl_.context->size;
+  sccl_args.rank = opts.impl_.context->rank;
+  for (int i = 0; i < sccl_args.nranks; i++) {
+    sccl_args.chip_map[i] = i;
+  }
   tpudnnStatus_t ret =
-      tpudnnC2CAllReduce(opts.handle_, opts.send_buff_, opts.recv_buff_,
-                           opts.impl_.elements, opts.dtype_, opts.reduce_method_, sccl_args);
+      tpudnnC2CAllReduce(opts.handle_, tpudnnPhysToVirt(opts.handle_, (uint64_t)opts.send_buff_),
+                  tpudnnPhysToVirt(opts.handle_, (uint64_t)opts.recv_buff_),
+                  opts.impl_.elements, opts.dtype_, opts.reduce_method_, sccl_args);
   return;
 }
 

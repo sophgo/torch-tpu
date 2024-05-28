@@ -39,7 +39,6 @@
 #include <gloo/rendezvous/prefix_store.h>
 #include "ProcessGroupSCCL.hpp"
 #include "SCCLDeviceFactory.hpp"
-#include <TPUDeviceManager.h>
 
 #ifdef _WIN32
 #define GENERATE_ALL_TYPES(type, func, ...)      \

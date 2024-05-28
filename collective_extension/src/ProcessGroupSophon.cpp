@@ -41,6 +41,7 @@
 #include "ProcessGroupSophon.hpp"
 #include "SophonDeviceFactory.hpp"
 #include "common_def.h" // for sg_data_type_t defines
+#include "TPUAddrHelper.h"
 
 #ifdef _WIN32
 #define GENERATE_ALL_TYPES(type, func, ...)                                    \
@@ -727,9 +728,9 @@ public:
     opts.setTag(tag);
     GENERATE_ALL_TYPES(scalarType, setOutput, opts, tensor);
 
-    tpudnnHandle_t handle_ = tpudnnCreate();
+    tpudnnHandle_t handle_ = tpudnnCreate(context->rank);
     size_t bytes_ = tensor.nbytes();
-    void* buff_dev = tensor.data_ptr();
+    void* buff_dev = (void*)GetAddrByUnifiedAddr((uint64_t)tensor.data_ptr());
 
     // for dev mem
     switch (scalarType) {
@@ -863,10 +864,10 @@ public:
     opts.setTag(tag);
     GENERATE_ALL_TYPES(scalarType, setOutputs, opts, tensors);
 
-    tpudnnHandle_t handle_ = tpudnnCreate();
+    tpudnnHandle_t handle_ = tpudnnCreate(context->rank);
     size_t bytes_ = tensors[0].nbytes();
-    void* send_buff = tensors[0].data_ptr();
-    void* recv_buff = tensors[0].data_ptr();
+    void* send_buff = (void*)GetAddrByUnifiedAddr((uint64_t)tensors[0].data_ptr());
+    void* recv_buff = (void*)GetAddrByUnifiedAddr((uint64_t)tensors[0].data_ptr());
     sg_reduce_method_t reduce_method = SG_REDUCE_SUM;
 
     switch (reduceOp) {
@@ -1071,14 +1072,14 @@ public:
       GENERATE_ALL_TYPES(scalarType, setOutput, opts, flatOutputTensor);
     }
 
-    tpudnnHandle_t handle_ = tpudnnCreate();
+    tpudnnHandle_t handle_ = tpudnnCreate(context->rank);
     size_t bytes_ = tensors[0].nbytes();
-    void* send_buff = tensors[0].data_ptr();
+    void* send_buff = (void*)GetAddrByUnifiedAddr((uint64_t)tensors[0].data_ptr());
     void* recv_buff;
     if (context->rank == root) {
-      recv_buff = tensors[0].data_ptr();
+      recv_buff = (void*)GetAddrByUnifiedAddr((uint64_t)tensors[0].data_ptr());
     } else {
-      recv_buff = flatOutputTensor.data_ptr();
+      recv_buff = (void*)GetAddrByUnifiedAddr((uint64_t)flatOutputTensor.data_ptr());
     }
     sg_reduce_method_t reduce_method = SG_REDUCE_SUM;
 
@@ -1276,11 +1277,11 @@ public:
     at::Tensor flatOutputTensor = newLikeFlat(outputs[0]);
     GENERATE_ALL_TYPES(scalarType, setOutput, opts, flatOutputTensor);
 
-    tpudnnHandle_t handle_ = tpudnnCreate();
+    tpudnnHandle_t handle_ = tpudnnCreate(context->rank);
     size_t send_bytes_ = inputs[0].nbytes();
-    void* send_buff = flatInputTensor[0].data_ptr();
+    void* send_buff = (void*)GetAddrByUnifiedAddr((uint64_t)flatInputTensor[0].data_ptr());
     size_t recv_bytes_ = outputs[0][0].nbytes();
-    void* recv_buff = flatOutputTensor[0].data_ptr();
+    void* recv_buff = (void*)GetAddrByUnifiedAddr((uint64_t)flatOutputTensor[0].data_ptr());
 
     // for dev mem
     switch (scalarType) {
@@ -1475,12 +1476,12 @@ public:
       GENERATE_ALL_TYPES(scalarType, setOutput, opts, flatOutputTensor);
     }
 
-    tpudnnHandle_t handle_ = tpudnnCreate();
+    tpudnnHandle_t handle_ = tpudnnCreate(context->rank);
     size_t send_bytes_ = inputs[0].nbytes();
-    void* send_buff = inputs[0].data_ptr();
+    void* send_buff = (void*)GetAddrByUnifiedAddr((uint64_t)inputs[0].data_ptr());
 
     size_t recv_bytes_ = inputs[0].nbytes();
-    void* recv_buff = flatOutputTensor.data_ptr();
+    void* recv_buff = (void*)GetAddrByUnifiedAddr((uint64_t)flatOutputTensor.data_ptr());
 
     // for dev mem
     switch (scalarType) {
@@ -1674,11 +1675,11 @@ public:
     // Set single output tensor on all processes
     GENERATE_ALL_TYPES(scalarType, setOutput, opts, outputs[0]);
 
-    tpudnnHandle_t handle_ = tpudnnCreate();
+    tpudnnHandle_t handle_ = tpudnnCreate(context->rank);
     size_t send_bytes_ = outputs[0].nbytes();
-    void* send_buff = flatInputTensor.data_ptr();
+    void* send_buff = (void*)GetAddrByUnifiedAddr((uint64_t)flatInputTensor.data_ptr());
     size_t recv_bytes_ = outputs[0].nbytes();
-    void*  recv_buff = outputs[0].data_ptr();
+    void*  recv_buff = (void*)GetAddrByUnifiedAddr((uint64_t)outputs[0].data_ptr());
 
     // for dev mem
     switch (scalarType) {
@@ -1864,10 +1865,10 @@ public:
       GENERATE_ALL_TYPES(scalarType, setInput, opts, inputTensor);
       GENERATE_ALL_TYPES(scalarType, setOutput, opts, outputTensor);
 
-      tpudnnHandle_t handle_ = tpudnnCreate();
+      tpudnnHandle_t handle_ = tpudnnCreate(context->rank);
       size_t bytes_ = inputTensor[0].nbytes();
-      void* send_buff = inputTensor[0].data_ptr();
-      void* recv_buff = outputTensor[0].data_ptr();
+      void* send_buff = (void*)GetAddrByUnifiedAddr((uint64_t)inputTensor[0].data_ptr());
+      void* recv_buff = (void*)GetAddrByUnifiedAddr((uint64_t)outputTensor[0].data_ptr());
 
       // for dev mem
       switch (scalarType) {
