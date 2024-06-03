@@ -4497,7 +4497,6 @@ void tpu_sync_finish();
 int tpu_next_msg_id();
 void tpu_set_base_msg_id(int base_msg_id);
 void tpu_core_context_setup(int core_idx, int core_num, int core_msg_id);
-void tpu_core_context_initialize();
 
 void tpu_bdc_send_msg(int msg_id, int wait_cnt);
 void tpu_bdc_wait_msg(int msg_id, int send_cnt);

@@ -2,9 +2,9 @@
 
 ## commit id
 - tpuv7_runtime
-bdfa3f2769f0b2d1f244a28e8ea8e55ea1d6e749
+38a661e27abc29061f1db77b97caa30a823c5b88
 - TPU1686
-3baf5bf830d62da97b7e421fed4f8da8d5cb6ddf
+db31f1ac6a197e90f14f3aa05ced62c4386c757a
 
 ## intro
 `tpuv7_runtime` 是TPUv7.0的异步运行时库。其中，
@@ -46,7 +46,8 @@ bdfa3f2769f0b2d1f244a28e8ea8e55ea1d6e749
 ```shell
 mkdir build && cd build
 mkdir emulator && cd emulator
-cmake -DCMAKE_INSTALL_PREFIX=$PWD/../install  -DUSING_CMODEL=ON -DCMAKE_BUILD_TYPE=Debug ../..
+cmake -DCMAKE_INSTALL_PREFIX=$PWD/../install  -DUSING_CMODEL=ON ../..
+#Debug版本 cmake -DCMAKE_INSTALL_PREFIX=$PWD/../install  -DUSING_CMODEL=ON -DUSING_DEBUG=ON ../..
 make -j4
 make install
 #### then
