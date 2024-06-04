@@ -3846,6 +3846,7 @@ tpu_status_t sgdnnLLamaMlp ( tpu_resource_t resource ,
   api.input_w       = input.shape[1];
   api.middle_w      = weight0.shape[1];
   api.dtype         = sgdnnTPUKernelDType ( input.dtype );
+  api.quantized      = false;
 
   SAFE_CALL ( sgdnnTPUKernelLaunchMultiCore ( resource , "tpu_kernel_llama_mlp_multi_core", &api, sizeof ( api ) , non_blocking) );
 #else
