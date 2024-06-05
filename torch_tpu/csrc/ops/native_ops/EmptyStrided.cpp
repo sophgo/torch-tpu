@@ -6,6 +6,9 @@
 #include "TPUTorchUtils.h"
 #include "common/config.h"
 #include "TPUDeviceUtils.h"
+#include "TPUStorageImpl.h"
+#include "TPUTensorImpl.h"
+#include "torch_tpu/csrc/aten/TPUFormatCastHelper.h"
 
 namespace at
 {
@@ -24,14 +27,15 @@ Tensor empty_strided_tpu ( IntArrayRef                size,
   caffe2::TypeMeta dtype = scalarTypeToTypeMeta ( scalar_type );
   auto size_bytes = at::detail::computeStorageNbytes ( size, stride, dtype.itemsize() );
   auto allocator = c10::GetTPUAllocator();
-  auto storage_impl = c10::make_intrusive<StorageImpl> (
+  c10::intrusive_ptr<c10::StorageImpl> storage_impl = c10::make_intrusive<torch_tpu::TPUStorageImpl> (
                       c10::StorageImpl::use_byte_size_t(),
                       size_bytes,
+                      allocator->allocate ( size_bytes ),
                       allocator,
                       /*resizeable=*/true );
-  constexpr c10::DispatchKeySet ks ( c10::DispatchKey::TPU );
-  auto tensor = detail::make_tensor_base<TensorImpl> ( std::move ( storage_impl ), ks, dtype );
+  auto tensor = detail::make_tensor<torch_tpu::TPUTensorImpl> ( storage_impl, dtype );
   tensor.unsafeGetTensorImpl()->set_sizes_and_strides ( size, stride );
+  at_tpu::StorageDescHelper::SetDesc(tensor, size, tensor.strides());
   TIMING_END(tpu::MALLOC);
   SHOW_EMPTY_INFO(tensor);
   return tensor;
@@ -58,13 +62,13 @@ c10::optional<c10::MemoryFormat>  memory_format_opt )
   at::detail::check_size_nonnegative ( size );
   caffe2::TypeMeta dtype = scalarTypeToTypeMeta ( scalar_type );
   size_t size_bytes = at::detail::computeStorageNbytesContiguous ( size, dtype.itemsize() );
-  auto storage_impl = c10::make_intrusive<StorageImpl> (
+  c10::intrusive_ptr<c10::StorageImpl> storage_impl = c10::make_intrusive<torch_tpu::TPUStorageImpl> (
                       c10::StorageImpl::use_byte_size_t(),
                       size_bytes,
                       allocator->allocate ( size_bytes ),
                       allocator,
                       /*resizeable=*/true );
-  auto tensor = detail::make_tensor_base<TensorImpl> ( std::move ( storage_impl ), ks, dtype );
+  auto tensor = detail::make_tensor<torch_tpu::TPUTensorImpl> ( storage_impl, dtype );
   // Default TensorImpl has size [0]
   if ( size.size() != 1 || size[0] != 0 )
   {
@@ -78,6 +82,7 @@ c10::optional<c10::MemoryFormat>  memory_format_opt )
       tensor.unsafeGetTensorImpl()->empty_tensor_restride ( *memory_format_opt );
     }
   }
+  at_tpu::StorageDescHelper::SetDesc(tensor, size, tensor.strides());
   TIMING_END(tpu::MALLOC);
   SHOW_EMPTY_INFO(tensor);
   return tensor;

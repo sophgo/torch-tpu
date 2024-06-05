@@ -82,6 +82,7 @@ __all__ = [
     "OpTimer_dump",
     "GlobalOpTimer_reset",
     "GlobalOpTimer_dump",
+    "format_cast",          # tensor format cast
 
     # "BoolStorage",
     # "ByteStorage",
@@ -131,5 +132,6 @@ if BACKEND == "SG2260":
 
 from .autocast_utils import *  # noqa: F403
 from .optimer_utils import * # noqa: F403
+from .custom_op import *
 
 default_generators: Tuple[torch._C.Generator] = ()

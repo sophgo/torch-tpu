@@ -5,8 +5,9 @@
 #include <ATen/native/ConvUtils.h>
 
 #include "TPUTorchUtils.h"
+#include "TPUStorageImpl.h"
 #include "common/config.h"
-
+#include "torch_tpu/csrc/aten/TPUNativeFunctions.h"
 namespace at
 {
 
@@ -202,7 +203,10 @@ std::array<bool, 3> output_mask )
   }
   if ( output_mask[1] == true )
   {
-    grad_weight = empty ( weight.sizes(), weight.options() );
+    if ( !at_tpu::StorageDescHelper::IsBaseFormatType(weight) )
+      grad_weight = at_tpu::FormatCastPreparation::apply_tensor_with_format(weight, torch_tpu::TPU_DFORMAT_CONV_DW);
+    else
+      grad_weight = empty ( weight.sizes(), weight.options() );
   }
   if ( output_mask[2] == true )
   {

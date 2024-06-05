@@ -7,6 +7,7 @@
 #include "TPUTorchUtils.h"
 #include "common/config.h"
 #include "ops.hpp"
+#include "torch_tpu/csrc/aten/TPUNativeFunctions.h"
 
 namespace at {
 Tensor &dummy(Tensor &in) {

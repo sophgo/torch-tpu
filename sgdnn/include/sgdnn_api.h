@@ -12,6 +12,7 @@ extern "C" {
 #endif
 
 #define USE_QKV_PACKED
+#define DIV_UP(a, b) ( ( ( a ) + ( b ) - 1 ) / ( b ) )
 
 typedef struct
 {
@@ -43,6 +44,15 @@ typedef enum
 }
 SgdnnDataType_t;
 
+typedef enum
+{
+  SGDNN_NO_FORMATED = 0,
+  SGDNN_CONV_W_INFER_FORMAT  = 1,
+  SGDNN_CONV_W_TRAIN_FORMAT  = 2,
+  SGDNN_CONV_DW_TRAIN_FORMAT = 3,
+} 
+SgdnnFormatedType_t;
+
 typedef struct
 {
   unsigned long long addr;
@@ -50,6 +60,7 @@ typedef struct
   int shape[8];
   int stride[8];
   SgdnnDataType_t dtype;
+  SgdnnFormatedType_t format_casted = SGDNN_NO_FORMATED; // default no cast
 }
 SgdnnTensor_t;
 
@@ -92,11 +103,35 @@ tpu_status_t sgdnnTPUKernelLaunch (
             bool use_multi_core = false);
 #endif
 
+/**
+ * HelerFunction for CONV 32 IC and 32OC
+*/
+void sgdnn32ICShape ( const int * shape, int * _32ic_shape );
+void sgdnn32OCShape ( const int * shape, int * _32oc_shape );
+void sgdnnContiguousStride ( const int * shape, int dim,  int * stride );
+
+
 tpu_status_t sgdnnReorderConv2dWeight ( tpu_resource_t resource,
                                          SgdnnTensor_t input,
                                          int mode,
                                          SgdnnTensor_t output,
                                          bool non_blocking = true );
+
+tpu_status_t sgdnnReorderConv2dGrad ( tpu_resource_t resource ,
+                                       SgdnnTensor_t input,
+                                       SgdnnTensor_t output,
+                                       bool non_blocking = true );
+
+tpu_status_t sgdnnRecoverConv2dWeight ( tpu_resource_t resource ,
+                                       SgdnnTensor_t input,
+                                       int mode,
+                                       SgdnnTensor_t output,
+                                       bool non_blocking = true );
+
+tpu_status_t sgdnnRecoverConv2dGrad ( tpu_resource_t resource ,
+                                      SgdnnTensor_t input,
+                                      SgdnnTensor_t output,
+                                      bool non_blocking = true );
 
 tpu_status_t sgdnnConvertInt64toInt32 ( tpu_resource_t resource,
                                          SgdnnTensor_t input,
@@ -113,6 +148,19 @@ tpu_status_t sgdnnDummy ( tpu_resource_t  stream,
 */
 tpu_status_t sgdnnDummy_WO_KERNEL_LAUNCH ( tpu_resource_t  stream,
                            bool non_blocking );
+
+/**
+ * Physical Memory Format Cast OP. 
+ * Because Some TPU's instrution( operation ) need particular data layout.
+ * For example conv need 32IC for fp16, 64IC for in8.
+ * - cast_type : 
+ *          0 - 32IC
+*/
+tpu_status_t sgdnnFormatCast( tpu_resource_t  resource,
+                              SgdnnTensor_t input,
+                              SgdnnTensor_t output,
+                              int cast_type 
+                              );
 
 /*
  * OUTPUT = CONV2D ( INPUT, WEIGHT, BIAS )

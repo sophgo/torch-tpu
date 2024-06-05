@@ -280,6 +280,16 @@ int tpu_kernel_api_conv_weight_reorder ( const void* args ) {
     api->input_global_addr,
     api->output_global_addr,
     &shape );
+  } else if ( api->mode == 2 ) {
+    int oc_w_offset = shape.n * (shape.h * shape.w) * DIV_UP(shape.c, 32) * 32 * tpu_data_type_size ( DT_FP16 );
+    nodechip_conv_weight_to_32ic_simluate (
+      api->input_global_addr,
+      api->output_global_addr,
+      &shape );
+    nodechip_conv_weight_to_32oc_simluate (
+      api->input_global_addr,
+      api->output_global_addr + oc_w_offset,
+      &shape);
   } else {
     TPUKERNEL_ASSERT ( 0 );
   }

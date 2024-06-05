@@ -76,6 +76,7 @@ else()
   message(STATUS "PYTHON API ENABLE")
   file(GLOB_RECURSE CSRC_SRCS
     csrc/aten/*.cpp
+    csrc/aten/*/*.cpp
     csrc/tpu/*.cpp
     csrc/utils/*.cpp
   )

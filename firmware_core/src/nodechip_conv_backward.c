@@ -987,7 +987,8 @@ void nodechip_conv_backward_input(
     const dim2          *stride,
     const dim2          *dilation,
     const padding_t     *pad,
-    const data_type_t   dtype
+    const data_type_t   dtype,
+    int                 weight_formated
  ) {
 
     const data_type_t idtype = dtype, odtype = dtype;
@@ -1060,7 +1061,7 @@ void nodechip_conv_backward_input(
     TPUKERNEL_DBG("out ping local addr = 0x%5x, bank id = %d\n", oaddr_ping, oaddr_ping / BANK_SIZE);
     TPUKERNEL_DBG("out pong local addr = 0x%5x, bank id = %d\n", oaddr_pong, oaddr_pong / BANK_SIZE);
 
-    if (dtype == DT_FP16 || dtype == DT_BFP16) {
+    if ((dtype == DT_FP16 || dtype == DT_BFP16) && !weight_formated) {
         //nodechip_weight_reorder(forward_weight_global_addr,
         //                        weight_reordered_global_addr,
         //                        oc,
@@ -1076,8 +1077,18 @@ void nodechip_conv_backward_input(
     }
 
     global_addr_t input_global_addr = grad_out_global_addr;
-    global_addr_t weight_global_addr = dtype == DT_FP32 ? forward_weight_global_addr
-                                                        : weight_reordered_global_addr;
+    global_addr_t weight_global_addr;
+    if ( dtype == DT_FP32 ) weight_global_addr = forward_weight_global_addr;
+    else
+    {
+        if ( weight_formated ) 
+        {
+            unsigned long long offset = ic * (kh * kw) * DIV_UP(oc, 32) * 32 * tpu_data_type_size ( DT_FP16 ); // 32ic offset
+            weight_global_addr = forward_weight_global_addr + offset;
+        }
+        else 
+            weight_global_addr = weight_reordered_global_addr;
+    }
     global_addr_t output_global_addr = grad_input_global_addr;
 
     bool ping = true;
@@ -1450,7 +1461,8 @@ void nodechip_conv_backward_weight(
     const dim2          *forward_dilation,
     const padding_t     *pad,
     bool                grad_bias_enable,
-    data_type_t         dtype
+    data_type_t         dtype,
+    int                weight_reordered
  ) {
     const data_type_t idtype = dtype, odtype = dtype;
 
@@ -1571,18 +1583,18 @@ void nodechip_conv_backward_weight(
         ih * iw,
         iw,
         1};
-
-    //dim4 ostride = {
-    //    oshape.c * oshape.h * oshape.w,
-    //    oshape.h * oshape.w,
-    //    oshape.w,
-    //    1};
+    // o_shape = [ic, kh*kw, 1, DIV_UP(oc, 32)*32]
+    dim4 o_32oc_stride = {
+        oh * ow * DIV_UP(oc, 32) *  32,
+        DIV_UP(oc, 32) * 32,
+        DIV_UP(oc, 32) * 32,
+        1};
 
     dim4 ostride_nc_trans = {
-        oshape.n * oshape.h * oshape.w,
-        oshape.h * oshape.w,
-        oshape.w,
-        1};
+            oshape.n * oshape.h * oshape.w,
+            oshape.h * oshape.w,
+            oshape.w,
+            1};
 
     dim4 wshape = {
         1,
@@ -1852,16 +1864,34 @@ void nodechip_conv_backward_weight(
                         NULL,
                         odtype);
                     */
-                    dim4 last_oslice_shape = {last_ocslice, last_nslice, oh, ow};
-                    tpu_gdma_cpy_nc_trans_L2S(
-                        output_global_addr +
-                            (last_nstart * ostride_nc_trans.c +
-                             (gidx * oc + last_ocstart) * ostride_nc_trans.n) * tpu_data_type_size(odtype),
-                        ping_out ? oaddr_pong : oaddr_ping,
-                        &last_oslice_shape,
-                        &ostride_nc_trans,//&ostride,
-                        NULL,
-                        odtype);
+                    if ( weight_reordered ) {
+                        dim4 last_oslice_shape = {last_nslice, oh*ow, 1, last_ocslice};
+                        dim4 last_oslice_local_stride;
+                        last_oslice_local_stride.w = 1;
+                        last_oslice_local_stride.h = oh*ow;
+                        last_oslice_local_stride.c = ALIGN(oh * ow, tpu_eu_num(dtype));
+                        last_oslice_local_stride.n = DIV_UP(last_ocslice, NPU_NUM) * last_oslice_local_stride.c;
+                        tpu_gdma_cpy_cw_trans_L2S(
+                            output_global_addr +
+                                (last_nstart * o_32oc_stride.n + 
+                                last_ocstart) * tpu_data_type_size(odtype),
+                            ping_out ? oaddr_pong : oaddr_ping,
+                            &last_oslice_shape,
+                            &o_32oc_stride,
+                            &last_oslice_local_stride,
+                            odtype);
+                    } else {
+                        dim4 last_oslice_shape = {last_ocslice, last_nslice, oh, ow};
+                        tpu_gdma_cpy_nc_trans_L2S(
+                            output_global_addr +
+                                (last_nstart * ostride_nc_trans.c +
+                                (gidx * oc + last_ocstart) * ostride_nc_trans.n) * tpu_data_type_size(odtype),
+                            ping_out ? oaddr_pong : oaddr_ping,
+                            &last_oslice_shape,
+                            &ostride_nc_trans,//&ostride,
+                            NULL,
+                            odtype);                        
+                    }
                     if (grad_bias_enable && nidx == 0 && ocidx > 0) {
                         bool do_cw_trans = last_ocslice > 1;
                         dim4 move_bias_shape = {1,
@@ -1910,16 +1940,34 @@ void nodechip_conv_backward_weight(
             NULL,
             odtype);
         */
-        dim4 last_oslice_shape = {last_ocslice, last_nslice, oh, ow};
-        tpu_gdma_cpy_nc_trans_L2S(
-            output_global_addr +
-                (last_nstart * ostride_nc_trans.c +
-                 (gidx * oc + last_ocstart) * ostride_nc_trans.n) * tpu_data_type_size(odtype),
-            ping_out ? oaddr_pong : oaddr_ping,
-            &last_oslice_shape,
-            &ostride_nc_trans,
-            NULL,
-            odtype);
+        if ( weight_reordered ) {
+            dim4 last_oslice_shape = {last_nslice, oh*ow, 1, last_ocslice};
+            dim4 last_oslice_local_stride;
+            last_oslice_local_stride.w = 1;
+            last_oslice_local_stride.h = oh*ow;
+            last_oslice_local_stride.c = ALIGN(oh * ow, tpu_eu_num(dtype));
+            last_oslice_local_stride.n = DIV_UP(last_ocslice, NPU_NUM) * last_oslice_local_stride.c;
+            tpu_gdma_cpy_cw_trans_L2S(
+                output_global_addr +
+                    (last_nstart * o_32oc_stride.n + 
+                    last_ocstart) * tpu_data_type_size(odtype),
+                ping_out ? oaddr_pong : oaddr_ping,
+                &last_oslice_shape,
+                &o_32oc_stride,
+                &last_oslice_local_stride,
+                odtype);
+        } else {
+            dim4 last_oslice_shape = {last_ocslice, last_nslice, oh, ow};
+            tpu_gdma_cpy_nc_trans_L2S(
+                output_global_addr +
+                    (last_nstart * ostride_nc_trans.c +
+                    (gidx * oc + last_ocstart) * ostride_nc_trans.n) * tpu_data_type_size(odtype),
+                ping_out ? oaddr_pong : oaddr_ping,
+                &last_oslice_shape,
+                &ostride_nc_trans,
+                NULL,
+                odtype);
+        }
         if (grad_bias_enable) {
             bool do_cw_trans = last_ocslice > 1;
             dim4 move_bias_shape = {1,
@@ -3210,7 +3258,8 @@ void nodechip_conv_backward(
     bool                grad_input_enable,
     bool                grad_weight_enable,
     bool                grad_bias_enable,
-    data_type_t         dtype
+    data_type_t         dtype,
+    int                 weight_reordered
  ) {
 
     TPUKERNEL_ASSERT(groups == 1);
@@ -3227,7 +3276,8 @@ void nodechip_conv_backward(
             stride,
             dilation,
             pad,
-            dtype);
+            dtype,
+            weight_reordered);
     }
     if (grad_weight_enable) {
         if ((input_shape->h * input_shape->w > 10000) || grad_bias_enable) {
@@ -3245,7 +3295,8 @@ void nodechip_conv_backward(
                 dilation,
                 pad,
                 grad_bias_enable,
-                dtype);
+                dtype,
+                weight_reordered);
         } else {
             bool can_use_conv = grad_weight_can_use_conv_with_no_split_hw(
                                     input_shape->n,
@@ -3379,9 +3430,25 @@ int tpu_kernel_api_conv2d_backward(const void* args) {
         api->grad_input_global_addr != 0,
         api->grad_weight_global_addr != 0,
         api->grad_bias_global_addr != 0,
-        (data_type_t)api->dtype);
+        (data_type_t)api->dtype,
+        api->weight_formated);
     tpu_poll();
     return 0;
 }
 
 TPUKERNEL_FUNC_REGISTER(tpu_kernel_api_conv2d_backward);
+
+int tpu_kernel_api_conv_grad_reorder(const void* args)
+{
+    sg_api_conv_grad_reorder_t* api = (sg_api_conv_grad_reorder_t*)args;
+    dim4 nd_shape = {.n = api->shape[0], .c = api->shape[1], .h = api->shape[2], .w = api->shape[3]};
+    tpu_initialize();
+    nodechip_weight_reorder_to_32oc(
+        api->input_global_addr,
+        api->output_global_addr,
+        &nd_shape);
+    tpu_poll();
+    return 0;
+}
+
+TPUKERNEL_FUNC_REGISTER(tpu_kernel_api_conv_grad_reorder);

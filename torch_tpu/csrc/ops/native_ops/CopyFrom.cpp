@@ -1,14 +1,12 @@
-#include <ATen/core/TensorBase.h>
-
-#include "TPUTorchUtils.h"
-#include <c10/util/Logging.h>
 #include <iostream>
-
+#include <ATen/core/TensorBase.h>
+#include <c10/util/Logging.h>
 #include <torch/library.h>
 #include <torch/torch.h>
 
 #include "common/config.h"
-
+#include "TPUTorchUtils.h"
+#include "torch_tpu/csrc/aten/TPUNativeFunctions.h"
 namespace at {
 
 Tensor _copy_from_tpu(const Tensor &self, const Tensor &dst,
@@ -119,6 +117,13 @@ Tensor _to_copy_tpu(const Tensor &self, c10::optional<ScalarType> dtype_opt,
   auto dst =
       empty(self.sizes(), dtype, layout, device, pin_memory, memory_format);
 
+  // copy formated tpu Tensor to cpu, recover tpu tensor's format firstly 
+  if ( device.type() == c10::DeviceType::CPU  && 
+        !at_tpu::StorageDescHelper::IsBaseFormatType(self) )
+  {
+    auto self_ori = at_tpu::TPUNativeFunctions::tpu_format_cast_back_to_origin(self);
+    return _copy_from_tpu(self_ori, dst, non_blocking);
+  }
   return _copy_from_tpu(self, dst, non_blocking);
 }
 

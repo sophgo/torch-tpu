@@ -16,8 +16,6 @@
 #include <iostream>
 #endif
 
-#define DIV_UP(a, b) ( ( ( a ) + ( b ) - 1 ) / ( b ) )
-
 static inline size_t sgdnnDataSize ( SgdnnDataType_t dtype )
 {
   if ( dtype == SGDNN_DTYPE_INT8 ||
@@ -107,7 +105,7 @@ static inline bool sgdnnIsSameShape ( const SgdnnTensor_t * tensor1, const Sgdnn
   return true;
 }
 
-static inline void sgdnn32ICShape ( const int * shape, int * _32ic_shape )
+void sgdnn32ICShape ( const int * shape, int * _32ic_shape )
 {
   _32ic_shape[0] = shape[0];
   _32ic_shape[1] = shape[2] * shape[3];
@@ -115,7 +113,7 @@ static inline void sgdnn32ICShape ( const int * shape, int * _32ic_shape )
   _32ic_shape[3] = 32;
 }
 
-static inline void sgdnn32OCShape ( const int * shape, int * _32oc_shape )
+void sgdnn32OCShape ( const int * shape, int * _32oc_shape )
 {
   _32oc_shape[0] = shape[1];
   _32oc_shape[1] = shape[2] * shape[3];
@@ -123,7 +121,7 @@ static inline void sgdnn32OCShape ( const int * shape, int * _32oc_shape )
   _32oc_shape[3] = 32;
 }
 
-static inline void sgdnnContiguousStride ( const int * shape, int dim,  int * stride )
+void sgdnnContiguousStride ( const int * shape, int dim,  int * stride )
 {
   int s = 1;
   for ( int i = dim - 1; i >= 0; --i )
@@ -307,6 +305,31 @@ tpu_status_t sgdnnDummy_WO_KERNEL_LAUNCH ( tpu_resource_t  resource ,
   return SG_SUCCESS;
 }
 
+tpu_status_t sgdnnFormatCast( tpu_resource_t  resource,
+                              SgdnnTensor_t input,
+                              SgdnnTensor_t output,
+                              int cast_type)
+{
+  if (cast_type == 0) {// 0 : conv weight forward 32 ic, and dtype is fp16. infer mode.
+    sgdnnReorderConv2dWeight(resource, input, 0, output);
+  } else if (cast_type == 1) { // 1: origin conv weight storage with 32IC, Cast to Contiguous. the inversion of case 0.
+    sgdnnRecoverConv2dWeight(resource, input, 0, output);
+  } else if (cast_type == 2) { // 2: origin conv weight is Contiguous. Cast to 32IC32OC(double Memory). Train mode.
+    sgdnnReorderConv2dWeight(resource, input, 2, output);
+  } else if (cast_type == 3) { // 3: origin conv weight storage with 32IC32OC, Cast to Contiguous. the inversion of case 2.
+    sgdnnRecoverConv2dWeight(resource, input, 2, output);
+  } else if (cast_type == 4) { // 4:  conv fp16 32OC weight'grad to contiguous format(ND)
+    sgdnnRecoverConv2dGrad( resource, input, output);
+  } else if (cast_type == 5) { // 5: conv  contiguous format(ND) weight'grad tofp16 32OC
+    sgdnnReorderConv2dGrad( resource, input, output);
+  }
+  else {
+    // TODO: support other case
+    SGDNN_CHECK ( false );
+  }
+  return SG_SUCCESS;
+}
+
 tpu_status_t sgdnnConvertInt64toInt32 ( tpu_resource_t resource ,
                                       SgdnnTensor_t input,
                                       SgdnnTensor_t output,
@@ -343,7 +366,7 @@ tpu_status_t sgdnnConv2d ( tpu_resource_t resource ,
                 input.dtype == SGDNN_DTYPE_FP16 ||
                 input.dtype == SGDNN_DTYPE_BF16 );
   SGDNN_CHECK ( input.dim == 4 );
-  SGDNN_CHECK ( weight.dim == 4 );
+  SGDNN_CHECK ( weight.dim == 4 || weight.dim == 8 );
   if ( bias.addr != 0 )
   {
     SGDNN_CHECK ( bias.dim == 1 );
@@ -360,7 +383,9 @@ tpu_status_t sgdnnConv2d ( tpu_resource_t resource ,
   }
   // TODO: CHECK H, W
   SGDNN_CHECK ( sgdnnIsTensorContiguous ( &input ) );
-  SGDNN_CHECK ( sgdnnIsTensorContiguous ( &weight ) );
+  if ( !weight.format_casted ) {
+    SGDNN_CHECK ( sgdnnIsTensorContiguous ( &weight ) );
+  }
   if ( bias.addr != 0 )
   {
     SGDNN_CHECK ( sgdnnIsTensorContiguous ( &bias ) );
@@ -369,15 +394,17 @@ tpu_status_t sgdnnConv2d ( tpu_resource_t resource ,
 #if defined BACKEND_1684X
   tpu_device_mem_t weight_reordered_mem, bias_fp32_mem;
   if ( weight.dtype == SGDNN_DTYPE_FP16 || weight.dtype == SGDNN_DTYPE_BF16 )
-  {
+  {      
     SgdnnTensor_t weight_reordered, bias_f32;
-    weight_reordered.dim = 4;
-    sgdnn32ICShape ( weight.shape, weight_reordered.shape );
-    sgdnnContiguousStride ( weight_reordered.shape, 4, weight_reordered.stride );
-    weight_reordered.dtype = weight.dtype;
-    SAFE_CALL ( sgdnnMallocDeviceByte ( resource , &weight_reordered_mem, sgdnnTensorBytes ( &weight_reordered ) ) );
-    weight_reordered.addr = sgdnnGetDeviceAddr ( weight_reordered_mem );
-    SAFE_CALL ( sgdnnReorderConv2dWeight ( resource , weight, 0, weight_reordered ) );
+    if ( !weight.format_casted ) {  // no format cast when init, cast in runtime
+      weight_reordered.dim = 4;
+      sgdnn32ICShape ( weight.shape, weight_reordered.shape );
+      sgdnnContiguousStride ( weight_reordered.shape, 4, weight_reordered.stride );
+      weight_reordered.dtype = weight.dtype;
+      SAFE_CALL ( sgdnnMallocDeviceByte ( resource , &weight_reordered_mem, sgdnnTensorBytes ( &weight_reordered ) ) );
+      weight_reordered.addr = sgdnnGetDeviceAddr ( weight_reordered_mem );
+      SAFE_CALL ( sgdnnReorderConv2dWeight ( resource , weight, 0, weight_reordered ) );      
+    }
     if (bias.addr != 0){
       bias_f32 = bias;
       bias_f32.dtype = SGDNN_DTYPE_FP32;
@@ -389,9 +416,15 @@ tpu_status_t sgdnnConv2d ( tpu_resource_t resource ,
   sg_api_conv2d_t api;
   api.input_global_addr = input.addr;
   if ( weight.dtype == SGDNN_DTYPE_FP16 || weight.dtype == SGDNN_DTYPE_BF16 )
-  {
-    api.weight_global_addr = sgdnnGetDeviceAddr ( weight_reordered_mem );
-    api.bias_global_addr = bias.addr != 0 ? sgdnnGetDeviceAddr ( bias_fp32_mem ) : 0 ;
+  { 
+    if (!weight.format_casted){
+      api.weight_global_addr = sgdnnGetDeviceAddr ( weight_reordered_mem );
+      api.bias_global_addr = bias.addr != 0 ? sgdnnGetDeviceAddr ( bias_fp32_mem ) : 0 ;
+    }
+    else {
+      api.weight_global_addr = weight.addr;
+      api.bias_global_addr = bias.addr != 0 ? sgdnnGetDeviceAddr ( bias_fp32_mem ) : 0 ;
+    }
   }
   else
   {
@@ -406,8 +439,8 @@ tpu_status_t sgdnnConv2d ( tpu_resource_t resource ,
   api.dtype = sgdnnTPUKernelDType ( input.dtype );
   api.groups = param.groups;
   api.output_c = output.shape[1];
-  api.kernel[0] = weight.shape[2];
-  api.kernel[1] = weight.shape[3];
+  api.kernel[0] = param.kernel_h;
+  api.kernel[1] = param.kernel_w;
   api.stride[0] = param.stride_h;
   api.stride[1] = param.stride_w;
   api.dilation[0] = param.dilation_h;
@@ -419,7 +452,9 @@ tpu_status_t sgdnnConv2d ( tpu_resource_t resource ,
   SAFE_CALL ( sgdnnTPUKernelLaunch ( resource , "tpu_kernel_api_conv2d", &api, sizeof ( api ) ) );
   if ( weight.dtype == SGDNN_DTYPE_FP16 || weight.dtype == SGDNN_DTYPE_BF16 )
   {
-    sgdnnFreeDevice ( resource , weight_reordered_mem );
+    if (!weight.format_casted) {
+      sgdnnFreeDevice ( resource , weight_reordered_mem );
+    }
     if (bias.addr != 0){
       sgdnnFreeDevice ( resource , bias_fp32_mem );
     }
@@ -460,7 +495,7 @@ tpu_status_t sgdnnConv2dBackward ( tpu_resource_t resource ,
                 input.dtype == SGDNN_DTYPE_FP16 ||
                 input.dtype == SGDNN_DTYPE_BF16 );
   SGDNN_CHECK ( input.dim == 4 );
-  SGDNN_CHECK ( weight.dim == 4 );
+  SGDNN_CHECK ( weight.dim == 4 || weight.dim == 8);
   SGDNN_CHECK ( grad_output.dim == 4 );
   if ( grad_input.addr != 0 )
   {
@@ -477,8 +512,8 @@ tpu_status_t sgdnnConv2dBackward ( tpu_resource_t resource ,
   SGDNN_CHECK ( input.shape[0] == grad_output.shape[0] );
   SGDNN_CHECK ( input.shape[1] % param.groups == 0 );
   SGDNN_CHECK ( grad_output.shape[1] % param.groups == 0 );
-  SGDNN_CHECK ( weight.shape[0] = grad_output.shape[1] );
-  SGDNN_CHECK ( weight.shape[1] = input.shape[1] / param.groups );
+  //SGDNN_CHECK ( weight.shape[0] = grad_output.shape[1] );
+  //SGDNN_CHECK ( weight.shape[1] = input.shape[1] / param.groups );
   if ( grad_bias.addr != 0 )
   {
     SGDNN_CHECK ( grad_bias.shape[0] == grad_output.shape[1] );
@@ -489,11 +524,11 @@ tpu_status_t sgdnnConv2dBackward ( tpu_resource_t resource ,
   }
   if ( grad_weight.addr != 0 )
   {
-    SGDNN_CHECK ( sgdnnIsSameShape ( &weight, &grad_weight ) );
+    // SGDNN_CHECK ( sgdnnIsSameShape ( &weight, &grad_weight ) );
   }
   // TODO: CHECK SHAPE
   SGDNN_CHECK ( sgdnnIsTensorContiguous ( &input ) );
-  SGDNN_CHECK ( sgdnnIsTensorContiguous ( &weight ) );
+  //SGDNN_CHECK ( sgdnnIsTensorContiguous ( &weight ) );
   SGDNN_CHECK ( sgdnnIsTensorContiguous ( &grad_output ) );
   if ( grad_input.addr != 0 )
   {
@@ -513,11 +548,19 @@ tpu_status_t sgdnnConv2dBackward ( tpu_resource_t resource ,
     tpu_device_mem_t buffer_mem;
     if ( weight.dtype == SGDNN_DTYPE_FP16 || weight.dtype == SGDNN_DTYPE_BF16 )
     {
-      SgdnnTensor_t weight_reordered;
-      weight_reordered.dim = 4;
-      sgdnn32OCShape ( weight.shape, weight_reordered.shape );
-      weight_reordered.dtype = weight.dtype;
-      size_t weight_reordered_size = sgdnnTensorBytes ( &weight_reordered );
+      size_t weight_reordered_size;
+      if ( weight.format_casted )
+      {
+        weight_reordered_size = 0;
+      }
+      else {
+        SgdnnTensor_t weight_reordered;
+        weight_reordered.dim = 4;
+        sgdnn32OCShape ( weight.shape, weight_reordered.shape );
+        weight_reordered.dtype = weight.dtype;
+        weight_reordered_size = sgdnnTensorBytes ( &weight_reordered );
+      }
+
       SgdnnTensor_t grad_output_reordered;
       grad_output_reordered.dim = 4;
       sgdnn32OCShape ( grad_output.shape, grad_output_reordered.shape );
@@ -545,8 +588,8 @@ tpu_status_t sgdnnConv2dBackward ( tpu_resource_t resource ,
     }
     api.dtype = sgdnnTPUKernelDType ( input.dtype );
     api.groups = param.groups;
-    api.kernel[0] = weight.shape[2];
-    api.kernel[1] = weight.shape[3];
+    api.kernel[0] = param.kernel_h;
+    api.kernel[1] = param.kernel_w;
     api.stride[0] = param.stride_h;
     api.stride[1] = param.stride_w;
     api.dilation[0] = param.dilation_h;
@@ -555,6 +598,7 @@ tpu_status_t sgdnnConv2dBackward ( tpu_resource_t resource ,
     api.pad[1] = param.pad_h;
     api.pad[2] = param.pad_w;
     api.pad[3] = param.pad_w;
+    api.weight_formated = weight.format_casted;
     SAFE_CALL ( sgdnnTPUKernelLaunch ( resource , "tpu_kernel_api_conv2d_backward", &api, sizeof ( api ) ) );
     if ( weight.dtype == SGDNN_DTYPE_FP16 || weight.dtype == SGDNN_DTYPE_BF16 )
     {
@@ -1100,25 +1144,44 @@ tpu_status_t sgdnnReorderConv2dWeight ( tpu_resource_t resource ,
   SGDNN_CHECK ( input.dtype == output.dtype );
   SGDNN_CHECK ( input.dtype == SGDNN_DTYPE_FP16 ||
                 input.dtype == SGDNN_DTYPE_BF16 );
-  SGDNN_CHECK ( input.dim == 4 );
-  SGDNN_CHECK ( output.dim == 4 );
-  SGDNN_CHECK ( mode == 0 || mode == 1 );
-  if ( mode == 0 )
+  SGDNN_CHECK ( mode == 0 || mode == 1 || mode == 2);
+  if ( mode == 0 ) // 32 IC
   {
+    SGDNN_CHECK ( input.dim == 4 );
+    SGDNN_CHECK ( output.dim == 4 );
     SGDNN_CHECK ( output.shape[0] == input.shape[0] );
     SGDNN_CHECK ( output.shape[1] == input.shape[2] * input.shape[3] );
     SGDNN_CHECK ( output.shape[2] == DIV_UP ( input.shape[1], 32 ) );
     SGDNN_CHECK ( output.shape[3] == 32 );
+    SGDNN_CHECK ( sgdnnIsTensorContiguous ( &input ) );
+    SGDNN_CHECK ( sgdnnIsTensorContiguous ( &output ) );
   }
-  else if ( mode == 1 )
+  else if ( mode == 1 ) // 32 OC
   {
+    SGDNN_CHECK ( input.dim == 4 );
+    SGDNN_CHECK ( output.dim == 4 );
     SGDNN_CHECK ( output.shape[0] == input.shape[1] );
     SGDNN_CHECK ( output.shape[1] == input.shape[2] * input.shape[3] );
     SGDNN_CHECK ( output.shape[2] == DIV_UP ( input.shape[0], 32 ) );
     SGDNN_CHECK ( output.shape[3] == 32 );
+    SGDNN_CHECK ( sgdnnIsTensorContiguous ( &input ) );
+    SGDNN_CHECK ( sgdnnIsTensorContiguous ( &output ) );
   }
-  SGDNN_CHECK ( sgdnnIsTensorContiguous ( &input ) );
-  SGDNN_CHECK ( sgdnnIsTensorContiguous ( &output ) );
+  else if ( mode == 2 ) // 32IC32OC
+  {
+    SGDNN_CHECK ( input.dim == 4 );
+    SGDNN_CHECK ( output.dim == 8 );
+    // 32IC
+    SGDNN_CHECK ( output.shape[0] == input.shape[0] );
+    SGDNN_CHECK ( output.shape[1] == input.shape[2] * input.shape[3] );
+    SGDNN_CHECK ( output.shape[2] == DIV_UP ( input.shape[1], 32 ) );
+    SGDNN_CHECK ( output.shape[3] == 32 );
+    // 32OC
+    SGDNN_CHECK ( output.shape[4] == input.shape[1] );
+    SGDNN_CHECK ( output.shape[5] == input.shape[2] * input.shape[3] );
+    SGDNN_CHECK ( output.shape[6] == DIV_UP ( input.shape[0], 32 ) );
+    SGDNN_CHECK ( output.shape[7] == 32 );
+  }
 #if defined BACKEND_1684X
   sg_api_conv_weight_reorder_t api;
   api.input_global_addr = input.addr;
@@ -1129,6 +1192,122 @@ tpu_status_t sgdnnReorderConv2dWeight ( tpu_resource_t resource ,
   }
   api.mode = mode;
   SAFE_CALL ( sgdnnTPUKernelLaunch ( resource , "tpu_kernel_api_conv_weight_reorder", &api, sizeof ( api ) ) );
+#elif defined BACKEND_SG2260
+  SGDNN_CHECK ( false );
+#else
+  SGDNN_CHECK ( false );
+#endif
+  return SG_SUCCESS;
+}
+
+// NCHW -> 32OC
+tpu_status_t sgdnnReorderConv2dGrad ( tpu_resource_t resource ,
+                                       SgdnnTensor_t input,
+                                       SgdnnTensor_t output,
+                                       bool non_blocking )
+{
+  SGDNN_CHECK ( input.dtype == output.dtype );
+  SGDNN_CHECK ( input.dtype == SGDNN_DTYPE_FP16 ||
+                input.dtype == SGDNN_DTYPE_BF16 );
+  SGDNN_CHECK ( output.dim == 4  && input.dim == 4);
+
+#if defined BACKEND_1684X
+  sg_api_conv_grad_reorder_t api;
+  api.input_global_addr = input.addr;
+  api.output_global_addr = output.addr;
+  for ( int i = 0; i < input.dim; ++i )
+  {
+    api.shape[i] = input.shape[i];
+  }
+  SAFE_CALL ( sgdnnTPUKernelLaunch ( resource , "tpu_kernel_api_conv_grad_reorder", &api, sizeof ( api ) ) );
+#elif defined BACKEND_SG2260
+  SGDNN_CHECK ( false );
+#else
+  SGDNN_CHECK ( false );
+#endif
+  return SG_SUCCESS;
+}
+
+tpu_status_t sgdnnRecoverConv2dGrad ( tpu_resource_t resource ,
+                                       SgdnnTensor_t input,
+                                       SgdnnTensor_t output,
+                                       bool non_blocking )
+{
+  SGDNN_CHECK ( input.dtype == output.dtype );
+  SGDNN_CHECK ( input.dtype == SGDNN_DTYPE_FP16 ||
+                input.dtype == SGDNN_DTYPE_BF16 );
+  SGDNN_CHECK ( output.dim == 4  && input.dim == 4);
+
+#if defined BACKEND_1684X
+  sg_api_conv_grad_recover_t api;
+  api.input_global_addr = input.addr;
+  api.output_global_addr = output.addr;
+  for ( int i = 0; i < output.dim; ++i )
+  {
+    api.shape[i] = output.shape[i];
+  }
+  SAFE_CALL ( sgdnnTPUKernelLaunch ( resource , "tpu_kernel_api_conv_grad_recover", &api, sizeof ( api ) ) );
+#elif defined BACKEND_SG2260
+  SGDNN_CHECK ( false );
+#else
+  SGDNN_CHECK ( false );
+#endif
+  return SG_SUCCESS;
+}
+
+tpu_status_t sgdnnRecoverConv2dWeight ( tpu_resource_t resource ,
+                                       SgdnnTensor_t input,
+                                       int mode,
+                                       SgdnnTensor_t output,
+                                       bool non_blocking )
+{
+  SGDNN_CHECK ( input.dtype == output.dtype );
+  SGDNN_CHECK ( input.dtype == SGDNN_DTYPE_FP16 ||
+                input.dtype == SGDNN_DTYPE_BF16 );
+  SGDNN_CHECK ( input.dim == 4 || input.dim == 8 );
+  SGDNN_CHECK ( output.dim == 4 );
+  if ( mode == 0 ) // 32 IC -> NCHW
+  {
+    SGDNN_CHECK ( input.shape[0] == output.shape[0] );
+    SGDNN_CHECK ( input.shape[1] == output.shape[2] * output.shape[3] );
+    SGDNN_CHECK ( input.shape[2] == DIV_UP ( output.shape[1], 32 ) );
+    SGDNN_CHECK ( input.shape[3] == 32 );
+    SGDNN_CHECK ( sgdnnIsTensorContiguous ( &input ) );
+    SGDNN_CHECK ( sgdnnIsTensorContiguous ( &output ) );
+  }
+  else if ( mode == 2 ) // 32IC32OC -> NCHW
+  {
+    SGDNN_CHECK ( input.shape[0] == output.shape[0] );
+    SGDNN_CHECK ( input.shape[1] == output.shape[2] * output.shape[3] );
+    SGDNN_CHECK ( input.shape[2] == DIV_UP ( output.shape[1], 32 ) );
+    SGDNN_CHECK ( input.shape[3] == 32 );
+    mode = 0;
+    // 32OC part - the alternative
+    // sg_api_conv_grad_recover_t api;
+    // api.input_global_addr = input.addr + (input.shape[0] * input.shape[1] * input.shape[2] * input.shape[3]) * 2;
+    // api.output_global_addr = output.addr;
+    // for ( int i = 0; i < output.dim; ++i )
+    // {
+    //   api.shape[i] = output.shape[i];
+    // }
+    // SAFE_CALL ( sgdnnTPUKernelLaunch ( resource , "tpu_kernel_api_conv_grad_recover", &api, sizeof ( api ) ) );
+    // return SG_SUCCESS;
+  }
+  else 
+  {
+    SGDNN_CHECK ( false );
+  }
+
+#if defined BACKEND_1684X
+  sg_api_conv_weight_recover_t api;
+  api.input_global_addr = input.addr;
+  api.output_global_addr = output.addr;
+  for ( int i = 0; i < output.dim; ++i )
+  {
+    api.shape[i] = output.shape[i];
+  }
+  api.mode = mode;
+  SAFE_CALL ( sgdnnTPUKernelLaunch ( resource , "tpu_kernel_api_conv_weight_recover", &api, sizeof ( api ) ) );
 #elif defined BACKEND_SG2260
   SGDNN_CHECK ( false );
 #else
@@ -2462,6 +2641,39 @@ tpu_status_t sgdnnBinary ( tpu_resource_t resource ,
                             int binary_type,
                             bool non_blocking )
 {
+  if ((input.format_casted || other.format_casted) && (output.addr == input.addr || output.addr == other.addr) ) { // this branch special for weight-grad update
+    //printf("SGDNN Binary todo imple formated binary. input.format = %d, other.format = %d", input.format_casted, other.format_casted);
+    SGDNN_CHECK( (input.format_casted == SGDNN_CONV_W_TRAIN_FORMAT && other.format_casted == SGDNN_CONV_DW_TRAIN_FORMAT) || 
+                 (input.format_casted == SGDNN_CONV_DW_TRAIN_FORMAT && other.format_casted == SGDNN_CONV_W_TRAIN_FORMAT) );
+    #if defined BACKEND_1684X
+    sg_api_weight_update_t api;
+    api.input_global_addr = input.addr;
+    api.other_global_addr = other.addr;
+    api.output_global_addr = output.addr;
+    api.in_dim = input.dim;
+    for ( int i = 0; i < input.dim; ++i )
+    {
+      api.in_shape[i] = input.shape[i];
+    }
+    api.other_dim = other.dim;
+    for ( int i = 0; i < other.dim; ++i )
+    {
+      api.other_shape[i] = other.shape[i];
+    }
+    api.input_format = (int)input.format_casted;
+    api.other_format = (int)other.format_casted;
+    api.dtype = sgdnnTPUKernelDType ( input.dtype );
+    api.value = scalar;
+    api.binary_type = (binary_type == BINARY_ADD && scalar!=0 ) ? BINARY_ADDCMUL : binary_type;
+      SAFE_CALL ( sgdnnTPUKernelLaunch ( resource , "tpu_kernel_api_weight_update", &api, sizeof ( api ) ) );
+    #elif defined BACKEND_SG2260
+      SGDNN_CHECK ( false );
+    #else
+      SGDNN_CHECK ( false );
+    #endif
+    return SG_SUCCESS;
+  }
+
   SGDNN_CHECK ( input.dtype == other.dtype );
   // SGDNN_CHECK ( input.dtype == output.dtype );
   SGDNN_CHECK ( input.dtype != SGDNN_DTYPE_INT64 );

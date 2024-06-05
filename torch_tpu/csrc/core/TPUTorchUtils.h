@@ -9,11 +9,14 @@
 #include <ATen/core/TensorBase.h>
 #include <c10/util/Logging.h>
 #include <c10/util/Half.h>
+#include <type_traits>
 
 #include "TPUDeviceManager.h"
 #include "TPUGuard.h"
 #include <tpuDNN.h>
+#include "torch_tpu/csrc/aten/TPUFormatCastHelper.h"
 #include "TPUStream.h"
+
 #ifdef BACKEND_SG2260
 #include <sgdnn_api.h>
 #elif defined BACKEND_1684X
@@ -187,7 +190,7 @@ static inline T TPUGenerateDnnTensor ( const at::Tensor & Tensor )
   T t = { 0 };
   t.addr = reinterpret_cast<decltype(t.addr)>(
     GetAddrByUnifiedAddr(( unsigned long long ) Tensor.data_ptr()));
-  t.dtype = TPUConvertDtype<decltype(t.dtype)>( Tensor.dtype() );
+  t.dtype =TPUConvertDtype<decltype(t.dtype)>( Tensor.dtype() );
   t.dim = Tensor.dim();
   for ( auto i = 0; i < Tensor.dim(); ++i )
   {
@@ -196,8 +199,29 @@ static inline T TPUGenerateDnnTensor ( const at::Tensor & Tensor )
   }
   return t;
 }
-
-constexpr const static auto TPUGenerateSgdnnTensor = TPUGenerateDnnTensor<SgdnnTensor_t>;
+static inline SgdnnTensor_t TPUGenerateSgdnnTensor ( const at::Tensor & Tensor )
+{
+  SgdnnTensor_t t = { 0 };
+  unsigned long long data_ptr;
+  if (at_tpu::StorageDescHelper::IsBaseFormatType(Tensor)) { 
+    data_ptr = (unsigned long long)Tensor.data_ptr();
+    t.dtype =TPUConvertDtype<decltype(t.dtype)>( Tensor.dtype() );
+    t.dim = Tensor.dim();
+    for ( auto i = 0; i < Tensor.dim(); ++i )
+    {
+      t.shape[i] = Tensor.size ( i );
+      t.stride[i] = Tensor.stride ( i );
+    }
+  }
+  else {
+    data_ptr = at_tpu::StorageDescHelper::GetDataPtrWithFormat(Tensor);
+    at_tpu::StorageDescHelper::SetSgTensorAttributeWithFormat(Tensor, t);
+   }
+  t.addr = reinterpret_cast<decltype(t.addr)>( GetAddrByUnifiedAddr( data_ptr ) );
+  return t;
+}
+using func_Sgdnn_t = SgdnnTensor_t (*)(const at::Tensor &);
+// constexpr const static func_Sgdnn_t TPUGenerateSgdnnTensor = TPUGenerateDnnTensor<SgdnnTensor_t>;
 
 static inline tpudnnTensor_t TPUGenerateTpudnnTensor(tpudnnHandle_t handle, const at::Tensor & tensor)
 {
@@ -252,7 +276,7 @@ static inline T TPUGenerateTensorforComplex64 ( const at::Tensor & Tensor )
   return t;
 }
 
-constexpr const static auto TPUGenerateSgdnnTensorforComplex64 = TPUGenerateDnnTensor<SgdnnTensor_t>;
+constexpr const static func_Sgdnn_t TPUGenerateSgdnnTensorforComplex64 = TPUGenerateDnnTensor<SgdnnTensor_t>;
 
 static inline tpudnnTensor_t TPUGenerateTpudnnTensorforComplex64(tpudnnHandle_t handle, const at::Tensor & tensor)
 {

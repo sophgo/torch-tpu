@@ -52,14 +52,19 @@ Tensor &binary_op_tpu(const Tensor &self, const Tensor &other,
     auto other_ =
         other.dtype() == self.dtype() ? other : other.to(self.dtype());
 
-    auto stream = c10_tpu::getCurrentTPUStream();
-    auto status = tpudnnBinaryAsync(
-        stream,
-        tpu::TPUGenerateTpudnnTensor(stream, self),
-        tpu::TPUGenerateTpudnnTensor(stream, other_),
-        alpha.toDouble(),
-        tpu::TPUGenerateTpudnnTensor(stream, out), binary_type);
-    TORCH_CHECK(status == TPUDNN_STATUS_SUCCESS);
+    // auto stream = c10_tpu::getCurrentTPUStream();
+    // auto status = tpudnnBinaryAsync(
+    //     stream,
+    //     tpu::TPUGenerateTpudnnTensor(stream, self),
+    //     tpu::TPUGenerateTpudnnTensor(stream, other_),
+    //     alpha.toDouble(),
+    //     tpu::TPUGenerateTpudnnTensor(stream, out), binary_type);
+    // TORCH_CHECK(status == TPUDNN_STATUS_SUCCESS);
+    auto status = sgdnnBinary(
+        tpu::TPUGetDeviceResource(), tpu::TPUGenerateSgdnnTensor(self),
+        tpu::TPUGenerateSgdnnTensor(other_), alpha.toDouble(),
+        tpu::TPUGenerateSgdnnTensor(out), binary_type);
+    TORCH_CHECK(status == SG_SUCCESS);
     TIMING_END(tpu::BINARYOP)
   } else {
     int self_dim = self.dim(), other_dim = other.dim();

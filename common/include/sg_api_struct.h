@@ -129,6 +129,7 @@ typedef enum {
   BINARY_SUB          = 1,
   BINARY_MUL          = 2,
   BINARY_DIV          = 3,
+  BINARY_ADDCMUL      = 4,
 } sg_binary_type_t;
 
 typedef struct {
@@ -176,6 +177,7 @@ typedef struct {
   int dilation[2];
   int pad[4];
   int dtype;
+  int weight_formated;
 } WITH_PLATFORM(sg_api_conv2d_backward_t);
 
 typedef struct
@@ -368,6 +370,28 @@ typedef struct
   int shape[4];
   int mode;
 } WITH_PLATFORM(sg_api_conv_weight_reorder_t);
+
+typedef struct
+{
+  unsigned long long input_global_addr;
+  unsigned long long output_global_addr;
+  int shape[4];
+  int mode;
+} WITH_PLATFORM(sg_api_conv_weight_recover_t);
+
+typedef struct
+{
+  unsigned long long input_global_addr;
+  unsigned long long output_global_addr;
+  int shape[4];
+} WITH_PLATFORM(sg_api_conv_grad_recover_t);
+
+typedef struct
+{
+  unsigned long long input_global_addr;
+  unsigned long long output_global_addr;
+  int shape[4];
+} WITH_PLATFORM(sg_api_conv_grad_reorder_t);
 
 typedef struct
 {
@@ -897,6 +921,22 @@ typedef struct
   int dtype;
   int binary_type;
 } WITH_PLATFORM(sg_api_binary_t);
+
+typedef struct
+{
+  unsigned long long input_global_addr;
+  unsigned long long other_global_addr;
+  unsigned long long output_global_addr;
+  int in_shape[FW_MAX_SHAPE_DIMS];
+  int in_dim;
+  int other_shape[FW_MAX_SHAPE_DIMS];
+  int other_dim;
+  float value;
+  int dtype;
+  int binary_type;
+  int input_format;
+  int other_format;
+} WITH_PLATFORM(sg_api_weight_update_t);
 
 typedef struct
 {
