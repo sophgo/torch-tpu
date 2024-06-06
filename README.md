@@ -30,30 +30,21 @@ Note:
 Or More detailed:
     2.a) source scripts/envsetup.sh bm1684x latest
         #CHIP_ARCH is bm1684x, and bmlib is using  tpu-train/../libsophon/build/bmlib/libbmlib.so (gerrit-latest)
-    
+
     2.b) source scripts/envsetup.sh bm1684x local
         #CHIP_ARCH is bm1684x, and bmlib is using  tpu-train/third_party/bm1684x/libbmlib.so
 
     2.c) source scripts/envsetup.sh bm1684x stable
         #CHIP_ARCH is bm1684x, and bmlib is using  /opt/sophon/libsophon-current (.deb)
 
-    2.d) source scripts/envsetup.sh sg2260 latest
-        #CHIP_ARCH is sg2260,  and bmlib is using  tpu-train/../libsophon (gerrit-latest)
+    2.d) source scripts/envsetup.sh sg2260 local
+        #CHIP_ARCH is sg2260,  and tpuv7-runtime is using tpu-train/third_party/tpuv7_runtime
 
-    2.e) source scripts/envsetup.sh sg2260 stable
-        #CHIP_ARCH is sg2260,  and bmlib is using  /opt/sophon/libsophon-current (.deb)
-
-[3]fast_build:
-    3.a)bm1684x cmodel only:
-        fast_build_bm1684x_latest
-    3.b)sg2260 cmodel only:
-        fast_build_sg2260_latest
-
-[4]cmodel mode:
-1. mkdir build && (re)build_all
+[3]cmodel mode:
+1. new_clean && new_build
 2. set_cmodel_firmware ./build/firmware_core/libcmodel.so
 
-[5]pcie_mode or soc_mode:
+[4]pcie_mode or soc_mode:
 firstly make USING_CMODEL OFF && PCIE_MODE or SOC_MODE ON in config_common.cmake, (or directly set -D in cmake)
 if you use SOC_MODE or need pybind, make ENABLE_PYBIND ON
 1. if you have bm_prebuilt_toolchains, first set:

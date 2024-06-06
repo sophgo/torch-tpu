@@ -99,7 +99,7 @@ TORCH-TPU会从安装的Pytorch包导入头文件和库文件，请确保Pytorch
 .. code-block:: shell
 
    $ cd tpu-train
-   $ source scripts/envsetup.sh bm1684x stable
+   $ source scripts/envsetup.sh bm1684x stable #仅支持bm1684x
    $ new_build
 
 如果使用`CMODEL模式`进行开发，
@@ -107,7 +107,7 @@ TORCH-TPU会从安装的Pytorch包导入头文件和库文件，请确保Pytorch
 .. code-block:: shell
 
    $ cd tpu-train
-   $ source scripts/envsetup.sh bm1684x local
+   $ source scripts/envsetup.sh bm1684x local #支持sg2260，需要替换命令中的"bm1684x"为"sg2260"
    $ new_build
    $ set_cmodel_firmware ./build/Release/firmware_core/libcmodel.so #path of libcmodel
 
@@ -125,7 +125,7 @@ TORCH-TPU会从安装的Pytorch包导入头文件和库文件，请确保Pytorch
 SE7交叉编译
 --------------------
 
-SE7交叉编译是指在x86主机上编译出SE7平台上可安装执行的wheel包。SE7平台是一款基于BM1684X芯片的AI加速边缘设备，其架构为arm不同，因此需要在x86上交叉编译。  
+SE7交叉编译是指在x86主机上编译出SE7平台上可安装执行的wheel包。SE7平台是一款基于BM1684X芯片的AI加速边缘设备，其架构为arm不同，因此需要在x86上交叉编译。
 
 SE7环境为python3.8，因此需要在x86 docker上安装python3.8。
 
@@ -142,14 +142,14 @@ SE7环境为python3.8，因此需要在x86 docker上安装python3.8。
    $ apt install python3.8-venv -y
    $ python3.8 -m venv crossp
 
-使用 `PCIE模式` , 
+使用 `PCIE模式` ,
 
 .. code-block:: shell
 
    $ cd tpu-train
    $ source scripts/envsetup.sh bm1684x stable
 
-下载并检查必要的文件, 
+下载并检查必要的文件,
 
 .. code-block:: shell
 
@@ -167,4 +167,4 @@ SE7环境为python3.8，因此需要在x86 docker上安装python3.8。
 
    $ soc_build
 
-编译完后可以在 `dist` 目录下找到编译好的wheel包。 
+编译完后可以在 `dist` 目录下找到编译好的wheel包。

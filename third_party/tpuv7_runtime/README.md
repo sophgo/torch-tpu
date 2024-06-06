@@ -39,7 +39,6 @@ db31f1ac6a197e90f14f3aa05ced62c4386c757a
    $source scripts/envsetup.sh sg2260
    $export EXTRA_CONFIG=-DDEBUG=ON
    $rebuild_firmware_cmodel
-   $cp build/firmware_core/libcmodel_firmware.so build/firmware_core/libtpuv7_emulator.so #only TPU1686 master branch need
    ```
   3) compile others
     YOU CAN FOUND IN `tpuv7-runtime/README` generate `tpuv7-emulator_0.1.0`.
