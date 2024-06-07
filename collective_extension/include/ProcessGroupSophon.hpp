@@ -26,7 +26,7 @@
 
 namespace c10d {
 
-constexpr const char *SOPHON_BACKEND_NAME = "SOPHON";
+constexpr const char *SOPHON_BACKEND_NAME = "SCCL";
 
 class TORCH_API ProcessGroupSophon : public ProcessGroup {
 public:
@@ -144,6 +144,7 @@ public:
 
     std::vector<std::shared_ptr<::sophon::transport::Device>> devices;
     int threads;
+    std::vector<int> chip_map;
   };
 
   const std::string getBackendName() const override {
@@ -267,16 +268,15 @@ protected:
   std::condition_variable workConsumeCV_;
 
 public:
-  static c10::intrusive_ptr<ProcessGroup>
-  createProcessGroupSophon(const c10::intrusive_ptr<::c10d::Store> &store,
-                           int rank, int size,
-                           const std::chrono::duration<float> &timeout);
+  static c10::intrusive_ptr<c10d::ProcessGroup>
+  createProcessGroupSCCL(const c10d::DistributedBackendOptions &dis_opts,
+                         Options &options);
 
-  static void ProcessGroupSophonConstructor() __attribute__((constructor)) {
+  static void ProcessGroupSCCLConstructor() __attribute__((constructor)) {
     py::object module = py::module::import("torch.distributed");
     py::object register_backend =
         module.attr("Backend").attr("register_backend");
-    register_backend("SOPHON", py::cpp_function(createProcessGroupSophon));
+    register_backend("SCCL", py::cpp_function(createProcessGroupSCCL), true);
   }
 };
 

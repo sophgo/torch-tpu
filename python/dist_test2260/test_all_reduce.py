@@ -16,7 +16,8 @@ world_size = os.environ.get("OMPI_COMM_WORLD_SIZE", None)
 tensor_len = 4
 torch_tpu.tpu.set_device(int(rank))
 # init dist and logger
-dist.init_process_group(backend="SOPHON", rank=int(rank), world_size=int(world_size))
+options = sccl_collectives.ProcessGroupSCCLOptions()
+dist.init_process_group(backend="sccl", rank=int(rank), world_size=int(world_size), pg_options=options)
 init_logger()
 
 def case1():

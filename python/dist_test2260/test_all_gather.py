@@ -8,13 +8,16 @@ import torch_tpu
 import sccl_collectives
 TPU = "tpu"
 
+options = sccl_collectives.ProcessGroupSCCLOptions()
+# options.chip_map = [0, 1]
 rank = os.environ.get("OMPI_COMM_WORLD_RANK", None)
 world_size = os.environ.get("OMPI_COMM_WORLD_SIZE", None)
 
 tensor_len = 4
 torch_tpu.tpu.set_device(int(rank))
-dist.init_process_group(backend="SOPHON", rank=int(rank), world_size=int(world_size))
+dist.init_process_group(backend="sccl", rank=int(rank), world_size=int(world_size), pg_options=options)
 init_logger()
+
 
 def case1():
 

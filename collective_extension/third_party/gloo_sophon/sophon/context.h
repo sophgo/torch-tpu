@@ -50,6 +50,8 @@ class Context {
 
   std::chrono::milliseconds getTimeout() const;
 
+  std::vector<int> chip_map;
+
  protected:
   std::shared_ptr<transport::Device> device_;
   std::shared_ptr<transport::Context> transportContext_;

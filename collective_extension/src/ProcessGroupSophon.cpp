@@ -291,6 +291,13 @@ void setInput(O &opts, at::Tensor &tensor, std::vector<int64_t> &counts) {
 }
 
 template <typename T, typename O>
+void setInput(O &opts, at::Tensor &tensor, tpudnnHandle_t handle) {
+  opts.template setInput<T>(
+      handle, (void *)GetAddrByUnifiedAddr((uint64_t)tensor.data_ptr()),
+      tensor.numel());
+}
+
+template <typename T, typename O>
 void setOutputs(O &opts, std::vector<at::Tensor> &tensors) {
   opts.setOutputs(getDataPointers<T>(tensors), tensors[0].numel());
 }
@@ -308,6 +315,13 @@ void setOutput(O &opts, at::Tensor &tensor, std::vector<size_t> &counts) {
 template <typename T, typename O>
 void setOutput(O &opts, at::Tensor &tensor, std::vector<int64_t> &counts) {
   opts.setOutput(getDataPointer<T>(tensor), counts);
+}
+
+template <typename T, typename O>
+void setOutput(O &opts, at::Tensor &tensor, tpudnnHandle_t handle) {
+  opts.template setOutput<T>(
+      handle, (void *)GetAddrByUnifiedAddr((uint64_t)tensor.data_ptr()),
+      tensor.numel());
 }
 
 const auto kLoopbackAddress = "127.0.0.1";
@@ -581,6 +595,7 @@ ProcessGroupSophon::ProcessGroupSophon(const c10::intrusive_ptr<Store> &store,
         std::make_shared<::sophon::rendezvous::Context>(rank_, size_);
     auto store = ::sophon::rendezvous::PrefixStore(std::to_string(i), *store_);
     context->setTimeout(options->timeout);
+    context->chip_map = options->chip_map;
     try {
       context->connectFullMesh(store, options->devices[i]);
     } catch (const std::runtime_error &e) {
@@ -1267,42 +1282,13 @@ public:
     sophon::AllgatherOptions opts(context);
     opts.setTag(tag);
 
-    // Use single flattened input tensor.
-    at::Tensor flatInputTensor = flattenDenseTensors(inputs);
-    GENERATE_ALL_TYPES(scalarType, setInput, opts, flatInputTensor);
-
     // Use single flat output tensor.
     // The first dimension corresponds to the index into outputs[N],
     // so copying into the actual output later is easy.
     at::Tensor flatOutputTensor = newLikeFlat(outputs[0]);
-    GENERATE_ALL_TYPES(scalarType, setOutput, opts, flatOutputTensor);
-
     tpudnnHandle_t handle_ = tpudnnCreate(context->rank);
-    size_t send_bytes_ = inputs[0].nbytes();
-    void* send_buff = (void*)GetAddrByUnifiedAddr((uint64_t)flatInputTensor[0].data_ptr());
-    size_t recv_bytes_ = outputs[0][0].nbytes();
-    void* recv_buff = (void*)GetAddrByUnifiedAddr((uint64_t)flatOutputTensor[0].data_ptr());
-
-    // for dev mem
-    switch (scalarType) {
-    case ::at::ScalarType::Float:
-      opts.setOutputSophon(handle_, send_buff, send_bytes_, recv_buff, recv_bytes_, SG_DTYPE_FP32);
-      break;
-    case ::at::ScalarType::Half:
-      opts.setOutputSophon(handle_, send_buff, send_bytes_, recv_buff, recv_bytes_, SG_DTYPE_FP16);
-      break;
-    case ::at::ScalarType::Char:
-      opts.setOutputSophon(handle_, send_buff, send_bytes_, recv_buff, recv_bytes_, SG_DTYPE_INT8);
-      break;
-    case ::at::ScalarType::Byte:
-      opts.setOutputSophon(handle_, send_buff, send_bytes_, recv_buff, recv_bytes_, SG_DTYPE_UINT8);
-      break;
-    case ::at::ScalarType::Int:
-      opts.setOutputSophon(handle_, send_buff, send_bytes_, recv_buff, recv_bytes_, SG_DTYPE_INT32);
-      break;
-    default:
-      TORCH_CHECK(false, "Invalid scalar type");
-    }
+    GENERATE_ALL_TYPES(scalarType, setInput, opts, inputs[0], handle_);
+    GENERATE_ALL_TYPES(scalarType, setOutput, opts, flatOutputTensor, handle_);
 
     sophon::allgather2260(opts);
 
@@ -2225,33 +2211,36 @@ uint64_t ProcessGroupSophon::getSequenceNumberForGroup() {
   return sequenceNum_->get();
 }
 
-c10::intrusive_ptr<ProcessGroup> ProcessGroupSophon::createProcessGroupSophon(
-    const c10::intrusive_ptr<::c10d::Store> &store, int rank, int size,
-    const std::chrono::duration<float> &timeout) {
-  auto options = Options::create();
+c10::intrusive_ptr<c10d::ProcessGroup>
+ProcessGroupSophon::createProcessGroupSCCL(
+    const c10d::DistributedBackendOptions &dis_opts, Options &options) {
   // Use interfaces listed in "GLOO_SOCKET_IFNAME", if set.
   char *ifnameEnv = getenv(SOPHON_SOCKET_IFNAME_ENV.c_str());
   if (ifnameEnv && strlen(ifnameEnv) > 1) {
     for (const auto &iface : split0(',', ifnameEnv)) {
-      options->devices.push_back(
-          ::c10d::ProcessGroupSophon::createDeviceForInterface(iface));
+      options.devices.push_back(createDeviceForInterface(iface));
     }
   } else {
     // If no hostname is specified, this function looks up
     // the machine's hostname and returns a device instance
     // associated with the address that the hostname resolves to.
-    options->devices.push_back(createDefaultDevice());
+    options.devices.push_back(createDefaultDevice());
   }
 
-  // options->timeout = timeout.float();
+  options.timeout =
+      std::chrono::duration_cast<std::chrono::milliseconds>(dis_opts.timeout);
   //  NOLINTNEXTLINE(bugprone-narrowing-conversions,cppcoreguidelines-narrowing-conversions)
-  options->threads = options->devices.size() * 2;
-  return c10::make_intrusive<ProcessGroupSophon>(store, rank, size, options);
+  options.threads = options.devices.size() * 2;
+  return c10::make_intrusive<c10d::ProcessGroupSophon>(
+      dis_opts.store, dis_opts.group_rank, dis_opts.group_size,
+      c10::make_intrusive<Options>(options));
 }
-
 PYBIND11_MODULE(TORCH_EXTENSION_NAME, m) {
-  m.def("createProcessGroupSophon",
-        &ProcessGroupSophon::createProcessGroupSophon);
+  m.def("createProcessGroupSCCL", &ProcessGroupSophon::createProcessGroupSCCL);
+
+  py::class_<ProcessGroupSophon::Options>(m, "ProcessGroupSCCLOptions")
+      .def(py::init<>())
+      .def_readwrite("chip_map", &ProcessGroupSophon::Options::chip_map);
 }
 
 } // namespace c10d

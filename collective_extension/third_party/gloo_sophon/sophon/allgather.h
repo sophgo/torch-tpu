@@ -11,13 +11,15 @@
 #include "sophon/context.h"
 #include "sophon/transport/unbound_buffer.h"
 #include "sophon_defines_2260.h"
+#include "types.h"
+#include <c10/util/Exception.h>
 
 namespace sophon {
 
 class AllgatherOptions {
  public:
   explicit AllgatherOptions(const std::shared_ptr<Context>& context)
-      : context(context), timeout(context->getTimeout()) {}
+      : context(context), timeout(context->getTimeout()), chip_map_(context->chip_map) {}
 
   template <typename T>
   void setInput(std::unique_ptr<transport::UnboundBuffer> buf) {
@@ -33,15 +35,33 @@ class AllgatherOptions {
     this->in = context->createUnboundBuffer(ptr, input_elements * sizeof(T));
   }
 
-  void setOutputSophon(tpudnnHandle_t handle, void* send_buff,
-                       size_t send_bytes, void* recv_buff,
-                       size_t recv_bytes, sg_data_type_t sg_type) {
+  template<typename T>
+  void setInput(tpudnnHandle_t handle, void *buf, size_t elements) {
+    this->input_elements = elements;
+    this->elementSize = sizeof(T);
+    this->send_buff_ = buf;
     this->handle_ = handle;
-    this->send_buff_ = send_buff;
-    this->send_bytes_ = send_bytes;
-    this->recv_buff_ = recv_buff;
-    this->recv_bytes_ = recv_bytes;
-    this->dtype_ = sg_type;
+  }
+
+  template<typename T>
+  void setOutput(tpudnnHandle_t handle, void *buf, size_t elements) {
+    this->output_elements = elements;
+    this->elementSize = sizeof(T);
+    this->recv_buff_ = buf;
+    this->handle_ = handle;
+    if (typeid(T) == typeid(float)) {
+      this->dtype_ = SG_DTYPE_FP32;
+    } else if (typeid(T) == typeid(sophon::float16)) {
+      this->dtype_ = SG_DTYPE_FP16;
+    } else if (typeid(T) == typeid(int8_t)) {
+      this->dtype_ = SG_DTYPE_INT8;
+    } else if (typeid(T) == typeid(uint8_t)) {
+      this->dtype_ = SG_DTYPE_UINT8;
+    } else if (typeid(T) == typeid(int32_t)) {
+      this->dtype_ = SG_DTYPE_INT32;
+    } else {
+      TORCH_CHECK(false, "Invalid data type\n");
+    }
   }
 
   template <typename T>
@@ -91,6 +111,7 @@ class AllgatherOptions {
   void* recv_buff_;
   size_t recv_bytes_;
   sg_data_type_t dtype_;
+  std::vector<int> chip_map_;
 
   friend void allgather(AllgatherOptions&);
 

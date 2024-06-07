@@ -98,11 +98,16 @@ void allgather(AllgatherOptions& opts) {
 
 void allgather2260(AllgatherOptions &opts) {
   // call tpudnnC2CAllGather
-  sccl_args_t sccl_args;
+  sccl_args_t sccl_args = {0};
   sccl_args.nranks = opts.context->size;
   sccl_args.rank = opts.context->rank;
-  for (int i = 0; i < sccl_args.nranks; i++) {
-    sccl_args.chip_map[i] = i;
+  if (opts.chip_map_.empty()) {
+    for (int i = 0; i < sccl_args.nranks; i++) {
+      sccl_args.chip_map[i] = i;
+    }
+  } else {
+    memcpy(sccl_args.chip_map, opts.chip_map_.data(),
+           sizeof(opts.chip_map_.size()) * 4);
   }
   tpudnnStatus_t ret =
       tpudnnC2CAllGather(opts.handle_, tpudnnPhysToVirt(opts.handle_, (uint64_t)opts.send_buff_),

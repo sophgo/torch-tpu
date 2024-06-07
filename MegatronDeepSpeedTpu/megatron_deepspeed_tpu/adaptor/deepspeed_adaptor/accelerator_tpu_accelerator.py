@@ -50,7 +50,7 @@ class TPU_Accelerator(DeepSpeedAccelerator):
     def __init__(self):
         self._name = 'tpu'
         # self._communication_backend_name = 'sccl' # 1684x
-        self._communication_backend_name = 'SOPHON'
+        self._communication_backend_name = 'sccl'
 
     def is_synchronized_device(self):
         return False
