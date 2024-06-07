@@ -8,6 +8,7 @@ include_dirs = [f"{os.path.dirname(os.path.abspath(__file__))}/include/",
                 f"{os.path.dirname(os.path.abspath(__file__))}/../torch_tpu/csrc/core",
                 f"{os.path.dirname(os.path.abspath(__file__))}/../",
                 f"{os.path.dirname(os.path.abspath(__file__))}/third_party/gloo_sophon/",
+                f"{os.path.dirname(os.path.abspath(__file__))}/third_party/gloo_sophon/sophon",
                 f"{os.path.dirname(os.path.abspath(__file__))}/third_party/tpudnn/include",
                 f"{os.path.dirname(os.path.abspath(__file__))}/../common/include"
                 ]

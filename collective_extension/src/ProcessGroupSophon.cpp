@@ -42,6 +42,7 @@
 #include "SophonDeviceFactory.hpp"
 #include "common_def.h" // for sg_data_type_t defines
 #include "TPUAddrHelper.h"
+#include "sccl.h"
 
 #ifdef _WIN32
 #define GENERATE_ALL_TYPES(type, func, ...)                                    \
@@ -166,6 +167,29 @@ void checkRemainingTime(
   }
 }
 
+sg_data_type_t toSgDtype(::at::ScalarType type) {
+  sg_data_type_t dtype = SG_DTYPE_FP32;
+  switch (type) {
+  case ::at::ScalarType::Float:
+    dtype = SG_DTYPE_FP32;
+    break;
+  case ::at::ScalarType::Half:
+    dtype = SG_DTYPE_FP16;
+    break;
+  case ::at::ScalarType::Char:
+    dtype = SG_DTYPE_INT8;
+    break;
+  case ::at::ScalarType::Byte:
+    dtype = SG_DTYPE_UINT8;
+    break;
+  case ::at::ScalarType::Int:
+    dtype = SG_DTYPE_INT32;
+    break;
+  default:
+    TORCH_CHECK(false, "Invalid scalar type");
+  }
+  return dtype;
+}
 // 要改？
 typedef void (*ReduceFunc)(void *, const void *, const void *, size_t);
 
@@ -291,13 +315,6 @@ void setInput(O &opts, at::Tensor &tensor, std::vector<int64_t> &counts) {
 }
 
 template <typename T, typename O>
-void setInput(O &opts, at::Tensor &tensor, tpudnnHandle_t handle) {
-  opts.template setInput<T>(
-      handle, (void *)GetAddrByUnifiedAddr((uint64_t)tensor.data_ptr()),
-      tensor.numel());
-}
-
-template <typename T, typename O>
 void setOutputs(O &opts, std::vector<at::Tensor> &tensors) {
   opts.setOutputs(getDataPointers<T>(tensors), tensors[0].numel());
 }
@@ -315,13 +332,6 @@ void setOutput(O &opts, at::Tensor &tensor, std::vector<size_t> &counts) {
 template <typename T, typename O>
 void setOutput(O &opts, at::Tensor &tensor, std::vector<int64_t> &counts) {
   opts.setOutput(getDataPointer<T>(tensor), counts);
-}
-
-template <typename T, typename O>
-void setOutput(O &opts, at::Tensor &tensor, tpudnnHandle_t handle) {
-  opts.template setOutput<T>(
-      handle, (void *)GetAddrByUnifiedAddr((uint64_t)tensor.data_ptr()),
-      tensor.numel());
 }
 
 const auto kLoopbackAddress = "127.0.0.1";
@@ -1279,18 +1289,28 @@ public:
   void allgather(std::vector<std::vector<at::Tensor>> &outputs,
                  std::vector<at::Tensor> &inputs) {
     const auto &scalarType = inputs[0].scalar_type();
-    sophon::AllgatherOptions opts(context);
-    opts.setTag(tag);
 
     // Use single flat output tensor.
     // The first dimension corresponds to the index into outputs[N],
     // so copying into the actual output later is easy.
     at::Tensor flatOutputTensor = newLikeFlat(outputs[0]);
-    tpudnnHandle_t handle_ = tpudnnCreate(context->rank);
-    GENERATE_ALL_TYPES(scalarType, setInput, opts, inputs[0], handle_);
-    GENERATE_ALL_TYPES(scalarType, setOutput, opts, flatOutputTensor, handle_);
+    tpudnnHandle_t handle = tpudnnCreate(context->rank);
 
-    sophon::allgather2260(opts);
+    const void *send_buff = (const void*)GetAddrByUnifiedAddr((uint64_t)inputs[0].data_ptr());
+    void *recv_buff = (void *)GetAddrByUnifiedAddr((uint64_t)flatOutputTensor.data_ptr());
+    size_t count = inputs[0].numel();
+    sg_data_type_t dtype = toSgDtype(scalarType);
+    sophon::scclComm_t comm;
+    sophon::scclUniqueId id;
+    TORCH_CHECK(sophon::scclCommInitRank(
+                    &comm, context->size, id, context->rank,
+                    context->chip_map.data()) == sophon::scclSuccess,
+                "sccl comm init rank failed\n");
+    auto ret =
+        sophon::scclAllGather(send_buff, recv_buff, count, dtype, comm, handle);
+    TORCH_CHECK(sophon::scclCommDestroy(comm) == sophon::scclSuccess,
+                "sccl comm destroy rank failed\n");
+    TORCH_CHECK(ret == sophon::scclSuccess);
 
     // Unflatten into output tensors.
     for (auto &outputgroup : outputs) {
@@ -2214,6 +2234,10 @@ uint64_t ProcessGroupSophon::getSequenceNumberForGroup() {
 c10::intrusive_ptr<c10d::ProcessGroup>
 ProcessGroupSophon::createProcessGroupSCCL(
     const c10d::DistributedBackendOptions &dis_opts, Options &options) {
+  if (!options.chip_map.empty()) {
+    TORCH_CHECK((int)options.chip_map.size() == dis_opts.group_size,
+                "chip map size must be same with the nranks\n");
+  }
   // Use interfaces listed in "GLOO_SOCKET_IFNAME", if set.
   char *ifnameEnv = getenv(SOPHON_SOCKET_IFNAME_ENV.c_str());
   if (ifnameEnv && strlen(ifnameEnv) > 1) {

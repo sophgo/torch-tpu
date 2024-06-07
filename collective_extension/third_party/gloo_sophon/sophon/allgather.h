@@ -12,6 +12,7 @@
 #include "sophon/transport/unbound_buffer.h"
 #include "sophon_defines_2260.h"
 #include "types.h"
+#include "sccl.h"
 #include <c10/util/Exception.h>
 
 namespace sophon {
@@ -19,7 +20,7 @@ namespace sophon {
 class AllgatherOptions {
  public:
   explicit AllgatherOptions(const std::shared_ptr<Context>& context)
-      : context(context), timeout(context->getTimeout()), chip_map_(context->chip_map) {}
+      : context(context), timeout(context->getTimeout()) {}
 
   template <typename T>
   void setInput(std::unique_ptr<transport::UnboundBuffer> buf) {
@@ -33,35 +34,6 @@ class AllgatherOptions {
     this->input_elements = elements;
     this->elementSize = sizeof(T);
     this->in = context->createUnboundBuffer(ptr, input_elements * sizeof(T));
-  }
-
-  template<typename T>
-  void setInput(tpudnnHandle_t handle, void *buf, size_t elements) {
-    this->input_elements = elements;
-    this->elementSize = sizeof(T);
-    this->send_buff_ = buf;
-    this->handle_ = handle;
-  }
-
-  template<typename T>
-  void setOutput(tpudnnHandle_t handle, void *buf, size_t elements) {
-    this->output_elements = elements;
-    this->elementSize = sizeof(T);
-    this->recv_buff_ = buf;
-    this->handle_ = handle;
-    if (typeid(T) == typeid(float)) {
-      this->dtype_ = SG_DTYPE_FP32;
-    } else if (typeid(T) == typeid(sophon::float16)) {
-      this->dtype_ = SG_DTYPE_FP16;
-    } else if (typeid(T) == typeid(int8_t)) {
-      this->dtype_ = SG_DTYPE_INT8;
-    } else if (typeid(T) == typeid(uint8_t)) {
-      this->dtype_ = SG_DTYPE_UINT8;
-    } else if (typeid(T) == typeid(int32_t)) {
-      this->dtype_ = SG_DTYPE_INT32;
-    } else {
-      TORCH_CHECK(false, "Invalid data type\n");
-    }
   }
 
   template <typename T>
@@ -105,21 +77,17 @@ class AllgatherOptions {
   // End-to-end timeout for this operation.
   std::chrono::milliseconds timeout;
 
-  tpudnnHandle_t handle_;
-  void* send_buff_;
-  size_t send_bytes_;
-  void* recv_buff_;
-  size_t recv_bytes_;
-  sg_data_type_t dtype_;
-  std::vector<int> chip_map_;
-
   friend void allgather(AllgatherOptions&);
 
-  friend void allgather2260(AllgatherOptions &);
+  friend scclResult_t scclAllGather(const void *, void *, size_t,
+                                      sg_data_type_t, scclComm_t,
+                                      tpudnnHandle_t);
 };
 
-void allgather(AllgatherOptions& opts);
+void allgather(AllgatherOptions &opts);
 
-void allgather2260(AllgatherOptions &opts);
+scclResult_t scclAllGather(const void *send_buff, void *recv_buff,
+                             size_t send_count, sg_data_type_t dtype,
+                             scclComm_t comm, tpudnnHandle_t handle);
 
 } // namespace sophon

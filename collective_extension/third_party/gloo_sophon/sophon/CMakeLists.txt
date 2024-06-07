@@ -23,6 +23,7 @@ list(APPEND SOPHON_SRCS
   "${CMAKE_CURRENT_SOURCE_DIR}/reduce.cc"
   "${CMAKE_CURRENT_SOURCE_DIR}/scatter.cc"
   "${CMAKE_CURRENT_SOURCE_DIR}/types.cc"
+  "${CMAKE_CURRENT_SOURCE_DIR}/sccl.cc"
   )
 
 list(APPEND SOPHON_HDRS
@@ -51,6 +52,7 @@ list(APPEND SOPHON_HDRS
   "${CMAKE_CURRENT_SOURCE_DIR}/reduce_scatter.h"
   "${CMAKE_CURRENT_SOURCE_DIR}/scatter.h"
   "${CMAKE_CURRENT_SOURCE_DIR}/types.h"
+  "${CMAKE_CURRENT_SOURCE_DIR}/sccl.h"
   )
 
 # if(USE_CUDA)

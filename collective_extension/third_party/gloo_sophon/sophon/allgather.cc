@@ -16,24 +16,24 @@
 
 namespace sophon {
 
-void allgather(AllgatherOptions& opts) {
-  const auto& context = opts.context;
-  transport::UnboundBuffer* in = opts.in.get();
-  transport::UnboundBuffer* out = opts.out.get();
+void allgather(AllgatherOptions &opts) {
+  const auto &context = opts.context;
+  transport::UnboundBuffer *in = opts.in.get();
+  transport::UnboundBuffer *out = opts.out.get();
   const auto slot = Slot::build(kAllgatherSlotPrefix, opts.tag);
 
   // Sanity checks
   SOPHON_ENFORCE(opts.elementSize > 0);
   const auto recvRank = (context->size + context->rank - 1) % context->size;
-  SOPHON_ENFORCE(
-      recvRank == context->rank || context->getPair(recvRank),
-      "missing connection between rank " + std::to_string(context->rank) +
-          " (this process) and rank " + std::to_string(recvRank));
+  SOPHON_ENFORCE(recvRank == context->rank || context->getPair(recvRank),
+                 "missing connection between rank " +
+                     std::to_string(context->rank) +
+                     " (this process) and rank " + std::to_string(recvRank));
   const auto sendRank = (context->size + context->rank + 1) % context->size;
-  SOPHON_ENFORCE(
-      sendRank == context->rank || context->getPair(sendRank),
-      "missing connection between rank " + std::to_string(context->rank) +
-          " (this process) and rank " + std::to_string(sendRank));
+  SOPHON_ENFORCE(sendRank == context->rank || context->getPair(sendRank),
+                 "missing connection between rank " +
+                     std::to_string(context->rank) +
+                     " (this process) and rank " + std::to_string(sendRank));
 
   if (in != nullptr) {
     SOPHON_ENFORCE_EQ(out->size, in->size * context->size);
@@ -47,10 +47,8 @@ void allgather(AllgatherOptions& opts) {
   // If the input buffer is specified, this is NOT an in place operation,
   // and the output buffer needs to be primed with the input.
   if (in != nullptr) {
-    memcpy(
-        static_cast<uint8_t*>(out->ptr) + context->rank * in->size,
-        static_cast<uint8_t*>(in->ptr),
-        in->size);
+    memcpy(static_cast<uint8_t *>(out->ptr) + context->rank * in->size,
+           static_cast<uint8_t *>(in->ptr), in->size);
   }
 
   // Short circuit if there is only a single process or the output is empty.
@@ -96,24 +94,18 @@ void allgather(AllgatherOptions& opts) {
   }
 }
 
-void allgather2260(AllgatherOptions &opts) {
-  // call tpudnnC2CAllGather
-  sccl_args_t sccl_args = {0};
-  sccl_args.nranks = opts.context->size;
-  sccl_args.rank = opts.context->rank;
-  if (opts.chip_map_.empty()) {
-    for (int i = 0; i < sccl_args.nranks; i++) {
-      sccl_args.chip_map[i] = i;
-    }
-  } else {
-    memcpy(sccl_args.chip_map, opts.chip_map_.data(),
-           sizeof(opts.chip_map_.size()) * 4);
-  }
-  tpudnnStatus_t ret =
-      tpudnnC2CAllGather(opts.handle_, tpudnnPhysToVirt(opts.handle_, (uint64_t)opts.send_buff_),
-          opts.input_elements, tpudnnPhysToVirt(opts.handle_, (uint64_t)opts.recv_buff_),
-          opts.output_elements, opts.dtype_, sccl_args);
-  return;
+scclResult_t scclAllGather(const void *send_buff, void *recv_buff,
+                           size_t send_count, sg_data_type_t dtype,
+                           scclComm_t comm, tpudnnHandle_t handle) {
+  scclComm *pcomm = static_cast<scclComm *>(comm);
+  sccl_args_t args = {0};
+  args.nranks = pcomm->nranks;
+  args.rank = pcomm->rank;
+  memcpy(args.chip_map, pcomm->chip_map, sizeof(int) * pcomm->nranks);
+  tpudnnStatus_t ret = tpudnnC2CAllGather(
+      handle, tpudnnPhysToVirt(handle, (uint64_t)send_buff), send_count,
+      tpudnnPhysToVirt(handle, (uint64_t)recv_buff), send_count, dtype, args);
+  return ret == TPUDNN_STATUS_SUCCESS ? scclSuccess : scclKernelError;
 }
 
 } // namespace sophon
