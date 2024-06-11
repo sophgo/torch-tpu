@@ -92,7 +92,7 @@ public:
   using Algorithm = detail::AllreduceOptionsImpl::Algorithm;
 
   explicit AllreduceOptions(const std::shared_ptr<Context> &context)
-      : impl_(context) {}
+      : impl_(context), chip_map_(context->chip_map) {}
 
   void setAlgorithm(Algorithm algorithm) { impl_.algorithm = algorithm; }
 
@@ -197,6 +197,7 @@ protected:
   size_t bytes_;
   sg_data_type_t dtype_;
   sg_reduce_method_t reduce_method_;
+  std::vector<int> chip_map_;
 
   friend void allreduce(const AllreduceOptions &);
 

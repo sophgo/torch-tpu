@@ -1,7 +1,7 @@
 import os
 
 import torch
-import sccl_collectives
+import sccl
 import torch.distributed as dist
 import torch_tpu
 TPU = "tpu"

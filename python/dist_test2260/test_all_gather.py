@@ -5,10 +5,10 @@ import logging
 import os
 from helper import init_logger, is_master, is_slave
 import torch_tpu
-import sccl_collectives
+import sccl
 TPU = "tpu"
 
-options = sccl_collectives.ProcessGroupSCCLOptions()
+options = sccl.ProcessGroupSCCLOptions()
 # options.chip_map = [0, 1]
 rank = os.environ.get("OMPI_COMM_WORLD_RANK", None)
 world_size = os.environ.get("OMPI_COMM_WORLD_SIZE", None)

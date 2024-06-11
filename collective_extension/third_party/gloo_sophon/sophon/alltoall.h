@@ -18,7 +18,7 @@ namespace sophon {
 class AlltoallOptions {
  public:
   explicit AlltoallOptions(const std::shared_ptr<Context>& context)
-      : context(context), timeout(context->getTimeout()) {}
+      : context(context), timeout(context->getTimeout()), chip_map_(context->chip_map) {}
 
   template <typename T>
   void setInput(std::unique_ptr<transport::UnboundBuffer> buf) {
@@ -89,6 +89,8 @@ class AlltoallOptions {
 
   // End-to-end timeout for this operation.
   std::chrono::milliseconds timeout;
+
+  std::vector<int> chip_map_;
 
   friend void alltoall( AlltoallOptions&);
 

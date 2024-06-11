@@ -1,6 +1,6 @@
 import torch
 import torch_tpu
-import sccl_collectives
+import sccl
 
 import time
 import functools

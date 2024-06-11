@@ -20,7 +20,7 @@ library_dirs = [f"{os.path.dirname(os.path.realpath(torch.__file__))}/lib",
 libraries = ["torch_tpu"]
 
 module = cpp_extension.CppExtension(
-    name="sccl_collectives",
+    name="sccl",
     sources=sources,
     include_dirs=include_dirs,
     library_dirs = library_dirs,
@@ -29,7 +29,7 @@ module = cpp_extension.CppExtension(
 )
 
 setup(
-    name="Sophon-Collectives",
+    name="sccl",
     version="0.0.1",
     ext_modules=[module],
     cmdclass={'build_ext': cpp_extension.BuildExtension}

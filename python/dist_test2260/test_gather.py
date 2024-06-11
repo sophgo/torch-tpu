@@ -6,7 +6,7 @@ import os
 from helper import init_logger, is_master, is_slave
 import time
 import torch_tpu
-import sccl_collectives
+import sccl
 TPU = "tpu"
 
 rank = os.environ.get("OMPI_COMM_WORLD_RANK", None)
@@ -14,7 +14,8 @@ world_size = os.environ.get("OMPI_COMM_WORLD_SIZE", None)
 
 tensor_len = 4
 torch_tpu.tpu.set_device(int(rank))
-options = sccl_collectives.ProcessGroupSCCLOptions()
+options = sccl.ProcessGroupSCCLOptions()
+# options.chip_map = [0, 1]
 dist.init_process_group(backend="sccl", rank=int(rank), world_size=int(world_size), pg_options=options)
 init_logger()
 

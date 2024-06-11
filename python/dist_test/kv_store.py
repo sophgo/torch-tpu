@@ -5,7 +5,7 @@ from base64 import b64encode, b64decode
 import torch.distributed as dist
 import logging
 from helper import init_logger, is_master, is_slave
-import sccl_collectives
+import sccl
 import torch_tpu
 TPU = "tpu"
 

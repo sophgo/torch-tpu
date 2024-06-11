@@ -3,7 +3,7 @@ import torch
 import torch.distributed as dist
 import logging
 from helper import init_logger, is_master, is_slave
-import sccl_collectives
+import sccl
 TPU = "tpu"
 
 dist.init_process_group(backend="sccl")

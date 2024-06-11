@@ -12,7 +12,7 @@ find_path(
 find_library(
     tpurt_LIBRARY
     NAMES tpuv7_rt
-    HINTS $ENV{TPURT_TOP}/build/cdmlib/host/cdm_runtime)
+    HINTS $ENV{TPURT_TOP}/build/emulator/cdmlib/host/cdm_runtime)
 
 find_package_handle_standard_args(
     tpurt

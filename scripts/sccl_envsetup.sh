@@ -105,7 +105,7 @@ function rebuild_gloo_sophon()
     build_gloo_sophon 1
 }
 
-function install_sccl_collectives()
+function install_sccl()
 {
     pushd $GLOO_SOPHON_PATH/../../
     python3 setup2260.py develop
@@ -115,8 +115,8 @@ function install_sccl_collectives()
 }
 
 function install_dist_test2260() {
-    pushd $TPUTRAIN_TOP/
-    python3 setup.py bdist_wheel --plat-name linux_x86_64
+    pushd $GLOO_SOPHON_PATH/../../
+    python3 setup2260.py bdist_wheel --plat-name linux_x86_64
     pip install dist/*.whl
     ret=$?
     popd
@@ -127,6 +127,6 @@ function rebuild_sccl()
 {
     # rebuild_torch_tpu
     rebuild_gloo_sophon
-    install_sccl_collectives
+    install_sccl
     # install_dist_test2260
 }
