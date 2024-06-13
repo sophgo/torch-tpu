@@ -171,8 +171,6 @@ link_directories($ENV{PYTORCH_INSTALL_DIR}/lib)
 include_directories(${PROJECT_ROOT}/third_party/include)
 include_directories(${PROJECT_ROOT}/torch_tpu/csrc/core)
 include_directories(${PROJECT_ROOT})
-find_package(tpurt REQUIRED)
-target_link_libraries(sophon PUBLIC tpurt::tpurt)
 find_package(tpudnn REQUIRED)
 target_link_libraries(sophon PUBLIC tpudnn::tpudnn)
 

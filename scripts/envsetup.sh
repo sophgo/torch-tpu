@@ -40,11 +40,14 @@ function set_v7runtime_env() {
      local root_path=$1
      local v7_lib_path=${root_path}/third_party/tpuv7_runtime/tpuv7-emulator_0.1.0/lib
      export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:${v7_lib_path}
-     export TPU_EMULATOR_PATH=${v7_lib_path}/libtpuv7_emulator.so
      export TPU_SCALAR_EMULATOR_PATH=${v7_lib_path}/libtpuv7_scalar_emulator.so
-
-     export TPU_KERNEL_PATH=${root_path}/build/Release/firmware_core/
-     export TPUKERNEL_FIRMWARE_PATH=${root_path}/build/Release/firmware_core/libcmodel.so
+     build_type=Release
+     if [ "$TPUTRAIN_DEBUG" = "ON" ]; then
+          build_type=Debug
+     fi
+     export TPU_KERNEL_PATH=${root_path}/build/${build_type}/firmware_core/
+     export TPU_EMULATOR_PATH=${root_path}/build/${build_type}/firmware_core/libcmodel.so
+     export TPUKERNEL_FIRMWARE_PATH=${root_path}/build/${build_type}/firmware_core/libcmodel.so
 }
 
 ################ MODE CHOICE ###################
@@ -79,3 +82,17 @@ export LD_LIBRARY_PATH=$TPUTRAIN_TOP/third_party/oneDNN/lib:$LD_LIBRARY_PATH
 if [ "${CHIP_ARCH}" == "sg2260" ]; then
      set_v7runtime_env ${TPUTRAIN_TOP}
 fi
+
+function update_tpuv7()
+{
+  pushd $TPURT_TOP
+  rm -rf build/emulator
+  mkdir -p build/emulator
+  cd build/emulator
+  cmake -DCMAKE_INSTALL_PREFIX=$PWD/../install  -DUSING_CMODEL=ON ../..
+  make -j$(nproc)
+  make install
+  popd
+  rm -rf $TPUTRAIN_TOP/third_party/tpuv7_runtime/tpuv7-emulator_0.1.0/
+  cp -r $TPURT_TOP/build/install/tpuv7-runtime-emulator_0.1.0 $TPUTRAIN_TOP/third_party/tpuv7_runtime/tpuv7-emulator_0.1.0/
+}

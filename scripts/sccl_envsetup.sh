@@ -21,9 +21,13 @@ export LD_LIBRARY_PATH=$LD_LIBRARY_PATH/install/lib:$LD_LIBRARY_PATH
 export TPUDNN_PATH=$SCCL_PATH/third_party/tpudnn
 export TPURT_TOP=$TPUTRAIN_TOP/../tpuv7-runtime
 # export TORCH_TPU_PATH=$TPUTRAIN_TOP/torch_tpu/
+build_type=Release
+if [ "$TPUTRAIN_DEBUG" = "ON" ]; then
+    build_type=Debug
+fi
 export GLOO_SOPHON_PATH=$TPUTRAIN_TOP/collective_extension/third_party/gloo_sophon/
-export LD_LIBRARY_PATH=$TPUTRAIN_TOP/build/Release/sgdnn:/usr/local/lib/python3.10/dist-packages/torch/lib:$TPUDNN_PATH/lib:$LD_LIBRARY_PATH
-export TPU_KERNEL_MODULE_PATH=$TPUTRAIN_TOP/build/Release/firmware_core/libcmodel.so
+export LD_LIBRARY_PATH=$TPUTRAIN_TOP/build/${build_type}/sgdnn:/usr/local/lib/python3.10/dist-packages/torch/lib:$TPUDNN_PATH/lib:$LD_LIBRARY_PATH
+export TPU_KERNEL_MODULE_PATH=$TPUTRAIN_TOP/build/${build_type}/firmware_core/libcmodel.so
 
 # These envs are here for the naughty tpurt
 # export TPU_KERNEL_PATH=${SG1684X_TOP}/build/firmware_core
@@ -108,25 +112,17 @@ function rebuild_gloo_sophon()
 function install_sccl()
 {
     pushd $GLOO_SOPHON_PATH/../../
-    python3 setup2260.py develop
-    ret=$?
-    popd
-    if [ $ret -ne 0 ]; then return $ret; fi
-}
-
-function install_dist_test2260() {
-    pushd $GLOO_SOPHON_PATH/../../
+    # python3 setup2260.py develop
     python3 setup2260.py bdist_wheel --plat-name linux_x86_64
-    pip install dist/*.whl
-    ret=$?
+    if [ $? -ne 0 ]; then popd; return -1; fi
+    pip install dist/* --force-reinstall
     popd
-    if [ $ret -ne 0 ]; then return $ret; fi
 }
 
 function rebuild_sccl()
 {
     # rebuild_torch_tpu
+    build_openmpi
     rebuild_gloo_sophon
     install_sccl
-    # install_dist_test2260
 }

@@ -13,9 +13,11 @@ rank = os.environ.get("OMPI_COMM_WORLD_RANK", None)
 world_size = os.environ.get("OMPI_COMM_WORLD_SIZE", None)
 
 tensor_len = 4
-torch_tpu.tpu.set_device(int(rank))
+# init dist and logger
 options = sccl.ProcessGroupSCCLOptions()
-# options.chip_map = [0, 1]
+chip_map = [0,1,2,3,4,5,6,7]
+options.chip_map = chip_map
+torch_tpu.tpu.set_device(options.chip_map[int(rank)])
 dist.init_process_group(backend="sccl", rank=int(rank), world_size=int(world_size), pg_options=options)
 init_logger()
 
@@ -23,16 +25,19 @@ def case1():
     logging.info("rank: {}".format(rank))
     master_results = None
     slave_results = None
+    device = torch.device(f"{TPU}:{chip_map[int(rank)]}")
 
     if is_master():
         tensor = torch.rand(tensor_len)
         logging.info("rank: {}, {}".format(rank, tensor))
-        tensor = tensor.to(TPU)
+        if torch_tpu.tpu.current_device() == device.index:
+            tensor = tensor.to(device)
 
     if is_slave():
         tensor = torch.rand(tensor_len)
         logging.info("rank: {}, {}".format(rank, tensor))
-        tensor = tensor.to(TPU)
+        if torch_tpu.tpu.current_device() == device.index:
+            tensor = tensor.to(device)
 
     dist.reduce(tensor, dst=0, op=dist.ReduceOp.SUM)
 

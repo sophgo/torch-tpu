@@ -14,10 +14,12 @@ world_size = os.environ.get("OMPI_COMM_WORLD_SIZE", None)
 
 # test tensor length
 tensor_len = 4
-torch_tpu.tpu.set_device(int(rank))
 # init dist and logger
 options = sccl.ProcessGroupSCCLOptions()
-# options.chip_map = [0, 1]
+chip_map = [0,1,2,3,4,5,6,7]
+options.chip_map = chip_map
+torch_tpu.tpu.set_device(options.chip_map[int(rank)])
+print('The device is set up!')
 dist.init_process_group(backend="sccl", rank=int(rank), world_size=int(world_size), pg_options=options)
 init_logger()
 
@@ -27,7 +29,10 @@ def case1():
     # init tensor
     tensor = torch.rand(tensor_len).float()
     logging.info("rank: {}, {}".format(rank, tensor))
-    tensor = tensor.to(TPU)
+    device = torch.device(f"{TPU}:{chip_map[int(rank)]}")
+
+    if torch_tpu.tpu.current_device() == device.index:
+        tensor = tensor.to(device)
 
     # all_reduce
     dist.all_reduce(tensor, op=dist.ReduceOp.SUM)

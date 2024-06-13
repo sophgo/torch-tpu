@@ -84,13 +84,13 @@ tpuRtStatus_t tpuRtKernelLaunchAsync(tpuRtKernelModule_t module, const char *fun
 				   uint32_t size, uint64_t group_num, uint64_t block_num, tpuRtStream_t stream);
 tpuRtStatus_t tpuRtKernelUnloadModule(tpuRtKernelModule_t p_module, tpuRtStream_t stream);
 
-uint64_t tpuRtGetClusterId(void);
+tpuRtStatus_t tpuRtGetUniqueId(char *uuid);
 tpuRtStatus_t tpuRtKernelLaunchCDMA(tpuRtKernelModule_t module, const char *func_name,
 				void *args, uint32_t size, uint64_t block_num, tpuRtStream_t stream,
-				int cdma_only, uint64_t unique_id, int rank_id, int rank_num);
+				int cdma_only, char *uuid, int rank_id, int rank_num);
 tpuRtStatus_t tpuRtKernelLaunchCDMAAsync(tpuRtKernelModule_t module, const char *func_name,
 				void *args, uint32_t size, uint64_t block_num, tpuRtStream_t stream,
-				int cdma_only, uint64_t unique_id, int rank_id, int rank_num);
+				int cdma_only, char *uuid, int rank_id, int rank_num);
 #ifdef __cplusplus
 }
 #endif

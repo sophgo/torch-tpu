@@ -753,7 +753,7 @@ public:
     opts.setTag(tag);
     GENERATE_ALL_TYPES(scalarType, setOutput, opts, tensor);
 
-    tpudnnHandle_t handle_ = tpudnnCreate(context->rank);
+    tpudnnHandle_t handle_ = tpudnnCreate(context->chip_map[context->rank]);
     size_t bytes_ = tensor.nbytes();
     void* buff_dev = (void*)GetAddrByUnifiedAddr((uint64_t)tensor.data_ptr());
 
@@ -889,7 +889,7 @@ public:
     opts.setTag(tag);
     GENERATE_ALL_TYPES(scalarType, setOutputs, opts, tensors);
 
-    tpudnnHandle_t handle_ = tpudnnCreate(context->rank);
+    tpudnnHandle_t handle_ = tpudnnCreate(context->chip_map[context->rank]);
     size_t bytes_ = tensors[0].nbytes();
     void* send_buff = (void*)GetAddrByUnifiedAddr((uint64_t)tensors[0].data_ptr());
     void* recv_buff = (void*)GetAddrByUnifiedAddr((uint64_t)tensors[0].data_ptr());
@@ -1097,7 +1097,7 @@ public:
       GENERATE_ALL_TYPES(scalarType, setOutput, opts, flatOutputTensor);
     }
 
-    tpudnnHandle_t handle_ = tpudnnCreate(context->rank);
+    tpudnnHandle_t handle_ = tpudnnCreate(context->chip_map[context->rank]);
     size_t bytes_ = tensors[0].nbytes();
     void* send_buff = (void*)GetAddrByUnifiedAddr((uint64_t)tensors[0].data_ptr());
     void* recv_buff;
@@ -1294,7 +1294,7 @@ public:
     // The first dimension corresponds to the index into outputs[N],
     // so copying into the actual output later is easy.
     at::Tensor flatOutputTensor = newLikeFlat(outputs[0]);
-    tpudnnHandle_t handle = tpudnnCreate(context->rank);
+    tpudnnHandle_t handle = tpudnnCreate(context->chip_map[context->rank]);
 
     const void *send_buff = (const void*)GetAddrByUnifiedAddr((uint64_t)inputs[0].data_ptr());
     void *recv_buff = (void *)GetAddrByUnifiedAddr((uint64_t)flatOutputTensor.data_ptr());
@@ -1482,7 +1482,7 @@ public:
       GENERATE_ALL_TYPES(scalarType, setOutput, opts, flatOutputTensor);
     }
 
-    tpudnnHandle_t handle_ = tpudnnCreate(context->rank);
+    tpudnnHandle_t handle_ = tpudnnCreate(context->chip_map[context->rank]);
     size_t send_bytes_ = inputs[0].nbytes();
     void* send_buff = (void*)GetAddrByUnifiedAddr((uint64_t)inputs[0].data_ptr());
 
@@ -1681,7 +1681,7 @@ public:
     // Set single output tensor on all processes
     GENERATE_ALL_TYPES(scalarType, setOutput, opts, outputs[0]);
 
-    tpudnnHandle_t handle_ = tpudnnCreate(context->rank);
+    tpudnnHandle_t handle_ = tpudnnCreate(context->chip_map[context->rank]);
     size_t send_bytes_ = outputs[0].nbytes();
     void* send_buff = (void*)GetAddrByUnifiedAddr((uint64_t)flatInputTensor.data_ptr());
     size_t recv_bytes_ = outputs[0].nbytes();
@@ -1871,7 +1871,7 @@ public:
       GENERATE_ALL_TYPES(scalarType, setInput, opts, inputTensor);
       GENERATE_ALL_TYPES(scalarType, setOutput, opts, outputTensor);
 
-      tpudnnHandle_t handle_ = tpudnnCreate(context->rank);
+      tpudnnHandle_t handle_ = tpudnnCreate(context->chip_map[context->rank]);
       size_t bytes_ = inputTensor[0].nbytes();
       void* send_buff = (void*)GetAddrByUnifiedAddr((uint64_t)inputTensor[0].data_ptr());
       void* recv_buff = (void*)GetAddrByUnifiedAddr((uint64_t)outputTensor[0].data_ptr());

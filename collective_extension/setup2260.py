@@ -3,6 +3,10 @@ import torch
 from setuptools import setup
 from torch.utils import cpp_extension
 
+build_type = "Release"
+if "TPUTRAIN_DEBUG" in os.environ and os.environ["TPUTRAIN_DEBUG"] == "ON":
+    build_type = "Debug"
+
 sources = ["src/ProcessGroupSophon.cpp", "src/SophonDeviceFactory.cpp"]
 include_dirs = [f"{os.path.dirname(os.path.abspath(__file__))}/include/",
                 f"{os.path.dirname(os.path.abspath(__file__))}/../torch_tpu/csrc/core",
@@ -14,7 +18,7 @@ include_dirs = [f"{os.path.dirname(os.path.abspath(__file__))}/include/",
                 ]
 library_dirs = [f"{os.path.dirname(os.path.realpath(torch.__file__))}/lib",
                 f"{os.path.dirname(os.path.realpath(__file__))}/lib",
-                f"{os.path.dirname(os.path.abspath(__file__))}/../build/Release/torch_tpu",
+                f"{os.path.dirname(os.path.abspath(__file__))}/../build/{build_type}/torch_tpu",
                 f"{os.path.dirname(os.path.abspath(__file__))}/third_party/gloo_sophon/build/sophon",
                 f"{os.path.dirname(os.path.abspath(__file__))}/third_party/tpudnn/lib",
                 ]
