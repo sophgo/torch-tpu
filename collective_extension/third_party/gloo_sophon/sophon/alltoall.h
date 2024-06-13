@@ -93,11 +93,8 @@ class AlltoallOptions {
   std::vector<int> chip_map_;
 
   friend void alltoall( AlltoallOptions&);
-
-  friend void alltoall2260( AlltoallOptions&);
 };
 
 void alltoall(AlltoallOptions &opts);
 
-void alltoall2260( AlltoallOptions &opts);
 } // namespace sophon

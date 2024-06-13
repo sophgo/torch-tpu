@@ -1,5 +1,8 @@
 #pragma once
 
+#include "sophon_defines_2260.h"
+#include <stddef.h>
+
 namespace sophon {
 typedef enum {
   scclSuccess = 0,
@@ -19,12 +22,24 @@ scclResult_t scclCommInitRank(scclComm_t *comm, int nranks, scclUniqueId commId,
                               int rank, const int *chip_map);
 scclResult_t scclCommDestroy(scclComm_t comm);
 
-#define MAX_CHIP_NUM (16)
-typedef struct {
-  int rank;
-  int nranks;
-  int chip_map[MAX_CHIP_NUM];
-  scclUniqueId unique_id;
-} scclComm;
-
+scclResult_t scclAllGather(const void *send_buff, void *recv_buff,
+                           size_t send_count, sg_data_type_t dtype,
+                           scclComm_t comm, tpudnnHandle_t handle);
+scclResult_t scclBroadcast(void *buff, size_t count, sg_data_type_t dtype,
+                           int root, scclComm_t comm, tpudnnHandle_t handle);
+scclResult_t scclAllReduce(const void *sendbuff, void *recvbuff, size_t count,
+                           sg_data_type_t dtype, sg_reduce_method_t op,
+                           scclComm_t comm, tpudnnHandle_t handle);
+scclResult_t scclReduce(const void *sendbuff, void *recvbuff, size_t count,
+                        sg_data_type_t dtype, sg_reduce_method_t op, int root,
+                        scclComm_t comm, tpudnnHandle_t handle);
+scclResult_t scclGather(const void *sendbuff, void *recvbuff, size_t sendcount,
+                        sg_data_type_t dtype, int root, scclComm_t comm,
+                        tpudnnHandle_t handle);
+scclResult_t scclScatter(const void *sendbuff, void *recvbuff,
+                         size_t recv_count, sg_data_type_t dtype, int root,
+                         scclComm_t comm, tpudnnHandle_t handle);
+scclResult_t scclAllToAll(const void *sendbuff, void *recvbuff,
+                          size_t recv_count, sg_data_type_t dtype,
+                          scclComm_t comm, tpudnnHandle_t handle);
 } // namespace sophon

@@ -123,11 +123,8 @@ protected:
   std::vector<int> chip_map_;
 
   friend void reduce(ReduceOptions &);
-
-  friend void reduce2260(ReduceOptions &);
 };
 
 void reduce(ReduceOptions &opts);
 
-void reduce2260(ReduceOptions &opts);
 } // namespace sophon

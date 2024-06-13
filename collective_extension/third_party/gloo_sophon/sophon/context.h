@@ -13,6 +13,7 @@
 #include <vector>
 
 #include <sophon/transport/pair.h>
+#include "sccl.h"
 
 namespace sophon {
 
@@ -51,6 +52,10 @@ class Context {
   std::chrono::milliseconds getTimeout() const;
 
   std::vector<int> chip_map;
+
+  scclUniqueId scclID;
+
+  tpudnnHandle_t handle;
 
  protected:
   std::shared_ptr<transport::Device> device_;

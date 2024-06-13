@@ -201,11 +201,8 @@ protected:
 
   friend void allreduce(const AllreduceOptions &);
 
-  friend void allreduce2260(const AllreduceOptions &);
 };
 
 void allreduce(const AllreduceOptions &opts);
-
-void allreduce2260(const AllreduceOptions &opts);
 
 } // namespace sophon

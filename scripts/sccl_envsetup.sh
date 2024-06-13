@@ -122,7 +122,7 @@ function install_sccl()
 function rebuild_sccl()
 {
     # rebuild_torch_tpu
-    build_openmpi
+    # build_openmpi
     rebuild_gloo_sophon
     install_sccl
 }

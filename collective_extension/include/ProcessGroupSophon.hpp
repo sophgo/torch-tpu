@@ -243,6 +243,8 @@ public:
 
   int getNumThreads() { return options_->threads; }
 
+  void broadcastUniqueSCCLID(sophon::scclUniqueId *scclID, int rank);
+
 protected:
   std::unique_ptr<::sophon::rendezvous::Store> store_;
   const c10::intrusive_ptr<Options> options_;
@@ -266,6 +268,8 @@ protected:
   std::mutex workMutex_;
   std::condition_variable workProduceCV_;
   std::condition_variable workConsumeCV_;
+
+  tpudnnHandle_t dev_handle_;
 
 public:
   static c10::intrusive_ptr<c10d::ProcessGroup>

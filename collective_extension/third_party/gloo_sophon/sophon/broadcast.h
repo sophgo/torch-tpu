@@ -100,12 +100,8 @@ class BroadcastOptions {
   std::vector<int> chip_map_;
 
   friend void broadcast(BroadcastOptions&);
-
-  friend void broadcast2260(BroadcastOptions&);
 };
 
 void broadcast(BroadcastOptions& opts);
-
-void broadcast2260(BroadcastOptions& opts);
 
 } // namespace sophon

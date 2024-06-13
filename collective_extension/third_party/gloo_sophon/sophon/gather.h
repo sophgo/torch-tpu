@@ -96,15 +96,11 @@ class GatherOptions {
   sg_data_type_t dtype_;
 
   friend void gather(GatherOptions&);
-
-  friend void gather2260(GatherOptions &);
 };
 
 // void gather(GatherOptions& opts, tpudnnHandle_t, void*, int, sg_data_type_t, void*,
 //             int, sg_data_type_t, int);
 
 void gather(GatherOptions& opts);
-
-void gather2260(GatherOptions &opts);
 
 }  // namespace sophon

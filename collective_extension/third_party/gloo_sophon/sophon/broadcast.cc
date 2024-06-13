@@ -17,27 +17,6 @@
 
 namespace sophon {
 
-// extern constexpr const int chips2260;
-
-void broadcast2260(BroadcastOptions &opts) {
-  // call tpudnnC2CBroadcast
-  sccl_args_t sccl_args = {0};
-  sccl_args.nranks = opts.context->size;
-  sccl_args.rank = opts.context->rank;
-  if (opts.chip_map_.empty()) {
-    for (int i = 0; i < sccl_args.nranks; i++) {
-      sccl_args.chip_map[i] = i;
-    }
-  } else {
-    memcpy(sccl_args.chip_map, opts.chip_map_.data(),
-           sizeof(opts.chip_map_.size()) * 4);
-  }
-
-  tpudnnStatus_t ret = tpudnnC2CBroadcast(opts.handle_, tpudnnPhysToVirt(opts.handle_, (uint64_t)opts.buff_),
-      opts.elements, opts.dtype_, opts.root, sccl_args);
-  return;
-}
-
 void broadcast(BroadcastOptions &opts) {
   const auto &context = opts.context;
   transport::UnboundBuffer *in = opts.in.get();

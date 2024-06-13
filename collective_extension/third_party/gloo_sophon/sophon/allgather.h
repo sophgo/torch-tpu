@@ -10,9 +10,7 @@
 
 #include "sophon/context.h"
 #include "sophon/transport/unbound_buffer.h"
-#include "sophon_defines_2260.h"
 #include "types.h"
-#include "sccl.h"
 #include <c10/util/Exception.h>
 
 namespace sophon {
@@ -78,16 +76,8 @@ class AllgatherOptions {
   std::chrono::milliseconds timeout;
 
   friend void allgather(AllgatherOptions&);
-
-  friend scclResult_t scclAllGather(const void *, void *, size_t,
-                                      sg_data_type_t, scclComm_t,
-                                      tpudnnHandle_t);
 };
 
 void allgather(AllgatherOptions &opts);
-
-scclResult_t scclAllGather(const void *send_buff, void *recv_buff,
-                             size_t send_count, sg_data_type_t dtype,
-                             scclComm_t comm, tpudnnHandle_t handle);
 
 } // namespace sophon

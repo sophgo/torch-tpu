@@ -53,24 +53,4 @@ void alltoall(AlltoallOptions& opts) {
   }
 }
 
-void alltoall2260( AlltoallOptions &opts) {
-  // call tpudnnC2CAllToAll
-  sccl_args_t sccl_args = {0};
-  sccl_args.nranks = opts.context->size;
-  sccl_args.rank = opts.context->rank;
-  if (opts.chip_map_.empty()) {
-    for (int i = 0; i < sccl_args.nranks; i++) {
-      sccl_args.chip_map[i] = i;
-    }
-  } else {
-    memcpy(sccl_args.chip_map, opts.chip_map_.data(),
-           sizeof(opts.chip_map_.size()) * 4);
-  }
-
-  tpudnnStatus_t ret =
-      tpudnnC2CAllToAll(opts.handle_, tpudnnPhysToVirt(opts.handle_, (uint64_t)opts.send_buff_), opts.elements, opts.sg_type_,
-                                       tpudnnPhysToVirt(opts.handle_, (uint64_t)opts.recv_buff_), opts.elements, opts.sg_type_, sccl_args);
-  return;
-}
-
 } // namespace sophon

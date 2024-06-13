@@ -3,6 +3,10 @@
 #include "common_def.h"
 #include <cstdint>
 
+#ifdef USING_PLD_TEST
+#include "../../common/include/api/sg_api_pld.h"
+#endif
+
 extern "C"
 {
 
@@ -19,6 +23,9 @@ extern "C"
 
     void *tpudnnPhysToVirt(tpudnnHandle_t handle, uint64_t addr);
     uint64_t tpudnnVirtToPhys(tpudnnHandle_t handle, void *addr);
+#if defined(__sg2260__)
+    tpudnnStatus_t tpudnnGetUniqueId(tpudnnHandle_t handle, char* uniqueId);
+#endif
 
     // TODO
     // tpudnnHandle_t handle_from_bmlib();
@@ -64,6 +71,69 @@ extern "C"
         void *output,
         void *max_mask_addr);
 
+    tpudnnStatus_t tpudnnArithmetic(
+            tpudnnHandle_t        handle,
+            void *    src0,
+            void *    src1,
+            void *    dst,
+            int       op,
+            int       n,
+            int       c,
+            int       h,
+            int       w);
+
+    tpudnnStatus_t tpudnnArithmeticShift(
+      tpudnnHandle_t         handle,
+      void *     input,
+      void *     shift,
+      void *     output,
+      const int*          shape,
+      int                 shape_dim,
+      int                 is_per_channel,
+      char                shift_value,
+      sg_data_type_t      in_dtype,
+      sg_data_type_t      shift_dtype,
+      sg_data_type_t      out_dtype,
+      sg_round_mode_t     sg_round_mode);
+
+    tpudnnStatus_t tpudnnActiveMultiCore(
+        tpudnnHandle_t      handle,
+        void *              input,
+        void *              output,
+        const int*          shape,
+        int                 dims,
+        sg_active_type_t    active_type,
+        const float*        coeff,
+        sg_data_type_t      dtype);
+
+    tpudnnStatus_t tpudnnMatmulMultiCore(
+        tpudnnHandle_t      handle,
+        void *              left,
+        void *              right,
+        void *              output,
+        const int*          L_shape,
+        const int*          R_shape,
+        const int           L_dims,
+        const int           R_dims,
+        const int           L_trans,
+        const int           R_trans,
+        sg_data_type_t      in_dtype,
+        sg_data_type_t      out_dtype,
+        int                 slice_m_core,
+        int                 slice_n_core,
+        int                 slice_m,
+        int                 slice_n,
+        int                 slice_k,
+        const int           left_slice_dim,
+        const int           right_slice_dim,
+        const int           result_slice_dim,
+        const int           left_8ch_buf_size,
+        const int           right_8ch_buf_size,
+        const int           result_8ch_buf_size,
+        char*               left_8ch_buf[8],
+        char*               right_8ch_buf[8],
+        char*               result_8ch_buf[8]);
+
     tpudnnStatus_t tpudnnPoolingFix8b(
         tpudnnHandle_t handle,
         // input
@@ -90,6 +160,20 @@ extern "C"
         // output
         void *output);
 
+    tpudnnStatus_t tpudnnArg(
+        tpudnnHandle_t handle,
+        void * input,
+        void * index,
+        void * value,
+        int *input_shape,
+        int dims,
+        int axis,
+        int method, // 0: argmax, 1: argmin
+        int is_index_int32,
+        int select_last_index,
+        int need_val,
+        sg_data_type_t dtype);
+
     tpudnnStatus_t tpudnnAdaptivePool(
         tpudnnHandle_t handle,
         void *input_mem,
@@ -100,6 +184,73 @@ extern "C"
         const int mode,
         void *output_mem,
         sg_data_type_t sgdtype);
+    tpudnnStatus_t tpudnnBilinearInterpolate(
+        tpudnnHandle_t     handle,
+        void * input,
+        void * map_y,
+        void * map_x,
+        void * output,
+        int             input_c,
+        int             input_h,
+        int             input_w,
+        int             map_yx_len,
+        int             map_yx_c_need_bcast,
+        int             mode,
+        sg_data_type_t  dtype);
+
+    tpudnnStatus_t tpudnnBinaryShift(
+        tpudnnHandle_t             handle,
+        void *         input_a,
+        void *         input_b,
+        void *         output,
+        const int*              a_shape,
+        const int*              b_shape,
+        int                     shape_dim,
+        sg_binary_type_t        binary_op,
+        int                     rshift_num,
+        int                     b_is_const,
+        int                     b_const_val,
+        int                     a_is_coeff,
+        int                     b_is_coeff,
+        int                     inversed,
+        sg_data_type_t          a_dtype,
+        sg_data_type_t          b_dtype,
+        sg_data_type_t          out_dtype);
+
+    tpudnnStatus_t tpudnnBatchNorm(
+        tpudnnHandle_t      handle,
+        // input
+        void *  input,
+        void *  mean_ma,
+        void *  variance_ma,
+        int              input_n,
+        int              input_c,
+        int              input_h,
+        int              input_w,
+        int              if_relu,
+        float            relu_upper_limit,
+        sg_data_type_t    dtype,
+        // output
+        void *  output);
+    tpudnnStatus_t tpudnnBnscaleFix8b(
+        tpudnnHandle_t       handle,
+        // input
+        void *   input,
+        void *   scale,
+        void *   bias,
+        void *   shift,
+        int               input_n,
+        int               input_c,
+        int               input_h,
+        int               input_w,
+        int               input_sign,
+        int               scale_sign,
+        int               bias_sign,
+        int               if_relu,
+        int               relu_upper_limit,
+        sg_round_mode_t   round_mode,
+        // output
+        void *   output);
 
     tpudnnStatus_t tpudnnInterpForward(
         tpudnnHandle_t handle,
@@ -367,7 +518,7 @@ extern "C"
         int diagonal,
         sg_data_type_t dtype);
 
-    tpudnnStatus_t sgdnn_upsample(
+    tpudnnStatus_t tpudnnUpsample(
         tpudnnHandle_t handle,
         void *input,
         int input_n,
@@ -378,6 +529,532 @@ extern "C"
         int if_relu,
         sg_data_type_t dtype,
         void *output);
+
+    tpudnnStatus_t tpudnnUpsampleMaskForward(
+        tpudnnHandle_t handle,
+        void *input,
+        void *input_mask,
+        int input_n,
+        int input_c,
+        int input_h,
+        int input_w,
+        int size,
+        void *output);
+
+    tpudnnStatus_t sgdnn_yolo_forward(
+        tpudnnHandle_t handle,
+        void *input,
+        void *output,
+        int input_n,
+        int input_c,
+        int input_h,
+        int input_w,
+        int num,
+        int classes,
+        int coords,
+        int background,
+        int softmax,
+        sg_data_type_t dtype,
+        int test_glb);
+
+    tpudnnStatus_t tpudnnYolov3DetectOut(
+        tpudnnHandle_t handle, int input_num, void *bottom[3],
+        int batch_num, int hw_shape[3][2], int num_classes,
+        int num_boxes, int mask_group_size, float nms_threshold, float confidence_threshold,
+        int keep_top_k, float bias[18], float anchor_scale[3], float mask[9],
+        void *output, int yolov5_flag, int len_per_batch,
+        int scale, int *orig_image_shape, int model_h, int model_w);
+
+#define MAX_YOLO_INPUT_NUM 8
+    tpudnnStatus_t tpudnnYolov5PostProcessDecode(
+        tpudnnHandle_t handle,
+        void **input_data,
+        void *output_data,
+        int *detected_box_num,
+        int input_num,
+        int batch_num,
+        int hw_shape[MAX_YOLO_INPUT_NUM][2],
+        int num_classes,
+        int num_boxes,
+        int keep_top_k,
+        float nms_threshold,
+        float confidence_threshold,
+        float *anchors,
+        float *anchor_scale,
+        int clip_box,
+        int agnostic_nms,
+        sg_data_type_t dtype);
+
+    tpudnnStatus_t tpudnnWhere(
+        tpudnnHandle_t handle,
+        void *input,
+        void *output,
+        void *pos_num,
+        const int *shape,
+        int dims,
+        int order,
+        sg_data_type_t sgdtype);
+
+    tpudnnStatus_t tpudnnEltwise(
+        tpudnnHandle_t handle,
+        int op_,
+        int input_n,
+        int input_c,
+        int input_h,
+        int input_w,
+        int if_relu,
+        int *coeffs_,
+        int *index,
+        void *input_A,
+        void *input_B,
+        void *mask_data,
+        void *output,
+        sg_data_type_t dtype);
+
+    tpudnnStatus_t tpudnnEltwiseFix8b(
+        tpudnnHandle_t handle,
+        // input
+        void *input_A,
+        void *input_B,
+        int batch_size,
+        int channels,
+        int height,
+        int width,
+        int op_code, // 0: mul, 1: add, 2: max
+        int scale_A,
+        int scale_B,
+        int sign_A,
+        int sign_B,
+        int rshift_A,
+        int rshift_B,
+        int if_relu,
+        int round_mode,
+        // output
+        void *output);
+
+    tpudnnStatus_t tpudnnEmbeddingBag(
+        tpudnnHandle_t handle,
+        void *input_data,
+        void *medium_data,
+        void *output_data,
+        int num_embeddings,
+        int embedding_dim,
+        int mode,
+        int indices_size,
+        int offsets_size,
+        void *indices,
+        void *offsets,
+        sg_data_type_t dtype);
+
+    tpudnnStatus_t tpudnnEmbeddingBagFix8b(
+        tpudnnHandle_t handle,
+        void *input_data,
+        void *medium_data,
+        void *output_data,
+        int num_embeddings,
+        int embedding_dim,
+        int mode,
+        int indices_size,
+        int offsets_size,
+        void *indices,
+        void *offsets,
+        void *scale,
+        void *bias,
+        sg_data_type_t dtype);
+
+    tpudnnStatus_t tpudnnFc(
+        tpudnnHandle_t handle,
+        void *L_addr,
+        void *R_addr,
+        void *bias_addr,
+        void *Y_addr,
+        int L_row_num,
+        int L_col_num,
+        int R_col_num,
+        int transpose,
+        int have_bias,
+        sg_data_type_t L_dtype,
+        sg_data_type_t R_dtype,
+        sg_data_type_t Y_dtype,
+        int if_relu,
+        float relu_upper_limit);
+
+    tpudnnStatus_t tpudnnFcQuantSym(
+        tpudnnHandle_t handle,
+        void *L_addr,
+        void *R_addr,
+        void *bias_addr,
+        void *Y_addr,
+        int L_row_num,
+        int L_col_num,
+        int R_col_num,
+        int transpose,
+        int have_bias,
+        sg_data_type_t L_dtype,
+        sg_data_type_t R_dtype,
+        sg_data_type_t bias_dtype,
+        sg_data_type_t Y_dtype,
+        int if_relu,
+        int rshift_bit);
+
+    tpudnnStatus_t tpudnnGatherNdTf(
+        tpudnnHandle_t handle,
+        void *input,
+        void *indices,
+        int *input_shape,
+        int shape_dims,
+        int *indices_shape,
+        int indices_dims,
+        int const_val, // fill_value if index not found in input
+        int batch_dims,
+        sg_data_type_t dtype,
+        void *output);
+
+    tpudnnStatus_t tpudnnGdmaLoopTest(
+        tpudnnHandle_t handle,
+        void *input_mem,
+        void *output_mem,
+        const int *shape,
+        int loop_num,
+        int mode);
+
+    tpudnnStatus_t tpudnnGemm(
+        tpudnnHandle_t handle,
+        void *L_addr,
+        void *R_addr,
+        void *Y_addr,
+        int L_row_num,
+        int L_col_num,
+        int R_col_num,
+        int transpose,
+        sg_data_type_t L_dtype,
+        sg_data_type_t R_dtype,
+        sg_data_type_t Y_dtype);
+
+    tpudnnStatus_t tpudnnGridSample(
+        tpudnnHandle_t handle,
+        void *input,
+        void *grid,
+        void *output,
+        int input_n,
+        int input_c,
+        int input_h,
+        int input_w,
+        int output_h,
+        int output_w,
+        int align_corners,
+        GridSampleInterpMode interp_mode,
+        GridSamplePaddingMode padding_mode,
+        sg_data_type_t dtype);
+
+    tpudnnStatus_t tpudnnGroupNorm(
+        tpudnnHandle_t handle,
+        void *input,
+        void *weight,
+        void *bias,
+        void *output,
+        const int *shape,
+        int dims,
+        int axis,
+        int group_num,
+        float eps,
+        int affine,
+        sg_data_type_t dtype);
+
+    tpudnnStatus_t tpudnnLayerNorm(
+        tpudnnHandle_t handle,
+        void *input,
+        void *weight,
+        void *bias,
+        void *output,
+        void *mean,
+        void *rstd,
+        const int *shape,
+        int dims,
+        int axis,
+        float eps,
+        int affine,
+        int need_mean,
+        int need_rstd,
+        sg_data_type_t dtype);
+
+    tpudnnStatus_t tpudnnRmsNorm(
+        tpudnnHandle_t handle,
+        void *input,
+        void *weight,
+        void *output,
+        const int *shape,
+        int dims,
+        float eps,
+        int affine,
+        sg_data_type_t dtype);
+
+    tpudnnStatus_t tpudnnColumnHash(
+        tpudnnHandle_t handle,
+        void *input[11],
+        void *output,
+        unsigned int len,
+        int init,
+        int mode);
+
+    tpudnnStatus_t tpudnnConvFloat(
+        tpudnnHandle_t handle,
+        void *input,
+        void *weight,
+        void *bias,
+        void *rescale,
+        void *output,
+        int n,
+        int ic,
+        int ih,
+        int iw,
+        int oc,
+        int groups,
+        int kh,
+        int kw,
+        int stride_h,
+        int stride_w,
+        int dh,
+        int dw,
+        int pht,
+        int phb,
+        int pwl,
+        int pwr,
+        bool has_bias,
+        bool if_relu,
+        float upper_limit,
+        bool result_add,
+        bool has_rescale,
+        sg_data_type_t idtype,
+        sg_data_type_t odtype,
+        int weight_is_coeff,
+        int weight_size,
+        bool use_multicore);
+
+    tpudnnStatus_t tpudnnConvLoopTest(
+        tpudnnHandle_t handle,
+        void *input_mem,
+        void *output_mem,
+        const int *shape,
+        int loop_num);
+
+    tpudnnStatus_t tpudnnConvQuantSym(
+        tpudnnHandle_t handle,
+        void *input,
+        void *weight,
+        void *bias,
+        void *output,
+        int n,
+        int ic,
+        int ih,
+        int iw,
+        int oc,
+        int groups,
+        int kh,
+        int kw,
+        int stride_h,
+        int stride_w,
+        int dh,
+        int dw,
+        int pht,
+        int phb,
+        int pwl,
+        int pwr,
+        bool has_bias,
+        bool if_relu,
+        int upper_limit,
+        int rshift,
+        bool isign,
+        bool wsign,
+        bool bsign,
+        bool out_is_16bit,
+        int wsize);
+
+    tpudnnStatus_t tpudnnConvRequant(
+        tpudnnHandle_t handle,
+        void *input,
+        void *weight,
+        void *bias,
+        void *requant,
+        void *output,
+        int n,
+        int ic,
+        int ih,
+        int iw,
+        int oc,
+        int groups,
+        int kh,
+        int kw,
+        int stride_h,
+        int stride_w,
+        int dh,
+        int dw,
+        int pht,
+        int phb,
+        int pwl,
+        int pwr,
+        bool has_bias,
+        bool if_relu,
+        bool if_requant,
+        bool requant_is_const,
+        int multiplier,
+        int rshift,
+        int yzp,
+        int upper_limit,
+        int nIC,
+        sg_data_type_t idtype,
+        sg_data_type_t wdtype,
+        sg_data_type_t bdtype,
+        sg_data_type_t odtype);
+
+    tpudnnStatus_t tpudnnDeformGatherForward(
+        tpudnnHandle_t handle,
+        void *input,
+        void *offset,
+        void *mask,
+        void *output,
+        int input_n,
+        int input_c,
+        int input_h,
+        int input_w,
+        int modulated,
+        int deform_groups,
+        int kh,
+        int kw,
+        int pad_h,
+        int pad_w,
+        int pad_h_after,
+        int pad_w_after,
+        int stride_h,
+        int stride_w,
+        int dilation_h,
+        int dilation_w,
+        int mode,
+        int offset_interleave,
+        sg_data_type_t dtype);
+
+    tpudnnStatus_t tpudnnDependIdWraparound(
+        tpudnnHandle_t handle,
+        void* input,
+        void* output);
+
+    tpudnnStatus_t tpudnnDepth2space(
+        tpudnnHandle_t      handle,
+        void *  input_mem,
+        void *  output_mem,
+        const int*       input_shape,
+        const int*       block_sizes,
+        int              in_is_nchw,
+        int              out_is_nchw,
+        int              is_inversed,
+        int              is_crd_mode,
+        int              swap_cr,
+        sg_data_type_t   sgdtype);
+
+    tpudnnStatus_t tpudnnDepthwise(
+        tpudnnHandle_t         handle,
+        // input
+        void *     input,
+        void *     weight,
+        void *     bias,
+        void *     rescale,
+        int                 input_n,
+        int                 input_c,
+        int                 input_h,
+        int                 input_w,
+        int                 kh,
+        int                 kw,
+        int                 stride_h,
+        int                 stride_w,
+        int                 pad_h_t,
+        int                 pad_h_b,
+        int                 pad_w_l,
+        int                 pad_w_r,
+        int                 dh,
+        int                 dw,
+        int                 has_bias,
+        int                 if_relu,
+        float               relu_upper_limit,
+        int                 if_rescale,
+        sg_data_type_t      dtype,
+        sg_data_type_t      out_dtype,
+        // output
+        void *     output);
+
+    tpudnnStatus_t tpudnnDepthwiseFix8b(
+        tpudnnHandle_t         handle,
+        // input
+        void *     input,
+        void *     weight,
+        void *     bias,
+        int                 input_n,
+        int                 input_c,
+        int                 input_h,
+        int                 input_w,
+        int                 kh,
+        int                 kw,
+        int                 stride_h,
+        int                 stride_w,
+        int                 pad_h_t,
+        int                 pad_h_b,
+        int                 pad_w_l,
+        int                 pad_w_r,
+        int                 dh,
+        int                 dw,
+        int                 has_bias,
+        int                 if_relu,
+        int                 relu_upper_limit,
+        int                 rshift_num,
+        int                 input_sign,
+        int                 weight_sign,
+        int                 bias_sign,
+        sg_data_type_t      output_dtype,
+        sg_round_mode_t     round_mode,
+        // output
+        void *     output);
+
+    tpudnnStatus_t tpudnnDequantFloat(
+        tpudnnHandle_t      handle,
+        void *  input,
+        void *  output,
+        void *  dequant,
+        int              N,
+        int              C,
+        int              H,
+        int              W,
+        bool             is_perchannel,
+        float            scale_val,
+        int              offset_val,
+        sg_data_type_t   bottom_dtype);
+
+    tpudnnStatus_t tpudnnDequantInt(
+        tpudnnHandle_t      handle,
+        void *  input,
+        void *  output,
+        void *  dequant,
+        int              N,
+        int              C,
+        int              H,
+        int              W,
+        bool             is_perchannel,
+        int              scale_val,
+        int              offset_val,
+        int              shift_val,
+        sg_data_type_t   bottom_dtype,
+        sg_data_type_t   top_dtype,
+        int              mode,
+        int              lshift,
+        sg_round_mode_t  round_mode);
+
+    tpudnnStatus_t tpudnnBatch2space(
+        tpudnnHandle_t      handle,
+        void *  input_mem,
+        const int*       input_shape,
+        int              input_dims,
+        const int*       block_sizes,
+        const int*       crop_sizes,
+        void *  output_mem,
+        sg_data_type_t   sgdtype);
 
     tpudnnStatus_t tpudnnActiveMultiCore(
         tpudnnHandle_t handle,
@@ -445,19 +1122,19 @@ extern "C"
         char **bias_8ch_buffer,
         char **output_8ch_buffer);
 
-    // tpudnnStatus_t tpudnnGroupNormMultiCore(
-    //     tpudnnHandle_t handle,
-    //     void * input,
-    //     void * weight,
-    //     void * bias,
-    //     void * output,
-    //     const int *shape,
-    //     int dims,
-    //     int axis,
-    //     int group_num,
-    //     float eps,
-    //     int affine,
-    //     sg_data_type_t dtype);
+    tpudnnStatus_t tpudnnGroupNormMultiCore(
+        tpudnnHandle_t handle,
+        void *input,
+        void *weight,
+        void *bias,
+        void *output,
+        const int *shape,
+        int dims,
+        int axis,
+        int group_num,
+        float eps,
+        int affine,
+        sg_data_type_t dtype);
 
     typedef struct
     {
@@ -713,33 +1390,28 @@ extern "C"
         char *input_8ch_buf[8],
         char *output_8ch_buf[8]);
 
-    tpudnnStatus_t tpudnnPoolingFp8(
-        tpudnnHandle_t handle,
-        // input
+
+    tpudnnStatus_t tpudnnAttention(
+        tpudnnHandle_t        handle,
         void *input,
-        int input_n,
-        int input_c,
-        int input_h,
-        int input_w,
-        int output_h,
-        int output_w,
-        int kh,
-        int kw,
-        int pad_h,
-        int pad_w,
-        int pad_h_after,
-        int pad_w_after,
-        int stride_h,
-        int stride_w,
-        int dilation_h,
-        int dilation_w,
-        int is_avg_pooling,
-        int avg_pooling_mode,
-        float re_scale,
-        sg_data_type_t output_dtype,
-        sg_data_type_t input_dtype,
-        // output
-        void *output);
+        void *keys,
+        void *values,
+        void *weight,
+        void *bias,
+        void *weight_o,
+        void *mask,
+        void *Y,
+        int batch_num,
+        int M_queries_num,
+        int M_keys_num,
+        int N_num,
+        int dim,
+        int hasbias,
+        float scale,
+        int has_mask,
+        bool has_keys,
+        bool has_value,
+        sg_data_type_t dtype);
 
     tpudnnStatus_t tpudnnGeluBackwardMultiCore(
         tpudnnHandle_t handle,
@@ -1002,7 +1674,591 @@ extern "C"
         tpudnnHandle_t handle,
         dma_k2k_stress_multi_core_param_t dma_k2k_stress_multi_core_param);
 
+    tpudnnStatus_t tpuDNNBatchMatmul(
+        tpudnnHandle_t handle,
+        void * L_addr,
+        void * R_addr,
+        void * B_addr,
+        void * Y_addr,
+        int batch_num,
+        int L_row_num,
+        int L_col_num,
+        int R_col_num,
+        sg_data_type_t L_dtype,
+        sg_data_type_t R_dtype,
+        sg_data_type_t Y_dtype,
+        int if_relu,
+        float relu_upper_limit,
+        int use_bias,
+        int do_rescale,
+        int rescale_const_val);
+
+    tpudnnStatus_t tpuDNNBatchMatmulFix8b(
+        tpudnnHandle_t handle,
+        void * L_addr,
+        void * R_addr,
+        void * zp_addr,
+        void * Y_addr,
+        int batch_num,
+        int L_row_num,
+        int L_col_num,
+        int R_col_num,
+        sg_data_type_t L_dtype,
+        sg_data_type_t R_dtype,
+        int zp_is_const,
+        int zp_const_val);
+
+    tpudnnStatus_t tpuDNNBatchMatmulFix8bExt(
+        tpudnnHandle_t handle,
+        void * L_mem,
+        void * R_mem,
+        void * rzp_mem,
+        void * bias_mem,
+        void * requant_mem,
+        void * Y_mem,
+        int batch_num,
+        int hsize,
+        int L_row_num,
+        int L_col_num,
+        sg_data_type_t L_dtype,
+        int R_row_num,
+        int R_col_num,
+        sg_data_type_t R_dtype,
+        int L_trans,
+        int R_trans,
+        int izp_const_val,
+        sg_data_type_t rzp_dtype,
+        int rzp_is_const,
+        int rzp_const_val,
+        sg_data_type_t bias_dtype,
+        int bias_is_const,
+        int bias_const_val,
+        int do_relu,
+        int requant_mode,
+        int is_perchannel,
+        int scale_val,
+        int offset_val,
+        int shift_val,
+        sg_round_mode_t round_mode,
+        int do_sym_saturate,
+        sg_data_type_t Y_dtype);
+
+    tpudnnStatus_t tpuDNNBcBinaryFloat(
+        tpudnnHandle_t handle,
+        void * input_A,
+        void * input_B,
+        void * output,
+        const int* A_shape,
+        const int* B_shape,
+        int shape_dim,
+        sg_data_type_t dtype,
+        sg_binary_type_t binary_type);
+
+    tpudnnStatus_t tpuDNNBcBinaryFix8b(
+        tpudnnHandle_t handle,
+        void * input_A,
+        void * input_B,
+        void * output,
+        const int* A_shape,
+        const int* B_shape,
+        int shape_dim,
+        int scale_A,
+        int scale_B,
+        int rshift_A,
+        int rshift_B,
+        sg_data_type_t A_dtype,
+        sg_data_type_t B_dtype,
+        sg_data_type_t res_dtype,
+        sg_binary_type_t binary_type);
+
+    tpudnnStatus_t tpudnnIndexPut(
+        tpudnnHandle_t      handle,
+        void *  input,
+        void *  index,
+        void *  value,
+        void *  output,
+        void *  buffer,
+        const int        shape[FW_MAX_SHAPE_DIMS],
+        int              dims,
+        int              indice_len,
+        int              mode,
+        int              accumulate,
+        sg_data_type_t   dtype);
+
+    tpudnnStatus_t tpudnnIndexSelect(
+        tpudnnHandle_t         handle,
+        void *     input,
+        void *     index,
+        const int          *input_shape,
+        int                 shape_dims,
+        int                 index_num,
+        int                 axis, // axis to do index_select
+        int                 const_val, // fill_value if index not found in input
+        sg_data_type_t      dtype,
+        void *     output);
+
+    tpudnnStatus_t tpudnnLLama2Attention(
+        tpudnnHandle_t handle,
+        void * Q,
+        void * K,
+        void * V,
+        void * Kcache,
+        void * Vcache,
+        void * Mask,
+        void * Y,
+        void * Input_length,
+        void * Save_slots,
+        void * Fetch_slots,
+        int slots_size,
+        float C,
+        const int batch,
+        const int mask_max,
+        const int head_size,
+        const int num_attention_heads,
+        const int num_k_v_heads,
+        const int attention_mode,
+        const int block_size,
+        const int block_num,
+        const int tokens_num,
+        sg_data_type_t dtype);
+
+    tpudnnStatus_t tpudnnMaskedFill(
+        tpudnnHandle_t      handle,
+        void *  input,
+        void *  mask,
+        void *  output,
+        const int*       input_shape,
+        const int*       mask_shape,
+        int              input_dims,
+        int              mask_dims,
+        float            value,
+        sg_data_type_t   dtype);
+
+    tpudnnStatus_t tpudnnMaskedSelect(
+        tpudnnHandle_t      handle,
+        void *  input,
+        void *  mask,
+        void *  output,
+        void *  buffer,
+        void *  mask_count,
+        const int       *input_shape,
+        const int       *mask_shape,
+        int              input_dims,
+        int              mask_dims,
+        bool             bcast_from_begin,
+        sg_data_type_t   input_dtype,
+        sg_data_type_t   mask_dtype);
+
+    tpudnnStatus_t tpudnnMemset(
+        tpudnnHandle_t handle,
+        void * output,
+        unsigned int height,
+        unsigned int width,
+        int mode,
+        int val);
+
+    tpudnnStatus_t tpudnnMsgSyncDebug(
+        tpudnnHandle_t        handle,
+        void *    input,
+        void *    weight,
+        void *    output);
+
+    tpudnnStatus_t tpudnnPixelNorm(
+        tpudnnHandle_t handle,
+        void * input,
+        void * weight,
+        void * bias,
+        void * output,
+        const int *shape,
+        int dims,
+        float eps,
+        int affine,
+        sg_data_type_t dtype);
+
+    tpudnnStatus_t tpudnnPixelNormFix8b(
+        tpudnnHandle_t handle,
+        void * input,
+        void * weight,
+        void * bias,
+        void * output,
+        const int *shape,
+        int dims,
+        float scale,
+        float eps,
+        int affine,
+        sg_data_type_t idtype,
+        sg_data_type_t odtype);
+
+    tpudnnStatus_t tpudnnPrelu(
+        tpudnnHandle_t         handle,
+        // input
+        void *     input,
+        void *     slope,
+        int                 input_n,
+        int                 input_c,
+        int                 input_h,
+        int                 input_w,
+        int                 channel_shared,
+        float               slope_value,
+        float               upper_limit,
+        sg_data_type_t      dtype,
+        // output
+        void *     output);
+
+    tpudnnStatus_t tpudnnPreluFix8b(
+        tpudnnHandle_t         handle,
+        // input
+        void *     input,
+        void *     slope,
+        int                 input_n,
+        int                 input_c,
+        int                 input_h,
+        int                 input_w,
+        int                 channel_shared,
+        int                 slope_value,
+        int                 rshift_bit,
+        int                 upper_limit,
+        sg_data_type_t      dtype,
+        // output
+        void *     output);
+
+    tpudnnStatus_t tpudnnPriorBox(
+        tpudnnHandle_t      handle,
+        void *  output,
+        void *  buffer,
+        const float*     mins,
+        const float*     maxs,
+        const float*     asps,
+        const float*     vars,
+        int              min_size,
+        int              max_size,
+        int              asp_size,
+        int              var_size,
+        float            step_h,
+        float            step_w,
+        int              img_h,
+        int              img_w,
+        int              fmp_h,
+        int              fmp_w,
+        int              num_priors,
+        float            offset,
+        bool             clip,
+        float            thTop,
+        sg_data_type_t   odtype);
+
+    tpudnnStatus_t tpudnnProposalLayer(
+        tpudnnHandle_t handle,
+        void * score,
+        void * box,
+        void * src_info,
+        int feat_stride,
+        int min_size,
+        int pre_nms_topN,
+        int post_nms_topN,
+        float nms_thresh,
+        float score_thresh,
+        int base_size,
+        int scales_num,
+        int ratios_num,
+        int *anchor_scales,
+        float *ratios,
+        int batch_num,
+        int map_height,
+        int map_width,
+        int distribute_fpn_proposals_flag,
+        int score_out_flag,
+        void * output,
+        void * score_out);
+
+    tpudnnStatus_t tpudnnQuantDiv(
+        tpudnnHandle_t         handle,
+        void *     input,
+        void *     output,
+        unsigned long long  length,
+        int                 divisor,
+        int                 quant_mode,
+        sg_data_type_t      in_dtype,
+        sg_data_type_t      out_dtype);
+
+    tpudnnStatus_t tpudnnReduce(
+        tpudnnHandle_t         handle,
+        void *     input,
+        void *     buffer,
+        const int          *input_shape,
+        const int          *axis_list,
+        int                 shape_dims,
+        int                 axis_num,
+        int                 method,
+        sg_data_type_t      dtype,
+        void *     output);
+
+    tpudnnStatus_t tpudnnReduceFix8b(
+        tpudnnHandle_t         handle,
+        void *     input,
+        void *     buffer,
+        const int          *input_shape,
+        const int          *axis_list,
+        int                 shape_dims,
+        int                 axis_num,
+        int                 method,
+        float               input_scale,
+        float               output_scale,
+        sg_data_type_t      input_dtype,
+        sg_data_type_t      output_dtype,
+        void *     output);
+
+    tpudnnStatus_t tpudnnRelativePositionEncoding(
+        tpudnnHandle_t     handle,
+        void * input_data,
+        void * seq_len,
+        void * output_data,
+        const int*      shape,
+        int             dims,
+        sg_data_type_t  dtype);
+
+    tpudnnStatus_t tpudnnRelu(
+        tpudnnHandle_t         handle,
+        // input
+        void *     input,
+        int                 input_n,
+        int                 input_c,
+        int                 input_h,
+        int                 input_w,
+        float               upper_limit,
+        sg_data_type_t      dtype,
+        // output
+        void *     output);
+
+    tpudnnStatus_t tpudnnRequantFloat(
+        tpudnnHandle_t      handle,
+        void *  input,
+        void *  output,
+        void *  requant,
+        int              N,
+        int              C,
+        int              H,
+        int              W,
+        bool             is_perchannel,
+        float            scale_val,
+        float            offset_val,
+        sg_data_type_t   bottom_dtype,
+        sg_data_type_t   top_dtype,
+        int              mode);
+
+    tpudnnStatus_t tpudnnRequantInt(
+        tpudnnHandle_t      handle,
+        void *  input,
+        void *  output,
+        void *  requant,
+        int              N,
+        int              C,
+        int              H,
+        int              W,
+        bool             is_perchannel,
+        int              scale_val,
+        int              shift_val,
+        int              offset_val,
+        sg_data_type_t   bottom_dtype,
+        sg_data_type_t   top_dtype,
+        int              mode);
+
+    tpudnnStatus_t tpudnnReverse(
+        tpudnnHandle_t         handle,
+        void *     input,
+        void *     output,
+        const int*          shape,
+        int                 dims,
+        sg_data_type_t      dtype,
+        int                 axis);
+
+    tpudnnStatus_t tpudnnRoiAlignForward(
+        tpudnnHandle_t         handle,
+        // input
+        void *     input,
+        void *     rois,
+        int                 input_n,
+        int                 input_c,
+        int                 input_h,
+        int                 input_w,
+        int                 roi_num,
+        int                 roi_len,
+        int                 pooled_height,
+        int                 pooled_width,
+        float               spatial_scale,
+        int                 sampling_ratio,
+        int                 position_sensitive,
+        int                 align_corners,
+        int                 plat_sp,
+        sg_data_type_t      dtype,
+        // output
+        void *     output);
+
+    tpudnnStatus_t tpudnnRoiPooling(
+        tpudnnHandle_t         handle,
+        void *     input,
+        void *     roi,
+        int                 input_n,
+        int                 input_c,
+        int                 input_h,
+        int                 input_w,
+        int                 roi_num,
+        int                 roi_len,
+        int                 pooled_h,
+        int                 pooled_w,
+        float               spatial_scale,
+        int                 position_sensitive,
+        sg_data_type_t      dtype,
+        void *     output);
+
+    tpudnnStatus_t tpudnnRoundFp(
+        tpudnnHandle_t handle,
+        void * input,
+        void * output,
+        const int* shape,
+        int shape_dim,
+        sg_round_mode_t round_mode);
+
+    tpudnnStatus_t tpudnnConstantFill(
+        tpudnnHandle_t         handle,
+        void *     output,
+        const int*          shape,
+        int                 shape_dim,
+        unsigned int        filled_value,
+        sg_data_type_t      filled_sgdtype);
+
+    tpudnnStatus_t tpudnnConstBinaryFix8b(
+        tpudnnHandle_t handle,
+        void * input,
+        void * output,
+        const int* shape,
+        int shape_dim,
+        int scale_A,
+        int rshift_A,
+        int B_const_val,
+        int inversed,
+        sg_data_type_t A_dtype,
+        sg_data_type_t B_dtype,
+        sg_data_type_t res_dtype,
+        sg_binary_type_t binary_type);
+
+    tpudnnStatus_t tpudnnConstBinaryFloat(
+        tpudnnHandle_t handle,
+        void * input,
+        void * output,
+        const int* shape,
+        int dims,
+        sg_data_type_t dtype,
+        sg_binary_type_t binary_type,
+        float const_value,
+        int is_inversed
+        );
+
+    tpudnnStatus_t tpudnnConvBwFloat(
+        tpudnnHandle_t      handle,
+        void *  input,
+        void *  grad_output,
+        void *  padding_insert,
+        void *  kernel_grad,
+        int              n,
+        int              ic,
+        int              ih,
+        int              iw,
+        int              oc,
+        int              oh,
+        int              ow,
+        int              kh,
+        int              kw,
+        int              ins_h,
+        int              ins_w,
+        int              dh,
+        int              dw,
+        int              stride_h,
+        int              stride_w,
+        int              pad_h_t,
+        int              pad_h_b,
+        int              pad_w_l,
+        int              pad_w_r,
+        unsigned int     ins_const_val,
+        int              pad_ins_is_const,
+        int              pad_mode,
+        sg_data_type_t   input_dtype,
+        sg_data_type_t   grad_dtype,
+        sg_data_type_t   res_dtype,
+        unsigned long long   osz_kgrad);
+
+    tpudnnStatus_t tpudnnSoftNms(tpudnnHandle_t     handle,
+        void * input_proposal_addr,
+        void * output_proposal_addr,
+        void * all_mask_buf,
+        int             nms_type,
+        int             proposal_size,
+        float           nms_threshold,
+        float           score_threshold,
+        float           sigma,
+        int             weighting_method,
+        float *         densities,
+        float           eta);
+
+    tpudnnStatus_t tpudnnNms(tpudnnHandle_t     handle,
+        void * input_proposal_addr,
+        void * score_addr,//just used at hard-nms V2
+        void * output_proposal_addr,
+        void * iou_buff,
+        void * all_mask_buf,
+        int             nms_type,
+        int             proposal_size,
+        float           nms_threshold,
+        float           score_threshold,
+        float           sigma,
+        int             weighting_method,
+        float *         densities,
+        float           eta,
+        int             hard_nms_version,
+        int             keep_top_k);
+
+    tpudnnStatus_t tpudnnOnnxNms(tpudnnHandle_t     handle,
+        void * box_addr,
+        void * score_addr,
+        void * output_addr,
+        void * buffer,
+        int             batch_num,
+        int             num_priors,
+        int             num_classes,
+        float           nms_threshold,
+        float           score_threshold,
+        int             top_k,
+        int             center_point_box);
+
+}
 #if defined(__sg2260__)
+    tpudnnStatus_t tpudnnPoolingFp8(
+        tpudnnHandle_t handle,
+        // input
+        void *input,
+        int input_n,
+        int input_c,
+        int input_h,
+        int input_w,
+        int output_h,
+        int output_w,
+        int kh,
+        int kw,
+        int pad_h,
+        int pad_w,
+        int pad_h_after,
+        int pad_w_after,
+        int stride_h,
+        int stride_w,
+        int dilation_h,
+        int dilation_w,
+        int is_avg_pooling,
+        int avg_pooling_mode,
+        float re_scale,
+        sg_data_type_t output_dtype,
+        sg_data_type_t input_dtype,
+        // output
+        void *output);
+
     tpudnnStatus_t tpudnnC2CAllReduce(
         tpudnnHandle_t handle,
         void *send_buff,
@@ -1010,6 +2266,7 @@ extern "C"
         int count,
         sg_data_type_t dtype,
         sg_reduce_method_t reduce_method,
+        const char* uuid,
         sccl_args_t sccl_args);
 
     tpudnnStatus_t tpudnnC2CReduce(
@@ -1020,6 +2277,7 @@ extern "C"
         sg_data_type_t dtype,
         sg_reduce_method_t reduce_method,
         int root,
+        const char* uuid,
         sccl_args_t sccl_args);
 
     tpudnnStatus_t tpudnnC2CGather(
@@ -1030,6 +2288,7 @@ extern "C"
         int recv_count,
         sg_data_type_t dtype,
         int root,
+        const char* uuid,
         sccl_args_t sccl_args);
 
     tpudnnStatus_t tpudnnC2CAllGather(
@@ -1038,6 +2297,7 @@ extern "C"
         int send_count,
         void *recv_buff,
         int recv_count,
+        const char* uuid,
         sg_data_type_t dtype,
         sccl_args_t sccl_args);
 
@@ -1047,6 +2307,7 @@ extern "C"
         int count,
         sg_data_type_t dtype,
         int root,
+        const char* uuid,
         sccl_args_t sccl_args);
 
     tpudnnStatus_t tpudnnC2CScatter(
@@ -1058,6 +2319,7 @@ extern "C"
         int recv_count,
         sg_data_type_t recv_type,
         int root,
+        const char* uuid,
         sccl_args_t sccl_args);
 
     tpudnnStatus_t tpudnnC2CAllToAll(
@@ -1068,6 +2330,7 @@ extern "C"
         void *recv_mem,
         int recv_count,
         sg_data_type_t recv_type,
+        const char* uuid,
         sccl_args_t sccl_args);
 
     tpudnnStatus_t tpudnnSdmaMultiThread(
@@ -1078,5 +2341,74 @@ extern "C"
         unsigned int element_num,
         sg_data_type_t dtype,
         unsigned int case_);
+
+tpudnnStatus_t tpudnnLossyCompress(
+    tpudnnHandle_t      handle,
+    void * input0_addr,
+    void * input1_addr,
+    void * output_addr,
+    void * buffer_addr,
+    int n,
+    int c,
+    int h,
+    int w,
+    int reduce_opcode);
+tpudnnStatus_t tpudnnL2mTest(
+    tpudnnHandle_t      handle,
+    void *  input,
+    void *  output);
+tpudnnStatus_t tpudnnMsgCentralStressTest(
+    tpudnnHandle_t         handle,
+    int                 loop
+    );
+tpudnnStatus_t tpudnnPipelineSdmaCwtrans(
+        tpudnnHandle_t     handle,
+        void * input_data,
+        void * output_data,
+        const int*      shape,
+        int             dims,
+        sg_data_type_t  dtype);
+tpudnnStatus_t tpudnnMultiSdmaCwtrans(
+        tpudnnHandle_t     handle,
+        void * input_data,
+        void * output_data,
+        const int*      shape,
+        int             dims,
+        sg_data_type_t  dtype);
+tpudnnStatus_t tpudnnMultiSdmaSparseAdd(
+        tpudnnHandle_t     handle,
+        void * input_A_data,
+        void * input_B_data,
+        void * mask,
+        void * output_data,
+        const int*      shape,
+        int             dims,
+        sg_data_type_t  dtype);
+
+#ifdef USING_PLD_TEST
+tpudnnStatus_t tpudnnPldTest(
+    tpudnnHandle_t        handle,
+    void *    src,
+    void *    dst,
+    int       size,
+    pld_test_id_t      id);
+
+tpudnnStatus_t tpudnnPldSendInstruction(
+    tpudnnHandle_t        handle,
+    void *    src,
+    void *    dst,
+    pld_test_id_t      id,
+    int                loop,
+    int                N,
+    int                C,
+    int                H,
+    int                W);
+
+tpudnnStatus_t tpudnnPldTestGeneral(
+    tpudnnHandle_t handle,
+    const void *api,
+    unsigned long api_size);
 #endif
-}
+
+
+#endif

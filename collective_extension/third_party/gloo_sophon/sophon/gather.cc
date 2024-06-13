@@ -57,24 +57,4 @@ void gather(GatherOptions& opts) {
   }
 }
 
-void gather2260(GatherOptions &opts) {
-  // call tpudnnC2CGather
-  sccl_args_t sccl_args = {0};
-  sccl_args.nranks = opts.context->size;
-  sccl_args.rank = opts.context->rank;
-  if (opts.chip_map_.empty()) {
-    for (int i = 0; i < sccl_args.nranks; i++) {
-      sccl_args.chip_map[i] = i;
-    }
-  } else {
-    memcpy(sccl_args.chip_map, opts.chip_map_.data(),
-           sizeof(opts.chip_map_.size()) * 4);
-  }
-
-  tpudnnStatus_t ret = tpudnnC2CGather(
-      opts.handle_, tpudnnPhysToVirt(opts.handle_, (uint64_t)opts.send_buff_), opts.input_elements,
-      tpudnnPhysToVirt(opts.handle_, (uint64_t)opts.recv_buff_), opts.output_elements, opts.dtype_, opts.root, sccl_args);
-  return;
-}
-
 }  // namespace sophon

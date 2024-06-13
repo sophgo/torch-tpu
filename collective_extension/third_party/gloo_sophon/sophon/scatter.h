@@ -100,12 +100,8 @@ class ScatterOptions {
   sg_data_type_t dtype_;
 
   friend void scatter(ScatterOptions&);
-
-  friend void scatter2260(ScatterOptions &);
 };
 
 void scatter(ScatterOptions& opts);
-
-void scatter2260(ScatterOptions& opts);
 
 }  // namespace sophon

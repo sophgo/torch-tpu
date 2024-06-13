@@ -94,18 +94,4 @@ void allgather(AllgatherOptions &opts) {
   }
 }
 
-scclResult_t scclAllGather(const void *send_buff, void *recv_buff,
-                           size_t send_count, sg_data_type_t dtype,
-                           scclComm_t comm, tpudnnHandle_t handle) {
-  scclComm *pcomm = static_cast<scclComm *>(comm);
-  sccl_args_t args = {0};
-  args.nranks = pcomm->nranks;
-  args.rank = pcomm->rank;
-  memcpy(args.chip_map, pcomm->chip_map, sizeof(int) * pcomm->nranks);
-  tpudnnStatus_t ret = tpudnnC2CAllGather(
-      handle, tpudnnPhysToVirt(handle, (uint64_t)send_buff), send_count,
-      tpudnnPhysToVirt(handle, (uint64_t)recv_buff), send_count, dtype, args);
-  return ret == TPUDNN_STATUS_SUCCESS ? scclSuccess : scclKernelError;
-}
-
 } // namespace sophon
