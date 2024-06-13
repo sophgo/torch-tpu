@@ -17,3 +17,4 @@ TORCH-TPU开发参考手册
    05_mix_precision
    06_distribute
    07_custom_op
+   09_dynamo
