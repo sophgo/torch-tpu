@@ -81,7 +81,7 @@ void nodechip_minimumc(global_addr_t input_global_addr, scalar_t value,
   }
 }
 
-void tpu_kernel_api_minimumc(const void *args) {
+int tpu_kernel_api_minimumc(const void *args) {
   sg_api_minimumc_t *api = (sg_api_minimumc_t *)args;
   TPUKERNEL_ASSERT(api->dtype == DT_FP32 || api->dtype == DT_FP16 ||
                    api->dtype == DT_BFP16 || api->dtype == DT_INT32);
@@ -96,11 +96,12 @@ void tpu_kernel_api_minimumc(const void *args) {
   nodechip_minimumc(api->input_global_addr, value, api->output_global_addr,
                     length, (data_type_t)api->dtype);
   tpu_poll();
+  return 0;
 }
 TPUKERNEL_FUNC_REGISTER(tpu_kernel_api_minimumc);
 
 #ifdef BACKEND_SG2260
-void tpu_kernel_api_minimumc_multi_core(const void *args) {
+int tpu_kernel_api_minimumc_multi_core(const void *args) {
   sg_api_minimumc_t *api = (sg_api_minimumc_t *)args;
   TPUKERNEL_ASSERT(api->dtype == DT_FP32 || api->dtype == DT_FP16 ||
                    api->dtype == DT_BFP16 || api->dtype == DT_INT32);
@@ -135,6 +136,7 @@ void tpu_kernel_api_minimumc_multi_core(const void *args) {
   }
 
   tpu_poll();
+  return 0;
 }
 TPUKERNEL_FUNC_REGISTER(tpu_kernel_api_minimumc_multi_core);
 #endif
@@ -226,7 +228,7 @@ void nodechip_minimum(global_addr_t input_global_addr,
   }
 }
 
-void tpu_kernel_api_minimum(const void *args) {
+int tpu_kernel_api_minimum(const void *args) {
   sg_api_minimum_t *api = (sg_api_minimum_t *)args;
   TPUKERNEL_ASSERT(api->dtype == DT_FP32 || api->dtype == DT_FP16 ||
                    api->dtype == DT_BFP16 || api->dtype == DT_INT32);
@@ -240,11 +242,12 @@ void tpu_kernel_api_minimum(const void *args) {
   nodechip_minimum(api->input_global_addr, api->other_global_addr,
                    api->output_global_addr, length, (data_type_t)api->dtype);
   tpu_poll();
+  return 0;
 }
 TPUKERNEL_FUNC_REGISTER(tpu_kernel_api_minimum);
 
 #ifdef BACKEND_SG2260
-void tpu_kernel_api_minimum_multi_core(const void *args) {
+int tpu_kernel_api_minimum_multi_core(const void *args) {
   sg_api_minimum_t *api = (sg_api_minimum_t *)args;
   TPUKERNEL_ASSERT(api->dtype == DT_FP32 || api->dtype == DT_FP16 ||
                    api->dtype == DT_BFP16 || api->dtype == DT_INT32);
@@ -277,6 +280,7 @@ void tpu_kernel_api_minimum_multi_core(const void *args) {
   }
 
   tpu_poll();
+  return 0;
 }
 TPUKERNEL_FUNC_REGISTER(tpu_kernel_api_minimum_multi_core);
 #endif
@@ -449,7 +453,7 @@ void nodechip_minimum_bcast(global_addr_t input_global_addr,
   }
 }
 
-void tpu_kernel_api_minimum_bcast(const void *args) {
+int tpu_kernel_api_minimum_bcast(const void *args) {
   sg_api_minimum_bcast_t *api = (sg_api_minimum_bcast_t *)args;
   TPUKERNEL_ASSERT(api->output_dim > 0 && api->output_dim <= 4);
 
@@ -498,11 +502,12 @@ void tpu_kernel_api_minimum_bcast(const void *args) {
                          api->output_global_addr, &input_shape, &other_shape,
                          &output_shape, (data_type_t)api->dtype);
   tpu_poll();
+  return 0;
 }
 TPUKERNEL_FUNC_REGISTER(tpu_kernel_api_minimum_bcast);
 
 #ifdef BACKEND_SG2260
-void tpu_kernel_api_minimum_bcast_multi_core(const void *args) {
+int tpu_kernel_api_minimum_bcast_multi_core(const void *args) {
   sg_api_minimum_bcast_t *api = (sg_api_minimum_bcast_t *)args;
   TPUKERNEL_ASSERT(api->output_dim > 0 && api->output_dim <= 4);
 
@@ -581,6 +586,7 @@ void tpu_kernel_api_minimum_bcast_multi_core(const void *args) {
   }
 
   tpu_poll();
+  return 0;
 }
 TPUKERNEL_FUNC_REGISTER(tpu_kernel_api_minimum_bcast_multi_core);
 #endif

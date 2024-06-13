@@ -255,7 +255,7 @@ bool is_index_int64 ) {
   free ( sorted_index_indx );
 }
 
-void tpu_kernel_api_embedding_backward ( const void* args ) {
+int tpu_kernel_api_embedding_backward ( const void* args ) {
   sg_api_embedding_backward_t *api = ( sg_api_embedding_backward_t * ) args;
   tpu_initialize();
   nodechip_embedding_backward (
@@ -276,6 +276,7 @@ void tpu_kernel_api_embedding_backward ( const void* args ) {
   ( data_type_t ) api->grad_output_dtype,
   api->is_index_int64 );
   tpu_poll();
+  return 0;
 }
 
 TPUKERNEL_FUNC_REGISTER ( tpu_kernel_api_embedding_backward );
@@ -1536,7 +1537,7 @@ void nodechip_embedding_backward_multi_core (
   }
 }
 
-void tpu_kernel_api_embedding_backward_multi_core ( const void* args ) {
+int tpu_kernel_api_embedding_backward_multi_core ( const void* args ) {
   sg_api_embedding_backward_t *api = ( sg_api_embedding_backward_t * ) args;
   const int using_MCU_flag = IS_USING_MCU;
   tpu_initialize();
@@ -1558,6 +1559,7 @@ void tpu_kernel_api_embedding_backward_multi_core ( const void* args ) {
   api->is_index_int64,
   using_MCU_flag);
   tpu_poll();
+  return 0;
 }
 
 TPUKERNEL_FUNC_REGISTER ( tpu_kernel_api_embedding_backward_multi_core );

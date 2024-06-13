@@ -212,7 +212,7 @@ data_type_t   dtype )
     cdone += shape.c;
   }
 }
-void tpu_kernel_api_where ( const void * args )
+int tpu_kernel_api_where ( const void * args )
 {
   sg_api_where_t * api = ( sg_api_where_t * ) args;
   TPUKERNEL_ASSERT ( api->dim > 0 && api->dim <= 4 );
@@ -261,6 +261,7 @@ void tpu_kernel_api_where ( const void * args )
   ( data_type_t ) api->cond_dtype,
   ( data_type_t ) api->dtype );
   tpu_poll();
+  return 0;
 }
 TPUKERNEL_FUNC_REGISTER ( tpu_kernel_api_where );
 
@@ -282,7 +283,7 @@ extern void nodechip_where_multi_core(
     data_type_t   cond_dtype,
     data_type_t   dtype);
 
-void tpu_kernel_api_where_multi_core(const void * args)
+int tpu_kernel_api_where_multi_core(const void * args)
 {
   sg_api_where_multi_core_t * api = (sg_api_where_multi_core_t *) args;
   TPUKERNEL_ASSERT ( api->dtype == DT_FP32 || api->dtype == DT_INT32 ||
@@ -304,6 +305,7 @@ void tpu_kernel_api_where_multi_core(const void * args)
                             (data_type_t)api->cond_dtype,
                             (data_type_t)api->dtype);
   tpu_poll();
+  return 0;
 }
 TPUKERNEL_FUNC_REGISTER(tpu_kernel_api_where_multi_core);
 #endif

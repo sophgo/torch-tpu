@@ -39,7 +39,7 @@ void nodechip_tile_1d_simulate(global_addr_t input_global_addr,
                    &in_stride, dtype);
 }
 
-void tpu_kernel_api_squeeze(const void *args) {
+int tpu_kernel_api_squeeze(const void *args) {
   sg_api_squeeze_t *api = (sg_api_squeeze_t *)args;
 
   unsigned long long length = 1;
@@ -51,6 +51,7 @@ void tpu_kernel_api_squeeze(const void *args) {
                             api->shape, api->dim, 0, 1, 0,
                             (data_type_t)api->dtype);
   tpu_poll();
+  return 0;
 }
 TPUKERNEL_FUNC_REGISTER(tpu_kernel_api_squeeze);
 
@@ -77,7 +78,7 @@ void nodechip_tile_1d_muiti_core_simulate(global_addr_t input_global_addr,
                    &in_stride, dtype);
 }
 
-void tpu_kernel_api_squeeze_multi_core(const void *args) {
+int tpu_kernel_api_squeeze_multi_core(const void *args) {
   sg_api_squeeze_t *api = (sg_api_squeeze_t *)args;
 
   unsigned long long length = 1;
@@ -106,6 +107,7 @@ void tpu_kernel_api_squeeze_multi_core(const void *args) {
       cur_length_slice, 0, 1, 0, (data_type_t)api->dtype);
 
   tpu_poll();
+  return 0;
 }
 TPUKERNEL_FUNC_REGISTER(tpu_kernel_api_squeeze_multi_core);
 #endif

@@ -715,7 +715,7 @@ data_type_t dtype) {
                            dtype);
     
 }
-void tpu_kernel_api_reduce_prod(const void *args) {
+int tpu_kernel_api_reduce_prod(const void *args) {
     sg_api_reduce_prod_t *api = (sg_api_reduce_prod_t*)args;
     TPUKERNEL_ASSERT(api->dtype == DT_FP32 || api->dtype == DT_FP16 || api->dtype == DT_BFP16);
 
@@ -728,6 +728,7 @@ void tpu_kernel_api_reduce_prod(const void *args) {
                          api->axis,
                          api->dtype);
     tpu_poll();
+    return 0;
 }
 TPUKERNEL_FUNC_REGISTER(tpu_kernel_api_reduce_prod);
 
@@ -1117,7 +1118,7 @@ data_type_t dtype) {
     }
     nodechip_div_n(sum_global_addr, output_global_addr, output_shape, output_dim, (float)n, dtype);
 }
-void tpu_kernel_api_reduce_var(const void *args) {
+int tpu_kernel_api_reduce_var(const void *args) {
     sg_api_reduce_var_t *api = (sg_api_reduce_var_t*)args;
     TPUKERNEL_ASSERT(api->dtype == DT_FP32);
 
@@ -1127,6 +1128,7 @@ void tpu_kernel_api_reduce_var(const void *args) {
                         api->input_dim, api->output_shape, api->output_dim, api->reduce_list,
                         api->reduce_dim, api->correction, api->dtype);
     tpu_poll();
+    return 0;
 }
 TPUKERNEL_FUNC_REGISTER(tpu_kernel_api_reduce_var);
 
@@ -1168,7 +1170,7 @@ data_type_t dtype) {
     float *out = tpu_global_mem_addr(output_global_addr);
     out[0] = sum[0] / (n - correction);
 }
-void tpu_kernel_api_reduce_var_all(const void *args) {
+int tpu_kernel_api_reduce_var_all(const void *args) {
     sg_api_reduce_var_t *api = (sg_api_reduce_var_t*)args;
     TPUKERNEL_ASSERT(api->dtype == DT_FP32);
 
@@ -1177,5 +1179,6 @@ void tpu_kernel_api_reduce_var_all(const void *args) {
                             api->output_global_addr, api->input_shape, api->input_dim,
                             api->correction, api->dtype);
     tpu_poll();
+    return 0;
 }
 TPUKERNEL_FUNC_REGISTER(tpu_kernel_api_reduce_var_all);

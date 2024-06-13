@@ -111,7 +111,7 @@ data_type_t dtype) {
                          dtype);
     }
 }
-void tpu_kernel_api_element_bitwise(const void *args) {
+int tpu_kernel_api_element_bitwise(const void *args) {
     sg_api_element_bitwise_t *api = (sg_api_element_bitwise_t*)args;
     TPUKERNEL_ASSERT(api->dtype == DT_INT32 || api->dtype == DT_UINT32 ||
                      api->dtype == DT_INT16 || api->dtype == DT_UINT16 ||
@@ -129,11 +129,12 @@ void tpu_kernel_api_element_bitwise(const void *args) {
                              api->mode,
                              (data_type_t)api->dtype);
     tpu_poll();
+    return 0;
 }
 TPUKERNEL_FUNC_REGISTER(tpu_kernel_api_element_bitwise);
 
 #ifdef BACKEND_SG2260
-void tpu_kernel_api_element_bitwise_multi_core(const void *args) {
+int tpu_kernel_api_element_bitwise_multi_core(const void *args) {
     sg_api_element_bitwise_t *api = (sg_api_element_bitwise_t*)args;
     TPUKERNEL_ASSERT(api->dtype == DT_INT32 || api->dtype == DT_UINT32 ||
                      api->dtype == DT_INT16 || api->dtype == DT_UINT16 ||
@@ -162,6 +163,7 @@ void tpu_kernel_api_element_bitwise_multi_core(const void *args) {
                              api->mode,
                              (data_type_t)api->dtype);
     tpu_poll();
+    return 0;
 }
 TPUKERNEL_FUNC_REGISTER(tpu_kernel_api_element_bitwise_multi_core);
 #endif
@@ -324,7 +326,7 @@ data_type_t   dtype) {
         cdone += shape.c;
     }
 }
-void tpu_kernel_api_element_bitwise_bcast(const void *args) {
+int tpu_kernel_api_element_bitwise_bcast(const void *args) {
     sg_api_element_bitwise_bcast_t *api = (sg_api_element_bitwise_bcast_t*) args;
     TPUKERNEL_ASSERT(api->input_dim > 0 && api->input_dim <= 4 &&
                      api->other_dim > 0 && api->other_dim <= 4);
@@ -362,11 +364,12 @@ void tpu_kernel_api_element_bitwise_bcast(const void *args) {
                                    api->mode,
                                    api->dtype);
     tpu_poll();
+    return 0;
 }
 TPUKERNEL_FUNC_REGISTER(tpu_kernel_api_element_bitwise_bcast);
 
 #ifdef BACKEND_SG2260
-void tpu_kernel_api_element_bitwise_bcast_multi_core(const void *args) {
+int tpu_kernel_api_element_bitwise_bcast_multi_core(const void *args) {
     sg_api_element_bitwise_bcast_t *api = (sg_api_element_bitwise_bcast_t*) args;
     TPUKERNEL_ASSERT(api->input_dim > 0 && api->input_dim <= 4 &&
                      api->other_dim > 0 && api->other_dim <= 4);
@@ -425,6 +428,7 @@ void tpu_kernel_api_element_bitwise_bcast_multi_core(const void *args) {
             &output_shape, api->mode, api->dtype);
     }
     tpu_poll();
+    return 0;
 }
 TPUKERNEL_FUNC_REGISTER(tpu_kernel_api_element_bitwise_bcast_multi_core);
 #endif
@@ -530,7 +534,7 @@ data_type_t dtype) {
                          dtype);
     }
 }
-void tpu_kernel_api_element_bitwise_c(const void *args) {
+int tpu_kernel_api_element_bitwise_c(const void *args) {
     sg_api_element_bitwise_c_t *api = (sg_api_element_bitwise_c_t*)args;
     TPUKERNEL_ASSERT(api->dtype == DT_INT32 || api->dtype == DT_UINT32 ||
                      api->dtype == DT_INT16 || api->dtype == DT_UINT16 ||
@@ -557,11 +561,12 @@ void tpu_kernel_api_element_bitwise_c(const void *args) {
                                api->mode,
                                (data_type_t)api->dtype);
     tpu_poll();
+    return 0;
 }
 TPUKERNEL_FUNC_REGISTER(tpu_kernel_api_element_bitwise_c);
 
 #ifdef BACKEND_SG2260
-void tpu_kernel_api_element_bitwise_c_multi_core(const void *args) {
+int tpu_kernel_api_element_bitwise_c_multi_core(const void *args) {
     sg_api_element_bitwise_c_t *api = (sg_api_element_bitwise_c_t*)args;
     TPUKERNEL_ASSERT(api->dtype == DT_INT32 || api->dtype == DT_UINT32 ||
                      api->dtype == DT_INT16 || api->dtype == DT_UINT16 ||
@@ -599,6 +604,7 @@ void tpu_kernel_api_element_bitwise_c_multi_core(const void *args) {
                                api->mode,
                                (data_type_t)api->dtype);
     tpu_poll();
+    return 0;
 }
 TPUKERNEL_FUNC_REGISTER(tpu_kernel_api_element_bitwise_c_multi_core);
 #endif

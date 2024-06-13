@@ -180,7 +180,7 @@ void nodechip_bcbinary_fp(
     }
   }
 
-void tpu_kernel_api_arithmetic_eltwise ( const void *args )
+int tpu_kernel_api_arithmetic_eltwise ( const void *args )
 {
   sg_api_arithmetic_eltwise_t *api = ( sg_api_arithmetic_eltwise_t * ) args;
   TPUKERNEL_ASSERT ( api->dtype == DT_FP32 || api->dtype == DT_FP16 || api->dtype == DT_BFP16 );
@@ -219,6 +219,7 @@ void tpu_kernel_api_arithmetic_eltwise ( const void *args )
       0,
       1);
   tpu_poll();
+  return 0;
 }
 
 // #define TPUKERNEL_FUNC_REGISTER(func) 
@@ -238,9 +239,10 @@ void tpu_kernel_api_arithmetic_eltwise ( const void *args )
 // TPUKERNEL_FUNC_REGISTER (tpu_kernel_api_div_eltwise);
 
 #ifdef BACKEND_SG2260
-void tpu_kernel_api_arithmetic_eltwise_multi_core(const void *args)
+int tpu_kernel_api_arithmetic_eltwise_multi_core(const void *args)
 {
   TPUKERNEL_ASSERT_INFO(false, "not implementated");
+  return 0;
 }
 TPUKERNEL_FUNC_REGISTER(tpu_kernel_api_arithmetic_eltwise_multi_core);
 #endif

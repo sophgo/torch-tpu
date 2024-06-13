@@ -864,7 +864,7 @@ void nodechip_cross_entropy_loss_forward(
 }
 #endif
 
-void tpu_kernel_api_cross_entropy_loss ( const void * args )
+int tpu_kernel_api_cross_entropy_loss ( const void * args )
 {
   sg_api_cross_entropy_loss_t * api = ( sg_api_cross_entropy_loss_t * ) args;
   TPUKERNEL_ASSERT ( api->dtype == DT_FP32 || api->dtype == DT_FP16 || api->dtype == DT_BFP16 );
@@ -881,5 +881,6 @@ void tpu_kernel_api_cross_entropy_loss ( const void * args )
                                         ( data_type_t ) api->dtype,
                                         api->is_target_int64 );
   tpu_poll();
+  return 0;
 }
 TPUKERNEL_FUNC_REGISTER ( tpu_kernel_api_cross_entropy_loss );

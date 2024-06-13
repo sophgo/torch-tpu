@@ -32,7 +32,7 @@ void nodechip_arg(global_addr_t input_global_addr,
                         zero_C, &shape_dim4, &stride, DT_INT32);
 }
 
-void tpu_kernel_api_arg(const void *args) {
+int tpu_kernel_api_arg(const void *args) {
   sg_api_reduce_arg_t *api = (sg_api_reduce_arg_t *)args;
   TPUKERNEL_ASSERT(api->dtype == DT_FP32 || api->dtype == DT_FP16 ||
                    api->dtype == DT_BFP16);
@@ -42,11 +42,12 @@ void tpu_kernel_api_arg(const void *args) {
                api->values_global_addr, api->indices_global_addr, api->shape,
                api->dim, api->axis, api->mode, api->dtype);
   tpu_poll();
+  return 0;
 }
 TPUKERNEL_FUNC_REGISTER(tpu_kernel_api_arg);
 
 #ifdef BACKEND_SG2260
-void tpu_kernel_api_arg_muti_core(const void *args) {
+int tpu_kernel_api_arg_muti_core(const void *args) {
   sg_api_reduce_arg_t *api = (sg_api_reduce_arg_t *)args;
   // TPUKERNEL_ASSERT(api->dtype == DT_FP32);
   tpu_initialize();
@@ -77,6 +78,7 @@ void tpu_kernel_api_arg_muti_core(const void *args) {
                  api->dim, api->axis, api->mode, api->dtype);
   }
   tpu_poll();
+  return 0;
 }
 
 TPUKERNEL_FUNC_REGISTER(tpu_kernel_api_arg_muti_core);

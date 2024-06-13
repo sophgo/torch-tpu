@@ -155,7 +155,7 @@ bool is_last_dim_spec(sg_api_repeat_t *api) {
   return true;
 }
 
-void tpu_kernel_api_repeat(const void *args) {
+int tpu_kernel_api_repeat(const void *args) {
   sg_api_repeat_t *api = (sg_api_repeat_t *)args;
 
   tpu_initialize();
@@ -171,11 +171,12 @@ void tpu_kernel_api_repeat(const void *args) {
                     api->repeat_times, api->dim, api->repeat_dim, api->dtype);
   }
   tpu_poll();
+  return 0;
 }
 TPUKERNEL_FUNC_REGISTER(tpu_kernel_api_repeat);
 
 #ifdef BACKEND_SG2260
-void tpu_kernel_api_repeat_multi_core(const void *args) {
+int tpu_kernel_api_repeat_multi_core(const void *args) {
   sg_api_repeat_t *api = (sg_api_repeat_t *)args;
 
   tpu_initialize();
@@ -206,6 +207,7 @@ void tpu_kernel_api_repeat_multi_core(const void *args) {
     nodechip_repeat(api->input_global_addr, api->output_global_addr, api->shape,
                     api->repeat_times, api->dim, api->repeat_dim, api->dtype);
   tpu_poll();
+  return 0;
 }
 TPUKERNEL_FUNC_REGISTER(tpu_kernel_api_repeat_multi_core);
 #endif

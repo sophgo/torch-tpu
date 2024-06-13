@@ -193,7 +193,7 @@ data_type_t dtype)
   }
 }
 
-void tpu_kernel_api_mse_loss ( const void * args )
+int tpu_kernel_api_mse_loss ( const void * args )
 {
   sg_api_mse_loss_t * api = ( sg_api_mse_loss_t * ) args;
   data_type_t dtype = ( data_type_t ) api->dtype;
@@ -213,6 +213,7 @@ void tpu_kernel_api_mse_loss ( const void * args )
   api->reduction,
   ( data_type_t ) api->dtype);
   tpu_poll();
+  return 0;
 }
 
 TPUKERNEL_FUNC_REGISTER ( tpu_kernel_api_mse_loss );

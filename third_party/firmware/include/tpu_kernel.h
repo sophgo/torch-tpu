@@ -11,9 +11,11 @@ typedef void (*tpu_kernel_func_t)(const void *);
 void tpu_register_kernel_func(const char *name, tpu_kernel_func_t func);
 void tpu_dump_registered_kernel_funcs();
 #define TPUKERNEL_FUNC_REGISTER(func)                              \
+void func##_wrapper(const void *arg) { func(arg); }                \
 __attribute__((constructor)) void tpu_kernel_register_##func() {   \
-    tpu_register_kernel_func(#func, func);                         \
+    tpu_register_kernel_func(#func, func##_wrapper);               \
 }
+
 
 #if defined(USING_CMODEL)
   #include <stdlib.h>

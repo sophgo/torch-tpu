@@ -3346,7 +3346,7 @@ void nodechip_conv_backward(
     }
 }
 
-void tpu_kernel_api_conv2d_backward(const void* args) {
+int tpu_kernel_api_conv2d_backward(const void* args) {
     sg_api_conv2d_backward_t* api = (sg_api_conv2d_backward_t*)args;
 
     TPUKERNEL_ASSERT ( api->dtype == DT_FP32 || api->dtype == DT_FP16 || api->dtype == DT_BFP16 );
@@ -3381,6 +3381,7 @@ void tpu_kernel_api_conv2d_backward(const void* args) {
         api->grad_bias_global_addr != 0,
         (data_type_t)api->dtype);
     tpu_poll();
+    return 0;
 }
 
 TPUKERNEL_FUNC_REGISTER(tpu_kernel_api_conv2d_backward);

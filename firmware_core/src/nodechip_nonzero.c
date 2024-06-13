@@ -126,17 +126,18 @@ void nodechip_reduce_nonzero(
   tpu_gdma_set_C_system(num_global_addr, num_scalar, &num_shape, NULL, DT_INT32);
 }
 
-void tpu_kernel_api_nonzero(const void *args) {
+int tpu_kernel_api_nonzero(const void *args) {
   sg_api_nonzero_t *api = (sg_api_nonzero_t *)args;
   tpu_initialize();
   nodechip_nonzero(api->input_global_addr, api->output_global_addr,
                    api->index_global_addr, api->num_global_addr, api->shape, api->dim,
                    (data_type_t)api->dtype);
   tpu_poll();
+  return 0;
 }
 TPUKERNEL_FUNC_REGISTER(tpu_kernel_api_nonzero);
 
-void tpu_kernel_api_nonzero_multicore(const void *args) {
+int tpu_kernel_api_nonzero_multicore(const void *args) {
   sg_api_nonzero_multi_core_t *api = (sg_api_nonzero_multi_core_t *)args;
   data_type_t dtype = (data_type_t)api->dtype;
   int dsize = tpu_data_type_size(dtype);
@@ -198,5 +199,6 @@ void tpu_kernel_api_nonzero_multicore(const void *args) {
                             api->dim);
   }
   tpu_poll();
+  return 0;
 }
 TPUKERNEL_FUNC_REGISTER(tpu_kernel_api_nonzero_multicore);

@@ -1478,7 +1478,7 @@ int grad_bias_enable )
   }
 }
 
-void tpu_kernel_api_batchnorm2d_backward ( const void *args )
+int tpu_kernel_api_batchnorm2d_backward ( const void *args )
 {
   sg_api_batchnorm2d_backward_t * api = ( sg_api_batchnorm2d_backward_t * ) args;
   dim4 shape = { .n = api->shape[0], .c = api->shape[1], .h = api->shape[2], .w = api->shape[3] };
@@ -1519,5 +1519,6 @@ void tpu_kernel_api_batchnorm2d_backward ( const void *args )
     }
   }
   tpu_poll();
+  return 0;
 }
 TPUKERNEL_FUNC_REGISTER ( tpu_kernel_api_batchnorm2d_backward );

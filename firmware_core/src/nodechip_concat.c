@@ -12,7 +12,7 @@ int input_num,
 int concat_axis,
 data_type_t dtype );
 
-void tpu_kernel_api_concat ( const void * args )
+int tpu_kernel_api_concat ( const void * args )
 {
   sg_api_concat_t * api = ( sg_api_concat_t * ) args;
   int st_by_concatway[FW_MAX_CONCAT_NUM] = { 0 };
@@ -26,6 +26,7 @@ void tpu_kernel_api_concat ( const void * args )
                        api->axis,
                        ( data_type_t ) api->dtype );
   tpu_poll();
+  return 0;
 }
 TPUKERNEL_FUNC_REGISTER ( tpu_kernel_api_concat );
 
@@ -111,7 +112,7 @@ void nodechip_concat_nd_multi_core(
     tpu_sync_all();
 }
 
-void tpu_kernel_api_concat_multi_core ( const void * args )
+int tpu_kernel_api_concat_multi_core ( const void * args )
 {
   sg_api_concat_t * api = ( sg_api_concat_t * ) args;
   int st_by_concatway[FW_MAX_CONCAT_NUM] = { 0 };
@@ -128,6 +129,7 @@ void tpu_kernel_api_concat_multi_core ( const void * args )
                        api->axis,
                       ( data_type_t ) api->dtype );
   tpu_poll();
+  return 0;
 }
 TPUKERNEL_FUNC_REGISTER ( tpu_kernel_api_concat_multi_core );
 #endif

@@ -84,7 +84,7 @@ data_type_t dtype )
   }
 }
 
-void tpu_kernel_api_signbit ( const void * args )
+int tpu_kernel_api_signbit ( const void * args )
 {
   sg_api_signbit_t * api = ( sg_api_signbit_t * ) args;
   
@@ -96,11 +96,12 @@ void tpu_kernel_api_signbit ( const void * args )
   tpu_initialize();
   nodechip_signbit ( api->input_global_addr, api->output_global_addr, length, ( data_type_t ) api->dtype );
   tpu_poll();
+  return 0;
 }
 TPUKERNEL_FUNC_REGISTER ( tpu_kernel_api_signbit );
 
 #ifdef BACKEND_SG2260
-void tpu_kernel_api_signbit_multi_core ( const void * args )
+int tpu_kernel_api_signbit_multi_core ( const void * args )
 {
   sg_api_signbit_t * api = ( sg_api_signbit_t * ) args;
   int length = 1;
@@ -125,6 +126,7 @@ void tpu_kernel_api_signbit_multi_core ( const void * args )
       (data_type_t)api->dtype);
 
   tpu_poll();
+  return 0;
 }
 TPUKERNEL_FUNC_REGISTER ( tpu_kernel_api_signbit_multi_core );
 #endif

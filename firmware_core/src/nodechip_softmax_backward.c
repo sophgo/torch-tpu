@@ -13,7 +13,7 @@ int           dims,
 int           axis,
 data_type_t   dtype );
 
-void tpu_kernel_api_softmax_backward ( const void *args )
+int tpu_kernel_api_softmax_backward ( const void *args )
 {
   sg_api_softmax_backward_t *api = ( sg_api_softmax_backward_t * ) args;
   tpu_initialize();
@@ -28,6 +28,7 @@ void tpu_kernel_api_softmax_backward ( const void *args )
   api->axis,
   ( data_type_t ) api->dtype );
   tpu_poll();
+  return 0;
 }
 TPUKERNEL_FUNC_REGISTER ( tpu_kernel_api_softmax_backward );
 
@@ -41,7 +42,7 @@ extern void nodechip_softmax_backward_multi_core (
   float         scale_val,
   data_type_t   dtype );
 
-void tpu_kernel_api_softmax_backward_multi_core ( const void *args )
+int tpu_kernel_api_softmax_backward_multi_core ( const void *args )
 {
   sg_api_softmax_backward_t *api = ( sg_api_softmax_backward_t * ) args;
   tpu_initialize();
@@ -55,6 +56,7 @@ void tpu_kernel_api_softmax_backward_multi_core ( const void *args )
     1.f,
     ( data_type_t ) api->dtype );
   tpu_poll();
+  return 0;
 }
 TPUKERNEL_FUNC_REGISTER ( tpu_kernel_api_softmax_backward_multi_core );
 #endif

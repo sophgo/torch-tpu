@@ -414,7 +414,7 @@ void nodechip_binary(global_addr_t input_global_addr,
   }
 }
 
-void tpu_kernel_api_binary(const void *args) {
+int tpu_kernel_api_binary(const void *args) {
   sg_api_binary_t *api = (sg_api_binary_t *)args;
   TPUKERNEL_ASSERT(api->dtype == DT_INT8 || api->dtype == DT_UINT8 ||
                    api->dtype == DT_INT16 || api->dtype == DT_UINT16 ||
@@ -451,11 +451,12 @@ void tpu_kernel_api_binary(const void *args) {
                     (sg_binary_type_t)api->binary_type);
   }
   tpu_poll();
+  return 0;
 }
 TPUKERNEL_FUNC_REGISTER(tpu_kernel_api_binary);
 
 #ifdef BACKEND_SG2260
-void tpu_kernel_api_binary_multi_core(const void *args) {
+int tpu_kernel_api_binary_multi_core(const void *args) {
   sg_api_binary_t *api = (sg_api_binary_t *)args;
   tpu_initialize();
 #ifdef USING_PERF_MODE
@@ -515,6 +516,7 @@ void tpu_kernel_api_binary_multi_core(const void *args) {
     }
   }
   tpu_poll();
+  return 0;
 }
 TPUKERNEL_FUNC_REGISTER(tpu_kernel_api_binary_multi_core);
 #endif
@@ -1074,7 +1076,7 @@ void nodechip_binary_bcast(global_addr_t input_global_addr,
   }
 }
 
-void tpu_kernel_api_binary_bcast(const void *args) {
+int tpu_kernel_api_binary_bcast(const void *args) {
   sg_api_binary_bcast_t *api = (sg_api_binary_bcast_t *)args;
   TPUKERNEL_ASSERT(api->dtype == DT_INT8 || api->dtype == DT_UINT8 ||
                    api->dtype == DT_INT16 || api->dtype == DT_UINT16 ||
@@ -1142,11 +1144,12 @@ void tpu_kernel_api_binary_bcast(const void *args) {
         (data_type_t)api->dtype, (sg_binary_type_t)api->binary_type);
   }
   tpu_poll();
+  return 0;
 }
 TPUKERNEL_FUNC_REGISTER(tpu_kernel_api_binary_bcast);
 
 #ifdef BACKEND_SG2260
-void tpu_kernel_api_binary_bcast_multi_core(const void *args) {
+int tpu_kernel_api_binary_bcast_multi_core(const void *args) {
   sg_api_binary_bcast_t *api = (sg_api_binary_bcast_t *)args;
   tpu_initialize();
   TPUKERNEL_ASSERT(api->dtype == DT_INT8 || api->dtype == DT_UINT8 ||
@@ -1282,6 +1285,7 @@ void tpu_kernel_api_binary_bcast_multi_core(const void *args) {
     }
   }
   tpu_poll();
+  return 0;
 }
 TPUKERNEL_FUNC_REGISTER(tpu_kernel_api_binary_bcast_multi_core);
 #endif
@@ -1541,7 +1545,7 @@ void nodechip_binary_scalar(global_addr_t input_global_addr,
   }
 }
 
-void tpu_kernel_api_binary_c(const void *args) {
+int tpu_kernel_api_binary_c(const void *args) {
   sg_api_binary_c_t *api = (sg_api_binary_c_t *)args;
   TPUKERNEL_ASSERT(api->dtype == DT_INT8 || api->dtype == DT_UINT8 ||
                    api->dtype == DT_INT16 || api->dtype == DT_UINT16 ||
@@ -1575,11 +1579,12 @@ void tpu_kernel_api_binary_c(const void *args) {
                            (sg_binary_type_t)api->binary_type, api->inversed);
   }
   tpu_poll();
+  return 0;
 }
 TPUKERNEL_FUNC_REGISTER(tpu_kernel_api_binary_c);
 
 #ifdef BACKEND_SG2260
-void tpu_kernel_api_binary_c_multi_core(const void *args) {
+int tpu_kernel_api_binary_c_multi_core(const void *args) {
   sg_api_binary_c_t *api = (sg_api_binary_c_t *)args;
   tpu_initialize();
 #ifdef USING_PERF_MODE
@@ -1636,6 +1641,7 @@ void tpu_kernel_api_binary_c_multi_core(const void *args) {
     }
   }
   tpu_poll();
+  return 0;
 }
 TPUKERNEL_FUNC_REGISTER(tpu_kernel_api_binary_c_multi_core);
 #endif

@@ -158,7 +158,7 @@ void nodechip_addcdiv(global_addr_t input_global_addr,
   }
 }
 
-void tpu_kernel_api_addcdiv(const void *args) {
+int tpu_kernel_api_addcdiv(const void *args) {
   sg_api_addcdiv_t *api = (sg_api_addcdiv_t *)args;
   data_type_t dtype = (data_type_t)api->dtype;
   TPUKERNEL_ASSERT(dtype == DT_FP32 || dtype == DT_FP16 || dtype == DT_BFP16);
@@ -178,5 +178,6 @@ void tpu_kernel_api_addcdiv(const void *args) {
                    api->tensor2_global_addr, api->output_global_addr, value,
                    length, dtype);
   tpu_poll();
+  return 0;
 }
 TPUKERNEL_FUNC_REGISTER(tpu_kernel_api_addcdiv);

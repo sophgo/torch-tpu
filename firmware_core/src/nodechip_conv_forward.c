@@ -22,7 +22,7 @@ data_type_t         idtype,
 data_type_t         odtype,
 bool                reshaped_bias );
 
-void tpu_kernel_api_conv2d ( const void * args ) {
+int tpu_kernel_api_conv2d ( const void * args ) {
   sg_api_conv2d_t * api = ( sg_api_conv2d_t * ) args;
   TPUKERNEL_ASSERT ( api->dtype == DT_FP32 || api->dtype == DT_FP16 || api->dtype == DT_BFP16 );
   dim4 input_shape =
@@ -54,6 +54,7 @@ void tpu_kernel_api_conv2d ( const void * args ) {
   ( data_type_t ) api->dtype,
   false );
   tpu_poll();
+  return 0;
 }
 
 TPUKERNEL_FUNC_REGISTER ( tpu_kernel_api_conv2d );

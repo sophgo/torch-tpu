@@ -257,7 +257,7 @@ static inline void nodechip_clear_buffer(
     tpu_gdma_set_C_system(buffer_global_addr, zero_scalar, &input_shape, NULL, DT_FP32);
 }
 
-void tpu_kernel_api_norm2 ( const void * args )
+int tpu_kernel_api_norm2 ( const void * args )
 {
   sg_api_norm2_t * api = ( sg_api_norm2_t * ) args;
   TPUKERNEL_ASSERT ( api->dtype == DT_FP32 || api->dtype == DT_FP16 || api->dtype == DT_BFP16 );
@@ -269,11 +269,12 @@ void tpu_kernel_api_norm2 ( const void * args )
   tpu_initialize();
   nodechip_norm2 ( api->input_global_addr, api->output_global_addr, len, ( data_type_t ) api->dtype, 1 );
   tpu_poll();
+  return 0;
 }
 TPUKERNEL_FUNC_REGISTER ( tpu_kernel_api_norm2 );
 
 #ifdef BACKEND_SG2260
-void tpu_kernel_api_norm2_multi_core ( const void * args )
+int tpu_kernel_api_norm2_multi_core ( const void * args )
 {
   sg_api_norm2_multi_core_t * api = ( sg_api_norm2_multi_core_t * ) args;
   TPUKERNEL_ASSERT ( api->dtype == DT_FP32 || api->dtype == DT_FP16 || api->dtype == DT_BFP16 );
@@ -308,6 +309,7 @@ void tpu_kernel_api_norm2_multi_core ( const void * args )
     nodechip_reduce_and_sqrt(api->buffer_global_addr, api->output_global_addr, len, (data_type_t)api->dtype);
   }
   tpu_poll();
+  return 0;
   
 }
 TPUKERNEL_FUNC_REGISTER ( tpu_kernel_api_norm2_multi_core );

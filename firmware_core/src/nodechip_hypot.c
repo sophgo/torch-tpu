@@ -101,7 +101,7 @@ data_type_t dtype) {
         tpu_gdma_cpy_L2S(l2s_global_addr, l2s_local_addr, &l2s_shape, NULL, NULL, dtype);
     }
 }
-void tpu_kernel_api_hypot(const void *args) {
+int tpu_kernel_api_hypot(const void *args) {
     sg_api_hypot_t *api = (sg_api_hypot_t*)args;
     TPUKERNEL_ASSERT(api->dtype == DT_FP32);
 
@@ -113,6 +113,7 @@ void tpu_kernel_api_hypot(const void *args) {
     nodechip_hypot(api->input_global_addr, api->other_global_addr,
                    api->output_global_addr, length, (data_type_t)api->dtype);
     tpu_poll();
+  return 0;
 }
 TPUKERNEL_FUNC_REGISTER(tpu_kernel_api_hypot);
 
@@ -278,7 +279,7 @@ data_type_t   dtype) {
         cdone += shape.c;
     }
 }
-void tpu_kernel_api_hypot_bcast(const void *args) {
+int tpu_kernel_api_hypot_bcast(const void *args) {
     sg_api_hypot_bcast_t *api = (sg_api_hypot_bcast_t*) args;
     TPUKERNEL_ASSERT(api->input_dim > 0 && api->input_dim <= 4 &&
                      api->other_dim > 0 && api->other_dim <= 4);
@@ -313,6 +314,7 @@ void tpu_kernel_api_hypot_bcast(const void *args) {
                          &output_shape,
                          api->dtype);
     tpu_poll();
+  return 0;
 }
 TPUKERNEL_FUNC_REGISTER(tpu_kernel_api_hypot_bcast);
 
@@ -389,7 +391,7 @@ data_type_t dtype) {
                          dtype);
     }
 }
-void tpu_kernel_api_hypot_c(const void *args) {
+int tpu_kernel_api_hypot_c(const void *args) {
     sg_api_hypot_c_t *api = (sg_api_hypot_c_t*)args;
     TPUKERNEL_ASSERT(api->dtype == DT_FP32);
 
@@ -405,5 +407,6 @@ void tpu_kernel_api_hypot_c(const void *args) {
                      length,
                      (data_type_t)api->dtype);
     tpu_poll();
+  return 0;
 }
 TPUKERNEL_FUNC_REGISTER(tpu_kernel_api_hypot_c);

@@ -217,7 +217,7 @@ data_type_t dtype )
   }
 }
 
-void tpu_kernel_api_addcmul_bcast ( const void * args )
+int tpu_kernel_api_addcmul_bcast ( const void * args )
 {
   sg_api_bcast_addcmul_t * api = ( sg_api_bcast_addcmul_t * ) args;
   data_type_t dtype = ( data_type_t ) api->dtype;
@@ -275,6 +275,7 @@ void tpu_kernel_api_addcmul_bcast ( const void * args )
                       &output_shape,
                       dtype );
   tpu_poll();
+  return 0;
 }
 TPUKERNEL_FUNC_REGISTER(tpu_kernel_api_addcmul_bcast);
 
@@ -393,7 +394,7 @@ void nodechip_addcmul(global_addr_t input_global_addr,
   }
 }
 
-void tpu_kernel_api_addcmul(const void *args) {
+int tpu_kernel_api_addcmul(const void *args) {
   sg_api_addcmul_t *api = (sg_api_addcmul_t *)args;
   data_type_t dtype = (data_type_t)api->dtype;
   TPUKERNEL_ASSERT(dtype == DT_FP32 || dtype == DT_FP16 || dtype == DT_BFP16);
@@ -413,5 +414,6 @@ void tpu_kernel_api_addcmul(const void *args) {
                    api->tensor2_global_addr, api->output_global_addr, value,
                    length, dtype);
   tpu_poll();
+  return 0;
 }
 TPUKERNEL_FUNC_REGISTER(tpu_kernel_api_addcmul);

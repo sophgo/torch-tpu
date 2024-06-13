@@ -244,7 +244,7 @@ data_type_t   dtype )
   }
 }
 
-void tpu_kernel_api_strided_copy ( const void *args )
+int tpu_kernel_api_strided_copy ( const void *args )
 {
   sg_api_strided_copy_t *api = ( sg_api_strided_copy_t* ) args;
   tpu_initialize();
@@ -257,12 +257,13 @@ void tpu_kernel_api_strided_copy ( const void *args )
   api->output_stride,
   ( data_type_t ) api->dtype );
   tpu_poll();
+  return 0;
 }
 
-TPUKERNEL_FUNC_REGISTER ( tpu_kernel_api_strided_copy );
+TPUKERNEL_FUNC_REGISTER( tpu_kernel_api_strided_copy );
 
 #ifdef BACKEND_SG2260
-void tpu_kernel_api_strided_copy_multi_core(const void *args) {
+int tpu_kernel_api_strided_copy_multi_core(const void *args) {
   sg_api_strided_copy_t *api = (sg_api_strided_copy_t*)args;
   tpu_initialize();
 #ifdef USING_PERF_MODE
@@ -279,6 +280,7 @@ void tpu_kernel_api_strided_copy_multi_core(const void *args) {
         (data_type_t)api->dtype);
     tpu_poll();
   }
+  return 0;
 }
 
 TPUKERNEL_FUNC_REGISTER(tpu_kernel_api_strided_copy_multi_core);

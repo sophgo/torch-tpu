@@ -28,7 +28,7 @@ extern void nodechip_pooling_parallel_with_data_split(
     data_type_t     dtype
 );
 
-void tpu_kernel_api_avg_pooling(const void *args)
+int tpu_kernel_api_avg_pooling(const void *args)
 {
   sg_api_pooling_t *api = (sg_api_pooling_t *)args;
   TPUKERNEL_ASSERT(api->dtype == DT_FP32 || api->dtype == DT_FP16 || api->dtype == DT_BFP16);
@@ -56,13 +56,15 @@ void tpu_kernel_api_avg_pooling(const void *args)
         0/*avg_pooling_mode*/, 0/*if_relu*/,
         -1/*relu_upper_limit*/, api->dtype);
   tpu_poll();
+  return 0;
 }
 TPUKERNEL_FUNC_REGISTER(tpu_kernel_api_avg_pooling);
 
 #ifdef BACKEND_SG2260
-void tpu_kernel_api_avg_pooling_multi_core(const void *args)
+int tpu_kernel_api_avg_pooling_multi_core(const void *args)
 {
   TPUKERNEL_ASSERT_INFO(false, "not implementated");
+  return 0;
 }
 TPUKERNEL_FUNC_REGISTER(tpu_kernel_api_avg_pooling_multi_core);
 #endif

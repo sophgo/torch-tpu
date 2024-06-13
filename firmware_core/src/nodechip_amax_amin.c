@@ -8,7 +8,7 @@ extern void nodechip_reduce_full(
     const int *axis_list_orig, int shape_dims_orig, int axis_num, int method,
     unsigned long long *buffer_size, data_type_t dtype);
 
-void tpu_kernel_api_reduce_max_or_min(const void *args) {
+int tpu_kernel_api_reduce_max_or_min(const void *args) {
   sg_api_reduce_max_or_min_t *api = (sg_api_reduce_max_or_min_t *)args;
   TPUKERNEL_ASSERT(api->dtype == DT_FP32 || api->dtype == DT_FP16 ||
                    api->dtype == DT_BFP16);
@@ -21,11 +21,12 @@ void tpu_kernel_api_reduce_max_or_min(const void *args) {
                        api->dim, api->reduction_dim_length, mode, NULL,
                        api->dtype);
   tpu_poll();
+  return 0;
 }
 TPUKERNEL_FUNC_REGISTER(tpu_kernel_api_reduce_max_or_min);
 
 #ifdef BACKEND_SG2260
-void tpu_kernel_api_reduce_max_or_min_multi_core(const void *args) {
+int tpu_kernel_api_reduce_max_or_min_multi_core(const void *args) {
   sg_api_reduce_max_or_min_t *api = (sg_api_reduce_max_or_min_t *)args;
   TPUKERNEL_ASSERT(api->dtype == DT_FP32 || api->dtype == DT_FP16 ||
                    api->dtype == DT_BFP16);
@@ -75,6 +76,7 @@ void tpu_kernel_api_reduce_max_or_min_multi_core(const void *args) {
         api->dtype);
   }
   tpu_poll();
+  return 0;
 }
 TPUKERNEL_FUNC_REGISTER(tpu_kernel_api_reduce_max_or_min_multi_core);
 #endif

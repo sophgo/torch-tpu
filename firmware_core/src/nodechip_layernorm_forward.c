@@ -17,7 +17,7 @@ float         eps,
 bool          affine,
 data_type_t   dtype );
 
-void tpu_kernel_api_layernorm ( const void *args )
+int tpu_kernel_api_layernorm ( const void *args )
 {
   sg_api_layernorm_t *api = ( sg_api_layernorm_t * ) args;
   TPUKERNEL_ASSERT ( api->dtype == DT_FP32 || api->dtype == DT_FP16 || api->dtype == DT_BFP16 );
@@ -36,6 +36,7 @@ void tpu_kernel_api_layernorm ( const void *args )
     api->weight_global_addr && api->bias_global_addr,
     ( data_type_t ) api->dtype );
   tpu_poll();
+  return 0;
 }
 TPUKERNEL_FUNC_REGISTER ( tpu_kernel_api_layernorm );
 
@@ -53,7 +54,7 @@ int           axis,
 float         eps,
 int           affine,
 data_type_t   dtype );
-void tpu_kernel_api_layernorm_multi_core ( const void *args )
+int tpu_kernel_api_layernorm_multi_core ( const void *args )
 {
   sg_api_layernorm_t *api = ( sg_api_layernorm_t * ) args;
   TPUKERNEL_ASSERT ( api->dtype == DT_FP32 || api->dtype == DT_FP16 || api->dtype == DT_BFP16 );
@@ -75,6 +76,7 @@ void tpu_kernel_api_layernorm_multi_core ( const void *args )
     api->weight_global_addr && api->bias_global_addr,
     ( data_type_t ) api->dtype );
   tpu_poll();
+  return 0;
 }
 TPUKERNEL_FUNC_REGISTER ( tpu_kernel_api_layernorm_multi_core );
 #endif

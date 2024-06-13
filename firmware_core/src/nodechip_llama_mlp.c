@@ -45,7 +45,7 @@ void nodechip_llama_mlp_forward_multi_core(
     global_addr_t scale2_global_addr);
 
     // void set_file_dump_subdir(const char*);
-void tpu_kernel_llama_mlp_multi_core(const void* api_buf) {
+int tpu_kernel_llama_mlp_multi_core(const void* api_buf) {
     // set_file_dump_subdir("./Custom_MLP");
     sg_api_llama_mlp_multi_core_t *api = (sg_api_llama_mlp_multi_core_t*)api_buf;
     tpu_initialize();
@@ -84,6 +84,7 @@ void tpu_kernel_llama_mlp_multi_core(const void* api_buf) {
         api->zp2_addr,
         api->scale2_addr);
     tpu_poll();
+    return 0;
 }
 
 TPUKERNEL_FUNC_REGISTER(tpu_kernel_llama_mlp_multi_core);

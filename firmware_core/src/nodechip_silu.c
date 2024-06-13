@@ -103,7 +103,7 @@ data_type_t   dtype,
 int           active_type,
 float*        coef);
 
-void tpu_kernel_api_silu(const void *args) {
+int tpu_kernel_api_silu(const void *args) {
   sg_api_silu_t *api = (sg_api_silu_t *) args;
   TPUKERNEL_ASSERT(api->dtype == DT_FP32 || api->dtype == DT_FP16 ||
                    api->dtype == DT_BFP16);
@@ -130,12 +130,14 @@ else
     NULL);
 }
 tpu_poll();
+return 0;
 }
 TPUKERNEL_FUNC_REGISTER(tpu_kernel_api_silu);
 
 #ifdef BACKEND_SG2260
-void tpu_kernel_api_silu_multi_core(const void *args) {
+int tpu_kernel_api_silu_multi_core(const void *args) {
   TPUKERNEL_ASSERT_INFO(false, "not implementated");
+  return 0;
 }
 TPUKERNEL_FUNC_REGISTER(tpu_kernel_api_silu_multi_core);
 #endif

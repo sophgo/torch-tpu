@@ -24,7 +24,7 @@ void nodechip_mlp0_fuse_multi_core_v3(
     bool            has_bias,
     bool            use_fast);
 
-void tpu_kernel_add_ln_mm_multi_core(const void* api_buf) {
+int tpu_kernel_add_ln_mm_multi_core(const void* api_buf) {
 
     sg_api_add_ln_mm_multi_core_t *api = (sg_api_add_ln_mm_multi_core_t*)api_buf;
     tpu_initialize();
@@ -48,6 +48,7 @@ void tpu_kernel_add_ln_mm_multi_core(const void* api_buf) {
         api->has_bias,
         api->use_fast);
     tpu_poll();
+    return 0;
 }
 
 TPUKERNEL_FUNC_REGISTER(tpu_kernel_add_ln_mm_multi_core);

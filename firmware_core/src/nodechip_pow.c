@@ -148,7 +148,7 @@ void nodechip_pow(global_addr_t output_global_addr,
   }
 }
 
-void tpu_kernel_api_pow(const void *args) {
+int tpu_kernel_api_pow(const void *args) {
   sg_api_pow_t *api = (sg_api_pow_t *)args;
   TPUKERNEL_ASSERT(api->input_dtype == DT_FP32 || api->input_dtype == DT_FP16 ||
                    api->input_dtype == DT_BFP16 ||
@@ -166,11 +166,12 @@ void tpu_kernel_api_pow(const void *args) {
                api->other_global_addr, length, api->input_dtype,
                api->other_dtype, api->output_dtype);
   tpu_poll();
+  return 0;
 }
 TPUKERNEL_FUNC_REGISTER(tpu_kernel_api_pow);
 
 #ifdef BACKEND_SG2260
-void tpu_kernel_api_pow_multi_core(const void *args) {
+int tpu_kernel_api_pow_multi_core(const void *args) {
   sg_api_pow_t *api = (sg_api_pow_t *)args;
   TPUKERNEL_ASSERT(api->input_dtype == DT_FP32 || api->input_dtype == DT_FP16 ||
                    api->input_dtype == DT_BFP16 ||
@@ -203,6 +204,7 @@ void tpu_kernel_api_pow_multi_core(const void *args) {
         api->output_dtype);
   }
   tpu_poll();
+  return 0;
 }
 TPUKERNEL_FUNC_REGISTER(tpu_kernel_api_pow_multi_core);
 #endif
@@ -474,7 +476,7 @@ void nodechip_pow_bcast(global_addr_t output_global_addr,
   }
 }
 
-void tpu_kernel_api_pow_bcast(const void *args) {
+int tpu_kernel_api_pow_bcast(const void *args) {
   sg_api_pow_bcast_t *api = (sg_api_pow_bcast_t *)args;
   TPUKERNEL_ASSERT(api->input_dtype == DT_FP32 || api->input_dtype == DT_FP16 ||
                    api->input_dtype == DT_BFP16 ||
@@ -526,11 +528,12 @@ void tpu_kernel_api_pow_bcast(const void *args) {
                      &other_global_stride, api->output_dtype, api->input_dtype,
                      api->other_dtype);
   tpu_poll();
+  return 0;
 }
 TPUKERNEL_FUNC_REGISTER(tpu_kernel_api_pow_bcast);
 
 #ifdef BACKEND_SG2260
-void tpu_kernel_api_pow_bcast_multi_core(const void *args) {
+int tpu_kernel_api_pow_bcast_multi_core(const void *args) {
   sg_api_pow_bcast_t *api = (sg_api_pow_bcast_t *)args;
   TPUKERNEL_ASSERT(api->input_dtype == DT_FP32 || api->input_dtype == DT_FP16 ||
                    api->input_dtype == DT_BFP16 ||
@@ -647,6 +650,7 @@ void tpu_kernel_api_pow_bcast_multi_core(const void *args) {
         api->input_dtype, api->other_dtype);
   }
   tpu_poll();
+  return 0;
 }
 TPUKERNEL_FUNC_REGISTER(tpu_kernel_api_pow_bcast_multi_core);
 #endif
@@ -916,7 +920,7 @@ static inline void nodechip_pow_c_parallel(global_addr_t in_global_addr,
   }
 }
 
-void tpu_kernel_api_pow_c(const void *args) {
+int tpu_kernel_api_pow_c(const void *args) {
   sg_api_pow_tensor_scalar_t *api = (sg_api_pow_tensor_scalar_t *)args;
   TPUKERNEL_ASSERT(api->dtype == DT_FP32 || api->dtype == DT_FP16 ||
                    api->dtype == DT_BFP16 || api->dtype == DT_INT32);
@@ -929,11 +933,12 @@ void tpu_kernel_api_pow_c(const void *args) {
   nodechip_pow_c_parallel(api->self_global_addr, api->out_global_addr, length,
                           api->value, api->dtype, api->out_is_int);
   tpu_poll();
+  return 0;
 }
 TPUKERNEL_FUNC_REGISTER(tpu_kernel_api_pow_c);
 
 #ifdef BACKEND_SG2260
-void tpu_kernel_api_pow_c_multi_core(const void *args) {
+int tpu_kernel_api_pow_c_multi_core(const void *args) {
   sg_api_pow_tensor_scalar_t *api = (sg_api_pow_tensor_scalar_t *)args;
   TPUKERNEL_ASSERT(api->dtype == DT_FP32 || api->dtype == DT_FP16 ||
                    api->dtype == DT_BFP16 || api->dtype == DT_INT32);
@@ -960,6 +965,7 @@ void tpu_kernel_api_pow_c_multi_core(const void *args) {
         cur_length_slice, api->value, api->dtype, api->out_is_int);
   }
   tpu_poll();
+  return 0;
 }
 TPUKERNEL_FUNC_REGISTER(tpu_kernel_api_pow_c_multi_core);
 #endif
@@ -1147,7 +1153,7 @@ static inline void nodechip_c_pow_parallel(global_addr_t in_global_addr,
   }
 }
 
-void tpu_kernel_api_c_pow(const void *args) {
+int tpu_kernel_api_c_pow(const void *args) {
   sg_api_pow_tensor_scalar_t *api = (sg_api_pow_tensor_scalar_t *)args;
   TPUKERNEL_ASSERT(api->dtype == DT_FP32 || api->dtype == DT_FP16 ||
                    api->dtype == DT_BFP16 || api->dtype == DT_INT32);
@@ -1160,11 +1166,12 @@ void tpu_kernel_api_c_pow(const void *args) {
   nodechip_c_pow_parallel(api->self_global_addr, api->out_global_addr, length,
                           api->value, api->dtype, api->out_is_int);
   tpu_poll();
+  return 0;
 }
 TPUKERNEL_FUNC_REGISTER(tpu_kernel_api_c_pow);
 
 #ifdef BACKEND_SG2260
-void tpu_kernel_api_c_pow_multi_core(const void *args) {
+int tpu_kernel_api_c_pow_multi_core(const void *args) {
   sg_api_pow_tensor_scalar_t *api = (sg_api_pow_tensor_scalar_t *)args;
   TPUKERNEL_ASSERT(api->dtype == DT_FP32 || api->dtype == DT_FP16 ||
                    api->dtype == DT_BFP16 || api->dtype == DT_INT32);
@@ -1191,6 +1198,7 @@ void tpu_kernel_api_c_pow_multi_core(const void *args) {
         cur_length_slice, api->value, api->dtype, api->out_is_int);
   }
   tpu_poll();
+  return 0;
 }
 TPUKERNEL_FUNC_REGISTER(tpu_kernel_api_c_pow_multi_core);
 #endif

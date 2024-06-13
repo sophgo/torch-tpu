@@ -154,7 +154,7 @@ data_type_t dtype) {
                          DT_UINT8);
     }
 }
-void tpu_kernel_api_comparision(const void *args) {
+int tpu_kernel_api_comparision(const void *args) {
     sg_api_comparision_t *api = (sg_api_comparision_t*) args;
     int length = 1;
     for(int i = 0; i < api->dim; ++i) {
@@ -171,11 +171,12 @@ void tpu_kernel_api_comparision(const void *args) {
                          (data_type_t)api->dtype);
 
     tpu_poll();
+    return 0;
 }
 TPUKERNEL_FUNC_REGISTER(tpu_kernel_api_comparision);
 
 #ifdef BACKEND_SG2260
-void tpu_kernel_api_comparision_multi_core(const void *args) {
+int tpu_kernel_api_comparision_multi_core(const void *args) {
     sg_api_comparision_t *api = (sg_api_comparision_t*) args;
     int length = 1;
     for(int i = 0; i < api->dim; ++i) {
@@ -203,6 +204,7 @@ void tpu_kernel_api_comparision_multi_core(const void *args) {
                          (data_type_t)api->dtype);
 
     tpu_poll();
+    return 0;
 }
 TPUKERNEL_FUNC_REGISTER(tpu_kernel_api_comparision_multi_core);
 #endif
@@ -448,7 +450,7 @@ data_type_t dtype) {
         cdone += shape.c;
     }    
 }
-void tpu_kernel_api_comparision_bcast(const void *args) {
+int tpu_kernel_api_comparision_bcast(const void *args) {
     sg_api_comparision_bcast_t *api = (sg_api_comparision_bcast_t*) args;
     TPUKERNEL_ASSERT(api->input_dim > 0 && api->input_dim <= 4 &&
                      api->other_dim > 0 && api->other_dim <= 4);
@@ -483,11 +485,12 @@ void tpu_kernel_api_comparision_bcast(const void *args) {
                                api->mode,
                                api->dtype);
     tpu_poll();
+    return 0;
 }
 TPUKERNEL_FUNC_REGISTER(tpu_kernel_api_comparision_bcast);
 
 #ifdef BACKEND_SG2260
-void tpu_kernel_api_comparision_bcast_multi_core(const void *args) {
+int tpu_kernel_api_comparision_bcast_multi_core(const void *args) {
     sg_api_comparision_bcast_t *api = (sg_api_comparision_bcast_t*) args;
     TPUKERNEL_ASSERT(api->input_dim > 0 && api->input_dim <= 4 &&
                      api->other_dim > 0 && api->other_dim <= 4);
@@ -548,6 +551,7 @@ void tpu_kernel_api_comparision_bcast_multi_core(const void *args) {
                                api->dtype);
     }
     tpu_poll();
+    return 0;
 }
 TPUKERNEL_FUNC_REGISTER(tpu_kernel_api_comparision_bcast_multi_core);
 #endif
@@ -745,7 +749,7 @@ data_type_t dtype) {
                          DT_UINT8);
     }
 }
-void tpu_kernel_api_comparision_c(const void *args) {
+int tpu_kernel_api_comparision_c(const void *args) {
     sg_api_comparision_c_t *api = (sg_api_comparision_c_t*)args;
     scalar_t value;
     if(api->dtype == DT_FP32) {
@@ -771,11 +775,12 @@ void tpu_kernel_api_comparision_c(const void *args) {
                            api->dtype);
 
     tpu_poll();
+    return 0;
 }
 TPUKERNEL_FUNC_REGISTER(tpu_kernel_api_comparision_c);
 
 #ifdef BACKEND_SG2260
-void tpu_kernel_api_comparision_c_multi_core(const void *args) {
+int tpu_kernel_api_comparision_c_multi_core(const void *args) {
     sg_api_comparision_c_t *api = (sg_api_comparision_c_t*)args;
     scalar_t value;
     if(api->dtype == DT_FP32) {
@@ -811,6 +816,7 @@ void tpu_kernel_api_comparision_c_multi_core(const void *args) {
                            api->dtype);
 
     tpu_poll();
+    return 0;
 }
 TPUKERNEL_FUNC_REGISTER(tpu_kernel_api_comparision_c_multi_core);
 #endif

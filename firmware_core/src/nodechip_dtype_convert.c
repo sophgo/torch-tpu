@@ -11,7 +11,7 @@ data_type_t     src_dtype,
 data_type_t     dst_dtype,
 rounding_mode_t round_mode );
 
-void tpu_kernel_api_dtype_convert ( const void* args ) {
+int tpu_kernel_api_dtype_convert ( const void* args ) {
   sg_api_dtype_convert_t* api = ( sg_api_dtype_convert_t* ) args;
   tpu_initialize();
   nodechip_cast (
@@ -23,6 +23,7 @@ void tpu_kernel_api_dtype_convert ( const void* args ) {
   ( data_type_t ) api->output_dtype,
   RM_HALF_TO_EVEN );
   tpu_poll();
+  return 0;
 }
 
 TPUKERNEL_FUNC_REGISTER ( tpu_kernel_api_dtype_convert );
@@ -44,7 +45,7 @@ static inline void compute_current_slice_info_multi_core(int total_num, int* exp
   *expected_secs = num_max_core_needed;
 }
 
-void tpu_kernel_api_dtype_convert_multi_core ( const void* args ) {
+int tpu_kernel_api_dtype_convert_multi_core ( const void* args ) {
   sg_api_dtype_convert_t* api = ( sg_api_dtype_convert_t* ) args;
   tpu_initialize();
 #ifdef USING_PERF_MODE
@@ -92,6 +93,7 @@ void tpu_kernel_api_dtype_convert_multi_core ( const void* args ) {
       RM_HALF_TO_EVEN );
   }
   tpu_poll();
+  return 0;
 }
 
 TPUKERNEL_FUNC_REGISTER ( tpu_kernel_api_dtype_convert_multi_core );

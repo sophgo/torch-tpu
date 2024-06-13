@@ -7,7 +7,7 @@ extern void nodechip_reverse(global_addr_t bottom_global_offset,
                              int *input_tensor_shape, int dims, int axis,
                              data_type_t dtype);
 
-void tpu_kernel_api_flip(const void *args) {
+int tpu_kernel_api_flip(const void *args) {
   sg_api_flip_t *api = (sg_api_flip_t *)args;
   TPUKERNEL_ASSERT(api->dtype == DT_FP32 || api->dtype == DT_FP16 ||
                    api->dtype == DT_BFP16);
@@ -20,12 +20,14 @@ void tpu_kernel_api_flip(const void *args) {
   nodechip_reverse(api->input_global_addr, api->output_global_addr, api->shape,
                    api->dim, api->axis, api->dtype);
   tpu_poll();
+  return 0;
 }
 TPUKERNEL_FUNC_REGISTER(tpu_kernel_api_flip);
 
 #ifdef BACKEND_SG2260
-void tpu_kernel_api_flip_multi_core(const void *args) {
+int tpu_kernel_api_flip_multi_core(const void *args) {
   TPUKERNEL_ASSERT_INFO(false, "not implementated");
+  return 0;
 }
 TPUKERNEL_FUNC_REGISTER(tpu_kernel_api_flip_multi_core);
 #endif

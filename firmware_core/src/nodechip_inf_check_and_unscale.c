@@ -211,7 +211,7 @@ static inline void nodechip_clear_buffer(
     tpu_gdma_set_C_system(buffer_global_addr, zero_scalar, &input_shape, &input_stride, dtype);
 }
 
-void tpu_kernel_api_inf_check_and_unscale(const void *args){
+int tpu_kernel_api_inf_check_and_unscale(const void *args){
     sg_api_inf_check_unscale_t* api = (sg_api_inf_check_unscale_t*)args;
     int length = 1;
     for (int i = 0; i < api->dim; i++ ){ length *= api->shape[i]; }
@@ -225,11 +225,12 @@ void tpu_kernel_api_inf_check_and_unscale(const void *args){
         (data_type_t)api->idtype,
         (data_type_t)api->found_inf_dtype);
     tpu_poll();
+    return 0;
 }
 TPUKERNEL_FUNC_REGISTER(tpu_kernel_api_inf_check_and_unscale);
 
 #ifdef BACKEND_SG2260
-void tpu_kernel_api_inf_check_and_unscale_multi_core(const void *args){
+int tpu_kernel_api_inf_check_and_unscale_multi_core(const void *args){
     sg_api_inf_check_unscale_multi_core_t* api = (sg_api_inf_check_unscale_multi_core_t*)args;
     int length = 1;
     for (int i = 0; i < api->dim; i++ ){ length *= api->shape[i]; }
@@ -269,6 +270,7 @@ void tpu_kernel_api_inf_check_and_unscale_multi_core(const void *args){
         nodechip_find_inf(api->found_inf_buffer_global_addr, api->found_inf_global_addr, (data_type_t)api->found_inf_dtype);
     }
     tpu_poll();
+    return 0;
 }
 TPUKERNEL_FUNC_REGISTER(tpu_kernel_api_inf_check_and_unscale_multi_core);
 #endif

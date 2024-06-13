@@ -23,7 +23,7 @@ void nodechip_mgm_multi_core(
     bool            use_fast            // gelu or gelu_fast
 );
 
-void tpu_kernel_mlp_multi_core(const void* api_buf) {
+int tpu_kernel_mlp_multi_core(const void* api_buf) {
 
     sg_api_mlp_multi_core_t *api = (sg_api_mlp_multi_core_t*)api_buf;
     tpu_initialize();
@@ -45,6 +45,7 @@ void tpu_kernel_mlp_multi_core(const void* api_buf) {
         api->has_bias,
         api->use_fast);
     tpu_poll();
+    return 0;
 }
 
 TPUKERNEL_FUNC_REGISTER(tpu_kernel_mlp_multi_core);

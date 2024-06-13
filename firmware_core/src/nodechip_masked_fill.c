@@ -27,7 +27,7 @@ extern void nodechip_select_fp(
     data_type_t  cond_dtype,
     data_type_t  res_dtype);
 
-void tpu_kernel_api_masked_fill ( const void * args )
+int tpu_kernel_api_masked_fill ( const void * args )
 {
     sg_api_masked_fill_t *api = ( sg_api_masked_fill_t * ) args;
     tpu_initialize();
@@ -60,11 +60,12 @@ void tpu_kernel_api_masked_fill ( const void * args )
     );
     #endif
     tpu_poll();
+    return 0;
 }
 TPUKERNEL_FUNC_REGISTER(tpu_kernel_api_masked_fill);
 
 #ifdef BACKEND_SG2260
-void tpu_kernel_api_masked_fill_multi_core ( const void * args )
+int tpu_kernel_api_masked_fill_multi_core ( const void * args )
 {
     sg_api_masked_fill_t *api = ( sg_api_masked_fill_t * ) args;
 
@@ -143,11 +144,12 @@ void tpu_kernel_api_masked_fill_multi_core ( const void * args )
         );
     }
     tpu_poll();
+    return 0;
 }
 TPUKERNEL_FUNC_REGISTER(tpu_kernel_api_masked_fill_multi_core);
 
 /* simple version, only split the first dim */
-// void tpu_kernel_api_masked_fill_multi_core ( const void * args )
+// int tpu_kernel_api_masked_fill_multi_core ( const void * args )
 // {
 //     sg_api_masked_fill_t *api = ( sg_api_masked_fill_t * ) args;
 
@@ -199,6 +201,7 @@ TPUKERNEL_FUNC_REGISTER(tpu_kernel_api_masked_fill_multi_core);
 //         );
 //     }
 //     tpu_poll();
+//     return 0;
 // }
 // TPUKERNEL_FUNC_REGISTER(tpu_kernel_api_masked_fill_multi_core);
 #endif

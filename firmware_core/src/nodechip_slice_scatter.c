@@ -18,7 +18,7 @@ void nodechip_slice_scatter(global_addr_t output_global_addr,
                          NULL, NULL, dtype);
 }
 
-void tpu_kernel_api_slice_scatter(const void *args) {
+int tpu_kernel_api_slice_scatter(const void *args) {
   sg_api_slice_scatter_t *api = (sg_api_slice_scatter_t *)args;
   TPUKERNEL_ASSERT(api->dtype == DT_FP32 || api->dtype == DT_FP16 ||
                    api->dtype == DT_BFP16 || api->dtype == DT_INT32);
@@ -34,11 +34,13 @@ void tpu_kernel_api_slice_scatter(const void *args) {
   nodechip_slice_scatter(api->output_global_addr, api->input_global_addr,
                          api->indices_global_addr, api->src_global_addr,
                          input_shape, api->src_shape[api->dim], api->dtype);
+  tpu_poll();
+  return 0;
 }
 TPUKERNEL_FUNC_REGISTER(tpu_kernel_api_slice_scatter);
 
 #ifdef BACKEND_SG2260
-void tpu_kernel_api_slice_scatter_multi_core(const void *args) {
+int tpu_kernel_api_slice_scatter_multi_core(const void *args) {
   sg_api_slice_scatter_t *api = (sg_api_slice_scatter_t *)args;
   TPUKERNEL_ASSERT(api->dtype == DT_FP32 || api->dtype == DT_FP16 ||
                    api->dtype == DT_BFP16 || api->dtype == DT_INT32);
@@ -77,6 +79,7 @@ void tpu_kernel_api_slice_scatter_multi_core(const void *args) {
                            api->src_shape[api->dim], api->dtype);
   }
   tpu_poll();
+  return 0;
 }
 TPUKERNEL_FUNC_REGISTER(tpu_kernel_api_slice_scatter_multi_core);
 #endif

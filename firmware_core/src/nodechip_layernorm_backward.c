@@ -20,7 +20,7 @@ int           requires_grad_input,
 #endif
 data_type_t   dtype );
 
-void tpu_kernel_api_layernorm_backward ( const void *args )
+int tpu_kernel_api_layernorm_backward ( const void *args )
 {
   sg_api_layernorm_backward_t *api = ( sg_api_layernorm_backward_t * ) args;
   TPUKERNEL_ASSERT ( api->dtype == DT_FP32 || api->dtype == DT_FP16 || api->dtype == DT_BFP16 );
@@ -43,6 +43,7 @@ void tpu_kernel_api_layernorm_backward ( const void *args )
 #endif
     ( data_type_t ) api->dtype );
   tpu_poll();
+  return 0;
 }
 TPUKERNEL_FUNC_REGISTER ( tpu_kernel_api_layernorm_backward );
 
@@ -63,7 +64,7 @@ int           affine,
 int            requires_grad_input,
 data_type_t   dtype );
 
-void tpu_kernel_api_layernorm_backward_multi_core ( const void *args )
+int tpu_kernel_api_layernorm_backward_multi_core ( const void *args )
 {
   sg_api_layernorm_backward_t *api = ( sg_api_layernorm_backward_t * ) args;
   TPUKERNEL_ASSERT ( api->dtype == DT_FP32 || api->dtype == DT_FP16 || api->dtype == DT_BFP16 );
@@ -87,6 +88,7 @@ void tpu_kernel_api_layernorm_backward_multi_core ( const void *args )
     api->requires_grad_input,
     ( data_type_t ) api->dtype );
   tpu_poll();
+  return 0;
 }
 TPUKERNEL_FUNC_REGISTER ( tpu_kernel_api_layernorm_backward_multi_core );
 #endif

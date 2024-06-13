@@ -853,7 +853,7 @@ void nodechip_softmax_forward_single_core_v2 (
   }
 }
 
-void tpu_kernel_api_softmax ( const void * args )
+int tpu_kernel_api_softmax ( const void * args )
 {
   sg_api_softmax_t * api = ( sg_api_softmax_t * ) args;
   TPUKERNEL_ASSERT ( api->dtype == DT_FP32 || api->dtype == DT_FP16 || api->dtype == DT_BFP16 );
@@ -866,6 +866,7 @@ void tpu_kernel_api_softmax ( const void * args )
     api->axis,
     api->dtype);
   tpu_poll();
+  return 0;
 }
 TPUKERNEL_FUNC_REGISTER ( tpu_kernel_api_softmax );
 
@@ -935,7 +936,7 @@ void nodechip_softmax_forward_multi_core_v2 (
     }
 }
 
-void tpu_kernel_api_softmax_multi_core ( const void *args )
+int tpu_kernel_api_softmax_multi_core ( const void *args )
 {
   sg_api_softmax_t *api = ( sg_api_softmax_t * ) args;
   TPUKERNEL_ASSERT ( api->dtype == DT_FP32 || api->dtype == DT_FP16 || api->dtype == DT_BFP16 );
@@ -957,11 +958,12 @@ void tpu_kernel_api_softmax_multi_core ( const void *args )
   //     1.f,
   //     ( data_type_t ) api->dtype );
   tpu_poll();
+  return 0;
 }
 TPUKERNEL_FUNC_REGISTER ( tpu_kernel_api_softmax_multi_core );
 #endif
 
-void tpu_kernel_api_log_softmax(const void *args) {
+int tpu_kernel_api_log_softmax(const void *args) {
   sg_api_log_softmax_t *api = (sg_api_log_softmax_t *)args;
   TPUKERNEL_ASSERT(api->dtype == DT_FP32 || api->dtype == DT_FP16 ||
                    api->dtype == DT_BFP16);
@@ -973,11 +975,12 @@ void tpu_kernel_api_log_softmax(const void *args) {
                    api->dim, api->axis, api->axis, 1, 1.f,
                    (data_type_t)api->dtype);
   tpu_poll();
+  return 0;
 }
 TPUKERNEL_FUNC_REGISTER(tpu_kernel_api_log_softmax);
 
 #ifdef BACKEND_SG2260
-void tpu_kernel_api_log_softmax_multi_core(const void *args) {
+int tpu_kernel_api_log_softmax_multi_core(const void *args) {
   sg_api_log_softmax_t *api = (sg_api_log_softmax_t *)args;
   TPUKERNEL_ASSERT(api->dtype == DT_FP32 || api->dtype == DT_FP16 ||
                    api->dtype == DT_BFP16);
@@ -1018,6 +1021,7 @@ void tpu_kernel_api_log_softmax_multi_core(const void *args) {
                      sliced_shape, 4, 3, 3, 1, 1.f, (data_type_t)api->dtype);
   }
   tpu_poll();
+  return 0;
 }
 TPUKERNEL_FUNC_REGISTER(tpu_kernel_api_log_softmax_multi_core);
 #endif

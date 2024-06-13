@@ -113,7 +113,7 @@ data_type_t shift_dtype)
   }
 }
 
-void tpu_kernel_api_shift_right_arithmetic ( const void * args )
+int tpu_kernel_api_shift_right_arithmetic ( const void * args )
 {
   sg_api_shift_right_arithmetic_t * api = ( sg_api_shift_right_arithmetic_t * ) args;
   //src_dtype unsigned, dst_dtype unsigned, shift_dtype signed(not implemented now)
@@ -127,11 +127,12 @@ void tpu_kernel_api_shift_right_arithmetic ( const void * args )
   nodechip_shift_right_arithmetic ( api->output_global_addr, api->input_global_addr,api->other_global_addr, length, 
   ( data_type_t ) api->dst_dtype,( data_type_t ) api->src_dtype,( data_type_t ) api->other_dtype);
   tpu_poll();
+  return 0;
 }
 TPUKERNEL_FUNC_REGISTER ( tpu_kernel_api_shift_right_arithmetic );
 
 #ifdef BACKEND_SG2260
-void tpu_kernel_api_shift_right_arithmetic_multi_core(const void *args)
+int tpu_kernel_api_shift_right_arithmetic_multi_core(const void *args)
 {
   sg_api_shift_right_arithmetic_t * api = ( sg_api_shift_right_arithmetic_t * ) args;
   //src_dtype unsigned, dst_dtype unsigned, shift_dtype signed(not implemented now)
@@ -159,6 +160,7 @@ void tpu_kernel_api_shift_right_arithmetic_multi_core(const void *args)
       (data_type_t)api->src_dtype,(data_type_t)api->dst_dtype, (data_type_t)api->other_dtype);
 
   tpu_poll();
+  return 0;
 }
 TPUKERNEL_FUNC_REGISTER(tpu_kernel_api_shift_right_arithmetic_multi_core);
 #endif
@@ -255,7 +257,7 @@ data_type_t src_dtype)
   }
 }
 
-void tpu_kernel_api_shift_right_arithmetic_c ( const void * args )
+int tpu_kernel_api_shift_right_arithmetic_c ( const void * args )
 {
   sg_api_shift_right_arithmetic_c_t * api = ( sg_api_shift_right_arithmetic_c_t * ) args;
   //src_dtype unsigned, dst_dtype unsigned, shift_dtype signed(not implemented now)
@@ -269,11 +271,12 @@ void tpu_kernel_api_shift_right_arithmetic_c ( const void * args )
   nodechip_shift_right_arithmetic_c ( api->output_global_addr, api->input_global_addr, length, api->const_value,
   ( data_type_t ) api->dst_dtype,( data_type_t ) api->src_dtype);
   tpu_poll();
+  return 0;
 }
 TPUKERNEL_FUNC_REGISTER ( tpu_kernel_api_shift_right_arithmetic_c );
 
 #ifdef BACKEND_SG2260
-void tpu_kernel_api_shift_right_arithmetic_c_multi_core(const void *args)
+int tpu_kernel_api_shift_right_arithmetic_c_multi_core(const void *args)
 {
   sg_api_shift_right_arithmetic_c_t * api = ( sg_api_shift_right_arithmetic_c_t * ) args;
   //src_dtype unsigned, dst_dtype unsigned, shift_dtype signed(not implemented now)
@@ -300,6 +303,7 @@ void tpu_kernel_api_shift_right_arithmetic_c_multi_core(const void *args)
       ( data_type_t ) api->dst_dtype,( data_type_t ) api->src_dtype);
 
   tpu_poll();
+  return 0;
 }
 TPUKERNEL_FUNC_REGISTER(tpu_kernel_api_shift_right_arithmetic_c_multi_core);
 #endif

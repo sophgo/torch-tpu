@@ -134,7 +134,7 @@ void cast_index_int64_to_int32(
   }
   tpu_sync_all();
 }
-void tpu_kernel_api_gather ( const void *args )
+int tpu_kernel_api_gather ( const void *args )
 {
   sg_api_gather_t *api = ( sg_api_gather_t * ) args;
   tpu_initialize();
@@ -167,11 +167,12 @@ void tpu_kernel_api_gather ( const void *args )
   api->axis,
   api->dtype );
   tpu_poll();
+  return 0;
 }
 TPUKERNEL_FUNC_REGISTER ( tpu_kernel_api_gather );
 
 #ifdef BACKEND_SG2260
-void tpu_kernel_api_gather_multi_core ( const void *args )
+int tpu_kernel_api_gather_multi_core ( const void *args )
 {
   sg_api_gather_t *api = ( sg_api_gather_t * ) args;
   tpu_initialize();
@@ -217,6 +218,7 @@ void tpu_kernel_api_gather_multi_core ( const void *args )
   }
 
   tpu_poll();
+  return 0;
 }
 TPUKERNEL_FUNC_REGISTER ( tpu_kernel_api_gather_multi_core );
 #endif

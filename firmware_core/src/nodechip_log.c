@@ -119,7 +119,7 @@ void nodechip_log(global_addr_t out_global_addr, global_addr_t in_global_addr,
   }
 }
 
-void tpu_kernel_api_log(const void *args) {
+int tpu_kernel_api_log(const void *args) {
   sg_api_log_t *api = (sg_api_log_t *)args;
   TPUKERNEL_ASSERT(api->dtype == DT_FP32 || api->dtype == DT_FP16 ||
                    api->dtype == DT_BFP16);
@@ -132,11 +132,12 @@ void tpu_kernel_api_log(const void *args) {
   nodechip_log(api->output_global_addr, api->input_global_addr, length,
                (data_type_t)api->dtype, api->log_type);
   tpu_poll();
+  return 0;
 }
 TPUKERNEL_FUNC_REGISTER(tpu_kernel_api_log);
 
 #ifdef BACKEND_SG2260
-void tpu_kernel_api_log_multi_core(const void *args) {
+int tpu_kernel_api_log_multi_core(const void *args) {
   sg_api_log_t *api = (sg_api_log_t *)args;
   TPUKERNEL_ASSERT(api->dtype == DT_FP32 || api->dtype == DT_FP16 ||
                    api->dtype == DT_BFP16);
@@ -160,6 +161,7 @@ void tpu_kernel_api_log_multi_core(const void *args) {
                cur_length_slice, (data_type_t)api->dtype, api->log_type);
   }
   tpu_poll();
+  return 0;
 }
 TPUKERNEL_FUNC_REGISTER(tpu_kernel_api_log_multi_core);
 #endif

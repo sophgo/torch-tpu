@@ -98,7 +98,7 @@ data_type_t dtype )
   }
 }
 
-void tpu_kernel_api_leakyrelu ( const void * args )
+int tpu_kernel_api_leakyrelu ( const void * args )
 {
   sg_api_leakyrelu_t * api = ( sg_api_leakyrelu_t * ) args;
   TPUKERNEL_ASSERT ( api->dtype == DT_FP32 || api->dtype == DT_FP16 || api->dtype == DT_BFP16 );
@@ -110,11 +110,12 @@ void tpu_kernel_api_leakyrelu ( const void * args )
   tpu_initialize();
   nodechip_leakyrelu ( api->output_global_addr, api->input_global_addr, (scalar_t)api->negative_slope, length, ( data_type_t ) api->dtype );
   tpu_poll();
+  return 0;
 }
 TPUKERNEL_FUNC_REGISTER ( tpu_kernel_api_leakyrelu );
 
 #ifdef BACKEND_SG2260
-void tpu_kernel_api_leakyrelu_multi_core(const void *args)
+int tpu_kernel_api_leakyrelu_multi_core(const void *args)
 {
   sg_api_leakyrelu_t * api = ( sg_api_leakyrelu_t * ) args;
   TPUKERNEL_ASSERT(api->dtype == DT_FP32 || api->dtype == DT_FP16 || api->dtype == DT_BFP16);
@@ -141,6 +142,7 @@ void tpu_kernel_api_leakyrelu_multi_core(const void *args)
       (data_type_t)api->dtype);
 
   tpu_poll();
+  return 0;
 }
 TPUKERNEL_FUNC_REGISTER(tpu_kernel_api_leakyrelu_multi_core);
 #endif

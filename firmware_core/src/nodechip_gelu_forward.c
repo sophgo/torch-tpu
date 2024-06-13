@@ -108,7 +108,7 @@ data_type_t   dtype,
 int           active_type,
 float*        coef);
 
-void tpu_kernel_api_gelu ( const void * args )
+int tpu_kernel_api_gelu ( const void * args )
 {
   sg_api_gelu_t * api = ( sg_api_gelu_t * ) args;
   TPUKERNEL_ASSERT ( api->dtype == DT_FP32 || api->dtype == DT_FP16 || api->dtype == DT_BFP16 );
@@ -134,6 +134,7 @@ void tpu_kernel_api_gelu ( const void * args )
       NULL);
   }
   tpu_poll();
+  return 0;
 }
 TPUKERNEL_FUNC_REGISTER ( tpu_kernel_api_gelu );
 
@@ -145,7 +146,7 @@ int*          shape,
 int           dims,
 data_type_t   dtype );
 
-void tpu_kernel_api_gelu_multi_core ( const void * args )
+int tpu_kernel_api_gelu_multi_core ( const void * args )
 {
   sg_api_gelu_t * api = ( sg_api_gelu_t * ) args;
   TPUKERNEL_ASSERT ( api->dtype == DT_FP32 || api->dtype == DT_FP16 || api->dtype == DT_BFP16 );
@@ -160,6 +161,7 @@ void tpu_kernel_api_gelu_multi_core ( const void * args )
     api->dim,
     ( data_type_t ) api->dtype );
   tpu_poll();
+  return 0;
 }
 TPUKERNEL_FUNC_REGISTER ( tpu_kernel_api_gelu_multi_core );
 #endif

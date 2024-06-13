@@ -255,7 +255,7 @@ static inline void nodechip_gelu_backward (
   tpu_gdma_cpy_L2S ( DXGlobalAddr + LastDone * DSize, DXAddrs[1 - Index], &LastShape, NULL, NULL, dtype );
 }
 
-void tpu_kernel_api_gelu_backward ( const void * args )
+int tpu_kernel_api_gelu_backward ( const void * args )
 {
   sg_api_gelu_backward_t * api = ( sg_api_gelu_backward_t * ) args;
   TPUKERNEL_ASSERT ( api->dtype == DT_FP32 || api->dtype == DT_FP16 || api->dtype == DT_BFP16 );
@@ -285,6 +285,7 @@ void tpu_kernel_api_gelu_backward ( const void * args )
   }
 
   tpu_poll();
+  return 0;
 }
 TPUKERNEL_FUNC_REGISTER ( tpu_kernel_api_gelu_backward );
 
@@ -303,7 +304,7 @@ extern void nodechip_gelu_backward_multi_core (
   global_addr_t* grad_output_8ch_global_addr,
   global_addr_t* input_8ch_global_addr);
 
-void tpu_kernel_api_gelu_backward_multi_core ( const void * args )
+int tpu_kernel_api_gelu_backward_multi_core ( const void * args )
 {
   sg_api_gelu_backward_t * api = ( sg_api_gelu_backward_t * ) args;
   TPUKERNEL_ASSERT ( api->dtype == DT_FP32 || api->dtype == DT_FP16 || api->dtype == DT_BFP16 );
@@ -320,6 +321,7 @@ void tpu_kernel_api_gelu_backward_multi_core ( const void * args )
     ( data_type_t ) api->dtype,
     0, 0, 0, 0, 0, 0);
   tpu_poll();
+  return 0;
 }
 TPUKERNEL_FUNC_REGISTER ( tpu_kernel_api_gelu_backward_multi_core );
 #endif

@@ -93,7 +93,7 @@ void nodechip_cbrt(global_addr_t input_global_addr, global_addr_t output_global_
     }
 }
 
-void tpu_kernel_api_cbrt(const void * args) {
+int tpu_kernel_api_cbrt(const void * args) {
     sg_api_cbrt_t *api = (sg_api_cbrt_t*)args;
 
     int length = 1;
@@ -103,11 +103,12 @@ void tpu_kernel_api_cbrt(const void * args) {
     tpu_initialize();
     nodechip_cbrt(api->input_global_addr, api->output_global_addr, length, (data_type_t) api->dtype);
     tpu_poll();
+    return 0;
 }
 TPUKERNEL_FUNC_REGISTER(tpu_kernel_api_cbrt);
 
 #ifdef BACKEND_SG2260
-void tpu_kernel_api_cbrt_multi_core(const void *args) {
+int tpu_kernel_api_cbrt_multi_core(const void *args) {
     sg_api_cbrt_t *api = (sg_api_cbrt_t*)args;
     
     int length = 1;
@@ -132,6 +133,7 @@ void tpu_kernel_api_cbrt_multi_core(const void *args) {
                   cur_length_slice,
                   (data_type_t)api->dtype);
     tpu_poll();
+    return 0;
 }
 TPUKERNEL_FUNC_REGISTER(tpu_kernel_api_cbrt_multi_core);
 #endif

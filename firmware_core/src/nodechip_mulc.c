@@ -113,7 +113,7 @@ int op ) // 0: add, 1: mul
   }
 }
 
-void tpu_kernel_api_mulc ( const void * args )
+int tpu_kernel_api_mulc ( const void * args )
 {
   sg_api_mulc_t * api = ( sg_api_mulc_t * ) args;
   TPUKERNEL_ASSERT ( api->dtype == DT_FP32 || api->dtype == DT_FP16 || api->dtype == DT_BFP16 || api->dtype == DT_INT32 );
@@ -139,6 +139,7 @@ void tpu_kernel_api_mulc ( const void * args )
   tpu_initialize();
   nodechip_opc ( api->input_global_addr, api->output_global_addr, value, length, ( data_type_t ) api->dtype, 1 );
   tpu_poll();
+  return 0;
 }
 TPUKERNEL_FUNC_REGISTER ( tpu_kernel_api_mulc );
 
@@ -257,7 +258,7 @@ int op ) // 0: sub, 1: div
   }
 }
 
-void tpu_kernel_api_cdiv ( const void * args )
+int tpu_kernel_api_cdiv ( const void * args )
 {
   sg_api_cdiv_t * api = ( sg_api_cdiv_t * ) args;
   TPUKERNEL_ASSERT ( api->dtype == DT_FP32 || api->dtype == DT_FP16 || api->dtype == DT_BFP16 || api->dtype == DT_INT32 );
@@ -283,10 +284,11 @@ void tpu_kernel_api_cdiv ( const void * args )
   tpu_initialize();
   nodechip_cop ( api->input_global_addr, api->output_global_addr, value, length, ( data_type_t ) api->dtype, 1 );
   tpu_poll();
+  return 0;
 }
 TPUKERNEL_FUNC_REGISTER ( tpu_kernel_api_cdiv );
 
-void tpu_kernel_api_csub ( const void * args )
+int tpu_kernel_api_csub ( const void * args )
 {
   sg_api_csub_t * api = ( sg_api_csub_t * ) args;
   TPUKERNEL_ASSERT ( api->dtype == DT_FP32 || api->dtype == DT_FP16 || api->dtype == DT_BFP16 || api->dtype == DT_INT32 );
@@ -312,6 +314,7 @@ void tpu_kernel_api_csub ( const void * args )
   tpu_initialize();
   nodechip_cop ( api->input_global_addr, api->output_global_addr, value, length, ( data_type_t ) api->dtype, 0 );
   tpu_poll();
+  return 0;
 }
 TPUKERNEL_FUNC_REGISTER ( tpu_kernel_api_csub );
 
@@ -328,7 +331,7 @@ extern void nodechip_const_binary_fp_multi_core(
     int if_relu,
     float relu_upper_limit);
 
-void tpu_kernel_api_const_binary_multi_core(const void* api_buf) {
+int tpu_kernel_api_const_binary_multi_core(const void* api_buf) {
 
     sg_api_const_binary_float_t *api = (sg_api_const_binary_float_t*)api_buf;
     tpu_initialize();
@@ -345,6 +348,7 @@ void tpu_kernel_api_const_binary_multi_core(const void* api_buf) {
         0, 0);
 
     tpu_poll();
+  return 0;
 }
 
 TPUKERNEL_FUNC_REGISTER(tpu_kernel_api_const_binary_multi_core);

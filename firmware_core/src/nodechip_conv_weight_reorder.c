@@ -266,7 +266,7 @@ const dim4      *shape
   dtype );
 }
 
-void tpu_kernel_api_conv_weight_reorder ( const void* args ) {
+int tpu_kernel_api_conv_weight_reorder ( const void* args ) {
   sg_api_conv_weight_reorder_t* api = ( sg_api_conv_weight_reorder_t* ) args;
   dim4 shape = {api->shape[0], api->shape[1], api->shape[2], api->shape[3]};
   tpu_initialize();
@@ -284,6 +284,7 @@ void tpu_kernel_api_conv_weight_reorder ( const void* args ) {
     TPUKERNEL_ASSERT ( 0 );
   }
   tpu_poll();
+  return 0;
 }
 
 TPUKERNEL_FUNC_REGISTER ( tpu_kernel_api_conv_weight_reorder );

@@ -1385,7 +1385,7 @@ void nodechip_upsample_nearest2d_backward_with_data_split(
         }
 }
 
-void tpu_kernel_api_upsample_nearest2d_backward(const void *args) {
+int tpu_kernel_api_upsample_nearest2d_backward(const void *args) {
   sg_api_upsample2d_backward_t *api = (sg_api_upsample2d_backward_t *)args;
   TPUKERNEL_ASSERT(api->dtype == DT_FP32 || api->dtype == DT_FP16 ||
                    api->dtype == DT_BFP16);
@@ -1413,5 +1413,6 @@ void tpu_kernel_api_upsample_nearest2d_backward(const void *args) {
         -1/*relu_upper_limit*/,
         api->scalar, api->dtype);
   tpu_poll();
+  return 0;
 }
 TPUKERNEL_FUNC_REGISTER(tpu_kernel_api_upsample_nearest2d_backward);

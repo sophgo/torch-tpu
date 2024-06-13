@@ -29,7 +29,7 @@ data_type_t filled_dtype )
   );
 }
 
-void tpu_kernel_api_const_fill ( const void * args ) {
+int tpu_kernel_api_const_fill ( const void * args ) {
   sg_api_constant_fill_t *api = ( sg_api_constant_fill_t* ) args;
   tpu_initialize();
   nodechip_fill (
@@ -39,6 +39,7 @@ void tpu_kernel_api_const_fill ( const void * args ) {
   api->value,
   ( data_type_t ) api->dtype );
   tpu_poll();
+  return 0;
 }
 TPUKERNEL_FUNC_REGISTER ( tpu_kernel_api_const_fill );
 
@@ -75,7 +76,7 @@ void nodechip_constant_fill_multi_core(
   );
 }
 
-void tpu_kernel_api_const_fill_multi_core ( const void * args ) {
+int tpu_kernel_api_const_fill_multi_core ( const void * args ) {
   sg_api_constant_fill_t *api = ( sg_api_constant_fill_t* ) args;
   tpu_initialize();
   nodechip_constant_fill_multi_core (
@@ -85,6 +86,7 @@ void tpu_kernel_api_const_fill_multi_core ( const void * args ) {
   api->value,
   (data_type_t)api->dtype );
   tpu_poll();
+  return 0;
 }
 TPUKERNEL_FUNC_REGISTER ( tpu_kernel_api_const_fill_multi_core );
 #endif

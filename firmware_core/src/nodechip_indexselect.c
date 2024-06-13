@@ -184,7 +184,7 @@ int           axis, // axis to do index_select
 int           const_val, // fill_value if index not found in input
 data_type_t   dtype );
 
-void tpu_kernel_api_index_select ( const void * args )
+int tpu_kernel_api_index_select ( const void * args )
 {
   sg_api_index_select_t *api = ( sg_api_index_select_t * ) args;
   tpu_initialize();
@@ -213,6 +213,7 @@ void tpu_kernel_api_index_select ( const void * args )
   0,
   ( data_type_t ) api->dtype );
   tpu_poll();
+  return 0;
 }
 TPUKERNEL_FUNC_REGISTER ( tpu_kernel_api_index_select );
 
@@ -480,7 +481,7 @@ void nodechip_index_select_multi_core(
   }
 }
 
-void tpu_kernel_api_index_select_multi_core ( const void * args )
+int tpu_kernel_api_index_select_multi_core ( const void * args )
 {
   sg_api_index_select_t *api = ( sg_api_index_select_t * ) args;
   tpu_initialize();
@@ -548,6 +549,7 @@ void tpu_kernel_api_index_select_multi_core ( const void * args )
   }
 
   tpu_poll();
+  return 0;
 }
 TPUKERNEL_FUNC_REGISTER ( tpu_kernel_api_index_select_multi_core );
 #endif

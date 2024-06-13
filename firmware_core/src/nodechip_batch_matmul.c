@@ -22,7 +22,7 @@ int has_bias,
 bool do_relu,
 float relu_upper_limit );
 
-void tpu_kernel_api_batch_matmul ( const void * args )
+int tpu_kernel_api_batch_matmul ( const void * args )
 {
   sg_api_batch_matmul_t * api = ( sg_api_batch_matmul_t * ) args;
   TPUKERNEL_ASSERT ( api->dtype == DT_FP32 || api->dtype == DT_FP16 || api->dtype == DT_BFP16 );
@@ -58,6 +58,7 @@ void tpu_kernel_api_batch_matmul ( const void * args )
                                 0,
                                 0 );
   tpu_poll();
+  return 0;
 }
 TPUKERNEL_FUNC_REGISTER ( tpu_kernel_api_batch_matmul );
 
@@ -88,7 +89,7 @@ extern void nodechip_matmul_multi_core(
     global_addr_t*  ga_private_right,
     global_addr_t*  ga_private_result);
 
-void tpu_kernel_api_matmul_multi_core(const void* api_buf) {
+int tpu_kernel_api_matmul_multi_core(const void* api_buf) {
     sg_api_matmul_multi_core_t *api = (sg_api_matmul_multi_core_t *)api_buf;
     tpu_initialize();
 #ifdef USING_PERF_MODE
@@ -120,6 +121,7 @@ void tpu_kernel_api_matmul_multi_core(const void* api_buf) {
         api->right_slyt_global_addr,
         api->result_slyt_global_addr);
     tpu_poll();
+    return 0;
 }
 
 TPUKERNEL_FUNC_REGISTER(tpu_kernel_api_matmul_multi_core);

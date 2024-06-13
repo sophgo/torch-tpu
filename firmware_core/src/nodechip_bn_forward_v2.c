@@ -506,7 +506,7 @@ data_type_t   dtype )
   }
 }
 
-void tpu_kernel_api_batchnorm2d ( const void * args )
+int tpu_kernel_api_batchnorm2d ( const void * args )
 {
   sg_api_batchnorm2d_t *api = ( sg_api_batchnorm2d_t * ) args;
   dim4 shape = { api->shape[0], api->shape[1], api->shape[2], api->shape[3] };
@@ -526,6 +526,7 @@ void tpu_kernel_api_batchnorm2d ( const void * args )
   api->eps,
   ( data_type_t ) api->dtype );
   tpu_poll();
+  return 0;
 }
 
 TPUKERNEL_FUNC_REGISTER ( tpu_kernel_api_batchnorm2d );

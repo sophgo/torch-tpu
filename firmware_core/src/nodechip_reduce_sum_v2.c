@@ -188,7 +188,7 @@ int reduction )
   }
 }
 
-void tpu_kernel_api_reduce ( const void *args )
+int tpu_kernel_api_reduce ( const void *args )
 {
   sg_api_reduce_t * api = ( sg_api_reduce_t * ) args;
   TPUKERNEL_ASSERT ( api->dtype == DT_FP32 || api->dtype == DT_FP16 || api->dtype == DT_BFP16 );
@@ -241,6 +241,7 @@ void tpu_kernel_api_reduce ( const void *args )
     TPUKERNEL_ASSERT ( false );
   }
   tpu_poll();
+  return 0;
 }
 TPUKERNEL_FUNC_REGISTER ( tpu_kernel_api_reduce );
 
@@ -499,7 +500,7 @@ void nodechip_reduce_sum_2d_multi_core (
   tpu_sync_all();
 }
 
-void tpu_kernel_api_reduce_multi_core ( const void *args )
+int tpu_kernel_api_reduce_multi_core ( const void *args )
 {
   sg_api_reduce_t * api = ( sg_api_reduce_t * ) args;
   TPUKERNEL_ASSERT ( api->dtype == DT_FP32 || api->dtype == DT_FP16 || api->dtype == DT_BFP16 );
@@ -559,6 +560,7 @@ void tpu_kernel_api_reduce_multi_core ( const void *args )
     TPUKERNEL_ASSERT ( false );
   }
   tpu_poll();
+  return 0;
 }
 TPUKERNEL_FUNC_REGISTER ( tpu_kernel_api_reduce_multi_core );
 #endif

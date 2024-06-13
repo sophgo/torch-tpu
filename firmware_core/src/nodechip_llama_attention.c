@@ -25,7 +25,7 @@ void nodechip_llama2_attention(
     data_type_t dtype,
     int qkv_packed);
 
-void tpu_kernel_llama_attention(const void* api_buf) {
+int tpu_kernel_llama_attention(const void* api_buf) {
     sg_api_llama2_qkv_t *api = (sg_api_llama2_qkv_t*)api_buf;
     tpu_initialize();
     nodechip_llama2_attention(
@@ -51,6 +51,7 @@ void tpu_kernel_llama_attention(const void* api_buf) {
         (data_type_t)api->dtype,
 	api->qkv_packed);
     tpu_poll();
+    return 0;
 }
 TPUKERNEL_FUNC_REGISTER(tpu_kernel_llama_attention);
 
@@ -87,7 +88,7 @@ void nodechip_llama2_qkv_multi_core(
     data_type_t dtype,
     int qkv_packed);
 
-void tpu_kernel_llama_attention_multi_core(const void* api_buf) {
+int tpu_kernel_llama_attention_multi_core(const void* api_buf) {
 
     sg_api_llama2_qkv_multi_core_t *api = (sg_api_llama2_qkv_multi_core_t*)api_buf;
     tpu_initialize();
@@ -120,6 +121,7 @@ void tpu_kernel_llama_attention_multi_core(const void* api_buf) {
         (data_type_t)api-> dtype,
         api-> qkv_packed);
     tpu_poll();
+    return 0;
 }
 
 TPUKERNEL_FUNC_REGISTER(tpu_kernel_llama_attention_multi_core);

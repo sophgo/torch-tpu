@@ -90,7 +90,7 @@ void nodechip_baddbmm (
     }
 }
 
-void tpu_kernel_api_baddbmm (const void* args){
+int tpu_kernel_api_baddbmm (const void* args){
     sg_api_baddbmm_t* op_args = (sg_api_baddbmm_t*)args;
     tpu_initialize();
     int batch2_shape [] =
@@ -119,6 +119,7 @@ void tpu_kernel_api_baddbmm (const void* args){
         op_args->is_left_transpose,
         op_args->is_right_transpose);
     tpu_poll();
+    return 0;
 }
 
 TPUKERNEL_FUNC_REGISTER ( tpu_kernel_api_baddbmm );

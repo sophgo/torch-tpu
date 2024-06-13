@@ -22,7 +22,7 @@ void nodechip_layernorm_matmul_fuse_multi_core(
     bool            has_bias);
 
 
-void tpu_kernel_ln_mm_multi_core(const void* api_buf) {
+int tpu_kernel_ln_mm_multi_core(const void* api_buf) {
 
     sg_api_ln_mm_multi_core_t *api = (sg_api_ln_mm_multi_core_t*)api_buf;
     tpu_initialize();
@@ -43,6 +43,7 @@ void tpu_kernel_ln_mm_multi_core(const void* api_buf) {
         api->eps,
         api->has_bias);
     tpu_poll();
+    return 0;
 }
 
 TPUKERNEL_FUNC_REGISTER(tpu_kernel_ln_mm_multi_core);

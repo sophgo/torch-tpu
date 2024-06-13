@@ -105,7 +105,7 @@ void nodechip_logical_or(global_addr_t output_global_addr,
   }
 }
 
-void tpu_kernel_api_logical_or(const void *args) {
+int tpu_kernel_api_logical_or(const void *args) {
   sg_api_logical_or_t *api = (sg_api_logical_or_t *)args;
   int length = 1;
   for (int i = 0; i < api->dim; ++i) {
@@ -115,11 +115,12 @@ void tpu_kernel_api_logical_or(const void *args) {
   nodechip_logical_or(api->output_global_addr, api->input_global_addr,
                       api->other_global_addr, length, (data_type_t)api->dtype);
   tpu_poll();
+  return 0;
 }
 TPUKERNEL_FUNC_REGISTER(tpu_kernel_api_logical_or);
 
 #ifdef BACKEND_SG2260
-void tpu_kernel_api_logical_or_multi_core(const void *args)
+int tpu_kernel_api_logical_or_multi_core(const void *args)
 {
   sg_api_logical_or_t * api = ( sg_api_logical_or_t * ) args;
   // TPUKERNEL_ASSERT(api->dtype == DT_FP32 || api->dtype == DT_FP16 || api->dtype == DT_BFP16);
@@ -145,6 +146,7 @@ void tpu_kernel_api_logical_or_multi_core(const void *args)
       cur_length_slice,
       (data_type_t)api->dtype);
   tpu_poll();
+  return 0;
 }
 TPUKERNEL_FUNC_REGISTER(tpu_kernel_api_logical_or_multi_core);
 #endif

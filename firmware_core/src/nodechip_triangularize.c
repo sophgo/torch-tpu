@@ -13,7 +13,7 @@ extern void nodechip_triangularize(
     data_type_t dtype
 );
 
-void tpu_kernel_api_triangularize(const void *args){
+int tpu_kernel_api_triangularize(const void *args){
     sg_api_triangularize_t *api = (sg_api_triangularize_t *) args;
     TPUKERNEL_ASSERT(api->dtype == DT_FP32 || api->dtype == DT_FP16 ||
                    api->dtype == DT_BFP16);
@@ -30,12 +30,14 @@ void tpu_kernel_api_triangularize(const void *args){
         api->dtype
     );
     tpu_poll();
+    return 0;
 }
 TPUKERNEL_FUNC_REGISTER(tpu_kernel_api_triangularize);
 
 #ifdef BACKEND_SG2260
-void tpu_kernel_api_triangularize_multi_core(const void *args) {
+int tpu_kernel_api_triangularize_multi_core(const void *args) {
   TPUKERNEL_ASSERT_INFO(false, "not implementated");
+  return 0;
 }
 TPUKERNEL_FUNC_REGISTER(tpu_kernel_api_triangularize_multi_core);
 #endif

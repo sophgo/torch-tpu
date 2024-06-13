@@ -19,7 +19,7 @@ extern void nodechip_llama2_a16_matmul(
     bool scale_zp_zip
 );
 
-void tpu_kernel_api_llama_a16_matmul ( const void * args )
+int tpu_kernel_api_llama_a16_matmul ( const void * args )
 {
   sg_api_a16_matmul_t * api = ( sg_api_a16_matmul_t * ) args;
   TPUKERNEL_ASSERT((!api->has_bias || api->bias_dtype == api->io_dtype) && "for W x A mode, bias dtype has to be the same with io");
@@ -41,5 +41,6 @@ void tpu_kernel_api_llama_a16_matmul ( const void * args )
     true
   );
   tpu_poll();
+  return 0;
 }
 TPUKERNEL_FUNC_REGISTER ( tpu_kernel_api_llama_a16_matmul );

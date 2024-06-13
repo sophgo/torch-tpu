@@ -38,7 +38,7 @@ extern void nodechip_batch_topk(system_addr_t bottom_value_addr,
                                 bool is_batch_same, int *batch_num, int batch_stride,
                                 data_type_t dtype);
 
-void tpu_kernel_api_topk(const void *args) {
+int tpu_kernel_api_topk(const void *args) {
   sg_api_topk_t *api = (sg_api_topk_t *)args;
   TPUKERNEL_ASSERT(api->dtype == DT_FP32 || api->dtype == DT_INT32 ||
                    api->dtype == DT_UINT32);
@@ -64,11 +64,12 @@ void tpu_kernel_api_topk(const void *args) {
                       batch_stride, api->dtype);
   tpu_poll();
   free(batch_nums);
+  return 0;
 }
 TPUKERNEL_FUNC_REGISTER(tpu_kernel_api_topk);
 
 #ifdef BACKEND_SG2260
-void tpu_kernel_api_topk_multi_core(const void *args) {
+int tpu_kernel_api_topk_multi_core(const void *args) {
   sg_api_topk_t *api = (sg_api_topk_t *)args;
   TPUKERNEL_ASSERT(api->dtype == DT_FP32 || api->dtype == DT_INT32 ||
                    api->dtype == DT_UINT32);
@@ -96,6 +97,7 @@ void tpu_kernel_api_topk_multi_core(const void *args) {
   }
   tpu_poll();
   free(batch_nums);
+  return 0;
 }
 TPUKERNEL_FUNC_REGISTER(tpu_kernel_api_topk_multi_core);
 #endif

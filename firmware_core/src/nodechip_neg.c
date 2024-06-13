@@ -98,7 +98,7 @@ void nodechip_neg(global_addr_t input_global_addr,
   }
 }
 
-void tpu_kernel_api_neg(const void *args) {
+int tpu_kernel_api_neg(const void *args) {
   sg_api_neg_t *api = (sg_api_neg_t *)args;
   unsigned long long length = 1;
   for (int i = 0; i < api->dim; ++i) {
@@ -108,11 +108,12 @@ void tpu_kernel_api_neg(const void *args) {
   nodechip_neg(api->input_global_addr, api->output_global_addr, length,
                (data_type_t)api->dtype);
   tpu_poll();
+  return 0;
 }
 TPUKERNEL_FUNC_REGISTER(tpu_kernel_api_neg);
 
 #ifdef BACKEND_SG2260
-void tpu_kernel_api_neg_multi_core ( const void * args )
+int tpu_kernel_api_neg_multi_core ( const void * args )
 {
   sg_api_neg_t * api = ( sg_api_neg_t * ) args;
 
@@ -139,6 +140,7 @@ void tpu_kernel_api_neg_multi_core ( const void * args )
   }
 
   tpu_poll();
+  return 0;
 }
 TPUKERNEL_FUNC_REGISTER(tpu_kernel_api_neg_multi_core);
 #endif

@@ -339,7 +339,7 @@ void nodechip_active_v2(global_addr_t in_global_addr,
   }
 }
 
-void tpu_kernel_api_active(const void *args) {
+int tpu_kernel_api_active(const void *args) {
   sg_api_active_t *api = (sg_api_active_t *)args;
   data_type_t dtype = (data_type_t)api->dtype;
   TPUKERNEL_ASSERT(dtype == DT_FP32 || dtype == DT_FP16 || dtype == DT_BFP16);
@@ -352,11 +352,12 @@ void tpu_kernel_api_active(const void *args) {
   nodechip_active_v2(api->input_global_addr, api->output_global_addr, length,
                      dtype, api->active_type, NULL);
   tpu_poll();
+  return 0;
 }
 TPUKERNEL_FUNC_REGISTER(tpu_kernel_api_active);
 
 #ifdef BACKEND_SG2260
-void tpu_kernel_api_active_multi_core(const void *args) {
+int tpu_kernel_api_active_multi_core(const void *args) {
   sg_api_active_t *api = (sg_api_active_t *)args;
   data_type_t dtype = (data_type_t)api->dtype;
   data_type_t out_dtype = (api->active_type == ACTIVE_ISINF ||
@@ -380,13 +381,14 @@ void tpu_kernel_api_active_multi_core(const void *args) {
   unsigned int offset = slice_idx * slice;
   unsigned long long real_slice = MIN(slice, length - offset);
   if (real_slice <= 0)
-    return;
+    return -1;
   const int dsize = tpu_data_type_size(dtype);
 
   nodechip_active_v2(api->input_global_addr + offset * dsize,
                      api->output_global_addr + offset * output_size, real_slice,
                      dtype, api->active_type, NULL);
   tpu_poll();
+  return 0;
 }
 TPUKERNEL_FUNC_REGISTER(tpu_kernel_api_active_multi_core);
 #endif

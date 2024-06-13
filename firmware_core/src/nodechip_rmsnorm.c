@@ -18,7 +18,7 @@ void nodechip_rmsnorm_forward_multi_core(
     int           with_bias,
     data_type_t   dtype);
 
-void tpu_kernel_rmsnorm_multi_core(const void * api_buf)
+int tpu_kernel_rmsnorm_multi_core(const void * api_buf)
 {
     sg_api_rmsnorm_multi_core_t *api = (sg_api_rmsnorm_multi_core_t*)api_buf;
     tpu_initialize();
@@ -36,6 +36,7 @@ void tpu_kernel_rmsnorm_multi_core(const void * api_buf)
         api->with_bias,
         ( data_type_t ) api->dtype );
     tpu_poll();
+    return 0;
 }
 
 TPUKERNEL_FUNC_REGISTER(tpu_kernel_rmsnorm_multi_core);

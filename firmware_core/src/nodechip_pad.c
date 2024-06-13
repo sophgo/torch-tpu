@@ -75,7 +75,7 @@ void nodechip_pad_3d(global_addr_t input_global_addr,
   }
 }
 
-void tpu_kernel_api_pad(const void *args) {
+int tpu_kernel_api_pad(const void *args) {
   sg_api_pad_t *api = (sg_api_pad_t *)args;
   if (api->pad3d) {
     int pad[5][2] = {0};
@@ -95,11 +95,13 @@ void tpu_kernel_api_pad(const void *args) {
                  api->shape[1], api->shape[2], api->shape[3], pad, api->mode,
                  api->value, api->dtype);
   }
+  tpu_poll();
+  return 0;
 }
 TPUKERNEL_FUNC_REGISTER(tpu_kernel_api_pad);
 
 #ifdef BACKEND_SG2260
-void tpu_kernel_api_pad_multi_core(const void *args) {
+int tpu_kernel_api_pad_multi_core(const void *args) {
   sg_api_pad_t *api = (sg_api_pad_t *)args;
   TPUKERNEL_ASSERT(api->dtype == DT_FP32 || api->dtype == DT_FP16 ||
                    api->dtype == DT_BFP16 || api->dtype == DT_INT32);
@@ -174,6 +176,7 @@ void tpu_kernel_api_pad_multi_core(const void *args) {
     }
     tpu_poll();
   }
+  return 0;
 }
 TPUKERNEL_FUNC_REGISTER(tpu_kernel_api_pad_multi_core);
 #endif

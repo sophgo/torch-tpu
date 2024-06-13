@@ -85,7 +85,7 @@ data_type_t     dtype) {
                        NULL,
                        dtype);
 }
-void tpu_kernel_api_permute(const void *args) {
+int tpu_kernel_api_permute(const void *args) {
     sg_api_permute_t *api = (sg_api_permute_t*)args;
     
     tpu_initialize();
@@ -99,5 +99,6 @@ void tpu_kernel_api_permute(const void *args) {
                      api->dim,
                      api->dtype);
     tpu_poll();
+    return 0;
 }
 TPUKERNEL_FUNC_REGISTER(tpu_kernel_api_permute);

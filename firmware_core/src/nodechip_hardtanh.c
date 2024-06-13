@@ -70,7 +70,7 @@ void nodechip_hardtanh(global_addr_t input_global_addr, global_addr_t output_glo
                          dtype);
     }
 }
-void tpu_kernel_api_hardtanh(const void *args) {
+int tpu_kernel_api_hardtanh(const void *args) {
     sg_api_hardtanh_t *api = (sg_api_hardtanh_t*)args;
     scalar_t min_value, max_value;
     if(api->dtype == DT_FP32) {
@@ -92,11 +92,12 @@ void tpu_kernel_api_hardtanh(const void *args) {
     nodechip_hardtanh(api->input_global_addr, api->output_global_addr,
                       min_value, max_value, length, api->dtype);
     tpu_poll();
+  return 0;
 }
 TPUKERNEL_FUNC_REGISTER(tpu_kernel_api_hardtanh);
 
 #ifdef BACKEND_SG2260
-void tpu_kernel_api_hardtanh_multi_core(const void *args) {
+int tpu_kernel_api_hardtanh_multi_core(const void *args) {
     sg_api_hardtanh_t *api = (sg_api_hardtanh_t*)args;
     scalar_t min_value, max_value;
     if(api->dtype == DT_FP32) {
@@ -130,6 +131,7 @@ void tpu_kernel_api_hardtanh_multi_core(const void *args) {
                       api->output_global_addr + (length_slice * core_idx) * tpu_data_type_size(api->dtype),
                       min_value, max_value, cur_length_slice, (data_type_t)api->dtype);
     tpu_poll();
+  return 0;
 }
 TPUKERNEL_FUNC_REGISTER(tpu_kernel_api_hardtanh_multi_core);
 #endif

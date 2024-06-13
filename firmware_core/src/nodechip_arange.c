@@ -57,7 +57,7 @@ const dim4  * output_shape
   }
 }
 
-void tpu_kernel_api_arange ( const void * args )
+int tpu_kernel_api_arange ( const void * args )
 {
   sg_api_arange_t * api = ( sg_api_arange_t * ) args;
   if ( api->isint64 ) {
@@ -76,13 +76,14 @@ void tpu_kernel_api_arange ( const void * args )
   api->isint64,
   &shape);
   tpu_poll();
+  return 0;
 }
 
 TPUKERNEL_FUNC_REGISTER ( tpu_kernel_api_arange );
 
 
 #ifdef BACKEND_SG2260
-void tpu_kernel_api_arange_multi_core ( const void *args )
+int tpu_kernel_api_arange_multi_core ( const void *args )
 {
   sg_api_arange_t * api = ( sg_api_arange_t * ) args;
   if ( api->isint64 ) {
@@ -101,6 +102,7 @@ void tpu_kernel_api_arange_multi_core ( const void *args )
   api->isint64,
   &shape);
   tpu_poll();
+  return 0;
 }
 TPUKERNEL_FUNC_REGISTER ( tpu_kernel_api_arange_multi_core );
 #endif
