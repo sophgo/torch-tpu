@@ -233,7 +233,8 @@ tpu_status_t sgdnnTPUKernelLaunch (
             const void * api,
             size_t api_size,
             bool non_blocking,
-            bool use_multi_core )
+            int group_num,
+            int block_num )
 {
 #if defined BACKEND_1684X
   tpu_kernel_function_t func_id;
@@ -241,10 +242,15 @@ tpu_status_t sgdnnTPUKernelLaunch (
   func_id = tpu_kernel_get_function ( resource , tpu_module, func_name );
   return tpu_kernel_launch ( resource , func_id, ( void * ) api, api_size );
 #elif defined BACKEND_SG2260
+  const char* core_num_env = getenv("TPUTRAIN_CORE_NUM");
+  if (core_num_env) {
+    group_num = 1;
+    block_num = atoi(core_num_env);
+  }
   if (non_blocking)
-    return kernel_launcher.launch_async( func_name, api, api_size, resource, use_multi_core );
+    return kernel_launcher.launch_async( func_name, api, api_size, resource, group_num, block_num );
   else
-    return kernel_launcher.launch_sync( func_name, api, api_size, resource, use_multi_core );
+    return kernel_launcher.launch_sync( func_name, api, api_size, resource, group_num, block_num );
 #else
   SGDNN_CHECK ( false );
 #endif
@@ -4032,6 +4038,8 @@ tpu_status_t sgdnnLLamaMlp ( tpu_resource_t resource ,
                           SgdnnTensor_t weight1,
                           SgdnnTensor_t weight2,
                           SgdnnTensor_t output,
+                          int group_num,
+                          int block_num,
                           bool non_blocking )
 {
   SGDNN_CHECK ( input.dtype == weight0.dtype );
@@ -4071,7 +4079,7 @@ tpu_status_t sgdnnLLamaMlp ( tpu_resource_t resource ,
   api.dtype         = sgdnnTPUKernelDType ( input.dtype );
   api.quantized      = false;
 
-  SAFE_CALL ( sgdnnTPUKernelLaunchMultiCore ( resource , "tpu_kernel_llama_mlp_multi_core", &api, sizeof ( api ) , non_blocking) );
+  SAFE_CALL ( sgdnnTPUKernelLaunchMultiCore ( resource , "tpu_kernel_llama_mlp_multi_core", &api, sizeof ( api ) , non_blocking, group_num, block_num ) );
 #else
   SGDNN_CHECK ( false );
 #endif
@@ -4092,6 +4100,8 @@ tpu_status_t sgdnnLLamaA16Mlp ( tpu_resource_t  resource ,
                                      int group_size,
                                      int weight_bits,
                                      SgdnnTensor_t output,
+                                     int group_num,
+                                     int block_num,
                                      bool non_blocking )
 {
   SGDNN_CHECK ( input.dtype == scale0.dtype );
@@ -4146,7 +4156,7 @@ tpu_status_t sgdnnLLamaA16Mlp ( tpu_resource_t  resource ,
   api.quantized     = true;
   api.group_size  = group_size;
   api.weight_bits   = weight_bits;
-  SAFE_CALL ( sgdnnTPUKernelLaunchMultiCore ( resource, "tpu_kernel_llama_mlp_multi_core", &api, sizeof ( api ) , non_blocking ) );
+  SAFE_CALL ( sgdnnTPUKernelLaunchMultiCore ( resource, "tpu_kernel_llama_mlp_multi_core", &api, sizeof ( api ) , non_blocking, group_num, block_num ) );
 #else
   SGDNN_CHECK ( false );
 #endif
@@ -4287,7 +4297,7 @@ tpu_status_t sgdnnLlamaAttention ( tpu_resource_t resource,
   api.Qbuffer_global_addr = sgdnnGetDeviceAddr(Qbuffer_dev_mem);
   api.Kbuffer_global_addr = sgdnnGetDeviceAddr(Kbuffer_dev_mem);
   api.Vbuffer_global_addr = sgdnnGetDeviceAddr(Vbuffer_dev_mem);
-  SAFE_CALL ( sgdnnTPUKernelLaunchMultiCore ( resource, "tpu_kernel_llama_attention_multi_core", &api, sizeof ( api ) , non_blocking) );
+  SAFE_CALL ( sgdnnTPUKernelLaunchMultiCore ( resource, "tpu_kernel_llama_attention_multi_core", &api, sizeof ( api ) , non_blocking ) );
 #else
   SGDNN_CHECK ( false );
 #endif

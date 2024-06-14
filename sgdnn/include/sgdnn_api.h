@@ -82,15 +82,18 @@ tpu_status_t sgdnnTPUKernelLaunch (
             const void * api,
             size_t api_size,
             bool non_blocking,
-            bool use_multi_core = false);
+            int group_num = 1,
+            int block_num = 8);
 
 static inline tpu_status_t sgdnnTPUKernelLaunchMultiCore (
                             tpu_resource_t resource,
                             const char * func_name,
                             const void * api,
                             size_t api_size,
-                            bool non_blocking) {
-  return sgdnnTPUKernelLaunch(resource, func_name, api, api_size, non_blocking, true);
+                            bool non_blocking,
+                            int group_num = 1,
+                            int block_num = 8) {
+  return sgdnnTPUKernelLaunch(resource, func_name, api, api_size, non_blocking, group_num, block_num);
 }
 
 #else
@@ -100,7 +103,8 @@ tpu_status_t sgdnnTPUKernelLaunch (
             const void * api,
             size_t api_size,
             bool non_blocking = false,
-            bool use_multi_core = false);
+            int group_num = 1,
+            int block_num = 1);
 #endif
 
 /**
@@ -1169,6 +1173,8 @@ tpu_status_t sgdnnLLamaMlp ( tpu_resource_t  stream,
                           SgdnnTensor_t weight1,
                           SgdnnTensor_t weight2,
                           SgdnnTensor_t output,
+                          int group_num,
+                          int block_num,
                           bool non_blocking = true);
 
 /*
@@ -1195,6 +1201,8 @@ tpu_status_t sgdnnLLamaA16Mlp ( tpu_resource_t stream,
                           int group_size,
                           int weight_bits,
                           SgdnnTensor_t output,
+                          int group_num,
+                          int block_num,
                           bool non_blocking = true);
 
 /*

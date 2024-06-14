@@ -55,9 +55,9 @@ public:
 
   tpuRtStatus_t unload_kernel_module(tpuRtStream_t stream);
 
-  tpuRtStatus_t launch_async(const char* func_name, const void* api, size_t api_size, tpuRtStream_t stream, bool use_multi_core);
+  tpuRtStatus_t launch_async(const char* func_name, const void* api, size_t api_size, tpuRtStream_t stream, int group_num, int block_num);
 
-  tpuRtStatus_t launch_sync(const char* func_name, const void* api, size_t api_size, tpuRtStream_t stream, bool use_multi_core);
+  tpuRtStatus_t launch_sync(const char* func_name, const void* api, size_t api_size, tpuRtStream_t stream, int group_num, int block_num);
 
   tpuRtStatus_t cache_malloc(void** p_dev_ptr, int64_t size);
   tpuRtStatus_t cache_free(void* dev_ptr, tpuRtStream_t stream);

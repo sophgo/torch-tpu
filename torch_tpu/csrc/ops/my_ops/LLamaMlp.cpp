@@ -24,13 +24,16 @@ namespace at
 
 		TIMING_START;
 #if defined BACKEND_SG2260
+		int group_num = 1, block_num = 8;
 		tpuRtStatus_t status = sgdnnLLamaMlp(
 			tpu::TPUGetDeviceResource(),
 			tpu::TPUGenerateSgdnnTensor(input),
 			tpu::TPUGenerateSgdnnTensor(weight0),
 			tpu::TPUGenerateSgdnnTensor(weight1),
 			tpu::TPUGenerateSgdnnTensor(weight2),
-			tpu::TPUGenerateSgdnnTensor(output));
+			tpu::TPUGenerateSgdnnTensor(output),
+			group_num,
+			block_num);
 		TORCH_CHECK(status == tpuRtSuccess);
 #elif defined BACKEND_1684X
 		TORCH_CHECK(false);
@@ -68,6 +71,10 @@ namespace at
 
 		TIMING_START;
 #if defined BACKEND_SG2260
+		int group_num = 1;
+		int block_num = ((tpu::TPUGenerateSgdnnTensor(weight2).shape[-1] % (7*group_size) == 0) &
+						 (tpu::TPUGenerateSgdnnTensor(weight2).shape[-1] % (8*group_size) != 0)) ?
+						 7 : 8;
 		tpuRtStatus_t status = sgdnnLLamaA16Mlp(
 			tpu::TPUGetDeviceResource(),
 			tpu::TPUGenerateSgdnnTensor(input),
@@ -82,7 +89,9 @@ namespace at
 			tpu::TPUGenerateSgdnnTensor(scale2),
 			group_size,
 			weight_bits,
-			tpu::TPUGenerateSgdnnTensor(output));
+			tpu::TPUGenerateSgdnnTensor(output),
+			group_num,
+			block_num);
 		TORCH_CHECK(status == tpuRtSuccess);
 #elif defined BACKEND_1684X
 		TORCH_CHECK(false);

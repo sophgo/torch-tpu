@@ -84,10 +84,9 @@ tpuRtStatus_t TPUKernelLauncher::unload_kernel_module(tpuRtStream_t stream) {
 }
 
 tpuRtStatus_t TPUKernelLauncher::launch_async(
-    const char* func_name, const void* api, size_t api_size, tpuRtStream_t stream, bool use_multi_core) {
+    const char* func_name, const void* api, size_t api_size, tpuRtStream_t stream, int group_num, int block_num) {
   tpuRtKernelModule_t kernel_module = _stream_kernel_modules[stream];
-  auto use_core_num = use_multi_core ? _core_num : 1;
-  tpuRtStatus_t status = tpuRtKernelLaunchAsync(kernel_module, func_name, (void *)api, api_size, 1, use_core_num, stream);
+  tpuRtStatus_t status = tpuRtKernelLaunchAsync(kernel_module, func_name, (void *)api, api_size, group_num, block_num, stream);
 #ifdef DUMP_INS
   tpuRtStreamSynchronize(stream);
   cmd_dump();
@@ -96,10 +95,9 @@ tpuRtStatus_t TPUKernelLauncher::launch_async(
 }
 
 tpuRtStatus_t TPUKernelLauncher::launch_sync(
-    const char* func_name, const void* api, size_t api_size, tpuRtStream_t stream, bool use_multi_core) {
+    const char* func_name, const void* api, size_t api_size, tpuRtStream_t stream, int group_num, int block_num) {
   tpuRtKernelModule_t kernel_module = _stream_kernel_modules[stream];
-  auto use_core_num = use_multi_core ? _core_num : 1;
-  tpuRtStatus_t status = tpuRtKernelLaunch(kernel_module, func_name, (void*)api, api_size, 1, use_core_num, stream );
+  tpuRtStatus_t status = tpuRtKernelLaunch(kernel_module, func_name, (void*)api, api_size, group_num, block_num, stream );
 #ifdef DUMP_INS
   cmd_dump();
 #endif
