@@ -46,7 +46,6 @@ Or More detailed:
 
 [4]pcie_mode or soc_mode:
 firstly make USING_CMODEL OFF && PCIE_MODE or SOC_MODE ON in config_common.cmake, (or directly set -D in cmake)
-if you use SOC_MODE or need pybind, make ENABLE_PYBIND ON
 1. if you have bm_prebuilt_toolchains, first set:
     export CROSS_TOOLCHAINS=path_to_bm_prebuilt_toolchains  (absolute path ex. /workspace/bm_prebuilt_toolchains )
     else run prepare_toolchains.sh first

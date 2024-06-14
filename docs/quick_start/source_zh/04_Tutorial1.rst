@@ -5,7 +5,7 @@
 本章节介绍了如何在使用Torch-TPU的前提下，使用LoRA进行Stable-Diffusion的Finetune的一个示例。
 
 本示例使用了开源的代码库Diffusers、Transformers，其展示了Torch-TPU仅需要做少量修改
-就可以嵌入现有的基于Pytorch的开源代码库当中的特点。
+就可以嵌入现有的基于PyTorch的开源代码库当中的特点。
 
 相关背景知识介绍
 ==================
@@ -29,14 +29,14 @@ LoRA的基本原理是：在冻结预训练好的模型权重参数的情况下�
 Diffusers
 ------------------
 
-Diffusers(https://github.com/huggingface/diffusers)是Huggingface推出了的基于Pytorch的扩散模型工具包集合，其中包含了StableDiffusion模型（StableDiffusion是扩散模型的一种）。
+Diffusers(https://github.com/huggingface/diffusers)是Huggingface推出了的基于PyTorch的扩散模型工具包集合，其中包含了StableDiffusion模型（StableDiffusion是扩散模型的一种）。
 
 该工具包提供了众多的模型和简单易用的使用方式，使开发者和用户可以轻松进行模型的训练和应用的开发。
 
 Transformers
 ------------------
 
-Transformers(https://github.com/huggingface/transformers)是Huggingface推出的NLP(自然语言处理)工具包，同样支持Pytorch框架。
+Transformers(https://github.com/huggingface/transformers)是Huggingface推出的NLP(自然语言处理)工具包，同样支持PyTorch框架。
 
 Transformers提供了数以千计的预训练模型，支持 100 多种语言的文本分类、信息抽取、问答、摘要、翻译、文本生成。
 

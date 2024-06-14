@@ -2,7 +2,7 @@
 开发环境配置
 ===================
 
-“torch-tpu”就是算能设备进入Pytorch框架的插件库，是利用了Pytorch的PRIVATEUSEONE后端对算能设备进行的支持。
+“torch-tpu”就是算能设备进入PyTorch框架的插件库，是利用了PyTorch的PRIVATEUSEONE后端对算能设备进行的支持。
 
 本章将详细描述如何安装torch_tpu以及其所依赖的环境。
 
@@ -266,7 +266,7 @@ Anaconda安装（可选）
 
 后续环境配置操作默认在Conda环境下执行，也可以自行通过pip指令进行如下环境包安装配置。
 
-Pytorch安装
+PyTorch安装
 ---------------------------------
 
 torch需要适配当前支持版本torch2.1.0：
@@ -312,7 +312,7 @@ torch-tpu安装
    :alt: SOPHGO LOGO
 
 
-如果之前有过使用cuda版本的Pytorch进行训练的经验，那么tpu的使用与cuda设备的使用是基本一致的，将cuda换成tpu就可以。
+如果之前有过使用cuda版本的PyTorch进行训练的经验，那么tpu的使用与cuda设备的使用是基本一致的，将cuda换成tpu就可以。
 
 值得注意的是，当想要直接通过print打印设备上的Tensor时，需要将Tensor传回至cpu，即：
 
@@ -320,6 +320,6 @@ torch-tpu安装
 
    $ print(out.cpu())
 
-至此，我们就完成了Pytorch的支持。
+至此，我们就完成了PyTorch的支持。
 
 

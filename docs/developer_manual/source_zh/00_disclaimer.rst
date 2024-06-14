@@ -36,4 +36,4 @@
      - 说明
    * - v0.1.0
      - 2024.01.16
-     - 初版发布, 支持Pytorch2.1.0 单卡`eager mode`模式,并提供图像识别、Stable-Diffusion LORA示例。 
+     - 初版发布, 支持PyTorch2.1.0 单卡`eager mode`模式,并提供图像识别、Stable-Diffusion LORA示例。 

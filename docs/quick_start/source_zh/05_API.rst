@@ -7,7 +7,7 @@ torch
    :widths: 30 10 65
    :header-rows: 1
 
-   * - Pytorch API
+   * - PyTorch API
      - Compatibility
      - Mapping
    * - torch.default_generator
