@@ -50,16 +50,11 @@ function set_v7runtime_env() {
      export TPUKERNEL_FIRMWARE_PATH=${root_path}/build/${build_type}/firmware_core/libcmodel.so
 }
 
-################ MODE CHOICE ###################
-export MODE_ASIC=stable        # stable: asic
-export MODE_CMODEL=local       # local: cmodel
-export MODE_PATTERN=${2:-$MODE_CMODEL}
-
 ######## ===== ENVS TO COMPILE TPUTRAIN ======########
 export TPUTRAIN_TOP=$(cd $(dirname "${BASH_SOURCE[0]}")/.. && pwd)
 export TPUTRAIN_DEBUG=OFF
 export CHIP_ARCH=${1:-bm1684x}  #sg2260
-export PS1="\[\e[1;35m\]("train-"${CHIP_ARCH}-${MODE_PATTERN}):\[\e[1;33m\]\w\[\e[1;34m\]\$ \[\e[0m\]"
+export PS1="\[\e[1;35m\]("train-"${CHIP_ARCH}):\[\e[1;33m\]\w\[\e[1;34m\]\$ \[\e[0m\]"
 
 ################cross toolchains###################
 source ${TPUTRAIN_TOP}/scripts/prepare_toolchains.sh

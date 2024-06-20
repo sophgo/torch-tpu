@@ -43,3 +43,5 @@ python/**/*.so
 !python/gen_ins/*.py
 torch_tpu/tpu/backend.py
 toolchains_dir
+_C.cpython*.so
+torch_tpu/lib

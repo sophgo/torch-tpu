@@ -1,14 +1,16 @@
 #!/bin/bash
 CUR_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}")" >/dev/null 2>&1 && pwd )"
 pushd $CUR_DIR/..
-release_archive="./dist"
-rm -rf ${release_archive}*
 
 # ------------------------------------------------------------------------------
 source scripts/envsetup.sh
 export RELEASE_MODE=ON
-new_build
-source scripts/release_doc.sh
+python setup.py clean
+bdist_wheel
+
+if [ ! -z $SKIP_DOC ]; then
+    source scripts/release_doc.sh
+fi
 
 # ------------------------------------------------------------------------------
 BUILD_PATH=build/Release

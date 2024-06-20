@@ -1,6 +1,18 @@
 cmake_minimum_required(VERSION 2.8)
 project(tpu-train)
 
+find_program(CCACHE_FOUND ccache)
+if (CCACHE_FOUND)
+    set_property(GLOBAL PROPERTY RULE_LAUNCH_COMPILE ccache)
+endif()
+
+list(APPEND CMAKE_MODULE_PATH ${CMAKE_SOURCE_DIR}/cmake)
+
+if (CMAKE_INSTALL_PREFIX_INITIALIZED_TO_DEFAULT)
+    set(CMAKE_INSTALL_PREFIX "${CMAKE_BINARY_DIR}/install"
+        CACHE PATH "default install path" FORCE)
+endif()
+
 if(NOT DEFINED ENV{TPUTRAIN_TOP})
   message(FATAL_ERROR "execute envsetup.sh first")
 endif()
@@ -18,7 +30,5 @@ include(${PROJECT_SOURCE_DIR}/config_common.cmake)
 
 set(PROJECT_ROOT ${PROJECT_SOURCE_DIR})
 
-add_subdirectory(firmware_core)
 add_subdirectory(sgdnn)
-add_dependencies(sgdnn firmware_core)
 add_subdirectory(torch_tpu)

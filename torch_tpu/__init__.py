@@ -3,24 +3,24 @@ import types
 from functools import wraps
 
 import torch
+
+import os
+import pkgutil
+pkg_path = os.path.dirname(pkgutil.get_loader('torch_tpu').get_filename())
+lib_pwd = os.path.join(pkg_path, 'lib/')
+if not os.path.exists(os.path.join(lib_pwd, 'libtorch_tpu.so')):
+    from ctypes import cdll
+    try:
+        cdll.LoadLibrary("libtpuv7_rt.so")
+        os.symlink('libtorch_tpu.so.sg2260', os.path.join(lib_pwd, 'libtorch_tpu.so'))
+    except:
+        os.symlink('libtorch_tpu.so.bm1684x', os.path.join(lib_pwd, 'libtorch_tpu.so'))
+
 import torch_tpu._C
 import torch_tpu.tpu
 
 from torch_tpu.utils import ( apply_module_patch, \
                              add_storage_methods, add_serialization_methods, apply_device_patch)
-
-import os
-# for release: there all 3 libtorch_tpu.so in release whl
-if not (os.getenv('MODE_PATTERN') and os.getenv('CHIP_ARCH')):
-    lib_pwd = os.path.join(os.path.dirname(torch_tpu.__file__), 'lib/')
-    if os.path.exists(os.path.join(lib_pwd, 'libtorch_tpu.so')):
-        os.remove(os.path.join(lib_pwd, 'libtorch_tpu.so'))
-    from ctypes import cdll
-    try:
-        cdll.LoadLibrary("libtpuv7_rt.so")
-        os.symlink(os.path.join(lib_pwd, f'torch_tpu_tpuv7/libtorch_tpu.so'), os.path.join(lib_pwd, 'libtorch_tpu.so'))
-    except:
-        os.symlink(os.path.join(lib_pwd, f'torch_tpu_bmlib/libtorch_tpu.so'), os.path.join(lib_pwd, 'libtorch_tpu.so'))
 
 __all__ = []
 

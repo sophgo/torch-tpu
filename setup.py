@@ -124,27 +124,26 @@ def CppExtension(name, sources, *args, **kwargs):
     kwargs['language'] = 'c++'
     return Extension(name, sources, *args, **kwargs)
 
-class CPPLibBuild(build_clib, object):
+class ExtBase:
+    def get_package_dir(self):
+        package_dir = self.distribution.package_dir
+        package_dir = os.path.join(package_dir.get(''), 'torch_tpu') if package_dir \
+            else os.path.join(BASE_DIR, 'torch_tpu')
+        package_dir = os.path.abspath(package_dir)
+        return package_dir
+
+class CPPLibBuild(build_clib, ExtBase, object):
     def run(self):
         release_mode = os.getenv('RELEASE_MODE') == 'ON'
         if not release_mode:
             self.build()
         else:
-            lib_pwd = os.path.join(BASE_DIR, "build", get_build_type(), 'packages/torch_tpu/lib/')
-            os.makedirs(os.path.join(lib_pwd, 'torch_tpu_tpuv7'), exist_ok=True)
-            os.makedirs(os.path.join(lib_pwd, 'torch_tpu_bmlib'), exist_ok=True)
             # build bmlib
             os.environ['CHIP_ARCH'] = 'bm1684x'
-            os.environ['MODE_PATTERN'] = 'stable'
             self.build()
-            subprocess.check_call(['cp']+['libtorch_tpu.so', 'torch_tpu_bmlib/libtorch_tpu.so'], cwd=lib_pwd, env=os.environ)
             # build tpuv7_runtime
             os.environ['CHIP_ARCH'] = 'sg2260'
-            os.environ['MODE_PATTERN'] = 'stable'
             self.build()
-            os.environ['MODE_PATTERN'] = 'local'
-            self.build()
-            subprocess.check_call(['cp']+['libtorch_tpu.so', 'torch_tpu_tpuv7/libtorch_tpu.so'], cwd=lib_pwd, env=os.environ)
 
     def build(self):
         cmake = get_cmake_command()
@@ -155,44 +154,66 @@ class CPPLibBuild(build_clib, object):
                 ", ".join(e.name for e in self.extensions))
         self.cmake = cmake
 
-        build_dir = os.path.join(BASE_DIR, "build")
-        build_type_dir = os.path.join(build_dir, get_build_type())
-        output_lib_path = os.path.join(build_type_dir, "packages/torch_tpu/lib")
-        os.makedirs(build_type_dir, exist_ok=True)
-        os.makedirs(output_lib_path, exist_ok=True)
-        self.build_lib = os.path.relpath(os.path.join(build_dir, "packages/torch_tpu"))
-        self.build_temp = os.path.relpath(build_type_dir)
+        arch = os.environ.get('CHIP_ARCH')
+        build_dir = os.path.join(BASE_DIR, 'build', f'firmware_{arch}')
+        src_dir = os.path.join(BASE_DIR, 'firmware_core')
+        args = [self.cmake, src_dir]
+        def build_firmware():
+            os.makedirs(build_dir, exist_ok=True)
+            subprocess.check_call(args, cwd=build_dir, env=os.environ)
+            subprocess.check_call(['make', '-j'], cwd=build_dir, env=os.environ)
 
+        build_fw = True
+        if arch == 'sg2260':
+            tc_path = os.environ.get('RISCV_TOOLCHAIN')
+        elif arch == 'bm1684x':
+            tc_path = os.environ.get('ARM_TOOLCHAIN')
+        if not tc_path or not os.path.exists(tc_path):
+            build_fw = False
+
+        if build_fw:
+            build_firmware()
+            fw_path = os.path.join(build_dir, 'libfirmware.so')
+
+        build_dir += '_cmodel'
+        if not build_fw:
+            fw_path = os.path.join(build_dir, 'libfirmware.so')
+        args.append('-DUSING_CMODEL=ON')
+        build_firmware()
+
+        package_dir = self.get_package_dir()
         cmake_args = [
             '-DCMAKE_BUILD_TYPE=' + get_build_type(),
             '-DPYTHON_INCLUDE_DIR=' + python_path_dir(),
             '-DPYTORCH_INSTALL_DIR=' + get_pytorch_dir(),
-            '-DBUILD_LIBTORCH=0'
+            '-DBUILD_LIBTORCH=0',
+            f'-DKERNEL_MODULE_PATH={fw_path}',
+            f'-DCMAKE_INSTALL_PREFIX={package_dir}'
             ]
+        build_dir = os.path.join(BASE_DIR, 'build/torch-tpu')
+        os.makedirs(build_dir, exist_ok=True)
         build_args = ['-j', str(8)]
-        subprocess.check_call([self.cmake, BASE_DIR] + cmake_args, cwd=build_type_dir, env=os.environ)
-        if os.environ.get("CHIP_ARCH", None) == "bm1684x":
-            subprocess.check_call(['make', 'kernel_module'], cwd=build_type_dir, env=os.environ)
-        subprocess.check_call(['make'] + build_args, cwd=build_type_dir, env=os.environ)
+        subprocess.check_call([self.cmake, BASE_DIR] + cmake_args, cwd=build_dir, env=os.environ)
+        subprocess.check_call(['make'] + build_args, cwd=build_dir, env=os.environ)
+        subprocess.check_call(['make', 'install/strip'], cwd=build_dir, env=os.environ)
 
-        generate_libs = glob.glob(os.path.join(build_type_dir, "*/*.so"), recursive=True)
-        for lib in generate_libs:
-            subprocess.check_call(['cp']+[lib, output_lib_path], cwd=build_type_dir, env=os.environ)
-
-        if os.environ.get("MODE_PATTERN", None) != "local": #cmodel mode will no release
-            subprocess.check_call(["patchelf", "--set-rpath",
-                                    "$ORIGIN",
-                                    os.path.relpath(os.path.join(BASE_DIR, f"build/{get_build_type()}/packages/torch_tpu/lib/libtorch_tpu.so"))
-                                    ])
-class Build(build_ext, object):
+class Build(build_ext, ExtBase, object):
 
     def run(self):
         self.run_command('build_clib')
+        package_dir = self.get_package_dir()
+        sym_fn = os.path.join(package_dir, 'lib/libtorch_tpu.so')
+        if not os.path.exists(sym_fn):
+            lib_fn = glob.glob(os.path.join(package_dir, 'lib/*libtorch_tpu.so*'))[0]
+            os.symlink(lib_fn, sym_fn)
+
         self.build_lib = os.path.relpath(os.path.join(BASE_DIR, f"build/{get_build_type()}/packages"))
-        self.build_temp = os.path.relpath(os.path.join(BASE_DIR, f"build/{get_build_type()}"))
+        self.build_temp = os.path.relpath(os.path.join(BASE_DIR, f"build/torch-plugin"))
         self.library_dirs.append(
             os.path.relpath(os.path.join(BASE_DIR, f"build/{get_build_type()}/packages/torch_tpu/lib")))
         super(Build, self).run()
+
+        os.unlink(sym_fn)
 
     def finalize_options(self):
         build_ext.finalize_options(self)
@@ -212,38 +233,8 @@ class InstallCmd(install):
         return super(InstallCmd, self).finalize_options()
 
 class Clean(distutils.command.clean.clean):
-
     def run(self):
-        f_ignore = open('.gitignore', 'r')
-        ignores = f_ignore.read()
-        pat = re.compile(r'^#( BEGIN NOT-CLEAN-FILES )?')
-        for wildcard in filter(None, ignores.split('\n')):
-            match = pat.match(wildcard)
-            if match:
-                if match.group(1):
-                    # Marker is found and stop reading .gitignore.
-                    break
-                # Ignore lines which begin with '#'.
-            else:
-                for filename in glob.glob(wildcard):
-                    if os.path.islink(filename):
-                        raise RuntimeError(f"Failed to remove path: {filename}")
-                    if os.path.exists(filename):
-                        try:
-                            shutil.rmtree(filename, ignore_errors=True)
-                        except Exception as err:
-                            raise RuntimeError(f"Failed to remove path: {filename}") from err
-        f_ignore.close()
-
-        # It's an old-style class in Python 2.7...
-        distutils.command.clean.clean.run(self)
-
-        remove_files = [
-        ]
-        for remove_file in remove_files:
-            file_path = os.path.join(BASE_DIR, remove_file)
-            if os.path.exists(file_path):
-                os.remove(file_path)
+        subprocess.check_call(['git', 'clean', '-fdx'], cwd=BASE_DIR, env=os.environ)
 
 def generate_backend_py():
     backend_f = os.path.join(BASE_DIR, "torch_tpu", "tpu/backend.py")
@@ -257,7 +248,6 @@ def generate_backend_py():
 
 def get_src_py_and_dst():
 
-    generate_backend_py()
     ret = []
     generated_python_files = glob.glob(
         os.path.join(BASE_DIR, "torch_tpu", '**/*.py'),
@@ -309,24 +299,33 @@ def get_src_py_and_dst():
 
 class PythonPackageBuild(build_py, object):
     def run(self) -> None:
+        generate_backend_py()
         ret = get_src_py_and_dst()
         for src, dst in ret:
             self.copy_file(src, dst)
+
         super(PythonPackageBuild, self).finalize_options()
 
 class EggInfoBuild(egg_info, object):
     def finalize_options(self):
-        self.egg_base = os.path.relpath(os.path.join(BASE_DIR, f"build/{get_build_type()}/packages"))
-        ret = get_src_py_and_dst()
-        for src, dst in ret:
-            self.copy_file(src, dst)
+        if self.distribution.package_dir:
+            self.egg_base = os.path.relpath(os.path.join(BASE_DIR, f"build/{get_build_type()}/packages"))
+            os.makedirs(self.egg_base, exist_ok=True)
         super(EggInfoBuild, self).finalize_options()
+
+    def run(self):
+        generate_backend_py()
+        super().run()
 
 class bdist_wheel(_bdist_wheel):
     def finalize_options(self):
         _bdist_wheel.finalize_options(self)
         if SOC_CROSS:
             self.plat_name = 'manylinux2014_aarch64'
+
+    def run(self):
+        self.run_command('build')
+        super().run()
 
 include_directories = [
     BASE_DIR,
@@ -359,6 +358,20 @@ if DEBUG:
 else:
     extra_compile_args += ['-DNDEBUG']
     extra_link_args += ['-Wl,-z,now,-s']
+
+from setuptools.command.develop import develop as _develop
+class CustomDevelop(_develop):
+    def initialize_options(self):
+        for ext in self.distribution.ext_modules:
+            for i, v in enumerate(ext.library_dirs):
+                if not os.path.abspath(v).startswith(BASE_DIR):
+                    continue
+                dev_path = os.path.join(BASE_DIR, 'torch_tpu/lib')
+                ext.library_dirs[i] = dev_path
+                break
+        self.distribution.package_dir = None
+        print("package_dir has been unset for the develop command.")
+        _develop.initialize_options(self)
 
 setup(
         name=os.environ.get('TORCH_TPU_PACKAGE_NAME', 'torch_tpu'),
@@ -394,6 +407,7 @@ setup(
             ],
         },
         cmdclass={
+            'develop': CustomDevelop,
             'build_clib': CPPLibBuild,
             'build_ext': Build,
             'build_py': PythonPackageBuild,

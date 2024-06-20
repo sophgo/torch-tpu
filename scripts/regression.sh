@@ -134,6 +134,9 @@ function run_online_regression_test() {
   echo "********************************************"
   echo "[NOTE]Print_necessary_info"
   echo "[INFO]CURRENT_DIR:$CURRENT_DIR"
+
+  SKIP_DOC=true
+  bash scripts/release.sh || return -1
   
   
   test_CHIP_ARCH=${1:-bm1684x}
@@ -157,7 +160,7 @@ function run_online_regression_test() {
       echo "************** $LIBSOPHON_LINK_PATTERN-LIBSOPHON IS REAEDY *********"
       source  $CURRENT_DIR/envsetup.sh $test_CHIP_ARCH $LIBSOPHON_LINK_PATTERN
       new_clean;new_build
-      TPU_TRAIN_CMODEL_PATH=$CURRENT_DIR/../build/Release/firmware_core/libcmodel.so
+      TPU_TRAIN_CMODEL_PATH=$CURRENT_DIR/../build/firmware_${test_CHIP_ARCH}_cmodel/libfirmware.so
       echo "[INFO]tpu_train_cmodel_path:$TPU_TRAIN_CMODEL_PATH"
       set_cmodel_firmware $TPU_TRAIN_CMODEL_PATH
       echo "*************** CMODEL IS SET *************"
@@ -206,7 +209,7 @@ function run_daily_regression_test() {
       echo "************** $LIBSOPHON_LINK_PATTERN-LIBSOPHON IS REAEDY *********"
       source  $CURRENT_DIR/envsetup.sh $test_CHIP_ARCH $LIBSOPHON_LINK_PATTERN
       new_clean; new_build
-      TPU_TRAIN_CMODEL_PATH=$CURRENT_DIR/../build/Release/firmware_core/libcmodel.so
+      TPU_TRAIN_CMODEL_PATH=$CURRENT_DIR/../build/firmware_${test_CHIP_ARCH}_cmodel/libfirmware.so
       echo "[INFO]tpu_train_cmodel_path:$TPU_TRAIN_CMODEL_PATH"
       set_cmodel_firmware $TPU_TRAIN_CMODEL_PATH
       echo "*************** CMODEL IS SET *************"

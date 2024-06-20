@@ -87,12 +87,25 @@ target_link_libraries(torch_tpu c10 torch_cpu)
 
 if(BACKEND_1684X)
   target_link_libraries(torch_tpu sgdnn bmlib)
+  set_target_properties(torch_tpu PROPERTIES INSTALL_RPATH
+      "$ORIGIN;$ORIGIN/../../third_party/bmlib/lib")
+  install(TARGETS torch_tpu DESTINATION lib)
 elseif(BACKEND_SG2260)
+  set_target_properties(torch_tpu PROPERTIES INSTALL_RPATH
+      "$ORIGIN;$ORIGIN/../../third_party/tpuv7_runtime/tpuv7-emulator_0.1.0/lib")
   target_link_libraries(torch_tpu sgdnn tpuv7_rt )
   if (USING_CMODEL)
     target_link_libraries(torch_tpu cdm_daemon_emulator pthread)
   endif()
+  install(TARGETS torch_tpu DESTINATION lib)
 endif()
+
+set_target_properties(torch_tpu PROPERTIES SUFFIX ".so.$ENV{CHIP_ARCH}")
+add_custom_command(TARGET torch_tpu POST_BUILD
+    COMMAND patchelf --set-soname libtorch_tpu.so $<TARGET_FILE:torch_tpu>
+    COMMENT "Change SONAME of libtorch_tpu.so"
+    DEPENDS torch_tpu VERBATIM)
+
 # Test
 #add_executable(test_conv2d test/conv2d.cpp)
 #target_link_libraries(test_conv2d torch_tpu)

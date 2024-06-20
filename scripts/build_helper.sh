@@ -31,12 +31,23 @@ export TRAIN_BUILD_FOLDER=build
 
 function new_build()
 {
+  pip uninstall torch_tpu -y
   pushd ${TPUTRAIN_TOP}
-  python setup.py build bdist_wheel
+  python setup.py develop
+  if [ $? -ne 0 ]; then popd; return -1; fi
+  popd
+}
+
+function bdist_wheel()
+{
+  python setup.py develop --uninstall
+  pushd ${TPUTRAIN_TOP}
+  python setup.py bdist_wheel
   if [ $? -ne 0 ]; then popd; return -1; fi
   pip install dist/* --force-reinstall
   popd
 }
+
 function new_clean()
 {
   pushd ${TPUTRAIN_TOP}
