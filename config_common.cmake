@@ -52,7 +52,8 @@ if(USING_CMODEL)
   add_definitions(-DUSING_CMODEL)
   message(STATUS "MODE : CMODEL" )
 elseif(PCIE_MODE)
-  set(TPUv7_RUNTIME_PATH    ${CMAKE_CURRENT_SOURCE_DIR}/third_party/tpuv7_runtime/tpuv7_0.1.0)
+  # set(TPUv7_RUNTIME_PATH    ${CMAKE_CURRENT_SOURCE_DIR}/third_party/tpuv7_runtime/tpuv7_0.1.0)
+  set(TPUv7_RUNTIME_PATH    /opt/tpuv7/tpuv7-current/)
   if(SOC_CROSS_MODE STREQUAL "ON")
     set(LIBSOPHON_PATH        $ENV{CROSS_TOOLCHAINS}/libsophon_soc_0.5.0_aarch64/opt/sophon/libsophon-0.5.0/)
     message(STATUS "SOC_CROSS_LIBSOPHON_PATH : ${LIBSOPHON_PATH}")
@@ -69,7 +70,7 @@ endif()
 
 ######################################
 ###             RUNTIME
-###################################### 
+######################################
 if (BACKEND_1684X)
   set(RUNTIME_INCLUDE_PATH ${LIBSOPHON_PATH}/include)
   set(RUNTIME_LIB_PATH ${LIBSOPHON_PATH}/lib)

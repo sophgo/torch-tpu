@@ -11,7 +11,7 @@ endif()
 if($ENV{CHIP_ARCH} STREQUAL "bm1684x")
     link_directories(${PROJECT_SOURCE_DIR}/../third_party/firmware/$ENV{CHIP_ARCH})
 elseif($ENV{CHIP_ARCH} STREQUAL "sg2260")
-    link_directories(${PROJECT_SOURCE_DIR}/../third_party/tpuv7_runtime/$ENV{CHIP_ARCH}_firmware)
+    link_directories(${PROJECT_SOURCE_DIR}/../third_party/tpuv7_runtime/$ENV{CHIP_ARCH}_firmware ${PROJECT_SOURCE_DIR}/../third_party/firmware/$ENV{CHIP_ARCH})
 endif()
 
 # Set the source files for the shared library
@@ -24,7 +24,7 @@ add_library(${SHARED_LIBRARY_OUTPUT_FILE} SHARED ${DEVICE_SRCS})
 if($ENV{CHIP_ARCH} STREQUAL "bm1684x")
     target_link_libraries(${SHARED_LIBRARY_OUTPUT_FILE} -Wl,--whole-archive "lib$ENV{CHIP_ARCH}.a" -Wl,--no-whole-archive m)
 elseif($ENV{CHIP_ARCH} STREQUAL "sg2260")
-    target_link_libraries(${SHARED_LIBRARY_OUTPUT_FILE} -Wl,--whole-archive firmware_core -Wl,--no-whole-archive m)
+    target_link_libraries(${SHARED_LIBRARY_OUTPUT_FILE} -Wl,--allow-multiple-definition,--whole-archive "libfirmware_core.a" -Wl,--no-whole-archive m)
 endif()
 set_target_properties(${SHARED_LIBRARY_OUTPUT_FILE} PROPERTIES PREFIX "" SUFFIX ".so" COMPILE_FLAGS "-O2 -fPIC" LINK_FLAGS "-shared")
 

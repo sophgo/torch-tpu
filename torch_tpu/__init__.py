@@ -9,6 +9,19 @@ import torch_tpu.tpu
 from torch_tpu.utils import ( apply_module_patch, \
                              add_storage_methods, add_serialization_methods, apply_device_patch)
 
+import os
+# for release: there all 3 libtorch_tpu.so in release whl
+if not (os.getenv('MODE_PATTERN') and os.getenv('CHIP_ARCH')):
+    lib_pwd = os.path.join(os.path.dirname(torch_tpu.__file__), 'lib/')
+    if os.path.exists(os.path.join(lib_pwd, 'libtorch_tpu.so')):
+        os.remove(os.path.join(lib_pwd, 'libtorch_tpu.so'))
+    from ctypes import cdll
+    try:
+        cdll.LoadLibrary("libtpuv7_rt.so")
+        os.symlink(os.path.join(lib_pwd, f'torch_tpu_tpuv7/libtorch_tpu.so'), os.path.join(lib_pwd, 'libtorch_tpu.so'))
+    except:
+        os.symlink(os.path.join(lib_pwd, f'torch_tpu_bmlib/libtorch_tpu.so'), os.path.join(lib_pwd, 'libtorch_tpu.so'))
+
 __all__ = []
 
 def wrap_torch_error_func(func):
@@ -21,11 +34,11 @@ def wrap_torch_error_func(func):
 
 ###### CUSTOM OPs. TODO: change tpu to my_ops
 tpu_functions = {
-    # "one_", "fast_gelu", "_amp_foreach_non_finite_check_", "empty_with_format", "unsafe_empty_with_format", 
-    # "empty_with_format", "copy_memory_", "_dropout_with_byte_mask_backward", "dropout_with_byte_mask", 
-    # "decode_jpeg", "crop_and_resize", "reverse", "image_normalize", "image_normalize_", "img_to_tensor", 
-    # "_conv_depthwise2d_backward", "slow_conv_dilated2d_backward", "slow_conv_transpose2d_backward", 
-    # "batch_norm_reduce", "batch_norm_gather_stats_update", "format_contiguous", "check_match", 
+    # "one_", "fast_gelu", "_amp_foreach_non_finite_check_", "empty_with_format", "unsafe_empty_with_format",
+    # "empty_with_format", "copy_memory_", "_dropout_with_byte_mask_backward", "dropout_with_byte_mask",
+    # "decode_jpeg", "crop_and_resize", "reverse", "image_normalize", "image_normalize_", "img_to_tensor",
+    # "_conv_depthwise2d_backward", "slow_conv_dilated2d_backward", "slow_conv_transpose2d_backward",
+    # "batch_norm_reduce", "batch_norm_gather_stats_update", "format_contiguous", "check_match",
     # "check_memory_overlaps", "get_storage_size", "_dropout_with_byte_mask", "empty_with_format"
 }
 
@@ -37,7 +50,7 @@ for name in dir(torch.ops.tpu):
         __all__.append(name)
     setattr(torch, name, wrap_torch_error_func(getattr(torch.ops.tpu, name)))
 
-##### register device 
+##### register device
 torch.utils.rename_privateuse1_backend("tpu")
 torch._register_device_module('tpu', torch_tpu.tpu)
 unsupported_dtype = [torch.quint8, torch.quint4x2, torch.quint2x4, torch.qint32, torch.qint8, torch.int64]
@@ -52,7 +65,7 @@ def apply_class_patches():
 
 apply_class_patches()
 
-## init TPU's Extension 
+## init TPU's Extension
 # torch_tpu.torch_tpu._initExtension()
 
 # #### distributed

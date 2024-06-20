@@ -1,11 +1,12 @@
 #!/bin/bash
 CUR_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}")" >/dev/null 2>&1 && pwd )"
-pushd $CUR_DIR/.. 
+pushd $CUR_DIR/..
 release_archive="./dist"
 rm -rf ${release_archive}*
 
 # ------------------------------------------------------------------------------
-source scripts/envsetup.sh bm1684x stable
+source scripts/envsetup.sh
+export RELEASE_MODE=ON
 new_build
 source scripts/release_doc.sh
 

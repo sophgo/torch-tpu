@@ -126,6 +126,25 @@ def CppExtension(name, sources, *args, **kwargs):
 
 class CPPLibBuild(build_clib, object):
     def run(self):
+        release_mode = os.getenv('RELEASE_MODE') == 'ON'
+        if not release_mode:
+            self.build()
+        else:
+            lib_pwd = os.path.join(BASE_DIR, "build", get_build_type(), 'packages/torch_tpu/lib/')
+            os.makedirs(os.path.join(lib_pwd, 'torch_tpu_tpuv7'), exist_ok=True)
+            os.makedirs(os.path.join(lib_pwd, 'torch_tpu_bmlib'), exist_ok=True)
+            # build bmlib
+            os.environ['CHIP_ARCH'] = 'bm1684x'
+            os.environ['MODE_PATTERN'] = 'stable'
+            self.build()
+            subprocess.check_call(['cp']+['libtorch_tpu.so', 'torch_tpu_bmlib/libtorch_tpu.so'], cwd=lib_pwd, env=os.environ)
+            # build tpuv7_runtime
+            os.environ['CHIP_ARCH'] = 'sg2260'
+            os.environ['MODE_PATTERN'] = 'stable'
+            self.build()
+            subprocess.check_call(['cp']+['libtorch_tpu.so', 'torch_tpu_tpuv7/libtorch_tpu.so'], cwd=lib_pwd, env=os.environ)
+
+    def build(self):
         cmake = get_cmake_command()
 
         if cmake is None:
@@ -158,7 +177,7 @@ class CPPLibBuild(build_clib, object):
         for lib in generate_libs:
             subprocess.check_call(['cp']+[lib, output_lib_path], cwd=build_type_dir, env=os.environ)
 
-        if os.environ.get("MODE_PATTERN", None) != "local": #cmodel mode will no release 
+        if os.environ.get("MODE_PATTERN", None) != "local": #cmodel mode will no release
             subprocess.check_call(["patchelf", "--set-rpath",
                                     "$ORIGIN",
                                     os.path.relpath(os.path.join(BASE_DIR, f"build/{get_build_type()}/packages/torch_tpu/lib/libtorch_tpu.so"))
