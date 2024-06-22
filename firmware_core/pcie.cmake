@@ -3,6 +3,8 @@ if($ENV{CHIP_ARCH} STREQUAL "bm1684x")
     set(CMAKE_C_COMPILER $ENV{ARM_TOOLCHAIN}/bin/aarch64-none-linux-gnu-gcc)
 elseif($ENV{CHIP_ARCH} STREQUAL "sg2260")
     set(CMAKE_C_COMPILER $ENV{RISCV_TOOLCHAIN}/bin/riscv64-unknown-linux-gnu-gcc)
+    set(CMAKE_STRIP $ENV{RISCV_TOOLCHAIN}/bin/riscv64-unknown-linux-gnu-strip)
+
 else()
     message(FATAL_ERROR "unsupport CHIP backend")
 endif()
@@ -38,5 +40,10 @@ add_custom_command(
     COMMAND hexdump -v -e '1/4 \"0x%08x,\\n\"' ${INPUT_FILE} >> ${OUTPUT_FILE}
     COMMAND echo "}\;" >> ${OUTPUT_FILE}
 )
+if($ENV{CHIP_ARCH} STREQUAL "sg2260")
+    add_custom_command(
+      TARGET ${SHARED_LIBRARY_OUTPUT_FILE} POST_BUILD
+      COMMAND ${CMAKE_STRIP} -s "${SHARED_LIBRARY_OUTPUT_FILE}.so")
+endif()
 # Add a custom target that depends on the custom command
 add_custom_target(kernel_module DEPENDS ${OUTPUT_FILE})

@@ -142,6 +142,8 @@ class CPPLibBuild(build_clib, object):
             os.environ['CHIP_ARCH'] = 'sg2260'
             os.environ['MODE_PATTERN'] = 'stable'
             self.build()
+            os.environ['MODE_PATTERN'] = 'local'
+            self.build()
             subprocess.check_call(['cp']+['libtorch_tpu.so', 'torch_tpu_tpuv7/libtorch_tpu.so'], cwd=lib_pwd, env=os.environ)
 
     def build(self):

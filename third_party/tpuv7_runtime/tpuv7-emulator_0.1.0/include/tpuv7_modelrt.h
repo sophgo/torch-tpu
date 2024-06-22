@@ -7,7 +7,7 @@ extern "C" {
 #endif
 
 /* tpuRtDataType_t holds the type for a scalar value */
-typedef enum tpuRtDataType {
+typedef enum {
   TPU_FLOAT32 = 0,
   TPU_FLOAT16 = 1,
   TPU_INT8 = 2,
@@ -23,7 +23,7 @@ typedef enum tpuRtDataType {
 
 /* tpuRtShape_t holds the shape info */
 #define TPU_MAX_DIMS_NUM 8
-typedef struct tpuRtShape {
+typedef struct {
   int num_dims;
   int dims[TPU_MAX_DIMS_NUM];
 } tpuRtShape_t;
@@ -31,7 +31,7 @@ typedef struct tpuRtShape {
 /*
 tpu_tensor_t holds a multi-dimensional array of elements of a single data type
 and tensor are in device memory */
-typedef struct tpuRtTensor {
+typedef struct {
   tpuRtDataType_t dtype;
   tpuRtShape_t shape;
   void *data; // data in device mem
@@ -82,8 +82,8 @@ tpuRtStatus_t tpuRtLoadNet(const char *net_path, tpuRtNetContext_t context,
                            tpuRtNet_t *net);
 tpuRtStatus_t tpuRtLoadNetFromMem(const void *net_data, size_t size,
                                   tpuRtNetContext_t context, tpuRtNet_t *net);
-tpuRtStatus_t tpuRtUnloadNet(tpuRtNet_t *net);
-tpuRtNetInfo_t tpuRtGetNetInfo(tpuRtNet_t *net);
+tpuRtStatus_t tpuRtUnloadNet(tpuRtNet_t net);
+tpuRtNetInfo_t tpuRtGetNetInfo(const tpuRtNet_t net);
 tpuRtStatus_t tpuRtLaunchNetAsync(tpuRtNet_t *net, const tpuRtTensor_t input[],
                                   tpuRtTensor_t output[], const char *net_name,
                                   tpuRtStream_t stream);
