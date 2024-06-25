@@ -81,6 +81,7 @@ static inline void sgdnnFreeDevice(tpu_resource_t tpu_resource, tpu_device_mem_t
 #if defined BACKEND_1684X
   bm_free_device(tpu_resource, device_mem);
 #elif defined BACKEND_SG2260
+  tpuRtStreamSynchronize(tpu_resource);
   tpuRtFree(&device_mem, NO_USE);
 #else
   SGDNN_CHECK ( false );
