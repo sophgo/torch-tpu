@@ -13,7 +13,7 @@ if [ ! -z $SKIP_DOC ]; then
 fi
 
 # ------------------------------------------------------------------------------
-BUILD_PATH=build/Release
+BUILD_PATH=build/torch-tpu
 torch_tpu_version="$(grep TORCHTPU_VERSION ${BUILD_PATH}/CMakeCache.txt | cut -d "=" -f2)"
 commit=$(git log -1 --pretty=format:"%h")
 tar -cvzf "torch-tpu_${torch_tpu_version}_${commit}.tar.gz" ${release_archive}

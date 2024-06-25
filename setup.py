@@ -317,7 +317,7 @@ class EggInfoBuild(egg_info, object):
         generate_backend_py()
         super().run()
 
-class bdist_wheel(_bdist_wheel):
+class bdist_wheel(_bdist_wheel, ExtBase):
     def finalize_options(self):
         _bdist_wheel.finalize_options(self)
         if SOC_CROSS:
@@ -325,6 +325,11 @@ class bdist_wheel(_bdist_wheel):
 
     def run(self):
         self.run_command('build')
+        fw_libs = glob.glob(os.path.join(BASE_DIR, 'build/firmware_*_cmodel/libfirmware.so'))
+        pkg_dir = self.get_package_dir()
+        for fw in fw_libs:
+            target = re.match('.+firmware_(\w+)_cmodel.+', fw).group(1)
+            self.copy_file(fw, os.path.join(pkg_dir, f'lib/{target}_cmodel_firmware.so'))
         super().run()
 
 include_directories = [
