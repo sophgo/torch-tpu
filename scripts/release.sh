@@ -8,11 +8,12 @@ export RELEASE_MODE=ON
 python setup.py clean
 bdist_wheel
 
-if [ ! -z $SKIP_DOC ]; then
+if [ -z $SKIP_DOC ]; then
     source scripts/release_doc.sh
 fi
 
 # ------------------------------------------------------------------------------
+release_archive="./dist"
 BUILD_PATH=build/torch-tpu
 torch_tpu_version="$(grep TORCHTPU_VERSION ${BUILD_PATH}/CMakeCache.txt | cut -d "=" -f2)"
 commit=$(git log -1 --pretty=format:"%h")

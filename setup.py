@@ -325,11 +325,11 @@ class bdist_wheel(_bdist_wheel, ExtBase):
 
     def run(self):
         self.run_command('build')
-        fw_libs = glob.glob(os.path.join(BASE_DIR, 'build/firmware_*_cmodel/libfirmware.so'))
+        fw_libs = glob.glob(os.path.join(BASE_DIR, 'build/firmware_*/libfirmware.so'))
         pkg_dir = self.get_package_dir()
         for fw in fw_libs:
-            target = re.match('.+firmware_(\w+)_cmodel.+', fw).group(1)
-            self.copy_file(fw, os.path.join(pkg_dir, f'lib/{target}_cmodel_firmware.so'))
+            target = re.match('.+firmware_(\w+).+', fw).group(1)
+            self.copy_file(fw, os.path.join(pkg_dir, f'lib/{target}_{"firmware" if "cmodel" in fw else "kernel_module"}.so'))
         super().run()
 
 include_directories = [
