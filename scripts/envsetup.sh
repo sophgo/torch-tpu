@@ -45,10 +45,14 @@ function set_v7runtime_env() {
      if [ "$TPUTRAIN_DEBUG" = "ON" ]; then
           build_type=Debug
      fi
-     export TPU_KERNEL_PATH=${root_path}/build/${build_type}/firmware_core/
-     export TPU_EMULATOR_PATH=${root_path}/build/${build_type}/firmware_core/libcmodel.so
-     export TPUKERNEL_FIRMWARE_PATH=${root_path}/build/${build_type}/firmware_core/libcmodel.so
+     export TPU_KERNEL_PATH=${root_path}/build/firmware_sg2260_cmodel/
+     export TPU_EMULATOR_PATH=${root_path}/build/firmware_sg2260_cmodel/libfirmware.so
+     export TPUKERNEL_FIRMWARE_PATH=${root_path}/build/firmware_sg2260_cmodel/libfirmware.so
 }
+################ MODE CHOICE ###################
+export MODE_ASIC=stable        # stable: asic
+export MODE_CMODEL=local       # local: cmodel
+export MODE_PATTERN=${2:-$MODE_CMODEL}
 
 ######## ===== ENVS TO COMPILE TPUTRAIN ======########
 export TPUTRAIN_TOP=$(cd $(dirname "${BASH_SOURCE[0]}")/.. && pwd)
@@ -80,6 +84,7 @@ fi
 
 function update_tpuv7()
 {
+  export TPURT_TOP=$TPUTRAIN_TOP/../tpuv7-runtime
   pushd $TPURT_TOP
   rm -rf build/emulator
   mkdir -p build/emulator

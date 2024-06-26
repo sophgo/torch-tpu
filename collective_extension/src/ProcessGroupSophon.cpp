@@ -103,6 +103,10 @@
   }
 #endif
 
+namespace tpu {
+  tpuRtStream_t TPUGetDeviceResource ( void );
+}
+
 namespace c10d {
 
 namespace {
@@ -632,8 +636,13 @@ ProcessGroupSophon::ProcessGroupSophon(const c10::intrusive_ptr<Store> &store,
       options_(options), stop_(false), collectiveCounter_(0) {
   sophon::scclUniqueId scclID;
   broadcastUniqueSCCLID(&scclID, rank);
-  dev_handle_ =
-      tpudnnCreate(!options->chip_map.empty() ? options->chip_map[rank] : rank);
+
+  int deviceID = (!options->chip_map.empty()) ? options->chip_map[rank] : rank;
+  tpuRtStream_t mStream = tpu::TPUGetDeviceResource();
+  const char *moduleName = getenv("TPU_KERNEL_MODULE_PATH");
+  tpuRtKernelModule_t mModule = tpuRtKernelLoadModuleFile(moduleName, mStream);
+
+  dev_handle_ = handle_from_stream(deviceID, &mStream, &mModule);
 
   auto &devices = options->devices;
   if (devices.empty()) {

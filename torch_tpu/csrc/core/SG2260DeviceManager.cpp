@@ -37,17 +37,16 @@ public:
     tpuRtStatus_t Status = tpuRtGetDeviceCount ( &DeviceCount );
     if (DeviceCount == 0) {
       std::cout << "Device Count:" << DeviceCount << "\n";
-      DeviceCount = 8;
+      DeviceCount = 1;
     }
     // TODO multi-device
-    TORCH_CHECK ( DeviceCount == 8 );
+    TORCH_CHECK ( DeviceCount == 1 );
     char* size = getenv("OMPI_COMM_WORLD_SIZE");
     if(size != nullptr) {
       DeviceCount = atoi(size);
     }
     tpuRtInit();
 
-    std::cout << "Device Count:" << DeviceCount << "\n";
     TORCH_CHECK ( Status == tpuRtSuccess, "Failed to get TPU device count" );
     if ( DeviceCount > 0 )
     {

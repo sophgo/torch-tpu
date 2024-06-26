@@ -1,61 +1,22 @@
 #!/bin/bash
-# export TPUTRAIN_TOP=$(cd $(dirname "${BASH_SOURCE[0]}")/.. && pwd)
-# source $TPUTRAIN_TOP/scripts/envsetup.sh sg2260 latest
 
-# if [ $CHIP_ARCH = sg2260 ] && [ $LIBSOPHON_PATTERN = latest ]; then
-#     #libcmodel_fimwares of TPU1686 and tpu-train have been combined in tpu-train/build/firmware_core
-#     # set_cmodel_firmware $TPUTRAIN_TOP/build/firmware_core/libcmodel.so
-#     set_cmodel_firmware $TPU1686_TOP/build/firmware_core/libcmodel_firmware.so
-#     echo "TPUKERNEL_FIRMWARE_PATH=$TPUKERNEL_FIRMWARE_PATH"
-# else
-#     echo "[ERROR] CHIP_ARCH is not sg2260 or LIBSOPHON_PATTERN is not latest"
-#     exit 1
-# fi
-
-export SG1684X_TOP=$TPUTRAIN_TOP/../TPU1686
-
-# export CMAKE_PREFIX_PATH=$TPU1686_TOP/install:$CMAKE_PREFIX_PATH
 export SCCL_PATH=$TPUTRAIN_TOP/collective_extension
 export PATH=$SCCL_PATH/install/bin:$PATH
 export LD_LIBRARY_PATH=$LD_LIBRARY_PATH/install/lib:$LD_LIBRARY_PATH
 export TPUDNN_PATH=$SCCL_PATH/third_party/tpudnn
-export TPURT_TOP=$TPUTRAIN_TOP/../tpuv7-runtime
-# export TORCH_TPU_PATH=$TPUTRAIN_TOP/torch_tpu/
+
 build_type=Release
 if [ "$TPUTRAIN_DEBUG" = "ON" ]; then
     build_type=Debug
 fi
+
 export GLOO_SOPHON_PATH=$TPUTRAIN_TOP/collective_extension/third_party/gloo_sophon/
 export LD_LIBRARY_PATH=$TPUTRAIN_TOP/build/${build_type}/sgdnn:/usr/local/lib/python3.10/dist-packages/torch/lib:$TPUDNN_PATH/lib:$LD_LIBRARY_PATH
-export TPU_KERNEL_MODULE_PATH=$TPUTRAIN_TOP/build/${build_type}/firmware_core/libcmodel.so
-
-# These envs are here for the naughty tpurt
-# export TPU_KERNEL_PATH=${SG1684X_TOP}/build/firmware_core
-# export TPU_EMULATOR_PATH=${SG1684X_TOP}/build/firmware_core/libcmodel_firmware.so
-# export TPU_SCALAR_EMULATOR_PATH=${TPURT_TOP}/build/cdmlib/tp/daemon/libtpuv7_scalar_emulator.so
+export LD_LIBRARY_PATH=$TPUTRAIN_TOP/build/${build_type}/torch_tpu:$LD_LIBRARY_PATH
+export TPU_KERNEL_MODULE_PATH=$TPUTRAIN_TOP/build/firmware_sg2260_cmodel/libfirmware.so
 
 export MASTER_ADDR=127.0.0.1
 export MASTER_PORT=6000
-
-#rebuild torch_tpu
-# function build_torch_tpu()
-# {
-#     should_clean=$1
-#     if [ ! -d "$TORCH_TPU_PATH/build/" ]; then
-#         mkdir -p "$TORCH_TPU_PATH/build/"
-#     elif [ -n "$should_clean" ]; then
-#         rm -rf "$TORCH_TPU_PATH/build/"
-#         mkdir -p "$TORCH_TPU_PATH/build/"
-#     fi
-
-#     pushd $TORCH_TPU_PATH/build/
-#     cores=$(($(nproc)/2))
-#     cmake .. -DCMAKE_BUILD_TYPE=Debug
-#     make -j$cores
-#     ret=$?
-#     popd
-#     if [ $ret -ne 0 ]; then return $ret; fi
-# }
 
 function build_openmpi() {
   if [ -e ${SCCL_PATH}/install/bin/mpirun ]; then
@@ -121,7 +82,6 @@ function install_sccl()
 
 function rebuild_sccl()
 {
-    # rebuild_torch_tpu
     # build_openmpi
     rebuild_gloo_sophon
     install_sccl

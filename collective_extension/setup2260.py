@@ -19,12 +19,11 @@ include_dirs = [f"{os.path.dirname(os.path.abspath(__file__))}/include/",
                 ]
 library_dirs = [f"{os.path.dirname(os.path.realpath(torch.__file__))}/lib",
                 f"{os.path.dirname(os.path.realpath(__file__))}/lib",
-                f"{os.path.dirname(os.path.abspath(__file__))}/../build/{build_type}/torch_tpu",
+                f"{os.path.dirname(os.path.abspath(__file__))}/../build/torch-tpu/torch_tpu/",
                 f"{os.path.dirname(os.path.abspath(__file__))}/third_party/gloo_sophon/build/sophon",
                 f"{os.path.dirname(os.path.abspath(__file__))}/third_party/tpudnn/lib",
                 ]
-
-libraries = ["torch_tpu", "sophon", "tpudnn"]
+libraries = ["torch_tpu.sg2260", "sophon", "tpudnn"]
 
 module = cpp_extension.CppExtension(
     name="sccl",

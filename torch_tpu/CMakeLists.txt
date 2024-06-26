@@ -100,7 +100,7 @@ elseif(BACKEND_SG2260)
   install(TARGETS torch_tpu DESTINATION lib)
 endif()
 
-set_target_properties(torch_tpu PROPERTIES SUFFIX ".so.$ENV{CHIP_ARCH}")
+set_target_properties(torch_tpu PROPERTIES SUFFIX ".$ENV{CHIP_ARCH}.so")
 add_custom_command(TARGET torch_tpu POST_BUILD
     COMMAND patchelf --set-soname libtorch_tpu.so $<TARGET_FILE:torch_tpu>
     COMMENT "Change SONAME of libtorch_tpu.so"

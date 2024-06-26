@@ -2,7 +2,6 @@
 
 #include "common_def.h"
 #include <cstdint>
-
 #ifdef USING_PLD_TEST
 #include "../../common/include/api/sg_api_pld.h"
 #endif
@@ -27,9 +26,7 @@ extern "C"
     tpudnnStatus_t tpudnnGetUniqueId(tpudnnHandle_t handle, char* uniqueId);
 #endif
 
-    // TODO
-    // tpudnnHandle_t handle_from_bmlib();
-    // tpudnnHandle_t handle_from_tpurt();
+    tpudnnHandle_t handle_from_stream(int deviceID, void* stream, void* module);
 
     tpudnnStatus_t tpudnnActive(
         tpudnnHandle_t handle,

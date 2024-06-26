@@ -12,9 +12,9 @@ if not os.path.exists(os.path.join(lib_pwd, 'libtorch_tpu.so')):
     from ctypes import cdll
     try:
         cdll.LoadLibrary("libtpuv7_rt.so")
-        os.symlink('libtorch_tpu.so.sg2260', os.path.join(lib_pwd, 'libtorch_tpu.so'))
+        os.symlink('libtorch_tpu.sg2260.so', os.path.join(lib_pwd, 'libtorch_tpu.so'))
     except:
-        os.symlink('libtorch_tpu.so.bm1684x', os.path.join(lib_pwd, 'libtorch_tpu.so'))
+        os.symlink('libtorch_tpu.bm1684x.so', os.path.join(lib_pwd, 'libtorch_tpu.so'))
 
 import torch_tpu._C
 import torch_tpu.tpu

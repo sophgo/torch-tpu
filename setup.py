@@ -204,7 +204,7 @@ class Build(build_ext, ExtBase, object):
         package_dir = self.get_package_dir()
         sym_fn = os.path.join(package_dir, 'lib/libtorch_tpu.so')
         if not os.path.exists(sym_fn):
-            lib_fn = glob.glob(os.path.join(package_dir, 'lib/*libtorch_tpu.so*'))[0]
+            lib_fn = glob.glob(os.path.join(package_dir, 'lib/*libtorch_tpu*.so'))[0]
             os.symlink(lib_fn, sym_fn)
 
         self.build_lib = os.path.relpath(os.path.join(BASE_DIR, f"build/{get_build_type()}/packages"))
