@@ -5,8 +5,6 @@
 #include <sgdnn_api.h>
 #include <tpuv7_rt.h>
 
-#define tpuStreamNonBlocking 0x01 /**< Stream does not synchronize with stream 0 (the NULL stream) */
-
 namespace c10_tpu {
 namespace sgrt {
 /********************************************************

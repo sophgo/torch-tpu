@@ -103,7 +103,11 @@ tpuRtStatus_t TPUKernelLauncher::cache_free(void* dev_ptr, tpuRtStream_t stream)
   return _cache_mem_Mgr.cache_free(dev_ptr, stream);
 }
 
-
+tpuRtKernelModule_t TPUKernelLauncher::get_kernel_module(tpuRtStream_t stream)
+{
+    this->register_kernel_module(stream);
+    return _stream_kernel_modules[stream];
+}
 
 /*********************************************************************
 *****************   Cached Device Memory Manager ********************

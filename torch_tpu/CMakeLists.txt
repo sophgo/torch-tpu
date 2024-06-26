@@ -82,17 +82,29 @@ else()
   LIST(APPEND SRCS ${CSRC_SRCS})
 endif()
 
-add_library(torch_tpu SHARED ${SRCS})
-target_link_libraries(torch_tpu c10 torch_cpu)
+set(concated_src all_in_one.cpp)
+add_custom_command(
+    OUTPUT ${concated_src}
+    COMMAND ${CMAKE_SOURCE_DIR}/scripts/concat_all_torch_plugin_sources.sh ${SRCS}
+        > ${CMAKE_CURRENT_BINARY_DIR}/${concated_src}
+    DEPENDS ${SRCS}
+    VERBATIM)
+
+find_package(TPU1686 REQUIRED)
+
+add_library(torch_tpu SHARED ${concated_src})
+target_link_libraries(torch_tpu TPU1686::tpuDNN c10 torch_cpu)
+
+get_filename_component(tpuDNNPath ${tpuDNN_LIBRARY} DIRECTORY)
 
 if(BACKEND_1684X)
   target_link_libraries(torch_tpu sgdnn bmlib)
   set_target_properties(torch_tpu PROPERTIES INSTALL_RPATH
-      "$ORIGIN;$ORIGIN/../../third_party/bmlib/lib")
+      "$ORIGIN;$ORIGIN/../../third_party/bmlib/lib;${tpuDNNPath}")
   install(TARGETS torch_tpu DESTINATION lib)
 elseif(BACKEND_SG2260)
   set_target_properties(torch_tpu PROPERTIES INSTALL_RPATH
-      "$ORIGIN;$ORIGIN/../../third_party/tpuv7_runtime/tpuv7-emulator_0.1.0/lib")
+      "$ORIGIN;$ORIGIN/../../third_party/tpuv7_runtime/tpuv7-emulator_0.1.0/lib;${tpuDNNPath}")
   target_link_libraries(torch_tpu sgdnn tpuv7_rt )
   if (USING_CMODEL)
     target_link_libraries(torch_tpu cdm_daemon_emulator pthread)

@@ -62,6 +62,8 @@ public:
   tpuRtStatus_t cache_malloc(void** p_dev_ptr, int64_t size);
   tpuRtStatus_t cache_free(void* dev_ptr, tpuRtStream_t stream);
 
+  tpuRtKernelModule_t get_kernel_module(tpuRtStream_t stream);
+
 private:
   bool stream_registered(tpuRtStream_t stream);
   size_t _wrap_param(const void* api, size_t api_size, const char* func_name);

@@ -5,7 +5,12 @@
 #include <c10/core/DeviceGuard.h>
 #include <c10/core/Stream.h>
 #include <c10/util/SmallVector.h>
+
+#ifdef BACKEND_SG2260
 #include "torch_tpu/csrc/core/Interface/sgrtInterface.h"
+#endif
+
+#include <tpuDNN.h>
 /*
  * Stream pool note.
  *
@@ -76,10 +81,32 @@ public:
     return unwrap() != other.unwrap();
   }
 
+#ifdef BACKEND_SG2260
   /// Implicit conversion to sgrtStream_t.
   operator sgrt::sgrtStream_t() const {
     return stream();
   }
+
+  bool query() const {
+    c10::DeviceGuard guard{stream_.device()};
+    sgrt::sgrtStreamStatus status = sgrt::SgrtStreamQuery(stream());
+    if ( status == sgrt::SG_STREAM_STATUS_COMPLETE ) {
+      return true;
+    }
+    return false;
+  }
+
+  void synchronize() const {
+    c10::DeviceGuard guard{stream_.device()};
+    sgrt::SgrtSynchronizeStream(stream());
+  }
+
+  /// Explicit conversion to rtStream_t.
+  sgrt::sgrtStream_t stream() const;
+
+#endif
+
+  operator tpudnnHandle_t() const;
 
   /// Implicit conversion to pytorch Stream.
   operator c10::Stream() const {
@@ -105,23 +132,6 @@ public:
   c10::StreamId id() const {
     return stream_.id();
   }
-
-  bool query() const {
-    c10::DeviceGuard guard{stream_.device()};
-    sgrt::sgrtStreamStatus status = sgrt::SgrtStreamQuery(stream());
-    if ( status == sgrt::SG_STREAM_STATUS_COMPLETE ) {
-      return true;
-    }
-    return false;
-  }
-
-  void synchronize() const {
-    c10::DeviceGuard guard{stream_.device()};
-    sgrt::SgrtSynchronizeStream(stream());
-  }
-
-  /// Explicit conversion to rtStream_t.
-  sgrt::sgrtStream_t stream() const;
 
   /// Explicit conversion to Stream.
   c10::Stream unwrap() const {
@@ -173,7 +183,9 @@ TPUStream getStreamFromPool(const int priority, c10::DeviceIndex device = -1);
  * want to operate on a non-torch allocated stream for data exchange or similar
  * purposes
  */
+#ifdef BACKEND_SG2260
 TPUStream getStreamFromExternal(sgrt::sgrtStream_t ext_stream, c10::DeviceIndex device_index);
+#endif
 
 
 /**

@@ -190,6 +190,8 @@ class CPPLibBuild(build_clib, ExtBase, object):
             f'-DKERNEL_MODULE_PATH={fw_path}',
             f'-DCMAKE_INSTALL_PREFIX={package_dir}'
             ]
+        if os.getenv('TPUTRAIN_DEBUG'):
+            cmake_args.append('-DDEBUG=ON')
         build_dir = os.path.join(BASE_DIR, 'build/torch-tpu')
         os.makedirs(build_dir, exist_ok=True)
         build_args = ['-j', str(8)]
@@ -234,6 +236,8 @@ class InstallCmd(install):
 
 class Clean(distutils.command.clean.clean):
     def run(self):
+        if not os.environ.get("TORCH_TPU_NONINTERACTIVE"):
+            input('\nsetup.py clean will run git clean -fdx, \033[1;31mTHIS IS DANGEROUS!\033[0m\nMake sure you known what you are doing.\n\nOtherwise Ctrl-C to exit NOW!\n')
         subprocess.check_call(['git', 'clean', '-fdx'], cwd=BASE_DIR, env=os.environ)
 
 def generate_backend_py():
@@ -330,10 +334,17 @@ class bdist_wheel(_bdist_wheel, ExtBase):
         for fw in fw_libs:
             target = re.match('.+firmware_(\w+).+', fw).group(1)
             self.copy_file(fw, os.path.join(pkg_dir, f'lib/{target}_{"firmware" if "cmodel" in fw else "kernel_module"}.so'))
+
+        tpuDNN_libs = glob.glob(os.path.join(BASE_DIR, 'third_party/tpuDNN/*_lib/*.so'))
+        for lib in tpuDNN_libs:
+            target = re.match('.+tpuDNN/(\w+)_lib.+', lib).group(1)
+            self.copy_file(lib, os.path.join(pkg_dir, f'lib/libtpudnn.{target}.so'))
+
         super().run()
 
 include_directories = [
     BASE_DIR,
+    os.path.join(BASE_DIR, 'third_party/tpuDNN/include'),
     os.path.join(TPUV7_RUNTIME_PATH, "tpuv7-emulator_0.1.0", "include"),
     os.path.join(SGDNN_PATH, "include"),
     os.path.join(SGAPI_STRUCT_PATH, "include")

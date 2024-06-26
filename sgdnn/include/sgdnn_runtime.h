@@ -16,11 +16,13 @@
 typedef tpuRtStream_t tpu_resource_t;
 typedef tpuRtStatus_t tpu_status_t;
 typedef void* tpu_device_mem_t;
+typedef tpuRtKernelModule_t tpu_module_t;
 #define SG_SUCCESS tpuRtSuccess
 #else
 typedef bm_handle_t tpu_resource_t;
 typedef bm_status_t tpu_status_t;
 typedef bm_device_mem_t tpu_device_mem_t;
+typedef tpu_kernel_module_t tpu_module_t;
 #define SG_SUCCESS BM_SUCCESS
 #endif
 

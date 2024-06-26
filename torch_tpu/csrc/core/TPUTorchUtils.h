@@ -12,8 +12,9 @@
 
 #include "TPUDeviceManager.h"
 #include "TPUGuard.h"
-#ifdef BACKEND_SG2260
+#include <tpuDNN.h>
 #include "TPUStream.h"
+#ifdef BACKEND_SG2260
 #include <sgdnn_api.h>
 #elif defined BACKEND_1684X
 #include <sgdnn_api.h>
@@ -150,11 +151,13 @@ static inline bool IsSupportDtype( caffe2::TypeMeta&& dtype )
   return support;
 }
 
-static inline SgdnnTensor_t TPUGenerateSgdnnTensor ( const at::Tensor & Tensor )
+template <typename T>
+static inline T TPUGenerateDnnTensor ( const at::Tensor & Tensor )
 {
-  SgdnnTensor_t t = { 0 };
-  t.addr = GetAddrByUnifiedAddr(( unsigned long long ) Tensor.data_ptr());
-  t.dtype = TPUConvertDType ( Tensor.dtype() );
+  T t = { 0 };
+  t.addr = reinterpret_cast<decltype(t.addr)>(
+    GetAddrByUnifiedAddr(( unsigned long long ) Tensor.data_ptr()));
+  t.dtype = (decltype(t.dtype))(TPUConvertDType ( Tensor.dtype() ));
   t.dim = Tensor.dim();
   for ( auto i = 0; i < Tensor.dim(); ++i )
   {
@@ -162,6 +165,15 @@ static inline SgdnnTensor_t TPUGenerateSgdnnTensor ( const at::Tensor & Tensor )
     t.stride[i] = Tensor.stride ( i );
   }
   return t;
+}
+
+constexpr const static auto TPUGenerateSgdnnTensor = TPUGenerateDnnTensor<SgdnnTensor_t>;
+
+static inline tpudnnTensor_t TPUGenerateTpudnnTensor(tpudnnHandle_t handle, const at::Tensor & tensor)
+{
+  auto ret = TPUGenerateDnnTensor<tpudnnTensor_t>(tensor);
+  ret.addr = tpudnnPhysToVirt(handle, (unsigned long long)ret.addr);
+  return ret;
 }
 
 static inline std::string GetTensorInfo( const at::Tensor & Tensor )

@@ -20,7 +20,7 @@ public:
   TPUDeviceManager() : init_flag_(false) {}
 
   ~TPUDeviceManager() {
-    if (auto stream_ = c10_tpu::getDefaultTPUStream()) {
+    if (tpu_resource_t stream_ = c10_tpu::getDefaultTPUStream()) {
       sgdnnDeinitialize(stream_);
       tpuRtStreamSynchronize(stream_);
       tpuRtStreamDestroy(stream_);
@@ -33,6 +33,9 @@ public:
   TPUMgrStatus initialize()
   {
     if (init_flag_) return INIT_SUCCESS;
+
+    tpuRtInit();
+
     int DeviceCount = 0;
     tpuRtStatus_t Status = tpuRtGetDeviceCount ( &DeviceCount );
     if (DeviceCount == 0) {
@@ -45,7 +48,6 @@ public:
     if(size != nullptr) {
       DeviceCount = atoi(size);
     }
-    tpuRtInit();
 
     TORCH_CHECK ( Status == tpuRtSuccess, "Failed to get TPU device count" );
     if ( DeviceCount > 0 )

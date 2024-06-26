@@ -1,4 +1,3 @@
-#ifdef BACKEND_SG2260
 #include <array>
 #include <climits>
 #include <atomic>
@@ -17,6 +16,11 @@
 #include "torch_tpu/csrc/core/TPUGuard.h"
 #include "torch_tpu/csrc/core/TPUException.h"
 #include "TPUMacros.h"
+
+#define tpuStreamNonBlocking 0x01 /**< Stream does not synchronize with stream 0 (the NULL stream) */
+
+extern tpu_module_t get_kernel_module(tpu_resource_t stream);
+
 namespace c10_tpu {
 namespace {
 
@@ -32,10 +36,14 @@ static std::once_flag device_flags[C10_COMPILE_TIME_MAX_TPUS];
 static std::atomic<uint32_t> 
         priority_counters[c10_tpu::max_compile_time_stream_priorities][C10_COMPILE_TIME_MAX_TPUS];
 
+#ifdef BACKEND_SG2260
 static sgrt::sgrtStream_t 
         streams[c10_tpu::max_compile_time_stream_priorities][C10_COMPILE_TIME_MAX_TPUS][kStreamsPerPool];
 static sgrt::sgrtStream_t
         default_streams[C10_COMPILE_TIME_MAX_TPUS] = {nullptr};
+#endif
+
+static tpudnnHandle_t tpudnn_handles[C10_COMPILE_TIME_MAX_TPUS] = {0};
 
 // Note [StreamId assignment]
 // ~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -135,6 +143,8 @@ static void initDeviceStreamState(c10::DeviceIndex device_index) {
   // Switches to the requested device so streams are properly associated
   // with it.
   TPUGuard device_guard{device_index};
+
+#if 0
   for (auto i = decltype(kStreamsPerPool){0}; i < kStreamsPerPool; ++i) {
     for (int priority_i = 0; priority_i < c10_tpu::max_compile_time_stream_priorities; priority_i++)
     {
@@ -145,6 +155,25 @@ static void initDeviceStreamState(c10::DeviceIndex device_index) {
       //TODO: trace to impl
     }
   }
+#endif
+
+#ifdef BACKEND_SG2260
+  C10_TPU_CHECK(sgrt::SgrtCreateStream(&default_streams[device_index]));
+  std::cout << "Stream created for device " << int(device_index) << std::endl;
+#endif
+
+  // The goal is to remove all runtime dependencies in torch-tpu,
+  // then we can use tpudnnCreate to create tpuDNN handle. Util then
+  // we have to keep all the resource management logic around.
+  //
+  // And don't bother freeing tpuDNN handles.
+#ifdef BACKEND_SG2260
+  auto stream = default_streams[device_index];
+#else
+  auto stream = tpu::TPUGetDeviceResource();
+#endif
+  auto kmodule = get_kernel_module(stream);
+  tpudnn_handles[device_index] = tpudnnHandleFromStream(device_index, stream, kmodule);
 }
 
 static void initTPUStreamsOnce() {
@@ -153,10 +182,13 @@ static void initTPUStreamsOnce() {
 
   DeviceIndex dev_index = current_device();
   TPUGuard device_guard{dev_index};
+
+#ifdef BACKEND_SG2260
   if (!default_streams[dev_index]) {
     C10_TPU_CHECK(sgrt::SgrtCreateStream(&default_streams[dev_index]));
     std::cout << "stream : " << default_streams[dev_index] << std::endl;
   }
+#endif
 
   if (current_streams) {
     return;
@@ -165,6 +197,11 @@ static void initTPUStreamsOnce() {
   current_streams = std::make_unique<StreamId[]>(num_tpus);
   for (const auto i : c10::irange(num_tpus)) {
     current_streams[i] = makeStreamId(StreamIdType::DEFAULT, 0);
+
+    // We probably should not do this
+    // Later when we implement priority streams we should reconsider this
+    std::call_once(
+        device_flags[i], initDeviceStreamState, i);
   }
 }
 
@@ -188,6 +225,18 @@ TPUStream TPUStreamForId(DeviceIndex device_index, StreamId stream_id) {
 
 } // namespace
 
+  TPUStream::operator tpudnnHandle_t() const
+  {
+    c10::DeviceIndex device_index = stream_.device_index();
+    StreamId stream_id = stream_.id();
+    StreamIdType st = streamIdType(stream_id);
+
+    TORCH_INTERNAL_ASSERT(st.isDefault());
+
+    return tpudnn_handles[device_index];
+  }
+
+#ifdef BACKEND_SG2260
  sgrt::sgrtStream_t TPUStream::stream() const {
   c10::DeviceIndex device_index = stream_.device_index();
   StreamId stream_id = stream_.id();
@@ -221,6 +270,18 @@ TPUStream TPUStreamForId(DeviceIndex device_index, StreamId stream_id) {
   }
 }
 
+void tpuSynchronizeDevice() {
+  sgrt::SgrtDeviceSynchronize();
+}
+
+TPUStream getStreamFromExternal(
+    tpuRtStream_t ext_stream,
+    DeviceIndex device_index) {
+  // The stream pointer will be the actual id
+  return TPUStreamForId(device_index, reinterpret_cast<int64_t>(ext_stream));
+}
+#endif // BACKEND_SG2260
+
 // Returns a stream from the requested pool
 // Note: when called the first time on a device, this will create the
 // stream pools for that device.
@@ -253,13 +314,6 @@ TPUStream getStreamFromPool(
   return getStreamFromPool(priority, device_index);
 }
 
-TPUStream getStreamFromExternal(
-    tpuRtStream_t ext_stream,
-    DeviceIndex device_index) {
-  // The stream pointer will be the actual id
-  return TPUStreamForId(device_index, reinterpret_cast<int64_t>(ext_stream));
-}
-
 TPUStream getDefaultTPUStream(c10::DeviceIndex device_index) {
   initTPUStreamsOnce();
   if (device_index == -1) {
@@ -283,14 +337,8 @@ void setCurrentTPUStream(TPUStream stream) {
   current_streams[stream.device_index()] = stream.id();
 }
 
-void tpuSynchronizeDevice() {
-  sgrt::SgrtDeviceSynchronize();
-}
-
 std::ostream& operator<<(std::ostream& stream, const TPUStream& s) {
   return stream << s.unwrap();
 }
 
 } // namespace c10_tpu
-
-#endif // BACKEND_SG2260

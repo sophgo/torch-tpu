@@ -2,6 +2,13 @@ cmake_minimum_required(VERSION 3.25)
 
 project(FIRMWARE C)
 
+find_program(CCACHE_FOUND ccache)
+if (CCACHE_FOUND)
+    set_property(GLOBAL PROPERTY RULE_LAUNCH_COMPILE ccache)
+endif()
+
+list(APPEND CMAKE_MODULE_PATH ${CMAKE_SOURCE_DIR}/../cmake)
+
 include(config.cmake)
 
 add_definitions(-Wno-address-of-packed-member
@@ -17,24 +24,9 @@ add_definitions(-Wno-address-of-packed-member
 include_directories(${CMAKE_CURRENT_SOURCE_DIR}/../common/include)
 include_directories(${CMAKE_CURRENT_SOURCE_DIR}/../third_party/firmware/include)
 
-if (USING_CMODEL)
-    message(STATUS "Building cmodel firmware for $ENV{CHIP_ARCH}")
-    if($ENV{CHIP_ARCH} STREQUAL "bm1684x")
-        set(FIRMWARE_PATH $ENV{TPUTRAIN_TOP}/third_party/firmware/$ENV{CHIP_ARCH}/libcmodel_firmware.so)
-    elseif($ENV{CHIP_ARCH} STREQUAL "sg2260")
-        set(FIRMWARE_PATH $ENV{TPUTRAIN_TOP}/third_party/tpuv7_runtime/tpuv7-emulator_0.1.0/lib/libtpuv7_emulator.so)
-    endif()
-else()
-    message(STATUS "Building firmware for $ENV{CHIP_ARCH}")
+if (NOT USING_CMODEL)
     include($ENV{CHIP_ARCH}-toolchain.cmake)
-    if($ENV{CHIP_ARCH} STREQUAL "bm1684x")
-        set(FIRMWARE_PATH $ENV{TPUTRAIN_TOP}/third_party/firmware/$ENV{CHIP_ARCH}/libbm1684x.a)
-    elseif($ENV{CHIP_ARCH} STREQUAL "sg2260")
-        set(FIRMWARE_PATH $ENV{TPUTRAIN_TOP}/third_party/firmware/sg2260/libfirmware_core.a)
-    endif()
 endif()
-
-message(STATUS "FIRMWARE_PATH = ${FIRMWARE_PATH}")
 
 aux_source_directory(src KERNEL_SRC_FILES)
 add_library(firmware SHARED ${KERNEL_SRC_FILES})
@@ -42,11 +34,12 @@ add_library(firmware SHARED ${KERNEL_SRC_FILES})
 string(TOUPPER "BACKEND_$ENV{CHIP_ARCH}" arch_flag)
 target_compile_definitions(firmware PRIVATE -D${arch_flag})
 
+find_package(TPU1686 REQUIRED)
 if (USING_CMODEL)
     target_compile_definitions(firmware PRIVATE -DUSING_CMODEL)
-    target_link_libraries(firmware PRIVATE ${FIRMWARE_PATH})
+    target_link_libraries(firmware PRIVATE TPU1686::cmodel_firmware)
 else()
     set_target_properties(firmware PROPERTIES LINK_FLAGS -s)
     target_link_options(firmware PRIVATE -Wl,-allow-multiple-definition)
-    target_link_libraries(firmware PRIVATE -Wl,--whole-archive ${FIRMWARE_PATH} -Wl,--no-whole-archive)
+    target_link_libraries(firmware PRIVATE -Wl,--whole-archive TPU1686::firmware -Wl,--no-whole-archive)
 endif()

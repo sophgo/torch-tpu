@@ -177,10 +177,21 @@ static inline int sgdnnTPUKernelDType ( SgdnnDataType_t dtype )
   SGDNN_CHECK ( false );
 }
 
+tpu_status_t sgdnnInitialize( tpu_resource_t resource );
+
 #if defined BACKEND_1684X
 static std::map<tpu_resource_t, tpu_kernel_module_t> tpu_kernel_module;
+tpu_kernel_module_t get_kernel_module(bm_handle_t handle)
+{
+  sgdnnInitialize(handle);
+  return tpu_kernel_module[handle];
+}
 #elif defined BACKEND_SG2260
 static TPUKernelLauncher kernel_launcher;
+tpuRtKernelModule_t get_kernel_module(tpuRtStream_t stream)
+{
+  return kernel_launcher.get_kernel_module(stream);
+}
 #endif
 
 tpu_status_t sgdnnInitialize( tpu_resource_t resource )

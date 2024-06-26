@@ -414,6 +414,7 @@ void nodechip_binary(global_addr_t input_global_addr,
   }
 }
 
+#ifndef BACKEND_SG2260
 int tpu_kernel_api_binary(const void *args) {
   sg_api_binary_t *api = (sg_api_binary_t *)args;
   TPUKERNEL_ASSERT(api->dtype == DT_INT8 || api->dtype == DT_UINT8 ||
@@ -455,8 +456,9 @@ int tpu_kernel_api_binary(const void *args) {
 }
 TPUKERNEL_FUNC_REGISTER(tpu_kernel_api_binary);
 
-#ifdef BACKEND_SG2260
-int tpu_kernel_api_binary_multi_core(const void *args) {
+#else // defined BACKEND_SG2260
+
+int tpu_kernel_api_binary(const void *args) {
   sg_api_binary_t *api = (sg_api_binary_t *)args;
   tpu_initialize();
 #ifdef USING_PERF_MODE
@@ -518,7 +520,7 @@ int tpu_kernel_api_binary_multi_core(const void *args) {
   tpu_poll();
   return 0;
 }
-TPUKERNEL_FUNC_REGISTER(tpu_kernel_api_binary_multi_core);
+TPUKERNEL_FUNC_REGISTER(tpu_kernel_api_binary);
 #endif
 
 // judge two dim can be merged according to their shapes

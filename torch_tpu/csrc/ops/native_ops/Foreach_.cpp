@@ -9,11 +9,9 @@
 #include "common/config.h"
 namespace at {
 
-using namespace native;
-
 #define FOREACH_UNARY_OP(OP)                                           \
   std::vector<Tensor> foreach_tensor_##OP##_tpu(TensorList tensors) {  \
-    check_foreach_api_restrictions(tensors);                           \
+    native::check_foreach_api_restrictions(tensors);                           \
                                                                        \
     std::vector<Tensor> result;                                        \
     result.reserve(tensors.size());                                    \
@@ -25,7 +23,7 @@ using namespace native;
   }                                                                    \
                                                                        \
   void foreach_tensor_##OP##_tpu_(TensorList tensors) {                \
-    check_foreach_api_restrictions(tensors);                           \
+    native::check_foreach_api_restrictions(tensors);                           \
                                                                        \
     for (auto& t : tensors) {                                          \
       t.OP##_();                                                       \
@@ -47,7 +45,7 @@ TORCH_LIBRARY_IMPL ( aten, TPU, m )                                    \
         " dimensions and ",                                     \
         scalar.numel(),                                         \
         " elements.");                                          \
-    check_foreach_api_restrictions(tensors);                    \
+    native::check_foreach_api_restrictions(tensors);                    \
                                                                 \
     for (auto& t : tensors) {                                   \
       t.OP##_(scalar);                                          \
@@ -63,7 +61,7 @@ TORCH_LIBRARY_IMPL ( aten, TPU, m )                                    \
         " dimensions and ",                                     \
         scalar.numel(),                                         \
         " elements.");                                          \
-    check_foreach_api_restrictions(tensors);                    \
+    native::check_foreach_api_restrictions(tensors);                    \
                                                                 \
     std::vector<Tensor> result;                                 \
     result.reserve(tensors.size());                             \
@@ -83,7 +81,7 @@ TORCH_LIBRARY_IMPL ( aten, TPU, m )                                             
 #define FOREACH_BINARY_OP_SCALAR(OP)                            \
   void foreach_tensor_##OP##_scalar_kernel_tpu_(                \
       TensorList tensors, const Scalar& scalar) {               \
-    check_foreach_api_restrictions(tensors);                    \
+    native::check_foreach_api_restrictions(tensors);                    \
                                                                 \
     for (auto& t : tensors) {                                   \
       t.OP##_(scalar);                                          \
@@ -92,7 +90,7 @@ TORCH_LIBRARY_IMPL ( aten, TPU, m )                                             
                                                                 \
   std::vector<Tensor> foreach_tensor_##OP##_scalar_kernel_tpu(  \
       TensorList tensors, const Scalar& scalar) {               \
-    check_foreach_api_restrictions(tensors);                    \
+    native::check_foreach_api_restrictions(tensors);                    \
                                                                 \
     std::vector<Tensor> result;                                 \
     result.reserve(tensors.size());                             \
@@ -112,7 +110,7 @@ TORCH_LIBRARY_IMPL ( aten, TPU, m )                                             
 #define FOREACH_BINARY_OP_LIST(OP)                            \
   std::vector<Tensor> foreach_tensor_##OP##_list_kernel_tpu(  \
       TensorList tensors1, TensorList tensors2) {             \
-    check_foreach_api_restrictions(tensors1, tensors2);       \
+    native::check_foreach_api_restrictions(tensors1, tensors2);       \
                                                               \
     std::vector<Tensor> result;                               \
     result.reserve(tensors1.size());                          \
@@ -125,7 +123,7 @@ TORCH_LIBRARY_IMPL ( aten, TPU, m )                                             
                                                               \
   void foreach_tensor_##OP##_list_kernel_tpu_(               \
       TensorList tensors1, TensorList tensors2) {             \
-    check_foreach_api_restrictions(tensors1, tensors2);       \
+    native::check_foreach_api_restrictions(tensors1, tensors2);       \
                                                               \
     for (const auto i : c10::irange(tensors1.size())) {       \
       tensors1[i].OP##_(tensors2[i]);                         \
@@ -141,7 +139,7 @@ TORCH_LIBRARY_IMPL ( aten, TPU, m )                                         \
 #define FOREACH_BINARY_OP_LIST_ALPHA(OP)                               \
   std::vector<Tensor> foreach_tensor_##OP##_list_kernel_tpu(          \
       TensorList tensors1, TensorList tensors2, const Scalar& alpha) { \
-    check_foreach_api_restrictions(tensors1, tensors2);                \
+    native::check_foreach_api_restrictions(tensors1, tensors2);                \
                                                                        \
     std::vector<Tensor> result;                                        \
     result.reserve(tensors1.size());                                   \
@@ -154,7 +152,7 @@ TORCH_LIBRARY_IMPL ( aten, TPU, m )                                         \
                                                                        \
   void foreach_tensor_##OP##_list_kernel_tpu_(                         \
       TensorList tensors1, TensorList tensors2, const Scalar& alpha) { \
-    check_foreach_api_restrictions(tensors1, tensors2);                \
+    native::check_foreach_api_restrictions(tensors1, tensors2);                \
                                                                        \
     for (const auto i : c10::irange(tensors1.size())) {                \
       tensors1[i].OP##_(tensors2[i], alpha);                           \
@@ -170,7 +168,7 @@ TORCH_LIBRARY_IMPL ( aten, TPU, m )                                         \
 #define FOREACH_BINARY_OP_SCALARLIST(OP)                            \
   void foreach_tensor_##OP##_scalarlist_kernel_tpu_(               \
       TensorList tensors, at::ArrayRef<Scalar> scalars) {           \
-    check_foreach_api_restrictions(tensors, scalars);               \
+    native::check_foreach_api_restrictions(tensors, scalars);               \
                                                                     \
     for (const auto i : c10::irange(tensors.size())) {              \
       tensors[i].OP##_(scalars[i]);                                 \
@@ -179,7 +177,7 @@ TORCH_LIBRARY_IMPL ( aten, TPU, m )                                         \
                                                                     \
   std::vector<Tensor> foreach_tensor_##OP##_scalarlist_kernel_tpu( \
       TensorList tensors, at::ArrayRef<Scalar> scalars) {           \
-    check_foreach_api_restrictions(tensors, scalars);               \
+    native::check_foreach_api_restrictions(tensors, scalars);               \
     std::vector<Tensor> result;                                     \
     result.reserve(tensors.size());                                 \
     for (const auto i : c10::irange(tensors.size())) {              \
@@ -200,7 +198,7 @@ TORCH_LIBRARY_IMPL ( aten, TPU, m )                                             
       TensorList tensors1,                                                \
       TensorList tensors2,                                                \
       const Scalar& scalar) {                                             \
-    check_foreach_api_restrictions(input, tensors1, tensors2);            \
+    native::check_foreach_api_restrictions(input, tensors1, tensors2);            \
                                                                           \
     std::vector<Tensor> result;                                           \
     for (const auto i : c10::irange(input.size())) {                      \
@@ -215,7 +213,7 @@ TORCH_LIBRARY_IMPL ( aten, TPU, m )                                             
       TensorList tensors1,                                                \
       TensorList tensors2,                                                \
       const Scalar& scalar) {                                             \
-    check_foreach_api_restrictions(input, tensors1, tensors2);            \
+    native::check_foreach_api_restrictions(input, tensors1, tensors2);            \
                                                                           \
     for (const auto i : c10::irange(input.size())) {                      \
       input[i].OP##_(tensors1[i], tensors2[i], scalar);                   \
@@ -233,7 +231,7 @@ TORCH_LIBRARY_IMPL ( aten, TPU, m )                                             
       TensorList tensors1,                                                    \
       TensorList tensors2,                                                    \
       at::ArrayRef<Scalar> scalars) {                                         \
-    check_foreach_api_restrictions(input, tensors1, tensors2, scalars);       \
+    native::check_foreach_api_restrictions(input, tensors1, tensors2, scalars);       \
                                                                               \
     std::vector<Tensor> result;                                               \
     for (const auto i : c10::irange(input.size())) {                          \
@@ -248,7 +246,7 @@ TORCH_LIBRARY_IMPL ( aten, TPU, m )                                             
       TensorList tensors1,                                                    \
       TensorList tensors2,                                                    \
       at::ArrayRef<Scalar> scalars) {                                         \
-    check_foreach_api_restrictions(input, tensors1, tensors2, scalars);       \
+    native::check_foreach_api_restrictions(input, tensors1, tensors2, scalars);       \
                                                                               \
     for (const auto i : c10::irange(input.size())) {                          \
       input[i].OP##_(tensors1[i], tensors2[i], scalars[i]);                   \
@@ -295,7 +293,7 @@ FOREACH_POINTWISE_OP_SCALARLIST(addcdiv);
 #define FOREACH_BINARY_OP_LIST_SCALAR(OP)                               \
   std::vector<Tensor> foreach_tensor_##OP##_list_kernel_tpu(          \
       TensorList tensors1, TensorList tensors2, const Scalar& alpha) { \
-    check_foreach_api_restrictions(tensors1, tensors2);                \
+    native::check_foreach_api_restrictions(tensors1, tensors2);                \
                                                                        \
     std::vector<Tensor> result;                                        \
     result.reserve(tensors1.size());                                   \
@@ -308,7 +306,7 @@ FOREACH_POINTWISE_OP_SCALARLIST(addcdiv);
                                                                        \
   void foreach_tensor_##OP##_list_kernel_tpu_(                         \
       TensorList tensors1, TensorList tensors2, const Scalar& alpha) { \
-    check_foreach_api_restrictions(tensors1, tensors2);                \
+    native::check_foreach_api_restrictions(tensors1, tensors2);                \
                                                                        \
     for (const auto i : c10::irange(tensors1.size())) {                \
       tensors1[i].OP##_(tensors2[i], alpha);                           \

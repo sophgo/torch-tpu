@@ -37,18 +37,21 @@ function get_pytorch_install_dir(){
 }
 
 function set_v7runtime_env() {
-     local root_path=$1
-     local v7_lib_path=${root_path}/third_party/tpuv7_runtime/tpuv7-emulator_0.1.0/lib
-     export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:${v7_lib_path}
-     export TPU_SCALAR_EMULATOR_PATH=${v7_lib_path}/libtpuv7_scalar_emulator.so
-     build_type=Release
-     if [ "$TPUTRAIN_DEBUG" = "ON" ]; then
-          build_type=Debug
-     fi
-     export TPU_KERNEL_PATH=${root_path}/build/firmware_sg2260_cmodel/
-     export TPU_EMULATOR_PATH=${root_path}/build/firmware_sg2260_cmodel/libfirmware.so
-     export TPUKERNEL_FIRMWARE_PATH=${root_path}/build/firmware_sg2260_cmodel/libfirmware.so
+    local root_path=$1
+    local v7_lib_path=${root_path}/third_party/tpuv7_runtime/tpuv7-emulator_0.1.0/lib
+    if [[ "$LD_LIBRARY_PATH" != *tpuv7_runtime* ]]; then
+        export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:${v7_lib_path}
+    fi
+    export TPU_SCALAR_EMULATOR_PATH=${v7_lib_path}/libtpuv7_scalar_emulator.so
+    build_type=Release
+    if [ "$TPUTRAIN_DEBUG" = "ON" ]; then
+         build_type=Debug
+    fi
+    export TPU_KERNEL_PATH=${root_path}/build/firmware_sg2260_cmodel/
+    export TPU_EMULATOR_PATH=${root_path}/build/firmware_sg2260_cmodel/libfirmware.so
+    export TPUKERNEL_FIRMWARE_PATH=${root_path}/build/firmware_sg2260_cmodel/libfirmware.so
 }
+
 ################ MODE CHOICE ###################
 export MODE_ASIC=stable        # stable: asic
 export MODE_CMODEL=local       # local: cmodel
@@ -58,7 +61,6 @@ export MODE_PATTERN=${2:-$MODE_CMODEL}
 export TPUTRAIN_TOP=$(cd $(dirname "${BASH_SOURCE[0]}")/.. && pwd)
 export TPUTRAIN_DEBUG=OFF
 export CHIP_ARCH=${1:-bm1684x}  #sg2260
-export PS1="\[\e[1;35m\]("train-"${CHIP_ARCH}):\[\e[1;33m\]\w\[\e[1;34m\]\$ \[\e[0m\]"
 
 ################cross toolchains###################
 source ${TPUTRAIN_TOP}/scripts/prepare_toolchains.sh
@@ -76,11 +78,31 @@ echo "[INFO]PYTORCH_INSTALL_DIR=$PYTORCH_INSTALL_DIR"
 source ${TPUTRAIN_TOP}/scripts/build_helper.sh
 source ${TPUTRAIN_TOP}/scripts/regression.sh
 
-export LD_LIBRARY_PATH=$TPUTRAIN_TOP/third_party/oneDNN/lib:$LD_LIBRARY_PATH
+if [[ "$LD_LIBRARY_PATH" != *oneDNN* ]]; then
+    export LD_LIBRARY_PATH=$TPUTRAIN_TOP/third_party/oneDNN/lib:$LD_LIBRARY_PATH
+fi
 
 if [ "${CHIP_ARCH}" == "sg2260" ]; then
      set_v7runtime_env ${TPUTRAIN_TOP}
 fi
+
+export TPUKERNEL_FIRMWARE_PATH=${TPUTRAIN_TOP}/build/firmware_${CHIP_ARCH}_cmodel/libfirmware.so
+
+export TPU1686_PATH=$(realpath $TPUTRAIN_TOP/../TPU1686)
+if [ ! -d $TPU1686_PATH ]; then
+    unset TPU1686_PATH
+else
+    echo "Found TPU1686 in ${TPU1686_PATH}"
+    source ${TPU1686_PATH}/scripts/envsetup.sh
+fi
+
+function rebuild_TPU1686()
+{
+    CMODEL_FW_BINARY_DIR=build_cmodel_fw rebuild_firmware_cmodel || return -1
+    FW_BINARY_DIR=build_fw rebuild_firmware_and_tpudnn || return -1
+}
+
+export PS1="\[\e[1;35m\]("train-"${CHIP_ARCH}):\[\e[1;33m\]\w\[\e[1;34m\]\$ \[\e[0m\]"
 
 function update_tpuv7()
 {

@@ -20,6 +20,8 @@ endif()
 set(CMAKE_INSTALL_PREFIX ${CMAKE_BINARY_DIR} CACHE PATH "Install prefix")
 message(STATUS "CMAKE PREFIX: " ${CMAKE_INSTALL_PREFIX})
 
+message(STATUS "Building for chip $ENV{CHIP_ARCH}")
+
 # ftp package
 string(TIMESTAMP BUILD_TIME "%Y%m%d")
 set(TORCHTPU_VERSION "${BUILD_TIME}" CACHE STRING "torch-tpu version" FORCE)

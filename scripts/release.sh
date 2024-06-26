@@ -5,8 +5,8 @@ pushd $CUR_DIR/..
 # ------------------------------------------------------------------------------
 source scripts/envsetup.sh
 export RELEASE_MODE=ON
-python setup.py clean
-bdist_wheel
+TORCH_TPU_NONINTERACTIVE=ON python setup.py clean
+bdist_wheel || exit -1
 
 if [ -z $SKIP_DOC ]; then
     source scripts/release_doc.sh
