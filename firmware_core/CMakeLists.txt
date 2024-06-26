@@ -39,6 +39,9 @@ message(STATUS "FIRMWARE_PATH = ${FIRMWARE_PATH}")
 aux_source_directory(src KERNEL_SRC_FILES)
 add_library(firmware SHARED ${KERNEL_SRC_FILES})
 
+string(TOUPPER "BACKEND_$ENV{CHIP_ARCH}" arch_flag)
+target_compile_definitions(firmware PRIVATE -D${arch_flag})
+
 if (USING_CMODEL)
     target_compile_definitions(firmware PRIVATE -DUSING_CMODEL)
     target_link_libraries(firmware PRIVATE ${FIRMWARE_PATH})
