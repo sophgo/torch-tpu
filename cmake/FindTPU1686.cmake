@@ -16,14 +16,14 @@ if ($ENV{CHIP_ARCH} STREQUAL "bm1684x")
         cmodel_firmware_LIBRARY
         NAMES cmodel_firmware
         HINTS
-        $ENV{TPUTRAIN_TOP}/../TPU1686/build_cmodel_fw/firmware_core/
+        #$ENV{TPUTRAIN_TOP}/../TPU1686/build_cmodel_fw/firmware_core/
         $ENV{TPUTRAIN_TOP}/third_party/firmware/$ENV{CHIP_ARCH}/)
 
     find_library(
         firmware_LIBRARY
         NAMES firmware_core bm1684x
         HINTS
-        $ENV{TPUTRAIN_TOP}/../TPU1686/build_fw/firmware_core/
+        #$ENV{TPUTRAIN_TOP}/../TPU1686/build_fw/firmware_core/
         $ENV{TPUTRAIN_TOP}/third_party/firmware/$ENV{CHIP_ARCH}/)
 elseif ($ENV{CHIP_ARCH} STREQUAL "sg2260")
     find_library(

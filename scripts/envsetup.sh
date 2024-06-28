@@ -59,7 +59,6 @@ export MODE_PATTERN=${2:-$MODE_CMODEL}
 
 ######## ===== ENVS TO COMPILE TPUTRAIN ======########
 export TPUTRAIN_TOP=$(cd $(dirname "${BASH_SOURCE[0]}")/.. && pwd)
-export TPUTRAIN_DEBUG=OFF
 export CHIP_ARCH=${1:-bm1684x}  #sg2260
 
 ################cross toolchains###################

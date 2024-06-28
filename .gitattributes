@@ -1,1 +1,4 @@
-third_party/tpuDNN/**/*.so filter=lfs diff=lfs merge=lfs -text
+third_party/tpuv7_runtime/tpuv7-emulator_0.1.0/bin/* filter=lfs diff=lfs merge=lfs -text
+third_party/firmware/**/*.a filter=lfs diff=lfs merge=lfs -text
+third_party/**/**/**/*.so* filter=lfs diff=lfs merge=lfs -text
+third_party/**/**/*.so* filter=lfs diff=lfs merge=lfs -text

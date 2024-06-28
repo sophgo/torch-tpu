@@ -190,14 +190,16 @@ class CPPLibBuild(build_clib, ExtBase, object):
             f'-DKERNEL_MODULE_PATH={fw_path}',
             f'-DCMAKE_INSTALL_PREFIX={package_dir}'
             ]
+        install_cmd = 'install/strip'
         if os.getenv('TPUTRAIN_DEBUG'):
+            install_cmd = 'install'
             cmake_args.append('-DDEBUG=ON')
         build_dir = os.path.join(BASE_DIR, 'build/torch-tpu')
         os.makedirs(build_dir, exist_ok=True)
         build_args = ['-j', str(8)]
         subprocess.check_call([self.cmake, BASE_DIR] + cmake_args, cwd=build_dir, env=os.environ)
         subprocess.check_call(['make'] + build_args, cwd=build_dir, env=os.environ)
-        subprocess.check_call(['make', 'install/strip'], cwd=build_dir, env=os.environ)
+        subprocess.check_call(['make', install_cmd], cwd=build_dir, env=os.environ)
 
 class Build(build_ext, ExtBase, object):
 

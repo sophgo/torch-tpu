@@ -180,16 +180,6 @@ static void initTPUStreamsOnce() {
   // Inits default and secondary streams (once, globally)
   c10::call_once(init_flag, initGlobalStreamState);
 
-  DeviceIndex dev_index = current_device();
-  TPUGuard device_guard{dev_index};
-
-#ifdef BACKEND_SG2260
-  if (!default_streams[dev_index]) {
-    C10_TPU_CHECK(sgrt::SgrtCreateStream(&default_streams[dev_index]));
-    std::cout << "stream : " << default_streams[dev_index] << std::endl;
-  }
-#endif
-
   if (current_streams) {
     return;
   }

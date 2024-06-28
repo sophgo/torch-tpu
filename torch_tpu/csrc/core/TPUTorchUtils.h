@@ -98,45 +98,51 @@ static inline void SaveTensorToBinaryFile ( const at::Tensor & Tensor, const std
   fout.close();
 }
 
-static inline SgdnnDataType_t TPUConvertDType ( caffe2::TypeMeta dtype )
-{
-  if ( dtype == caffe2::TypeMeta::Make<float>() )
-  {
-    return SGDNN_DTYPE_FP32;
-  }
-  else if ( dtype == caffe2::TypeMeta::Make<at::Half>() )
-  {
-    return SGDNN_DTYPE_FP16;
-  }
-  else if ( dtype == caffe2::TypeMeta::Make<at::BFloat16>() )
-  {
-    return SGDNN_DTYPE_BF16;
-  }
-  else if ( dtype == caffe2::TypeMeta::Make<long>() )
-  {
-    return SGDNN_DTYPE_INT64;
-  }
-  else if ( dtype == caffe2::TypeMeta::Make<int>() )
-  {
-    return SGDNN_DTYPE_INT32;
-  }
-  else if ( dtype == caffe2::TypeMeta::Make<bool>() ||
-            dtype == caffe2::TypeMeta::Make<unsigned char>() ) {
-    return SGDNN_DTYPE_UINT8;
-  }
-  else if ( dtype == caffe2::TypeMeta::Make<int8_t>() )
-  {
-    return SGDNN_DTYPE_INT8;
-  }
-  else if (dtype == caffe2::TypeMeta::Make<short>()){
-    return SGDNN_DTYPE_INT16;
-  }
-  else
-  {
-    TORCH_CHECK ( false, "Unsupported data type ", dtype );
-  }
-  return SGDNN_DTYPE_UNKNOWN;
+#define define_converter(dtype_t, PREFIX)                                               \
+static inline dtype_t TPUConvert##dtype_t ( caffe2::TypeMeta dtype )               \
+{                                                                                       \
+  if ( dtype == caffe2::TypeMeta::Make<float>() )                                       \
+  {                                                                                     \
+    return PREFIX##_DTYPE_FP32;                                                         \
+  }                                                                                     \
+  else if ( dtype == caffe2::TypeMeta::Make<at::Half>() )                               \
+  {                                                                                     \
+    return PREFIX##_DTYPE_FP16;                                                         \
+  }                                                                                     \
+  else if ( dtype == caffe2::TypeMeta::Make<at::BFloat16>() )                           \
+  {                                                                                     \
+    return PREFIX##_DTYPE_BF16;                                                         \
+  }                                                                                     \
+  else if ( dtype == caffe2::TypeMeta::Make<long>() )                                   \
+  {                                                                                     \
+    return PREFIX##_DTYPE_INT64;                                                        \
+  }                                                                                     \
+  else if ( dtype == caffe2::TypeMeta::Make<int>() )                                    \
+  {                                                                                     \
+    return PREFIX##_DTYPE_INT32;                                                        \
+  }                                                                                     \
+  else if ( dtype == caffe2::TypeMeta::Make<bool>() ||                                  \
+            dtype == caffe2::TypeMeta::Make<unsigned char>() ) {                        \
+    return PREFIX##_DTYPE_UINT8;                                                        \
+  }                                                                                     \
+  else if ( dtype == caffe2::TypeMeta::Make<int8_t>() )                                 \
+  {                                                                                     \
+    return PREFIX##_DTYPE_INT8;                                                         \
+  }                                                                                     \
+  else if (dtype == caffe2::TypeMeta::Make<short>()){                                   \
+    return PREFIX##_DTYPE_INT16;                                                        \
+  }                                                                                     \
+  else                                                                                  \
+  {                                                                                     \
+    TORCH_CHECK ( false, "Unsupported data type ", dtype );                             \
+  }                                                                                     \
+  return PREFIX##_DTYPE_UNKNOWN;                                                        \
 }
+
+define_converter(SgdnnDataType_t, SGDNN)
+define_converter(tpudnnDataType_t, TPUDNN)
+
+#undef define_converter
 
 static inline bool IsSupportDtype( caffe2::TypeMeta&& dtype )
 {
@@ -152,12 +158,24 @@ static inline bool IsSupportDtype( caffe2::TypeMeta&& dtype )
 }
 
 template <typename T>
+struct TensorTypeInfo
+{
+    constexpr static const decltype(TPUConvertSgdnnDataType_t) *type_convert = TPUConvertSgdnnDataType_t;
+};
+
+template <>
+struct TensorTypeInfo<tpudnnTensor_t>
+{
+    constexpr static const decltype(TPUConverttpudnnDataType_t) *type_convert = TPUConverttpudnnDataType_t;
+};
+
+template <typename T>
 static inline T TPUGenerateDnnTensor ( const at::Tensor & Tensor )
 {
   T t = { 0 };
   t.addr = reinterpret_cast<decltype(t.addr)>(
     GetAddrByUnifiedAddr(( unsigned long long ) Tensor.data_ptr()));
-  t.dtype = (decltype(t.dtype))(TPUConvertDType ( Tensor.dtype() ));
+  t.dtype = TensorTypeInfo<T>::type_convert( Tensor.dtype() );
   t.dim = Tensor.dim();
   for ( auto i = 0; i < Tensor.dim(); ++i )
   {
@@ -206,11 +224,13 @@ static inline std::string GetTensorInfo( const at::Tensor & Tensor )
   return Tensor_info.str();
 }
 
-static inline SgdnnTensor_t TPUGenerateSgdnnTensorforComplex64 ( const at::Tensor & Tensor )
+template <typename T>
+static inline T TPUGenerateTensorforComplex64 ( const at::Tensor & Tensor )
 {
-  SgdnnTensor_t t = { 0 };
-  t.addr = GetAddrByUnifiedAddr(( unsigned long long ) Tensor.data_ptr());
-  t.dtype = TPUConvertDType ( caffe2::TypeMeta::Make<float>() );
+  T t = { 0 };
+  t.addr = reinterpret_cast<decltype(t.addr)>(
+    GetAddrByUnifiedAddr(( unsigned long long ) Tensor.data_ptr()));
+  t.dtype = TensorTypeInfo<T>::type_convert( caffe2::TypeMeta::Make<float>() );
   t.dim = Tensor.dim();
   for ( auto i = 0; i < Tensor.dim(); ++i )
   {
@@ -218,6 +238,15 @@ static inline SgdnnTensor_t TPUGenerateSgdnnTensorforComplex64 ( const at::Tenso
     t.stride[i] = Tensor.stride ( i ) * 2;
   }
   return t;
+}
+
+constexpr const static auto TPUGenerateSgdnnTensorforComplex64 = TPUGenerateDnnTensor<SgdnnTensor_t>;
+
+static inline tpudnnTensor_t TPUGenerateTpudnnTensorforComplex64(tpudnnHandle_t handle, const at::Tensor & tensor)
+{
+  auto ret = TPUGenerateTensorforComplex64<tpudnnTensor_t>(tensor);
+  ret.addr = tpudnnPhysToVirt(handle, (unsigned long long)ret.addr);
+  return ret;
 }
 
 static inline bool TPUIsSameShape ( const at::Tensor & Tensor1, const at::Tensor & Tensor2 )
