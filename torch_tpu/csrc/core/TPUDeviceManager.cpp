@@ -206,7 +206,7 @@ void CopyDeviceToDevice(void* Dst, const void* Src, size_t Size, int Index)
     auto SrcMem = bm_mem_from_device((unsigned long long)Src + chunkOffset, chunkCopySize);
 
     bm_status_t Status = BM_SUCCESS;
-    Status = bm_memcpy_d2d_byte ( Handle, DstMem, 0, SrcMem, 0, Size );
+    Status = bm_memcpy_d2d_byte ( Handle, DstMem, 0, SrcMem, 0, chunkCopySize );
     TORCH_CHECK (Status == BM_SUCCESS, "D2D failed! Error Code : #", Status );
   }
 }
