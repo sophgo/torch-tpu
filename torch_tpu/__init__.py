@@ -17,7 +17,7 @@ if not os.path.exists(os.path.join(lib_pwd, 'libtorch_tpu.so')):
     except:
         os.symlink('libtorch_tpu.bm1684x.so', os.path.join(lib_pwd, 'libtorch_tpu.so'))
         tpudnn = 'libtpudnn.bm1684x.so'
-    if os.path.exists(tpudnn):
+    if os.path.exists(os.path.join(lib_pwd, tpudnn)):
         os.symlink(tpudnn, os.path.join(lib_pwd, 'libtpudnn.so'))
 
 import torch_tpu._C
