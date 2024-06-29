@@ -454,11 +454,10 @@ int tpu_kernel_api_binary(const void *args) {
   tpu_poll();
   return 0;
 }
-TPUKERNEL_FUNC_REGISTER(tpu_kernel_api_binary);
 
 #else // defined BACKEND_SG2260
 
-int tpu_kernel_api_binary(const void *args) {
+int tpu_kernel_api_binary_multi_core(const void *args) {
   sg_api_binary_t *api = (sg_api_binary_t *)args;
   tpu_initialize();
 #ifdef USING_PERF_MODE
@@ -519,6 +518,12 @@ int tpu_kernel_api_binary(const void *args) {
   }
   tpu_poll();
   return 0;
+}
+TPUKERNEL_FUNC_REGISTER(tpu_kernel_api_binary_multi_core);
+
+int tpu_kernel_api_binary(const void *args)
+{
+    return tpu_kernel_api_binary_multi_core(args);
 }
 TPUKERNEL_FUNC_REGISTER(tpu_kernel_api_binary);
 #endif
