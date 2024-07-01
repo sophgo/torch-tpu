@@ -41,7 +41,7 @@ class BroadcastOptions {
     this->out = std::move(buf);
   }
 
-  void setOutputSophon(tpudnnHandle_t handle, void* buff, size_t bytes, sg_data_type_t sg_type) {
+  void setOutputSophon(tpudnnHandle_t handle, void* buff, size_t bytes, tpudnnDataType_t sg_type) {
     this->handle_ = handle;
     this->bytes_ = bytes;
     this->dtype_ = sg_type;
@@ -73,7 +73,7 @@ class BroadcastOptions {
   tpudnnHandle_t handle_;
   void* buff_;
   size_t bytes_;
-  sg_data_type_t dtype_;
+  tpudnnDataType_t dtype_;
 
   // Broadcast has an optional input buffer for the root.
   std::unique_ptr<transport::UnboundBuffer> in;

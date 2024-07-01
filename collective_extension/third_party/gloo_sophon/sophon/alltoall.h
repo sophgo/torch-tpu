@@ -49,7 +49,7 @@ class AlltoallOptions {
   }
 
   void setOutputSophon(tpudnnHandle_t handle, void* send_buff, 
-                       void* recv_buff, size_t bytes, sg_data_type_t sg_type) {
+                       void* recv_buff, size_t bytes, tpudnnDataType_t sg_type) {
     this->handle_ = handle;
     this->send_buff_ = send_buff;
     this->recv_buff_ = recv_buff;
@@ -75,7 +75,7 @@ class AlltoallOptions {
   void* send_buff_;
   void* recv_buff_;
   size_t bytes_;
-  sg_data_type_t sg_type_;
+  tpudnnDataType_t sg_type_;
 
   // Number of elements.
   size_t elements = 0;

@@ -2,9 +2,9 @@
 
 ## commit id
 - tpuv7_runtime
-f082e94cc7ee0ad9bf0c4ecf30f1bac8b916f5b8
+7219ce77b39fc11eb56a2b7d51a04537520573d5
 - TPU1686
-1ad2bb77bc374a513e92d22f9ec10c813e03c6dc
+7975ce0d46403d69e60eeaf0e20eb1b410e4eddc
 
 ## intro
 `tpuv7_runtime` 是TPUv7.0的异步运行时库。其中，

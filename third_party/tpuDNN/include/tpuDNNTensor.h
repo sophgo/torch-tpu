@@ -8,17 +8,33 @@ extern "C"
 
 enum tpudnnDataType_t
 {
-    TPUDNN_DTYPE_UNKNOWN = 0,
-    TPUDNN_DTYPE_INT8,
-    TPUDNN_DTYPE_UINT8,
-    TPUDNN_DTYPE_INT16,
-    TPUDNN_DTYPE_UINT16,
-    TPUDNN_DTYPE_FP16,
-    TPUDNN_DTYPE_BF16,
-    TPUDNN_DTYPE_INT32,
-    TPUDNN_DTYPE_UINT32,
-    TPUDNN_DTYPE_FP32,
-    TPUDNN_DTYPE_INT64
+    TPUDNN_DTYPE_FP32 = 0,
+    TPUDNN_DTYPE_FP16 = 1,
+    TPUDNN_DTYPE_INT8 = 2,
+    TPUDNN_DTYPE_UINT8 = 3,
+    TPUDNN_DTYPE_INT16 = 4,
+    TPUDNN_DTYPE_UINT16 = 5,
+    TPUDNN_DTYPE_INT32 = 6,
+    TPUDNN_DTYPE_UINT32 = 7,
+    TPUDNN_DTYPE_BF16 = 8,
+    TPUDNN_DTYPE_INT4 = 9,
+    TPUDNN_DTYPE_UINT4 = 10,
+    TPUDNN_DTYPE_FP20 = 11,
+    TPUDNN_DTYPE_FP8E5M2 = 12,
+    TPUDNN_DTYPE_FP8E4M3 = 13,
+    TPUDNN_DTYPE_INT64 = 14,
+
+    TPUDNN_DTYPE_UNKNOWN = -1,
+};
+
+enum tpudnnReduceType_t {
+    TPUDNN_REDUCE_MEAN = 0,
+    TPUDNN_REDUCE_SUM  = 1,
+    TPUDNN_REDUCE_MAX  = 2,
+    TPUDNN_REDUCE_MIN  = 3,
+    TPUDNN_REDUCE_PROD = 4,
+    TPUDNN_REDUCE_L2   = 5,
+    TPUDNN_REDUCE_L1   = 6,
 };
 
 typedef struct
@@ -91,5 +107,93 @@ tpudnnStatus_t tpudnnBinaryAsync(
     float scalar,
     tpudnnTensor_t output,
     int binary_type);
+
+tpudnnStatus_t tpudnnC2CAllReduce(
+    tpudnnHandle_t handle,
+    void *send_buff,
+    void *recv_buff,
+    int count,
+    tpudnnDataType_t dtype,
+    tpudnnReduceType_t reduce_method,
+    const char* uuid,
+    int nranks,
+    int cur_rank,
+    const int *chip_map);
+
+tpudnnStatus_t tpudnnC2CReduce(
+    tpudnnHandle_t handle,
+    void *send_buff,
+    void *recv_buff,
+    int count,
+    tpudnnDataType_t dtype,
+    tpudnnReduceType_t reduce_method,
+    int root,
+    const char* uuid,
+    int nranks,
+    int cur_rank,
+    const int *chip_map);
+
+tpudnnStatus_t tpudnnC2CGather(
+    tpudnnHandle_t handle,
+    void *send_buff,
+    int send_count,
+    void *recv_buff,
+    int recv_count,
+    tpudnnDataType_t dtype,
+    int root,
+    const char* uuid,
+    int nranks,
+    int cur_rank,
+    const int *chip_map);
+
+tpudnnStatus_t tpudnnC2CAllGather(
+    tpudnnHandle_t handle,
+    void *send_buff,
+    int send_count,
+    void *recv_buff,
+    int recv_count,
+    const char* uuid,
+    tpudnnDataType_t dtype,
+    int nranks,
+    int cur_rank,
+    const int *chip_map);
+
+tpudnnStatus_t tpudnnC2CBroadcast(
+    tpudnnHandle_t handle,
+    void *buff,
+    int count,
+    tpudnnDataType_t dtype,
+    int root,
+    const char* uuid,
+    int nranks,
+    int cur_rank,
+    const int *chip_map);
+
+tpudnnStatus_t tpudnnC2CScatter(
+    tpudnnHandle_t handle,
+    void *send_mem,
+    int send_count,
+    tpudnnDataType_t send_type,
+    void *recv_mem,
+    int recv_count,
+    tpudnnDataType_t recv_type,
+    int root,
+    const char* uuid,
+    int nranks,
+    int cur_rank,
+    const int *chip_map);
+
+tpudnnStatus_t tpudnnC2CAllToAll(
+    tpudnnHandle_t handle,
+    void *send_mem,
+    int send_count,
+    tpudnnDataType_t send_type,
+    void *recv_mem,
+    int recv_count,
+    tpudnnDataType_t recv_type,
+    const char* uuid,
+    int nranks,
+    int cur_rank,
+    const int *chip_map);
 
 } // extern "C"

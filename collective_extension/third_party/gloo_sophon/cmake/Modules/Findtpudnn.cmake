@@ -13,7 +13,7 @@ find_path(
 find_library(
     tpudnn_LIBRARY
     NAMES tpudnn
-    HINTS $ENV{TPUDNN_PATH}/lib)
+    HINTS $ENV{TPUDNN_PATH}/$ENV{CHIP_ARCH}_lib)
 
 find_package_handle_standard_args(
     tpudnn

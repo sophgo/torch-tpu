@@ -47,7 +47,7 @@ public:
 
   void setOutputSophon(tpudnnHandle_t handle, void* send_buff,
                        void* recv_buff, size_t bytes,
-                       sg_data_type_t sg_type, sg_reduce_method_t reduce_method) {
+                       tpudnnDataType_t sg_type, tpudnnReduceType_t reduce_method) {
     this->handle_ = handle;
     this->send_buff_ = send_buff;
     this->recv_buff_ = recv_buff;
@@ -84,8 +84,8 @@ protected:
   void* send_buff_;
   void* recv_buff_;
   size_t bytes_;
-  sg_data_type_t dtype_;
-  sg_reduce_method_t reduce_method_;
+  tpudnnDataType_t dtype_;
+  tpudnnReduceType_t reduce_method_;
 
   std::unique_ptr<transport::UnboundBuffer> in;
   std::unique_ptr<transport::UnboundBuffer> out;

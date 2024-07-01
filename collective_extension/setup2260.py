@@ -13,15 +13,14 @@ include_dirs = [f"{os.path.dirname(os.path.abspath(__file__))}/include/",
                 f"{os.path.dirname(os.path.abspath(__file__))}/../",
                 f"{os.path.dirname(os.path.abspath(__file__))}/third_party/gloo_sophon/",
                 f"{os.path.dirname(os.path.abspath(__file__))}/third_party/gloo_sophon/sophon",
-                f"{os.path.dirname(os.path.abspath(__file__))}/third_party/tpudnn/include",
-                f"{os.path.dirname(os.path.abspath(__file__))}/../common/include",
+                f"{os.path.dirname(os.path.abspath(__file__))}/../third_party/tpuDNN/include",
                 f"{os.path.dirname(os.path.abspath(__file__))}/../third_party/tpuv7_runtime/tpuv7-emulator_0.1.0/include/"
                 ]
 library_dirs = [f"{os.path.dirname(os.path.realpath(torch.__file__))}/lib",
                 f"{os.path.dirname(os.path.realpath(__file__))}/lib",
                 f"{os.path.dirname(os.path.abspath(__file__))}/../build/torch-tpu/torch_tpu/",
                 f"{os.path.dirname(os.path.abspath(__file__))}/third_party/gloo_sophon/build/sophon",
-                f"{os.path.dirname(os.path.abspath(__file__))}/third_party/tpudnn/lib",
+                f"{os.path.dirname(os.path.abspath(__file__))}/../third_party/tpuDNN/{os.environ.get('CHIP_ARCH', None)}_lib",
                 ]
 libraries = ["torch_tpu.sg2260", "sophon", "tpudnn"]
 

@@ -23,23 +23,23 @@ scclResult_t scclCommInitRank(scclComm_t *comm, int nranks, scclUniqueId commId,
 scclResult_t scclCommDestroy(scclComm_t comm);
 
 scclResult_t scclAllGather(const void *send_buff, void *recv_buff,
-                           size_t send_count, sg_data_type_t dtype,
+                           size_t send_count, tpudnnDataType_t dtype,
                            scclComm_t comm, tpudnnHandle_t handle);
-scclResult_t scclBroadcast(void *buff, size_t count, sg_data_type_t dtype,
+scclResult_t scclBroadcast(void *buff, size_t count, tpudnnDataType_t dtype,
                            int root, scclComm_t comm, tpudnnHandle_t handle);
 scclResult_t scclAllReduce(const void *sendbuff, void *recvbuff, size_t count,
-                           sg_data_type_t dtype, sg_reduce_method_t op,
+                           tpudnnDataType_t dtype, tpudnnReduceType_t op,
                            scclComm_t comm, tpudnnHandle_t handle);
 scclResult_t scclReduce(const void *sendbuff, void *recvbuff, size_t count,
-                        sg_data_type_t dtype, sg_reduce_method_t op, int root,
+                        tpudnnDataType_t dtype, tpudnnReduceType_t op, int root,
                         scclComm_t comm, tpudnnHandle_t handle);
 scclResult_t scclGather(const void *sendbuff, void *recvbuff, size_t sendcount,
-                        sg_data_type_t dtype, int root, scclComm_t comm,
+                        tpudnnDataType_t dtype, int root, scclComm_t comm,
                         tpudnnHandle_t handle);
 scclResult_t scclScatter(const void *sendbuff, void *recvbuff,
-                         size_t recv_count, sg_data_type_t dtype, int root,
+                         size_t recv_count, tpudnnDataType_t dtype, int root,
                          scclComm_t comm, tpudnnHandle_t handle);
 scclResult_t scclAllToAll(const void *sendbuff, void *recvbuff,
-                          size_t recv_count, sg_data_type_t dtype,
+                          size_t recv_count, tpudnnDataType_t dtype,
                           scclComm_t comm, tpudnnHandle_t handle);
 } // namespace sophon

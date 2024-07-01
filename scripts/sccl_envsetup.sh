@@ -3,7 +3,7 @@
 export SCCL_PATH=$TPUTRAIN_TOP/collective_extension
 export PATH=$SCCL_PATH/install/bin:$PATH
 export LD_LIBRARY_PATH=$LD_LIBRARY_PATH/install/lib:$LD_LIBRARY_PATH
-export TPUDNN_PATH=$SCCL_PATH/third_party/tpudnn
+export TPUDNN_PATH=$TPUTRAIN_TOP/third_party/tpuDNN
 
 build_type=Release
 if [ "$TPUTRAIN_DEBUG" = "ON" ]; then
@@ -11,7 +11,7 @@ if [ "$TPUTRAIN_DEBUG" = "ON" ]; then
 fi
 
 export GLOO_SOPHON_PATH=$TPUTRAIN_TOP/collective_extension/third_party/gloo_sophon/
-export LD_LIBRARY_PATH=$TPUTRAIN_TOP/build/${build_type}/sgdnn:/usr/local/lib/python3.10/dist-packages/torch/lib:$TPUDNN_PATH/lib:$LD_LIBRARY_PATH
+export LD_LIBRARY_PATH=$TPUTRAIN_TOP/build/${build_type}/sgdnn:/usr/local/lib/python3.10/dist-packages/torch/lib:$TPUDNN_PATH/${CHIP_ARCH}_lib:$LD_LIBRARY_PATH
 export LD_LIBRARY_PATH=$TPUTRAIN_TOP/build/${build_type}/torch_tpu:$LD_LIBRARY_PATH
 export TPU_KERNEL_MODULE_PATH=$TPUTRAIN_TOP/build/firmware_sg2260_cmodel/libfirmware.so
 
@@ -72,7 +72,15 @@ function rebuild_gloo_sophon()
 
 function install_sccl()
 {
-    pushd $GLOO_SOPHON_PATH/../../
+    should_clean=$1
+    if [ ! -d "$SCCL_PATH/build/" ]; then
+        mkdir -p "$SCCL_PATH/build/"
+    elif [ -n "$should_clean" ]; then
+        rm -rf "$SCCL_PATH/build/"
+        mkdir -p "$SCCL_PATH/build/"
+    fi
+
+    pushd $SCCL_PATH
     # python3 setup2260.py develop
     python3 setup2260.py bdist_wheel --plat-name linux_x86_64
     if [ $? -ne 0 ]; then popd; return -1; fi
@@ -84,5 +92,5 @@ function rebuild_sccl()
 {
     # build_openmpi
     rebuild_gloo_sophon
-    install_sccl
+    install_sccl 1
 }

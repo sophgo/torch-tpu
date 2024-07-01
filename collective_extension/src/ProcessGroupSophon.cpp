@@ -40,7 +40,6 @@
 // #include "../include/ProcessGroupSophon.hpp"
 #include "ProcessGroupSophon.hpp"
 #include "SophonDeviceFactory.hpp"
-#include "common_def.h" // for sg_data_type_t defines
 #include "TPUAddrHelper.h"
 #include "sccl.h"
 #include "tpuv7_rt.h"
@@ -172,30 +171,30 @@ void checkRemainingTime(
   }
 }
 
-sg_data_type_t toSgDtype(::at::ScalarType type) {
-  sg_data_type_t dtype = SG_DTYPE_FP32;
+tpudnnDataType_t toTpudnnDtype(::at::ScalarType type) {
+  tpudnnDataType_t dtype = TPUDNN_DTYPE_FP32;
   switch (type) {
   case ::at::ScalarType::Float:
-    dtype = SG_DTYPE_FP32;
+    dtype = TPUDNN_DTYPE_FP32;
     break;
   case ::at::ScalarType::Half:
-    dtype = SG_DTYPE_FP16;
+    dtype = TPUDNN_DTYPE_FP16;
     break;
   case ::at::ScalarType::Char:
-    dtype = SG_DTYPE_INT8;
+    dtype = TPUDNN_DTYPE_INT8;
     break;
   case ::at::ScalarType::Byte:
-    dtype = SG_DTYPE_UINT8;
+    dtype = TPUDNN_DTYPE_UINT8;
     break;
   case ::at::ScalarType::Int:
-    dtype = SG_DTYPE_INT32;
+    dtype = TPUDNN_DTYPE_INT32;
     break;
   default:
     TORCH_CHECK(false, "Invalid scalar type");
   }
   return dtype;
 }
-// 要改？
+
 typedef void (*ReduceFunc)(void *, const void *, const void *, size_t);
 
 template <typename T,
@@ -641,8 +640,7 @@ ProcessGroupSophon::ProcessGroupSophon(const c10::intrusive_ptr<Store> &store,
   tpuRtStream_t mStream = tpu::TPUGetDeviceResource();
   const char *moduleName = getenv("TPU_KERNEL_MODULE_PATH");
   tpuRtKernelModule_t mModule = tpuRtKernelLoadModuleFile(moduleName, mStream);
-
-  dev_handle_ = handle_from_stream(deviceID, &mStream, &mModule);
+  dev_handle_ = tpudnnHandleFromStream(deviceID, mStream, mModule);
 
   auto &devices = options->devices;
   if (devices.empty()) {
@@ -804,7 +802,7 @@ public:
                    sophon::scclComm_t comm, tpudnnHandle_t handle) {
                  return sophon::scclBroadcast(
                      (void *)GetAddrByUnifiedAddr((uint64_t)input.data_ptr()),
-                     input.numel(), toSgDtype(input.scalar_type()), rootRank,
+                     input.numel(), toTpudnnDtype(input.scalar_type()), rootRank,
                      comm, handle);
                });
   }
@@ -855,6 +853,44 @@ ProcessGroupSophon::broadcast(std::vector<at::Tensor> &inputs,
 }
 
 // allreduce
+
+inline tpudnnReduceType_t reduceMethod(const ReduceOp reduceOp){
+  tpudnnReduceType_t reduce_method = TPUDNN_REDUCE_SUM;
+
+    switch (reduceOp) {
+    case ReduceOp::SUM:
+      reduce_method = TPUDNN_REDUCE_SUM;
+      break;
+    case ReduceOp::PRODUCT:
+      reduce_method = TPUDNN_REDUCE_PROD;
+      break;
+    case ReduceOp::MIN:
+      reduce_method = TPUDNN_REDUCE_MIN;
+      break;
+    case ReduceOp::MAX:
+      reduce_method = TPUDNN_REDUCE_MAX;
+      break;
+    case ReduceOp::BAND:
+      TORCH_CHECK(false, "Cannot use ReduceOp.BAND with Sophon");
+      break;
+    case ReduceOp::BOR:
+      TORCH_CHECK(false, "Cannot use ReduceOp.BOR with Sophon");
+      break;
+    case ReduceOp::BXOR:
+      TORCH_CHECK(false, "Cannot use ReduceOp.BXOR with Sophon");
+      break;
+    case ReduceOp::PREMUL_SUM:
+      TORCH_CHECK(false, "Cannot use ReduceOp.PREMUL_SUM with Sophon");
+      break;
+    case ReduceOp::AVG:
+      TORCH_CHECK(false, "Cannot use ReduceOp.AVG with Sophon");
+      break;
+    case ReduceOp::UNUSED:
+      break;
+    }
+  return reduce_method;
+}
+
 namespace {
 
 class AsyncAllreduceWork : public ProcessGroupSophon::AsyncWork {
@@ -911,39 +947,7 @@ public:
   const uint32_t tag;
 
   void allreduce(std::vector<at::Tensor> &tensors) {
-    sg_reduce_method_t reduce_method = SG_REDUCE_SUM;
-
-    switch (reduceOp) {
-    case ReduceOp::SUM:
-      reduce_method = SG_REDUCE_SUM;
-      break;
-    case ReduceOp::PRODUCT:
-      reduce_method = SG_REDUCE_PROD;
-      break;
-    case ReduceOp::MIN:
-      reduce_method = SG_REDUCE_MIN;
-      break;
-    case ReduceOp::MAX:
-      reduce_method = SG_REDUCE_MAX;
-      break;
-    case ReduceOp::BAND:
-      TORCH_CHECK(false, "Cannot use ReduceOp.BAND with Sophon");
-      break;
-    case ReduceOp::BOR:
-      TORCH_CHECK(false, "Cannot use ReduceOp.BOR with Sophon");
-      break;
-    case ReduceOp::BXOR:
-      TORCH_CHECK(false, "Cannot use ReduceOp.BXOR with Sophon");
-      break;
-    case ReduceOp::PREMUL_SUM:
-      TORCH_CHECK(false, "Cannot use ReduceOp.PREMUL_SUM with Sophon");
-      break;
-    case ReduceOp::AVG:
-      TORCH_CHECK(false, "Cannot use ReduceOp.AVG with Sophon");
-      break;
-    case ReduceOp::UNUSED:
-      break;
-    }
+    tpudnnReduceType_t reduce_method = reduceMethod(reduceOp);
 
     collective(
         context, tensors[0], tensors[0],
@@ -952,7 +956,7 @@ public:
           return sophon::scclAllReduce(
               (const void *)GetAddrByUnifiedAddr((uint64_t)input.data_ptr()),
               (void *)GetAddrByUnifiedAddr((uint64_t)output.data_ptr()),
-              input.numel(), toSgDtype(input.scalar_type()), reduce_method,
+              input.numel(), toTpudnnDtype(input.scalar_type()), reduce_method,
               comm, handle);
         });
   }
@@ -1100,40 +1104,7 @@ public:
     } else {
       flatOutputTensor = newLikeFlat(tensors);
     }
-
-    sg_reduce_method_t reduce_method = SG_REDUCE_SUM;
-
-    switch (reduceOp) {
-    case ReduceOp::SUM:
-      reduce_method = SG_REDUCE_SUM;
-      break;
-    case ReduceOp::PRODUCT:
-      reduce_method = SG_REDUCE_PROD;
-      break;
-    case ReduceOp::MIN:
-      reduce_method = SG_REDUCE_MIN;
-      break;
-    case ReduceOp::MAX:
-      reduce_method = SG_REDUCE_MAX;
-      break;
-    case ReduceOp::BAND:
-      TORCH_CHECK(false, "Cannot use ReduceOp.BAND with Sophon");
-      break;
-    case ReduceOp::BOR:
-      TORCH_CHECK(false, "Cannot use ReduceOp.BOR with Sophon");
-      break;
-    case ReduceOp::BXOR:
-      TORCH_CHECK(false, "Cannot use ReduceOp.BXOR with Sophon");
-      break;
-    case ReduceOp::PREMUL_SUM:
-      TORCH_CHECK(false, "Cannot use ReduceOp.PREMUL_SUM with Sophon");
-      break;
-    case ReduceOp::AVG:
-      TORCH_CHECK(false, "Cannot use ReduceOp.AVG with Sophon");
-      break;
-    case ReduceOp::UNUSED:
-      break;
-    }
+    tpudnnReduceType_t reduce_method = reduceMethod(reduceOp);
 
     collective(
         context, tensors[0],
@@ -1143,7 +1114,7 @@ public:
           return sophon::scclReduce(
               (const void *)GetAddrByUnifiedAddr((uint64_t)input.data_ptr()),
               (void *)GetAddrByUnifiedAddr((uint64_t)output.data_ptr()),
-              input.numel(), toSgDtype(input.scalar_type()), reduce_method,
+              input.numel(), toTpudnnDtype(input.scalar_type()), reduce_method,
               root, comm, handle);
         });
   }
@@ -1290,7 +1261,7 @@ public:
           return sophon::scclAllGather(
               (const void *)GetAddrByUnifiedAddr((uint64_t)input.data_ptr()),
               (void *)GetAddrByUnifiedAddr((uint64_t)output.data_ptr()),
-              input.numel(), toSgDtype(input.scalar_type()), comm, handle);
+              input.numel(), toTpudnnDtype(input.scalar_type()), comm, handle);
         });
 
     // Unflatten into output tensors.
@@ -1460,7 +1431,7 @@ public:
           return sophon::scclGather(
               (const void *)GetAddrByUnifiedAddr((uint64_t)input.data_ptr()),
               (void *)GetAddrByUnifiedAddr((uint64_t)output.data_ptr()),
-              input.numel(), toSgDtype(input.scalar_type()), root, comm,
+              input.numel(), toTpudnnDtype(input.scalar_type()), root, comm,
               handle);
         });
 
@@ -1630,7 +1601,7 @@ public:
           return sophon::scclScatter(
               (const void *)GetAddrByUnifiedAddr((uint64_t)input.data_ptr()),
               (void *)GetAddrByUnifiedAddr((uint64_t)output.data_ptr()),
-              output.numel(), toSgDtype(output.scalar_type()), root, comm,
+              output.numel(), toTpudnnDtype(output.scalar_type()), root, comm,
               handle);
         });
   }
@@ -1796,7 +1767,7 @@ public:
             return sophon::scclAllToAll(
                 (const void *)GetAddrByUnifiedAddr((uint64_t)input.data_ptr()),
                 (void *)GetAddrByUnifiedAddr((uint64_t)output.data_ptr()),
-                output.numel(), toSgDtype(output.scalar_type()), comm, handle);
+                output.numel(), toTpudnnDtype(output.scalar_type()), comm, handle);
           });
     } else {
       // sophon alltoallv

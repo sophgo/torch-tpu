@@ -45,102 +45,86 @@ scclResult_t scclCommDestroy(scclComm_t comm) {
   return scclSuccess;
 }
 
-static inline void ConvertToTpuDNNArgs(const scclComm_t comm,
-                                       sccl_args_t *args) {
-  memset(args, 0x0, sizeof(sccl_args_t));
-  const scclComm *pcomm = static_cast<scclComm *>(comm);
-  args->nranks = pcomm->nranks;
-  args->rank = pcomm->rank;
-  memcpy(args->chip_map, pcomm->chip_map, sizeof(int) * pcomm->nranks);
-}
-
 scclResult_t scclAllGather(const void *send_buff, void *recv_buff,
-                           size_t send_count, sg_data_type_t dtype,
+                           size_t send_count, tpudnnDataType_t dtype,
                            scclComm_t comm, tpudnnHandle_t handle) {
   scclComm *pcomm = static_cast<scclComm *>(comm);
-  sccl_args_t args = {0};
-  ConvertToTpuDNNArgs(comm, &args);
   tpudnnStatus_t ret = tpudnnC2CAllGather(
       handle, tpudnnPhysToVirt(handle, (uint64_t)send_buff), send_count,
       tpudnnPhysToVirt(handle, (uint64_t)recv_buff), send_count,
-      reinterpret_cast<const char *>(&pcomm->unique_id), dtype, args);
+      reinterpret_cast<const char *>(&pcomm->unique_id), dtype,
+      pcomm->nranks, pcomm->rank, pcomm->chip_map);
   return ret == TPUDNN_STATUS_SUCCESS ? scclSuccess : scclKernelError;
 }
 
-scclResult_t scclBroadcast(void *buff, size_t count, sg_data_type_t dtype,
+scclResult_t scclBroadcast(void *buff, size_t count, tpudnnDataType_t dtype,
                            int root, scclComm_t comm, tpudnnHandle_t handle) {
   scclComm *pcomm = static_cast<scclComm *>(comm);
-  sccl_args_t args = {0};
-  ConvertToTpuDNNArgs(comm, &args);
   auto ret = tpudnnC2CBroadcast(
       handle, tpudnnPhysToVirt(handle, (uint64_t)buff), count, dtype, root,
-      reinterpret_cast<const char *>(&pcomm->unique_id), args);
+      reinterpret_cast<const char *>(&pcomm->unique_id),
+      pcomm->nranks, pcomm->rank, pcomm->chip_map);
   return ret == TPUDNN_STATUS_SUCCESS ? scclSuccess : scclKernelError;
 }
 
 scclResult_t scclAllReduce(const void *sendbuff, void *recvbuff, size_t count,
-                           sg_data_type_t dtype, sg_reduce_method_t op,
+                           tpudnnDataType_t dtype, tpudnnReduceType_t op,
                            scclComm_t comm, tpudnnHandle_t handle) {
   scclComm *pcomm = static_cast<scclComm *>(comm);
-  sccl_args_t args = {0};
-  ConvertToTpuDNNArgs(comm, &args);
   auto ret = tpudnnC2CAllReduce(
       handle, tpudnnPhysToVirt(handle, (uint64_t)sendbuff),
       tpudnnPhysToVirt(handle, (uint64_t)recvbuff), count, dtype, op,
-      reinterpret_cast<const char *>(&pcomm->unique_id), args);
+      reinterpret_cast<const char *>(&pcomm->unique_id),
+      pcomm->nranks, pcomm->rank, pcomm->chip_map);
   return ret == TPUDNN_STATUS_SUCCESS ? scclSuccess : scclKernelError;
 }
 
 scclResult_t scclReduce(const void *sendbuff, void *recvbuff, size_t count,
-                        sg_data_type_t dtype, sg_reduce_method_t op, int root,
+                        tpudnnDataType_t dtype, tpudnnReduceType_t op, int root,
                         scclComm_t comm, tpudnnHandle_t handle) {
   scclComm *pcomm = static_cast<scclComm *>(comm);
-  sccl_args_t args = {0};
-  ConvertToTpuDNNArgs(comm, &args);
   auto ret = tpudnnC2CReduce(
       handle, tpudnnPhysToVirt(handle, (uint64_t)sendbuff),
       tpudnnPhysToVirt(handle, (uint64_t)recvbuff), count, dtype, op, root,
-      reinterpret_cast<const char *>(&pcomm->unique_id), args);
+      reinterpret_cast<const char *>(&pcomm->unique_id),
+      pcomm->nranks, pcomm->rank, pcomm->chip_map);
   return ret == TPUDNN_STATUS_SUCCESS ? scclSuccess : scclKernelError;
 }
 
 scclResult_t scclGather(const void *sendbuff, void *recvbuff, size_t sendcount,
-                        sg_data_type_t dtype, int root, scclComm_t comm,
+                        tpudnnDataType_t dtype, int root, scclComm_t comm,
                         tpudnnHandle_t handle) {
   scclComm *pcomm = static_cast<scclComm *>(comm);
-  sccl_args_t args = {0};
-  ConvertToTpuDNNArgs(comm, &args);
   auto ret = tpudnnC2CGather(
       handle, tpudnnPhysToVirt(handle, (uint64_t)sendbuff), sendcount,
-      tpudnnPhysToVirt(handle, (uint64_t)recvbuff), sendcount * args.nranks,
-      dtype, root, reinterpret_cast<const char *>(&pcomm->unique_id), args);
+      tpudnnPhysToVirt(handle, (uint64_t)recvbuff), sendcount * pcomm->nranks,
+      dtype, root, reinterpret_cast<const char *>(&pcomm->unique_id),
+      pcomm->nranks, pcomm->rank, pcomm->chip_map);
   return ret == TPUDNN_STATUS_SUCCESS ? scclSuccess : scclKernelError;
 }
 
 scclResult_t scclScatter(const void *sendbuff, void *recvbuff,
-                         size_t recv_count, sg_data_type_t dtype, int root,
+                         size_t recv_count, tpudnnDataType_t dtype, int root,
                          scclComm_t comm, tpudnnHandle_t handle) {
   scclComm *pcomm = static_cast<scclComm *>(comm);
-  sccl_args_t args = {0};
-  ConvertToTpuDNNArgs(comm, &args);
   auto ret = tpudnnC2CScatter(
       handle, tpudnnPhysToVirt(handle, (uint64_t)sendbuff),
-      recv_count / args.nranks, dtype,
+      recv_count / pcomm->nranks, dtype,
       tpudnnPhysToVirt(handle, (uint64_t)recvbuff), recv_count, dtype, root,
-      reinterpret_cast<const char *>(&pcomm->unique_id), args);
+      reinterpret_cast<const char *>(&pcomm->unique_id),
+      pcomm->nranks, pcomm->rank, pcomm->chip_map);
   return ret == TPUDNN_STATUS_SUCCESS ? scclSuccess : scclKernelError;
 }
 
 scclResult_t scclAllToAll(const void *sendbuff, void *recvbuff,
-                          size_t recv_count, sg_data_type_t dtype,
+                          size_t recv_count, tpudnnDataType_t dtype,
                           scclComm_t comm, tpudnnHandle_t handle) {
   scclComm *pcomm = static_cast<scclComm *>(comm);
-  sccl_args_t args = {0};
-  ConvertToTpuDNNArgs(comm, &args);
   auto ret = tpudnnC2CAllToAll(
       handle, tpudnnPhysToVirt(handle, (uint64_t)sendbuff), recv_count, dtype,
       tpudnnPhysToVirt(handle, (uint64_t)recvbuff), recv_count, dtype,
-      reinterpret_cast<const char *>(&pcomm->unique_id), args);
+      reinterpret_cast<const char *>(&pcomm->unique_id),
+      pcomm->nranks, pcomm->rank, pcomm->chip_map);
   return ret == TPUDNN_STATUS_SUCCESS ? scclSuccess : scclKernelError;
 }
 } // namespace sophon

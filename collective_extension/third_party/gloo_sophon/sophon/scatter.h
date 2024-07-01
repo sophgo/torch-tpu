@@ -38,7 +38,7 @@ class ScatterOptions {
 
   void setOutputSophon(tpudnnHandle_t handle, void* send_buff,
                        size_t send_bytes, void* recv_buff,
-                       size_t recv_bytes, sg_data_type_t sg_type) {
+                       size_t recv_bytes, tpudnnDataType_t sg_type) {
     this->handle_ = handle;
     this->send_buff_ = send_buff;
     this->send_bytes_ = send_bytes;
@@ -97,7 +97,7 @@ class ScatterOptions {
   size_t send_bytes_;
   void* recv_buff_;
   size_t recv_bytes_;
-  sg_data_type_t dtype_;
+  tpudnnDataType_t dtype_;
 
   friend void scatter(ScatterOptions&);
 };
