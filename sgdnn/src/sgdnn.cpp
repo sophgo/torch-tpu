@@ -2831,9 +2831,9 @@ tpu_status_t sgdnnLLamaA16Matmul ( tpu_resource_t handle,
     api.sign = true;
     api.has_bias = false;
     api.has_zp = true;
-    api.final_row_num = left.shape[2];
-    api.inner_num = left.shape[3];
-    api.final_col_num = right.shape[2];
+    api.final_row_num = left.shape[left.dim-2];
+    api.inner_num = left.shape[left.dim-1];
+    api.final_col_num = right.shape[left.dim-2];
     api.q_group_size = abs(group_size);
     api.weight_bits = weight_bits;
     api.io_dtype = sgdnnTPUKernelDType ( left.dtype );
