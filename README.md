@@ -1,5 +1,84 @@
-this doc is out of date, Please refer to `docs/developer_manual`
+
+Torch-TPU
+=========
+
+## SG2260 Emulator Mode Development - Recommended Setup
+
+### Prerequisites
+
+Firstly, get `tpu-train` and `TPU1686` repo cloned and orgnize them like so:
+
+```
+torch-tpu-dev/
+├── TPU1686
+└── tpu-train
+```
+
+Install git-lfs and pull third-party dependencies:
+
+```bash
+sudo apt install git-lfs
+
+# MAKE SURE YOU ARE USING 2.x VERSION! Otherwise IT WILL NOT BE COMPATIBLE WITH GERRIT
+git-lfs --version
+
+# Extra configs to make Gerrit happy
+export GIT_SSL_NO_VERIFY=1
+export GIT_LFS_SKIP_SMUDGE=1
+
+cd tpu-train
+git lfs install
+git lfs pull --include '*' --exclude ''
+```
+
+Next, have docker installed and pull the latest torch-tpu dev docker image:
+
+```bash
+docker pull sophgo/torch_tpu:v0.1
+```
+
+Then start a docker container:
+
+```bash
+cd torch-tpu-dev/
+docker run -v $(pwd):/workspace --restart always -td --name torch-tpu-dev sophgo/torch_tpu:v0.1 bash
+
+# And into the container
+docker exec -it torch-tpu-dev bash
+```
+
+### Build
+
+```bash
+cd tpu-train
+source scripts/envsetup.sh sg2260 local
+
+# Build TPU base kernels
+rebuild_TPU1686
+
+# Make sure we have a clean env
+pip uninstall --yes torch-tpu
+
+# Build torch-tpu and install editable
+python setup.py develop
+```
+
+If everything went well, now we have a editable development install.
+
++ Any changes in .py files, you don't have to reinstall, it is usable on the fly.
+
++ If you change torch-tpu extension cpps, cd into `build/torch-tpu` and execute `make install` and you are ready to go.
+
++ If you change kernel source files in `firmware_core`, cd into `build/firmware_sg2260[_cmodel]` and execute `make`.
+
+You can always execute `python setup.py develop` after changing source files to rebuild all binaries.
+\
+\
+\
+
+The following content is out of date, Please refer to `docs/developer_manual`
 ===========
+
 [1]PrePare:
 1) Link host device to your docker:
     sudo docker pull  sophgo/tpuc_dev:latest

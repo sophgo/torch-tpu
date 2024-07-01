@@ -62,7 +62,9 @@ export TPUTRAIN_TOP=$(cd $(dirname "${BASH_SOURCE[0]}")/.. && pwd)
 export CHIP_ARCH=${1:-bm1684x}  #sg2260
 
 ################cross toolchains###################
-source ${TPUTRAIN_TOP}/scripts/prepare_toolchains.sh
+if [ $CHIP_ARCH = 'local' ]; then
+    source ${TPUTRAIN_TOP}/scripts/prepare_toolchains.sh
+fi
 
 ############### PYTORCH ################
 check_pytorch_version;
