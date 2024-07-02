@@ -180,19 +180,21 @@ static void initTPUStreamsOnce() {
   // Inits default and secondary streams (once, globally)
   c10::call_once(init_flag, initGlobalStreamState);
 
-  if (current_streams) {
+  if (!current_streams) {
+    // Inits current streams (thread local) to default streams
+    current_streams = std::make_unique<StreamId[]>(num_tpus);
+  }
+
+  DeviceIndex dev_index = current_device();
+  if (current_streams[dev_index])
+  {
     return;
   }
-  // Inits current streams (thread local) to default streams
-  current_streams = std::make_unique<StreamId[]>(num_tpus);
-  for (const auto i : c10::irange(num_tpus)) {
-    current_streams[i] = makeStreamId(StreamIdType::DEFAULT, 0);
 
-    // We probably should not do this
-    // Later when we implement priority streams we should reconsider this
-    std::call_once(
-        device_flags[i], initDeviceStreamState, i);
-  }
+  // We probably should not do this
+  // Later when we implement priority streams we should reconsider this
+  std::call_once(
+    device_flags[dev_index], initDeviceStreamState, dev_index);
 }
 
 static inline void check_tpu(c10::DeviceIndex device_index) {
