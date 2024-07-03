@@ -16,7 +16,8 @@ world_size = os.environ.get("OMPI_COMM_WORLD_SIZE", None)
 tensor_len = 4
 # init dist and logger
 options = sccl.ProcessGroupSCCLOptions()
-chip_map = [0,1,2,3,4,5,6,7]
+chip_map = torch_tpu.tpu.read_rank_table()
+# chip_map = [0,1,2,3,4,5,6,7]
 options.chip_map = chip_map
 torch_tpu.tpu.set_device(options.chip_map[int(rank)])
 print('The device is set up!')
