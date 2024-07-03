@@ -98,51 +98,75 @@ static inline void SaveTensorToBinaryFile ( const at::Tensor & Tensor, const std
   fout.close();
 }
 
-#define define_converter(dtype_t, PREFIX)                                               \
-static inline dtype_t TPUConvert##dtype_t ( caffe2::TypeMeta dtype )               \
-{                                                                                       \
-  if ( dtype == caffe2::TypeMeta::Make<float>() )                                       \
-  {                                                                                     \
-    return PREFIX##_DTYPE_FP32;                                                         \
-  }                                                                                     \
-  else if ( dtype == caffe2::TypeMeta::Make<at::Half>() )                               \
-  {                                                                                     \
-    return PREFIX##_DTYPE_FP16;                                                         \
-  }                                                                                     \
-  else if ( dtype == caffe2::TypeMeta::Make<at::BFloat16>() )                           \
-  {                                                                                     \
-    return PREFIX##_DTYPE_BF16;                                                         \
-  }                                                                                     \
-  else if ( dtype == caffe2::TypeMeta::Make<long>() )                                   \
-  {                                                                                     \
-    return PREFIX##_DTYPE_INT64;                                                        \
-  }                                                                                     \
-  else if ( dtype == caffe2::TypeMeta::Make<int>() )                                    \
-  {                                                                                     \
-    return PREFIX##_DTYPE_INT32;                                                        \
-  }                                                                                     \
-  else if ( dtype == caffe2::TypeMeta::Make<bool>() ||                                  \
-            dtype == caffe2::TypeMeta::Make<unsigned char>() ) {                        \
-    return PREFIX##_DTYPE_UINT8;                                                        \
-  }                                                                                     \
-  else if ( dtype == caffe2::TypeMeta::Make<int8_t>() )                                 \
-  {                                                                                     \
-    return PREFIX##_DTYPE_INT8;                                                         \
-  }                                                                                     \
-  else if (dtype == caffe2::TypeMeta::Make<short>()){                                   \
-    return PREFIX##_DTYPE_INT16;                                                        \
-  }                                                                                     \
-  else                                                                                  \
-  {                                                                                     \
-    TORCH_CHECK ( false, "Unsupported data type ", dtype );                             \
-  }                                                                                     \
-  return PREFIX##_DTYPE_UNKNOWN;                                                        \
-}
+#define define_converter_entry(T, PREFIX, dtype) \
+  const static T dtype = PREFIX##_##dtype;
 
-define_converter(SgdnnDataType_t, SGDNN)
-define_converter(tpudnnDataType_t, TPUDNN)
+#define define_converter(T, PREFIX)                   \
+  define_converter_entry(T, PREFIX, DTYPE_FP32)       \
+  define_converter_entry(T, PREFIX, DTYPE_FP16)       \
+  define_converter_entry(T, PREFIX, DTYPE_BF16)       \
+  define_converter_entry(T, PREFIX, DTYPE_INT64)      \
+  define_converter_entry(T, PREFIX, DTYPE_INT32)      \
+  define_converter_entry(T, PREFIX, DTYPE_UINT8)      \
+  define_converter_entry(T, PREFIX, DTYPE_INT8)       \
+  define_converter_entry(T, PREFIX, DTYPE_INT16)      \
+  define_converter_entry(T, PREFIX, DTYPE_UNKNOWN)
+
+template <typename T>
+struct dtypes
+{
+  define_converter(SgdnnDataType_t, SGDNN)
+};
+
+template <>
+struct dtypes<tpudnnDataType_t>
+{
+  define_converter(tpudnnDataType_t, TPUDNN)
+};
 
 #undef define_converter
+#undef define_converter_entry
+
+template <typename T>
+static inline T TPUConvertDtype ( caffe2::TypeMeta dtype )
+{
+  if ( dtype == caffe2::TypeMeta::Make<float>() )
+  {
+    return dtypes<T>::DTYPE_FP32;
+  }
+  else if ( dtype == caffe2::TypeMeta::Make<at::Half>() )
+  {
+    return dtypes<T>::DTYPE_FP16;
+  }
+  else if ( dtype == caffe2::TypeMeta::Make<at::BFloat16>() )
+  {
+    return dtypes<T>::DTYPE_BF16;
+  }
+  else if ( dtype == caffe2::TypeMeta::Make<long>() )
+  {
+    return dtypes<T>::DTYPE_INT64;
+  }
+  else if ( dtype == caffe2::TypeMeta::Make<int>() )
+  {
+    return dtypes<T>::DTYPE_INT32;
+  }
+  else if ( dtype == caffe2::TypeMeta::Make<bool>() |
+            dtype == caffe2::TypeMeta::Make<unsigned char>() ) {
+    return dtypes<T>::DTYPE_UINT8;
+  }
+  else if ( dtype == caffe2::TypeMeta::Make<int8_t>() )
+  {
+    return dtypes<T>::DTYPE_INT8;
+  }
+  else if ( dtype == caffe2::TypeMeta::Make<short>() ) {
+    return dtypes<T>::DTYPE_INT16;
+  }
+  else
+  {
+    TORCH_CHECK ( false, "Unsupported data type ", dtype );
+  }
+  return dtypes<T>::DTYPE_UNKNOWN;
+}
 
 static inline bool IsSupportDtype( caffe2::TypeMeta&& dtype )
 {
@@ -158,24 +182,12 @@ static inline bool IsSupportDtype( caffe2::TypeMeta&& dtype )
 }
 
 template <typename T>
-struct TensorTypeInfo
-{
-    constexpr static const decltype(TPUConvertSgdnnDataType_t) *type_convert = TPUConvertSgdnnDataType_t;
-};
-
-template <>
-struct TensorTypeInfo<tpudnnTensor_t>
-{
-    constexpr static const decltype(TPUConverttpudnnDataType_t) *type_convert = TPUConverttpudnnDataType_t;
-};
-
-template <typename T>
 static inline T TPUGenerateDnnTensor ( const at::Tensor & Tensor )
 {
   T t = { 0 };
   t.addr = reinterpret_cast<decltype(t.addr)>(
     GetAddrByUnifiedAddr(( unsigned long long ) Tensor.data_ptr()));
-  t.dtype = TensorTypeInfo<T>::type_convert( Tensor.dtype() );
+  t.dtype = TPUConvertDtype<decltype(t.dtype)>( Tensor.dtype() );
   t.dim = Tensor.dim();
   for ( auto i = 0; i < Tensor.dim(); ++i )
   {
@@ -230,7 +242,7 @@ static inline T TPUGenerateTensorforComplex64 ( const at::Tensor & Tensor )
   T t = { 0 };
   t.addr = reinterpret_cast<decltype(t.addr)>(
     GetAddrByUnifiedAddr(( unsigned long long ) Tensor.data_ptr()));
-  t.dtype = TensorTypeInfo<T>::type_convert( caffe2::TypeMeta::Make<float>() );
+  t.dtype = TPUConvertDtype<decltype(t.dtype)>( Tensor.dtype() );
   t.dim = Tensor.dim();
   for ( auto i = 0; i < Tensor.dim(); ++i )
   {

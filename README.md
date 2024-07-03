@@ -53,11 +53,17 @@ docker exec -it torch-tpu-dev bash
 cd tpu-train
 source scripts/envsetup.sh sg2260 local
 
+# Debug TPU1686, optional
+export EXTRA_CONFIG='-DDEBUG=ON -DUSING_FW_PRINT=ON -DUSING_FW_DEBUG=ON'
+
 # Build TPU base kernels
 rebuild_TPU1686
 
 # Make sure we have a clean env
 pip uninstall --yes torch-tpu
+
+# Debug torch-tpu, optional
+export TPUTRAIN_DEBUG=ON
 
 # Build torch-tpu and install editable
 python setup.py develop

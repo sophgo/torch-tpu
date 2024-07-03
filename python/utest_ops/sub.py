@@ -20,11 +20,11 @@ def test_sub():
     #list is also acceptable
 
     input_data = [
-        [torch.randint(0, 5, (5, 5), dtype=torch.float32), torch.randint(0 ,5, (1, 5), dtype=torch.float32)],
+        [torch.randint(0, 5, (5, 5), dtype=torch.float32), torch.randint(0 ,5, (5, 5), dtype=torch.float32)],
     ]
 
     metric_table = ['max_diff','MAE']
-    chip_arch_dict = {"bm1684x":1, 'sg2260':0}
+    chip_arch_dict = {"bm1684x":1, 'sg2260':1}
     epsilon_dict = {'bm1684x':{'f32':1e-6,'f16':1e-2},'sg2260':{'f32':1e-6,'f16':1e-2}}
     case_name =  __file__.split('.py')[0]# You can change your name
     dump_flag = True #it will dump alll wrong cases
