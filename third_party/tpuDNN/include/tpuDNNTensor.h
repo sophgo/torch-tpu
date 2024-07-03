@@ -100,6 +100,57 @@ static inline bool tpudnnIsTensorContiguous(const tpudnnTensor_t *tensor)
     return true;
 }
 
+static inline bool tpudnnIsTensorTransposed ( const tpudnnTensor_t * tensor )
+{
+    if ( tensor->dim < 2 || tpudnnIsTensorContiguous ( tensor ) )
+    {
+        return false;
+    }
+    else
+    {
+        int stride = 1;
+        for ( int i = tensor->dim - 1; i >= 0; --i )
+        {
+            if ( ( i == tensor->dim - 1 && tensor->stride[i] != tensor->shape[tensor->dim - 2] ) ||
+                 ( i == tensor->dim - 2 && tensor->stride[i] != 1 ) ||
+                 ( i < tensor->dim - 2 && tensor->stride[i] != stride ) )
+            {
+                return false;
+            }
+            else
+            {
+                stride *= tensor->shape[i];
+            }
+        }
+    }
+    return true;
+}
+
+static inline bool tpudnnIsSameShape ( const tpudnnTensor_t * tensor1, const tpudnnTensor_t * tensor2 )
+{
+    if ( tensor1->dim == tensor2->dim )
+    {
+        for ( int i = 0; i < tensor1->dim; ++i )
+        {
+            if ( tensor1->shape[i] != tensor2->shape[i] )
+            {
+                return false;
+            }
+        }
+    }
+    else
+    {
+        return false;
+    }
+    return true;
+}
+
+static inline tpudnnTensor_t tpudnnUndefinedTensor()
+{
+    tpudnnTensor_t tensor = { .addr = 0 };
+    return tensor;
+}
+
 tpudnnStatus_t tpudnnBinaryAsync(
     tpudnnHandle_t handle,
     tpudnnTensor_t input,
@@ -107,6 +158,13 @@ tpudnnStatus_t tpudnnBinaryAsync(
     float scalar,
     tpudnnTensor_t output,
     int binary_type);
+
+tpudnnStatus_t tpudnnMatmulAsync(
+    tpudnnHandle_t handle,
+    tpudnnTensor_t left,
+    tpudnnTensor_t right,
+    tpudnnTensor_t bias,
+    tpudnnTensor_t output);
 
 tpudnnStatus_t tpudnnC2CAllReduce(
     tpudnnHandle_t handle,

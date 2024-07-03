@@ -81,13 +81,14 @@ Tensor & mm_out_tpu ( const Tensor & self, const Tensor & mat2, Tensor & out )
 
   TIMING_START;
 
-  auto status = sgdnnMatmul (
-                tpu::TPUGetDeviceResource(),
-                tpu::TPUGenerateSgdnnTensor ( self_ ),
-                tpu::TPUGenerateSgdnnTensor ( mat2_ ),
-                sgdnnUndefinedTensor(),
-                tpu::TPUGenerateSgdnnTensor ( out ) );
-  TORCH_CHECK ( status == SG_SUCCESS );
+  auto stream = c10_tpu::getCurrentTPUStream();
+  auto status = tpudnnMatmulAsync(
+    stream,
+    tpu::TPUGenerateTpudnnTensor(stream, self_),
+    tpu::TPUGenerateTpudnnTensor(stream, mat2_),
+    tpudnnUndefinedTensor(),
+    tpu::TPUGenerateTpudnnTensor(stream, out));
+  TORCH_CHECK ( status == TPUDNN_STATUS_SUCCESS );
     TIMING_END( tpu::MM );
 #endif
   SHOW_TENSOR_OP(self, mat2, out);
@@ -112,12 +113,15 @@ Tensor & bmm_out_tpu ( const Tensor & self, const Tensor & mat2, Tensor & out )
 
   TIMING_START;
 
-  auto status = sgdnnBatchMatmul (
-                tpu::TPUGetDeviceResource(),
-                tpu::TPUGenerateSgdnnTensor ( self_ ),
-                tpu::TPUGenerateSgdnnTensor ( mat2_ ),
-                tpu::TPUGenerateSgdnnTensor ( out ) );
-  TORCH_CHECK ( status == SG_SUCCESS );
+  auto stream = c10_tpu::getCurrentTPUStream();
+  auto status = tpudnnMatmulAsync(
+    stream,
+    tpu::TPUGenerateTpudnnTensor(stream, self_),
+    tpu::TPUGenerateTpudnnTensor(stream, mat2_),
+    tpudnnUndefinedTensor(),
+    tpu::TPUGenerateTpudnnTensor(stream, out));
+  TORCH_CHECK ( status == TPUDNN_STATUS_SUCCESS );
+
     TIMING_END( tpu::BMM );
 #endif
   SHOW_TENSOR_OP(self, mat2, out);

@@ -5,20 +5,36 @@ from functools import wraps
 import torch
 
 import os
+
+def symlink(src, dst):
+    try:
+        os.unlink(dst)
+    except FileNotFoundError:
+        pass
+    os.symlink(src, dst)
+
 import pkgutil
 pkg_path = os.path.dirname(pkgutil.get_loader('torch_tpu').get_filename())
 lib_pwd = os.path.join(pkg_path, 'lib/')
-if not os.path.exists(os.path.join(lib_pwd, 'libtorch_tpu.so')):
-    from ctypes import cdll
-    try:
-        cdll.LoadLibrary("libtpuv7_rt.so")
-        os.symlink('libtorch_tpu.sg2260.so', os.path.join(lib_pwd, 'libtorch_tpu.so'))
+arch = os.environ.get('CHIP_ARCH')
+if arch or not os.path.exists(os.path.join(lib_pwd, 'libtorch_tpu.so')):
+    if not arch:
+        from ctypes import cdll
+        try:
+            cdll.LoadLibrary("libtpuv7_rt.so")
+            arch = 'sg2260'
+        except:
+            arch = 'bm1684x'
+
+    if arch == 'sg2260':
+        symlink('libtorch_tpu.sg2260.so', os.path.join(lib_pwd, 'libtorch_tpu.so'))
         tpudnn = 'libtpudnn.sg2260.so'
-    except:
-        os.symlink('libtorch_tpu.bm1684x.so', os.path.join(lib_pwd, 'libtorch_tpu.so'))
+    else:
+        symlink('libtorch_tpu.bm1684x.so', os.path.join(lib_pwd, 'libtorch_tpu.so'))
         tpudnn = 'libtpudnn.bm1684x.so'
+
     if os.path.exists(os.path.join(lib_pwd, tpudnn)):
-        os.symlink(tpudnn, os.path.join(lib_pwd, 'libtpudnn.so'))
+        symlink(tpudnn, os.path.join(lib_pwd, 'libtpudnn.so'))
 
 import torch_tpu._C
 import torch_tpu.tpu

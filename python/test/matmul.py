@@ -59,8 +59,6 @@ def check_matmul():
     out_cpu.backward(ref)
     out_tpu.backward(ref_tpu)
 
-    import pdb;pdb.set_trace()
-
     print(torch.max(abs(q_cpu.grad - q_tpu.grad.cpu())))
     print(torch.max(abs(k_cpu.grad - k_tpu.grad.cpu())))
 
