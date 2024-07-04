@@ -3,7 +3,7 @@ import torch
 import torch.distributed as dist
 import logging
 import os
-from helper import init_logger, is_master, is_slave
+from helper import init_logger, is_master, is_slave, is_rank_table_valid
 import torch_tpu
 import sccl
 TPU = "tpu"
@@ -16,8 +16,9 @@ world_size = os.environ.get("OMPI_COMM_WORLD_SIZE", None)
 tensor_len = 16
 # init dist and logger
 options = sccl.ProcessGroupSCCLOptions()
-# chip_map = [0,1,2,3,4,5,6,7]
-chip_map = torch_tpu.tpu.read_rank_table()
+chip_map = [0,1,2,3,4,5,6,7]
+if is_rank_table_valid():
+    chip_map = torch_tpu.tpu.read_rank_table()
 options.chip_map = chip_map
 torch_tpu.tpu.set_device(options.chip_map[int(rank)])
 dist.init_process_group(backend="sccl", rank=int(rank), world_size=int(world_size), pg_options=options)

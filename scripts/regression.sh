@@ -5,6 +5,8 @@
 #[RESULT] the results of some procedures
 #[ERROR]  some params are wrong or files not exist
 
+set -x
+
 function ops_utest() {
     CURRENT_DIR=$(dirname ${BASH_SOURCE})
     PYTHON_UTEST_PATH=$CURRENT_DIR/../python/utest_ops
@@ -174,6 +176,22 @@ function run_online_regression_test() {
         echo "[RESULT-$test_CHIP_ARCH] all ops_utest are computed, Please check Results above"
       else
         echo "[RESULT-$test_CHIP_ARCH] some ops_utest are failed!"
+      fi
+    fi
+    if [ $test_CHIP_ARCH = 'sg2260' ]; then
+      source  $CURRENT_DIR/sccl_envsetup.sh
+      build_openmpi
+      rebuild_sccl; ret_sccl=$?
+      if [ $ret_sccl -eq 0 ];then
+        echo "[RESULT-$test_CHIP_ARCH] sccl is built successfully!"
+      else
+        echo "[RESULT-$test_CHIP_ARCH] sccl is built failed!"
+      fi
+      regression_for_sccl; ret_regression_for_sccl=$?
+      if [ $ret_regression_for_sccl -eq 0 ];then
+        echo "[RESULT-$test_CHIP_ARCH] regression_for_sccl is computed successfully!"
+      else
+        echo "[RESULT-$test_CHIP_ARCH] regression_for_sccl is computed failed!"
       fi
     fi
   fi

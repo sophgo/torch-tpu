@@ -1,5 +1,6 @@
 import torch.distributed as dist
 import logging
+import os
 
 
 def init_logger():
@@ -20,3 +21,6 @@ def is_master():
 
 def is_slave():
     return dist.get_rank() != 0
+
+def is_rank_table_valid():
+    return os.environ.get("RANK_TABLE_FILE", None) is not None
