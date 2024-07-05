@@ -8,10 +8,18 @@ import os
 
 def symlink(src, dst):
     try:
-        os.unlink(dst)
+        link_val = os.readlink(dst)
+        if link_val == src:
+            return
+        else:
+            os.unlink(dst)
     except FileNotFoundError:
         pass
-    os.symlink(src, dst)
+
+    try:
+        os.symlink(src, dst)
+    except FileExistsError:
+        pass
 
 import pkgutil
 pkg_path = os.path.dirname(pkgutil.get_loader('torch_tpu').get_filename())
