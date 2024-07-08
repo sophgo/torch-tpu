@@ -8,6 +8,8 @@ export RELEASE_MODE=ON
 TORCH_TPU_NONINTERACTIVE=ON python setup.py clean
 bdist_wheel || exit -1
 
+unset RELEASE_MODE
+
 if [ -z $SKIP_DOC ]; then
     source scripts/release_doc.sh
 fi

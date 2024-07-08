@@ -51,8 +51,12 @@ function bdist_wheel()
 function new_clean()
 {
   pushd ${TPUTRAIN_TOP}
+  echo " - Delete build ..."
   rm -rf build
+  echo " - Delete dist ..."
   rm -rf dist
+  echo " - Delete torch_tpu.egg-info ..."
+  rm -rf torch_tpu.egg-info
   popd
 }
 
