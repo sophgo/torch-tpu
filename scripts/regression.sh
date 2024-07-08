@@ -5,8 +5,6 @@
 #[RESULT] the results of some procedures
 #[ERROR]  some params are wrong or files not exist
 
-set -x
-
 function ops_utest() {
     CURRENT_DIR=$(dirname ${BASH_SOURCE})
     PYTHON_UTEST_PATH=$CURRENT_DIR/../python/utest_ops
@@ -153,15 +151,16 @@ function run_online_regression_test() {
   link_libsophon $LIBSOPHON_LINK_PATTERN $DEB_PATH_STABLE $VERSION_PATH_STABLE; ret_libsophon=$?
   if [ $ret_libsophon -eq 255 ]; then
     echo "[INFO]test_CHIP_ARCH:$test_CHIP_ARCH libsophon setting failed!"
+    return -1
   else
     if [ $LIBSOPHON_LINK_PATTERN = 'stable' ];then
       echo "[INFO]test_CHIP_ARCH:$test_CHIP_ARCH"
       source  $CURRENT_DIR/envsetup.sh $test_CHIP_ARCH $LIBSOPHON_LINK_PATTERN
-      new_clean;new_build
+      new_clean;new_build || return -1
     elif [ $LIBSOPHON_LINK_PATTERN = 'local' ];then
       echo "************** $LIBSOPHON_LINK_PATTERN-LIBSOPHON IS REAEDY *********"
       source  $CURRENT_DIR/envsetup.sh $test_CHIP_ARCH $LIBSOPHON_LINK_PATTERN
-      new_clean;new_build
+      new_clean;new_build || return -1
       TPU_TRAIN_CMODEL_PATH=$CURRENT_DIR/../build/firmware_${test_CHIP_ARCH}_cmodel/libfirmware.so
       echo "[INFO]tpu_train_cmodel_path:$TPU_TRAIN_CMODEL_PATH"
       set_cmodel_firmware $TPU_TRAIN_CMODEL_PATH
@@ -176,22 +175,25 @@ function run_online_regression_test() {
         echo "[RESULT-$test_CHIP_ARCH] all ops_utest are computed, Please check Results above"
       else
         echo "[RESULT-$test_CHIP_ARCH] some ops_utest are failed!"
+        return -1
       fi
     fi
     if [ $test_CHIP_ARCH = 'sg2260' ]; then
       source  $CURRENT_DIR/sccl_envsetup.sh
-      build_openmpi
+      build_openmpi || return -1
       rebuild_sccl; ret_sccl=$?
       if [ $ret_sccl -eq 0 ];then
         echo "[RESULT-$test_CHIP_ARCH] sccl is built successfully!"
       else
         echo "[RESULT-$test_CHIP_ARCH] sccl is built failed!"
+        return -1
       fi
       regression_for_sccl; ret_regression_for_sccl=$?
       if [ $ret_regression_for_sccl -eq 0 ];then
         echo "[RESULT-$test_CHIP_ARCH] regression_for_sccl is computed successfully!"
       else
         echo "[RESULT-$test_CHIP_ARCH] regression_for_sccl is computed failed!"
+        return -1
       fi
     fi
   fi
@@ -219,6 +221,7 @@ function run_daily_regression_test() {
   link_libsophon $LIBSOPHON_LINK_PATTERN $DEB_PATH_STABLE $VERSION_PATH_STABLE; ret_libsophon=$?
   if [ $ret_libsophon -eq 255 ]; then
     echo "[INFO]test_CHIP_ARCH:$test_CHIP_ARCH libsophon setting failed!"
+    return -1
   else
     if [ $LIBSOPHON_LINK_PATTERN = 'stable' ];then
       echo "[INFO]test_CHIP_ARCH:$test_CHIP_ARCH"
@@ -241,6 +244,7 @@ function run_daily_regression_test() {
         echo "[RESULT-$test_CHIP_ARCH] all ops_utest are computed, Please check Results above"
       else
         echo "[RESULT-$test_CHIP_ARCH] some ops_utest are failed!"
+        return -1
       fi
       if [ "${test_CHIP_ARCH}" = "sg2260" ]; then
         gpt3block_test; ret_gpt3block_test=$?
@@ -249,6 +253,7 @@ function run_daily_regression_test() {
           echo "[RESULT-$test_CHIP_ARCH] all gpt3block results are computed, Please check Results above"
         else
           echo "[RESULT-$test_CHIP_ARCH] some gpt3block results are failed!"
+          return -1
         fi
       fi
     fi

@@ -56,9 +56,21 @@ bool TPUKernelLauncher::stream_registered(tpuRtStream_t stream)
   return registered;
 }
 
+#include "tpu_kernel_data.h"
+
 tpuRtStatus_t TPUKernelLauncher::register_kernel_module(tpuRtStream_t stream){
   if (!stream_registered(stream)){
-    tpuRtKernelModule_t sg_module = tpuRtKernelLoadModuleFile(_library_file, stream);
+    tpuRtKernelModule_t sg_module;
+    if (_library_file)
+    {
+      sg_module = tpuRtKernelLoadModuleFile(_library_file, stream);
+      if (!sg_module)
+      {
+        printf("Failed to load kernel module \"%s\"\n", _library_file);
+      }
+    } else {
+      sg_module = tpuRtKernelLoadModule(tpu_kernel_data, tpu_kernel_data_length, stream);
+    }
     _stream_kernel_modules[stream] = sg_module;
   }
   return tpuRtSuccess;

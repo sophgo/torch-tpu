@@ -85,8 +85,6 @@ if [ "${CHIP_ARCH}" == "sg2260" ]; then
      set_v7runtime_env ${TPUTRAIN_TOP}
 fi
 
-export TPUKERNEL_FIRMWARE_PATH=${TPUTRAIN_TOP}/build/firmware_${CHIP_ARCH}_cmodel/libfirmware.so
-
 export TPU1686_PATH=$(realpath $TPUTRAIN_TOP/../TPU1686)
 if [ ! -d $TPU1686_PATH ]; then
     unset TPU1686_PATH
