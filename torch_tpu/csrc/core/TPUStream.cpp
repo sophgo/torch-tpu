@@ -180,21 +180,24 @@ static void initTPUStreamsOnce() {
   // Inits default and secondary streams (once, globally)
   c10::call_once(init_flag, initGlobalStreamState);
 
-  if (!current_streams) {
-    // Inits current streams (thread local) to default streams
-    current_streams = std::make_unique<StreamId[]>(num_tpus);
-  }
-
+  // Because tpurt does not have a default stream, we have to
+  // add device init once any stream is used.
+  //
+  // We probably should not do this
+  // Later when we implement priority streams we should reconsider
   DeviceIndex dev_index = current_device();
-  if (current_streams[dev_index])
-  {
+  std::call_once(
+    device_flags[dev_index], initDeviceStreamState, dev_index);
+
+  if (current_streams) {
     return;
   }
 
-  // We probably should not do this
-  // Later when we implement priority streams we should reconsider this
-  std::call_once(
-    device_flags[dev_index], initDeviceStreamState, dev_index);
+  // Inits current streams (thread local) to default streams
+  current_streams = std::make_unique<StreamId[]>(num_tpus);
+  for (const auto i : c10::irange(num_tpus)) {
+    current_streams[i] = makeStreamId(StreamIdType::DEFAULT, 0);
+  }
 }
 
 static inline void check_tpu(c10::DeviceIndex device_index) {
