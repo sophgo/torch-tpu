@@ -7,7 +7,7 @@
 #include <algorithm>
 
 #if defined BACKEND_1684X
-#include "tpu_kernel_data.h"
+#include "torch_tpu_kernel_data.h"
 #elif defined BACKEND_SG2260
 #include "tpukernel_launcher.hpp"
 #endif
@@ -201,8 +201,8 @@ tpu_status_t sgdnnInitialize( tpu_resource_t resource )
   {
     return SG_SUCCESS;
   }
-  const char* p = tpu_kernel_data;
-  const size_t length = tpu_kernel_data_length;
+  const char* p = torch_tpu_kernel_data;
+  const size_t length = torch_tpu_kernel_data_length;
   tpu_kernel_module_t tpu_module = tpu_kernel_load_module ( resource , ( const char * ) p, length );
   tpu_kernel_module.insert ( std::pair<tpu_resource_t, tpu_kernel_module_t> ( resource , tpu_module ) );
 #elif defined BACKEND_SG2260

@@ -2,6 +2,8 @@
 #include "tpu_kernel.h"
 // #include "config.h"
 
+#ifdef BACKEND_SG2260
+
 extern void nodechip_llama2_a16_matmul(
     global_addr_t activation_global_addr,
     global_addr_t weight_global_addr,
@@ -44,3 +46,5 @@ int tpu_kernel_api_llama_a16_matmul ( const void * args )
   return 0;
 }
 TPUKERNEL_FUNC_REGISTER ( tpu_kernel_api_llama_a16_matmul );
+
+#endif

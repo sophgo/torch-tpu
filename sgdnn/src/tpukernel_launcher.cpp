@@ -56,7 +56,7 @@ bool TPUKernelLauncher::stream_registered(tpuRtStream_t stream)
   return registered;
 }
 
-#include "tpu_kernel_data.h"
+#include "torch_tpu_kernel_data.h"
 
 tpuRtStatus_t TPUKernelLauncher::register_kernel_module(tpuRtStream_t stream){
   if (!stream_registered(stream)){
@@ -69,7 +69,7 @@ tpuRtStatus_t TPUKernelLauncher::register_kernel_module(tpuRtStream_t stream){
         printf("Failed to load kernel module \"%s\"\n", _library_file);
       }
     } else {
-      sg_module = tpuRtKernelLoadModule(tpu_kernel_data, tpu_kernel_data_length, stream);
+      sg_module = tpuRtKernelLoadModule(torch_tpu_kernel_data, torch_tpu_kernel_data_length, stream);
     }
     _stream_kernel_modules[stream] = sg_module;
   }

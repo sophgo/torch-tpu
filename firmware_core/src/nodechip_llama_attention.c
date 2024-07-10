@@ -1,6 +1,8 @@
 #include "sg_api_struct.h"
 #include "tpu_kernel.h"
 
+#ifdef BACKEND_SG2260
+
 extern
 void nodechip_llama2_attention(
     global_addr_t Q_global_addr,
@@ -125,4 +127,6 @@ int tpu_kernel_llama_attention_multi_core(const void* api_buf) {
 }
 
 TPUKERNEL_FUNC_REGISTER(tpu_kernel_llama_attention_multi_core);
+
+#endif
 #endif

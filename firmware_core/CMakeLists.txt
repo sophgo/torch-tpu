@@ -43,7 +43,5 @@ else()
     set_target_properties(firmware PROPERTIES LINK_FLAGS -s)
     target_link_options(firmware PRIVATE -Wl,-allow-multiple-definition) # FIXME
     target_link_libraries(firmware PRIVATE -Wl,--whole-archive TPU1686::firmware -Wl,--no-whole-archive m)
-    if (NOT $ENV{CHIP_ARCH} STREQUAL "bm1684x")
-        target_link_options(firmware PRIVATE -Wl,--no-undefined)
-    endif()
+    target_link_options(firmware PRIVATE -Wl,--no-undefined)
 endif()
