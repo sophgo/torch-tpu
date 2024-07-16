@@ -9,11 +9,11 @@
 #include <sophon/transport/device.h>
 #include <torch/python.h>
 #include "tpuDNN.h"
+#include "TPUStream.h"
 
 #include <condition_variable>
 #include <deque>
 #include <mutex>
-#include <thread>
 
 #include <c10/util/hash.h>
 #include <torch/csrc/distributed/c10d/ProcessGroup.hpp>
@@ -30,35 +30,25 @@ constexpr const char *SOPHON_BACKEND_NAME = "SCCL";
 
 class TORCH_API ProcessGroupSophon : public ProcessGroup {
 public:
-  class TORCH_API AsyncWork : public Work {
+  class TORCH_API AsyncWork final: public Work {
   public:
-    explicit AsyncWork(std::vector<std::vector<at::Tensor>> outputTensors,
-                       const char *profilingTitle = nullptr,
-                       const c10::optional<std::vector<at::Tensor>>
-                           &inputTensors = c10::nullopt);
-    ~AsyncWork() override = default;
-
-    static void execute(c10::intrusive_ptr<AsyncWork> work);
-
-    virtual void run() = 0;
+    explicit AsyncWork(at::Tensor outputTensor);
 
     std::vector<at::Tensor> result() override;
 
     c10::intrusive_ptr<c10::ivalue::Future> getFuture() override;
 
+    bool wait(std::chrono::milliseconds timeout = kNoTimeout) override;
+
+    bool isCompleted() override;
+
   protected:
     friend class ProcessGroupSophon;
-    virtual void finishWorkSophon() = 0;
 
   private:
-    void finishWorkSophonError(std::exception_ptr eptr);
-    inline void recordAsyncWorkProfilingInfo(
-        const char *profilingTitle,
-        const c10::optional<std::vector<at::Tensor>> &inputTensors);
 
-    const std::vector<std::vector<at::Tensor>> outputTensors_;
+    const at::Tensor outputTensor_;
     c10::intrusive_ptr<at::ivalue::Future> future_;
-    std::function<void()> recordFunctionBeforeCallback_;
   };
 
   class TORCH_API SophonStore : public ::sophon::rendezvous::Store {
@@ -117,8 +107,7 @@ public:
   public:
     explicit RecvWork(
         at::Tensor &tensor,
-        std::unique_ptr<::sophon::transport::UnboundBuffer> buffer,
-        const char *profilingTitle = nullptr);
+        std::unique_ptr<::sophon::transport::UnboundBuffer> buffer);
 
     int sourceRank() const override;
 
@@ -143,7 +132,6 @@ public:
     }
 
     std::vector<std::shared_ptr<::sophon::transport::Device>> devices;
-    int threads;
     std::vector<int> chip_map;
   };
 
@@ -234,14 +222,9 @@ public:
     return store_;
   }
 
-  void monitoredBarrier(const BarrierOptions &opts = BarrierOptions(),
-                        bool waitAllRanks = false) override;
-
   void setSequenceNumberForGroup() override;
 
   uint64_t getSequenceNumberForGroup() override;
-
-  int getNumThreads() { return options_->threads; }
 
   void broadcastUniqueSCCLID(sophon::scclUniqueId *scclID, int rank);
 
@@ -250,7 +233,6 @@ protected:
   const c10::intrusive_ptr<Options> options_;
 
   std::vector<std::shared_ptr<::sophon::Context>> contexts_;
-  std::vector<std::thread> threads_;
   bool stop_;
 
   uint32_t collectiveCounter_;
