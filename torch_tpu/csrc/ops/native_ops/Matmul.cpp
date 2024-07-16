@@ -43,14 +43,16 @@ Tensor & addmm_out_tpu ( const Tensor & self, const Tensor & mat1, const Tensor 
 
     TIMING_START;
 
-    auto status = sgdnnMatmul (
-                  tpu::TPUGetDeviceResource(),
-                  tpu::TPUGenerateSgdnnTensor ( mat1_ ),
-                  tpu::TPUGenerateSgdnnTensor ( mat2_ ),
-                  tpu::TPUGenerateSgdnnTensor ( self ),
-                  tpu::TPUGenerateSgdnnTensor ( out ) );
-    TORCH_CHECK ( status == SG_SUCCESS );
-        TIMING_END( tpu::MM );
+    auto stream = c10_tpu::getCurrentTPUStream();
+    auto status = tpudnnMatmulAsync(
+      stream,
+      tpu::TPUGenerateTpudnnTensor(stream, mat1_),
+      tpu::TPUGenerateTpudnnTensor(stream, mat2_),
+      tpu::TPUGenerateTpudnnTensor(stream, self),
+      tpu::TPUGenerateTpudnnTensor(stream, out));
+    TORCH_CHECK ( status == TPUDNN_STATUS_SUCCESS );
+
+    TIMING_END( tpu::ADDMM );
   }
   else
   {
@@ -122,7 +124,7 @@ Tensor & bmm_out_tpu ( const Tensor & self, const Tensor & mat2, Tensor & out )
     tpu::TPUGenerateTpudnnTensor(stream, out));
   TORCH_CHECK ( status == TPUDNN_STATUS_SUCCESS );
 
-    TIMING_END( tpu::BMM );
+  TIMING_END( tpu::BMM );
 #endif
   SHOW_TENSOR_OP(self, mat2, out);
   return out;

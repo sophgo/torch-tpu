@@ -89,7 +89,6 @@ function regression_for_sccl() {
     done
 }
 
-export stable_libsophon_path="/workspace/libsophon_Release_20230605_025400"
 # function for online regression
 function link_libsophon() {
     echo "********************************************"
@@ -142,33 +141,7 @@ function make_kernel_module() {
   fi
 }
 
-#this function is fake  as make -j exists error
 function build_kernel_module() {
-  CURRENT_DIR=$(dirname ${BASH_SOURCE})
-  export CROSS_TOOLCHAINS="$CURRENT_DIR/../../bm_prebuilt_toolchains/"
-  test_CHIP_ARCH=${1:-bm1684x}
-  if [ ! -d $CROSS_TOOLCHAINS ]; then
-    echo "[bm_prebuilt_toolchains]:$CROSS_TOOLCHAINS is not found !"
-  else
- if [ "${test_CHIP_ARCH}" = "sg2260" ]; then
-      echo "chip 2260 kernel_module building is 'invalid'"
-  else
-    dumpinstall="apt-get install bsdmainutils"
-    $dumpinstall
-    pushd $CURRENT_DIR/..
-    rm -rf build
-    mkdir build && cd build
-    cmake_cmd_kerenl="cmake .. -DCMAKE_BUILD_TYPE=Debug -DUSING_CMODEL=OFF -DPCIE_MODE=ON -DSOC_MODE=OFF"
-    echo "[CMD-INFO] $cmake_cmd_kerenl"
-    $cmake_cmd_kerenl
-    make kernel_module
-    #make -j$(($(nproc)-2)) #the only difference!!!!!!!!!!!!!
-    popd
-  fi
-  fi
-}
-
-function build_kernel_module_real() {
   CURRENT_DIR=$(dirname ${BASH_SOURCE})
   export CROSS_TOOLCHAINS="$CURRENT_DIR/../../bm_prebuilt_toolchains/"
   test_CHIP_ARCH=${1:-bm1684x}
@@ -190,8 +163,7 @@ function run_online_regression_test() {
 
   SKIP_DOC=true
   bash scripts/release.sh || return -1
-  
-  
+
   test_CHIP_ARCH=${1:-bm1684x}
   LIBSOPHON_LINK_PATTERN=${2:-local} #local or stable
   TEST_PATTERN=${3:-online} #online,local, or fast
@@ -269,7 +241,7 @@ function run_daily_regression_test() {
   else
     if [ $LIBSOPHON_LINK_PATTERN = 'stable' ];then
       echo "[INFO]test_CHIP_ARCH:$test_CHIP_ARCH"
-      build_kernel_module_real $test_CHIP_ARCH
+      build_kernel_module $test_CHIP_ARCH
     elif [ $LIBSOPHON_LINK_PATTERN = 'local' ];then
       echo "************** $LIBSOPHON_LINK_PATTERN-LIBSOPHON IS REAEDY *********"
       source  $CURRENT_DIR/envsetup.sh $test_CHIP_ARCH $LIBSOPHON_LINK_PATTERN

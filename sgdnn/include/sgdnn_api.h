@@ -312,29 +312,6 @@ tpu_status_t sgdnnPoolingForward ( tpu_resource_t  stream,
  * 5. BIAS is optional
  */
 
-tpu_status_t sgdnnMatmul ( tpu_resource_t  stream,
-                          SgdnnTensor_t left,
-                          SgdnnTensor_t right,
-                          SgdnnTensor_t bias,
-                          SgdnnTensor_t output ,
-                          bool non_blocking = true);
-
-/*
- * OUTPUT ( batch ) = LEFT ( batch ) * RIGHT ( batch ), where " * " is matrix multiplication
- * Note:
- * 1. The data types of LEFT, RIGHT and OUTPUT must be the same and one of FP32, FP16 and BF16
- * 2. The dimensions of LEFT, RIGHT and OUTPUT must be 3
- * 3. The shape of LEFT is ( B, M, K ), RIGHT is ( B, K, N ), OUTPUT is ( B, M, N )
- * 4. LEFT is allowed to be contiguous or transposed, meaning that the stride is ( M * K, K, 1 ) or ( M * K, 1, M )
- *    RIGHT is allowed to be contiguous or transposed, meaning that the stride is ( N * K, N, 1 ) or ( N * K, 1, K )
- *    OUTPUT is only allowed to be contiguous, meaning that the stride is ( M * N, N, 1 )
- */
-tpu_status_t sgdnnBatchMatmul ( tpu_resource_t  stream,
-                               SgdnnTensor_t left,
-                               SgdnnTensor_t right,
-                               SgdnnTensor_t output ,
-                               bool non_blocking = true);
-
 tpu_status_t sgdnnLLamaA16Matmul ( tpu_resource_t handle,
                              SgdnnTensor_t left,
                              SgdnnTensor_t right,

@@ -7,10 +7,6 @@ option(BACKEND_SG2260        "Opt for 2260"                                    O
 
 option(USING_CMODEL          "option for using cmodel"                         OFF)
 
-option(USING_PERF_MODE       "Using performance mode"                          OFF)
-
-option(USE_TPUv7_RUNTIME     "option for control use new runtime"              OFF)
-
 option(DUMP_INS              "option for control dump ins, cmodel only"        OFF)
 ######################################
 ### CHIP BACKEND
@@ -44,15 +40,13 @@ elseif(BACKEND_SG2260)
   set(RUNTIME_LIB_PATH ${TPUv7_RUNTIME_PATH}/lib)
 endif()
 
+message(STATUS "BACKEND_CHIP : $ENV{CHIP_ARCH}")
 message(STATUS "RUNTIME_INCLUDE_PATH : ${RUNTIME_INCLUDE_PATH}")
 message(STATUS "RUNTIME_LIB_PATH : ${RUNTIME_LIB_PATH}")
-message(STATUS "BACKEND_CHIP : $ENV{CHIP_ARCH}")
-
 
 if(USING_PERF_MODE)
   add_definitions(-DUSING_PERF_MODE)
 endif()
-
 
 if(DUMP_INS)
   add_definitions(-DDUMP_INS)
