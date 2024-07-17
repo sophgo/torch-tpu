@@ -14,8 +14,9 @@ Tensor &reciprocal_out_tpu(const at::Tensor &self, at::Tensor &out) {
 #if 0
   auto out_cpu = reciprocal ( self.cpu() );
   tpu::TPUCopyHostToDevice ( out.data_ptr(), out_cpu.contiguous().data_ptr(), out.nbytes() );
+  return out;
 #endif
-  if (self.dim() == 0) {
+  if (self.dim() == 0 || self.numel() == 1) {
     CPU_IMPL_WARNING();
     TIMING_START;
     auto out_cpu = reciprocal(self.cpu());
@@ -29,7 +30,7 @@ Tensor &reciprocal_out_tpu(const at::Tensor &self, at::Tensor &out) {
      * self.dim() == 0 condition, which should be handled separately.
      */
     TIMING_START;
-
+    SHOW_TENSOR_OP(self, out);
     auto status = sgdnnActive(
         tpu::TPUGetDeviceResource(), tpu::TPUGenerateSgdnnTensor(self),
         tpu::TPUGenerateSgdnnTensor(out), ACTIVE_RECIPROCAL);

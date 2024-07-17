@@ -1,0 +1,100 @@
+diff --git a/src/accelerate/accelerator.py b/src/accelerate/accelerator.py
+index c109365..aad24ee 100755
+--- a/src/accelerate/accelerator.py
++++ b/src/accelerate/accelerator.py
+@@ -86,6 +86,7 @@ from .utils import (
+     is_npu_available,
+     is_torch_version,
+     is_torch_xla_available,
++    is_torch_tpu_available,
+     is_xpu_available,
+     load_fsdp_model,
+     load_fsdp_optimizer,
+@@ -460,7 +461,7 @@ class Accelerator:
+             and self.distributed_type not in (DistributedType.DEEPSPEED, DistributedType.MEGATRON_LM)
+         ):
+             self.native_amp = True
+-            if self.device.type not in ("xpu", "cuda", "npu", "xla", "mlu") or is_torch_xla_available(
++            if self.device.type not in ("xpu", "cuda", "npu", "xla", "mlu", "tpu") or is_torch_xla_available(
+                 check_is_tpu=True
+             ):
+                 raise ValueError(f"fp16 mixed precision requires a GPU (not {self.device.type!r}).")
+@@ -475,6 +476,8 @@ class Accelerator:
+                 self.scaler = torch.mlu.amp.GradScaler(**kwargs)
+             elif is_npu_available():
+                 self.scaler = torch.npu.amp.GradScaler(**kwargs)
++            elif is_torch_tpu_available():
++                self.scaler = torch.tpu.amp.GradScaler(**kwargs)
+             else:
+                 self.scaler = torch.cuda.amp.GradScaler(**kwargs)
+ 
+diff --git a/src/accelerate/state.py b/src/accelerate/state.py
+index 43c75ce..7e040b6 100644
+--- a/src/accelerate/state.py
++++ b/src/accelerate/state.py
+@@ -43,6 +43,7 @@ from .utils import (
+     is_mps_available,
+     is_npu_available,
+     is_torch_xla_available,
++    is_torch_tpu_available,
+     is_xpu_available,
+     parse_choice_from_env,
+     parse_flag_from_env,
+@@ -705,6 +706,8 @@ class PartialState:
+             return torch.device("xpu:0")
+         elif is_npu_available():
+             return torch.device("npu")
++        elif is_torch_tpu_available():
++            return torch.device("tpu")
+         else:
+             return torch.device("cpu")
+ 
+@@ -772,7 +775,7 @@ class PartialState:
+             self.device = torch.device("cpu") if self._cpu else self.default_device
+             return
+         device = str(self.distributed_type).split(".")[-1].replace("MULTI_", "").lower()
+-        if device not in ("cpu", "gpu", "mlu", "npu", "xpu", "xla"):
++        if device not in ("cpu", "gpu", "mlu", "npu", "xpu", "xla", "tpu"):
+             raise ValueError(
+                 f"Can't set device for {self.distributed_type} ({device}), verify we should be calling `_set_device()` for it!"
+             )
+diff --git a/src/accelerate/utils/__init__.py b/src/accelerate/utils/__init__.py
+index 1a6217e..18e9141 100644
+--- a/src/accelerate/utils/__init__.py
++++ b/src/accelerate/utils/__init__.py
+@@ -98,6 +98,7 @@ from .imports import (
+     is_tensorboard_available,
+     is_timm_available,
+     is_torch_xla_available,
++    is_torch_tpu_available,
+     is_torchvision_available,
+     is_transformer_engine_available,
+     is_transformers_available,
+diff --git a/src/accelerate/utils/imports.py b/src/accelerate/utils/imports.py
+index 54f24ae..4ea253c 100644
+--- a/src/accelerate/utils/imports.py
++++ b/src/accelerate/utils/imports.py
+@@ -162,6 +162,23 @@ def is_torch_xla_available(check_is_tpu=False, check_is_gpu=False):
+ 
+     return True
+ 
++@lru_cache()
++def is_torch_tpu_available(check_device=False):
++    "Checks if `torch_npu` is installed and potentially if a NPU is in the environment"
++    if importlib.util.find_spec("torch_tpu") is None:
++        return False
++
++    import torch
++    import torch_tpu  # noqa: F401
++
++    if check_device:
++        try:
++            # Will raise a RuntimeError if no TPU is found
++            _ = torch.tpu.device_count()
++            return torch.tpu.is_available()
++        except RuntimeError:
++            return False
++    return hasattr(torch, "tpu") and torch.tpu.is_available()
+ 
+ def is_deepspeed_available():
+     if is_mlu_available():

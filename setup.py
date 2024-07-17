@@ -252,13 +252,21 @@ def generate_backend_py():
         else:
             raise RuntimeError("Failed to generate backend.py")
 
+def walk_dir(dir):
+    res = []
+    for root, _, files in os.walk(dir):
+        for file in files:
+            res.append(os.path.join(root, file))
+    return res
+
 def get_src_py_and_dst():
 
     ret = []
     generated_python_files = glob.glob(
         os.path.join(BASE_DIR, "torch_tpu", '**/*.py'),
         recursive=True)
-
+    demo_files = walk_dir(os.path.join(BASE_DIR, "torch_tpu/demo"))
+    generated_python_files = list(set(generated_python_files) | set(demo_files))
     for src in generated_python_files:
         dst = os.path.join(
             os.path.join(BASE_DIR, f"build/{get_build_type()}/packages/torch_tpu"),

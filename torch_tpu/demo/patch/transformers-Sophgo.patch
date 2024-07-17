@@ -1,0 +1,59 @@
+diff --git a/src/transformers/training_args.py b/src/transformers/training_args.py
+index 2807c9951..9a52657c8 100644
+--- a/src/transformers/training_args.py
++++ b/src/transformers/training_args.py
+@@ -49,6 +49,7 @@ from .utils import (
+     is_torch_mlu_available,
+     is_torch_neuroncore_available,
+     is_torch_npu_available,
++    is_torch_tpu_available,
+     is_torch_tf32_available,
+     is_torch_xla_available,
+     is_torch_xpu_available,
+@@ -1642,6 +1643,7 @@ class TrainingArguments:
+             and (self.device.type != "cuda")
+             and (self.device.type != "mlu")
+             and (self.device.type != "npu")
++            and (self.device.type != "tpu")
+             and (self.device.type != "xpu")
+             and (get_xla_device_type(self.device) not in ["GPU", "CUDA"])
+             and (self.fp16 or self.fp16_full_eval)
+@@ -2125,6 +2127,10 @@ class TrainingArguments:
+                 device = torch.device("npu:0")
+                 torch.npu.set_device(device)
+                 self._n_gpu = 1
++            elif is_torch_tpu_available():
++                device = torch.device("tpu:0")
++                torch.tpu.set_device(device)
++                self._n_gpu = 1
+             else:
+                 # if n_gpu is > 1 we'll use nn.DataParallel.
+                 # If you only want to use a specific subset of GPUs use `CUDA_VISIBLE_DEVICES=0`
+diff --git a/src/transformers/utils/import_utils.py b/src/transformers/utils/import_utils.py
+index b941080b9..bef58a076 100755
+--- a/src/transformers/utils/import_utils.py
++++ b/src/transformers/utils/import_utils.py
+@@ -621,6 +621,23 @@ def is_torch_mlu_available(check_device=False):
+             return False
+     return hasattr(torch, "mlu") and torch.mlu.is_available()
+ 
++@lru_cache()
++def is_torch_tpu_available(check_device=False):
++    "Checks if `torch_npu` is installed and potentially if a NPU is in the environment"
++    if not _torch_available or importlib.util.find_spec("torch_tpu") is None:
++        return False
++
++    import torch
++    import torch_tpu  # noqa: F401
++
++    if check_device:
++        try:
++            # Will raise a RuntimeError if no NPU is found
++            _ = torch.tpu.device_count()
++            return torch.tpu.is_available()
++        except RuntimeError:
++            return False
++    return hasattr(torch, "tpu") and torch.tpu.is_available()
+ 
+ def is_torchdynamo_available():
+     if not is_torch_available():

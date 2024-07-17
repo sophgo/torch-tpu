@@ -67,10 +67,10 @@ Tensor upsample_nearest2d_tpu(const at::Tensor &self,
   CHECK_TENSOR_IN_DEVICE_NO_CONTIGUOUS(self);
   TORCH_CHECK(self.dim() > 0, "input dim should larger than 0.");
 #if 0
-  auto self_cpu = upsample_bilinear2d(self.cpu(), output_size, align_corners,
-                                      scale_factors);
-  tpu::TPUCopyHostToDevice(out.data_ptr(), self.contiguous().data_ptr(),
-                           self.nbytes());
+  auto out_cpu = upsample_nearest2d(self.cpu().to(at::kFloat), output_size);
+  // tpu::TPUCopyHostToDevice(out.data_ptr(), self.contiguous().data_ptr(),
+  //                          self.nbytes());
+  auto out = out_cpu.to(self.dtype()).to(self.device());
 #else
   std::vector<int64_t> output_shape(4, 0);
   output_shape[0] = self.size(0);
@@ -126,10 +126,7 @@ Tensor &upsample_nearest2d_backward_out_tpu(
   auto input_r = upsample_nearest2d_backward_outf(
       grad_output.cpu().to(torch::kFloat32), output_size, input_size,
       scales_h, scales_w, T_input);
-  tpu::TPUCopyHostToDevice(grad_input.data_ptr(),
-                           grad_input.cpu().to(input_type).contiguous().data_ptr(),
-                           grad_input.nbytes());
-  grad_input = grad_input.contiguous();
+  grad_input = TENSOR_TO_TPU(input_r.to(input_type).contiguous());
 #else
   PoolingDescriptor_t pooling_desc = {
       .kh = int(scales_h.value()),

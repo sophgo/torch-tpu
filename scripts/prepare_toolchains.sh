@@ -9,7 +9,7 @@ download_arm_toolchain(){
       echo "soc_cross_chain not found, try to download from web"
       if [ ! -e "${arm_toolchain}.tar.xz" ]; then
           pip3 install dfss
-          python3 -m dfss --upgrade
+          pip3 install --upgrade dfss
           python3 -m dfss --url=open@sophgo.com:/toolchains/gcc-arm-10.3-2021.07-x86_64-aarch64-none-linux-gnu.tar.xz
       fi
       tar xvf "${arm_toolchain}.tar.xz"
@@ -58,7 +58,7 @@ function soc_build_env_prepare()
       echo "soc_cross_chain not found, try to download from web"
       if [ ! -e "${soc_cross_chain}.tar.xz" ]; then
           pip3 install dfss
-          python3 -m dfss --upgrade
+          pip3 install --upgrade dfss
           python3 -m dfss --url=open@sophgo.com:/toolchains/gcc-arm-10.3-2021.07-x86_64-aarch64-none-linux-gnu.tar.xz
       fi
       tar xvf "${soc_cross_chain}.tar.xz"
@@ -80,7 +80,7 @@ function soc_build_env_prepare()
       if [ ! -e "${python382_path}.tar.xz" ]; then
           echo "Python-3.8.2.tar.xz not found, try to download from sophgo.com"
           pip3 install dfss
-          python3 -m dfss --upgrade
+          pip3 install --upgrade dfss
           python3 -m dfss --url=open@sophgo.com:/toolchains/pythons/Python-3.8.2.tar.gz
       fi
       tar zxvf "${python382_path}.tar.gz"
@@ -92,7 +92,7 @@ function soc_build_env_prepare()
       if [ ! -e "${libsophon_soc_path}.tar.gz" ]; then
           echo "libsophon_soc_0.5.0_aarch64.tar.gz not found, try to download from sophgo.com"
           pip3 install dfss
-          python3 -m dfss --upgrade
+          pip3 install --upgrade dfss
           python3 -m dfss --url=open@sophgo.com:/toolchains/libsophon_soc_0.5.0_aarch64.tar.gz
       fi
       tar zxvf "${libsophon_soc_path}.tar.gz"

@@ -3452,3 +3452,65 @@ int tpu_kernel_api_conv_grad_reorder(const void* args)
 }
 
 TPUKERNEL_FUNC_REGISTER(tpu_kernel_api_conv_grad_reorder);
+
+#ifdef BACKEND_SG2260
+int tpu_kernel_api_conv_grad_reorder_multi_core(const void* args)
+{
+    sg_api_conv_grad_reorder_t* api = (sg_api_conv_grad_reorder_t*)args;
+    dim4 nd_shape = {.n = api->shape[0], .c = api->shape[1], .h = api->shape[2], .w = api->shape[3]};
+    tpu_initialize();
+    int core_idx = tpu_core_index();
+    if(core_idx == 0){
+        nodechip_weight_reorder_to_32oc(
+            api->input_global_addr,
+            api->output_global_addr,
+            &nd_shape);
+    }
+    tpu_poll();
+    return 0;
+}
+TPUKERNEL_FUNC_REGISTER(tpu_kernel_api_conv_grad_reorder_multi_core);
+
+int tpu_kernel_api_conv2d_backward_multi_core(const void* args) {
+    sg_api_conv2d_backward_t* api = (sg_api_conv2d_backward_t*)args;
+
+    TPUKERNEL_ASSERT ( api->dtype == DT_FP32 || api->dtype == DT_FP16 || api->dtype == DT_BFP16 );
+
+    dim4 input_shape = {api->input_shape[0], api->input_shape[1],
+                        api->input_shape[2], api->input_shape[3]};
+    dim4 output_shape = {api->output_shape[0], api->output_shape[1],
+                         api->output_shape[2], api->output_shape[3]};
+    dim2 kernel = {api->kernel[0], api->kernel[1]};
+    dim2 stride = {api->stride[0], api->stride[1]};
+    dim2 dilation = {api->dilation[0], api->dilation[1]};
+    padding_t pad = {api->pad[0], api->pad[1], api->pad[2], api->pad[3]};
+
+    tpu_initialize();
+    int core_idx = tpu_core_index();
+    if(core_idx == 0){
+    nodechip_conv_backward(
+        api->grad_output_global_addr,
+        api->input_global_addr,
+        api->weight_global_addr,
+        api->grad_input_global_addr,
+        api->grad_weight_global_addr,
+        api->grad_bias_global_addr,
+        api->buffer_global_addr,
+        &input_shape,
+        &output_shape,
+        &kernel,
+        &stride,
+        &dilation,
+        &pad,
+        api->groups,
+        api->grad_input_global_addr != 0,
+        api->grad_weight_global_addr != 0,
+        api->grad_bias_global_addr != 0,
+        (data_type_t)api->dtype,
+        api->weight_formated);
+    }
+    tpu_poll();
+    return 0;
+}
+TPUKERNEL_FUNC_REGISTER(tpu_kernel_api_conv2d_backward_multi_core);
+#endif

@@ -39,6 +39,7 @@ std::tuple<Tensor, Tensor, Tensor> native_group_norm_tpu(
     const c10::optional<Tensor> &beta_opt /* optional */, int64_t N, int64_t C,
     int64_t HxW, int64_t group, double eps) {
   CHECK_TENSOR_IN_DEVICE(X);
+
   const Tensor X_32 = X.to(caffe2::TypeMeta::Make<float>());
   // See [Note: hacky wrapper removal for optional tensor]
   c10::MaybeOwned<Tensor> gamma_maybe_owned =
@@ -65,25 +66,31 @@ std::tuple<Tensor, Tensor, Tensor> native_group_norm_tpu(
     // if beta_opt has value, copy beta_opt value to bias
     bias = bias.copy_(beta_opt.value());
   }
-
   // set affine depend on gamma_opt and beta_opt
-  int affine = 0;
-  if (gamma_opt.has_value() && beta_opt.has_value()) {
-    affine = 3;
-  } else if (gamma_opt.has_value()) {
-    affine = 1;
-  } else if (beta_opt.has_value()) {
-    affine = 2;
-  } else {
-    affine = 0;
-  }
+  // int affine = 0;
+  // if (gamma_opt.has_value() && beta_opt.has_value()) {
+  //   affine = 3;
+  // } else if (gamma_opt.has_value()) {
+  //   affine = 1;
+  // } else if (beta_opt.has_value()) {
+  //   affine = 2;
+  // } else {
+  //   affine = 0;
+  // }
 
-#if 0
-  auto result =
-      native_group_norm(X.cpu(), gamma_opt, beta_opt, N, C, HxW, group, eps);
-  Y = std::get<0>(result).cpu();
-  mean = std::get<1>(result).cpu();
-  rstd = std::get<2>(result).cpu();
+#if 1
+  // auto dtype = X.dtype();
+  // auto result = at::native_group_norm(X_32.cpu(), weight.cpu().to(torch::kFloat), bias.cpu().to(torch::kFloat), N, C, HxW, group, eps);
+  // Y = TENSOR_TO_TPU(std::get<0>(result).to(dtype));
+  // mean = TENSOR_TO_TPU(std::get<1>(result).to(dtype));
+  // rstd = TENSOR_TO_TPU(std::get<2>(result).to(dtype));
+  auto input_type = X.dtype();
+  // c10::optional<at::Tensor> weight_cpu = weight.defined() ? c10::optional<at::Tensor>(weight) : c10::nullopt;
+  // c10::optional<at::Tensor> bias_cpu = bias.defined() ? c10::optional<at::Tensor>(bias) : c10::nullopt;
+  auto result = at::native_group_norm(X_32.cpu(), weight.cpu().to(torch::kFloat), bias.cpu().to(torch::kFloat), N, C, HxW, group, eps);
+  Y = TENSOR_TO_TPU(std::get<0>(result).to(input_type));
+  mean = TENSOR_TO_TPU(std::get<1>(result).to(input_type));
+  rstd = TENSOR_TO_TPU(std::get<2>(result).to(input_type));
 #else
   TIMING_START;
   auto stream = c10_tpu::getCurrentTPUStream();

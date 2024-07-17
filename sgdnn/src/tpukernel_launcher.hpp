@@ -4,12 +4,15 @@
 #include <set>
 #include <map>
 #include <string>
+// file io
+#include <fstream>
 #include <tpuv7_rt.h>
 #include <mutex>
 #include <thread>
 #include <queue>
 #include <condition_variable>
 #include "sgdnn_runtime.h"
+
 
 /**
  * @brief Wrappr class of the launch functions
@@ -74,3 +77,5 @@ private:
   Cached_DevMem_Mgr _cache_mem_Mgr;
 };
 
+void sgdnn_dump_data_into_file(const void* data, size_t size, const char* file_name);
+void sgdnn_dump_tensor_into_file(tpu_resource_t tpu_resource, tpu_device_mem_t tensor, size_t size, const char* file_name);

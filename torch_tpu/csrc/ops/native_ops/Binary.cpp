@@ -25,24 +25,42 @@ Tensor &binary_op_tpu(const Tensor &self, const Tensor &other,
   }
   CHECK_TENSOR_IN_DEVICE(out);
 
+  auto self_ = self;
+  if(self_.dtype() == torch::kInt64){
+    self_ = self.to(torch::kInt32);
+  }
+  auto other_ = other;
+  if(other_.dtype() == torch::kInt64){
+    other_ = other.to(torch::kInt32);
+  }
+  auto out_ = out;
+  if(out_.dtype() == torch::kInt64){
+    out_ = out.to(torch::kInt32);
+  }
+
   if (self.dim() == 0 || other.dim() == 0) {
     // tensor op scalar
     if (self.dim() == 0) {
       TIMING_START;
       auto status = sgdnnBinaryC(
-          tpu::TPUGetDeviceResource(), tpu::TPUGenerateSgdnnTensor(other),
+          tpu::TPUGetDeviceResource(), tpu::TPUGenerateSgdnnTensor(other_),
           self.item().toFloat() * alpha.toFloat(),
-          tpu::TPUGenerateSgdnnTensor(out), binary_type, 1);
+          tpu::TPUGenerateSgdnnTensor(out_), binary_type, 1);
       TORCH_CHECK(status == SG_SUCCESS);
       TIMING_END(tpu::BINARYOP_C);
     } else {
       TIMING_START;
       auto status = sgdnnBinaryC(
-          tpu::TPUGetDeviceResource(), tpu::TPUGenerateSgdnnTensor(self),
+          tpu::TPUGetDeviceResource(), tpu::TPUGenerateSgdnnTensor(self_),
           other.item().toFloat() * alpha.toFloat(),
-          tpu::TPUGenerateSgdnnTensor(out), binary_type, 0);
+          tpu::TPUGenerateSgdnnTensor(out_), binary_type, 0);
       TORCH_CHECK(status == SG_SUCCESS);
       TIMING_END(tpu::BINARYOP_C);
+    }
+    if(out.dtype() == torch::kInt32){
+      out = out_.to(torch::kInt64);
+    }else{
+      out = out_;
     }
     return out;
   }
@@ -739,10 +757,17 @@ Tensor &less_than_out_tpu(const Tensor &self, const Tensor &other,
       TIMING_END(tpu::LESS_THAN);
     } else {
       TIMING_START;
+      auto self_  = self.dtype() == torch::kInt64 ? self.to(torch::kInt32) : self;
+      auto other_ = other.dtype() == torch::kInt64 ? other.to(torch::kInt32) : other;
+      auto out_   = out.dtype() == torch::kInt64 ? out.to(torch::kInt32) : out;
       auto status = sgdnnComparisionBcast(tpu::TPUGetDeviceResource(),
-                                          tpu::TPUGenerateSgdnnTensor(self),
-                                          tpu::TPUGenerateSgdnnTensor(other), 4,
-                                          tpu::TPUGenerateSgdnnTensor(out));
+                                          tpu::TPUGenerateSgdnnTensor(self_),
+                                          tpu::TPUGenerateSgdnnTensor(other_), 4,
+                                          tpu::TPUGenerateSgdnnTensor(out_));
+      if(out.dtype() == torch::kInt64)
+        out = out_.to(torch::kInt64);
+      else
+        out = out_;
       TORCH_CHECK(status == SG_SUCCESS);
       TIMING_END(tpu::LESS_THAN_BCAST);
     }
@@ -1220,6 +1245,12 @@ Tensor &pow_c_out_tpu(const Tensor &self, const Scalar &exponent, Tensor &out) {
     Tensor out_cpu = pow(self.cpu(), exponent);
     tpu::TPUCopyHostToDevice(out.data_ptr(), out_cpu.contiguous().data_ptr(),
                              out.nbytes());
+    SHOW_TENSOR_OP(self, out);
+    return out;
+  }
+  if (exponent.toDouble() == 1.0) {
+    tpu::TPUCopyDeviceToDevice(out.data_ptr(), self.data_ptr(), out.nbytes());
+    SHOW_TENSOR_OP(self, out);
     return out;
   }
   TORCH_CHECK(exponent.toDouble() > 0);

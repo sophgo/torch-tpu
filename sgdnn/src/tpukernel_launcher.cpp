@@ -219,3 +219,26 @@ void Cached_DevMem_Mgr::free_cache_daemon(){
     set_mem_no_use(msg.dev_ptr);
   }
 }
+
+void sgdnn_dump_data_into_file(const void* data, size_t size, const char* file_name)
+{
+  // std::ofstream file(file_name, std::ios::binary);
+  // file.write((const char*)data, size);
+  // file.close();
+  FILE *fp = fopen(file_name, "wb");
+  if (fp) {
+    fwrite(data, size, 1, fp);
+    fclose(fp);
+  }
+}
+
+void sgdnn_dump_tensor_into_file(tpu_resource_t tpu_resource, tpu_device_mem_t tensor, size_t size, const char* file_name)
+{
+  printf(">>>> tensor addr: %lld\n", (unsigned long long)tensor);
+  printf(">>>> Dump tensor into file: %s, size: %ld\n", file_name, size);
+  void* data = malloc(size);
+  SAFE_CALL(sgdnnMemcpyD2S(tpu_resource, data, tensor, size));
+  sgdnn_dump_data_into_file(data, size, file_name);
+  printf(">>>>> after write\n");
+  free(data);
+}

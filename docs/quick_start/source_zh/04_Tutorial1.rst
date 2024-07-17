@@ -1,5 +1,5 @@
 ===================
-模型训练实例_StableDiffusion
+模型训练实例_BM1684X_StableDiffusion
 ===================
 
 本章节介绍了如何在使用Torch-TPU的前提下，使用LoRA进行Stable-Diffusion的Finetune的一个示例。

@@ -11,6 +11,12 @@
 #include <c10/util/Half.h>
 #include <type_traits>
 
+#include <Python.h>
+#include <frameobject.h> 
+#include <execinfo.h>
+#include <stdio.h>
+#include <stdlib.h>
+
 #include "TPUDeviceManager.h"
 #include "TPUGuard.h"
 #include <tpuDNN.h>
@@ -570,4 +576,7 @@ private:
 };
 
 #endif // TPU_OP_TIMING
+
+void print_python_code();
+
 } // namespace tpu

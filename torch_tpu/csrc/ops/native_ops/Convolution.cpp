@@ -64,15 +64,17 @@ int64_t groups )
 #if 0
   c10::MaybeOwned<Tensor> bias_maybe_owned = borrow_from_optional_tensor ( bias_opt );
   const Tensor & bias = *bias_maybe_owned;
-  auto output_cpu = torch::convolution ( input_.cpu(),
-                                         weight.cpu(),
-                                         c10::optional<Tensor> ( bias.defined() ? bias.cpu() : Tensor() ),
+  auto input_dtype = input_.scalar_type();
+  auto output_cpu = torch::convolution ( input_.cpu().to( at::kFloat ),
+                                         weight.cpu().to( at::kFloat ),
+                                         c10::optional<Tensor> ( bias.defined() ? bias.cpu().to( at::kFloat ) : Tensor() ),
                                          stride,
                                          padding,
                                          dilation,
                                          transposed,
                                          output_padding,
                                          groups );
+  output_cpu = output_cpu.to ( input_dtype );
   return TENSOR_TO_TPU ( output_cpu );
 #else
   TORCH_CHECK ( at::isComplexType ( input_.scalar_type() ) == false, "Complex convolution is unsupported by TPU" );
@@ -176,22 +178,29 @@ std::array<bool, 3> output_mask )
     return std::tuple<Tensor, Tensor, Tensor> ( grad_input, grad_weight, grad_bias);
   }
 #if 0
-  auto outputs_cpu =  torch::convolution_backward (
-                      grad_output.cpu(),
-                      input.cpu(),
-                      weight.cpu(),
-                      at::OptionalIntArrayRef ( { weight.size ( 0 ) } ),
-                      stride,
-                      padding,
-                      dilation,
-                      transposed,
-                      output_padding,
-                      groups,
-                      output_mask );
-  return std::tuple<Tensor, Tensor, Tensor> (
-         output_mask[0] ? TENSOR_TO_TPU ( std::get<0> ( outputs_cpu ) ) : Tensor(),
-         output_mask[1] ? TENSOR_TO_TPU ( std::get<1> ( outputs_cpu ) ) : Tensor(),
-         output_mask[2] ? TENSOR_TO_TPU ( std::get<2> ( outputs_cpu ) ) : Tensor() );
+    CPU_IMPL_WARNING();
+    TIMING_START;
+    auto input_dtype = input.scalar_type();
+    // change dtype into f32
+    auto outputs_cpu = torch::convolution_backward (
+                       grad_output.cpu().to ( at::kFloat ),
+                       input.cpu().to ( at::kFloat ),
+                       weight.cpu().to ( at::kFloat ),
+                       at::OptionalIntArrayRef ( { weight.size ( 0 ) } ),
+                       stride,
+                       padding,
+                       dilation,
+                       transposed,
+                       output_padding,
+                       groups,
+                       output_mask );
+    TIMING_END ( tpu::CONVOLUTION_BACKWARD );
+    Tensor grad_input, grad_weight, grad_bias;
+    grad_input  = output_mask[0] ? TENSOR_TO_TPU ( std::get<0> ( outputs_cpu ).to ( input_dtype ) ) : Tensor();
+    grad_weight = output_mask[1] ? TENSOR_TO_TPU ( std::get<1> ( outputs_cpu ).to ( input_dtype ) ) : Tensor();
+    grad_bias   = output_mask[2] ? TENSOR_TO_TPU ( std::get<2> ( outputs_cpu ).to ( input_dtype ) ) : Tensor();
+    SHOW_TENSOR_OP(grad_output_, input, weight, grad_input, grad_weight, grad_bias);
+    return std::tuple<Tensor, Tensor, Tensor> ( grad_input, grad_weight, grad_bias);
 #else
   TORCH_CHECK ( at::isComplexType ( input.scalar_type() ) == false,
                 "Complex convolution backward is unsupported by TPU" );
