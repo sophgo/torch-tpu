@@ -400,7 +400,7 @@ tpu_status_t sgdnnConv2d ( tpu_resource_t resource ,
 #if defined BACKEND_1684X
   tpu_device_mem_t weight_reordered_mem, bias_fp32_mem;
   if ( weight.dtype == SGDNN_DTYPE_FP16 || weight.dtype == SGDNN_DTYPE_BF16 )
-  {      
+  {
     SgdnnTensor_t weight_reordered, bias_f32;
     if ( !weight.format_casted ) {  // no format cast when init, cast in runtime
       weight_reordered.dim = 4;
@@ -409,7 +409,7 @@ tpu_status_t sgdnnConv2d ( tpu_resource_t resource ,
       weight_reordered.dtype = weight.dtype;
       SAFE_CALL ( sgdnnMallocDeviceByte ( resource , &weight_reordered_mem, sgdnnTensorBytes ( &weight_reordered ) ) );
       weight_reordered.addr = sgdnnGetDeviceAddr ( weight_reordered_mem );
-      SAFE_CALL ( sgdnnReorderConv2dWeight ( resource , weight, 0, weight_reordered ) );      
+      SAFE_CALL ( sgdnnReorderConv2dWeight ( resource , weight, 0, weight_reordered ) );
     }
     if (bias.addr != 0){
       bias_f32 = bias;
@@ -422,7 +422,7 @@ tpu_status_t sgdnnConv2d ( tpu_resource_t resource ,
   sg_api_conv2d_t api;
   api.input_global_addr = input.addr;
   if ( weight.dtype == SGDNN_DTYPE_FP16 || weight.dtype == SGDNN_DTYPE_BF16 )
-  { 
+  {
     if (!weight.format_casted){
       api.weight_global_addr = sgdnnGetDeviceAddr ( weight_reordered_mem );
       api.bias_global_addr = bias.addr != 0 ? sgdnnGetDeviceAddr ( bias_fp32_mem ) : 0 ;
@@ -1299,7 +1299,7 @@ tpu_status_t sgdnnRecoverConv2dWeight ( tpu_resource_t resource ,
     // SAFE_CALL ( sgdnnTPUKernelLaunch ( resource , "tpu_kernel_api_conv_grad_recover", &api, sizeof ( api ) ) );
     // return SG_SUCCESS;
   }
-  else 
+  else
   {
     SGDNN_CHECK ( false );
   }
@@ -2649,7 +2649,7 @@ tpu_status_t sgdnnBinary ( tpu_resource_t resource ,
 {
   if ((input.format_casted || other.format_casted) && (output.addr == input.addr || output.addr == other.addr) ) { // this branch special for weight-grad update
     //printf("SGDNN Binary todo imple formated binary. input.format = %d, other.format = %d", input.format_casted, other.format_casted);
-    SGDNN_CHECK( (input.format_casted == SGDNN_CONV_W_TRAIN_FORMAT && other.format_casted == SGDNN_CONV_DW_TRAIN_FORMAT) || 
+    SGDNN_CHECK( (input.format_casted == SGDNN_CONV_W_TRAIN_FORMAT && other.format_casted == SGDNN_CONV_DW_TRAIN_FORMAT) ||
                  (input.format_casted == SGDNN_CONV_DW_TRAIN_FORMAT && other.format_casted == SGDNN_CONV_W_TRAIN_FORMAT) );
     #if defined BACKEND_1684X
     sg_api_weight_update_t api;
@@ -4297,7 +4297,11 @@ tpu_status_t sgdnnLlamaAttention ( tpu_resource_t resource,
   api.Qbuffer_global_addr = sgdnnGetDeviceAddr(Qbuffer_dev_mem);
   api.Kbuffer_global_addr = sgdnnGetDeviceAddr(Kbuffer_dev_mem);
   api.Vbuffer_global_addr = sgdnnGetDeviceAddr(Vbuffer_dev_mem);
-  SAFE_CALL ( sgdnnTPUKernelLaunchMultiCore ( resource, "tpu_kernel_llama_attention_multi_core", &api, sizeof ( api ) , non_blocking ) );
+  SAFE_CALL ( sgdnnTPUKernelLaunchMultiCore ( resource, "tpu_kernel_llama_attention_multi_core", &api, sizeof ( api ) , non_blocking) );
+  sgdnnFreeDevice ( resource , Kbuffer_dev_mem );
+  sgdnnFreeDevice ( resource , Vbuffer_dev_mem );
+  if (attention_mode == 2)
+    sgdnnFreeDevice ( resource , Qbuffer_dev_mem );
 #else
   SGDNN_CHECK ( false );
 #endif
