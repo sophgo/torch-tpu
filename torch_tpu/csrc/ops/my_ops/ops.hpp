@@ -113,6 +113,22 @@ namespace at
 		double dropout_rate,
 		int64_t batch);
 
+	std::tuple<Tensor, Tensor, Tensor> llama_attention_backward(
+		Tensor &Q,
+		Tensor &K,
+		Tensor &V,
+		Tensor &O,
+		Tensor &dO,
+		Tensor &l,
+		Tensor &dQ,
+		Tensor &dK,
+		Tensor &dV,
+		const c10::optional<Tensor> &cos,
+		const c10::optional<Tensor> &sin,
+		const Tensor &input_lengths,
+		double C
+		);
+
 	Tensor attn_forward(
 		Tensor &input,
 		Tensor &w_attn,

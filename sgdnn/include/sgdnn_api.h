@@ -52,7 +52,7 @@ typedef enum
   SGDNN_CONV_W_INFER_FORMAT  = 1,
   SGDNN_CONV_W_TRAIN_FORMAT  = 2,
   SGDNN_CONV_DW_TRAIN_FORMAT = 3,
-} 
+}
 SgdnnFormatedType_t;
 
 typedef struct
@@ -156,16 +156,16 @@ tpu_status_t sgdnnDummy_WO_KERNEL_LAUNCH ( tpu_resource_t  stream,
                            bool non_blocking );
 
 /**
- * Physical Memory Format Cast OP. 
+ * Physical Memory Format Cast OP.
  * Because Some TPU's instrution( operation ) need particular data layout.
  * For example conv need 32IC for fp16, 64IC for in8.
- * - cast_type : 
+ * - cast_type :
  *          0 - 32IC
 */
 tpu_status_t sgdnnFormatCast( tpu_resource_t  resource,
                               SgdnnTensor_t input,
                               SgdnnTensor_t output,
-                              int cast_type 
+                              int cast_type
                               );
 
 /*
@@ -1134,6 +1134,32 @@ tpu_status_t sgdnnLlamaAttentionForward ( tpu_resource_t resource,
                                   float C,
                                   float dropout_rate,
                                   int batch,
+                                  bool non_blocking = true);
+
+/*
+ * [DQ, DK, DV] = ATTENTION BACKWARD ( Q, K, V, O, DO, L )
+ * 1. The data types of all the tensors must be the same
+ * 2. The shapes of Q, O, DO, and DQ are (Ntotal, num_q_head, head_dim), The shapes of K, V, DQ and DV are (Ntotal, num_kv_head, head_dim), The shape of L is (Ntotal, num_kv_head, 1), The shapes of cos and sin are (Ntotal, 1, head_dim)
+ * 3. Q, K, V, O, L and DO are saved during the forward pass, while DQ, DK, and DV are the output of the backward propagation.
+ * 4. All the tensors must be contiguous
+ * 5. input_lengths: (first_len, seconde_len, third_len, ...)
+ * 6. C: softmax scale
+ */
+tpu_status_t sgdnnLlamaAttentionBackward ( tpu_resource_t resource,
+                                  SgdnnTensor_t Q,
+                                  SgdnnTensor_t K,
+                                  SgdnnTensor_t V,
+                                  SgdnnTensor_t O,
+                                  SgdnnTensor_t dO,
+                                  SgdnnTensor_t l,
+                                  SgdnnTensor_t dQ,
+                                  SgdnnTensor_t dK,
+                                  SgdnnTensor_t dV,
+                                  SgdnnTensor_t cos,
+                                  SgdnnTensor_t sin,
+                                  SgdnnTensor_t input_lengths,
+                                  float C,
+                                  int Ntotal,
                                   bool non_blocking = true);
 
 /*

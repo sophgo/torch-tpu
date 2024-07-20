@@ -4216,6 +4216,100 @@ tpu_status_t sgdnnLlamaAttentionForward ( tpu_resource_t resource,
   return SG_SUCCESS;
 }
 
+tpu_status_t sgdnnLlamaAttentionBackward ( tpu_resource_t resource,
+                                  SgdnnTensor_t Q,
+                                  SgdnnTensor_t K,
+                                  SgdnnTensor_t V,
+                                  SgdnnTensor_t O,
+                                  SgdnnTensor_t dO,
+                                  SgdnnTensor_t l,
+                                  SgdnnTensor_t dQ,
+                                  SgdnnTensor_t dK,
+                                  SgdnnTensor_t dV,
+                                  SgdnnTensor_t cos,
+                                  SgdnnTensor_t sin,
+                                  SgdnnTensor_t input_lengths,
+                                  float C,
+                                  int Ntotal,
+                                  bool non_blocking)
+{
+  SGDNN_CHECK ( Q.dtype == O.dtype );
+  SGDNN_CHECK ( Q.dtype == K.dtype );
+  SGDNN_CHECK ( Q.dtype == V.dtype );
+  SGDNN_CHECK ( Q.dtype == SGDNN_DTYPE_FP16 );
+  SGDNN_CHECK ( sgdnnIsSameShape( &Q, &O ) );
+  SGDNN_CHECK ( sgdnnIsSameShape( &K, &V ) );
+  SGDNN_CHECK ( sgdnnIsSameShape( &dO, &O ) );
+  SGDNN_CHECK ( sgdnnIsSameShape( &dQ, &Q ) );
+  SGDNN_CHECK ( sgdnnIsSameShape( &dK, &K ) );
+  SGDNN_CHECK ( sgdnnIsSameShape( &dV, &V ) );
+  SGDNN_CHECK ( Q.dim == 3 );
+  SGDNN_CHECK ( K.dim == 3 );
+  SGDNN_CHECK ( V.dim == 3 );
+  if (cos.addr != 0){
+    SGDNN_CHECK ( Q.dtype == cos.dtype );
+    SGDNN_CHECK ( Q.dtype == sin.dtype );
+    SGDNN_CHECK ( cos.dim == 3 );
+    SGDNN_CHECK ( sin.dim == 3 );
+    SGDNN_CHECK ( sgdnnIsSameShape( &cos, &sin ) );
+    SGDNN_CHECK ( sgdnnIsTensorContiguous ( &cos ) );
+    SGDNN_CHECK ( sgdnnIsTensorContiguous ( &sin ) );
+  }
+
+  SGDNN_CHECK ( sgdnnIsTensorContiguous ( &Q ) );
+  SGDNN_CHECK ( sgdnnIsTensorContiguous ( &K ) );
+  SGDNN_CHECK ( sgdnnIsTensorContiguous ( &V ) );
+  SGDNN_CHECK ( sgdnnIsTensorContiguous ( &O ) );
+  SGDNN_CHECK ( sgdnnIsTensorContiguous ( &dO ) );
+  SGDNN_CHECK ( sgdnnIsTensorContiguous ( &l ) );
+
+#if defined BACKEND_SG2260
+  sg_api_llama2_qkv_backward_multi_core_t api = {0};
+  api.Q_global_addr = Q.addr;
+  api.K_global_addr = K.addr;
+  api.V_global_addr = V.addr;
+  api.O_global_addr = O.addr;
+  api.dO_global_addr = dO.addr;
+  api.l_global_addr = l.addr;
+  api.dQ_global_addr = dQ.addr;
+  api.dK_global_addr = dK.addr;
+  api.dV_global_addr = dV.addr;
+  api.cos_global_addr = cos.addr;
+  api.sin_global_addr = sin.addr;
+  api.input_lengths_global_addr = input_lengths.addr;
+  api.C = C;
+  api.dtype = sgdnnTPUKernelDType(Q.dtype);
+  api.batch = input_lengths.shape[0];
+  api.hidden_size = Q.shape[1] * Q.shape[2];
+  api.q_heads = Q.shape[1];
+  api.kv_heads = K.shape[1];
+
+  tpu_device_mem_t Qbuffer_dev_mem, Kbuffer_dev_mem, Vbuffer_dev_mem, Obuffer_dev_mem, dObuffer_dev_mem, lbuffer_dev_mem;
+  SAFE_CALL(sgdnnMallocDeviceByte(resource, &Qbuffer_dev_mem, sgdnnTensorBytes(&Q)));
+  SAFE_CALL(sgdnnMallocDeviceByte(resource, &Kbuffer_dev_mem, sgdnnTensorBytes(&K)));
+  SAFE_CALL(sgdnnMallocDeviceByte(resource, &Vbuffer_dev_mem, sgdnnTensorBytes(&V)));
+  SAFE_CALL(sgdnnMallocDeviceByte(resource, &Obuffer_dev_mem, sgdnnTensorBytes(&O)));
+  SAFE_CALL(sgdnnMallocDeviceByte(resource, &dObuffer_dev_mem, sgdnnTensorBytes(&dO)));
+  SAFE_CALL(sgdnnMallocDeviceByte(resource, &lbuffer_dev_mem, sgdnnTensorBytes(&l)));
+  api.Qbuffer_global_addr = sgdnnGetDeviceAddr(Qbuffer_dev_mem);
+  api.Kbuffer_global_addr = sgdnnGetDeviceAddr(Kbuffer_dev_mem);
+  api.Vbuffer_global_addr = sgdnnGetDeviceAddr(Vbuffer_dev_mem);
+  api.Obuffer_global_addr = sgdnnGetDeviceAddr(Obuffer_dev_mem);
+  api.dObuffer_global_addr = sgdnnGetDeviceAddr(dObuffer_dev_mem);
+  api.lbuffer_global_addr = sgdnnGetDeviceAddr(lbuffer_dev_mem);
+  SAFE_CALL ( sgdnnTPUKernelLaunchMultiCore ( resource, "tpu_kernel_llama_attention_backward_multi_core", &api, sizeof ( api ) , non_blocking) );
+  sgdnnFreeDevice ( resource , Kbuffer_dev_mem );
+  sgdnnFreeDevice ( resource , Vbuffer_dev_mem );
+  sgdnnFreeDevice ( resource , Qbuffer_dev_mem );
+  sgdnnFreeDevice ( resource , Obuffer_dev_mem );
+  sgdnnFreeDevice ( resource , dObuffer_dev_mem );
+  sgdnnFreeDevice ( resource , lbuffer_dev_mem );
+#else
+  SGDNN_CHECK ( false );
+#endif
+  return SG_SUCCESS;
+}
+
 tpu_status_t sgdnnRMSNorm ( tpu_resource_t  resource ,
                           SgdnnTensor_t input,
                           SgdnnTensor_t weight,
