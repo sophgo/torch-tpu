@@ -145,28 +145,61 @@ void nodechip_repeat_spec_for_last_dim(global_addr_t input_global_addr,
   }
 }
 
-bool is_last_dim_spec(sg_api_repeat_t *api) {
+void simply_params(int repeat_dim, int* repeat_times,
+                   int input_dim,  int* input_shape,
+                   int* simply_dim, int* simply_repeat_times, int* simply_shape)
+{
+  bool can_simply = true;
+  int repeat_size = 1;
+  *simply_dim = input_dim;
+  for (int i = input_dim - 1; i >= 0; i--)
+  {
+    simply_shape[i] = input_shape[i];
+    if (can_simply)
+    {  if ( input_shape[i] == 1) {
+        repeat_size *= repeat_times[i];
+        simply_repeat_times[i] = repeat_size;
+      } else { 
+        can_simply = false;
+        simply_repeat_times[i] = repeat_times[i];
+        *simply_dim = i + 2;
+      }
+    }
+    else
+    {
+      simply_repeat_times[i] = repeat_times[i];
+    }
+  }
+}
+
+bool is_last_dim_spec(sg_api_repeat_t *api, int* row, int* col, int* repeat) {
   if (api->repeat_dim != api->dim)
     return false;
-  for (int i = 0; i < api->dim - 1; ++i) {
-    if (api->repeat_times[i] != 1)
+  int simply_dim = api->dim;
+  int simply_shape[api->dim];
+  int simply_repeat_times[api->dim];
+  simply_params(api->repeat_dim, api->repeat_times, api->dim, api->shape,
+            &simply_dim, simply_repeat_times, simply_shape);
+  for (int i = 0; i < simply_dim - 1; ++i) {
+    if (simply_repeat_times[i] != 1)
       return false;
+  }
+  *col = simply_shape[simply_dim-1];
+  *repeat = simply_repeat_times[simply_dim - 1];
+  *row = 1;
+  for (int i = 0; i < simply_dim - 1; ++i) {
+    *row *= simply_shape[i];
   }
   return true;
 }
 
 int tpu_kernel_api_repeat(const void *args) {
   sg_api_repeat_t *api = (sg_api_repeat_t *)args;
-
+  int rows = 1, cols = 1, repeats = 1;
   tpu_initialize();
-  if( is_last_dim_spec(api) ){
-    int rows = 1, cols = api->shape[api->dim - 1];
-    for (int i = 0; i < api->dim - 1; ++i) {
-      rows *= api->shape[i];
-    }
-    int repeats = api->repeat_times[api->repeat_dim - 1];
+  if( is_last_dim_spec(api, &rows, &cols, &repeats) ){
     nodechip_repeat_spec_for_last_dim(api->input_global_addr, api->output_global_addr,  rows, cols, repeats, api->dtype);
-  }else{
+  } else {
     nodechip_repeat(api->input_global_addr, api->output_global_addr, api->shape,
                     api->repeat_times, api->dim, api->repeat_dim, api->dtype);
   }
@@ -187,12 +220,8 @@ int tpu_kernel_api_repeat_multi_core(const void *args) {
   int core_num = tpu_core_num();
   int dsize = tpu_data_type_size(api->dtype);
   // multi-core opt only support repeatting last dim now
-  if (is_last_dim_spec(api)) {
-    int rows = 1, cols = api->shape[api->dim - 1];
-    for (int i = 0; i < api->dim - 1; ++i) {
-      rows *= api->shape[i];
-    }
-    int repeats = api->repeat_times[api->repeat_dim - 1];
+  int rows = 1, cols = 1, repeats = 1;
+  if (is_last_dim_spec(api, &rows, &cols, &repeats)) {
     int row_sp = DIV_UP(rows, core_num);
     int core_slice = MIN(row_sp, rows - row_sp * core_idx);
     if (core_slice > 0) {
