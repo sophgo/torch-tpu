@@ -3,25 +3,25 @@
 #include <string>
 
 #include <c10/util/Registry.h>
-#include <sophon/config.h>
-#include <sophon/transport/device.h>
+#include <gloo/config.h>
+#include <gloo/transport/device.h>
 
 namespace c10d {
 
-class TORCH_API SophonDeviceFactory {
+class TORCH_API SCCLHostDeviceFactory {
  public:
   // Create new device instance for specific interface.
-  static std::shared_ptr<::sophon::transport::Device> makeDeviceForInterface(
+  static std::shared_ptr<::gloo::transport::Device> makeDeviceForInterface(
       const std::string& interface);
 
   // Create new device instance for specific hostname or address.
-  static std::shared_ptr<::sophon::transport::Device> makeDeviceForHostname(
+  static std::shared_ptr<::gloo::transport::Device> makeDeviceForHostname(
       const std::string& hostname);
 };
 
 C10_DECLARE_SHARED_REGISTRY(
-    SophonDeviceRegistry,
-    ::sophon::transport::Device,
+    SCCLDeviceRegistry,
+    ::gloo::transport::Device,
     const std::string&, /* interface */
     const std::string& /* hostname */);
 

@@ -3,22 +3,31 @@ import torch
 import torch.distributed as dist
 import logging
 from helper import init_logger, is_master, is_slave
-import sccl
+import scclHost
 import torch_tpu
+import os
 TPU = "tpu"
 
-dist.init_process_group(backend="sccl")
+rank = os.environ.get("OMPI_COMM_WORLD_RANK", None)
+world_size = os.environ.get("OMPI_COMM_WORLD_SIZE", None)
+
+torch_tpu.tpu.set_device(int(rank))
+dist.init_process_group(backend="scclHost", rank=int(rank), world_size=int(world_size))
 init_logger()
 
-if is_master():
-    tensor = torch.tensor([3., 4.]).to(TPU)
+tensor_len = 16
+input_tensor = torch.rand(tensor_len)
+logging.info("rank: {}, input_tensor: {}".format(rank, input_tensor))
+device = torch.device(f"{TPU}:{int(rank)}")
+if torch_tpu.tpu.current_device() == device.index:
+    input_tensor = input_tensor.to(device)
 
-if is_slave():
-    tensor = torch.tensor([5., 6.]).to(TPU)
+output_tensor = torch.zeros(tensor_len)
+logging.info("rank: {}, output_tensor: {}".format(rank, output_tensor))
+if torch_tpu.tpu.current_device() == device.index:
+    output_tensor = output_tensor.to(device)
 
-output_tensor = torch.zeros(2).to(TPU)
+dist.all_to_all_single(output_tensor, input_tensor)
 
-logging.info(f"before alltoall: {tensor.cpu()} {output_tensor.cpu()}")
-dist.all_to_all_single(output_tensor, tensor)
-logging.info(f"after alltoall: {tensor.cpu()} {output_tensor.cpu()}")
-
+results = output_tensor.cpu()
+logging.info("rank: {}, result: {}".format(rank, results))

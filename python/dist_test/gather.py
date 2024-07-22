@@ -3,11 +3,16 @@ import torch
 import torch.distributed as dist
 import logging
 from helper import init_logger, is_master, is_slave
-import sccl
+import scclHost
 import torch_tpu
+import os
 TPU = "tpu"
 
-dist.init_process_group(backend="sccl")
+rank = os.environ.get("OMPI_COMM_WORLD_RANK", None)
+world_size = os.environ.get("OMPI_COMM_WORLD_SIZE", None)
+
+torch_tpu.tpu.set_device(int(rank))
+dist.init_process_group(backend="scclHost", rank=int(rank), world_size=int(world_size))
 init_logger()
 
 if is_master():
@@ -16,11 +21,12 @@ if is_master():
 if is_slave():
     tensor = torch.tensor([5, 6]).to(TPU)
 
-tensor_list = [torch.zeros(2, dtype=torch.int64).to(TPU) for _ in range(2)]
+tensor_list = [torch.zeros(2, dtype=torch.int64).to(TPU) for _ in range(int(world_size))]
 
 if is_master():
     dist.gather(tensor, tensor_list, dst=0)
 else:
     dist.gather(tensor, dst=0)
 
-logging.info(f"gathered: {tensor_list}")
+results = [tensor.cpu() for tensor in tensor_list]
+logging.info("rank: {}, results: {}".format(rank, results))

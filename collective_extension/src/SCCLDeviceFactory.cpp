@@ -2,74 +2,70 @@
 
 #include <c10/util/Exception.h>
 
-#include <gloo/transport/tcp/device.h>
-
+#include <sophon/transport/tcp/device.h>
 
 #include "SCCLDeviceFactory.hpp"
 
 namespace c10d {
 
-C10_DEFINE_SHARED_REGISTRY_WITHOUT_WARNING(
-    SCCLDeviceRegistry,
-    ::gloo::transport::Device,
-    const std::string& /* interface */,
-    const std::string& /* hostname */);
+C10_DEFINE_SHARED_REGISTRY_WITHOUT_WARNING(SophonDeviceRegistry,
+                                           ::sophon::transport::Device,
+                                           const std::string & /* interface */,
+                                           const std::string & /* hostname */);
 
-static std::shared_ptr<::gloo::transport::Device> makeTCPDevice(
-    const std::string& interfaceName,
-    const std::string& hostname) {
-  TORCH_CHECK(
-      !interfaceName.empty() || !hostname.empty(),
-      "SCCLDeviceFactory::makeTCPDevice(): interface or hostname "
-      "can't be empty");
+static std::shared_ptr<::sophon::transport::Device>
+makeTCPDevice(const std::string &interfaceName, const std::string &hostname) {
+  TORCH_CHECK(!interfaceName.empty() || !hostname.empty(),
+              "SCCLDeviceFactory::makeTCPDevice(): interface or hostname "
+              "can't be empty");
 
-  ::gloo::transport::tcp::attr attr;
+  ::sophon::transport::tcp::attr attr;
   if (!interfaceName.empty()) {
     attr.iface = interfaceName;
   } else {
     attr.hostname = hostname;
   }
-  return ::gloo::transport::tcp::CreateDevice(attr);
+  return ::sophon::transport::tcp::CreateDevice(attr);
 }
 
 // Registry priority is per key identifier. We register TCP to `LINUX` for
 // the flexibility of other application to override by priority. Register
-// TCP to `TCP` for env "GLOO_DEVICE_TRANSPORT" override.
-C10_REGISTER_CREATOR(SCCLDeviceRegistry, LINUX, makeTCPDevice);
-C10_REGISTER_CREATOR(SCCLDeviceRegistry, TCP, makeTCPDevice);
-
+// TCP to `TCP` for env "SOPHON_DEVICE_TRANSPORT" override.
+C10_REGISTER_CREATOR(SophonDeviceRegistry, LINUX, makeTCPDevice);
+C10_REGISTER_CREATOR(SophonDeviceRegistry, TCP, makeTCPDevice);
 
 namespace {
-std::shared_ptr<::gloo::transport::Device> makeGlooDevice(
-    const std::string& interfaceName,
-    const std::string& hostName) {
-  static auto transportName = getenv("GLOO_DEVICE_TRANSPORT");
+std::shared_ptr<::sophon::transport::Device>
+makeSophonDevice(const std::string &interfaceName,
+                 const std::string &hostName) {
+  static auto transportName = getenv("SOPHON_DEVICE_TRANSPORT");
   if (transportName) {
-    return SCCLDeviceRegistry()->Create(transportName, interfaceName, hostName);
+    return SophonDeviceRegistry()->Create(transportName, interfaceName,
+                                          hostName);
   }
 
 #ifdef __linux__
-  return SCCLDeviceRegistry()->Create("LINUX", interfaceName, hostName);
+  return SophonDeviceRegistry()->Create("LINUX", interfaceName, hostName);
 #endif
 
   return nullptr;
 }
 } // anonymous namespace
 
-std::shared_ptr<::gloo::transport::Device> SCCLDeviceFactory::
-    makeDeviceForInterface(const std::string& interfaceName) {
-  auto device = makeGlooDevice(interfaceName, "");
+std::shared_ptr<::sophon::transport::Device>
+SCCLDeviceFactory::makeDeviceForInterface(const std::string &interfaceName) {
+  auto device = makeSophonDevice(interfaceName, "");
   if (!device) {
-    TORCH_CHECK(false, "makeDeviceForInterface(): unsupported gloo device");
+    TORCH_CHECK(false, "makeDeviceForInterface(): unsupported sophon device");
   }
   return device;
 }
 
-std::shared_ptr<::gloo::transport::Device> SCCLDeviceFactory::
-    makeDeviceForHostname(const std::string& hostname) {
-  auto device = makeGlooDevice("", hostname);
+std::shared_ptr<::sophon::transport::Device>
+SCCLDeviceFactory::makeDeviceForHostname(const std::string &hostname) {
+  auto device = makeSophonDevice("", hostname);
   if (!device) {
-    TORCH_CHECK(false, "makeDeviceForHostname(): unsupported gloo device");
+    TORCH_CHECK(false, "makeDeviceForHostname(): unsupported sophon device");
   }
   return device;
 }

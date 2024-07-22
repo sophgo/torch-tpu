@@ -12,7 +12,7 @@ fi
 
 export GLOO_SOPHON_PATH=$TPUTRAIN_TOP/collective_extension/third_party/gloo_sophon/
 export LD_LIBRARY_PATH=$TPUTRAIN_TOP/build/${build_type}/sgdnn:/usr/local/lib/python3.10/dist-packages/torch/lib:$TPUDNN_PATH/${CHIP_ARCH}_lib:$LD_LIBRARY_PATH
-export LD_LIBRARY_PATH=$TPUTRAIN_TOP/build/${build_type}/torch_tpu:$LD_LIBRARY_PATH
+export LD_LIBRARY_PATH=$TPUTRAIN_TOP/torch_tpu/lib/::$LD_LIBRARY_PATH
 export TPU_KERNEL_MODULE_PATH=$TPUTRAIN_TOP/build/firmware_sg2260_cmodel/libfirmware.so
 
 export MASTER_ADDR=127.0.0.1
@@ -60,11 +60,6 @@ function build_gloo_sophon()
     if [ $ret -ne 0 ]; then return $ret; fi
 }
 
-function rebuild_torch_tpu()
-{
-    build_torch_tpu 1
-}
-
 function rebuild_gloo_sophon()
 {
     build_gloo_sophon 1 || return -1
@@ -84,7 +79,7 @@ function install_sccl()
     # python3 setup2260.py develop
     python3 setup2260.py bdist_wheel --plat-name linux_x86_64
     if [ $? -ne 0 ]; then popd; return -1; fi
-    pip install dist/* --force-reinstall
+    pip install dist/sccl_tpu*.whl --force-reinstall
     popd
 }
 
