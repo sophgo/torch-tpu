@@ -45,9 +45,10 @@ public:
     friend class ProcessGroupSCCL;
 
   private:
-
     const at::Tensor outputTensor_;
     c10::intrusive_ptr<at::ivalue::Future> future_;
+    // Tensors used for barrier op
+    std::vector<at::Tensor> barrierTensor_;
   };
 
   class TORCH_API SophonStore : public ::sophon::rendezvous::Store {
@@ -171,8 +172,8 @@ public:
   c10::intrusive_ptr<Work> recvAnysource(std::vector<at::Tensor> &tensors,
                                          int tag) override;
 
-  c10::intrusive_ptr<Work>
-  barrier(const BarrierOptions &opts = BarrierOptions()) override;
+  c10::intrusive_ptr<Work>barrier(
+    const BarrierOptions &opts = BarrierOptions()) override;
 
   const std::unique_ptr<::sophon::rendezvous::Store> &_getStore() const {
     return store_;
@@ -183,6 +184,8 @@ public:
   uint64_t getSequenceNumberForGroup() override;
 
   void broadcastUniqueSCCLID(sophon::scclUniqueId *scclID, int rank);
+
+  void insertUsedDeviceIdx(int idx);
 
 protected:
   std::unique_ptr<::sophon::rendezvous::Store> store_;
@@ -202,6 +205,9 @@ protected:
   std::mutex workMutex_;
   std::condition_variable workProduceCV_;
   std::condition_variable workConsumeCV_;
+
+  // Device Indexes used for all collectives in this group
+  std::set<int> usedDeviceIdxs_;
 
   tpudnnHandle_t dev_handle_;
 

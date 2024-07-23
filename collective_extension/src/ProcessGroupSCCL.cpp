@@ -18,7 +18,6 @@
 #include <c10/util/StringUtil.h>
 #include <c10/util/intrusive_ptr.h>
 #include <c10/util/irange.h>
-#include <sophon/barrier.h>
 #include <sophon/config.h>
 #include <sophon/rendezvous/context.h>
 #include <sophon/rendezvous/prefix_store.h>
@@ -91,8 +90,6 @@
 #endif
 
 namespace c10d {
-
-namespace {
 
 static const std::string SCCL_SOCKET_IFNAME_ENV = "SCCL_SOCKET_IFNAME";
 constexpr int kBytes = 8;
@@ -181,16 +178,27 @@ tpudnnDataType_t toTpudnnDtype(::at::ScalarType type) {
 
 typedef void (*ReduceFunc)(void *, const void *, const void *, size_t);
 
+
+void ProcessGroupSCCL::insertUsedDeviceIdx(int idx) {
+  usedDeviceIdxs_.insert(idx);
+}
+
 template <typename F>
-static c10::intrusive_ptr<ProcessGroupSCCL::WorkSCCL> collective(
+c10::intrusive_ptr<ProcessGroupSCCL::WorkSCCL> collective(
+    ProcessGroupSCCL& group,
     const std::shared_ptr<sophon::Context> &context,
     at::Tensor &input, at::Tensor &output, F func) {
   sophon::scclComm_t comm;
+
+  auto device = input.device();
+  group.insertUsedDeviceIdx((int)device.index());
+
   TORCH_CHECK(sophon::scclCommInitRank(
                   &comm, context->size, context->scclID, context->rank,
                   context->chip_map.data()) == sophon::scclSuccess,
               "sccl comm init rank failed\n");
   auto ret = func(input, output, comm, context->handle);
+
   TORCH_CHECK(sophon::scclCommDestroy(comm) == sophon::scclSuccess,
               "sccl comm destroy rank failed\n");
   TORCH_CHECK(ret == sophon::scclSuccess);
@@ -239,7 +247,6 @@ void setOutput(O &opts, at::Tensor &tensor, std::vector<int64_t> &counts) {
 }
 
 const auto kLoopbackAddress = "127.0.0.1";
-} // namespace
 
 std::vector<at::Tensor> ProcessGroupSCCL::WorkSCCL::result() {
   TORCH_CHECK(isCompleted(),
@@ -414,7 +421,6 @@ ProcessGroupSCCL::ProcessGroupSCCL(const c10::intrusive_ptr<Store> &store,
 }
 
 ProcessGroupSCCL::~ProcessGroupSCCL() {
-  tpudnnDestroy(dev_handle_);
 }
 
 uint32_t ProcessGroupSCCL::nextTag() { return collectiveCounter_++; }
@@ -443,7 +449,7 @@ ProcessGroupSCCL::broadcast(std::vector<at::Tensor> &inputs,
     invalidArgument(c10::str("unsupported device type", device.type()));
   }
 
-  return collective(context, inputs[opts.rootTensor], inputs[opts.rootTensor],
+  return collective(*this, context, inputs[opts.rootTensor], inputs[opts.rootTensor],
     [&](at::Tensor &input, at::Tensor &output,
         sophon::scclComm_t comm, tpudnnHandle_t handle) {
       return sophon::scclBroadcast(
@@ -524,7 +530,7 @@ ProcessGroupSCCL::allreduce(std::vector<at::Tensor> &inputs,
   tpudnnReduceType_t reduce_method = reduceMethod(opts.reduceOp);
 
   return collective(
-    context, inputs[0], inputs[0],
+    *this, context, inputs[0], inputs[0],
     [&](at::Tensor &input, at::Tensor &output, sophon::scclComm_t comm,
         tpudnnHandle_t handle) {
       return sophon::scclAllReduce(
@@ -568,7 +574,7 @@ ProcessGroupSCCL::reduce(std::vector<at::Tensor> &inputs,
   tpudnnReduceType_t reduce_method = reduceMethod(opts.reduceOp);
   
   return collective(
-    context, inputs[0],
+    *this, context, inputs[0],
     context->rank == opts.rootRank ? inputs[0] : flatOutputTensor,
     [&](at::Tensor &input, at::Tensor &output, sophon::scclComm_t comm,
         tpudnnHandle_t handle) {
@@ -626,7 +632,7 @@ ProcessGroupSCCL::allgather(std::vector<std::vector<at::Tensor>> &outputs,
   at::Tensor flatOutputTensor = newLikeFlat(outputs[0]);
 
   auto work = collective(
-    context, inputs[0], flatOutputTensor,
+    *this, context, inputs[0], flatOutputTensor,
     [](at::Tensor &input, at::Tensor &output, sophon::scclComm_t comm,
         tpudnnHandle_t handle) {
       return sophon::scclAllGather(
@@ -703,7 +709,7 @@ ProcessGroupSCCL::gather(std::vector<std::vector<at::Tensor>> &outputs,
   }
 
   auto work = collective(
-      context, inputs[0], flatOutputTensor,
+      *this, context, inputs[0], flatOutputTensor,
       [&](at::Tensor &input, at::Tensor &output, sophon::scclComm_t comm,
           tpudnnHandle_t handle) {
         return sophon::scclGather(
@@ -775,7 +781,7 @@ ProcessGroupSCCL::scatter(std::vector<at::Tensor> &outputs,
   }
 
   return collective(
-    context, flatInputTensor, outputs[0],
+    *this, context, flatInputTensor, outputs[0],
     [&](at::Tensor &input, at::Tensor &output, sophon::scclComm_t comm,
         tpudnnHandle_t handle) {
       return sophon::scclScatter(
@@ -816,7 +822,7 @@ c10::intrusive_ptr<Work> ProcessGroupSCCL::alltoall_base(
   // invalidArgument("Not support alltoall_base when !(outputCounts.empty() && inputCounts.empty())");
 
   return collective(
-    context, inputTensor, outputTensor,
+    *this, context, inputTensor, outputTensor,
     [](at::Tensor &input, at::Tensor &output, sophon::scclComm_t comm,
         tpudnnHandle_t handle) {
       return sophon::scclAllToAll(
@@ -913,9 +919,41 @@ ProcessGroupSCCL::recvAnysource(std::vector<at::Tensor> &tensors, int tag) {
 
 c10::intrusive_ptr<Work>
 ProcessGroupSCCL::barrier(const BarrierOptions &opts) {
-  std::vector<c10::weak_intrusive_ptr<WorkSCCL>> priorWork;
-  TORCH_CHECK(false, "barrier not implement");
-  return c10::make_intrusive<Work>();
+
+  std::vector<at::Device> devices;
+  for (auto it = usedDeviceIdxs_.cbegin(); it != usedDeviceIdxs_.cend(); ++it){
+    std::cout << "usedDeviceIdxs_:"<< *it << std::endl;
+  }
+
+  // Use user defined TPU device ids if provided
+  if (!opts.device_ids.empty()) {
+    for (auto device : opts.device_ids) {
+      devices.emplace_back(at::kPrivateUse1, device);
+    }
+  } else {
+    TORCH_CHECK(usedDeviceIdxs_.empty() != true, "Ensure an SCCL collective is called prior to any other operations!\n");
+
+    for (auto usedDeviceIdx : usedDeviceIdxs_) {
+      devices.emplace_back(at::kPrivateUse1, usedDeviceIdx);
+    }
+  }
+
+  // Use one device only
+  auto device = devices.back();
+  if (device.type() != at::kPrivateUse1) {
+    TORCH_CHECK(false, "unsupported device type", device.type(), "\n");
+  }
+
+  std::vector<at::Tensor> barrierTensor = {
+      at::empty({1}, at::TensorOptions().device(device).dtype(at::ScalarType::Float)),
+      at::empty({1}, at::TensorOptions().device(device).dtype(at::ScalarType::Float))
+      };
+  auto work = allreduce(barrierTensor);
+
+  // Work will take over barrierTensors
+  auto scclWork = dynamic_cast<ProcessGroupSCCL::WorkSCCL*>(work.get());
+  scclWork->barrierTensor_ = std::move(barrierTensor);
+  return work;
 }
 
 void ProcessGroupSCCL::setSequenceNumberForGroup() {

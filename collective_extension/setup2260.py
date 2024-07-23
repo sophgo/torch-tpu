@@ -40,8 +40,6 @@ scclHost_include_dirs = [f"{os.path.dirname(os.path.abspath(__file__))}/include/
                 f"{os.path.dirname(os.path.abspath(__file__))}/../torch_tpu/csrc/core",
                 f"{os.path.dirname(os.path.abspath(__file__))}/../",
                 f"{os.path.dirname(os.path.abspath(__file__))}/third_party/gloo",
-                f"{os.path.dirname(os.path.abspath(__file__))}/third_party/gloo_sophon/",
-                f"{os.path.dirname(os.path.abspath(__file__))}/third_party/gloo_sophon/sophon",
                 f"{os.path.dirname(os.path.abspath(__file__))}/../third_party/tpuDNN/include",
                 f"{os.path.dirname(os.path.abspath(__file__))}/../third_party/tpuv7_runtime/tpuv7-emulator_0.1.0/include/"
                 ]
