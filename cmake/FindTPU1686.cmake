@@ -16,28 +16,28 @@ if ($ENV{CHIP_ARCH} STREQUAL "bm1684x")
         cmodel_firmware_LIBRARY
         NAMES cmodel_firmware
         HINTS
-        #$ENV{TPUTRAIN_TOP}/../TPU1686/build/firmware_core/
+        #$ENV{TPUTRAIN_TOP}/../TPU1686/build_$ENV{CHIP_ARCH}/firmware_core/
         $ENV{TPUTRAIN_TOP}/third_party/firmware/$ENV{CHIP_ARCH}/)
 
     find_library(
         firmware_LIBRARY
         NAMES firmware_core bm1684x
         HINTS
-        #$ENV{TPUTRAIN_TOP}/../TPU1686/build_fw/firmware_core/
+        #$ENV{TPUTRAIN_TOP}/../TPU1686/build_fw_$ENV{CHIP_ARCH}/firmware_core/
         $ENV{TPUTRAIN_TOP}/third_party/firmware/$ENV{CHIP_ARCH}/)
 elseif ($ENV{CHIP_ARCH} STREQUAL "sg2260")
     find_library(
         cmodel_firmware_LIBRARY
         NAMES cmodel_firmware tpuv7_emulator
         HINTS
-        $ENV{TPUTRAIN_TOP}/../TPU1686/build/firmware_core/
+        $ENV{TPUTRAIN_TOP}/../TPU1686/build_$ENV{CHIP_ARCH}/firmware_core/
         $ENV{TPUTRAIN_TOP}/third_party/tpuv7_runtime/tpuv7-emulator_0.1.0/lib/)
 
     find_library(
         firmware_LIBRARY
         NAMES firmware_core
         HINTS
-        $ENV{TPUTRAIN_TOP}/../TPU1686/build_fw/firmware_core/
+        $ENV{TPUTRAIN_TOP}/../TPU1686/build_fw_$ENV{CHIP_ARCH}/firmware_core/
         $ENV{TPUTRAIN_TOP}/third_party/firmware/$ENV{CHIP_ARCH}/)
 endif()
 
@@ -45,7 +45,7 @@ find_library(
     tpuDNN_LIBRARY
     NAMES tpudnn
     HINTS
-    $ENV{TPUTRAIN_TOP}/../TPU1686/build/tpuDNN/src/
+    $ENV{TPUTRAIN_TOP}/../TPU1686/build_$ENV{CHIP_ARCH}/tpuDNN/src/
     $ENV{TPUTRAIN_TOP}/third_party/tpuDNN/$ENV{CHIP_ARCH}_lib/)
 
 find_package_handle_standard_args(
