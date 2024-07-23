@@ -166,6 +166,14 @@ tpudnnStatus_t tpudnnMatmulAsync(
     tpudnnTensor_t bias,
     tpudnnTensor_t output);
 
+tpudnnStatus_t tpudnnSliceScatterAsync(
+    tpudnnHandle_t handle,
+    tpudnnTensor_t input,
+    tpudnnTensor_t src,
+    tpudnnTensor_t indices,
+    int dim,
+    tpudnnTensor_t output);
+
 tpudnnStatus_t tpudnnC2CAllReduce(
     tpudnnHandle_t handle,
     void *send_buff,

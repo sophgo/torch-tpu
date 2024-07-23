@@ -62,11 +62,15 @@ Tensor &slice_scatter_out_tpu(const Tensor &self, const Tensor &src,
                        .to(self.device());
   TIMING_START;
 
-  auto status = sgdnnSliceScatter(
-      tpu::TPUGetDeviceResource(), tpu::TPUGenerateSgdnnTensor(self),
-      tpu::TPUGenerateSgdnnTensor(src), tpu::TPUGenerateSgdnnTensor(indices),
-      dim, tpu::TPUGenerateSgdnnTensor(out));
-  TORCH_CHECK(status == SG_SUCCESS);
+  auto stream = c10_tpu::getCurrentTPUStream();
+  auto status = tpudnnSliceScatterAsync(
+      stream,
+      tpu::TPUGenerateTpudnnTensor(stream, self),
+      tpu::TPUGenerateTpudnnTensor(stream, src),
+      tpu::TPUGenerateTpudnnTensor(stream, indices),
+      dim,
+      tpu::TPUGenerateTpudnnTensor(stream, out));
+  TORCH_CHECK(status == TPUDNN_STATUS_SUCCESS);
     TIMING_END(tpu::SLICE_SCATTER);
 #endif
   SHOW_TENSOR_OP(self, out);

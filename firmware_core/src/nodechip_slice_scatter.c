@@ -18,28 +18,7 @@ void nodechip_slice_scatter(global_addr_t output_global_addr,
                          NULL, NULL, dtype);
 }
 
-int tpu_kernel_api_slice_scatter(const void *args) {
-  sg_api_slice_scatter_t *api = (sg_api_slice_scatter_t *)args;
-  TPUKERNEL_ASSERT(api->dtype == DT_FP32 || api->dtype == DT_FP16 ||
-                   api->dtype == DT_BFP16 || api->dtype == DT_INT32);
-  int input_shape[4] = {1, 1, 1, 1};
 
-  for (int i = 0; i < api->dim; i++) {
-    input_shape[1] *= api->input_shape[i];
-  }
-  input_shape[2] *= api->input_shape[api->dim];
-  for (int i = api->dim + 1; i < api->input_dim; i++) {
-    input_shape[3] *= api->input_shape[i];
-  }
-  nodechip_slice_scatter(api->output_global_addr, api->input_global_addr,
-                         api->indices_global_addr, api->src_global_addr,
-                         input_shape, api->src_shape[api->dim], api->dtype);
-  tpu_poll();
-  return 0;
-}
-TPUKERNEL_FUNC_REGISTER(tpu_kernel_api_slice_scatter);
-
-#ifdef BACKEND_SG2260
 int tpu_kernel_api_slice_scatter_multi_core(const void *args) {
   sg_api_slice_scatter_t *api = (sg_api_slice_scatter_t *)args;
   TPUKERNEL_ASSERT(api->dtype == DT_FP32 || api->dtype == DT_FP16 ||
@@ -52,7 +31,7 @@ int tpu_kernel_api_slice_scatter_multi_core(const void *args) {
   for (int i = api->dim + 1; i < api->input_dim; i++) {
     input_shape[3] *= api->input_shape[i];
   }
-
+  #ifdef BACKEND_SG2260
   tpu_initialize();
   int core_num = tpu_core_num();
   int core_idx = tpu_core_index();
@@ -80,6 +59,13 @@ int tpu_kernel_api_slice_scatter_multi_core(const void *args) {
   }
   tpu_poll();
   return 0;
+  #else
+  nodechip_slice_scatter(api->output_global_addr, api->input_global_addr,
+                        api->indices_global_addr, api->src_global_addr,
+                        input_shape, api->src_shape[api->dim], api->dtype);
+  tpu_poll();
+  return 0;
+  #endif
 }
+
 TPUKERNEL_FUNC_REGISTER(tpu_kernel_api_slice_scatter_multi_core);
-#endif
