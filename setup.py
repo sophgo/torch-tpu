@@ -349,7 +349,11 @@ include_directories = [
     os.path.join(BASE_DIR, 'third_party/tpuDNN/include'),
     os.path.join(TPUV7_RUNTIME_PATH, "tpuv7-emulator_0.1.0", "include"),
     os.path.join(SGDNN_PATH, "include"),
-    os.path.join(SGAPI_STRUCT_PATH, "include")
+    os.path.join(SGAPI_STRUCT_PATH, "include"),
+    os.path.join(BASE_DIR, 'collective_extension/include'),
+    os.path.join(BASE_DIR, 'collective_extension/third_party/gloo_sophon/'),
+    os.path.join(BASE_DIR, 'collective_extension/third_party/gloo/'),
+    os.path.join(BASE_DIR, 'torch_tpu/csrc/core/')
 ]
 lib_directories = [
     os.path.join(BASE_DIR, f"build/{get_build_type()}/packages", "torch_tpu/lib"),
@@ -410,7 +414,7 @@ setup(
                 extra_compile_args=extra_compile_args + ['-fstack-protector-all'],
                 library_dirs=lib_directories,
                 extra_link_args=extra_link_args + ['-Wl,-rpath,$ORIGIN/lib'],
-            ),
+            )
         ],
         python_requires=">=3.8",
         install_requires = [],

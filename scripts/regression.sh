@@ -36,6 +36,59 @@ function gpt3block_test() {
     return $cmd_gpt3block_test_result
 }
 
+function test_sccl() {
+    local NODES=8
+    if [ -n "$2" ]; then
+      NODES=$2
+    fi
+    if [ ! -n "$1" ]; then
+        echo "Usage: test_sccl <test_name> [nodes]"
+        echo "test case is empty, please choose one from:"
+        echo "test_all_gather.py"
+        echo "test_all_reduce.py"
+        echo "test_broadcast.py"
+        echo "test_gather.py"
+        echo "test_reduce.py"
+        echo "test_scatter.py"
+        echo "test_alltoall.py"
+        return
+    fi
+    TEST_DIR=$TPUTRAIN_TOP/python/dist_test2260/
+    pushd ${TEST_DIR} > /dev/null
+    echo "test dir: $TEST_DIR"
+
+    echo "################################"
+    echo "Test sccl with mpi, NODES=$NODES"
+    echo "################################"
+
+    ret=0
+    mpirun --use-hwthread-cpus  -n ${NODES} --allow-run-as-root -output-filename log python3 $TEST_DIR/$1 || ret=1
+    if [ $ret -ne 0 ]; then
+      echo "test sccl case: $1 failed"
+      popd
+      return $ret
+    fi
+    popd
+}
+
+function regression_for_sccl() {
+    local_cases=(
+        test_all_gather.py
+        test_all_reduce.py
+        test_broadcast.py
+        test_gather.py
+        test_reduce.py
+        test_scatter.py
+        test_alltoall.py
+    )
+    for case in ${local_cases[@]}; do
+        test_sccl $case $1
+        if [ $? -ne 0 ]; then
+            return 1
+        fi
+    done
+}
+
 export stable_libsophon_path="/workspace/libsophon_Release_20230605_025400"
 # function for online regression
 function link_libsophon() {
@@ -179,15 +232,6 @@ function run_online_regression_test() {
       fi
     fi
     if [ $test_CHIP_ARCH = 'sg2260' ]; then
-      source  $CURRENT_DIR/sccl_envsetup.sh
-      build_openmpi || return -1
-      rebuild_sccl; ret_sccl=$?
-      if [ $ret_sccl -eq 0 ];then
-        echo "[RESULT-$test_CHIP_ARCH] sccl is built successfully!"
-      else
-        echo "[RESULT-$test_CHIP_ARCH] sccl is built failed!"
-        return -1
-      fi
       regression_for_sccl; ret_regression_for_sccl=$?
       if [ $ret_regression_for_sccl -eq 0 ];then
         echo "[RESULT-$test_CHIP_ARCH] regression_for_sccl is computed successfully!"

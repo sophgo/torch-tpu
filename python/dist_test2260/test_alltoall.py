@@ -5,17 +5,16 @@ import logging
 import os
 from helper import init_logger, is_master, is_slave, is_rank_table_valid
 import torch_tpu
-import sccl
 TPU = "tpu"
 
 # get rank and world_size from env
-rank = os.environ.get("OMPI_COMM_WORLD_RANK", None)
-world_size = os.environ.get("OMPI_COMM_WORLD_SIZE", None)
+rank = os.environ.get("OMPI_COMM_WORLD_RANK", 0)
+world_size = os.environ.get("OMPI_COMM_WORLD_SIZE", 1)
 
 # test tensor length
 tensor_len = 16
 # init dist and logger
-options = sccl.ProcessGroupSCCLOptions()
+options = torch_tpu.ProcessGroupSCCLOptions()
 chip_map = [0,1,2,3,4,5,6,7]
 if is_rank_table_valid():
     chip_map = torch_tpu.tpu.read_rank_table()

@@ -30,6 +30,10 @@ add_definitions(-DTORCHTPU_VERSION="${TORCHTPU_VERSION}")
 
 include(${PROJECT_SOURCE_DIR}/config_common.cmake)
 
+if (BACKEND_SG2260)
+    add_subdirectory(third_party/gloo_sophon)
+endif()
+
 set(PROJECT_ROOT ${PROJECT_SOURCE_DIR})
 
 add_subdirectory(sgdnn)

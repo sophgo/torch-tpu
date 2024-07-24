@@ -13,6 +13,7 @@
 #include "torch_tpu/csrc/core/TPUFunction.h"
 #if defined BACKEND_SG2260
 #include "torch_tpu/csrc/core/TPUStream.h"
+#include "ProcessGroupSCCL.hpp"
 #include "torch_tpu/csrc/core/Interface/sgrtInterface.h"
 #endif
 
@@ -24,7 +25,7 @@ struct TPUDeviceProp {
 };
 
 TPUDeviceProp prop;
-void RegisterTPUDeviceProperties(PyObject* module) {
+void RegisterTPUProperties(PyObject* module) {
   auto m = py::handle(module).cast<py::module>();
   py::class_<TPUDeviceProp>(m, "_TPUDeviceProperties")
             .def_readonly("name", &TPUDeviceProp::name)
@@ -35,6 +36,12 @@ void RegisterTPUDeviceProperties(PyObject* module) {
                 << prop.totalGlobalMem / (CHANGE_UNIT_SIZE * CHANGE_UNIT_SIZE) << "MB)";
               return stream.str();
             });
+#if defined BACKEND_SG2260
+  m.def("createProcessGroupSCCL", &c10d::ProcessGroupSCCL::createProcessGroupSCCL);
+  py::class_<c10d::ProcessGroupSCCL::Options>(m, "ProcessGroupSCCLOptions")
+    .def(py::init<>())
+    .def_readwrite("chip_map", &c10d::ProcessGroupSCCL::Options::chip_map);
+#endif
 }
 
 TPUDeviceProp* GetDeviceProperties(int64_t deviceid) {

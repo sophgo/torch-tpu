@@ -50,13 +50,12 @@ PyObject* initModule() {
     THPTStream_init(module);
     THPTEvent_init(module);
 #endif
-    RegisterTPUDeviceProperties(module);
+    RegisterTPUProperties(module);
     BindGetDeviceProperties(module);
     return module;
 }
 PyMODINIT_FUNC PyInit__C(void){
     return initModule();
 }
-
 
 }; //extern "C"

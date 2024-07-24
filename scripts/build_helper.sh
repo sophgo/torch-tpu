@@ -29,6 +29,12 @@
 
 export TRAIN_BUILD_FOLDER=build
 
+export PATH=$PATH:$TPUTRAIN_TOP/third_party/openmpi/bin
+export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:$TPUTRAIN_TOP/third_party/openmpi/lib
+export OPAL_PREFIX=$TPUTRAIN_TOP/third_party/openmpi
+export MASTER_ADDR=127.0.0.1
+export MASTER_PORT=6000
+
 function new_build()
 {
   pip uninstall torch_tpu -y

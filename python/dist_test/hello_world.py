@@ -1,7 +1,6 @@
 import torch
 import logging
 from helper import init_logger, is_master, is_slave
-import sccl
 import torch_tpu
 TPU = "tpu"
 

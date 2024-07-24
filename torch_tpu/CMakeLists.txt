@@ -15,6 +15,7 @@ endif()
 include(${CMAKE_CURRENT_SOURCE_DIR}/config.cmake)
 add_compile_options(-std=c++17 -Wno-attributes -Wall -fPIC)
 add_definitions("-D_GLIBCXX_USE_CXX11_ABI=0")
+add_definitions("-DPYBIND11_BUILD_ABI=\"_cxxabi1011\"")
 
 ## runtime
 include_directories(${RUNTIME_INCLUDE_PATH})
@@ -91,6 +92,16 @@ add_custom_command(
     DEPENDS ${SRCS}
     VERBATIM)
 
+if(BACKEND_SG2260)
+  include_directories(${CMAKE_CURRENT_SOURCE_DIR}/csrc/distributed/c10d)
+  list(APPEND concated_src
+    ${CMAKE_CURRENT_SOURCE_DIR}/csrc/distributed/c10d/ProcessGroupSCCL.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/csrc/distributed/c10d/SCCLDeviceFactory.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/csrc/distributed/c10d/ProcessGroupSCCLHost.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/csrc/distributed/c10d/SCCLHostDeviceFactory.cpp
+  )
+endif()
+
 find_package(TPU1686 REQUIRED)
 
 add_library(torch_tpu SHARED ${concated_src})
@@ -106,7 +117,7 @@ if(BACKEND_1684X)
 elseif(BACKEND_SG2260)
   set_target_properties(torch_tpu PROPERTIES INSTALL_RPATH
       "$ORIGIN;$ORIGIN/../../third_party/tpuv7_runtime/tpuv7-emulator_0.1.0/lib;${tpuDNNPath}")
-  target_link_libraries(torch_tpu sgdnn tpuv7_rt )
+  target_link_libraries(torch_tpu sgdnn tpuv7_rt sophon)
   if (USING_CMODEL)
     target_link_libraries(torch_tpu cdm_daemon_emulator pthread)
   endif()

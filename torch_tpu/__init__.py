@@ -49,6 +49,8 @@ import torch_tpu.tpu
 
 from torch_tpu.utils import ( apply_module_patch, \
                              add_storage_methods, add_serialization_methods, apply_device_patch)
+if arch == 'sg2260':
+    from torch_tpu._C import ProcessGroupSCCLOptions
 
 __all__ = []
 
