@@ -174,6 +174,25 @@ tpudnnStatus_t tpudnnSliceScatterAsync(
     int dim,
     tpudnnTensor_t output);
 
+tpudnnStatus_t tpudnnLogSoftmaxAsync(
+    tpudnnHandle_t handle,
+    tpudnnTensor_t input,
+    int dim,
+    tpudnnTensor_t output);
+
+tpudnnStatus_t tpudnnSoftmaxAsync(
+    tpudnnHandle_t handle,
+    tpudnnTensor_t input,
+    int dim,
+    tpudnnTensor_t output);
+
+tpudnnStatus_t tpudnnSoftmaxBackwardAsync(
+    tpudnnHandle_t handle,
+    tpudnnTensor_t grad_output,
+    tpudnnTensor_t output,
+    int dim,
+    tpudnnTensor_t grad_input);
+
 tpudnnStatus_t tpudnnC2CAllReduce(
     tpudnnHandle_t handle,
     void *send_buff,

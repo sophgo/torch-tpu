@@ -853,25 +853,10 @@ void nodechip_softmax_forward_single_core_v2 (
   }
 }
 
-int tpu_kernel_api_softmax ( const void * args )
-{
-  sg_api_softmax_t * api = ( sg_api_softmax_t * ) args;
-  TPUKERNEL_ASSERT ( api->dtype == DT_FP32 || api->dtype == DT_FP16 || api->dtype == DT_BFP16 );
-  tpu_initialize();
-  nodechip_softmax_forward_single_core_v2(
-    api->input_global_addr,
-    api->output_global_addr,
-    api->shape,
-    api->dim,
-    api->axis,
-    api->dtype);
-  tpu_poll();
-  return 0;
-}
-TPUKERNEL_FUNC_REGISTER ( tpu_kernel_api_softmax );
 
 
-#ifdef BACKEND_SG2260
+
+
 extern void nodechip_softmax_forward_multi_core (
 global_addr_t input_global_addr,
 global_addr_t output_global_addr,
@@ -941,6 +926,7 @@ int tpu_kernel_api_softmax_multi_core ( const void *args )
   sg_api_softmax_t *api = ( sg_api_softmax_t * ) args;
   TPUKERNEL_ASSERT ( api->dtype == DT_FP32 || api->dtype == DT_FP16 || api->dtype == DT_BFP16 );
   tpu_initialize();
+  #ifdef BACKEND_SG2260
   nodechip_softmax_forward_multi_core_v2 (
    api->input_global_addr,
    api->output_global_addr,
@@ -959,27 +945,20 @@ int tpu_kernel_api_softmax_multi_core ( const void *args )
   //     ( data_type_t ) api->dtype );
   tpu_poll();
   return 0;
-}
-TPUKERNEL_FUNC_REGISTER ( tpu_kernel_api_softmax_multi_core );
-#endif
-
-int tpu_kernel_api_log_softmax(const void *args) {
-  sg_api_log_softmax_t *api = (sg_api_log_softmax_t *)args;
-  TPUKERNEL_ASSERT(api->dtype == DT_FP32 || api->dtype == DT_FP16 ||
-                   api->dtype == DT_BFP16);
-  if (api->axis != api->dim - 1) {
-    TPUKERNEL_ASSERT_INFO(false, "not support axis != dim-1 now");
-  }
-  tpu_initialize();
-  nodechip_softmax(api->input_global_addr, api->output_global_addr, api->shape,
-                   api->dim, api->axis, api->axis, 1, 1.f,
-                   (data_type_t)api->dtype);
+  #else
+  nodechip_softmax_forward_single_core_v2(
+    api->input_global_addr,
+    api->output_global_addr,
+    api->shape,
+    api->dim,
+    api->axis,
+    api->dtype);
   tpu_poll();
   return 0;
+  #endif
 }
-TPUKERNEL_FUNC_REGISTER(tpu_kernel_api_log_softmax);
+TPUKERNEL_FUNC_REGISTER ( tpu_kernel_api_softmax_multi_core );
 
-#ifdef BACKEND_SG2260
 int tpu_kernel_api_log_softmax_multi_core(const void *args) {
   sg_api_log_softmax_t *api = (sg_api_log_softmax_t *)args;
   TPUKERNEL_ASSERT(api->dtype == DT_FP32 || api->dtype == DT_FP16 ||
@@ -988,7 +967,7 @@ int tpu_kernel_api_log_softmax_multi_core(const void *args) {
   if (api->axis != api->dim - 1) {
     TPUKERNEL_ASSERT_INFO(false, "not support axis != dim-1 now");
   }
-
+  #ifdef BACKEND_SG2260
   dim4 new_shape = {.n = 1, .c = 1, .h = 1, .w = 1};
   // new_shape.h = shape[axis];
   for (int i = 0; i < api->axis; i++) {
@@ -1022,6 +1001,13 @@ int tpu_kernel_api_log_softmax_multi_core(const void *args) {
   }
   tpu_poll();
   return 0;
+  #else
+  tpu_initialize();
+  nodechip_softmax(api->input_global_addr, api->output_global_addr, api->shape,
+                   api->dim, api->axis, api->axis, 1, 1.f,
+                   (data_type_t)api->dtype);
+  tpu_poll();
+  return 0;
+  #endif
 }
 TPUKERNEL_FUNC_REGISTER(tpu_kernel_api_log_softmax_multi_core);
-#endif

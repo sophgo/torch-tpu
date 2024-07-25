@@ -31,10 +31,13 @@ Tensor & _log_softmax_out_tpu ( const Tensor & self, int64_t dim, bool half_to_f
   }
 
   TIMING_START;
-  auto status = sgdnnLogSoftmax(tpu::TPUGetDeviceResource(),
-                                       tpu::TPUGenerateSgdnnTensor(self_f), dim,
-                                       tpu::TPUGenerateSgdnnTensor(out_f));
-  TORCH_CHECK(status == SG_SUCCESS);
+  auto stream = c10_tpu::getCurrentTPUStream();
+  auto status = tpudnnLogSoftmaxAsync(
+                stream,
+                tpu::TPUGenerateTpudnnTensor ( stream,self_f ),
+                dim,
+                tpu::TPUGenerateTpudnnTensor ( stream,out_f ) );
+  TORCH_CHECK(status == TPUDNN_STATUS_SUCCESS );
   tpu::TPUCopyDeviceToDevice(out.data_ptr(), out_f.to(out.dtype()).data_ptr(),
                              out.nbytes());
     TIMING_END(tpu::LOGSOFTMAX);
@@ -73,12 +76,13 @@ Tensor & _softmax_out_tpu ( const Tensor & self, int64_t dim, bool half_to_float
 #else
   TIMING_START;
 
-  auto status = sgdnnSoftmax (
-                       tpu::TPUGetDeviceResource(),
-                       tpu::TPUGenerateSgdnnTensor ( self ),
-                       dim,
-                       tpu::TPUGenerateSgdnnTensor ( out ) );
-  TORCH_CHECK ( status == SG_SUCCESS );
+  auto stream = c10_tpu::getCurrentTPUStream();
+  auto status = tpudnnSoftmaxAsync(
+                      stream,
+                      tpu::TPUGenerateTpudnnTensor ( stream,self ),
+                      dim,
+                      tpu::TPUGenerateTpudnnTensor ( stream,out) );
+  TORCH_CHECK ( status == TPUDNN_STATUS_SUCCESS  );
     TIMING_END ( tpu::SOFTMAX );
 #endif
   SHOW_TENSOR_OP(self, out);
@@ -101,13 +105,14 @@ Tensor & _softmax_backward_data_out_tpu ( const Tensor & grad_output, const Tens
 #else
   TIMING_START;
 
-  auto status = sgdnnSoftmaxBackward (
-                       tpu::TPUGetDeviceResource(),
-                       tpu::TPUGenerateSgdnnTensor ( grad_output ),
-                       tpu::TPUGenerateSgdnnTensor ( output ),
-                       dim,
-                       tpu::TPUGenerateSgdnnTensor ( grad_input ) );
-  TORCH_CHECK ( status == SG_SUCCESS );
+  auto stream = c10_tpu::getCurrentTPUStream();
+  auto status = tpudnnSoftmaxBackwardAsync(
+      stream,
+      tpu::TPUGenerateTpudnnTensor(stream, grad_output),
+      tpu::TPUGenerateTpudnnTensor(stream, output),
+      dim,
+      tpu::TPUGenerateTpudnnTensor(stream, grad_input));
+  TORCH_CHECK(status == TPUDNN_STATUS_SUCCESS);
     TIMING_END ( tpu::SOFTMAX_BACKWARD );
 #endif
   SHOW_TENSOR_OP(grad_output, output, grad_input);
