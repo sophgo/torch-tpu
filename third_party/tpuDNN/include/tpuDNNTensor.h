@@ -37,6 +37,13 @@ enum tpudnnReduceType_t {
     TPUDNN_REDUCE_L1   = 6,
 };
 
+typedef enum {
+  TPUDNN_LOG_E = 0,
+  TPUDNN_LOG_1P = 1,
+  TPUDNN_LOG_2 = 2,
+  TPUDNN_LOG_10 = 10,
+} tensor_log_type_t;
+
 typedef struct
 {
     void *addr;
@@ -192,6 +199,12 @@ tpudnnStatus_t tpudnnSoftmaxBackwardAsync(
     tpudnnTensor_t output,
     int dim,
     tpudnnTensor_t grad_input);
+
+tpudnnStatus_t tpudnnLogAsync(
+    tpudnnHandle_t handle,
+    tpudnnTensor_t input,
+    tpudnnTensor_t output,
+    tensor_log_type_t log_type);
 
 tpudnnStatus_t tpudnnC2CAllReduce(
     tpudnnHandle_t handle,

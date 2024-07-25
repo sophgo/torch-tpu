@@ -10,7 +10,7 @@
 
 namespace at {
 
-Tensor &logx_out_tpu(const Tensor &self, Tensor &out, sg_log_type_t log_type) {
+Tensor &logx_out_tpu(const Tensor &self, Tensor &out, tensor_log_type_t log_type) {
   if (self.dim() > 0) {
     CHECK_TENSOR_IN_DEVICE(self);
   }
@@ -29,11 +29,13 @@ Tensor &logx_out_tpu(const Tensor &self, Tensor &out, sg_log_type_t log_type) {
     TIMING_END(tpu::CPU_LAYER);
   } else if (IS_TPU_TENSOR(self)) {
     TIMING_START;
-
-    auto status =
-        sgdnnLog(tpu::TPUGetDeviceResource(), tpu::TPUGenerateSgdnnTensor(self),
-                 tpu::TPUGenerateSgdnnTensor(out), log_type);
-    TORCH_CHECK(status == SG_SUCCESS);
+    auto stream = c10_tpu::getCurrentTPUStream();
+    auto status = tpudnnLogAsync(
+        stream,
+        tpu::TPUGenerateTpudnnTensor(stream, self),
+        tpu::TPUGenerateTpudnnTensor(stream, out),
+        log_type);
+    TORCH_CHECK(status == TPUDNN_STATUS_SUCCESS);
         TIMING_END(tpu::LOG_FORWARD)
   } else {
     TORCH_CHECK(false, "At least one input is required in TPU device");
@@ -43,25 +45,25 @@ Tensor &logx_out_tpu(const Tensor &self, Tensor &out, sg_log_type_t log_type) {
   return out;
 }
 
-Tensor logx_tpu(const Tensor &self, sg_log_type_t log_type) {
+Tensor logx_tpu(const Tensor &self, tensor_log_type_t log_type) {
   auto out = empty(self.sizes(), self.options());
   return logx_out_tpu(self, out, log_type);
 }
 
 Tensor &log_out_tpu(const Tensor &self, Tensor &out) {
-  return logx_out_tpu(self, out, LOG_E);
+  return logx_out_tpu(self, out, TPUDNN_LOG_E);
 }
 
 Tensor &log1p_out_tpu(const Tensor &self, Tensor &out) {
-  return logx_out_tpu(self, out, LOG_1P);
+  return logx_out_tpu(self, out, TPUDNN_LOG_1P);
 }
 
 Tensor &log2_out_tpu(const Tensor &self, Tensor &out) {
-  return logx_out_tpu(self, out, LOG_2);
+  return logx_out_tpu(self, out, TPUDNN_LOG_2);
 }
 
 Tensor &log10_out_tpu(const Tensor &self, Tensor &out) {
-  return logx_out_tpu(self, out, LOG_10);
+  return logx_out_tpu(self, out, TPUDNN_LOG_10);
 }
 
 Tensor log_tpu(const Tensor &self) {
