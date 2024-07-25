@@ -39,8 +39,11 @@ inline void torch_check_npu(const at::Device& device) {
               "Expected TPU tensor, please check whether the input tensor device is correct.");
 }
 
-inline void maybe_initialize_tpu(const at::TensorOptions& options) {
+inline void maybe_initialize_tpu(at::TensorOptions& options) {
     if (torch_tpu::utils::is_tpu(options)) {
+        if (options.device().index() < 0) {
+          options.device().set_index(0);
+        }
         auto status = tpu::TPUDeviceInitialize(options.device().index());
         if (status != tpu::INIT_SUCCESS) {
         TORCH_CHECK(false, "tpu device ", options.device().index(), " init failed.");
@@ -51,8 +54,11 @@ inline void maybe_initialize_tpu(const at::TensorOptions& options) {
     }
 }
 
-inline void maybe_initialize_tpu(const at::Device& device) {
+inline void maybe_initialize_tpu(at::Device& device) {
   if (torch_tpu::utils::is_tpu(device)) {
+    if (device.index() < 0) {
+      device.set_index(0);
+    }
         auto status = tpu::TPUDeviceInitialize(device.index());
     if (status != tpu::INIT_SUCCESS) {
       TORCH_CHECK(false, "tpu device ", device.index(), " init failed.");
@@ -63,11 +69,11 @@ inline void maybe_initialize_tpu(const at::Device& device) {
   }
 }
 
-inline void maybe_initialize_tpu(const c10::optional<at::Device>& device) {
+inline void maybe_initialize_tpu(c10::optional<at::Device>& device) {
   if (device) {
     maybe_initialize_tpu(*device);
   }
 }
-} // namespace utils 
+} // namespace utils
 } // namespace torch_tpu
 
