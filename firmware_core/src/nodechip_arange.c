@@ -66,15 +66,18 @@ int tpu_kernel_api_arange_multi_core ( const void *args )
     TPUKERNEL_ASSERT ( api->dtype == DT_INT32 || api->dtype == DT_FP32);
   }
   tpu_initialize();
-  dim4 shape = { .n = 1, .c = api->shape[0], .h = 1, .w = 1 };
-  nodechip_arange (
-  api->start,
-  api->end,
-  api->step,
-  api->output_global_addr,
-  api->dtype,
-  api->isint64,
-  &shape);
+  // only support single core current
+  if (tpu_core_index() == 0) {
+    dim4 shape = { .n = 1, .c = api->shape[0], .h = 1, .w = 1 };
+    nodechip_arange (
+    api->start,
+    api->end,
+    api->step,
+    api->output_global_addr,
+    api->dtype,
+    api->isint64,
+    &shape);
+  }
   tpu_poll();
   return 0;
 }

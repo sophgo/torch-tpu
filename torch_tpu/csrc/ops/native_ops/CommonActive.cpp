@@ -86,8 +86,8 @@ namespace at {
     } else {                                                                   \
       if (self.dim() == 0) {                                                   \
         auto self_cpu = OP(self.cpu());                                        \
-        tpu::TPUCopyHostToDevice(self.data_ptr(),                              \
-                                 self.contiguous().data_ptr(), self.nbytes()); \
+        tpu::TPUCopyHostToDevice(out.data_ptr(),                              \
+                                 self_cpu.contiguous().data_ptr(), out.nbytes()); \
       } else if (IS_TPU_TENSOR(self)) {                                        \
         TIMING_START;                                                          \
         auto status = sgdnnActive(                                             \
