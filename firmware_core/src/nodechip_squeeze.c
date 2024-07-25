@@ -39,23 +39,7 @@ void nodechip_tile_1d_simulate(global_addr_t input_global_addr,
                    &in_stride, dtype);
 }
 
-int tpu_kernel_api_squeeze(const void *args) {
-  sg_api_squeeze_t *api = (sg_api_squeeze_t *)args;
 
-  unsigned long long length = 1;
-  for (int i = 0; i < api->dim; ++i) {
-    length *= api->shape[i];
-  }
-  tpu_initialize();
-  nodechip_tile_1d_simulate(api->output_global_addr, api->input_global_addr,
-                            api->shape, api->dim, 0, 1, 0,
-                            (data_type_t)api->dtype);
-  tpu_poll();
-  return 0;
-}
-TPUKERNEL_FUNC_REGISTER(tpu_kernel_api_squeeze);
-
-#ifdef BACKEND_SG2260
 /**
  * output = squeeze(input, dim)
  */
@@ -87,7 +71,7 @@ int tpu_kernel_api_squeeze_multi_core(const void *args) {
   }
 
   tpu_initialize();
-
+  #ifdef BACKEND_SG2260
   int core_num = tpu_core_num();
   int core_idx = tpu_core_index();
 
@@ -105,9 +89,14 @@ int tpu_kernel_api_squeeze_multi_core(const void *args) {
       api->input_global_addr +
           (length_slice * core_idx) * tpu_data_type_size(api->dtype),
       cur_length_slice, 0, 1, 0, (data_type_t)api->dtype);
-
   tpu_poll();
   return 0;
+  #else
+  nodechip_tile_1d_simulate(api->output_global_addr, api->input_global_addr,
+                            api->shape, api->dim, 0, 1, 0,
+                            (data_type_t)api->dtype);
+  tpu_poll();
+  return 0;
+  #endif
 }
 TPUKERNEL_FUNC_REGISTER(tpu_kernel_api_squeeze_multi_core);
-#endif

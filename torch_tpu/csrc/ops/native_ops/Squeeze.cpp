@@ -35,10 +35,12 @@ Tensor &squeeze_out_tpu(const Tensor &self, Tensor &out) {
     }
     TIMING_START;
 
-    auto status = sgdnnSqueeze(tpu::TPUGetDeviceResource(),
-                                      tpu::TPUGenerateSgdnnTensor(self),
-                                      tpu::TPUGenerateSgdnnTensor(out));
-    TORCH_CHECK(status == SG_SUCCESS);
+    auto stream = c10_tpu::getCurrentTPUStream();
+    auto status = tpudnnSqueezeAsync(
+        stream,
+        tpu::TPUGenerateTpudnnTensor(stream, self),
+        tpu::TPUGenerateTpudnnTensor(stream, out));
+    TORCH_CHECK(status == TPUDNN_STATUS_SUCCESS);
         TIMING_END(tpu::SQUEEZE);
   } else {
     TORCH_CHECK(false, "At least one input is required in TPU device");
@@ -74,10 +76,12 @@ Tensor &unsqueeze_out_tpu(const Tensor &self, Tensor &out, int64_t &dim) {
     TIMING_START;
 
     // same as squeeze
-    auto status = sgdnnSqueeze(tpu::TPUGetDeviceResource(),
-                                      tpu::TPUGenerateSgdnnTensor(self),
-                                      tpu::TPUGenerateSgdnnTensor(out));
-    TORCH_CHECK(status == SG_SUCCESS);
+    auto stream = c10_tpu::getCurrentTPUStream();
+    auto status = tpudnnSqueezeAsync(
+        stream,
+        tpu::TPUGenerateTpudnnTensor(stream, self),
+        tpu::TPUGenerateTpudnnTensor(stream, out));
+    TORCH_CHECK(status == TPUDNN_STATUS_SUCCESS);
         TIMING_END(tpu::UNSQUEEZE);
   } else {
     TORCH_CHECK(false, "At least one input is required in TPU device");

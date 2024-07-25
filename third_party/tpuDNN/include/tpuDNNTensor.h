@@ -206,6 +206,11 @@ tpudnnStatus_t tpudnnLogAsync(
     tpudnnTensor_t output,
     tensor_log_type_t log_type);
 
+tpudnnStatus_t tpudnnSqueezeAsync(
+    tpudnnHandle_t handle,
+    tpudnnTensor_t input,
+    tpudnnTensor_t output);
+
 tpudnnStatus_t tpudnnC2CAllReduce(
     tpudnnHandle_t handle,
     void *send_buff,
