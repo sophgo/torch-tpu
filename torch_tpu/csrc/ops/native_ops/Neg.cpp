@@ -21,11 +21,12 @@ Tensor & neg_out_tpu ( const Tensor & self, Tensor & out )
 #else
   TIMING_START;
 
-  auto status = sgdnnNeg(
-                       tpu::TPUGetDeviceResource(),
-                       tpu::TPUGenerateSgdnnTensor ( self ),
-                       tpu::TPUGenerateSgdnnTensor ( out ) );
-  TORCH_CHECK ( status == SG_SUCCESS );
+  auto stream = c10_tpu::getCurrentTPUStream();
+  auto status = tpudnnNegAsync(
+              stream,
+              tpu::TPUGenerateTpudnnTensor(stream, self),
+              tpu::TPUGenerateTpudnnTensor(stream, out));
+  TORCH_CHECK(status == TPUDNN_STATUS_SUCCESS);
     TIMING_END ( tpu::NEG );
 #endif
   SHOW_TENSOR_OP(self, out);
