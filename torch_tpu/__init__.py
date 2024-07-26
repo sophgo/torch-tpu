@@ -44,6 +44,9 @@ if arch or not os.path.exists(os.path.join(lib_pwd, 'libtorch_tpu.so')):
     if os.path.exists(os.path.join(lib_pwd, tpudnn)):
         symlink(tpudnn, os.path.join(lib_pwd, 'libtpudnn.so'))
 
+if not os.environ.get('TPU_EMULATOR_PATH'):
+    os.environ['TPU_EMULATOR_PATH'] = os.path.join(lib_pwd, f'{arch}_cmodel_firmware.so')
+
 import torch_tpu._C
 import torch_tpu.tpu
 
