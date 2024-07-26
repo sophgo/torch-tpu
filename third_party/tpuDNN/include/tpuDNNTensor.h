@@ -211,6 +211,13 @@ tpudnnStatus_t tpudnnSqueezeAsync(
     tpudnnTensor_t input,
     tpudnnTensor_t output);
 
+tpudnnStatus_t tpudnnWhereAsync(
+    tpudnnHandle_t handle,
+    tpudnnTensor_t cond,
+    tpudnnTensor_t self,
+    tpudnnTensor_t other,
+    tpudnnTensor_t output);
+
 tpudnnStatus_t tpudnnC2CAllReduce(
     tpudnnHandle_t handle,
     void *send_buff,

@@ -212,60 +212,7 @@ data_type_t   dtype )
     cdone += shape.c;
   }
 }
-int tpu_kernel_api_where ( const void * args )
-{
-  sg_api_where_t * api = ( sg_api_where_t * ) args;
-  TPUKERNEL_ASSERT ( api->dim > 0 && api->dim <= 4 );
-  dim4 output_shape = { .n = 1, .c = 1, .h = 1, .w = 1 };
-  dim4 cond_shape = { .n = 1, .c = 1, .h = 1, .w = 1 };
-  dim4 self_shape = { .n = 1, .c = 1, .h = 1, .w = 1 };
-  dim4 other_shape = { .n = 1, .c = 1, .h = 1, .w = 1 };
-  if ( api->dim >= 1 )
-  {
-    output_shape.n = api->output_shape[0];
-    cond_shape.n = api->cond_shape[0];
-    self_shape.n = api->self_shape[0];
-    other_shape.n = api->other_shape[0];
-  }
-  if ( api->dim >= 2 )
-  {
-    output_shape.c = api->output_shape[1];
-    cond_shape.c = api->cond_shape[1];
-    self_shape.c = api->self_shape[1];
-    other_shape.c = api->other_shape[1];
-  }
-  if ( api->dim >= 3 )
-  {
-    output_shape.h = api->output_shape[2];
-    cond_shape.h = api->cond_shape[2];
-    self_shape.h = api->self_shape[2];
-    other_shape.h = api->other_shape[2];
-  }
-  if ( api->dim >= 4 )
-  {
-    output_shape.w = api->output_shape[3];
-    cond_shape.w = api->cond_shape[3];
-    self_shape.w = api->self_shape[3];
-    other_shape.w = api->other_shape[3];
-  }
-  tpu_initialize();
-  nodechip_where_bcast (
-  api->output_global_addr,
-  api->cond_global_addr,
-  api->self_global_addr,
-  api->other_global_addr,
-  &output_shape,
-  &cond_shape,
-  &self_shape,
-  &other_shape,
-  ( data_type_t ) api->cond_dtype,
-  ( data_type_t ) api->dtype );
-  tpu_poll();
-  return 0;
-}
-TPUKERNEL_FUNC_REGISTER ( tpu_kernel_api_where );
 
-#ifdef BACKEND_SG2260
 extern void nodechip_where_multi_core(
     global_addr_t out_global_addr,
     global_addr_t cond_global_addr,
@@ -286,6 +233,7 @@ extern void nodechip_where_multi_core(
 int tpu_kernel_api_where_multi_core(const void * args)
 {
   sg_api_where_multi_core_t * api = (sg_api_where_multi_core_t *) args;
+#ifdef BACKEND_SG2260
   TPUKERNEL_ASSERT ( api->dtype == DT_FP32 || api->dtype == DT_INT32 ||
                      api->dtype == DT_FP16 || api->dtype == DT_BFP16);
   tpu_initialize();
@@ -306,6 +254,54 @@ int tpu_kernel_api_where_multi_core(const void * args)
                             (data_type_t)api->dtype);
   tpu_poll();
   return 0;
+#else
+  TPUKERNEL_ASSERT ( api->dims > 0 && api->dims <= 4 );
+  dim4 out_shape = { .n = 1, .c = 1, .h = 1, .w = 1 };
+  dim4 cond_shape = { .n = 1, .c = 1, .h = 1, .w = 1 };
+  dim4 self_shape = { .n = 1, .c = 1, .h = 1, .w = 1 };
+  dim4 other_shape = { .n = 1, .c = 1, .h = 1, .w = 1 };
+  if ( api->dims >= 1 )
+  {
+    out_shape.n = api->out_shape[0];
+    cond_shape.n = api->cond_shape[0];
+    self_shape.n = api->self_shape[0];
+    other_shape.n = api->other_shape[0];
+  }
+  if ( api->dims >= 2 )
+  {
+    out_shape.c = api->out_shape[1];
+    cond_shape.c = api->cond_shape[1];
+    self_shape.c = api->self_shape[1];
+    other_shape.c = api->other_shape[1];
+  }
+  if ( api->dims >= 3 )
+  {
+    out_shape.h = api->out_shape[2];
+    cond_shape.h = api->cond_shape[2];
+    self_shape.h = api->self_shape[2];
+    other_shape.h = api->other_shape[2];
+  }
+  if ( api->dims >= 4 )
+  {
+    out_shape.w = api->out_shape[3];
+    cond_shape.w = api->cond_shape[3];
+    self_shape.w = api->self_shape[3];
+    other_shape.w = api->other_shape[3];
+  }
+  tpu_initialize();
+  nodechip_where_bcast (
+  api->output_addr,
+  api->cond_addr,
+  api->self_addr,
+  api->other_addr,
+  &out_shape,
+  &cond_shape,
+  &self_shape,
+  &other_shape,
+  ( data_type_t ) api->cond_dtype,
+  ( data_type_t ) api->dtype );
+  tpu_poll();
+  return 0;
+#endif
 }
 TPUKERNEL_FUNC_REGISTER(tpu_kernel_api_where_multi_core);
-#endif

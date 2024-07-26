@@ -40,14 +40,15 @@ Tensor where_self_tpu(const Tensor &condition, const Tensor &self,
   IntArrayRef sizes(sizes_vec.data(), sizes_vec.size());
   auto out = torch::empty(sizes, options);
   TIMING_START;
-
-  auto status = sgdnnWhere(
-      tpu::TPUGetDeviceResource(), tpu::TPUGenerateSgdnnTensor(condition_),
-      tpu::TPUGenerateSgdnnTensor(self), tpu::TPUGenerateSgdnnTensor(other),
-      tpu::TPUGenerateSgdnnTensor(out));
-  TORCH_CHECK(status == SG_SUCCESS);
+  auto stream = c10_tpu::getCurrentTPUStream();
+  auto status = tpudnnWhereAsync(
+      stream,
+      tpu::TPUGenerateTpudnnTensor(stream, condition_),
+      tpu::TPUGenerateTpudnnTensor(stream, self),
+      tpu::TPUGenerateTpudnnTensor(stream, other),
+      tpu::TPUGenerateTpudnnTensor(stream, out));
+  TORCH_CHECK(status == TPUDNN_STATUS_SUCCESS);
   TIMING_END(tpu::WHERE);
-
   SHOW_TENSOR_OP(condition, self, other, out);
   return out;
 }
