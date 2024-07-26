@@ -218,6 +218,12 @@ tpudnnStatus_t tpudnnWhereAsync(
     tpudnnTensor_t other,
     tpudnnTensor_t output);
 
+tpudnnStatus_t tpudnnNorm2Async(
+    tpudnnHandle_t handle,
+    const tpudnnTensor_t input,
+    int keepdim,
+    tpudnnTensor_t output);
+
 tpudnnStatus_t tpudnnC2CAllReduce(
     tpudnnHandle_t handle,
     void *send_buff,
