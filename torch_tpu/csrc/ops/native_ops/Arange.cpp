@@ -21,12 +21,15 @@ Tensor & arange_start_out_tpu( const at::Scalar & start, const at::Scalar & end,
         int empty_length = (end.toInt()-start.toInt() - 1) / step.toInt() + 1;
         out = empty({empty_length},out.options());
         TIMING_START;
-        auto status = sgdnnArange ( tpu::TPUGetDeviceResource(),
-                                            start.toInt(),
-                                            end.toInt(),
-                                            step.toInt(),
-                                            tpu::TPUGenerateSgdnnTensor ( out ));
-        TORCH_CHECK ( status == SG_SUCCESS );
+        auto stream = c10_tpu::getCurrentTPUStream();
+        auto status = tpudnnArangeAsync(
+            stream,
+            start.toInt(),
+            end.toInt(),
+            step.toInt(),
+            tpu::TPUGenerateTpudnnTensor(stream, out)
+            );
+        TORCH_CHECK(status == TPUDNN_STATUS_SUCCESS);
         TIMING_END(tpu::ARANGE)
     }else{
         CPU_IMPL_WARNING();
@@ -45,3 +48,4 @@ TORCH_LIBRARY_IMPL ( aten, TPU, m )
  m.impl ( "arange.start_out",  arange_start_out_tpu);
 }
 }
+

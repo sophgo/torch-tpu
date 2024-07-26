@@ -229,6 +229,13 @@ tpudnnStatus_t tpudnnNegAsync(
     tpudnnTensor_t input,
     tpudnnTensor_t output);
 
+tpudnnStatus_t tpudnnArangeAsync (
+    tpudnnHandle_t handle,
+    int start,
+    int end,
+    int step,
+    tpudnnTensor_t out);
+
 tpudnnStatus_t tpudnnC2CAllReduce(
     tpudnnHandle_t handle,
     void *send_buff,

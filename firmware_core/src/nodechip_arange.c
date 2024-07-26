@@ -57,32 +57,6 @@ const dim4  * output_shape
   }
 }
 
-int tpu_kernel_api_arange ( const void * args )
-{
-  sg_api_arange_t * api = ( sg_api_arange_t * ) args;
-  if ( api->isint64 ) {
-    TPUKERNEL_ASSERT(api->dtype == DT_INT32);
-  } else {
-    TPUKERNEL_ASSERT ( api->dtype == DT_INT32 || api->dtype == DT_FP32);
-  }
-  tpu_initialize();
-  dim4 shape = { .n = 1, .c = api->shape[0], .h = 1, .w = 1 };
-  nodechip_arange (
-  api->start,
-  api->end,
-  api->step,
-  api->output_global_addr,
-  api->dtype,
-  api->isint64,
-  &shape);
-  tpu_poll();
-  return 0;
-}
-
-TPUKERNEL_FUNC_REGISTER ( tpu_kernel_api_arange );
-
-
-#ifdef BACKEND_SG2260
 int tpu_kernel_api_arange_multi_core ( const void *args )
 {
   sg_api_arange_t * api = ( sg_api_arange_t * ) args;
@@ -105,4 +79,3 @@ int tpu_kernel_api_arange_multi_core ( const void *args )
   return 0;
 }
 TPUKERNEL_FUNC_REGISTER ( tpu_kernel_api_arange_multi_core );
-#endif
