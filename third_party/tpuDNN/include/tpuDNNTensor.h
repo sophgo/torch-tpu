@@ -236,6 +236,36 @@ tpudnnStatus_t tpudnnArangeAsync (
     int step,
     tpudnnTensor_t out);
 
+tpudnnStatus_t tpudnnRepeatAsync(
+    tpudnnHandle_t handle,
+    tpudnnTensor_t input,
+    int* repeat_times,
+    int repeat_dim,
+    tpudnnTensor_t output);
+
+tpudnnStatus_t tpudnnStridedCopyAsync(
+    tpudnnHandle_t handle,
+    tpudnnTensor_t input,
+    tpudnnTensor_t output);
+
+tpudnnStatus_t tpudnnConvertAsync(
+    tpudnnHandle_t handle,
+    tpudnnTensor_t input,
+    tpudnnTensor_t output);
+
+tpudnnStatus_t tpudnnNonzeroAsync(
+    tpudnnHandle_t handle,
+    tpudnnTensor_t self,
+    tpudnnTensor_t out,
+    tpudnnTensor_t num);
+
+tpudnnStatus_t tpudnnClampAsync(
+    tpudnnHandle_t handle,
+    tpudnnTensor_t input,
+    float min,
+    float max,
+    tpudnnTensor_t output);
+
 tpudnnStatus_t tpudnnC2CAllReduce(
     tpudnnHandle_t handle,
     void *send_buff,

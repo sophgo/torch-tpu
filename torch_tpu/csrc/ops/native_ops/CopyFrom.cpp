@@ -41,10 +41,12 @@ Tensor _copy_from_tpu(const Tensor &self, const Tensor &dst,
       } else {
         TIMING_START;
 
-        auto status = sgdnnStridedCopy(tpu::TPUGetDeviceResource(),
-                                              tpu::TPUGenerateSgdnnTensor(self),
-                                              tpu::TPUGenerateSgdnnTensor(dst));
-        TORCH_CHECK(status == SG_SUCCESS);
+        auto stream = c10_tpu::getCurrentTPUStream();
+        auto status = tpudnnStridedCopyAsync(
+          stream,
+          tpu::TPUGenerateTpudnnTensor(stream, self),
+          tpu::TPUGenerateTpudnnTensor(stream, dst));
+        TORCH_CHECK(status == TPUDNN_STATUS_SUCCESS);
                 TIMING_END(tpu::STRIDED_COPY);
       }
     } else {
@@ -74,11 +76,13 @@ Tensor _copy_from_tpu(const Tensor &self, const Tensor &dst,
         auto self_ = self.contiguous();
         if (dst.is_contiguous()) {
           TIMING_START;
-
-          auto status = sgdnnConvert(tpu::TPUGetDeviceResource(),
-                                    tpu::TPUGenerateSgdnnTensor(self_),
-                                    tpu::TPUGenerateSgdnnTensor(dst));
-          TORCH_CHECK(status == SG_SUCCESS);
+          auto stream = c10_tpu::getCurrentTPUStream();
+          auto status = tpudnnConvertAsync(
+            stream,
+            tpu::TPUGenerateTpudnnTensor(stream, self_),
+            tpu::TPUGenerateTpudnnTensor(stream, dst));
+          TORCH_CHECK(status == TPUDNN_STATUS_SUCCESS);
+                    TIMING_END(tpu::DTYPE_CONVERT);
                     TIMING_END(tpu::DTYPE_CONVERT);
           SHOW_TENSOR_OP(self_, dst);
         } else {

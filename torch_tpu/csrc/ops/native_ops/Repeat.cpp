@@ -28,11 +28,14 @@ Tensor &repeat_out_tpu(const Tensor &self, const IntArrayRef repeats,
     }
 
     TIMING_START;
-
-    auto status = sgdnnRepeat(
-        tpu::TPUGetDeviceResource(), tpu::TPUGenerateSgdnnTensor(contiguous_self),
-        repeat_times.data(), repeats.size(), tpu::TPUGenerateSgdnnTensor(out));
-    TORCH_CHECK(status == SG_SUCCESS);
+    auto stream = c10_tpu::getCurrentTPUStream();
+    auto status = tpudnnRepeatAsync(
+        stream,
+        tpu::TPUGenerateTpudnnTensor(stream, contiguous_self),
+        repeat_times.data(),
+        repeats.size(),
+        tpu::TPUGenerateTpudnnTensor(stream, out));
+    TORCH_CHECK(status == TPUDNN_STATUS_SUCCESS);
         TIMING_END(tpu::REPEAT)
   }
   SHOW_TENSOR_OP(self, out);

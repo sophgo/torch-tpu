@@ -193,25 +193,12 @@ bool is_last_dim_spec(sg_api_repeat_t *api, int* row, int* col, int* repeat) {
   return true;
 }
 
-int tpu_kernel_api_repeat(const void *args) {
-  sg_api_repeat_t *api = (sg_api_repeat_t *)args;
-  int rows = 1, cols = 1, repeats = 1;
-  tpu_initialize();
-  if( is_last_dim_spec(api, &rows, &cols, &repeats) ){
-    nodechip_repeat_spec_for_last_dim(api->input_global_addr, api->output_global_addr,  rows, cols, repeats, api->dtype);
-  } else {
-    nodechip_repeat(api->input_global_addr, api->output_global_addr, api->shape,
-                    api->repeat_times, api->dim, api->repeat_dim, api->dtype);
-  }
-  tpu_poll();
-  return 0;
-}
-TPUKERNEL_FUNC_REGISTER(tpu_kernel_api_repeat);
 
-#ifdef BACKEND_SG2260
+
+
 int tpu_kernel_api_repeat_multi_core(const void *args) {
   sg_api_repeat_t *api = (sg_api_repeat_t *)args;
-
+#ifdef BACKEND_SG2260
   tpu_initialize();
 #ifdef USING_PERF_MODE
     tpu_sync_all();
@@ -237,6 +224,17 @@ int tpu_kernel_api_repeat_multi_core(const void *args) {
                     api->repeat_times, api->dim, api->repeat_dim, api->dtype);
   tpu_poll();
   return 0;
+#else
+  int rows = 1, cols = 1, repeats = 1;
+  tpu_initialize();
+  if( is_last_dim_spec(api, &rows, &cols, &repeats) ){
+    nodechip_repeat_spec_for_last_dim(api->input_global_addr, api->output_global_addr,  rows, cols, repeats, api->dtype);
+  } else {
+    nodechip_repeat(api->input_global_addr, api->output_global_addr, api->shape,
+                    api->repeat_times, api->dim, api->repeat_dim, api->dtype);
+  }
+  tpu_poll();
+  return 0;
+#endif
 }
 TPUKERNEL_FUNC_REGISTER(tpu_kernel_api_repeat_multi_core);
-#endif

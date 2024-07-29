@@ -11,24 +11,6 @@ data_type_t     src_dtype,
 data_type_t     dst_dtype,
 rounding_mode_t round_mode );
 
-int tpu_kernel_api_dtype_convert ( const void* args ) {
-  sg_api_dtype_convert_t* api = ( sg_api_dtype_convert_t* ) args;
-  tpu_initialize();
-  nodechip_cast (
-  api->input_global_addr,
-  api->output_global_addr,
-  api->shape,
-  api->dim,
-  ( data_type_t ) api->input_dtype,
-  ( data_type_t ) api->output_dtype,
-  RM_HALF_TO_EVEN );
-  tpu_poll();
-  return 0;
-}
-
-TPUKERNEL_FUNC_REGISTER ( tpu_kernel_api_dtype_convert );
-
-#ifdef BACKEND_SG2260
 static inline void compute_current_slice_info_multi_core(int total_num, int* expected_current_slice,
                                                          int* expected_avg_slice, int* expected_secs) {
   const int core_num = tpu_core_num();
@@ -47,6 +29,7 @@ static inline void compute_current_slice_info_multi_core(int total_num, int* exp
 
 int tpu_kernel_api_dtype_convert_multi_core ( const void* args ) {
   sg_api_dtype_convert_t* api = ( sg_api_dtype_convert_t* ) args;
+#ifdef BACKEND_SG2260
   tpu_initialize();
 #ifdef USING_PERF_MODE
   tpu_sync_all();
@@ -94,7 +77,18 @@ int tpu_kernel_api_dtype_convert_multi_core ( const void* args ) {
   }
   tpu_poll();
   return 0;
-}
-
-TPUKERNEL_FUNC_REGISTER ( tpu_kernel_api_dtype_convert_multi_core );
+#else
+  tpu_initialize();
+  nodechip_cast (
+  api->input_global_addr,
+  api->output_global_addr,
+  api->shape,
+  api->dim,
+  ( data_type_t ) api->input_dtype,
+  ( data_type_t ) api->output_dtype,
+  RM_HALF_TO_EVEN );
+  tpu_poll();
+  return 0;
 #endif
+}
+TPUKERNEL_FUNC_REGISTER ( tpu_kernel_api_dtype_convert_multi_core );

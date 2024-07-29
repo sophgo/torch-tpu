@@ -28,13 +28,14 @@ Tensor & clamp_out_tpu( const at::Tensor & self, const c10::optional<at::Scalar>
     else if (IS_TPU_TENSOR(self_)){
         TIMING_START;
 
-        auto status = sgdnnClamp(
-            tpu::TPUGetDeviceResource(),
-            tpu::TPUGenerateSgdnnTensor(self_),
+        auto stream = c10_tpu::getCurrentTPUStream();
+        auto status = tpudnnClampAsync(
+            stream,
+            tpu::TPUGenerateTpudnnTensor(stream, self_),
             min.has_value() ? min.value().to<float>() : -std::numeric_limits<float>::infinity(),
             max.has_value() ? max.value().to<float>() : std::numeric_limits<float>::infinity(),
-            tpu::TPUGenerateSgdnnTensor(out));
-        TORCH_CHECK(status == SG_SUCCESS);
+            tpu::TPUGenerateTpudnnTensor(stream, out));
+        TORCH_CHECK(status == TPUDNN_STATUS_SUCCESS);
                 TIMING_END(tpu::CLAMP);
     }
     else

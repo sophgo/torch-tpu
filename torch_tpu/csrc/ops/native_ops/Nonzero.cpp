@@ -19,11 +19,13 @@ Tensor nonzero_tpu(const Tensor &self) {
   Tensor num = empty({1}, self.options().dtype(kInt));
   TIMING_START;
 
-  auto status = sgdnnNonzero(tpu::TPUGetDeviceResource(),
-                                    tpu::TPUGenerateSgdnnTensor(self),
-                                    tpu::TPUGenerateSgdnnTensor(out_temp),
-                                    tpu::TPUGenerateSgdnnTensor(num));
-  TORCH_CHECK(status == SG_SUCCESS);
+  auto stream = c10_tpu::getCurrentTPUStream();
+  auto status = tpudnnNonzeroAsync(
+      stream,
+      tpu::TPUGenerateTpudnnTensor(stream, self),
+      tpu::TPUGenerateTpudnnTensor(stream, out_temp),
+      tpu::TPUGenerateTpudnnTensor(stream, num));
+  TORCH_CHECK(status == TPUDNN_STATUS_SUCCESS);
     TIMING_END(tpu::NONZERO);
 
   Tensor out = empty({num.item().toInt(), self.dim()}, self.options().dtype(kInt));
