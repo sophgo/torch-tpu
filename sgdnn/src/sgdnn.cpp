@@ -3363,19 +3363,29 @@ tpu_status_t sgdnnAddCMulBcast ( tpu_resource_t resource ,
   SAFE_CALL ( sgdnnTPUKernelLaunch ( resource , "tpu_kernel_api_addcmul_bcast", &api, sizeof ( api ) ) );
 #elif defined BACKEND_SG2260
   //SGDNN_CHECK ( false );
-  sg_api_addcmul_t api;
+  sg_api_bcast_addcmul_t api;
   api.input_global_addr = input.addr;
   api.tensor1_global_addr = tensor1.addr;
   api.tensor2_global_addr = tensor2.addr;
   api.output_global_addr = output.addr;
-  api.dim = input.dim;
+  api.input_dim = input.dim;
+  api.tensor1_dim = tensor1.dim;
+  api.tensor2_dim = tensor2.dim;
   for ( int i = 0; i < input.dim; ++i )
   {
-    api.shape[i] = input.shape[i];
+    api.input_shape[i] = input.shape[i];
+  }
+  for ( int i = 0; i < tensor1.dim; ++i )
+  {
+    api.tensor1_shape[i] = tensor1.shape[i];
+  }
+  for ( int i = 0; i < tensor2.dim; ++i )
+  {
+    api.tensor2_shape[i] = tensor2.shape[i];
   }
   api.dtype = sgdnnTPUKernelDType ( input.dtype );
   api.value = scalar;
-  SAFE_CALL ( sgdnnTPUKernelLaunchMultiCore ( resource , "addcmul_multi_core", &api, sizeof ( api ) , non_blocking) );
+  SAFE_CALL ( sgdnnTPUKernelLaunchMultiCore ( resource , "tpu_kernel_api_addcmul_bcast", &api, sizeof ( api ) , non_blocking) );
 #else
   SGDNN_CHECK ( false );
 #endif
