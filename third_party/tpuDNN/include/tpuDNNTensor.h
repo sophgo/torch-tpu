@@ -266,6 +266,69 @@ tpudnnStatus_t tpudnnClampAsync(
     float max,
     tpudnnTensor_t output);
 
+tpudnnStatus_t tpudnnNativeGroupNormAsync(
+    tpudnnHandle_t handle,
+    tpudnnTensor_t input,
+    tpudnnTensor_t gamma,
+    tpudnnTensor_t beta,
+    int group,
+    int affine,
+    float eps,
+    tpudnnTensor_t output,
+    tpudnnTensor_t mean,
+    tpudnnTensor_t rstd);
+
+tpudnnStatus_t tpudnnLogicalAndAsync(
+    tpudnnHandle_t handle,
+    tpudnnTensor_t input,
+    tpudnnTensor_t other,
+    tpudnnTensor_t output);
+
+tpudnnStatus_t tpudnnLogicalNotAsync(
+    tpudnnHandle_t handle,
+    tpudnnTensor_t input,
+    tpudnnTensor_t output);
+
+tpudnnStatus_t tpudnnLogicalOrAsync(
+    tpudnnHandle_t handle,
+    tpudnnTensor_t input,
+    tpudnnTensor_t other,
+    tpudnnTensor_t output);
+
+tpudnnStatus_t tpudnnBitwiseNotAsync(
+    tpudnnHandle_t handle,
+    tpudnnTensor_t input,
+    tpudnnTensor_t output);
+
+tpudnnStatus_t tpudnnCbrtAsync(
+    tpudnnHandle_t handle,
+    tpudnnTensor_t input,
+    tpudnnTensor_t output);
+
+tpudnnStatus_t tpudnnAddCMulAsync(
+    tpudnnHandle_t handle,
+    tpudnnTensor_t input,
+    tpudnnTensor_t tensor1,
+    tpudnnTensor_t tensor2,
+    float scalar,
+    tpudnnTensor_t output);
+
+tpudnnStatus_t tpudnnAddCMulBcastAsync(
+    tpudnnHandle_t handle,
+    tpudnnTensor_t input,
+    tpudnnTensor_t tensor1,
+    tpudnnTensor_t tensor2,
+    float scalar,
+    tpudnnTensor_t output);
+
+tpudnnStatus_t tpudnnAddCDivAsync(
+    tpudnnHandle_t handle,
+    tpudnnTensor_t input,
+    tpudnnTensor_t tensor1,
+    tpudnnTensor_t tensor2,
+    float scalar,
+    tpudnnTensor_t output);
+
 tpudnnStatus_t tpudnnC2CAllReduce(
     tpudnnHandle_t handle,
     void *send_buff,

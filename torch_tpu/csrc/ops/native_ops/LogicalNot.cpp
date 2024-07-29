@@ -33,12 +33,12 @@ namespace at
         else if (IS_TPU_TENSOR(self))
         {
             TIMING_START;
-
-            auto status = sgdnnLogicalNot(
-                tpu::TPUGetDeviceResource(),
-                tpu::TPUGenerateSgdnnTensor(self),
-                tpu::TPUGenerateSgdnnTensor(out));
-            TORCH_CHECK(status == SG_SUCCESS);
+            auto stream = c10_tpu::getCurrentTPUStream();
+            auto status = tpudnnLogicalNotAsync(
+            stream,
+            tpu::TPUGenerateTpudnnTensor(stream, self),
+            tpu::TPUGenerateTpudnnTensor(stream, out));
+            TORCH_CHECK(status == TPUDNN_STATUS_SUCCESS);
                         TIMING_END(tpu::LOGICAL_NOT);
         }
         else

@@ -86,13 +86,19 @@ std::tuple<Tensor, Tensor, Tensor> native_group_norm_tpu(
   rstd = std::get<2>(result).cpu();
 #else
   TIMING_START;
-
-  auto status = sgdnnNativeGroupNorm(
-      tpu::TPUGetDeviceResource(), tpu::TPUGenerateSgdnnTensor(X_32),
-      tpu::TPUGenerateSgdnnTensor(weight), tpu::TPUGenerateSgdnnTensor(bias),
-      group, affine, eps, tpu::TPUGenerateSgdnnTensor(Y),
-      tpu::TPUGenerateSgdnnTensor(mean), tpu::TPUGenerateSgdnnTensor(rstd));
-  TORCH_CHECK(status == SG_SUCCESS);
+  auto stream = c10_tpu::getCurrentTPUStream();
+  auto status = tpudnnNativeGroupNormAsync(
+      stream,
+      tpu::TPUGenerateTpudnnTensor(stream, X_32),
+      tpu::TPUGenerateTpudnnTensor(stream, weight),
+      tpu::TPUGenerateTpudnnTensor(stream, bias),
+      group,
+      affine,
+      eps,
+      tpu::TPUGenerateTpudnnTensor(stream, Y),
+      tpu::TPUGenerateTpudnnTensor(stream, mean),
+      tpu::TPUGenerateTpudnnTensor(stream, rstd));
+  TORCH_CHECK(status == TPUDNN_STATUS_SUCCESS);
     TIMING_END(tpu::NATIVE_GROUP_NORM);
 #endif
   return std::make_tuple(Y, mean, rstd);

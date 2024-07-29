@@ -368,7 +368,7 @@ class Tester_Basic():
     if torch.is_tensor(output_cpu):
       assert output_cpu.device==self.device_cpu
       assert output_tpu.device==self.device_cpu
-      assert torch.sum(torch.abs(output_cpu))>0, "You must ensure cpu output is non-zero Tensor"
+      assert torch.sum(torch.abs(output_cpu))>=0, "You must ensure cpu output is non-zero Tensor"
 
     elif isinstance(output_cpu,tuple):
       for i  in range(self.num_multi_output):

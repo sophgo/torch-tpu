@@ -35,13 +35,13 @@ namespace at
         {
         //need to consider broadcast later
             TIMING_START;
-
-            auto status = sgdnnLogicalOr(
-                tpu::TPUGetDeviceResource(),
-                tpu::TPUGenerateSgdnnTensor(self),
-                tpu::TPUGenerateSgdnnTensor(other),
-                tpu::TPUGenerateSgdnnTensor(out));
-            TORCH_CHECK(status == SG_SUCCESS);
+            auto stream = c10_tpu::getCurrentTPUStream();
+            auto status = tpudnnLogicalOrAsync(
+            stream,
+            tpu::TPUGenerateTpudnnTensor(stream, self),
+            tpu::TPUGenerateTpudnnTensor(stream, other),
+            tpu::TPUGenerateTpudnnTensor(stream, out));
+            TORCH_CHECK(status == TPUDNN_STATUS_SUCCESS);
                         TIMING_END(tpu::LOGICAL_OR);
         }
         else
@@ -66,3 +66,4 @@ namespace at
     }
 
 } // namespace at
+

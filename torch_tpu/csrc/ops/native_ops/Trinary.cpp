@@ -23,18 +23,21 @@ Tensor &addcmul_out_tpu(const Tensor &self, const Tensor &tensor1,
   if (tpu::TPUIsSameShape(self, tensor1) &&
       tpu::TPUIsSameShape(self, tensor2)) {
     TIMING_START;
-
-    auto status = sgdnnAddCMul(
-        tpu::TPUGetDeviceResource(), tpu::TPUGenerateSgdnnTensor(self),
-        tpu::TPUGenerateSgdnnTensor(tensor1),
-        tpu::TPUGenerateSgdnnTensor(tensor2), value.toDouble(),
-        tpu::TPUGenerateSgdnnTensor(out));
-    TORCH_CHECK(status == SG_SUCCESS);
+    auto stream = c10_tpu::getCurrentTPUStream();
+    auto status = tpudnnAddCMulAsync(
+      stream,
+      tpu::TPUGenerateTpudnnTensor(stream, self),
+      tpu::TPUGenerateTpudnnTensor(stream, tensor1),
+      tpu::TPUGenerateTpudnnTensor(stream, tensor2),
+      value.toDouble(),
+      tpu::TPUGenerateTpudnnTensor(stream, out));
+    TORCH_CHECK(status == TPUDNN_STATUS_SUCCESS);
     TIMING_END(tpu::ADDCMUL);
   } else {
-    auto self_t = tpu::TPUGenerateSgdnnTensor(self);
-    auto tensor1_t = tpu::TPUGenerateSgdnnTensor(tensor1);
-    auto tensor2_t = tpu::TPUGenerateSgdnnTensor(tensor2);
+    tpudnnHandle_t handle = tpudnnCreate();
+    auto self_t = tpu::TPUGenerateTpudnnTensor(handle, self);
+    auto tensor1_t = tpu::TPUGenerateTpudnnTensor(handle, tensor1);
+    auto tensor2_t = tpu::TPUGenerateTpudnnTensor(handle, tensor2);
     int maxdim = self_t.dim > tensor1_t.dim
                      ? self_t.dim > tensor2_t.dim ? self_t.dim : tensor2_t.dim
                  : tensor1_t.dim > tensor2_t.dim ? tensor1_t.dim
@@ -85,13 +88,16 @@ Tensor &addcmul_out_tpu(const Tensor &self, const Tensor &tensor1,
       }
       tensor2_t.dim = maxdim;
     }
-
     TIMING_START;
-
-    auto status = sgdnnAddCMulBcast(tpu::TPUGetDeviceResource(), self_t,
-                                    tensor1_t, tensor2_t, value.toDouble(),
-                                    tpu::TPUGenerateSgdnnTensor(out));
-    TORCH_CHECK(status == SG_SUCCESS);
+    auto stream = c10_tpu::getCurrentTPUStream();
+    auto status = tpudnnAddCMulBcastAsync(
+      stream,
+      self_t,
+      tensor1_t,
+      tensor2_t,
+      value.toDouble(),
+      tpu::TPUGenerateTpudnnTensor(stream, out));
+    TORCH_CHECK(status == TPUDNN_STATUS_SUCCESS);
     TIMING_END(tpu::ADDCMUL);
   }
 #endif
@@ -108,12 +114,15 @@ Tensor &addcdiv_out_tpu(const Tensor &self, const Tensor &tensor1,
   CHECK_TENSOR_IN_DEVICE(tensor2);
   CHECK_TENSOR_IN_DEVICE(out);
   TIMING_START;
-  auto status = sgdnnAddCDiv(
-      tpu::TPUGetDeviceResource(), tpu::TPUGenerateSgdnnTensor(self),
-      tpu::TPUGenerateSgdnnTensor(tensor1),
-      tpu::TPUGenerateSgdnnTensor(tensor2), value.toDouble(),
-      tpu::TPUGenerateSgdnnTensor(out));
-  TORCH_CHECK(status == SG_SUCCESS);
+  auto stream = c10_tpu::getCurrentTPUStream();
+  auto status = tpudnnAddCDivAsync(
+    stream,
+    tpu::TPUGenerateTpudnnTensor(stream, self),
+    tpu::TPUGenerateTpudnnTensor(stream, tensor1),
+    tpu::TPUGenerateTpudnnTensor(stream, tensor2),
+    value.toDouble(),
+    tpu::TPUGenerateTpudnnTensor(stream, out));
+  TORCH_CHECK(status == TPUDNN_STATUS_SUCCESS);
   TIMING_END(tpu::ADDCDIV);
   SHOW_TENSOR_OP(self, tensor1, tensor2, out);
   return out;
@@ -121,3 +130,4 @@ Tensor &addcdiv_out_tpu(const Tensor &self, const Tensor &tensor1,
 TORCH_LIBRARY_IMPL(aten, TPU, m) { m.impl("addcdiv.out", addcdiv_out_tpu); }
 
 } // namespace at
+

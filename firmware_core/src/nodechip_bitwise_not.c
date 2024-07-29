@@ -73,22 +73,6 @@ void nodechip_bitwise_not(global_addr_t input_global_addr,
   }
 }
 
-int tpu_kernel_api_bitwise_not(const void* args) {
-  sg_api_bitwise_not_t* api = (sg_api_bitwise_not_t*)args;
-  TPUKERNEL_ASSERT(api->dtype == DT_INT32);
-  int length = 1;
-  for (int i = 0; i < api->dim; ++i) {
-    length *= api->shape[i];
-  }
-  tpu_initialize();
-  nodechip_bitwise_not(api->input_global_addr, api->output_global_addr, length,
-                       (data_type_t)api->dtype);
-  tpu_poll();
-  return 0;
-}
-TPUKERNEL_FUNC_REGISTER(tpu_kernel_api_bitwise_not);
-
-#ifdef BACKEND_SG2260
 int tpu_kernel_api_bitwise_not_multi_core(const void* args) {
   sg_api_bitwise_not_t* api = (sg_api_bitwise_not_t*)args;
   TPUKERNEL_ASSERT(api->dtype == DT_INT32);
@@ -98,6 +82,7 @@ int tpu_kernel_api_bitwise_not_multi_core(const void* args) {
     length *= api->shape[i];
   }
   tpu_initialize();
+#ifdef BACKEND_SG2260
   int core_num = tpu_core_num();
   int core_idx = tpu_core_index();
   int length_slice = DIV_UP(length, core_num);
@@ -116,6 +101,11 @@ int tpu_kernel_api_bitwise_not_multi_core(const void* args) {
   }
   tpu_poll();
   return 0;
+#else
+  nodechip_bitwise_not(api->input_global_addr, api->output_global_addr, length,
+                       (data_type_t)api->dtype);
+  tpu_poll();
+  return 0;
+#endif
 }
 TPUKERNEL_FUNC_REGISTER(tpu_kernel_api_bitwise_not_multi_core);
-#endif

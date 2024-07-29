@@ -100,28 +100,13 @@ void nodechip_logical_and(
     }
     stage_idx++;
   }
-    
+
 }
 
-int tpu_kernel_api_logical_and(const void *args)
-{
-  sg_api_logical_and_t *api = (sg_api_logical_and_t *)args;
-  int length = 1;
-  for (int i = 0; i < api->dim; ++i)
-  {
-    length *= api->shape[i];
-  }
-  tpu_initialize();
-  nodechip_logical_and(api->output_global_addr, api->input_global_addr, api->other_global_addr, length, (data_type_t)api->dtype);
-  tpu_poll();
-  return 0;
-}
-TPUKERNEL_FUNC_REGISTER(tpu_kernel_api_logical_and);
-
-#ifdef BACKEND_SG2260
 int tpu_kernel_api_logical_and_multi_core(const void *args)
 {
   sg_api_logical_and_t * api = ( sg_api_logical_and_t * ) args;
+#ifdef BACKEND_SG2260
   TPUKERNEL_ASSERT(api->dtype == DT_FP32 || api->dtype == DT_FP16 || api->dtype == DT_BFP16);
   int length = 1;
   for ( int i = 0; i < api->dim; ++i )
@@ -147,6 +132,16 @@ int tpu_kernel_api_logical_and_multi_core(const void *args)
 
   tpu_poll();
   return 0;
+#else
+  int length = 1;
+  for (int i = 0; i < api->dim; ++i)
+  {
+    length *= api->shape[i];
+  }
+  tpu_initialize();
+  nodechip_logical_and(api->output_global_addr, api->input_global_addr, api->other_global_addr, length, (data_type_t)api->dtype);
+  tpu_poll();
+  return 0;
+#endif
 }
 TPUKERNEL_FUNC_REGISTER(tpu_kernel_api_logical_and_multi_core);
-#endif

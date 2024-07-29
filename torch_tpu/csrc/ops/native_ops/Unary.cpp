@@ -24,11 +24,13 @@ Tensor &bitwise_not_out_tpu(const Tensor &self, Tensor &out) {
                              out.nbytes());
   } else if (IS_TPU_TENSOR(self)) {
     TIMING_START;
+    auto stream = c10_tpu::getCurrentTPUStream();
+    auto status = tpudnnBitwiseNotAsync(
+                  stream,
+                  tpu::TPUGenerateTpudnnTensor ( stream,self ),
+                  tpu::TPUGenerateTpudnnTensor ( stream,out ) );
+    TORCH_CHECK(status == TPUDNN_STATUS_SUCCESS );
 
-    auto status = sgdnnBitwiseNot(tpu::TPUGetDeviceResource(),
-                                  tpu::TPUGenerateSgdnnTensor(self),
-                                  tpu::TPUGenerateSgdnnTensor(out));
-    TORCH_CHECK(status == SG_SUCCESS);
     TIMING_END(tpu::BITWISE_NOT);
   }
 #endif
@@ -59,11 +61,12 @@ Tensor &cbrt_out_tpu(const Tensor &self, Tensor &out) {
     tpu::TPUCopyHostToDevice(out.data_ptr(), &out_cpu, out.nbytes());
   } else if (IS_TPU_TENSOR(self)) {
     TIMING_START;
-
-    auto status = sgdnnCbrt(tpu::TPUGetDeviceResource(),
-                            tpu::TPUGenerateSgdnnTensor(self),
-                            tpu::TPUGenerateSgdnnTensor(out));
-    TORCH_CHECK(status == SG_SUCCESS);
+    auto stream = c10_tpu::getCurrentTPUStream();
+    auto status = tpudnnCbrtAsync(
+                  stream,
+                  tpu::TPUGenerateTpudnnTensor ( stream,self ),
+                  tpu::TPUGenerateTpudnnTensor ( stream,out ) );
+    TORCH_CHECK(status == TPUDNN_STATUS_SUCCESS );
     TIMING_END(tpu::CBRT);
   }
 #endif
