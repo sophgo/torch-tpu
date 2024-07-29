@@ -162,7 +162,7 @@ void simply_params(int repeat_dim, int* repeat_times,
       } else { 
         can_simply = false;
         simply_repeat_times[i] = repeat_times[i];
-        *simply_dim = i + 2;
+        *simply_dim = MIN(i + 2, input_dim);
       }
     }
     else
