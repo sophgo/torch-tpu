@@ -24,16 +24,17 @@ def symlink(src, dst):
 import pkgutil
 pkg_path = os.path.dirname(pkgutil.get_loader('torch_tpu').get_filename())
 lib_pwd = os.path.join(pkg_path, 'lib/')
-arch = os.environ.get('CHIP_ARCH')
-if arch or not os.path.exists(os.path.join(lib_pwd, 'libtorch_tpu.so')):
-    if not arch:
-        from ctypes import cdll
-        try:
-            cdll.LoadLibrary("libtpuv7_rt.so")
-            arch = 'sg2260'
-        except:
-            arch = 'bm1684x'
 
+arch = arch_env = os.environ.get('CHIP_ARCH')
+if not arch:
+    from ctypes import cdll
+    try:
+        cdll.LoadLibrary("libtpuv7_rt.so")
+        arch = 'sg2260'
+    except:
+        arch = 'bm1684x'
+
+if arch_env or not os.path.exists(os.path.join(lib_pwd, 'libtorch_tpu.so')):
     if arch == 'sg2260':
         symlink('libtorch_tpu.sg2260.so', os.path.join(lib_pwd, 'libtorch_tpu.so'))
         tpudnn = 'libtpudnn.sg2260.so'
