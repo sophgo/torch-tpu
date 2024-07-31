@@ -1,0 +1,96 @@
+diff --git a/requirements.txt b/requirements.txt
+index 7380add..fc916b3 100644
+--- a/requirements.txt
++++ b/requirements.txt
+@@ -1,6 +1,4 @@
+-transformers>=4.41.2
+ datasets>=2.16.0
+-accelerate>=0.30.1
+ peft>=0.11.1
+ trl>=0.8.6
+ gradio>=4.0.0
+diff --git a/src/llamafactory/cli.py b/src/llamafactory/cli.py
+index 48eb289..00d987c 100644
+--- a/src/llamafactory/cli.py
++++ b/src/llamafactory/cli.py
+@@ -12,6 +12,11 @@
+ # See the License for the specific language governing permissions and
+ # limitations under the License.
+ 
++try:
++    import torch_tpu
++    from . import tpu_workarounds
++except ImportError:
++    pass
+ import os
+ import random
+ import subprocess
+diff --git a/src/llamafactory/extras/misc.py b/src/llamafactory/extras/misc.py
+index d7329b0..c0b43f9 100644
+--- a/src/llamafactory/extras/misc.py
++++ b/src/llamafactory/extras/misc.py
+@@ -29,6 +29,7 @@ from transformers.utils import (
+     is_torch_mps_available,
+     is_torch_npu_available,
+     is_torch_xpu_available,
++    is_torch_tpu_available,
+ )
+ from transformers.utils.versions import require_version
+ 
+@@ -121,6 +122,8 @@ def get_current_device() -> "torch.device":
+     """
+     if is_torch_xpu_available():
+         device = "xpu:{}".format(os.environ.get("LOCAL_RANK", "0"))
++    elif is_torch_tpu_available():
++        device = "tpu:{}".format(os.environ.get("LOCAL_RANK", "0"))
+     elif is_torch_npu_available():
+         device = "npu:{}".format(os.environ.get("LOCAL_RANK", "0"))
+     elif is_torch_mps_available():
+@@ -141,6 +144,8 @@ def get_device_count() -> int:
+         return torch.npu.device_count()
+     elif is_torch_cuda_available():
+         return torch.cuda.device_count()
++    elif is_torch_tpu_available():
++        return torch.tpu.device_count()
+     else:
+         return 0
+ 
+@@ -177,7 +182,7 @@ def is_gpu_or_npu_available() -> bool:
+     r"""
+     Checks if the GPU or NPU is available.
+     """
+-    return is_torch_npu_available() or is_torch_cuda_available()
++    return is_torch_npu_available() or is_torch_cuda_available() or is_torch_tpu_available()
+ 
+ 
+ def numpify(inputs: Union["NDArray", "torch.Tensor"]) -> "NDArray":
+diff --git a/src/llamafactory/tpu_workarounds.py b/src/llamafactory/tpu_workarounds.py
+new file mode 100644
+index 0000000..7293cc7
+--- /dev/null
++++ b/src/llamafactory/tpu_workarounds.py
+@@ -0,0 +1,24 @@
++import torch
++
++def arange_wrapper(func):
++    def wrapper(*args, **kwargs):
++        ret = func(*args, **kwargs)
++        if ret.dtype == torch.int64:
++            return ret.to(torch.int32)
++    return wrapper
++
++torch.arange = arange_wrapper(torch.arange)
++
++def ce_wrapper(func):
++    def wrapper(input, tensor, weight=None, *args, **kwargs):
++        input_cpu = input.cpu()
++        tensor_cpu = tensor.cpu()
++        if weight is not None:
++            weight_cpu = weight.cpu()
++        else:
++            weight_cpu = None
++        return func(input_cpu, tensor_cpu, weight_cpu, *args, **kwargs).to(input.device)
++    return wrapper
++
++torch.nn.functional.cross_entropy = ce_wrapper(torch.nn.functional.cross_entropy)
++

@@ -2871,7 +2871,18 @@ tpu_status_t sgdnnCrossEntropyLoss ( tpu_resource_t resource ,
   api.is_target_int64 = target.dtype == SGDNN_DTYPE_INT64;
   SAFE_CALL ( sgdnnTPUKernelLaunch ( resource , "tpu_kernel_api_cross_entropy_loss", &api, sizeof ( api ) ) );
 #elif defined BACKEND_SG2260
-  SGDNN_CHECK ( false );
+  sg_api_cross_entropy_loss_t api;
+  api.input_global_addr = input.addr;
+  api.target_global_addr = target.addr;
+  api.output_global_addr = output.addr;
+  api.batch = input.shape[0];
+  api.class_ = input.shape[1];
+  api.reduction = reduction;
+  api.label_smoothing = label_smoothing;
+  api.dtype = sgdnnTPUKernelDType ( input.dtype );
+  api.is_target_int64 = target.dtype == SGDNN_DTYPE_INT64;
+  SAFE_CALL ( sgdnnTPUKernelLaunchMultiCore ( resource , "tpu_kernel_api_cross_entropy_loss_multicore", &api, sizeof ( api ) , non_blocking) );
+
 #else
   SGDNN_CHECK ( false );
 #endif
@@ -2920,7 +2931,19 @@ bool non_blocking )
   api.is_target_int64 = target.dtype == SGDNN_DTYPE_INT64;
   SAFE_CALL ( sgdnnTPUKernelLaunch ( resource , "tpu_kernel_api_cross_entropy_loss_backward", &api, sizeof ( api ) ) );
 #elif defined BACKEND_SG2260
-  SGDNN_CHECK ( false );
+  sg_api_cross_entropy_loss_backward_t api;
+  api.input_global_addr = input.addr;
+  api.target_global_addr = target.addr;
+  api.grad_output_global_addr = grad_output.addr;
+  api.grad_input_global_addr = grad_input.addr;
+  api.batch = input.shape[0];
+  api.class_ = input.shape[1];
+  api.reduction = reduction;
+  api.label_smoothing = label_smoothing;
+  api.dtype = sgdnnTPUKernelDType ( input.dtype );
+  api.is_target_int64 = target.dtype == SGDNN_DTYPE_INT64;
+  SAFE_CALL ( sgdnnTPUKernelLaunchMultiCore ( resource , "tpu_kernel_api_cross_entropy_loss_backward_multicore", &api, sizeof ( api ) , non_blocking) );
+
 #else
   SGDNN_CHECK ( false );
 #endif
@@ -3028,27 +3051,18 @@ tpu_status_t sgdnnEmbeddingBackward ( tpu_resource_t resource ,
   sgdnnFreeDevice ( resource , to_index );
 #elif defined BACKEND_SG2260
   sg_api_embedding_backward_t api;
+  const int window_size = 64;
+  SGDNN_CHECK ( window_size % 64 == 0 );
   int indices_num = 1;
   for ( int i = 0; i < indices.dim; ++i )
   {
     indices_num *= indices.shape[i];
   }
-  int V = 1;
-  for ( int i = 0; i < grad_output.dim - 1; ++i )
-  {
-    V *= grad_output.shape[i];
-  }
   tpu_device_mem_t sorted_index, sorted_index_index, from_index, to_index;
-  //[Error] [CONFLICT-INFO] loop=0,core=1; loop=0,core =2  if not enough or aligned correctly overlap area on these 4 index buffers will be flushed by mutli-thread.
-  //Sgdnn needs corresponding changes, create mem for 8 cores.
-  //If NUM_V_reused could be computed on host, index_mem_size could be shrinked to max(group_index_loop_or_sliced)
-  const int max_number = indices_num > V ? indices_num : V;
-  const int index_mem_size = DIV_UP(max_number * sgdnnTPUKernelDType(grad_output.dtype), 64)*64 * 8;
-  SAFE_CALL ( sgdnnMallocDeviceByte ( resource , &sorted_index      , index_mem_size));
-  SAFE_CALL ( sgdnnMallocDeviceByte ( resource , &sorted_index_index, index_mem_size));
-  SAFE_CALL ( sgdnnMallocDeviceByte ( resource , &from_index        , index_mem_size));
-  SAFE_CALL ( sgdnnMallocDeviceByte ( resource , &to_index          , index_mem_size));
-  api.grad_output_global_addr = grad_output.addr;
+  SAFE_CALL ( sgdnnMallocDeviceByte ( resource , &sorted_index, indices_num * sizeof ( int ) ) );
+  SAFE_CALL ( sgdnnMallocDeviceByte ( resource , &sorted_index_index, indices_num * sizeof ( int ) ) );
+  SAFE_CALL ( sgdnnMallocDeviceByte ( resource , &from_index, window_size * sizeof ( int ) ) );
+  SAFE_CALL ( sgdnnMallocDeviceByte ( resource , &to_index, window_size * sizeof ( int ) ) );
   api.grad_output_global_addr = grad_output.addr;
   api.index_global_addr = indices.addr;
   api.grad_input_global_addr = grad_input.addr;
@@ -3071,10 +3085,10 @@ tpu_status_t sgdnnEmbeddingBackward ( tpu_resource_t resource ,
   {
     api.grad_input_shape[i] = grad_input.shape[i];
   }
-  api.window_size = 1;
+  api.window_size = window_size;
   api.grad_output_dtype = sgdnnTPUKernelDType ( grad_output.dtype );
   api.is_index_int64 = indices.dtype == SGDNN_DTYPE_INT64;
-  SAFE_CALL ( sgdnnTPUKernelLaunchMultiCore ( resource , "tpu_kernel_api_embedding_backward_multi_core", &api, sizeof ( api ) , non_blocking) );
+  SAFE_CALL ( sgdnnTPUKernelLaunchMultiCore ( resource , "tpu_kernel_api_embedding_backward_multicore", &api, sizeof ( api ), non_blocking ) );
   sgdnnFreeDevice ( resource , sorted_index );
   sgdnnFreeDevice ( resource , sorted_index_index );
   sgdnnFreeDevice ( resource , from_index );

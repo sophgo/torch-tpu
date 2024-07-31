@@ -319,3 +319,18 @@ int tpu_kernel_api_cross_entropy_loss_backward ( const void * args )
   return 0;
 }
 TPUKERNEL_FUNC_REGISTER ( tpu_kernel_api_cross_entropy_loss_backward );
+
+int tpu_kernel_api_cross_entropy_loss_backward_multicore ( const void * args )
+{
+  sg_api_cross_entropy_loss_backward_t * api = ( sg_api_cross_entropy_loss_backward_t * ) args;
+  TPUKERNEL_ASSERT ( api->dtype == DT_FP32 || api->dtype == DT_FP16 || api->dtype == DT_BFP16 );
+  TPUKERNEL_ASSERT ( api->reduction == 0 || api->reduction == 1 );
+  tpu_initialize();
+  int core_idx = tpu_core_index();
+  // only support single core current
+  if (core_idx == 0)
+    nodechip_cross_entropy_loss_backward ( api->input_global_addr, api->target_global_addr, 0, api->grad_output_global_addr, api->grad_input_global_addr, api->batch, api->class_, api->reduction, api->label_smoothing, ( data_type_t ) api->dtype, api->is_target_int64 );
+  tpu_poll();
+  return 0;
+}
+TPUKERNEL_FUNC_REGISTER ( tpu_kernel_api_cross_entropy_loss_backward_multicore );

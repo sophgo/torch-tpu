@@ -84,7 +84,7 @@ namespace at {
       tpu::TPUCopyHostToDevice(self.data_ptr(), self.contiguous().data_ptr(),  \
                                self.nbytes());                                 \
     } else {                                                                   \
-      if (self.dim() == 0) {                                                   \
+      if (self.dim() == 0 || self.numel() == 1) {                              \
         auto self_cpu = OP(self.cpu());                                        \
         tpu::TPUCopyHostToDevice(out.data_ptr(),                              \
                                  self_cpu.contiguous().data_ptr(), out.nbytes()); \

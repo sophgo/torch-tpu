@@ -281,6 +281,37 @@ int tpu_kernel_api_embedding_backward ( const void* args ) {
 
 TPUKERNEL_FUNC_REGISTER ( tpu_kernel_api_embedding_backward );
 
+int tpu_kernel_api_embedding_backward_multicore ( const void* args ) {
+  sg_api_embedding_backward_t *api = ( sg_api_embedding_backward_t * ) args;
+  tpu_initialize();
+
+  int core_idx = tpu_core_index();
+  // only support single core current
+  if (core_idx == 0)
+  nodechip_embedding_backward (
+  api->grad_output_global_addr,
+  api->index_global_addr,
+  api->grad_input_global_addr,
+  api->sorted_index_global_addr,
+  api->sorted_index_index_global_addr,
+  api->from_index_global_addr,
+  api->to_index_global_addr,
+  api->window_size,
+  api->grad_output_shape,
+  api->index_shape,
+  api->grad_input_shape,
+  api->grad_output_dim,
+  api->index_dim,
+  api->grad_input_dim,
+  ( data_type_t ) api->grad_output_dtype,
+  api->is_index_int64 );
+  tpu_poll();
+  return 0;
+}
+
+TPUKERNEL_FUNC_REGISTER ( tpu_kernel_api_embedding_backward_multicore);
+
+
 
 #if 0
 static inline int get_L1_TOTAL_MEM() {
