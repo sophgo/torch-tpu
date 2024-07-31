@@ -6,10 +6,11 @@ Torch-TPU
 
 ### Prerequisites
 
-Firstly, get `tpu-train` and `TPU1686` repo cloned and orgnize them like so:
+Firstly, get `tpu-train`, `tpuv7-runtime` and `TPU1686` repos cloned and orgnize them like so:
 
 ```
 torch-tpu-dev/
+├── tpuv7-runtime
 ├── TPU1686
 └── tpu-train
 ```

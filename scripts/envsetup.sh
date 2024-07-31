@@ -39,10 +39,9 @@ function get_pytorch_install_dir(){
 function set_v7runtime_env() {
     local root_path=$1
     local v7_lib_path=${root_path}/third_party/tpuv7_runtime/tpuv7-emulator_0.1.0/lib
-    if [[ "$LD_LIBRARY_PATH" != *tpuv7_runtime* ]]; then
+    if [[ ! -d ${root_path}/../TPU1686 && "$LD_LIBRARY_PATH" != *tpuv7_runtime* ]]; then
         export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:${v7_lib_path}
     fi
-    export TPU_SCALAR_EMULATOR_PATH=${v7_lib_path}/libtpuv7_scalar_emulator.so
     build_type=Release
     if [ "$TPUTRAIN_DEBUG" = "ON" ]; then
          build_type=Debug
