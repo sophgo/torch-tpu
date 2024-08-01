@@ -50,15 +50,15 @@ public:
     TORCH_CHECK ( ignore_index < 0 );
 
     TIMING_START;
-
-    auto status = sgdnnCrossEntropyLoss (
-                         tpu::TPUGetDeviceResource(),
-                         tpu::TPUGenerateSgdnnTensor ( self ),
-                         tpu::TPUGenerateSgdnnTensor ( target ),
-                         reduction - 1,
-                         label_smoothing,
-                         tpu::TPUGenerateSgdnnTensor ( out ) );
-    TORCH_CHECK ( status == SG_SUCCESS );
+    auto stream = c10_tpu::getCurrentTPUStream();
+    auto status = tpudnnCrossEntropyLossAsync(
+        stream,
+        tpu::TPUGenerateTpudnnTensor(stream, self),
+        tpu::TPUGenerateTpudnnTensor(stream, target),
+        reduction - 1,
+        label_smoothing,
+        tpu::TPUGenerateTpudnnTensor(stream, out));
+    TORCH_CHECK(status == TPUDNN_STATUS_SUCCESS);
         TIMING_END ( tpu::CROSS_ENTROPY_LOSS );
 #endif
     SHOW_TENSOR_OP(self, target, out);
@@ -95,16 +95,17 @@ public:
     TORCH_CHECK ( ignore_index < 0 );
 
     TIMING_START;
+    auto stream = c10_tpu::getCurrentTPUStream();
+    auto status = tpudnnCrossEntropyLossBackwardAsync(
+        stream,
+        tpu::TPUGenerateTpudnnTensor(stream, input),
+        tpu::TPUGenerateTpudnnTensor(stream, target),
+        tpu::TPUGenerateTpudnnTensor(stream, grad_outputs[0]),
+        reduction - 1,
+        label_smoothing,
+        tpu::TPUGenerateTpudnnTensor(stream, grad_input));
+    TORCH_CHECK(status == TPUDNN_STATUS_SUCCESS);
 
-    auto status = sgdnnCrossEntropyLossBackward (
-                         tpu::TPUGetDeviceResource(),
-                         tpu::TPUGenerateSgdnnTensor ( input ),
-                         tpu::TPUGenerateSgdnnTensor ( target ),
-                         tpu::TPUGenerateSgdnnTensor ( grad_outputs[0] ),
-                         reduction - 1,
-                         label_smoothing,
-                         tpu::TPUGenerateSgdnnTensor ( grad_input ) );
-    TORCH_CHECK ( status == SG_SUCCESS );
         TIMING_END ( tpu::CROSS_ENTROPY_LOSS_BACKWARD );
 #endif
     SHOW_TENSOR_OP(input, target, grad_outputs[0], grad_input);

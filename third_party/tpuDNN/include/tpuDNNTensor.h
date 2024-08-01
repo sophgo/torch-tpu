@@ -44,6 +44,12 @@ typedef enum {
   TPUDNN_LOG_10 = 10,
 } tensor_log_type_t;
 
+typedef enum {
+  TPUDNN_POOLING_MAX = 0,
+  TPUDNN_POOLING_MIN = 1,
+  TPUDNN_POOLING_AVG = 2,
+} tensor_pooling_mode_t;
+
 typedef struct
 {
     void *addr;
@@ -52,6 +58,18 @@ typedef struct
     int stride[8];
     tpudnnDataType_t dtype;
 } tpudnnTensor_t;
+
+typedef struct {
+  int kh;
+  int kw;
+  int pad_h;
+  int pad_w;
+  int stride_h;
+  int stride_w;
+  int output_h;
+  int output_w;
+  tensor_pooling_mode_t mode;
+} TPUDNN_PoolingDescriptor_t;
 
 static inline size_t tpudnnTensorDataSize(tpudnnDataType_t dtype)
 {
@@ -327,6 +345,77 @@ tpudnnStatus_t tpudnnAddCDivAsync(
     tpudnnTensor_t tensor1,
     tpudnnTensor_t tensor2,
     float scalar,
+    tpudnnTensor_t output);
+
+tpudnnStatus_t tpudnnCrossEntropyLossAsync(
+    tpudnnHandle_t handle,
+    tpudnnTensor_t input,
+    tpudnnTensor_t target,
+    int reduction,
+    float label_smoothing,
+    tpudnnTensor_t output);
+
+tpudnnStatus_t tpudnnCrossEntropyLossBackwardAsync(
+    tpudnnHandle_t handle,
+    tpudnnTensor_t input,
+    tpudnnTensor_t target,
+    tpudnnTensor_t grad_output,
+    int reduction,
+    float label_smoothing,
+    tpudnnTensor_t grad_input);
+
+tpudnnStatus_t tpudnnMselossAsync(
+    tpudnnHandle_t handle,
+    tpudnnTensor_t self,
+    tpudnnTensor_t target,
+    tpudnnTensor_t out,
+    int reduction);
+
+tpudnnStatus_t tpudnnPoolingForwardAsync (
+    tpudnnHandle_t handle,
+    tpudnnTensor_t input,
+    tpudnnTensor_t output,
+    TPUDNN_PoolingDescriptor_t pooling_desc);
+
+tpudnnStatus_t tpudnnReduceMaxOrMinAsync (
+    tpudnnHandle_t handle,
+    tpudnnTensor_t input,
+    int* reduction_dim,
+    int reduction_dim_length,
+    int keepdim,
+    int mode,
+    tpudnnTensor_t output);
+
+tpudnnStatus_t tpudnnReduceVarAsync (
+    tpudnnHandle_t handle,
+    tpudnnTensor_t input,
+    int* reduce_list,
+    int reduce_dim,
+    int correction,
+    int keepdim,
+    tpudnnTensor_t output);
+
+tpudnnStatus_t tpudnnReduceVarAllAsync (
+    tpudnnHandle_t handle,
+    tpudnnTensor_t input,
+    int correction,
+    bool keepdim,
+    tpudnnTensor_t output);
+
+tpudnnStatus_t tpudnnReduceAsync (
+    tpudnnHandle_t handle,
+    tpudnnTensor_t input,
+    int start_dim,
+    int end_dim,
+    int keepdim,
+    int mode,
+    tpudnnTensor_t output);
+
+tpudnnStatus_t tpudnnReduceProdAsync (
+    tpudnnHandle_t handle,
+    tpudnnTensor_t input,
+    int axis,
+    int keepdim,
     tpudnnTensor_t output);
 
 tpudnnStatus_t tpudnnC2CAllReduce(

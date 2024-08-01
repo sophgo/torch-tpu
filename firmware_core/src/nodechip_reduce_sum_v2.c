@@ -188,64 +188,6 @@ int reduction )
   }
 }
 
-int tpu_kernel_api_reduce ( const void *args )
-{
-  sg_api_reduce_t * api = ( sg_api_reduce_t * ) args;
-  TPUKERNEL_ASSERT ( api->dtype == DT_FP32 || api->dtype == DT_FP16 || api->dtype == DT_BFP16 );
-  TPUKERNEL_ASSERT ( api->mode == 0 || api->mode == 1 );
-  tpu_initialize();
-  if ( api->end_dim == api->dim )
-  {
-    int row = 1;
-    int column = 1;
-    for ( int i = 0; i < api->start_dim; ++i )
-    {
-      row *= api->shape[i];
-    }
-    for ( int i = api->start_dim; i < api->dim; ++i )
-    {
-      column *= api->shape[i];
-    }
-    nodechip_reduce_sum_2d (
-    api->input_global_addr,
-    api->output_global_addr,
-    row,
-    column,
-    1,
-    ( data_type_t ) api->dtype,
-    api->mode );
-  }
-  else if ( api->start_dim == 0 )
-  {
-    int row = 1;
-    int column = 1;
-    for ( int i = 0; i < api->end_dim; ++i )
-    {
-      row *= api->shape[i];
-    }
-    for ( int i = api->end_dim; i < api->dim; ++i )
-    {
-      column *= api->shape[i];
-    }
-    nodechip_reduce_sum_2d (
-    api->input_global_addr,
-    api->output_global_addr,
-    row,
-    column,
-    0,
-    ( data_type_t ) api->dtype,
-    api->mode );
-  }
-  else
-  {
-    TPUKERNEL_ASSERT ( false );
-  }
-  tpu_poll();
-  return 0;
-}
-TPUKERNEL_FUNC_REGISTER ( tpu_kernel_api_reduce );
-
-#ifdef BACKEND_SG2260
 static inline void compute_current_slice_info_multi_core(int total_num, int* expected_current_slice,
                                                          int* expected_avg_slice, int* expected_secs) {
   const int core_num = tpu_core_num();
@@ -506,6 +448,7 @@ int tpu_kernel_api_reduce_multi_core ( const void *args )
   TPUKERNEL_ASSERT ( api->dtype == DT_FP32 || api->dtype == DT_FP16 || api->dtype == DT_BFP16 );
   TPUKERNEL_ASSERT ( api->mode == 0 || api->mode == 1 );
   tpu_initialize();
+#ifdef BACKEND_SG2260
 #ifdef USING_PERF_MODE
     tpu_sync_all();
 #endif
@@ -561,6 +504,56 @@ int tpu_kernel_api_reduce_multi_core ( const void *args )
   }
   tpu_poll();
   return 0;
+
+#else
+  if ( api->end_dim == api->dim )
+  {
+    int row = 1;
+    int column = 1;
+    for ( int i = 0; i < api->start_dim; ++i )
+    {
+      row *= api->shape[i];
+    }
+    for ( int i = api->start_dim; i < api->dim; ++i )
+    {
+      column *= api->shape[i];
+    }
+    nodechip_reduce_sum_2d (
+    api->input_global_addr,
+    api->output_global_addr,
+    row,
+    column,
+    1,
+    ( data_type_t ) api->dtype,
+    api->mode );
+  }
+  else if ( api->start_dim == 0 )
+  {
+    int row = 1;
+    int column = 1;
+    for ( int i = 0; i < api->end_dim; ++i )
+    {
+      row *= api->shape[i];
+    }
+    for ( int i = api->end_dim; i < api->dim; ++i )
+    {
+      column *= api->shape[i];
+    }
+    nodechip_reduce_sum_2d (
+    api->input_global_addr,
+    api->output_global_addr,
+    row,
+    column,
+    0,
+    ( data_type_t ) api->dtype,
+    api->mode );
+  }
+  else
+  {
+    TPUKERNEL_ASSERT ( false );
+  }
+  tpu_poll();
+  return 0;
+#endif
 }
 TPUKERNEL_FUNC_REGISTER ( tpu_kernel_api_reduce_multi_core );
-#endif

@@ -42,12 +42,14 @@ Tensor mse_loss_tpu(const at::Tensor & self, const at::Tensor & target, int64_t 
     }
     TIMING_START;
 
-    auto status = sgdnnMseloss( tpu::TPUGetDeviceResource(),
-                                        tpu::TPUGenerateSgdnnTensor ( self ),
-                                        tpu::TPUGenerateSgdnnTensor ( target ),
-                                        tpu::TPUGenerateSgdnnTensor ( out ),
-                                        reduction );
-    TORCH_CHECK ( status == SG_SUCCESS );
+    auto stream = c10_tpu::getCurrentTPUStream();
+    auto status = tpudnnMselossAsync(
+        stream,
+        tpu::TPUGenerateTpudnnTensor(stream, self),
+        tpu::TPUGenerateTpudnnTensor(stream, target),
+        tpu::TPUGenerateTpudnnTensor(stream, out),
+        reduction);
+    TORCH_CHECK(status == TPUDNN_STATUS_SUCCESS);
         TIMING_END(tpu::MSE_LOSS);
     SHOW_TENSOR_OP(self, target);
     return out;

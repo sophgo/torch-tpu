@@ -193,32 +193,6 @@ data_type_t dtype)
   }
 }
 
-int tpu_kernel_api_mse_loss ( const void * args )
-{
-  sg_api_mse_loss_t * api = ( sg_api_mse_loss_t * ) args;
-  data_type_t dtype = ( data_type_t ) api->dtype;
-  TPUKERNEL_ASSERT ( dtype == DT_FP32 || dtype == DT_FP16 || dtype == DT_BFP16 );
-  TPUKERNEL_ASSERT ( api->reduction == 0 || api->reduction == 1 || api->reduction == 2 );
-  int length = 1;
-  for ( int i = 0; i < api->dim; ++i )
-  {
-    length *= api->shape[i];
-  }
-  tpu_initialize();
-  nodechip_mse_loss_forward (
-  api->input1_global_addr,
-  api->input2_global_addr,
-  api->output_global_addr,
-  length,
-  api->reduction,
-  ( data_type_t ) api->dtype);
-  tpu_poll();
-  return 0;
-}
-
-TPUKERNEL_FUNC_REGISTER ( tpu_kernel_api_mse_loss );
-
-#ifdef BACKEND_SG2260
 int tpu_kernel_api_mse_loss_multi_core(const void* args){
   sg_api_mse_loss_t* api = (sg_api_mse_loss_t*)args;
   data_type_t dtype = (data_type_t)api->dtype;
@@ -229,6 +203,7 @@ int tpu_kernel_api_mse_loss_multi_core(const void* args){
     length *= api->shape[i];
   }
   tpu_initialize();
+#ifdef BACKEND_SG2260
   int core_idx = tpu_core_index();
   if (core_idx == 0) {
     nodechip_mse_loss_forward(
@@ -237,6 +212,16 @@ int tpu_kernel_api_mse_loss_multi_core(const void* args){
   }
   tpu_poll();
   return 0;
+#else
+  nodechip_mse_loss_forward (
+  api->input1_global_addr,
+  api->input2_global_addr,
+  api->output_global_addr,
+  length,
+  api->reduction,
+  ( data_type_t ) api->dtype);
+  tpu_poll();
+  return 0;
+#endif
 }
 TPUKERNEL_FUNC_REGISTER(tpu_kernel_api_mse_loss_multi_core);
-#endif
