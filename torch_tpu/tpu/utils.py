@@ -184,6 +184,9 @@ def read_rank_table():
     print(f'[chip_map] {chip_map}')
     return chip_map
 
+def is_rank_table_valid():
+    return "RANK_TABLE_FILE" in os.environ
+
 @lru_cache(maxsize=1)
 def device_count():
     return torch_tpu._C._tpu_getDeviceCount()
