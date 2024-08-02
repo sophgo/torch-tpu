@@ -92,6 +92,8 @@ else
     source ${TPU1686_PATH}/scripts/envsetup.sh
 fi
 
+export TPU_SCALAER_EMULATOR_WORKDIR=${TPUTRAIN_TOP}/build
+
 function rebuild_TPU1686()
 {
     CMODEL_FW_BINARY_DIR=build_${CHIP_ARCH} rebuild_firmware_cmodel_and_tpudnn || return -1
