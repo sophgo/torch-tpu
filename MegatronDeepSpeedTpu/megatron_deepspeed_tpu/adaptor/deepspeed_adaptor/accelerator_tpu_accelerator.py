@@ -1,47 +1,12 @@
 import torch
 import torch_tpu
+# import sccl
 
-import time
+import os
 import functools
 import deepspeed
 from deepspeed.accelerator.abstract_accelerator import DeepSpeedAccelerator
 
-
-class FakeEvent:
-    def __init__(self, enable_timing=False):
-        self.enable_timing = enable_timing
-        self.start_time = None
-        self.end_time = None
-
-    def record(self):
-        if self.enable_timing:
-            self.start_time = time.time()
-
-    def synchronize(self):
-        if self.enable_timing:
-            self.end_time = time.time()
-
-    def elapsed_time(self, end_event):
-        if self.enable_timing and self.start_time is not None and end_event.end_time is not None:
-            return (end_event.end_time - self.start_time) * 1000  # convert to milliseconds
-        else:
-            return 0.0
-
-class FakeStream:
-    def __init__(self, *args, **kwargs):
-        pass
-
-    def synchronize(self):
-        pass
-
-    def __enter__(self):
-        return self
-
-    def __exit__(self, type, value, traceback):
-        pass
-    
-    def wait_event(self, event):
-        pass
 
 class TPU_Accelerator(DeepSpeedAccelerator):
 
@@ -54,7 +19,7 @@ class TPU_Accelerator(DeepSpeedAccelerator):
         return False
 
     def use_host_timers(self):
-        return self.is_synchronized_device()
+        return True
 
     def resolves_data_dependency(self):
         return self.is_synchronized_device()
@@ -74,8 +39,12 @@ class TPU_Accelerator(DeepSpeedAccelerator):
     def set_device(self, device_index):
         if isinstance(device_index, torch.device):
             device_index = device_index.index
-        torch_tpu._C._tpu_setDevice(device_index)
-        # torch.tpu.set_device(device_index)
+        TPU_VISIBLE_DEVICES = os.environ.get("TPU_VISIBLE_DEVICES", None)
+        if TPU_VISIBLE_DEVICES:
+            visible_devices = map(int, TPU_VISIBLE_DEVICES.split(","))
+            torch.tpu.set_device(visible_devices[device_index])
+        else:
+            torch.tpu.set_device(device_index)
 
     def current_device(self):
         return torch.tpu.current_device()
@@ -91,63 +60,50 @@ class TPU_Accelerator(DeepSpeedAccelerator):
 
     # RNG APIs
     def random(self):
-        return torch.random
+        return torch.tpu.random
 
     def set_rng_state(self, new_state, device_index=None):
         if device_index == None:
             return torch.tpu.set_rng_state(new_state)
-            # return torch.set_rng_state(new_state)
         return torch.tpu.set_rng_state(new_state, device_index)
-        # return torch.set_rng_state(new_state, device_index)
 
     def get_rng_state(self, device_index=None):
         if device_index == None:
             return torch.tpu.get_rng_state()
-            # return torch.get_rng_state()
         return torch.tpu.get_rng_state(device_index)
-        # return torch.get_rng_state(device_index)
 
     def manual_seed(self, seed):
         return torch.tpu.manual_seed(seed)
-        # return torch.manual_seed(seed)
 
     def manual_seed_all(self, seed):
         return torch.tpu.manual_seed_all(seed)
-        # return torch.manual_seed(seed)
 
-    def initial_seed(self, seed):
-        return torch.tpu.initial_seed(seed)
-        # return torch.initial_seed(seed)
+    def initial_seed(self):
+        return torch.tpu.initial_seed()
 
     def default_generator(self, device_index):
         return torch.tpu.default_generators[device_index]
-        # return torch.default_generators
 
     # Streams/Events
     @property
     def Stream(self):
-        return FakeStream
-        # return torch.tpu.Stream
+        return torch.tpu.Stream
     
     def stream(self, stream):
-        return FakeStream()
-        # return torch.tpu.stream(stream)
+        return torch.tpu.stream(stream)
 
     def current_stream(self, device_index=None):
-        return FakeStream()
-        # return torch.tpu.current_stream(device_index)
+        return torch.tpu.current_stream(device_index)
 
     def default_stream(self, device_index=None):
         # torch.tpu does not support the sync behavior of default stream as cuda
         # use current_stream as workaround
         # see https://pytorch.org/docs/stable/notes/cuda.html#cuda-streams
-        return FakeStream()
-        # return torch.tpu.current_stream(device_index)
+        return torch.tpu.current_stream(device_index)
 
     @property
     def Event(self):
-        return FakeEvent
-        # return torch.tpu.Event
+        return torch.tpu.Event
 
     # Memory management
     def empty_cache(self):
@@ -198,11 +154,11 @@ class TPU_Accelerator(DeepSpeedAccelerator):
         # return torch.tpu.max_memory_reserved(device_index)
 
     def total_memory(self, device_index=None):
-        return 4294967296
+        return 9223372036854775807
         # return torch.tpu.get_device_properties(device_index).total_memory
 
     def available_memory(self, device_index=None):
-        return 4294967296
+        return 9223372036854775807
         # return self.total_memory(device_index) - self.memory_allocated(device_index)
 
     # Misc
@@ -331,4 +287,7 @@ class TPU_Accelerator(DeepSpeedAccelerator):
         return []
     
 def set_tpu_accelerator():
-    deepspeed.accelerator.real_accelerator.set_accelerator(TPU_Accelerator())
+    tpu_accelerator = TPU_Accelerator()
+    rank = int(os.environ.get("RANK", "0"))
+    tpu_accelerator.set_device(rank)
+    deepspeed.accelerator.real_accelerator.set_accelerator(tpu_accelerator)

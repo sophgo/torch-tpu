@@ -1,0 +1,446 @@
+diff --git a/.gitignore b/.gitignore
+index 2e86fdf..53406fc 100644
+--- a/.gitignore
++++ b/.gitignore
+@@ -2,3 +2,4 @@
+ Megatron-LM-*
+ LM-Evaluation-Harness*
+ Bigcode-Evaluation-Harness*
++*__pycache__*
+Submodule PAI-Megatron-LM-240718 contains modified content
+diff --git a/PAI-Megatron-LM-240718/megatron/core/distributed/param_and_grad_buffer.py b/PAI-Megatron-LM-240718/megatron/core/distributed/param_and_grad_buffer.py
+index efed47c5..620bfb6c 100644
+--- a/PAI-Megatron-LM-240718/megatron/core/distributed/param_and_grad_buffer.py
++++ b/PAI-Megatron-LM-240718/megatron/core/distributed/param_and_grad_buffer.py
+@@ -363,13 +363,17 @@ class ParamAndGradBuffer:
+                 device=torch.cuda.current_device(),
+                 requires_grad=False,
+             )
+-        self.grad_data = torch.zeros(
++        self.grad_data = torch.empty(
+             self.numel,
+             dtype=self.grad_dtype,
+             device=torch.cuda.current_device(),
+             requires_grad=False,
+         )
+-
++        
++        chunk_size = 1073741824
++        for i in range(0, self.numel, chunk_size):
++            self.grad_data[i: i + chunk_size].zero_()
++        
+         # Finally, map param.data and param.main_grad fields to buffers.
+         bucket_params = set()
+         bucket_data_start_index = 0
+@@ -436,7 +440,11 @@ class ParamAndGradBuffer:
+ 
+     def scale_gradients(self, scaling_factor: float) -> None:
+         """Scale the gradient data by `scaling_factor`."""
+-        self.grad_data *= scaling_factor
++        # self.grad_data *= scaling_factor
++        # a workaround for tensor shape ge 2^31
++        chunk_size = 1073741824
++        for i in range(0, self.numel, chunk_size):
++            self.grad_data[i: i + chunk_size] *= scaling_factor
+ 
+     def _get(self, shape: torch.Size, start_index: int, buffer_type: BufferType) -> torch.Tensor:
+         """
+@@ -505,7 +513,12 @@ class ParamAndGradBuffer:
+         Zero out the underlying grad_buffer and reset all buckets in preparation for the next
+         iteration of training.
+         """
+-        self.grad_data.zero_()
++        # self.grad_data.zero_()
++        # a workaround for tensor shape ge 2^31
++        chunk_size = 1073741824
++        for i in range(0, self.numel, chunk_size):
++            self.grad_data[i: i + chunk_size].zero_()
++        # 
+         for bucket in self.buckets:
+             bucket.reset()
+         self.is_last_microbatch = True
+diff --git a/PAI-Megatron-LM-240718/megatron/core/models/common/embeddings/language_model_embedding.py b/PAI-Megatron-LM-240718/megatron/core/models/common/embeddings/language_model_embedding.py
+index bc1a2de9..940855ef 100644
+--- a/PAI-Megatron-LM-240718/megatron/core/models/common/embeddings/language_model_embedding.py
++++ b/PAI-Megatron-LM-240718/megatron/core/models/common/embeddings/language_model_embedding.py
+@@ -9,6 +9,8 @@ from megatron.core import tensor_parallel
+ from megatron.core.transformer.module import MegatronModule
+ from megatron.core.transformer.transformer_config import TransformerConfig
+ 
++import os
++from distutils.util import strtobool
+ 
+ class LanguageModelEmbedding(MegatronModule):
+     """Language model embeddings.
+@@ -106,7 +108,9 @@ class LanguageModelEmbedding(MegatronModule):
+ 
+         if not self.reduce_scatter_embeddings:
+             # Data format change to avoid explicit tranposes : [b s h] --> [s b h].
+-            embeddings = embeddings.transpose(0, 1).contiguous()
++            whole_net_trans = strtobool(os.environ.get("QWEN2_WHOLE_NET_TRANS", "0"))
++            if not whole_net_trans:
++                embeddings = embeddings.transpose(0, 1).contiguous()
+ 
+         if tokentype_ids is not None:
+             assert self.tokentype_embeddings is not None
+diff --git a/PAI-Megatron-LM-240718/megatron/core/models/common/embeddings/rotary_pos_embedding.py b/PAI-Megatron-LM-240718/megatron/core/models/common/embeddings/rotary_pos_embedding.py
+index d4e6be8c..6454d745 100644
+--- a/PAI-Megatron-LM-240718/megatron/core/models/common/embeddings/rotary_pos_embedding.py
++++ b/PAI-Megatron-LM-240718/megatron/core/models/common/embeddings/rotary_pos_embedding.py
+@@ -3,6 +3,8 @@
+ from __future__ import annotations
+ 
+ from typing import TYPE_CHECKING, Optional
++import os
++from distutils.util import strtobool
+ 
+ if TYPE_CHECKING:
+     from megatron.core.transformer.transformer_config import TransformerConfig
+@@ -138,10 +140,11 @@ class RotaryEmbedding(nn.Module):
+         if inference_params is not None:
+             rotary_seq_len = inference_params.max_sequence_length
+         else:
++            whole_net_trans = strtobool(os.environ.get("QWEN2_WHOLE_NET_TRANS", "0"))
+             if transformer.input_tensor is not None:
+-                rotary_seq_len = transformer.input_tensor.size(0)
++                rotary_seq_len = transformer.input_tensor.size(0 + int(whole_net_trans))
+             else:
+-                rotary_seq_len = transformer_input.size(0)
++                rotary_seq_len = transformer_input.size(0 + int(whole_net_trans))
+ 
+             if transformer_config.sequence_parallel:
+                 rotary_seq_len *= transformer_config.tensor_model_parallel_size
+diff --git a/PAI-Megatron-LM-240718/megatron/core/models/common/language_module/language_module.py b/PAI-Megatron-LM-240718/megatron/core/models/common/language_module/language_module.py
+index cd9b14df..6e8c48c9 100644
+--- a/PAI-Megatron-LM-240718/megatron/core/models/common/language_module/language_module.py
++++ b/PAI-Megatron-LM-240718/megatron/core/models/common/language_module/language_module.py
+@@ -11,6 +11,8 @@ from megatron.core.transformer.module import MegatronModule
+ from megatron.core.transformer.transformer_config import TransformerConfig
+ from megatron.core.utils import make_tp_sharded_tensor_for_checkpoint
+ 
++import os
++from distutils.util import strtobool
+ 
+ class LanguageModule(MegatronModule):
+     """Base language module that has common helper functions used across GPT, BERT etc.
+@@ -33,14 +35,17 @@ class LanguageModule(MegatronModule):
+             Tensor: Loss tensor of dimensions [batch size, sequence_length]
+         """
+         # [b s] => [s b]
+-        labels = labels.transpose(0, 1).contiguous()
++        whole_net_trans = strtobool(os.environ.get("QWEN2_WHOLE_NET_TRANS", "0"))
++        if not whole_net_trans:
++            labels = labels.transpose(0, 1).contiguous()
+         if self.config.cross_entropy_loss_fusion:
+             loss = fused_vocab_parallel_cross_entropy(logits, labels)
+         else:
+             loss = tensor_parallel.vocab_parallel_cross_entropy(logits, labels)
+ 
+         # [s b] => [b, s]
+-        loss = loss.transpose(0, 1).contiguous()
++        if not whole_net_trans:
++            loss = loss.transpose(0, 1).contiguous()
+         return loss
+ 
+     def setup_embeddings_and_output_layer(self) -> None:
+diff --git a/PAI-Megatron-LM-240718/megatron/core/optimizer/__init__.py b/PAI-Megatron-LM-240718/megatron/core/optimizer/__init__.py
+index 8552ab8f..97ea1814 100644
+--- a/PAI-Megatron-LM-240718/megatron/core/optimizer/__init__.py
++++ b/PAI-Megatron-LM-240718/megatron/core/optimizer/__init__.py
+@@ -9,7 +9,9 @@ try:
+     from transformer_engine.pytorch.optimizers import FusedSGD as SGD
+ except ImportError:
+     try:
+-        from apex.optimizers import FusedAdam as Adam
++        from functools import partial
++        from apex.optimizers import FusedAdam
++        Adam = partial(FusedAdam, adam_w_mode=False)
+         from apex.optimizers import FusedSGD as SGD
+     except ImportError:
+         import warnings
+@@ -20,7 +22,7 @@ except ImportError:
+ 
+         ## apex's FusedAdam is a drop-in replacement for torch's AdamW
+         ## see https://github.com/NVIDIA/apex/blob/7b73b12361068a10b0f44844534613f252a5ea75/apex/optimizers/fused_adam.py#L16
+-        from torch.optim import AdamW as Adam, SGD
++        from torch.optim import Adam, SGD
+ 
+ from megatron.core import mpu
+ 
+diff --git a/PAI-Megatron-LM-240718/megatron/core/optimizer/clip_grads.py b/PAI-Megatron-LM-240718/megatron/core/optimizer/clip_grads.py
+index 708ccd01..b3edc26a 100644
+--- a/PAI-Megatron-LM-240718/megatron/core/optimizer/clip_grads.py
++++ b/PAI-Megatron-LM-240718/megatron/core/optimizer/clip_grads.py
+@@ -139,7 +139,7 @@ def clip_grad_by_total_norm_fp32(
+     grads = []
+     for param in parameters:
+         if param.grad is not None:
+-            assert param.grad.type() == 'torch.cuda.FloatTensor'
++            assert param.grad.type() in ['torch.cuda.FloatTensor', 'torch.tpu.FloatTensor']
+             grads.append(param.grad.detach())
+ 
+     # Scale.
+diff --git a/PAI-Megatron-LM-240718/megatron/core/optimizer/optimizer.py b/PAI-Megatron-LM-240718/megatron/core/optimizer/optimizer.py
+index 989a4438..06ce8f56 100644
+--- a/PAI-Megatron-LM-240718/megatron/core/optimizer/optimizer.py
++++ b/PAI-Megatron-LM-240718/megatron/core/optimizer/optimizer.py
+@@ -502,7 +502,7 @@ class Float16OptimizerWithFloat16Params(MixedPrecisionOptimizer):
+                 if param.requires_grad:
+ 
+                     # float16 params:
+-                    if param.type() in ['torch.cuda.HalfTensor', 'torch.cuda.BFloat16Tensor']:
++                    if param.type() in ['torch.cuda.HalfTensor', 'torch.cuda.BFloat16Tensor', 'torch.tpu.HalfTensor', 'torch.tpu.BFloat16Tensor']:
+                         float16_params_this_group.append(param)
+                         # Create a copy
+                         main_param = param.detach().clone().float()
+@@ -518,7 +518,7 @@ class Float16OptimizerWithFloat16Params(MixedPrecisionOptimizer):
+                         if param in self.optimizer.state:
+                             self.optimizer.state[main_param] = self.optimizer.state.pop(param)
+                     # fp32 params.
+-                    elif param.type() == 'torch.cuda.FloatTensor':
++                    elif param.type() in ['torch.cuda.FloatTensor', 'torch.tpu.FloatTensor']:
+                         fp32_params_this_group.append(param)
+                         param_group['params'][i] = param
+ 
+diff --git a/PAI-Megatron-LM-240718/megatron/training/arguments.py b/PAI-Megatron-LM-240718/megatron/training/arguments.py
+index 2eeea3d5..ab2a1947 100644
+--- a/PAI-Megatron-LM-240718/megatron/training/arguments.py
++++ b/PAI-Megatron-LM-240718/megatron/training/arguments.py
+@@ -1412,8 +1412,8 @@ def _add_distributed_args(parser):
+     group.add_argument('--no-overlap-p2p-communication', action='store_false',
+                        help='overlap pipeline parallel communication with forward and backward chunks',
+                        dest='overlap_p2p_comm')
+-    group.add_argument('--distributed-backend', default='nccl',
+-                       choices=['nccl', 'gloo'],
++    group.add_argument('--distributed-backend', default='sccl',
++                       choices=['nccl', 'gloo', 'sccl', 'scclhost'],
+                        help='Which backend to use for distributed training.')
+     group.add_argument('--distributed-timeout-minutes', type=int, default=10,
+                        help='Timeout minutes for torch.distributed.')
+diff --git a/PAI-Megatron-LM-240718/megatron/training/training.py b/PAI-Megatron-LM-240718/megatron/training/training.py
+index f8169d54..441a0344 100644
+--- a/PAI-Megatron-LM-240718/megatron/training/training.py
++++ b/PAI-Megatron-LM-240718/megatron/training/training.py
+@@ -644,6 +644,7 @@ def setup_model_and_optimizer(
+ 
+ 
+ from megatron.core.distributed import ParamAndGradBuffer
++from nnmoduletools.module_debugger import print_log
+ 
+ 
+ def __get_param_buffer_size(buffer: ParamAndGradBuffer) -> int:
+@@ -685,6 +686,7 @@ def train_step(
+ 
+     # Forward pass.
+     forward_backward_func = get_forward_backward_func()
++    timestamp = time.time()
+     losses_reduced = forward_backward_func(
+         forward_step_func=forward_step_func,
+         data_iterator=data_iterator,
+@@ -695,6 +697,8 @@ def train_step(
+         decoder_seq_length=args.decoder_seq_length,
+         forward_only=False,
+     )
++    elapsed_time = time.time() - timestamp
++    print_log(f"Time elapsed for iter {args.curr_iteration} forward_backward_func: {elapsed_time}s")
+ 
+     # Empty unused memory.
+     if args.empty_unused_memory_level >= 1:
+@@ -708,6 +712,7 @@ def train_step(
+         memory_stats_collector.sample_overall_data()
+ 
+     # Update parameters.
++    timestamp = time.time()
+     timers('optimizer', log_level=1).start(barrier=args.barrier_with_L1_time)
+     if hasattr(optimizer, 'chunk_manager') and memory_stats_collector is not None:
+         update_successful, grad_norm, num_zeros_in_grad = optimizer.step(
+@@ -723,6 +728,8 @@ def train_step(
+         )
+ 
+         memory_stats_collector.sample_overall_data()
++    elapsed_time = time.time() - timestamp
++    print_log(f"Time elapsed for iter {args.curr_iteration} update parameters: {elapsed_time}s")
+ 
+     # Vision momentum.
+     if getattr(args, 'vision_pretraining', False) and args.vision_pretraining_type == "dino":
+@@ -996,7 +1003,7 @@ def training_log(
+             if torch.distributed.get_rank() == 0:
+                 num_microbatches = get_num_microbatches()
+                 report_theoretical_memory(args, num_microbatches=num_microbatches, verbose=True)
+-            report_memory('(after {} iterations)'.format(iteration))
++            # report_memory('(after {} iterations)'.format(iteration))
+             report_memory_flag = False
+         timers.log(timers_to_log, normalizer=args.log_interval)
+ 
+diff --git a/PAI-Megatron-LM-240718/megatron/training/utils.py b/PAI-Megatron-LM-240718/megatron/training/utils.py
+index 5965d785..685f77c7 100644
+--- a/PAI-Megatron-LM-240718/megatron/training/utils.py
++++ b/PAI-Megatron-LM-240718/megatron/training/utils.py
+@@ -315,11 +315,11 @@ def get_batch_on_this_tp_rank(data_iterator):
+            data = None
+ 
+        batch = {
+-           'tokens': data["tokens"].cuda(non_blocking = True),
+-           'labels': data["labels"].cuda(non_blocking = True),
+-           'loss_mask': data["loss_mask"].cuda(non_blocking = True),
+-           'attention_mask': None if "attention_mask" not in data else data["attention_mask"].cuda(non_blocking = True),
+-           'position_ids': data["position_ids"].cuda(non_blocking = True)
++           'tokens': data["tokens"].cuda(non_blocking = False),
++           'labels': data["labels"].cuda(non_blocking = False),
++           'loss_mask': data["loss_mask"].cuda(non_blocking = False),
++           'attention_mask': None if "attention_mask" not in data else data["attention_mask"].cuda(non_blocking = False),
++           'position_ids': data["position_ids"].cuda(non_blocking = False)
+        }
+ 
+        if args.pipeline_model_parallel_size == 1:
+diff --git a/examples/qwen2/pretrain_qwen.py b/examples/qwen2/pretrain_qwen.py
+index 8ab6be0..1e359d5 100644
+--- a/examples/qwen2/pretrain_qwen.py
++++ b/examples/qwen2/pretrain_qwen.py
+@@ -6,7 +6,19 @@ from functools import partial
+ from typing import Union
+ 
+ import torch
+-import torch._dynamo
++# import torch._dynamo
++try:
++    import torch_tpu
++    import tpu_workarounds
++except ImportError:
++    pass
++
++import megatron_deepspeed_tpu
++
++from distutils.util import strtobool
++if strtobool(os.environ.get('ENABLE_FRAMEWORK_DEBUGGER', "0")):
++    from nnmoduletools.module_debugger import register_hook
++
+ from megatron.core import mpu
+ from megatron.core.datasets.blended_megatron_dataset_builder import (
+     BlendedMegatronDatasetBuilder,
+@@ -37,7 +49,7 @@ from megatron_patch.model.qwen2.model import GPTModel
+ from megatron_patch.model.qwen2.transformer_config import Qwen2TransformerConfig
+ from megatron_patch.tokenizer import build_tokenizer, get_tokenizer
+ 
+-torch._dynamo.config.suppress_errors = True
++# torch._dynamo.config.suppress_errors = True
+ 
+ 
+ def model_provider(
+@@ -78,6 +90,9 @@ def model_provider(
+         seq_len_interpolation_factor=args.rotary_seq_len_interpolation_factor,
+     )
+ 
++    if strtobool(os.environ.get('ENABLE_FRAMEWORK_DEBUGGER', "0")):
++        model.apply(register_hook)
++    
+     return model
+ 
+ 
+diff --git a/megatron_patch/model/qwen2/layer_specs.py b/megatron_patch/model/qwen2/layer_specs.py
+index 68a76dd..70874e1 100755
+--- a/megatron_patch/model/qwen2/layer_specs.py
++++ b/megatron_patch/model/qwen2/layer_specs.py
+@@ -16,13 +16,13 @@ from megatron.core.fusions.fused_bias_dropout import get_bias_dropout_add
+ from megatron.core.fusions.fused_layer_norm import FusedLayerNorm
+ from megatron.core.tensor_parallel.layers import ColumnParallelLinear, RowParallelLinear
+ 
+-from megatron.core.transformer.custom_layers.transformer_engine import (
+-    TEDotProductAttention,
+-    TELayerNormColumnParallelLinear,
+-    TENorm,
+-    TERowParallelLinear,
+-    TEColumnParallelLinear,
+-)
++# from megatron.core.transformer.custom_layers.transformer_engine import (
++#     TEDotProductAttention,
++#     TELayerNormColumnParallelLinear,
++#     TENorm,
++#     TERowParallelLinear,
++#     TEColumnParallelLinear,
++# )
+ from megatron.core.transformer.dot_product_attention import DotProductAttention
+ from megatron.core.transformer.enums import AttnMaskType
+ from megatron.core.transformer.identity_op import IdentityOp
+diff --git a/megatron_patch/model/qwen2/transformer/attention.py b/megatron_patch/model/qwen2/transformer/attention.py
+index 365ce2a..e8881ea 100644
+--- a/megatron_patch/model/qwen2/transformer/attention.py
++++ b/megatron_patch/model/qwen2/transformer/attention.py
+@@ -26,7 +26,7 @@ from megatron.core.parallel_state import (
+     get_tensor_model_parallel_rank,
+     get_tensor_model_parallel_world_size,
+ )
+-from megatron.core.transformer.custom_layers.transformer_engine import SplitAlongDim
++from megatron.core.transformer.attention import SplitAlongDim
+ from megatron.core.transformer.module import MegatronModule
+ from megatron.core.transformer.spec_utils import ModuleSpec, build_module
+ from megatron.core.transformer.transformer_config import TransformerConfig
+diff --git a/megatron_patch/model/qwen2/transformer_block.py b/megatron_patch/model/qwen2/transformer_block.py
+index fb4745a..3b3fd52 100755
+--- a/megatron_patch/model/qwen2/transformer_block.py
++++ b/megatron_patch/model/qwen2/transformer_block.py
+@@ -23,12 +23,12 @@ from megatron.core.dist_checkpointing.mapping import ShardedStateDict
+ from megatron.core.dist_checkpointing.utils import replace_prefix_for_sharding
+ from megatron.core.fusions.fused_layer_norm import FusedLayerNorm
+ from megatron.core.packed_seq_params import PackedSeqParams
+-from megatron.core.transformer.custom_layers.transformer_engine import (
+-    TEDelayedScaling,
+-    TENorm,
+-    get_cpu_offload_context,
+-    te_checkpoint,
+-)
++# from megatron.core.transformer.custom_layers.transformer_engine import (
++#     TEDelayedScaling,
++#     TENorm,
++#     get_cpu_offload_context,
++#     te_checkpoint,
++# )
+ from megatron.core.transformer.enums import AttnMaskType
+ from megatron.core.transformer.module import MegatronModule
+ from megatron.core.transformer.spec_utils import ModuleSpec, build_module
+@@ -130,26 +130,26 @@ class TransformerBlock(MegatronModule):
+ 
+         self.checkpoint_core_attention = self.config.recompute_granularity == 'selective'
+ 
+-        if get_cpu_offload_context is not None:
+-            (
+-                self.offload_context,
+-                self.group_prefetch_offload_commit_async,
+-            ) = get_cpu_offload_context(
+-                self.config.cpu_offloading,
+-                self.config.cpu_offloading_num_layers,
+-                self.config.cpu_offloading_activations,
+-                self.config.cpu_offloading_weights,
+-            )
+-            self.config._cpu_offloading_context = (
+-                self.offload_context if self.config.cpu_offloading else None
+-            )
+-        else:
+-            assert (
+-                self.config.cpu_offloading == False
+-            ), "CPU Offloading is enabled when TE is not present"
++        # if get_cpu_offload_context is not None:
++        #     (
++        #         self.offload_context,
++        #         self.group_prefetch_offload_commit_async,
++        #     ) = get_cpu_offload_context(
++        #         self.config.cpu_offloading,
++        #         self.config.cpu_offloading_num_layers,
++        #         self.config.cpu_offloading_activations,
++        #         self.config.cpu_offloading_weights,
++        #     )
++        #     self.config._cpu_offloading_context = (
++        #         self.offload_context if self.config.cpu_offloading else None
++        #     )
++        # else:
++        assert (
++            self.config.cpu_offloading == False
++        ), "CPU Offloading is enabled when TE is not present"
+ 
+-            self.offload_context, self.group_prefetch_offload_commit_async = nullcontext(), None
+-            self.config._cpu_offloading_context = None
++        self.offload_context, self.group_prefetch_offload_commit_async = nullcontext(), None
++        self.config._cpu_offloading_context = None
+ 
+         self._build_layers()
+         self.num_layers_per_pipeline_rank = len(self.layers)

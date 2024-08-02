@@ -1,5 +1,12 @@
 # Examples for MegatronDeepSpeedTpu
 
+See qwen2 for more information.
+
+The following material is out of maintenance. We will update it in the future.
+
+---
+---
+
 We provide two examples for MegatronDeepSpeedTpu: bert and gpt.
 
 `gen_dist_cmd.py` will generate the distributed training command for you.  You can run the following command to generate the command:

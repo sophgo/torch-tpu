@@ -1,12 +1,11 @@
-import os
 import torch
+from distutils.util import strtobool
+from .utils import environ_flag
 
-if os.environ.get('DS_DISABLE_TPU', '0') == '0':
+if not environ_flag('DS_DISABLE_TPU'):
     import torch_tpu
-
-    if os.environ.get('TPU_DISABLE_WORKAROUNDS', '0') == '0':
-        from . import tpu_workarounds
-    
+    if environ_flag('ENABLE_TPU_WORKAROUNDS'):
+        import tpu_workarounds
     from . import adaptor
 
 from . import debugger

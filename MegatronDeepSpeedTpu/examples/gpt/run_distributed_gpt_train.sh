@@ -56,7 +56,7 @@ ds_args=" --deepspeed-activation-checkpointing ${ds_args}"
 
 
 python -u pretrain_gpt.py \
-    --local_rank 0 \
+    --local_rank $LOCAL_RANK \
     --tensor-model-parallel-size $TP \
     --pipeline-model-parallel-size $PP \
     --num-layers $NLAYERS \
@@ -70,6 +70,7 @@ python -u pretrain_gpt.py \
     --lr 1.e-4 \
     --log-interval 1 \
     --data-path $DATA_PATH \
+    --tokenizer-type GPT2BPETokenizer \
     --vocab-file $BASE_PATH/gpt2-vocab.json \
     --merge-file $BASE_PATH/gpt2-merges.txt \
     --save-interval 0 \

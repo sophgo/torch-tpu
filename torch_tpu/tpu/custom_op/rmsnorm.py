@@ -1,7 +1,7 @@
 import torch
 import torch.nn as nn
 import os
-
+from nnmoduletools.module_debugger import print_log
 # now rmsnorm with CMODEL_FAST_EXEC=1 has problem
 class cmodel_slow_exec:
     def __init__(self, wait_tensor):
@@ -74,10 +74,15 @@ class RMSNormBlock(nn.Module):
         return RMSNormFunc.apply(x, self.scale, self.bias, self.axis, self.eps)
 
 def llama_rmsnorm_forward(self, hidden_states):
+    print_log("I am using llama_rmsnorm_forward")
     dim = hidden_states.dim() - 1
     return RMSNormFunc.apply(hidden_states, self.weight, None, dim, self.variance_epsilon)
 
 def fuse_llama_rmsnorm():
     import transformers
     transformers.models.llama.modeling_llama.LlamaRMSNorm.forward = llama_rmsnorm_forward
- 
+    
+def fuse_qwen2_rmsnorm():
+    import megatron_patch
+    from megatron_patch.model.qwen2.rms_norm import Qwen2RMSNorm
+    megatron_patch.model.qwen2.rms_norm.Qwen2RMSNorm.forward = llama_rmsnorm_forward

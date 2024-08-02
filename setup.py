@@ -205,7 +205,7 @@ class CPPLibBuild(build_clib, ExtBase, object):
             cmake_args.append('-DDEBUG=ON')
         build_dir = os.path.join(BASE_DIR, 'build/torch-tpu')
         os.makedirs(build_dir, exist_ok=True)
-        build_args = ['-j', str(8)]
+        build_args = ['-j', str(os.cpu_count())]
         subprocess.check_call([self.cmake, BASE_DIR] + cmake_args, cwd=build_dir, env=os.environ)
         subprocess.check_call(['make'] + build_args, cwd=build_dir, env=os.environ)
         subprocess.check_call(['make', install_cmd], cwd=build_dir, env=os.environ)
