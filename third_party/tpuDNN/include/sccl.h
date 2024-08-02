@@ -1,9 +1,12 @@
 #pragma once
 
-#include "sophon_defines_2260.h"
+#include "tpuDNN.h"
+#include "tpuDNNTensor.h"
 #include <stddef.h>
 
-namespace sophon {
+extern "C"
+{
+
 typedef enum {
   scclSuccess = 0,
   scclKernelError = 1,
@@ -42,4 +45,5 @@ scclResult_t scclScatter(const void *sendbuff, void *recvbuff,
 scclResult_t scclAllToAll(const void *sendbuff, void *recvbuff,
                           size_t recv_count, tpudnnDataType_t dtype,
                           scclComm_t comm, tpudnnHandle_t handle);
-} // namespace sophon
+
+} // extern "C"

@@ -48,6 +48,15 @@ find_library(
     $ENV{TPUTRAIN_TOP}/../TPU1686/build_$ENV{CHIP_ARCH}/tpuDNN/src/
     $ENV{TPUTRAIN_TOP}/third_party/tpuDNN/$ENV{CHIP_ARCH}_lib/)
 
+if ($ENV{CHIP_ARCH} STREQUAL "sg2260")
+    find_library(
+        sccl_LIBRARY
+        NAMES sccl
+        HINTS
+        $ENV{TPUTRAIN_TOP}/../TPU1686/build_$ENV{CHIP_ARCH}/tpuDNN/src/sccl/
+        $ENV{TPUTRAIN_TOP}/third_party/tpuDNN/$ENV{CHIP_ARCH}_lib/)
+endif()
+
 find_package_handle_standard_args(
     TPU1686
     REQUIRED_VARS tpuDNN_INCLUDE_DIR cmodel_firmware_LIBRARY firmware_LIBRARY tpuDNN_LIBRARY)
@@ -68,4 +77,11 @@ if (TPU1686_FOUND)
     set_target_properties(
         TPU1686::firmware PROPERTIES
         IMPORTED_LOCATION ${firmware_LIBRARY})
+    if($ENV{CHIP_ARCH} STREQUAL "sg2260")
+        add_library(TPU1686::sccl IMPORTED SHARED)
+        set_target_properties(
+            TPU1686::sccl PROPERTIES
+            INTERFACE_INCLUDE_DIRECTORIES ${tpuDNN_INCLUDE_DIR}
+            IMPORTED_LOCATION ${sccl_LIBRARY})
+    endif()
 endif()

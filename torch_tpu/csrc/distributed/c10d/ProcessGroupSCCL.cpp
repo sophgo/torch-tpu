@@ -188,20 +188,20 @@ c10::intrusive_ptr<ProcessGroupSCCL::WorkSCCL> collective(
     ProcessGroupSCCL& group,
     const std::shared_ptr<sophon::Context> &context,
     at::Tensor &input, at::Tensor &output, F func) {
-  sophon::scclComm_t comm;
+  scclComm_t comm;
 
   auto device = input.device();
   group.insertUsedDeviceIdx((int)device.index());
 
-  TORCH_CHECK(sophon::scclCommInitRank(
+  TORCH_CHECK(scclCommInitRank(
                   &comm, context->size, context->scclID, context->rank,
-                  context->chip_map.data()) == sophon::scclSuccess,
+                  context->chip_map.data()) == scclSuccess,
               "sccl comm init rank failed\n");
   auto ret = func(input, output, comm, context->handle);
 
-  TORCH_CHECK(sophon::scclCommDestroy(comm) == sophon::scclSuccess,
+  TORCH_CHECK(scclCommDestroy(comm) == scclSuccess,
               "sccl comm destroy rank failed\n");
-  TORCH_CHECK(ret == sophon::scclSuccess);
+  TORCH_CHECK(ret == scclSuccess);
 
   return c10::make_intrusive<ProcessGroupSCCL::WorkSCCL>(output);
 }
@@ -364,10 +364,10 @@ ProcessGroupSCCL::createDefaultDevice() {
 }
 #endif
 
-void ProcessGroupSCCL::broadcastUniqueSCCLID(sophon::scclUniqueId *scclID,
+void ProcessGroupSCCL::broadcastUniqueSCCLID(scclUniqueId *scclID,
                                                int rank) {
   const std::string key = "ProcessGroupSCCL";
-  memset(scclID, 0x0, sizeof(sophon::scclUniqueId));
+  memset(scclID, 0x0, sizeof(scclUniqueId));
   if (rank == 0) {
     TORCH_CHECK(tpuRtGetUniqueId(reinterpret_cast<char *>(scclID)) ==
                     tpuRtSuccess,
@@ -389,7 +389,7 @@ ProcessGroupSCCL::ProcessGroupSCCL(const c10::intrusive_ptr<Store> &store,
                                        c10::intrusive_ptr<Options> options)
     : ProcessGroup(rank, size), store_(new SophonStore(store)),
       options_(options), stop_(false), collectiveCounter_(0) {
-  sophon::scclUniqueId scclID;
+  scclUniqueId scclID;
   broadcastUniqueSCCLID(&scclID, rank);
 
   c10_tpu::TPUStream stream = c10_tpu::getCurrentTPUStream();
@@ -451,8 +451,8 @@ ProcessGroupSCCL::broadcast(std::vector<at::Tensor> &inputs,
 
   return collective(*this, context, inputs[opts.rootTensor], inputs[opts.rootTensor],
     [&](at::Tensor &input, at::Tensor &output,
-        sophon::scclComm_t comm, tpudnnHandle_t handle) {
-      return sophon::scclBroadcast(
+        scclComm_t comm, tpudnnHandle_t handle) {
+      return scclBroadcast(
           (void *)GetAddrByUnifiedAddr((uint64_t)input.data_ptr()),
           input.numel(), toTpudnnDtype(input.scalar_type()), opts.rootRank,
           comm, handle);
@@ -531,9 +531,9 @@ ProcessGroupSCCL::allreduce(std::vector<at::Tensor> &inputs,
 
   return collective(
     *this, context, inputs[0], inputs[0],
-    [&](at::Tensor &input, at::Tensor &output, sophon::scclComm_t comm,
+    [&](at::Tensor &input, at::Tensor &output, scclComm_t comm,
         tpudnnHandle_t handle) {
-      return sophon::scclAllReduce(
+      return scclAllReduce(
           (const void *)GetAddrByUnifiedAddr((uint64_t)input.data_ptr()),
           (void *)GetAddrByUnifiedAddr((uint64_t)output.data_ptr()),
           input.numel(), toTpudnnDtype(input.scalar_type()), reduce_method,
@@ -572,13 +572,13 @@ ProcessGroupSCCL::reduce(std::vector<at::Tensor> &inputs,
   }
 
   tpudnnReduceType_t reduce_method = reduceMethod(opts.reduceOp);
-  
+
   return collective(
     *this, context, inputs[0],
     context->rank == opts.rootRank ? inputs[0] : flatOutputTensor,
-    [&](at::Tensor &input, at::Tensor &output, sophon::scclComm_t comm,
+    [&](at::Tensor &input, at::Tensor &output, scclComm_t comm,
         tpudnnHandle_t handle) {
-      return sophon::scclReduce(
+      return scclReduce(
           (const void *)GetAddrByUnifiedAddr((uint64_t)input.data_ptr()),
           (void *)GetAddrByUnifiedAddr((uint64_t)output.data_ptr()),
           input.numel(), toTpudnnDtype(input.scalar_type()), reduce_method,
@@ -633,14 +633,14 @@ ProcessGroupSCCL::allgather(std::vector<std::vector<at::Tensor>> &outputs,
 
   auto work = collective(
     *this, context, inputs[0], flatOutputTensor,
-    [](at::Tensor &input, at::Tensor &output, sophon::scclComm_t comm,
+    [](at::Tensor &input, at::Tensor &output, scclComm_t comm,
         tpudnnHandle_t handle) {
-      return sophon::scclAllGather(
+      return scclAllGather(
           (const void *)GetAddrByUnifiedAddr((uint64_t)input.data_ptr()),
           (void *)GetAddrByUnifiedAddr((uint64_t)output.data_ptr()),
           input.numel(), toTpudnnDtype(input.scalar_type()), comm, handle);
     });
-  
+
   // Unflatten into output tensors.
   for (auto &outputgroup : outputs) {
     for (const auto j : c10::irange(outputgroup.size())) {
@@ -710,9 +710,9 @@ ProcessGroupSCCL::gather(std::vector<std::vector<at::Tensor>> &outputs,
 
   auto work = collective(
       *this, context, inputs[0], flatOutputTensor,
-      [&](at::Tensor &input, at::Tensor &output, sophon::scclComm_t comm,
+      [&](at::Tensor &input, at::Tensor &output, scclComm_t comm,
           tpudnnHandle_t handle) {
-        return sophon::scclGather(
+        return scclGather(
             (const void *)GetAddrByUnifiedAddr((uint64_t)input.data_ptr()),
             (void *)GetAddrByUnifiedAddr((uint64_t)output.data_ptr()),
             input.numel(), toTpudnnDtype(input.scalar_type()), opts.rootRank, comm,
@@ -782,9 +782,9 @@ ProcessGroupSCCL::scatter(std::vector<at::Tensor> &outputs,
 
   return collective(
     *this, context, flatInputTensor, outputs[0],
-    [&](at::Tensor &input, at::Tensor &output, sophon::scclComm_t comm,
+    [&](at::Tensor &input, at::Tensor &output, scclComm_t comm,
         tpudnnHandle_t handle) {
-      return sophon::scclScatter(
+      return scclScatter(
           (const void *)GetAddrByUnifiedAddr((uint64_t)input.data_ptr()),
           (void *)GetAddrByUnifiedAddr((uint64_t)output.data_ptr()),
           output.numel(), toTpudnnDtype(output.scalar_type()), opts.rootRank, comm,
@@ -823,9 +823,9 @@ c10::intrusive_ptr<Work> ProcessGroupSCCL::alltoall_base(
 
   return collective(
     *this, context, inputTensor, outputTensor,
-    [](at::Tensor &input, at::Tensor &output, sophon::scclComm_t comm,
+    [](at::Tensor &input, at::Tensor &output, scclComm_t comm,
         tpudnnHandle_t handle) {
-      return sophon::scclAllToAll(
+      return scclAllToAll(
           (const void *)GetAddrByUnifiedAddr((uint64_t)input.data_ptr()),
           (void *)GetAddrByUnifiedAddr((uint64_t)output.data_ptr()),
           output.numel(), toTpudnnDtype(output.scalar_type()), comm, handle);

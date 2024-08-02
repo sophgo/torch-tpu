@@ -122,7 +122,7 @@ elseif(BACKEND_SG2260)
   endif()
   set_target_properties(torch_tpu PROPERTIES INSTALL_RPATH
       "$ORIGIN;${tpuv7_rpath};${tpuDNNPath}")
-  target_link_libraries(torch_tpu sgdnn tpuv7_rt sophon)
+  target_link_libraries(torch_tpu sgdnn tpuv7_rt sophon TPU1686::sccl)
   if (USING_CMODEL)
     target_link_libraries(torch_tpu cdm_daemon_emulator pthread)
   endif()

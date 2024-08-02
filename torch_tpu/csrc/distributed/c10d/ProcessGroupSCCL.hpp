@@ -183,7 +183,7 @@ public:
 
   uint64_t getSequenceNumberForGroup() override;
 
-  void broadcastUniqueSCCLID(sophon::scclUniqueId *scclID, int rank);
+  void broadcastUniqueSCCLID(scclUniqueId *scclID, int rank);
 
   void insertUsedDeviceIdx(int idx);
 
