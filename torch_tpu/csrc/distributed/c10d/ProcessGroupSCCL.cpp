@@ -19,10 +19,8 @@
 #include <c10/util/intrusive_ptr.h>
 #include <c10/util/irange.h>
 #include <sophon/config.h>
-#include <sophon/rendezvous/context.h>
-#include <sophon/rendezvous/prefix_store.h>
+#include <torch/csrc/distributed/c10d/PrefixStore.hpp>
 #include <sys/types.h>
-
 #include <type_traits>
 
 #include "ProcessGroupSCCL.hpp"
@@ -183,21 +181,24 @@ void ProcessGroupSCCL::insertUsedDeviceIdx(int idx) {
   usedDeviceIdxs_.insert(idx);
 }
 
+void ProcessGroupSCCL::collectiveCounter(){
+  seqCollective_++;
+}
+
 template <typename F>
 c10::intrusive_ptr<ProcessGroupSCCL::WorkSCCL> collective(
     ProcessGroupSCCL& group,
-    const std::shared_ptr<sophon::Context> &context,
     at::Tensor &input, at::Tensor &output, F func) {
-  scclComm_t comm;
+  // Bump collective counter
+  group.collectiveCounter();
 
   auto device = input.device();
   group.insertUsedDeviceIdx((int)device.index());
+  c10_tpu::TPUStream stream = c10_tpu::getCurrentTPUStream();
 
-  TORCH_CHECK(scclCommInitRank(
-                  &comm, context->size, context->scclID, context->rank,
-                  context->chip_map.data()) == scclSuccess,
-              "sccl comm init rank failed\n");
-  auto ret = func(input, output, comm, context->handle);
+  scclComm_t comm;
+  group.getSCCLcomm(&comm);
+  auto ret = func(input, output, comm, stream);
 
   TORCH_CHECK(scclCommDestroy(comm) == scclSuccess,
               "sccl comm destroy rank failed\n");
@@ -324,46 +325,6 @@ bool doesHostnameResolveToUsableAddress(const std::string &hostname) {
   return rp != nullptr;
 }
 
-std::shared_ptr<::sophon::transport::Device>
-ProcessGroupSCCL::createDeviceForInterface(
-    const std::string &interface_name) {
-  return ::c10d::SCCLDeviceFactory::makeDeviceForInterface(interface_name);
-}
-
-std::shared_ptr<::sophon::transport::Device>
-ProcessGroupSCCL::createDeviceForHostname(const std::string &hostname) {
-  TORCH_CHECK(doesHostnameResolveToUsableAddress(hostname), "Cannot resolve ",
-              hostname, " to a (local) address");
-  return ::c10d::SCCLDeviceFactory::makeDeviceForHostname(hostname);
-}
-
-#if defined(__linux__) || defined(_WIN32)
-std::shared_ptr<::sophon::transport::Device>
-ProcessGroupSCCL::createDefaultDevice() {
-  // Use the hostname to resolve the network address to
-  // use. Note: if the hostname does not resolve to an address (e.g.
-  // because of misconfigured /etc/hosts file), this will not work.
-  socketInitialize();
-  std::array<char, HOST_NAME_MAX> hostname{};
-  auto rv = gethostname(hostname.data(), HOST_NAME_MAX);
-  if (rv != 0) {
-    // throw std::system_error(errno, std::system_category());
-  }
-
-  // Use this machine's hostname if it resolves to an address.
-  if (doesHostnameResolveToUsableAddress(hostname.data())) {
-    return ::c10d::SCCLDeviceFactory::makeDeviceForHostname(hostname.data());
-  }
-
-  // Otherwise, use the loopback address.
-  TORCH_WARN_ONCE("Unable to resolve hostname to a (local) address. ",
-                  "Using the loopback address as fallback. ",
-                  "Manually set the network interface to bind to with "
-                  "SCCL_SOCKET_IFNAME.");
-  return createDeviceForHostname(kLoopbackAddress);
-}
-#endif
-
 void ProcessGroupSCCL::broadcastUniqueSCCLID(scclUniqueId *scclID,
                                                int rank) {
   const std::string key = "ProcessGroupSCCL";
@@ -372,9 +333,9 @@ void ProcessGroupSCCL::broadcastUniqueSCCLID(scclUniqueId *scclID,
     TORCH_CHECK(tpuRtGetUniqueId(reinterpret_cast<char *>(scclID)) ==
                     tpuRtSuccess,
                 "sccl get unique ID failed\n");
-    auto vec = std::vector<char>(reinterpret_cast<char *>(scclID),
-                                 reinterpret_cast<char *>(scclID) +
-                                     SCCL_UNIQUE_ID_BYTES);
+    auto vec = std::vector<uint8_t>(reinterpret_cast<uint8_t *>(scclID),
+                                 reinterpret_cast<uint8_t *>(scclID) +
+                                 SCCL_UNIQUE_ID_BYTES);
     store_->set(key, vec);
   } else {
     auto vec = store_->get(key);
@@ -387,47 +348,26 @@ void ProcessGroupSCCL::broadcastUniqueSCCLID(scclUniqueId *scclID,
 ProcessGroupSCCL::ProcessGroupSCCL(const c10::intrusive_ptr<Store> &store,
                                        int rank, int size,
                                        c10::intrusive_ptr<Options> options)
-    : ProcessGroup(rank, size), store_(new SophonStore(store)),
-      options_(options), stop_(false), collectiveCounter_(0) {
-  scclUniqueId scclID;
-  broadcastUniqueSCCLID(&scclID, rank);
-
-  c10_tpu::TPUStream stream = c10_tpu::getCurrentTPUStream();
-  auto &devices = options->devices;
-  if (devices.empty()) {
-    TORCH_CHECK(false, "No device(s) specified");
-  }
-  contexts_.reserve(options->devices.size());
-  for (const auto i : c10::irange(options->devices.size())) {
-    auto context =
-        std::make_shared<::sophon::rendezvous::Context>(rank_, size_);
-    auto store = ::sophon::rendezvous::PrefixStore(std::to_string(i), *store_);
-    context->setTimeout(options->timeout);
-    context->chip_map = options->chip_map;
-    context->handle = stream;
-    memcpy(&context->scclID, &scclID, sizeof(scclID));
-    try {
-      context->connectFullMesh(store, options->devices[i]);
-    } catch (const std::runtime_error &e) {
-      auto err = e.what();
-      // TORCH_CHECK to print the cpp stacktrace.
-      auto msg = c10::str("SCCL connectFullMesh failed with ", err);
-      logAndThrow(msg, msg);
-    }
-    contexts_.push_back(std::move(context));
-  }
-
+    : ProcessGroup(rank, size), store_(store),
+      options_(options), stop_(false) {
+  broadcastUniqueSCCLID(&scclID_, rank);
   init();
 }
 
 ProcessGroupSCCL::~ProcessGroupSCCL() {
 }
 
-uint32_t ProcessGroupSCCL::nextTag() { return collectiveCounter_++; }
+void ProcessGroupSCCL::getSCCLcomm(scclComm_t *comm){
+  int ranks, rank;
+  ranks = getSize();
+  rank = getRank();
 
-std::shared_ptr<::sophon::Context>
-ProcessGroupSCCL::getContext(uint32_t tag) {
-  return contexts_[tag % contexts_.size()];
+  c10::intrusive_ptr<Options> options = getOptions();
+
+  TORCH_CHECK(scclCommInitRank(
+              comm, ranks, scclID_, rank,
+              options->chip_map.data()) == scclSuccess,
+          "sccl comm init rank failed\n");
 }
 
 c10::intrusive_ptr<Work>
@@ -441,15 +381,12 @@ ProcessGroupSCCL::broadcast(std::vector<at::Tensor> &inputs,
   assertDense(invalidArgument, inputs);
   assertTypeAndSizesMatch(invalidArgument, inputs);
 
-  auto tag = nextTag();
-  auto context = getContext(tag);
-
   const auto &device = inputs[0].device();
   if (device.type() != at::kPrivateUse1) {
     invalidArgument(c10::str("unsupported device type", device.type()));
   }
 
-  return collective(*this, context, inputs[opts.rootTensor], inputs[opts.rootTensor],
+  return collective(*this, inputs[opts.rootTensor], inputs[opts.rootTensor],
     [&](at::Tensor &input, at::Tensor &output,
         scclComm_t comm, tpudnnHandle_t handle) {
       return scclBroadcast(
@@ -458,8 +395,6 @@ ProcessGroupSCCL::broadcast(std::vector<at::Tensor> &inputs,
           comm, handle);
     });
 }
-
-// allreduce
 
 inline tpudnnReduceType_t reduceMethod(const ReduceOp reduceOp){
   tpudnnReduceType_t reduce_method = TPUDNN_REDUCE_SUM;
@@ -515,9 +450,6 @@ ProcessGroupSCCL::allreduce(std::vector<at::Tensor> &inputs,
         "(allreduce of sparse tensors only works with ReduceOp.SUM)");
   }
 
-  auto tag = nextTag();
-  auto context = getContext(tag);
-
   const auto &device = inputs[0].device();
   if (device.type() != at::kPrivateUse1) {
     invalidArgument(c10::str("unsupported device type ", device.type()));
@@ -527,12 +459,11 @@ ProcessGroupSCCL::allreduce(std::vector<at::Tensor> &inputs,
     invalidArgument("unsupported layout");
   }
 
-  tpudnnReduceType_t reduce_method = reduceMethod(opts.reduceOp);
-
   return collective(
-    *this, context, inputs[0], inputs[0],
+    *this, inputs[0], inputs[0],
     [&](at::Tensor &input, at::Tensor &output, scclComm_t comm,
         tpudnnHandle_t handle) {
+      tpudnnReduceType_t reduce_method = reduceMethod(opts.reduceOp);
       return scclAllReduce(
           (const void *)GetAddrByUnifiedAddr((uint64_t)input.data_ptr()),
           (void *)GetAddrByUnifiedAddr((uint64_t)output.data_ptr()),
@@ -557,27 +488,24 @@ ProcessGroupSCCL::reduce(std::vector<at::Tensor> &inputs,
   if (layout == c10::kSparse && opts.reduceOp != ReduceOp::SUM) {
     invalidArgument(
         "unsupported reduction operation "
-        "(allreduce of sparse tensors only works with ReduceOp.SUM)");
+        "(reduce of sparse tensors only works with ReduceOp.SUM)");
   }
 
-  auto tag = nextTag();
-  auto context = getContext(tag);
   if (device.type() != at::kPrivateUse1) {
     invalidArgument(c10::str("unsupported device type ", device.type()));
   }
 
   at::Tensor flatOutputTensor;
-  if (context->rank != opts.rootRank) {
+  if (getRank() != opts.rootRank) {
     flatOutputTensor = newLikeFlat(inputs);
   }
 
-  tpudnnReduceType_t reduce_method = reduceMethod(opts.reduceOp);
-
   return collective(
-    *this, context, inputs[0],
-    context->rank == opts.rootRank ? inputs[0] : flatOutputTensor,
+    *this, inputs[0],
+    getRank() == opts.rootRank ? inputs[0] : flatOutputTensor,
     [&](at::Tensor &input, at::Tensor &output, scclComm_t comm,
         tpudnnHandle_t handle) {
+      tpudnnReduceType_t reduce_method = reduceMethod(opts.reduceOp);
       return scclReduce(
           (const void *)GetAddrByUnifiedAddr((uint64_t)input.data_ptr()),
           (void *)GetAddrByUnifiedAddr((uint64_t)output.data_ptr()),
@@ -621,9 +549,6 @@ ProcessGroupSCCL::allgather(std::vector<std::vector<at::Tensor>> &outputs,
     assertTypeAndSizesMatch(invalidArgument, output, options, sizes);
   }
 
-  auto tag = nextTag();
-  auto context = getContext(tag);
-
   const auto &device = inputs[0].device();
   if (device.type() != at::kPrivateUse1) {
     invalidArgument(c10::str("unsupported device type ", device.type()));
@@ -632,7 +557,7 @@ ProcessGroupSCCL::allgather(std::vector<std::vector<at::Tensor>> &outputs,
   at::Tensor flatOutputTensor = newLikeFlat(outputs[0]);
 
   auto work = collective(
-    *this, context, inputs[0], flatOutputTensor,
+    *this, inputs[0], flatOutputTensor,
     [](at::Tensor &input, at::Tensor &output, scclComm_t comm,
         tpudnnHandle_t handle) {
       return scclAllGather(
@@ -693,23 +618,20 @@ ProcessGroupSCCL::gather(std::vector<std::vector<at::Tensor>> &outputs,
     }
   }
 
-  auto tag = nextTag();
-  auto context = getContext(tag);
-
   const auto &device = inputs[0].device();
   if (device.type() != at::kPrivateUse1) {
     invalidArgument(c10::str("unsupported device type ", device.type()));
   }
 
   at::Tensor flatOutputTensor;
-  if (context->rank == opts.rootRank) {
+  if (getRank() == opts.rootRank) {
     flatOutputTensor = newLikeFlat(outputs[0]);
   } else {
     flatOutputTensor = newLikeFlat(inputs);
   }
 
   auto work = collective(
-      *this, context, inputs[0], flatOutputTensor,
+      *this, inputs[0], flatOutputTensor,
       [&](at::Tensor &input, at::Tensor &output, scclComm_t comm,
           tpudnnHandle_t handle) {
         return scclGather(
@@ -720,7 +642,7 @@ ProcessGroupSCCL::gather(std::vector<std::vector<at::Tensor>> &outputs,
       });
 
   // Unflatten into output tensors on root process.
-  if (context->rank == opts.rootRank) {
+  if (getRank() == opts.rootRank) {
     for (const auto i : c10::irange(outputs[0].size())) {
       outputs[0][i].copy_(flatOutputTensor[i]);
     }
@@ -730,8 +652,8 @@ ProcessGroupSCCL::gather(std::vector<std::vector<at::Tensor>> &outputs,
 
 c10::intrusive_ptr<Work>
 ProcessGroupSCCL::scatter(std::vector<at::Tensor> &outputs,
-                            std::vector<std::vector<at::Tensor>> &inputs,
-                            const ScatterOptions &opts) {
+    std::vector<std::vector<at::Tensor>> &inputs,
+    const ScatterOptions &opts) {
   static auto invalidArgument = [](const std::string &msg) {
     TORCH_CHECK(false, "ProcessGroupSCCL::scatter: " + msg);
   };
@@ -762,16 +684,13 @@ ProcessGroupSCCL::scatter(std::vector<at::Tensor> &outputs,
     }
   }
 
-  auto tag = nextTag();
-  auto context = getContext(tag);
-
   const auto &device = outputs[0].device();
   if (device.type() != at::kPrivateUse1) {
     invalidArgument(c10::str("unsupported device type ", device.type()));
   }
 
   at::Tensor flatInputTensor;
-  if (context->rank == opts.rootRank) {
+  if (getRank() == opts.rootRank) {
     flatInputTensor = newLikeFlat(inputs[0]);
     for (const auto i : c10::irange(inputs[0].size())) {
       flatInputTensor[i].copy_(inputs[0][i]);
@@ -781,7 +700,7 @@ ProcessGroupSCCL::scatter(std::vector<at::Tensor> &outputs,
   }
 
   return collective(
-    *this, context, flatInputTensor, outputs[0],
+    *this, flatInputTensor, outputs[0],
     [&](at::Tensor &input, at::Tensor &output, scclComm_t comm,
         tpudnnHandle_t handle) {
       return scclScatter(
@@ -794,8 +713,8 @@ ProcessGroupSCCL::scatter(std::vector<at::Tensor> &outputs,
 
 c10::intrusive_ptr<Work>
 ProcessGroupSCCL::reduce_scatter(std::vector<at::Tensor> &outputs,
-                                   std::vector<std::vector<at::Tensor>> &inputs,
-                                   const ReduceScatterOptions &opts) {
+    std::vector<std::vector<at::Tensor>> &inputs,
+    const ReduceScatterOptions &opts) {
   TORCH_CHECK(false, "ProcessGroupSCCL does not support reduce_scatter");
 }
 
@@ -812,8 +731,6 @@ c10::intrusive_ptr<Work> ProcessGroupSCCL::alltoall_base(
       "output tensor and input tensor must be on the same type of device");
 
   const auto &device = outputTensor.device();
-  auto tag = nextTag();
-  auto context = getContext(tag);
 
   if (device.type() != at::kPrivateUse1) {
     invalidArgument(c10::str("unsupported device type ", device.type()));
@@ -822,7 +739,7 @@ c10::intrusive_ptr<Work> ProcessGroupSCCL::alltoall_base(
   // invalidArgument("Not support alltoall_base when !(outputCounts.empty() && inputCounts.empty())");
 
   return collective(
-    *this, context, inputTensor, outputTensor,
+    *this, inputTensor, outputTensor,
     [](at::Tensor &input, at::Tensor &output, scclComm_t comm,
         tpudnnHandle_t handle) {
       return scclAllToAll(
@@ -846,80 +763,20 @@ static inline at::Tensor &checkSingleTensor(std::vector<at::Tensor> &tensors) {
   return tensor;
 }
 
-static inline uint32_t checkTag(int32_t tag) {
-  TORCH_CHECK(tag >= 0, "Tag must be nonnegative");
-  return (uint32_t)tag;
-}
-
 c10::intrusive_ptr<Work>
-ProcessGroupSCCL::send(std::vector<at::Tensor> &tensors, int dstRank,
-                         int tag) {
-  auto &tensor = checkSingleTensor(tensors);
-  auto utag = checkTag(tag);
-  auto ptr = tensor.data_ptr();
-  auto size = tensor.numel() * tensor.element_size();
-
-  // Construct unbound buffer.
-  auto context = getContext(tag);
-  auto buf = context->createUnboundBuffer(ptr, size);
-  buf->send(dstRank, utag);
-
-  // The work captures the tensor to prevent it being deallocated and
-  // the unbound buffer to synchronize on completion of the send.
-  TORCH_CHECK(false, "send not implement");
+ProcessGroupSCCL::send(std::vector<at::Tensor> &tensors,int dstRank, int /* unused */) {
+  // to do
   return c10::make_intrusive<Work>();
 }
 
 c10::intrusive_ptr<Work>
-ProcessGroupSCCL::recv(std::vector<at::Tensor> &tensors, int srcRank,
-                         int tag) {
-  auto &tensor = checkSingleTensor(tensors);
-  auto utag = checkTag(tag);
-  auto ptr = tensor.data_ptr();
-  auto size = tensor.numel() * tensor.element_size();
-
-  // Construct unbound buffer.
-  auto context = getContext(tag);
-  auto buf = context->createUnboundBuffer(ptr, size);
-  buf->recv(srcRank, utag);
-
-  // The work captures the tensor to prevent it being deallocated and
-  // the unbound buffer to synchronize on completion of the recv.
-  TORCH_CHECK(false, "recv not implement");
-  return c10::make_intrusive<Work>();
-}
-
-c10::intrusive_ptr<Work>
-ProcessGroupSCCL::recvAnysource(std::vector<at::Tensor> &tensors, int tag) {
-  auto &tensor = checkSingleTensor(tensors);
-  auto utag = checkTag(tag);
-  auto ptr = tensor.data_ptr();
-  auto size = tensor.numel() * tensor.element_size();
-
-  // Construct unbound buffer.
-  auto context = getContext(tag);
-  auto buf = context->createUnboundBuffer(ptr, size);
-
-  // Build list of ranks that this operation can recv from. In these
-  // bindings we don't differentiate between ranks and can receive
-  // from any other process in the group.
-  std::vector<int> srcRanks;
-  srcRanks.resize(size_);
-  for (const auto i : c10::irange(size_)) {
-    srcRanks.push_back(i);
-  }
-
-  buf->recv(srcRanks, utag);
-
-  // The work captures the tensor to prevent it being deallocated and
-  // the unbound buffer to synchronize on completion of the recv.
-  TORCH_CHECK(false, "recvAnysource not implement");
+ProcessGroupSCCL::recv(std::vector<at::Tensor> &tensors, int srcRank, int /* unused */) {
+  // to do
   return c10::make_intrusive<Work>();
 }
 
 c10::intrusive_ptr<Work>
 ProcessGroupSCCL::barrier(const BarrierOptions &opts) {
-
   std::vector<at::Device> devices;
   for (auto it = usedDeviceIdxs_.cbegin(); it != usedDeviceIdxs_.cend(); ++it){
     std::cout << "usedDeviceIdxs_:"<< *it << std::endl;
@@ -957,27 +814,11 @@ ProcessGroupSCCL::barrier(const BarrierOptions &opts) {
 }
 
 void ProcessGroupSCCL::setSequenceNumberForGroup() {
-  if (rank_ == 0) {
-    // Create and broadcast sequence number
-    auto seq = 1 + rand();
-    sequenceNum_ = c10d::SequenceNum(seq);
-    std::vector<char> values = c10d::toVec<char>(seq, kBytes);
-    store_->set(kSeqNumStoreKey, values);
-  } else {
-    // Read rank 0's sequence number from store.
-    sequenceNum_ = c10d::SequenceNum();
-    store_->wait({kSeqNumStoreKey}, options_->timeout);
-    std::vector<char> values = store_->get(kSeqNumStoreKey);
-    uint64_t num = c10d::fromVec<char>(values);
-    sequenceNum_->set(num);
-  }
-}
+} // SCCL just starts sequence numbers at 0.
 
 uint64_t ProcessGroupSCCL::getSequenceNumberForGroup() {
-  if (sequenceNum_ == c10::nullopt) {
-    return 0;
-  }
-  return sequenceNum_->get();
+  // to do
+  return 0;
 }
 
 c10::intrusive_ptr<c10d::ProcessGroup>
@@ -986,19 +827,6 @@ ProcessGroupSCCL::createProcessGroupSCCL(
   if (!options.chip_map.empty()) {
     TORCH_CHECK((int)options.chip_map.size() >= dis_opts.group_size,
                 "chip map size must be same with the nranks\n");
-  }
-
-  // Use interfaces listed in "SCCL_SOCKET_IFNAME", if set.
-  char *ifnameEnv = getenv(SCCL_SOCKET_IFNAME_ENV.c_str());
-  if (ifnameEnv && strlen(ifnameEnv) > 1) {
-    for (const auto &iface : split0(',', ifnameEnv)) {
-      options.devices.push_back(createDeviceForInterface(iface));
-    }
-  } else {
-    // If no hostname is specified, this function looks up
-    // the machine's hostname and returns a device instance
-    // associated with the address that the hostname resolves to.
-    options.devices.push_back(createDefaultDevice());
   }
 
   options.timeout =
