@@ -88,7 +88,8 @@ void nodechip_llama2_qkv_multi_core(
     int attention_mode,
     int block_size,
     data_type_t dtype,
-    int qkv_packed);
+    int qkv_packed,
+    int page_kv_cache_layout);
 
 int tpu_kernel_llama_attention_multi_core(const void* api_buf) {
 
@@ -121,7 +122,8 @@ int tpu_kernel_llama_attention_multi_core(const void* api_buf) {
         api-> attention_mode,
         api-> block_size,
         (data_type_t)api-> dtype,
-        api-> qkv_packed);
+        api-> qkv_packed,
+        0); // page_kv_cache_layout
     tpu_poll();
     return 0;
 }

@@ -1295,6 +1295,7 @@ typedef struct {
   int hidden_size;
   int dtype;
   int qkv_packed;
+  int page_kv_cache_layout;
 #ifndef WIN32
 } __attribute__((packed)) sg_api_llama2_qkv_multi_core_t;
 #else
