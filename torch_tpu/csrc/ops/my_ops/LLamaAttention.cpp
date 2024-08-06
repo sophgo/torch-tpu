@@ -100,5 +100,73 @@ namespace at
 		return OUT;
 	}
 
-}
+	Tensor llama_attention_forward(
+		Tensor &OUT,
+		Tensor &Q,
+		Tensor &K,
+		Tensor &V,
+		const c10::optional<Tensor> &cos,
+		const c10::optional<Tensor> &sin,
+		const c10::optional<Tensor> &mask,
+		int64_t mask_size, // mask_size
+		double C,
+		double dropout_rate,
+		int64_t batch)
+	{
+		if (!Q.is_contiguous() || !K.is_contiguous() || !V.is_contiguous()){
+#ifndef USE_QKV_PACKED
+			LOG(WARNING) << "llama_attention not contiguous, change Q, K, V to contiguous.";
+			Q = Q.contiguous();
+			K = K.contiguous();
+			V = V.contiguous();
+#else
 
+			LOG(WARNING) << "llama_attention not contiguous, use QKV packed.";
+#endif
+		}
+
+		CHECK_TENSOR_IN_DEVICE(OUT);
+#ifndef USE_QKV_PACKED
+		CHECK_TENSOR_IN_DEVICE(Q);
+		CHECK_TENSOR_IN_DEVICE(K);
+		CHECK_TENSOR_IN_DEVICE(V);
+#else
+		CHECK_TENSOR_IN_DEVICE_NO_CONTIGUOUS(Q);
+		CHECK_TENSOR_IN_DEVICE_NO_CONTIGUOUS(K);
+		CHECK_TENSOR_IN_DEVICE_NO_CONTIGUOUS(V);
+#endif
+
+		if (cos.has_value())
+			CHECK_TENSOR_IN_DEVICE(cos.value());
+		if (sin.has_value())
+			CHECK_TENSOR_IN_DEVICE(sin.value());
+		if (mask.has_value())
+			CHECK_TENSOR_IN_DEVICE(mask.value());
+
+#ifdef TPU_OP_TIMING
+		auto timer = tpu::Timer().Start();
+#endif
+
+		tpu_status_t status = sgdnnLlamaAttentionForward(
+			tpu::TPUGetDeviceResource(),
+			tpu::TPUGenerateSgdnnTensor(OUT),
+			tpu::TPUGenerateSgdnnTensor(Q),
+			tpu::TPUGenerateSgdnnTensor(K),
+			tpu::TPUGenerateSgdnnTensor(V),
+			cos.has_value() ? tpu::TPUGenerateSgdnnTensor(cos.value()) : sgdnnUndefinedTensor(),
+			sin.has_value() ? tpu::TPUGenerateSgdnnTensor(sin.value()) : sgdnnUndefinedTensor(),
+			mask.has_value() ? tpu::TPUGenerateSgdnnTensor(mask.value()) : sgdnnUndefinedTensor(),
+			mask_size,
+			C,
+			dropout_rate,
+			batch);
+		TORCH_CHECK(status == SG_SUCCESS);
+
+#ifdef TPU_OP_TIMING
+		tpu::OpTimer::Instance().AddTime(tpu::LLAMA_ATTENTION, timer.ElapsedUS());
+#endif
+		return OUT;
+
+	}
+
+}

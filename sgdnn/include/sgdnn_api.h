@@ -1111,6 +1111,28 @@ tpu_status_t sgdnnLlamaAttention ( tpu_resource_t resource,
                                   bool non_blocking = true);
 
 /*
+ * Calc process:
+ * OUT, Q: (tokens, q_heads, head_size)
+ * K, V: (tokens, kv_heads, head_size)
+ * cos, sin: (tokens, 1, 128)
+ * mask: prefill.shape(mask_size, mask_size)
+ * dropout_rate: dropout probability
+ */
+tpu_status_t sgdnnLlamaAttentionForward ( tpu_resource_t resource,
+                                  SgdnnTensor_t OUT,
+                                  SgdnnTensor_t Q,
+                                  SgdnnTensor_t K,
+                                  SgdnnTensor_t V,
+                                  SgdnnTensor_t cos,
+                                  SgdnnTensor_t sin,
+                                  SgdnnTensor_t mask,
+                                  int mask_size,
+                                  float C,
+                                  float dropout_rate,
+                                  int batch,
+                                  bool non_blocking = true);
+
+/*
  * [ GRAD_INPUT, GRAD_W1, GRAD_W2, GRAD_B1, GRAD_B2 ] = MLP BACKWARD ( GRAD_OUTPUT, INPUT, W1, W2, OUT1, P )
  * Note:
  * 1. The data types of all the tensors must be the same and one of FP32, FP16 and BF16

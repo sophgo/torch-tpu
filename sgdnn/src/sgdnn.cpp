@@ -4111,6 +4111,94 @@ tpu_status_t sgdnnLlamaAttention ( tpu_resource_t resource,
   return SG_SUCCESS;
 }
 
+tpu_status_t sgdnnLlamaAttentionForward ( tpu_resource_t resource,
+                                  SgdnnTensor_t OUT,
+                                  SgdnnTensor_t Q,
+                                  SgdnnTensor_t K,
+                                  SgdnnTensor_t V,
+                                  SgdnnTensor_t cos,
+                                  SgdnnTensor_t sin,
+                                  SgdnnTensor_t mask,
+                                  int mask_size,
+                                  float C,
+                                  float dropout_rate,
+                                  int batch,
+                                  bool non_blocking)
+{
+  SGDNN_CHECK ( Q.dtype == OUT.dtype );
+  SGDNN_CHECK ( Q.dtype == K.dtype );
+  SGDNN_CHECK ( Q.dtype == V.dtype );
+  SGDNN_CHECK ( Q.dtype == SGDNN_DTYPE_FP32 ||
+                Q.dtype == SGDNN_DTYPE_FP16 ||
+                Q.dtype == SGDNN_DTYPE_BF16 );
+  SGDNN_CHECK ( sgdnnIsSameShape( &Q, &OUT ) );
+  SGDNN_CHECK ( sgdnnIsSameShape( &K, &V ) );
+  SGDNN_CHECK ( Q.dim == 3 );
+  SGDNN_CHECK ( K.dim == 3 );
+  SGDNN_CHECK ( V.dim == 3 );
+  if (cos.addr != 0){
+    SGDNN_CHECK ( Q.dtype == cos.dtype );
+    SGDNN_CHECK ( Q.dtype == sin.dtype );
+    SGDNN_CHECK ( cos.dim == 3 );
+    SGDNN_CHECK ( sin.dim == 3 );
+    SGDNN_CHECK ( sgdnnIsSameShape( &cos, &sin ) );
+  }
+  if (mask.addr != 0){
+    SGDNN_CHECK ( Q.dtype == mask.dtype );
+    SGDNN_CHECK ( mask.dim == 2 );
+  }
+
+#ifndef USE_QKV_PACKED
+  SGDNN_CHECK ( sgdnnIsTensorContiguous ( &Q ) );
+  SGDNN_CHECK ( sgdnnIsTensorContiguous ( &K ) );
+  SGDNN_CHECK ( sgdnnIsTensorContiguous ( &V ) );
+#endif
+
+  SGDNN_CHECK ( sgdnnIsTensorContiguous ( &OUT ) );
+
+#if defined BACKEND_1684X
+#elif defined BACKEND_SG2260
+  sg_api_llama_attention_forward_multi_core_t api = {0};
+  api.Y_global_addr = OUT.addr;
+  api.Q_global_addr = Q.addr;
+  api.K_global_addr = K.addr;
+  api.V_global_addr = V.addr;
+  api.cos_global_addr = cos.addr;
+  api.sin_global_addr = sin.addr;
+  api.mask_global_addr = mask.addr;
+  api.mask_max = mask_size;
+  api.C = C;
+  api.dropout_rate = dropout_rate;
+  api.dtype = sgdnnTPUKernelDType(Q.dtype);
+  api.batch = batch;
+  api.hidden_size = Q.shape[1] * Q.shape[2]; // heads * head_size
+  api.num_attention_heads = Q.shape[1];
+  api.num_k_v_heads = K.shape[1];
+  api.seq_len = Q.shape[0];
+#ifdef USE_QKV_PACKED
+  api.qkv_packed = !sgdnnIsTensorContiguous(&Q);
+#endif
+
+  tpu_device_mem_t Qbuffer_dev_mem, Kbuffer_dev_mem, Vbuffer_dev_mem;
+
+  // prefill
+  SAFE_CALL(sgdnnMallocDeviceByte(resource, &Qbuffer_dev_mem, sgdnnTensorBytes(&Q)));
+  SAFE_CALL(sgdnnMallocDeviceByte(resource, &Kbuffer_dev_mem, sgdnnTensorBytes(&K)));
+  SAFE_CALL(sgdnnMallocDeviceByte(resource, &Vbuffer_dev_mem, sgdnnTensorBytes(&V)));
+
+  api.Qbuffer_global_addr = sgdnnGetDeviceAddr(Qbuffer_dev_mem);
+  api.Kbuffer_global_addr = sgdnnGetDeviceAddr(Kbuffer_dev_mem);
+  api.Vbuffer_global_addr = sgdnnGetDeviceAddr(Vbuffer_dev_mem);
+  SAFE_CALL ( sgdnnTPUKernelLaunchMultiCore ( resource, "tpu_kernel_llama_attention_forward_multi_core", &api, sizeof ( api ) , non_blocking) );
+  sgdnnFreeDevice ( resource , Kbuffer_dev_mem );
+  sgdnnFreeDevice ( resource , Vbuffer_dev_mem );
+  sgdnnFreeDevice ( resource , Qbuffer_dev_mem );
+#else
+  SGDNN_CHECK ( false );
+#endif
+  return SG_SUCCESS;
+}
+
 tpu_status_t sgdnnRMSNorm ( tpu_resource_t  resource ,
                           SgdnnTensor_t input,
                           SgdnnTensor_t weight,

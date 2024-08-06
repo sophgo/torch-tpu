@@ -43,6 +43,7 @@ namespace at
 		m.def("a16_llama_mlp_forward", a16_llama_mlp_forward);
 		m.def("rmsnorm_forward", rmsnorm_forward);
 		m.def("llama_attention", llama_attention);
+		m.def("llama_attention_forward", llama_attention_forward);
 		m.def("attn_forward", attn_forward);
 		m.def("attn_backward", attn_backward);
 		m.def("ln_mm_forward", ln_mm_forward);

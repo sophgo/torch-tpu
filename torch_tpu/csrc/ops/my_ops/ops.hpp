@@ -86,6 +86,19 @@ namespace at
 		double C,
 		int64_t attention_mode);
 
+	Tensor llama_attention_forward(
+		Tensor &OUT,
+		Tensor &Q,
+		Tensor &K,
+		Tensor &V,
+		const c10::optional<Tensor> &cos,
+		const c10::optional<Tensor> &sin,
+		const c10::optional<Tensor> &mask,
+		int64_t mask_size,
+		double C,
+		double dropout_rate,
+		int64_t batch);
+
 	Tensor attn_forward(
 		Tensor &input,
 		Tensor &w_attn,
