@@ -28,6 +28,19 @@ index c109365..aad24ee 100755
              else:
                  self.scaler = torch.cuda.amp.GradScaler(**kwargs)
  
+diff --git a/src/accelerate/sophgo.py b/src/accelerate/sophgo.py
+new file mode 100644
+index 0000000..a0b7b63
+--- /dev/null
++++ b/src/accelerate/sophgo.py
+@@ -0,0 +1,7 @@
++# ==============================================================================
++#
++# Copyright (C) 2022 Sophgo Technologies Inc.  All rights reserved.
++#
++# This file for check sign.
++#
++# ==============================================================================
 diff --git a/src/accelerate/state.py b/src/accelerate/state.py
 index 43c75ce..7e040b6 100644
 --- a/src/accelerate/state.py

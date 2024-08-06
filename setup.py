@@ -427,6 +427,12 @@ setup(
                 extra_link_args=extra_link_args + ['-Wl,-rpath,$ORIGIN/lib'],
             )
         ],
+        entry_points={
+            'console_scripts': [
+                'tpu_apply_all_patch=torch_tpu.utils:apply_all_patches',
+                'tpu_revert_all_patch=torch_tpu.utils:revert_all_patches',
+            ],
+        },
         python_requires=">=3.8",
         install_requires = [],
         dependency_links = [
