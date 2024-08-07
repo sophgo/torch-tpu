@@ -45,6 +45,9 @@ public:
     // TODO multi-device
     TORCH_CHECK ( DeviceCount == 1 );
     char* size = getenv("OMPI_COMM_WORLD_SIZE");
+    if (size == nullptr) {
+        size = getenv("LOCAL_WORLD_SIZE");
+    }
     if(size != nullptr) {
       DeviceCount = atoi(size);
     }

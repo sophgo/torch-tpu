@@ -8,8 +8,11 @@ import torch_tpu
 TPU = "tpu"
 
 # get rank and world_size from env
-rank = os.environ.get("OMPI_COMM_WORLD_RANK", 0)
-world_size = os.environ.get("OMPI_COMM_WORLD_SIZE", 1)
+rank = os.environ.get("LOCAL_RANK")
+world_size = os.environ.get("LOCAL_WORLD_SIZE")
+if rank == None:
+    rank = os.environ.get("OMPI_COMM_WORLD_RANK", 0)
+    world_size = os.environ.get("OMPI_COMM_WORLD_SIZE", 1)
 
 # test tensor length
 tensor_len = 4
@@ -22,13 +25,14 @@ options.chip_map = chip_map
 torch_tpu.tpu.set_device(options.chip_map[int(rank)])
 dist.init_process_group(backend="sccl", rank=int(rank), world_size=int(world_size), pg_options=options)
 init_logger()
+logger = logging.getLogger('sccl_logger')
 
 def case1():
-    logging.info("rank: {}".format(rank))
+    logger.info("rank: {}".format(rank))
 
     # init tensor
     tensor = torch.rand(tensor_len).float()
-    logging.info("rank: {}, {}".format(rank, tensor))
+    logger.info("rank: {}, {}".format(rank, tensor))
     device = torch.device(f"{TPU}:{chip_map[int(rank)]}")
 
     if torch_tpu.tpu.current_device() == device.index:
@@ -39,7 +43,7 @@ def case1():
 
     # print results
     results = tensor.cpu()
-    logging.info("rank: {}, results: {}".format(rank, results))
+    logger.info("rank: {}, results: {}".format(rank, results))
 
 
 if __name__ == "__main__":

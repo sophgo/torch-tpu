@@ -1,39 +1,11 @@
-# function build_all()
-# {
-#   should_clean=$1
+#!/bin/bash
 
-#   if [ -z "${TRAIN_BUILD_FOLDER}" ]; then
-#     TRAIN_BUILD_FOLDER=build
-#   fi
-#   if [ -n "$should_clean" ]; then
-#     rm -rf "$TPUTRAIN_TOP/${TRAIN_BUILD_FOLDER}/"
-#     mkdir -p "$TPUTRAIN_TOP/${TRAIN_BUILD_FOLDER}/"
-#   fi
-#   if [ ! -d "$TPUTRAIN_TOP/${TRAIN_BUILD_FOLDER}/" ]; then
-#     echo "Couldn't find path $TPUTRAIN_TOP/${TRAIN_BUILD_FOLDER}/"
-#     return -1
-#   fi
-#   pushd $TPUTRAIN_TOP/${TRAIN_BUILD_FOLDER}/
-#   cores=$(($(nproc)-2))
-#   cmake .. -DCMAKE_BUILD_TYPE=Debug -DUSING_CMODEL=ON -DPCIE_MODE=OFF -DSOC_MODE=OFF
-#   make -j$cores
-#   ret=$?
-#   popd
-#   if [ $ret -ne 0 ]; then return $ret; fi
-# }
-
-# function rebuild_all()
-# {
-#   build_all 1
-# }
-
-export TRAIN_BUILD_FOLDER=build
-
-export PATH=$PATH:$TPUTRAIN_TOP/third_party/openmpi/bin
-export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:$TPUTRAIN_TOP/third_party/openmpi/lib
-export OPAL_PREFIX=$TPUTRAIN_TOP/third_party/openmpi
-export MASTER_ADDR=127.0.0.1
-export MASTER_PORT=6000
+function openmpi()
+{
+  export PATH=$PATH:$TPUTRAIN_TOP/third_party/openmpi/bin
+  export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:$TPUTRAIN_TOP/third_party/openmpi/lib
+  export OPAL_PREFIX=$TPUTRAIN_TOP/third_party/openmpi
+}
 
 function new_build()
 {

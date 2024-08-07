@@ -8,8 +8,11 @@ import torch_tpu
 TPU = "tpu"
 
 # get rank and world_size from env
-rank = os.environ.get("OMPI_COMM_WORLD_RANK", 0)
-world_size = os.environ.get("OMPI_COMM_WORLD_SIZE", 1)
+rank = os.environ.get("LOCAL_RANK")
+world_size = os.environ.get("LOCAL_WORLD_SIZE")
+if rank == None:
+    rank = os.environ.get("OMPI_COMM_WORLD_RANK", 0)
+    world_size = os.environ.get("OMPI_COMM_WORLD_SIZE", 1)
 
 tensor_len = 4
 # init dist and logger
@@ -21,10 +24,11 @@ options.chip_map = chip_map
 torch_tpu.tpu.set_device(options.chip_map[int(rank)])
 dist.init_process_group(backend="sccl", rank=int(rank), world_size=int(world_size), pg_options=options)
 init_logger()
+logger = logging.getLogger('sccl_logger')
 
 if is_slave():
     tensor = torch.zeros(tensor_len)
-    logging.info(tensor)
+    logger.info(tensor)
     print(tensor)
     device = torch.device(f"{TPU}:{chip_map[int(rank)]}")
     if torch_tpu.tpu.current_device() == device.index:
@@ -32,7 +36,7 @@ if is_slave():
 
 if is_master():
     tensor = torch.rand(tensor_len)
-    logging.info(tensor)
+    logger.info(tensor)
     print(tensor)
     device = torch.device(f"{TPU}:{chip_map[int(rank)]}")
     if torch_tpu.tpu.current_device() == device.index:
@@ -40,6 +44,6 @@ if is_master():
 
 dist.broadcast(tensor, src=0)
 
-logging.info(tensor.cpu())
+logger.info(tensor.cpu())
 
 # mpirun --allow-run-as-root  -n 8 -output-filename log python test_broadcast.py 2>&1 | tee 1.log

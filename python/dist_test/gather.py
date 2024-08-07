@@ -7,12 +7,17 @@ import torch_tpu
 import os
 TPU = "tpu"
 
-rank = os.environ.get("OMPI_COMM_WORLD_RANK", 0)
-world_size = os.environ.get("OMPI_COMM_WORLD_SIZE", 1)
+# get rank and world_size from env
+rank = os.environ.get("LOCAL_RANK")
+world_size = os.environ.get("LOCAL_WORLD_SIZE")
+if rank == None:
+    rank = os.environ.get("OMPI_COMM_WORLD_RANK", 0)
+    world_size = os.environ.get("OMPI_COMM_WORLD_SIZE", 1)
 
 torch_tpu.tpu.set_device(int(rank))
 dist.init_process_group(backend="scclHost", rank=int(rank), world_size=int(world_size))
 init_logger()
+logger = logging.getLogger('sccl_logger')
 
 if is_master():
     tensor = torch.tensor([3, 4]).to(TPU)
@@ -28,4 +33,4 @@ else:
     dist.gather(tensor, dst=0)
 
 results = [tensor.cpu() for tensor in tensor_list]
-logging.info("rank: {}, results: {}".format(rank, results))
+logger.info("rank: {}, results: {}".format(rank, results))

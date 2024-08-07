@@ -37,6 +37,7 @@ typedef enum {
 typedef struct tpuRtModule *tpuRtKernelModule_t;
 typedef struct tpuRtStream *tpuRtStream_t;
 typedef struct tpuRtEvent *tpuRtEvent_t;
+typedef struct tpuRtLaunchOutput *tpuRtLaunchOutput_t;
 typedef struct timeval tpuRtTimeRecord;
 typedef int (*pTpuRtStreamCallback)(void *);
 
@@ -47,6 +48,7 @@ tpuRtStatus_t tpuRtInit(void);
 tpuRtStatus_t tpuRtGetDeviceCount(int *count);
 tpuRtStatus_t tpuRtGetDevice(int *device);
 tpuRtStatus_t tpuRtSetDevice(int device);
+tpuRtStatus_t tpuRtFreeDevice(int device);
 tpuRtStatus_t tpuRtDeviceSynchronize(void);
 tpuRtStatus_t tpuRtMalloc(void **devPtr, unsigned long long size, int parallel_num);
 tpuRtStatus_t tpuRtFree(void **devPtr, int free_num);
@@ -71,10 +73,14 @@ tpuRtStatus_t tpuRtStreamSynchronize(tpuRtStream_t stream);
 tpuRtStatus_t tpuRtStreamAddCallback(tpuRtStream_t stream, pTpuRtStreamCallback callback, void *userData);
 tpuRtStatus_t tpuRtStreamWaitEvent(tpuRtStream_t stream, tpuRtEvent_t event);
 tpuRtStatus_t tpuRtEventCreate(tpuRtEvent_t *pEvent);
+tpuRtStatus_t tpuRtEventFree(tpuRtEvent_t pEvent, tpuRtStream_t stream);
+
 // tpuRtStatus_t sgEventDestroy(tpuRtEvent_t event);
 tpuRtStatus_t tpuRtEventRecord(tpuRtEvent_t event, tpuRtStream_t stream);
 tpuRtStatus_t tpuRtEventSynchronize(tpuRtEvent_t event);
 tpuRtStatus_t tpuRtEventElapsedTime(float *ms, tpuRtEvent_t start, tpuRtEvent_t end);
+
+tpuRtKernelModule_t tpuRtKernelLoadModuleFileForCV(const char *module_file, tpuRtStream_t stream);
 
 tpuRtKernelModule_t tpuRtKernelLoadModuleFile(const char *module_file, tpuRtStream_t stream);
 tpuRtKernelModule_t tpuRtKernelLoadModule(const char *data, size_t length, tpuRtStream_t stream);
@@ -82,6 +88,9 @@ tpuRtStatus_t tpuRtKernelLaunch(tpuRtKernelModule_t module, const char *func_nam
 			      uint64_t group_num, uint64_t block_num, tpuRtStream_t stream);
 tpuRtStatus_t tpuRtKernelLaunchAsync(tpuRtKernelModule_t module, const char *func_name, void *args,
 				   uint32_t size, uint64_t group_num, uint64_t block_num, tpuRtStream_t stream);
+tpuRtStatus_t tpuRtKernelLaunchCVOP(tpuRtKernelModule_t module, const char *func_name, void *args, uint32_t size,
+				uint32_t channel_num, uint32_t block_num,
+				tpuRtLaunchOutput_t output, tpuRtStream_t stream);
 tpuRtStatus_t tpuRtKernelUnloadModule(tpuRtKernelModule_t p_module, tpuRtStream_t stream);
 
 tpuRtStatus_t tpuRtGetUniqueId(char *uuid);

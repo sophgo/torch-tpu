@@ -106,13 +106,13 @@ function update_tpuv7()
 {
   export TPURT_TOP=$TPUTRAIN_TOP/../tpuv7-runtime
   pushd $TPURT_TOP
-  rm -rf build/emulator
-  mkdir -p build/emulator
-  cd build/emulator
-  cmake -DCMAKE_INSTALL_PREFIX=$PWD/../install  -DUSING_CMODEL=ON ../..
+  rm -rf build/emulator-onednn
+  mkdir -p build/emulator-onednn
+  cd build/emulator-onednn
+  cmake -DCMAKE_INSTALL_PREFIX=$PWD/../install -DUSING_CMODEL=ON -DUSING_ONEDNN=ON ../..
   make -j$(nproc)
   make install
   popd
   rm -rf $TPUTRAIN_TOP/third_party/tpuv7_runtime/tpuv7-emulator_0.1.0/
-  cp -r $TPURT_TOP/build/install/tpuv7-runtime-emulator_0.1.0 $TPUTRAIN_TOP/third_party/tpuv7_runtime/tpuv7-emulator_0.1.0/
+  cp -r $TPURT_TOP/build/install/tpuv7-runtime-emulator-onednn_0.1.0 $TPUTRAIN_TOP/third_party/tpuv7_runtime/tpuv7-emulator_0.1.0/
 }

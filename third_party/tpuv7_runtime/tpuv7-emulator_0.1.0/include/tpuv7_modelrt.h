@@ -57,12 +57,9 @@ typedef struct {
   const char **names;
   float *scales;
   int *zero_points;
-  size_t *max_bytes;
   tpuRtDataType_t *dtypes;
 } tpuRtIOInfo_t;
 
-/* tpu_tensor_info_t holds all information of one net.
- * scale for float type is 1.0 as default */
 typedef struct tpu_net_info_s {
   char const *name; /* net name */
   bool is_dynamic;  /* dynamic or static */
@@ -83,13 +80,15 @@ tpuRtStatus_t tpuRtLoadNet(const char *net_path, tpuRtNetContext_t context,
 tpuRtStatus_t tpuRtLoadNetFromMem(const void *net_data, size_t size,
                                   tpuRtNetContext_t context, tpuRtNet_t *net);
 tpuRtStatus_t tpuRtUnloadNet(tpuRtNet_t net);
-tpuRtNetInfo_t tpuRtGetNetInfo(const tpuRtNet_t net);
-tpuRtStatus_t tpuRtLaunchNetAsync(tpuRtNet_t *net, const tpuRtTensor_t input[],
+tpuRtNetInfo_t tpuRtGetNetInfo(const tpuRtNet_t net, const char *name);
+tpuRtStatus_t tpuRtLaunchNetAsync(tpuRtNet_t net, const tpuRtTensor_t input[],
                                   tpuRtTensor_t output[], const char *net_name,
                                   tpuRtStream_t stream);
-tpuRtStatus_t tpuRtLaunchNet(tpuRtNet_t *net, const tpuRtTensor_t input[],
+tpuRtStatus_t tpuRtLaunchNet(tpuRtNet_t net, const tpuRtTensor_t input[],
                              tpuRtTensor_t output[], const char *net_name,
                              tpuRtStream_t stream);
+int tpuRtGetNetNames(const tpuRtNet_t net, char ***names);
+void tpuRtFreeNetNames(char **names);
 
 #ifdef __cplusplus
 }

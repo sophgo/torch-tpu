@@ -62,7 +62,7 @@ function test_sccl() {
     echo "################################"
 
     ret=0
-    mpirun --use-hwthread-cpus  -n ${NODES} --allow-run-as-root -output-filename log python3 $TEST_DIR/$1 || ret=1
+    torchrun --nproc_per_node ${NODES} --nnodes 1 $TEST_DIR/$1 || ret=1
     if [ $ret -ne 0 ]; then
       echo "test sccl case: $1 failed"
       popd
