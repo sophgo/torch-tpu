@@ -15,7 +15,7 @@ directory_stack  = []
 apply_table = [
     ["transformers"   , "4.41.2" , "transformers-Sophgo"        ],
     ["accelerate"     , "0.30.1" , "accelerate-Sophgo"    ],
-    # ["llamafactory"   , "0.8.3"  , "LLaMA-Factory-Sophgo" ]
+    ["llamafactory"   , "0.8.3"  , "LLaMA-Factory-Sophgo" ]
 ]
 
 def pushd(path):

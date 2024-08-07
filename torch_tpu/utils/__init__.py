@@ -17,6 +17,6 @@ from .module import apply_module_patch
 from .storage import add_storage_methods
 from .serialization import add_serialization_methods
 from .device_guard import apply_device_patch
-
+from .apply_revert_patch import apply_all_patches, revert_all_patches
 
 __all__ = []

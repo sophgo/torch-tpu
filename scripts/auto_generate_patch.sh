@@ -1,26 +1,33 @@
 set -ex
 TPUTRAIN_TOP=$(cd $(dirname "${BASH_SOURCE[0]}")/.. && pwd)
-function command_with_check()
-{
-    command=$1
-    ret=$(eval $command)
-    if [ $? -ne 0 ]; then
-        echo "Error: $command"
-        exit 1
-    fi
-}
 
 
 function generate_patch()
 {
-    package_name=$1
-    target_dir=$TPUTRAIN_TOP/torch_tpu/demo/patch/
-    echo "Current patch"
-    pushd $TPUTRAIN_TOP/../$package_name
-    ret=`git diff HEAD remotes/origin/sophgo > $target_dir"${package_name}-Sophgo.patch"`
-    popd
+    local target_dir=$TPUTRAIN_TOP/torch_tpu/demo/patch
+    local package_name=$1
+    echo "Current patch:" ${package_name}
+    local package_dir=$TPUTRAIN_TOP/../${package_name}
+    # we assume that the package is up-to-date in the same directory as torch-tpu
+    if [ ! -d ${package_dir} ]; then\
+        echo "Error: ${package_dir} not exist"
+        return 1
+    fi
+    pushd ${package_dir} || return 1
+    trap "popd" RETURN
+    # git fetch origin || return 1
+    git reset --hard origin/master || return 1
+    git diff HEAD remotes/origin/sophgo > ${target_dir}/${package_name}-Sophgo.patch || return 1
+    
+    local commit_id=$(git rev-parse HEAD)
+    local tag=$(git describe --tags HEAD 2>/dev/null)
+    sed -i "s/${package_name}_commit_id/${commit_id}/g" ${target_dir}/README.md || return 1
+    sed -i "s/${package_name}_commit_tag/${tag}/g" ${target_dir}/README.md || return 1
+    echo "Patch generated for" ${package_name}
+    return 0
 }
 
-# generate_patch transformers
-# generate_patch accelerate
-# generate_patch LLaMA-Factory
+for package in transformers accelerate LLaMA-Factory
+do
+    generate_patch $package || exit -1
+done

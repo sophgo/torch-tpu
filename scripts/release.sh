@@ -6,6 +6,7 @@ pushd $CUR_DIR/..
 source scripts/envsetup.sh
 export RELEASE_MODE=ON
 TORCH_TPU_NONINTERACTIVE=ON python setup.py clean
+bash scripts/auto_generate_patch.sh || exit -1
 bdist_wheel || exit -1
 
 unset RELEASE_MODE

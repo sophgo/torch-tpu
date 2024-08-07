@@ -1,12 +1,14 @@
 diff --git a/src/transformers/sophgo.py b/src/transformers/sophgo.py
 new file mode 100644
-index 000000000..1b894a34f
+index 000000000..a0b7b63db
 --- /dev/null
 +++ b/src/transformers/sophgo.py
-@@ -0,0 +1,5 @@
+@@ -0,0 +1,7 @@
 +# ==============================================================================
 +#
 +# Copyright (C) 2022 Sophgo Technologies Inc.  All rights reserved.
++#
++# This file for check sign.
 +#
 +# ==============================================================================
 diff --git a/src/transformers/training_args.py b/src/transformers/training_args.py
