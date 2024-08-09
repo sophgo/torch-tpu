@@ -35,7 +35,7 @@ elseif ($ENV{CHIP_ARCH} STREQUAL "sg2260")
 
     find_library(
         firmware_LIBRARY
-        NAMES firmware_core
+        NAMES libfirmware_core.a
         HINTS
         $ENV{TPUTRAIN_TOP}/../TPU1686/build_fw_$ENV{CHIP_ARCH}/firmware_core/
         $ENV{TPUTRAIN_TOP}/third_party/firmware/$ENV{CHIP_ARCH}/)
