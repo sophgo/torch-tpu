@@ -348,7 +348,10 @@ class bdist_wheel(_bdist_wheel, ExtBase):
         tpuDNN_libs = glob.glob(os.path.join(BASE_DIR, 'third_party/tpuDNN/*_lib/*.so'))
         for lib in tpuDNN_libs:
             target = re.match('.+tpuDNN/(\w+)_lib.+', lib).group(1)
-            self.copy_file(lib, os.path.join(pkg_dir, f'lib/libtpudnn.{target}.so'))
+            if 'tpudnn' in lib:
+                self.copy_file(lib, os.path.join(pkg_dir, f'lib/libtpudnn.{target}.so'))
+            else:
+                self.copy_file(lib, os.path.join(pkg_dir, f'lib/'))
 
         super().run()
 
