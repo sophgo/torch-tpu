@@ -17,10 +17,6 @@ add_compile_options(-std=c++17 -Wno-attributes -Wall -fPIC)
 add_definitions("-D_GLIBCXX_USE_CXX11_ABI=0")
 add_definitions("-DPYBIND11_BUILD_ABI=\"_cxxabi1011\"")
 
-## runtime
-include_directories(${RUNTIME_INCLUDE_PATH})
-link_directories(${RUNTIME_LIB_PATH})
-
 ## pytorch
 if (DEFINED PYTORCH_INSTALL_DIR)
   include_directories(${PYTORCH_INSTALL_DIR}/include/torch/csrc/api/include)
@@ -110,14 +106,20 @@ target_link_libraries(torch_tpu TPU1686::tpuDNN c10 torch_cpu)
 get_filename_component(tpuDNNPath ${tpuDNN_LIBRARY} DIRECTORY)
 
 if(BACKEND_1684X)
+  include_directories(${RUNTIME_INCLUDE_PATH})
+  target_link_directories(torch_tpu PRIVATE ${RUNTIME_LIB_PATH})
   target_link_libraries(torch_tpu sgdnn bmlib)
   set_target_properties(torch_tpu PROPERTIES INSTALL_RPATH
       "$ORIGIN;$ORIGIN/../../third_party/bmlib/lib;${tpuDNNPath}")
   install(TARGETS torch_tpu DESTINATION lib)
 elseif(BACKEND_SG2260)
   if (EXISTS ${CMAKE_SOURCE_DIR}/../tpuv7-runtime)
+    include_directories(${CMAKE_SOURCE_DIR}/../tpuv7-runtime/cdmlib/host/cdm_runtime/include)
     set(tpuv7_rpath "$ORIGIN/../../../tpuv7-runtime/build/cdmlib/host/cdm_runtime")
+    target_link_directories(torch_tpu PRIVATE "${CMAKE_SOURCE_DIR}/../tpuv7-runtime/build/cdmlib/host/cdm_runtime")
   else()
+    include_directories(${RUNTIME_INCLUDE_PATH})
+    target_link_directories(torch_tpu PRIVATE ${RUNTIME_LIB_PATH})
     set(tpuv7_rpath "$ORIGIN/../../third_party/tpuv7_runtime/tpuv7-emulator_0.1.0/lib")
   endif()
   set_target_properties(torch_tpu PROPERTIES INSTALL_RPATH

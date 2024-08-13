@@ -77,6 +77,7 @@ tpuRtStatus_t tpuRtEventFree(tpuRtEvent_t pEvent, tpuRtStream_t stream);
 
 // tpuRtStatus_t sgEventDestroy(tpuRtEvent_t event);
 tpuRtStatus_t tpuRtEventRecord(tpuRtEvent_t event, tpuRtStream_t stream);
+tpuRtStatus_t tpuRtEventQuery(tpuRtEvent_t event);
 tpuRtStatus_t tpuRtEventSynchronize(tpuRtEvent_t event);
 tpuRtStatus_t tpuRtEventElapsedTime(float *ms, tpuRtEvent_t start, tpuRtEvent_t end);
 

@@ -4,6 +4,7 @@
 #include <iostream>
 #include <c10/util/Logging.h>
 #include <c10/core/DeviceType.h>
+#include <sys/time.h>
 #include "TPUDeviceManager.h"
 
 #ifdef BACKEND_SG2260
@@ -14,8 +15,34 @@ namespace tpu
 {
 using Devptr = unsigned char *;
 
+size_t getTPUAllocatorFreeDelay()
+{
+  const char *delay = getenv("TPU_ALLOCATOR_FREE_DELAY_IN_MS");
+  if (!delay) return 0;
+  return atoi(delay);
+}
+
+bool getEnableAllocatorReuse()
+{
+  const char *reuseEnabled = getenv("TPU_ALLOCATOR_REUSE");
+  if (!reuseEnabled) return true;
+  return atoi(reuseEnabled);
+}
+
 class TPUDeviceManager
 {
+private:
+  struct MemToFree {
+    void *ptr;
+    tpuRtEvent_t event;
+    tpuRtStream_t stream;
+    uint64_t freed_timestamp = 0;
+  };
+
+  struct MemInfo {
+    size_t size;
+  };
+
 public:
   TPUDeviceManager() : init_flag_(false) {}
 
@@ -55,12 +82,16 @@ public:
     TORCH_CHECK ( Status == tpuRtSuccess, "Failed to get TPU device count" );
     if ( DeviceCount > 0 )
     {
-      Mutexes_ = std::vector<std::mutex> ( DeviceCount );
-      AddrMemMaps_ = std::vector<std::unordered_set<Devptr>> ( DeviceCount );
+      mutexes_ = std::vector<std::mutex>(DeviceCount);;
+      free_tbds_.resize(DeviceCount);
+      mem_info_.resize(DeviceCount);
+
       devices_init_ = std::vector<std::atomic<bool>> ( DeviceCount );
+      device_count_ = DeviceCount;
       devices_init_[0] = 1; // tpuRtDeviceInit will default set idx = 0 device. that not a good idea.
     }
     SOPHON_LOG("TPU Device Manager init successfully\n");
+    free_delay_ = getTPUAllocatorFreeDelay();
     init_flag_ = true;
     return INIT_SUCCESS;
   }
@@ -82,41 +113,123 @@ public:
 
   int GetDeviceCount() const
   {
-    return ( int ) AddrMemMaps_.size();
+    return device_count_;
+  }
+
+  size_t getSize(void *ptr, int i)
+  {
+    auto &mem_info = getMemInfo(i);
+    if (mem_info.find(ptr) == mem_info.end())
+    {
+      return 0;
+    }
+    return mem_info[ptr].size;
+  }
+
+  void *processFreeTBDs(size_t size, int index)
+  {
+    struct timeval t;
+    gettimeofday ( &t, NULL );
+    uint64_t now = (t.tv_sec * 1000000UL + t.tv_usec) / 1000UL;
+
+    std::lock_guard<std::mutex> lock(getMutex(index));
+
+    void *reusedPtr = nullptr;
+    std::vector<void *> toRm;
+    auto &freeTBDs = getFreeTBDs(index);
+    bool reuseEnabled = getEnableAllocatorReuse();
+    for (auto pair : freeTBDs)
+    {
+      auto &event = pair.second.event;
+      auto &tbd = pair.second;
+      if (tbd.freed_timestamp == 0)
+      {
+        if (tpuRtEventQuery(event) != tpuRtDevnotready)
+        {
+          tbd.freed_timestamp = now;
+        } else continue;
+      }
+
+      if (reuseEnabled && !reusedPtr && getSize(tbd.ptr, index) == size)
+      {
+        // Reuse it
+        toRm.push_back(tbd.ptr);
+        reusedPtr = tbd.ptr;
+        std::cout << "Re-use " << reusedPtr << std::endl;
+        continue;
+      }
+
+      if (tbd.freed_timestamp + free_delay_ > now)
+        continue;
+
+      std::cout << "Raw free " << tbd.ptr << std::endl;
+      tpuRtFree(&tbd.ptr, NO_USE);
+      getMemInfo(index).erase(tbd.ptr);
+      toRm.push_back(tbd.ptr);
+    }
+
+    for (auto ptr : toRm)
+    {
+      auto &tbd = freeTBDs[ptr];
+      tpuRtEventFree(tbd.event, tbd.stream);
+      freeTBDs.erase(ptr);
+    }
+
+    return reusedPtr;
   }
 
   void * Alloc ( size_t Size, int Index )
   {
-    Mutexes_[Index].lock();
+    auto reused = processFreeTBDs(Size, Index);
+    if (reused) return reused;
+
     if ( Size == 0 )
     {
-      Mutexes_[Index].unlock();
       return nullptr;
     }
     Devptr dev_ptr;
     tpuRtStatus_t Status = tpuRtMalloc((void **)(&dev_ptr), Size, NO_USE);
     TORCH_CHECK ( Status == tpuRtSuccess, "Failed to allocate memory on TPU device #", Index, " size = ", Size, "bytes" );
-    AddrMemMaps_[Index].insert ( dev_ptr );
 
-    Mutexes_[Index].unlock();
-    return ( void * ) UnifiedAddr((unsigned long long) dev_ptr, Index);
+    MemInfo info;
+    info.size = Size;
+    auto ptr = ( void * ) UnifiedAddr((unsigned long long) dev_ptr, Index);
+    std::lock_guard<std::mutex> lock(getMutex(Index));
+    getMemInfo(Index)[ptr] = info;
+
+    std::cout << "Alloc " << ptr << std::endl;
+
+    return ptr;
   }
 
   void Free ( void * Ptr, int Index )
   {
-    Mutexes_[Index].lock();
     if ( Ptr == nullptr )
     {
-      Mutexes_[Index].unlock();
       return;
     }
-    auto Iter = AddrMemMaps_[Index].find ( ( Devptr ) Ptr );
-    TORCH_CHECK ( Iter != AddrMemMaps_[Index].end(), "Memory of address = ", Ptr, " is not found" );
-    AddrMemMaps_[Index].erase ( (Devptr) Ptr );
-    auto stream = c10_tpu::getDefaultTPUStream();
-    tpuRtStreamSynchronize(stream);
-    tpuRtFree((void **)&Ptr, NO_USE);
-    Mutexes_[Index].unlock();
+
+    std::cout << "Free " << Ptr << std::endl;
+
+    MemToFree tbd;
+    tbd.stream = c10_tpu::getCurrentTPUStream();
+    std::lock_guard<std::mutex> lock(getMutex(Index));
+
+    auto &memInfo = getMemInfo(Index);
+    if (memInfo.find(Ptr) == memInfo.end())
+      return;
+
+    auto &freeTBDs = getFreeTBDs(Index);
+    if (freeTBDs.find(Ptr) != freeTBDs.end())
+      return;
+
+    tbd.ptr = Ptr;
+
+    auto status = tpuRtEventCreate(&tbd.event);
+    TORCH_CHECK (status == tpuRtSuccess, "Failed to create event");
+    status = tpuRtEventRecord(tbd.event, tbd.stream);
+    TORCH_CHECK (status == tpuRtSuccess, "Failed to record stream");
+    freeTBDs[Ptr] = tbd;
   }
 
   void CopyHostToDevice ( void * Dst, const void * Src, size_t Size, int Index, bool non_blocking )
@@ -174,11 +287,16 @@ public:
   }
 
 private:
-  std::mutex& get_handle_mutex(int i) { return Mutexes_[i]; }
-  std::unordered_set<Devptr>& getAddrMems(int i) { return AddrMemMaps_[i]; }
+  std::mutex& getMutex(int i) { return mutexes_[i]; }
+  std::unordered_map<void *, MemInfo>& getMemInfo(int i) { return mem_info_[i]; }
+  std::unordered_map<void *, MemToFree> &getFreeTBDs(int i) { return free_tbds_[i]; }
 
-  std::vector<std::mutex> Mutexes_;
-  std::vector<std::unordered_set<Devptr>> AddrMemMaps_;
+  std::vector<std::mutex> mutexes_;
+  std::vector<std::unordered_map<void *, MemToFree>> free_tbds_;
+  std::vector<std::unordered_map<void *, MemInfo>> mem_info_;
+
+  int device_count_;
+  size_t free_delay_;
   std::atomic<bool> init_flag_;
   std::vector<std::atomic<bool>> devices_init_;
 
