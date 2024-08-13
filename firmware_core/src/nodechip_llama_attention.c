@@ -123,7 +123,7 @@ int tpu_kernel_llama_attention_multi_core(const void* api_buf) {
         api-> block_size,
         (data_type_t)api-> dtype,
         api-> qkv_packed,
-        0); // page_kv_cache_layout
+        1); // page_kv_cache_layout
     tpu_poll();
     return 0;
 }
