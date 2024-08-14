@@ -63,7 +63,13 @@ Tensor _copy_from_tpu(const Tensor &self, const Tensor &dst,
       auto dst_cpu = self.cpu().to ( dst.dtype() );
       tpu::TPUCopyHostToDevice ( dst.data_ptr(), dst_cpu.contiguous().data_ptr(), dst.nbytes(), non_blocking );
 #else
-      if ( !tpu::IsSupportDtype(self.dtype()) || !tpu::IsSupportDtype( dst.dtype() ))
+      if(tpu::TPUConvertDtype<SgdnnDataType_t>(self.dtype()) == SGDNN_DTYPE_INT64 && tpu::TPUConvertDtype<SgdnnDataType_t>(dst.dtype()) == SGDNN_DTYPE_INT32) {
+        sgdnnConvertInt64toInt32(
+          tpu::TPUGetDeviceResource(),
+          tpu::TPUGenerateSgdnnTensor(self),
+          tpu::TPUGenerateSgdnnTensor(dst),
+          non_blocking);
+      } else if ( !tpu::IsSupportDtype(self.dtype()) || !tpu::IsSupportDtype( dst.dtype() ))
       {
         CPU_IMPL_WARNING("unsupport dtype.");
         TIMING_START;
