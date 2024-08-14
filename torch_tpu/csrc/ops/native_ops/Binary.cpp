@@ -57,7 +57,7 @@ Tensor &binary_op_tpu(const Tensor &self, const Tensor &other,
       TORCH_CHECK(status == SG_SUCCESS);
       TIMING_END(tpu::BINARYOP_C);
     }
-    if(out.dtype() == torch::kInt32){
+    if(out.dtype() == torch::kInt64){
       out = out_.to(torch::kInt64);
     }else{
       out = out_;
