@@ -69,10 +69,6 @@ namespace at
 			CHECK_TENSOR_IN_DEVICE(fetch_slots.value());
 		if (mask.has_value())
 			CHECK_TENSOR_IN_DEVICE(mask.value());
-		int Ntotal = 0;
-		for (int i=0; i<input_lengths.size(0); ++i){
-			Ntotal = Ntotal + input_lengths[i].item().toInt();
-		}
 
 #ifdef TPU_OP_TIMING
 		auto timer = tpu::Timer().Start();
@@ -95,8 +91,7 @@ namespace at
 			mask_size,
 			block_size,
 			C,
-			attention_mode,
-			Ntotal);
+			attention_mode);
 		TORCH_CHECK(status == SG_SUCCESS);
 
 #ifdef TPU_OP_TIMING

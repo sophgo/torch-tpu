@@ -1108,7 +1108,6 @@ tpu_status_t sgdnnLlamaAttention ( tpu_resource_t resource,
                                   int block_size,
                                   float C,
                                   int attention_mode,
-                                  int Ntotal,
                                   bool non_blocking = true);
 
 /*
