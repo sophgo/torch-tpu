@@ -42,29 +42,15 @@ Tensor & addmm_out_tpu ( const Tensor & self, const Tensor & mat1, const Tensor 
     auto mat2_ = mat2.is_contiguous() == false && is_transposed ( mat2 ) == false ? mat2.contiguous() : mat2;
 
     TIMING_START;
-    auto self_ = self;
-    auto out_  = out;
-    if (self.dtype() == torch::kFloat32 )
-    {
-      mat1_ = mat1_.to(torch::kFloat16);
-      mat2_ = mat2_.to(torch::kFloat16);
-      self_  = self.to(torch::kFloat16);
-      out_   = out.to(torch::kFloat16);
-    }
 
     auto stream = c10_tpu::getCurrentTPUStream();
     auto status = tpudnnMatmulAsync(
       stream,
       tpu::TPUGenerateTpudnnTensor(stream, mat1_),
       tpu::TPUGenerateTpudnnTensor(stream, mat2_),
-      tpu::TPUGenerateTpudnnTensor(stream, self_),
-      tpu::TPUGenerateTpudnnTensor(stream, out_));
+      tpu::TPUGenerateTpudnnTensor(stream, self),
+      tpu::TPUGenerateTpudnnTensor(stream, out));
     TORCH_CHECK ( status == TPUDNN_STATUS_SUCCESS );
-
-    if(self.dtype() == torch::kFloat32 )
-      out = out_.to(torch::kFloat32);
-    else
-      out = out_;
 
     TIMING_END( tpu::ADDMM );
   }
@@ -96,26 +82,16 @@ Tensor & mm_out_tpu ( const Tensor & self, const Tensor & mat2, Tensor & out )
   auto mat2_ = mat2.is_contiguous() == false && is_transposed ( mat2 ) == false ? mat2.contiguous() : mat2;
 
   TIMING_START;
-  auto out_  = out;
-  if(self.dtype() == torch::kFloat32 )
-  {
-    self_ = self_.to(torch::kFloat16);
-    mat2_ = mat2_.to(torch::kFloat16);
-    out_  = out_.to(torch::kFloat16);
-  }
+
   auto stream = c10_tpu::getCurrentTPUStream();
   auto status = tpudnnMatmulAsync(
     stream,
     tpu::TPUGenerateTpudnnTensor(stream, self_),
     tpu::TPUGenerateTpudnnTensor(stream, mat2_),
     tpudnnUndefinedTensor(),
-    tpu::TPUGenerateTpudnnTensor(stream, out_));
+    tpu::TPUGenerateTpudnnTensor(stream, out));
   TORCH_CHECK ( status == TPUDNN_STATUS_SUCCESS );
     TIMING_END( tpu::MM );
-    if(self.dtype() == torch::kFloat32 )
-      out = out_.to(torch::kFloat32);
-    else
-      out = out_;
 #endif
   SHOW_TENSOR_OP(self, mat2, out);
   return out;
@@ -138,30 +114,17 @@ Tensor & bmm_out_tpu ( const Tensor & self, const Tensor & mat2, Tensor & out )
   auto mat2_ = mat2.is_contiguous() == false && is_transposed ( mat2 ) == false ? mat2.contiguous() : mat2;
 
   TIMING_START;
-  auto out_  = out;
-  if(self.dtype() == torch::kFloat32 )
-  {
-    self_ = self_.to(torch::kFloat16);
-    mat2_ = mat2_.to(torch::kFloat16);
-    out_  = out_.to(torch::kFloat16);
-  }
-  else
-    out = out_;
+
   auto stream = c10_tpu::getCurrentTPUStream();
   auto status = tpudnnMatmulAsync(
     stream,
     tpu::TPUGenerateTpudnnTensor(stream, self_),
     tpu::TPUGenerateTpudnnTensor(stream, mat2_),
     tpudnnUndefinedTensor(),
-    tpu::TPUGenerateTpudnnTensor(stream, out_));
+    tpu::TPUGenerateTpudnnTensor(stream, out));
   TORCH_CHECK ( status == TPUDNN_STATUS_SUCCESS );
 
   TIMING_END( tpu::BMM );
-  if(self.dtype() == torch::kFloat32 )
-    out = out_.to(torch::kFloat32);
-  else
-    out = out_;
-  
 #endif
   SHOW_TENSOR_OP(self, mat2, out);
   return out;
