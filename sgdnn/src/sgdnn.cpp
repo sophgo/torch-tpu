@@ -412,7 +412,7 @@ tpu_status_t sgdnnConv2d ( tpu_resource_t resource ,
     SGDNN_CHECK ( sgdnnIsTensorContiguous ( &bias ) );
   }
   SGDNN_CHECK ( sgdnnIsTensorContiguous ( &output ) );
-  
+
   tpu_device_mem_t weight_reordered_mem, bias_fp32_mem;
   size_t weight_reordered_bytes = 0;
   if ( weight.dtype == SGDNN_DTYPE_FP16 || weight.dtype == SGDNN_DTYPE_BF16 )
@@ -489,7 +489,7 @@ tpu_status_t sgdnnConv2d ( tpu_resource_t resource ,
       sgdnnFreeDevice ( resource , bias_fp32_mem );
     }
   }
-  SGDNN_UNUSED ( weight_reordered_bytes );  
+  SGDNN_UNUSED ( weight_reordered_bytes );
   return SG_SUCCESS;
 }
 
@@ -4096,20 +4096,16 @@ tpu_status_t sgdnnLlamaAttention ( tpu_resource_t resource,
     SAFE_CALL(sgdnnMallocDeviceByte(resource, &Qbuffer_dev_mem, sgdnnTensorBytes(&Q)));
     SAFE_CALL(sgdnnMallocDeviceByte(resource, &Kbuffer_dev_mem, sgdnnTensorBytes(&K)));
     SAFE_CALL(sgdnnMallocDeviceByte(resource, &Vbuffer_dev_mem, sgdnnTensorBytes(&V)));
-  } else if (attention_mode == 3){
-    size_t buffer_bytes = sgdnnDataSize (K.dtype) * K.shape[1] * K.shape[2] * Ntotal ;
-    // SAFE_CALL(sgdnnMallocDeviceByte(resource, &Qbuffer_dev_mem, 0));
-    SAFE_CALL(sgdnnMallocDeviceByte(resource, &Kbuffer_dev_mem, buffer_bytes));
-    SAFE_CALL(sgdnnMallocDeviceByte(resource, &Vbuffer_dev_mem, buffer_bytes));
   }
   api.Qbuffer_global_addr = sgdnnGetDeviceAddr(Qbuffer_dev_mem);
   api.Kbuffer_global_addr = sgdnnGetDeviceAddr(Kbuffer_dev_mem);
   api.Vbuffer_global_addr = sgdnnGetDeviceAddr(Vbuffer_dev_mem);
   SAFE_CALL ( sgdnnTPUKernelLaunchMultiCore ( resource, "tpu_kernel_llama_attention_multi_core", &api, sizeof ( api ) , non_blocking) );
-  sgdnnFreeDevice ( resource , Kbuffer_dev_mem );
-  sgdnnFreeDevice ( resource , Vbuffer_dev_mem );
-  if (attention_mode == 2)
+  if (attention_mode == 2){
+    sgdnnFreeDevice ( resource , Kbuffer_dev_mem );
+    sgdnnFreeDevice ( resource , Vbuffer_dev_mem );
     sgdnnFreeDevice ( resource , Qbuffer_dev_mem );
+  }
 #else
   SGDNN_CHECK ( false );
 #endif
