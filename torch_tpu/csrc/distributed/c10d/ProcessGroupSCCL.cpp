@@ -150,23 +150,23 @@ void checkRemainingTime(
   }
 }
 
-tpudnnDataType_t toTpudnnDtype(::at::ScalarType type) {
-  tpudnnDataType_t dtype = TPUDNN_DTYPE_FP32;
+scclDataType_t toSCCLDtype(::at::ScalarType type) {
+  scclDataType_t dtype = SCCL_DTYPE_FP32;
   switch (type) {
   case ::at::ScalarType::Float:
-    dtype = TPUDNN_DTYPE_FP32;
+    dtype = SCCL_DTYPE_FP32;
     break;
   case ::at::ScalarType::Half:
-    dtype = TPUDNN_DTYPE_FP16;
+    dtype = SCCL_DTYPE_FP16;
     break;
   case ::at::ScalarType::Char:
-    dtype = TPUDNN_DTYPE_INT8;
+    dtype = SCCL_DTYPE_INT8;
     break;
   case ::at::ScalarType::Byte:
-    dtype = TPUDNN_DTYPE_UINT8;
+    dtype = SCCL_DTYPE_UINT8;
     break;
   case ::at::ScalarType::Int:
-    dtype = TPUDNN_DTYPE_INT32;
+    dtype = SCCL_DTYPE_INT32;
     break;
   default:
     TORCH_CHECK(false, "Invalid scalar type");
@@ -206,48 +206,6 @@ c10::intrusive_ptr<ProcessGroupSCCL::WorkSCCL> collective(
 
   return c10::make_intrusive<ProcessGroupSCCL::WorkSCCL>(output);
 }
-
-template <typename T, typename O>
-void setInputs(O &opts, std::vector<at::Tensor> &tensors) {
-  opts.setInputs(getDataPointers<T>(tensors), tensors[0].numel());
-}
-
-template <typename T, typename O>
-void setInput(O &opts, at::Tensor &tensor) {
-  opts.setInput(getDataPointer<T>(tensor), tensor.numel());
-}
-
-template <typename T, typename O>
-void setInput(O &opts, at::Tensor &tensor, std::vector<size_t> &counts) {
-  opts.setInput(getDataPointer<T>(tensor), counts);
-}
-
-template <typename T, typename O>
-void setInput(O &opts, at::Tensor &tensor, std::vector<int64_t> &counts) {
-  opts.setInput(getDataPointer<T>(tensor), counts);
-}
-
-template <typename T, typename O>
-void setOutputs(O &opts, std::vector<at::Tensor> &tensors) {
-  opts.setOutputs(getDataPointers<T>(tensors), tensors[0].numel());
-}
-
-template <typename T, typename O>
-void setOutput(O &opts, at::Tensor &tensor) {
-  opts.setOutput(getDataPointer<T>(tensor), tensor.numel());
-}
-
-template <typename T, typename O>
-void setOutput(O &opts, at::Tensor &tensor, std::vector<size_t> &counts) {
-  opts.setOutput(getDataPointer<T>(tensor), counts);
-}
-
-template <typename T, typename O>
-void setOutput(O &opts, at::Tensor &tensor, std::vector<int64_t> &counts) {
-  opts.setOutput(getDataPointer<T>(tensor), counts);
-}
-
-const auto kLoopbackAddress = "127.0.0.1";
 
 std::vector<at::Tensor> ProcessGroupSCCL::WorkSCCL::result() {
   TORCH_CHECK(isCompleted(),
@@ -291,38 +249,6 @@ void socketInitialize() {
 #ifdef _WIN32
   ::sophon::init_winsock();
 #endif
-}
-
-bool doesHostnameResolveToUsableAddress(const std::string &hostname) {
-  socketInitialize();
-  struct addrinfo hints;
-  memset(&hints, 0, sizeof(hints));
-  hints.ai_family = AF_UNSPEC;
-  hints.ai_socktype = SOCK_STREAM;
-  struct addrinfo *result;
-  auto rv = getaddrinfo(hostname.c_str(), nullptr, &hints, &result);
-  if (rv < 0) {
-    return false;
-  }
-  struct addrinfo *rp;
-  for (rp = result; rp != nullptr; rp = rp->ai_next) {
-    auto fd = socket(rp->ai_family, rp->ai_socktype, rp->ai_protocol);
-    if (fd == -1) {
-      continue;
-    }
-    rv = bind(fd, rp->ai_addr, rp->ai_addrlen);
-#ifdef _WIN32
-    closesocket(fd);
-#else
-    close(fd);
-#endif
-    if (rv == -1) {
-      continue;
-    }
-    break;
-  }
-  freeaddrinfo(result);
-  return rp != nullptr;
 }
 
 void ProcessGroupSCCL::broadcastUniqueSCCLID(scclUniqueId *scclID,
@@ -388,29 +314,30 @@ ProcessGroupSCCL::broadcast(std::vector<at::Tensor> &inputs,
 
   return collective(*this, inputs[opts.rootTensor], inputs[opts.rootTensor],
     [&](at::Tensor &input, at::Tensor &output,
-        scclComm_t comm, tpudnnHandle_t handle) {
+        scclComm_t comm, scclHandle_t handle) {
+      void *sendBuff = scclPhysToVirt(handle, GetAddrByUnifiedAddr((uint64_t)input.data_ptr()));
       return scclBroadcast(
-          (void *)GetAddrByUnifiedAddr((uint64_t)input.data_ptr()),
-          input.numel(), toTpudnnDtype(input.scalar_type()), opts.rootRank,
+          sendBuff,
+          input.numel(), toSCCLDtype(input.scalar_type()), opts.rootRank,
           comm, handle);
     });
 }
 
-inline tpudnnReduceType_t reduceMethod(const ReduceOp reduceOp){
-  tpudnnReduceType_t reduce_method = TPUDNN_REDUCE_SUM;
+inline scclReduceType_t toSCCLReduceOp(const ReduceOp reduceOp){
+  scclReduceType_t reduceMethod = SCCL_REDUCE_SUM;
 
     switch (reduceOp) {
     case ReduceOp::SUM:
-      reduce_method = TPUDNN_REDUCE_SUM;
+      reduceMethod = SCCL_REDUCE_SUM;
       break;
     case ReduceOp::PRODUCT:
-      reduce_method = TPUDNN_REDUCE_PROD;
+      reduceMethod = SCCL_REDUCE_PROD;
       break;
     case ReduceOp::MIN:
-      reduce_method = TPUDNN_REDUCE_MIN;
+      reduceMethod = SCCL_REDUCE_MIN;
       break;
     case ReduceOp::MAX:
-      reduce_method = TPUDNN_REDUCE_MAX;
+      reduceMethod = SCCL_REDUCE_MAX;
       break;
     case ReduceOp::BAND:
       TORCH_CHECK(false, "Cannot use ReduceOp.BAND with SCCL");
@@ -430,7 +357,7 @@ inline tpudnnReduceType_t reduceMethod(const ReduceOp reduceOp){
     case ReduceOp::UNUSED:
       break;
     }
-  return reduce_method;
+  return reduceMethod;
 }
 
 c10::intrusive_ptr<Work>
@@ -462,12 +389,14 @@ ProcessGroupSCCL::allreduce(std::vector<at::Tensor> &inputs,
   return collective(
     *this, inputs[0], inputs[0],
     [&](at::Tensor &input, at::Tensor &output, scclComm_t comm,
-        tpudnnHandle_t handle) {
-      tpudnnReduceType_t reduce_method = reduceMethod(opts.reduceOp);
+        scclHandle_t handle) {
+      scclReduceType_t reduceMethod = toSCCLReduceOp(opts.reduceOp);
+      const void * sendBuff = scclPhysToVirt(handle, GetAddrByUnifiedAddr((uint64_t)input.data_ptr()));
+      void *recvBuff = scclPhysToVirt(handle, GetAddrByUnifiedAddr((uint64_t)output.data_ptr()));
       return scclAllReduce(
-          (const void *)GetAddrByUnifiedAddr((uint64_t)input.data_ptr()),
-          (void *)GetAddrByUnifiedAddr((uint64_t)output.data_ptr()),
-          input.numel(), toTpudnnDtype(input.scalar_type()), reduce_method,
+          sendBuff,
+          recvBuff,
+          input.numel(), toSCCLDtype(input.scalar_type()), reduceMethod,
           comm, handle);
     });
 }
@@ -504,12 +433,14 @@ ProcessGroupSCCL::reduce(std::vector<at::Tensor> &inputs,
     *this, inputs[0],
     getRank() == opts.rootRank ? inputs[0] : flatOutputTensor,
     [&](at::Tensor &input, at::Tensor &output, scclComm_t comm,
-        tpudnnHandle_t handle) {
-      tpudnnReduceType_t reduce_method = reduceMethod(opts.reduceOp);
+        scclHandle_t handle) {
+      scclReduceType_t reduceMethod = toSCCLReduceOp(opts.reduceOp);
+      const void * sendBuff = scclPhysToVirt(handle, GetAddrByUnifiedAddr((uint64_t)input.data_ptr()));
+      void *recvBuff = scclPhysToVirt(handle, GetAddrByUnifiedAddr((uint64_t)output.data_ptr()));
       return scclReduce(
-          (const void *)GetAddrByUnifiedAddr((uint64_t)input.data_ptr()),
-          (void *)GetAddrByUnifiedAddr((uint64_t)output.data_ptr()),
-          input.numel(), toTpudnnDtype(input.scalar_type()), reduce_method,
+          sendBuff,
+          recvBuff,
+          input.numel(), toSCCLDtype(input.scalar_type()), reduceMethod,
           opts.rootRank, comm, handle);
     });
 }
@@ -559,11 +490,13 @@ ProcessGroupSCCL::allgather(std::vector<std::vector<at::Tensor>> &outputs,
   auto work = collective(
     *this, inputs[0], flatOutputTensor,
     [](at::Tensor &input, at::Tensor &output, scclComm_t comm,
-        tpudnnHandle_t handle) {
+        scclHandle_t handle) {
+      const void * sendBuff = scclPhysToVirt(handle, GetAddrByUnifiedAddr((uint64_t)input.data_ptr()));
+      void *recvBuff = scclPhysToVirt(handle, GetAddrByUnifiedAddr((uint64_t)output.data_ptr()));
       return scclAllGather(
-          (const void *)GetAddrByUnifiedAddr((uint64_t)input.data_ptr()),
-          (void *)GetAddrByUnifiedAddr((uint64_t)output.data_ptr()),
-          input.numel(), toTpudnnDtype(input.scalar_type()), comm, handle);
+          sendBuff,
+          recvBuff,
+          input.numel(), toSCCLDtype(input.scalar_type()), comm, handle);
     });
 
   // Unflatten into output tensors.
@@ -633,11 +566,13 @@ ProcessGroupSCCL::gather(std::vector<std::vector<at::Tensor>> &outputs,
   auto work = collective(
       *this, inputs[0], flatOutputTensor,
       [&](at::Tensor &input, at::Tensor &output, scclComm_t comm,
-          tpudnnHandle_t handle) {
+          scclHandle_t handle) {
+        const void * sendBuff = scclPhysToVirt(handle, GetAddrByUnifiedAddr((uint64_t)input.data_ptr()));
+        void *recvBuff = scclPhysToVirt(handle, GetAddrByUnifiedAddr((uint64_t)output.data_ptr()));
         return scclGather(
-            (const void *)GetAddrByUnifiedAddr((uint64_t)input.data_ptr()),
-            (void *)GetAddrByUnifiedAddr((uint64_t)output.data_ptr()),
-            input.numel(), toTpudnnDtype(input.scalar_type()), opts.rootRank, comm,
+            sendBuff,
+            recvBuff,
+            input.numel(), toSCCLDtype(input.scalar_type()), opts.rootRank, comm,
             handle);
       });
 
@@ -702,11 +637,13 @@ ProcessGroupSCCL::scatter(std::vector<at::Tensor> &outputs,
   return collective(
     *this, flatInputTensor, outputs[0],
     [&](at::Tensor &input, at::Tensor &output, scclComm_t comm,
-        tpudnnHandle_t handle) {
+        scclHandle_t handle) {
+      const void * sendBuff = scclPhysToVirt(handle, GetAddrByUnifiedAddr((uint64_t)input.data_ptr()));
+      void *recvBuff = scclPhysToVirt(handle, GetAddrByUnifiedAddr((uint64_t)output.data_ptr()));
       return scclScatter(
-          (const void *)GetAddrByUnifiedAddr((uint64_t)input.data_ptr()),
-          (void *)GetAddrByUnifiedAddr((uint64_t)output.data_ptr()),
-          output.numel(), toTpudnnDtype(output.scalar_type()), opts.rootRank, comm,
+          sendBuff,
+          recvBuff,
+          output.numel(), toSCCLDtype(output.scalar_type()), opts.rootRank, comm,
           handle);
     });
 }
@@ -736,16 +673,16 @@ c10::intrusive_ptr<Work> ProcessGroupSCCL::alltoall_base(
     invalidArgument(c10::str("unsupported device type ", device.type()));
   }
 
-  // invalidArgument("Not support alltoall_base when !(outputCounts.empty() && inputCounts.empty())");
-
   return collective(
     *this, inputTensor, outputTensor,
     [](at::Tensor &input, at::Tensor &output, scclComm_t comm,
-        tpudnnHandle_t handle) {
+        scclHandle_t handle) {
+      const void * sendBuff = scclPhysToVirt(handle, GetAddrByUnifiedAddr((uint64_t)input.data_ptr()));
+      void *recvBuff = scclPhysToVirt(handle, GetAddrByUnifiedAddr((uint64_t)output.data_ptr()));
       return scclAllToAll(
-          (const void *)GetAddrByUnifiedAddr((uint64_t)input.data_ptr()),
-          (void *)GetAddrByUnifiedAddr((uint64_t)output.data_ptr()),
-          output.numel(), toTpudnnDtype(output.scalar_type()), comm, handle);
+          sendBuff,
+          recvBuff,
+          output.numel(), toSCCLDtype(output.scalar_type()), comm, handle);
     });
 }
 
