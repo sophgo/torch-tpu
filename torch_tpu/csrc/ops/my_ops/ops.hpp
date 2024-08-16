@@ -173,4 +173,7 @@ namespace at
         Tensor &grad_gamma,
         Tensor &grad_beta);
 
+	void enable_pmu();
+
+	void disable_pmu();
 }

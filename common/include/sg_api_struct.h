@@ -1270,6 +1270,11 @@ typedef struct {
 #endif
 
 typedef struct {
+  int enable;
+} WITH_PLATFORM(sg_api_pmu_t);
+
+
+typedef struct {
   unsigned long long OUT_global_addr;
   unsigned long long Q_global_addr; // local mem data
   unsigned long long K_global_addr;

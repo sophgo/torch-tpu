@@ -4246,6 +4246,19 @@ tpu_status_t sgdnnRMSNorm ( tpu_resource_t  resource ,
   return SG_SUCCESS;
 }
 
+tpu_status_t sgdnnPMU(tpu_resource_t resource, int enable, bool non_blocking)
+{
+#if defined BACKEND_SG2260
+  sg_api_pmu_t api;
+  api.enable = enable;
+  SAFE_CALL(sgdnnTPUKernelLaunchMultiCore(resource, "tpu_kernel_pmu", &api, sizeof(api), non_blocking));
+  if(!enable) {
+    getPMU(resource);
+  }
+#endif
+  return SG_SUCCESS;
+}
+
 tpu_status_t sgdnnAttn ( tpu_resource_t resource ,
                           SgdnnTensor_t input,
                           SgdnnTensor_t w_attn,

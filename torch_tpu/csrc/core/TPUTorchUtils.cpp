@@ -289,7 +289,9 @@ static const char * OpTypeStr[OP_NUM] =
   "binary_op_bcast",
   "real",
   "Conj",
-  "Dummy"
+  "Dummy",
+  "ENABLE_PMU",
+  "DISABLE_PMU",
 };
 
 

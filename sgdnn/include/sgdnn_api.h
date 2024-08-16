@@ -5,6 +5,9 @@
 #include "sgdnn_runtime.h"
 #include <map>
 #include <vector>
+#ifdef BACKEND_SG2260
+#include "pmu.hpp"
+#endif
 
 
 #if defined(__cplusplus)
@@ -1175,6 +1178,7 @@ tpu_status_t sgdnnLLamaMlp ( tpu_resource_t  stream,
                           int block_num,
                           bool non_blocking = true);
 
+tpu_status_t sgdnnPMU(tpu_resource_t stream, int enable, bool non_blocking = true);
 /*
  * OUTPUT = MLP ( INPUT, WEIGHT0, ZP0, SCALE0, WEIGHT1, ZP1, SCALE1, WEIGHT2, ZP2, SCALE2, OUTPUT )
  * Note:

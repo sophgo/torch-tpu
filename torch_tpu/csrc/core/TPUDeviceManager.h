@@ -62,7 +62,7 @@ void TPUCopyHostToDevice ( void * Dst, const void * Src, size_t Size, bool non_b
  */
 void TPUCopyDeviceToHost ( void * Dst, const void * Src, size_t Size, bool non_blocking = false);
 
-void TPUCopyDeviceToDevice ( void * Dst, const void * Src, size_t Size, bool non_blocking = false);
+void TPUCopyDeviceToDevice ( void * Dst, const void * Src, size_t Size, bool non_blocking = true);
 
 #if defined BACKEND_1684X
 /**

@@ -509,6 +509,8 @@ typedef enum
   REAL,
   CONJ,
   DUMMY,
+  ENABLE_PMU,
+  DISABLE_PMU,
   OP_NUM
 }
 OpType;
