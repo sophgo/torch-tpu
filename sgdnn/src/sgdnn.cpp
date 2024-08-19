@@ -4192,9 +4192,10 @@ tpu_status_t sgdnnLlamaAttentionBackward ( tpu_resource_t resource,
                                   SgdnnTensor_t dV,
                                   SgdnnTensor_t cos,
                                   SgdnnTensor_t sin,
+                                  SgdnnTensor_t mask,
                                   SgdnnTensor_t input_lengths,
+                                  int mask_max,
                                   float C,
-                                  int Ntotal,
                                   bool non_blocking)
 {
   SGDNN_CHECK ( Q.dtype == O.dtype );
@@ -4219,6 +4220,10 @@ tpu_status_t sgdnnLlamaAttentionBackward ( tpu_resource_t resource,
     SGDNN_CHECK ( sgdnnIsTensorContiguous ( &cos ) );
     SGDNN_CHECK ( sgdnnIsTensorContiguous ( &sin ) );
   }
+  if (mask.addr != 0){
+    SGDNN_CHECK ( Q.dtype == mask.dtype );
+    SGDNN_CHECK ( mask.dim == 2 );
+  }
 
   SGDNN_CHECK ( sgdnnIsTensorContiguous ( &Q ) );
   SGDNN_CHECK ( sgdnnIsTensorContiguous ( &K ) );
@@ -4240,34 +4245,17 @@ tpu_status_t sgdnnLlamaAttentionBackward ( tpu_resource_t resource,
   api.dV_global_addr = dV.addr;
   api.cos_global_addr = cos.addr;
   api.sin_global_addr = sin.addr;
+  api.mask_global_addr = mask.addr;
   api.input_lengths_global_addr = input_lengths.addr;
   api.C = C;
+  api.mask_max = mask_max;
   api.dtype = sgdnnTPUKernelDType(Q.dtype);
   api.batch = input_lengths.shape[0];
   api.hidden_size = Q.shape[1] * Q.shape[2];
   api.q_heads = Q.shape[1];
   api.kv_heads = K.shape[1];
 
-  tpu_device_mem_t Qbuffer_dev_mem, Kbuffer_dev_mem, Vbuffer_dev_mem, Obuffer_dev_mem, dObuffer_dev_mem, lbuffer_dev_mem;
-  SAFE_CALL(sgdnnMallocDeviceByte(resource, &Qbuffer_dev_mem, sgdnnTensorBytes(&Q)));
-  SAFE_CALL(sgdnnMallocDeviceByte(resource, &Kbuffer_dev_mem, sgdnnTensorBytes(&K)));
-  SAFE_CALL(sgdnnMallocDeviceByte(resource, &Vbuffer_dev_mem, sgdnnTensorBytes(&V)));
-  SAFE_CALL(sgdnnMallocDeviceByte(resource, &Obuffer_dev_mem, sgdnnTensorBytes(&O)));
-  SAFE_CALL(sgdnnMallocDeviceByte(resource, &dObuffer_dev_mem, sgdnnTensorBytes(&dO)));
-  SAFE_CALL(sgdnnMallocDeviceByte(resource, &lbuffer_dev_mem, sgdnnTensorBytes(&l)));
-  api.Qbuffer_global_addr = sgdnnGetDeviceAddr(Qbuffer_dev_mem);
-  api.Kbuffer_global_addr = sgdnnGetDeviceAddr(Kbuffer_dev_mem);
-  api.Vbuffer_global_addr = sgdnnGetDeviceAddr(Vbuffer_dev_mem);
-  api.Obuffer_global_addr = sgdnnGetDeviceAddr(Obuffer_dev_mem);
-  api.dObuffer_global_addr = sgdnnGetDeviceAddr(dObuffer_dev_mem);
-  api.lbuffer_global_addr = sgdnnGetDeviceAddr(lbuffer_dev_mem);
   SAFE_CALL ( sgdnnTPUKernelLaunchMultiCore ( resource, "tpu_kernel_llama_attention_backward_multi_core", &api, sizeof ( api ) , non_blocking) );
-  sgdnnFreeDevice ( resource , Kbuffer_dev_mem );
-  sgdnnFreeDevice ( resource , Vbuffer_dev_mem );
-  sgdnnFreeDevice ( resource , Qbuffer_dev_mem );
-  sgdnnFreeDevice ( resource , Obuffer_dev_mem );
-  sgdnnFreeDevice ( resource , dObuffer_dev_mem );
-  sgdnnFreeDevice ( resource , lbuffer_dev_mem );
 #else
   SGDNN_CHECK ( false );
 #endif

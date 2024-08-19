@@ -125,7 +125,9 @@ namespace at
 		Tensor &dV,
 		const c10::optional<Tensor> &cos,
 		const c10::optional<Tensor> &sin,
+		const c10::optional<Tensor> &mask,
 		const Tensor &input_lengths,
+		int64_t mask_max,
 		double C
 		);
 

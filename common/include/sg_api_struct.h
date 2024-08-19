@@ -1316,15 +1316,11 @@ typedef struct {
   unsigned long long dV_global_addr;
   unsigned long long cos_global_addr;
   unsigned long long sin_global_addr;
+  unsigned long long mask_global_addr;
   unsigned long long input_lengths_global_addr;
-  unsigned long long Qbuffer_global_addr;
-  unsigned long long Kbuffer_global_addr;
-  unsigned long long Vbuffer_global_addr;
-  unsigned long long Obuffer_global_addr;
-  unsigned long long dObuffer_global_addr;
-  unsigned long long lbuffer_global_addr;
   float C;
   int batch;
+  int mask_max;
   int q_heads;
   int kv_heads;
   int hidden_size;

@@ -168,7 +168,9 @@ namespace at
 		Tensor &dV,
 		const c10::optional<Tensor> &cos,
 		const c10::optional<Tensor> &sin,
+		const c10::optional<Tensor> &mask,
 		const Tensor &input_lengths,
+		int64_t mask_max, // mask_size
 		double C // softmax_scale
 		)
 	{
@@ -186,11 +188,8 @@ namespace at
 			CHECK_TENSOR_IN_DEVICE(cos.value());
 		if (sin.has_value())
 			CHECK_TENSOR_IN_DEVICE(sin.value());
-
-		int Ntotal = 0;
-		for (int i=0; i<input_lengths.size(0); ++i){
-			Ntotal = Ntotal + input_lengths[i].item().toInt();
-		}
+		if (mask.has_value())
+			CHECK_TENSOR_IN_DEVICE(mask.value());
 
 #ifdef TPU_OP_TIMING
 		auto timer = tpu::Timer().Start();
@@ -208,9 +207,10 @@ namespace at
 			tpu::TPUGenerateSgdnnTensor(dV),
 			cos.has_value() ? tpu::TPUGenerateSgdnnTensor(cos.value()) : sgdnnUndefinedTensor(),
 			sin.has_value() ? tpu::TPUGenerateSgdnnTensor(sin.value()) : sgdnnUndefinedTensor(),
+			mask.has_value() ? tpu::TPUGenerateSgdnnTensor(mask.value()) : sgdnnUndefinedTensor(),
 			tpu::TPUGenerateSgdnnTensor(input_lengths),
-			C,
-			Ntotal);
+			mask_max,
+			C);
 		TORCH_CHECK(status == SG_SUCCESS);
 
 #ifdef TPU_OP_TIMING

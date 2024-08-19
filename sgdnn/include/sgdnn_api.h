@@ -1147,9 +1147,10 @@ tpu_status_t sgdnnLlamaAttentionBackward ( tpu_resource_t resource,
                                   SgdnnTensor_t dV,
                                   SgdnnTensor_t cos,
                                   SgdnnTensor_t sin,
+                                  SgdnnTensor_t mask,
                                   SgdnnTensor_t input_lengths,
+                                  int mask_max,
                                   float C,
-                                  int Ntotal,
                                   bool non_blocking = true);
 
 /*

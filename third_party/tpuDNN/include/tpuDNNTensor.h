@@ -861,6 +861,12 @@ tpudnnStatus_t tpudnnAdamBackwardMultiCoreAsync(
     bool amsgrad,
     bool maximize);
 
+tpudnnStatus_t tpudnnDropoutMultiCoreAsync(
+    tpudnnHandle_t handle,
+    tpudnnTensor_t input,
+    tpudnnTensor_t output,
+    const float drop_rate);
+
 tpudnnStatus_t tpudnnLoraMatmulForwardAsync(
     tpudnnHandle_t handle,
     tpudnnTensor_t input,
