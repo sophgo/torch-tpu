@@ -14,7 +14,6 @@ function generate_patch()
         return 1
     fi
     pushd ${package_dir} || return 1
-    trap "popd" RETURN
     # git fetch origin || return 1
     git reset --hard origin/master || return 1
     git diff HEAD remotes/origin/sophgo > ${target_dir}/${package_name}-Sophgo.patch || return 1
@@ -24,6 +23,7 @@ function generate_patch()
     sed -i "s/${package_name}_commit_id/${commit_id}/g" ${target_dir}/README.md || return 1
     sed -i "s/${package_name}_commit_tag/${tag}/g" ${target_dir}/README.md || return 1
     echo "Patch generated for" ${package_name}
+    popd
     return 0
 }
 

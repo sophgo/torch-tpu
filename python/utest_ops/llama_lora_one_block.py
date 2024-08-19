@@ -4,12 +4,16 @@ import os
 import sys
 import copy
 from top_utest import TensorComparator, set_bacis_info
-try:
-    import transformers
-    import peft
-    import accelerate
-except ImportError:
-    os.system("python3 -m pip install transformers==4.41.2 accelerate==0.30.1 peft==0.11.1")
+import pkg_resources
+from pkg_resources import DistributionNotFound, VersionConflict
+
+# now peft 0.12.0 will cause problem. So we fix the version of transformers and peft.
+for package, version in {"transformers": "4.41.2", "peft": "0.11.1"}.items():
+    try:
+        if pkg_resources.get_distribution(package).version != version:
+            raise VersionConflict
+    except (DistributionNotFound, VersionConflict):
+        os.system(f"python3 -m pip install {package}=={version}")
 
 os.environ["CMODEL_FAST_EXEC"]="1"
 from transformers import LlamaForCausalLM, LlamaConfig
@@ -23,6 +27,20 @@ def arange_wrapper(func):
             return ret.to(torch.int32)
     return wrapper
 torch.arange = arange_wrapper(torch.arange)
+
+# temporary fix for cross_entropy
+def ce_wrapper(func):
+    def wrapper(input, tensor, weight=None, *args, **kwargs):
+        input_cpu = input.cpu()
+        tensor_cpu = tensor.cpu()
+        if weight is not None:
+            weight_cpu = weight.cpu()
+        else:
+            weight_cpu = None
+        return func(input_cpu, tensor_cpu, weight_cpu, *args, **kwargs).to(input.device)
+    return wrapper
+
+torch.nn.functional.cross_entropy = ce_wrapper(torch.nn.functional.cross_entropy)
 
 llama_config_dict = {
     "bos_token_id": 1,
@@ -114,5 +132,4 @@ def case1():
     return status1 and status2
 
 if __name__ == "__main__":
-    pass # now this case has problem
-    # case1()
+    case1()
