@@ -169,8 +169,30 @@ TPUKERNEL_FUNC_REGISTER(tpu_kernel_api_real);
 #ifdef BACKEND_SG2260
 int tpu_kernel_api_real_multi_core(const void *args)
 {
+#ifdef BACKEND_SG2260
   TPUKERNEL_ASSERT_INFO(false, "not implementated");
   return 0;
+#else
+  sg_api_real_t *api = (sg_api_real_t *)args;
+  TPUKERNEL_ASSERT(api->dtype == DT_FP32 || api->dtype == DT_FP16 || api->dtype == DT_BFP16);
+  // printf("tpu_kernel_api_real:\n  api->dtype: %d  api->dim: %d\n", api->dtype, api->dim);
+  int length = 1;
+  for (int i = 0; i < api->dim; ++i)
+  {
+    length *= api->shape[i];
+    // printf("  api->shape[%d]: %d  api->input_stride: %d api->output_stride: %d\n", i, api->shape[i], api->input_stride[i], api->output_stride[i]);
+  }
+  tpu_initialize();
+  nodechip_scale_real(api->input_global_addr, 
+                      api->output_global_addr, 
+                      api->dim, 
+                      length, 
+                      api->input_stride, 
+                      api->output_stride, 
+                      (data_type_t)api->dtype);
+  tpu_poll();
+  return 0;
+#endif
 }
 TPUKERNEL_FUNC_REGISTER(tpu_kernel_api_real_multi_core);
 #endif

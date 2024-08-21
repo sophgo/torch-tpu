@@ -25,11 +25,13 @@ Tensor &threshold_backward_grad_input_tpu(const Tensor &grad_output,
   TIMING_END(tpu::CPU_LAYER);
 #else
   TIMING_START;
-  auto status = sgdnnReLUBackward(
-      tpu::TPUGetDeviceResource(), tpu::TPUGenerateSgdnnTensor(grad_output),
-      tpu::TPUGenerateSgdnnTensor(input),
-      tpu::TPUGenerateSgdnnTensor(grad_input));
-  TORCH_CHECK(status == SG_SUCCESS);
+  auto stream = c10_tpu::getCurrentTPUStream();
+  auto status = tpudnnReLUBackwardAsync(
+    stream,
+    tpu::TPUGenerateTpudnnTensor(stream, grad_output),
+    tpu::TPUGenerateTpudnnTensor(stream, input),
+    tpu::TPUGenerateTpudnnTensor(stream, grad_input));
+  TORCH_CHECK(status == TPUDNN_STATUS_SUCCESS);
   TIMING_END(tpu::RELU_BACKWARD);
 #endif
   SHOW_TENSOR_OP(grad_output, input, grad_input);
@@ -50,10 +52,12 @@ Tensor &gelu_out_tpu(const Tensor &self, c10::string_view approximate,
   auto self_ = self.contiguous();
   out = out.contiguous();
   TIMING_START;
-  auto status =
-      sgdnnGELU(tpu::TPUGetDeviceResource(), tpu::TPUGenerateSgdnnTensor(self_),
-                tpu::TPUGenerateSgdnnTensor(out));
-  TORCH_CHECK(status == SG_SUCCESS);
+  auto stream = c10_tpu::getCurrentTPUStream();
+  auto status = tpudnnGELUAsync(
+    stream,
+    tpu::TPUGenerateTpudnnTensor(stream, self_),
+    tpu::TPUGenerateTpudnnTensor(stream, out));
+  TORCH_CHECK(status == TPUDNN_STATUS_SUCCESS);
   TIMING_END(tpu::GELU);
 #endif
   SHOW_TENSOR_OP(self, out);
@@ -74,11 +78,13 @@ Tensor &gelu_backward_grad_input_tpu(const Tensor &grad_output,
 #else
   auto self_ = self.contiguous();
   TIMING_START;
-  auto status = sgdnnGELUBackward(
-      tpu::TPUGetDeviceResource(), tpu::TPUGenerateSgdnnTensor(grad_output),
-      tpu::TPUGenerateSgdnnTensor(self_),
-      tpu::TPUGenerateSgdnnTensor(grad_input));
-  TORCH_CHECK(status == SG_SUCCESS);
+  auto stream = c10_tpu::getCurrentTPUStream();
+  auto status = tpudnnGELUBackwardAsync(
+    stream,
+    tpu::TPUGenerateTpudnnTensor(stream, grad_output),
+    tpu::TPUGenerateTpudnnTensor(stream, self_),
+    tpu::TPUGenerateTpudnnTensor(stream, grad_input));
+  TORCH_CHECK(status == TPUDNN_STATUS_SUCCESS);
   TIMING_END(tpu::GELU_BACKWARD);
 #endif
   SHOW_TENSOR_OP(grad_output, self, grad_input);
@@ -97,10 +103,13 @@ Tensor &silu_out_tpu(const Tensor &self, Tensor &out) {
   out = out_cpu.to(out.device()).to(out.dtype());
 #else
   TIMING_START;
-  auto status =
-      sgdnnActive(tpu::TPUGetDeviceResource(), tpu::TPUGenerateSgdnnTensor(self),
-                  tpu::TPUGenerateSgdnnTensor(out), ACTIVE_SILU);
-  TORCH_CHECK(status == SG_SUCCESS);
+  auto stream = c10_tpu::getCurrentTPUStream();
+  auto status = tpudnnActiveAsync(
+    stream,
+    tpu::TPUGenerateTpudnnTensor(stream, self),
+    tpu::TPUGenerateTpudnnTensor(stream, out),
+    TPUDNN_ACTIVE_SILU);
+  TORCH_CHECK(status == TPUDNN_STATUS_SUCCESS);
   TIMING_END(tpu::SILU);
 #endif
   SHOW_TENSOR_OP(self, out);
@@ -117,10 +126,13 @@ Tensor &leakyrelu__tpu(Tensor &self, Scalar negative_slope) {
   return self;
 #else
   TIMING_START;
-  auto status = sgdnnLeakyReLU(
-      tpu::TPUGetDeviceResource(), tpu::TPUGenerateSgdnnTensor(self),
-      tpu::TPUGenerateSgdnnTensor(self), negative_slope.to<double>());
-  TORCH_CHECK(status == SG_SUCCESS);
+  auto stream = c10_tpu::getCurrentTPUStream();
+  auto status = tpudnnLeakyReLUAsync(
+    stream,
+    tpu::TPUGenerateTpudnnTensor(stream, self),
+    tpu::TPUGenerateTpudnnTensor(stream, self),
+    negative_slope.to<double>());
+  TORCH_CHECK(status == TPUDNN_STATUS_SUCCESS);
   TIMING_END(tpu::LEAKY_RELU);
   SHOW_TENSOR_OP(self);
   return self;
@@ -138,10 +150,13 @@ Tensor &leakyrelu_tpu(const Tensor &self, const Scalar &negative_slope,
   return self;
 #else
   TIMING_START;
-  auto status = sgdnnLeakyReLU(
-      tpu::TPUGetDeviceResource(), tpu::TPUGenerateSgdnnTensor(self),
-      tpu::TPUGenerateSgdnnTensor(out), negative_slope.to<double>());
-  TORCH_CHECK(status == SG_SUCCESS);
+  auto stream = c10_tpu::getCurrentTPUStream();
+  auto status = tpudnnLeakyReLUAsync(
+    stream,
+    tpu::TPUGenerateTpudnnTensor(stream, self),
+    tpu::TPUGenerateTpudnnTensor(stream, out),
+    negative_slope.to<double>());
+  TORCH_CHECK(status == TPUDNN_STATUS_SUCCESS);
   TIMING_END(tpu::LEAKY_RELU);
   SHOW_TENSOR_OP(self, out);
   return out;
@@ -163,10 +178,14 @@ Tensor & hardtanh_out_tpu(const Tensor &self, const Scalar &min_value,
   }
   else {
     TIMING_START;
-    auto status = sgdnnHardtanh(
-                            tpu::TPUGetDeviceResource(), tpu::TPUGenerateSgdnnTensor(self),
-                            min_value.toFloat(), max_value.toFloat(), tpu::TPUGenerateSgdnnTensor(out));
-    TORCH_CHECK(status == SG_SUCCESS);
+    auto stream = c10_tpu::getCurrentTPUStream();
+    auto status = tpudnnHardtanhAsync(
+      stream,
+      tpu::TPUGenerateTpudnnTensor(stream, self),
+      min_value.toFloat(),
+      max_value.toFloat(),
+      tpu::TPUGenerateTpudnnTensor(stream, out));
+    TORCH_CHECK(status == TPUDNN_STATUS_SUCCESS);
     TIMING_END(tpu::HARDTANH);
   }
   SHOW_TENSOR_OP(self, out);

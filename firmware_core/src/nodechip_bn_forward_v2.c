@@ -506,38 +506,13 @@ data_type_t   dtype )
   }
 }
 
-int tpu_kernel_api_batchnorm2d ( const void * args )
-{
-  sg_api_batchnorm2d_t *api = ( sg_api_batchnorm2d_t * ) args;
-  dim4 shape = { api->shape[0], api->shape[1], api->shape[2], api->shape[3] };
-  TPUKERNEL_ASSERT ( api->dtype == DT_FP32 || api->dtype == DT_FP16 || api->dtype == DT_BFP16 );
-  tpu_initialize();
-  nodechip_batchnorm2d_forward_training_parallel (
-  api->input_global_addr,
-  api->running_mean_global_addr,
-  api->running_var_global_addr,
-  api->weight_global_addr,
-  api->bias_global_addr,
-  api->saved_mean_global_addr,
-  api->saved_invstd_global_addr,
-  api->output_global_addr,
-  shape,
-  api->momentum,
-  api->eps,
-  ( data_type_t ) api->dtype );
-  tpu_poll();
-  return 0;
-}
-
-TPUKERNEL_FUNC_REGISTER ( tpu_kernel_api_batchnorm2d );
-
-#ifdef BACKEND_SG2260
 int tpu_kernel_api_batchnorm2d_multi_core ( const void * args )
 {
   sg_api_batchnorm2d_t *api = ( sg_api_batchnorm2d_t * ) args;
   dim4 shape = { api->shape[0], api->shape[1], api->shape[2], api->shape[3] };
   TPUKERNEL_ASSERT ( api->dtype == DT_FP32 || api->dtype == DT_FP16 || api->dtype == DT_BFP16 );
   tpu_initialize();
+#ifdef BACKEND_SG2260
   int core_idx = tpu_core_index();
   if(core_idx == 0){
     nodechip_batchnorm2d_forward_training_parallel (
@@ -556,6 +531,22 @@ int tpu_kernel_api_batchnorm2d_multi_core ( const void * args )
   }
   tpu_poll();
   return 0;
+#else
+  nodechip_batchnorm2d_forward_training_parallel (
+  api->input_global_addr,
+  api->running_mean_global_addr,
+  api->running_var_global_addr,
+  api->weight_global_addr,
+  api->bias_global_addr,
+  api->saved_mean_global_addr,
+  api->saved_invstd_global_addr,
+  api->output_global_addr,
+  shape,
+  api->momentum,
+  api->eps,
+  ( data_type_t ) api->dtype );
+  tpu_poll();
+  return 0;
+#endif
 }
 TPUKERNEL_FUNC_REGISTER ( tpu_kernel_api_batchnorm2d_multi_core );  
-#endif

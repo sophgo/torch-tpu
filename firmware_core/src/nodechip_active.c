@@ -339,27 +339,10 @@ void nodechip_active_v2(global_addr_t in_global_addr,
   }
 }
 
-int tpu_kernel_api_active(const void *args) {
-  sg_api_active_t *api = (sg_api_active_t *)args;
-  data_type_t dtype = (data_type_t)api->dtype;
-  TPUKERNEL_ASSERT(dtype == DT_FP32 || dtype == DT_FP16 || dtype == DT_BFP16);
-  tpu_initialize();
-  unsigned long long length = 1;
-  for (int i = 0; i < api->dim; i++) {
-    length *= (unsigned long long)api->shape[i];
-  }
-
-  nodechip_active_v2(api->input_global_addr, api->output_global_addr, length,
-                     dtype, api->active_type, NULL);
-  tpu_poll();
-  return 0;
-}
-TPUKERNEL_FUNC_REGISTER(tpu_kernel_api_active);
-
-#ifdef BACKEND_SG2260
 int tpu_kernel_api_active_multi_core(const void *args) {
   sg_api_active_t *api = (sg_api_active_t *)args;
   data_type_t dtype = (data_type_t)api->dtype;
+#ifdef BACKEND_SG2260
   data_type_t out_dtype = (api->active_type == ACTIVE_ISINF ||
                            api->active_type == ACTIVE_ISNAN) ? DT_UINT8 : dtype;
   int output_size = tpu_data_type_size(out_dtype);
@@ -389,6 +372,18 @@ int tpu_kernel_api_active_multi_core(const void *args) {
                      dtype, api->active_type, NULL);
   tpu_poll();
   return 0;
+#else
+  TPUKERNEL_ASSERT(dtype == DT_FP32 || dtype == DT_FP16 || dtype == DT_BFP16);
+  tpu_initialize();
+  unsigned long long length = 1;
+  for (int i = 0; i < api->dim; i++) {
+    length *= (unsigned long long)api->shape[i];
+  }
+
+  nodechip_active_v2(api->input_global_addr, api->output_global_addr, length,
+                     dtype, api->active_type, NULL);
+  tpu_poll();
+  return 0;
+#endif
 }
 TPUKERNEL_FUNC_REGISTER(tpu_kernel_api_active_multi_core);
-#endif

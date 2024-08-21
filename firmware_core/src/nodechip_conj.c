@@ -131,8 +131,12 @@ void nodechip_scale_conj(
   }
 }
 
-int tpu_kernel_api_conj(const void *args)
+int tpu_kernel_api_conj_multi_core(const void *args)
 {
+#ifdef BACKEND_SG2260
+  TPUKERNEL_ASSERT_INFO(false, "not implementated");
+  return 0;
+#else
   sg_api_real_t *api = (sg_api_real_t *)args;
   TPUKERNEL_ASSERT(api->dtype == DT_FP32 || api->dtype == DT_FP16 || api->dtype == DT_BFP16);
   int length = 1;
@@ -148,14 +152,6 @@ int tpu_kernel_api_conj(const void *args)
                       (data_type_t)api->dtype);
   tpu_poll();
   return 0;
-}
-TPUKERNEL_FUNC_REGISTER(tpu_kernel_api_conj);
-
-#ifdef BACKEND_SG2260
-int tpu_kernel_api_conj_multi_core(const void *args)
-{
-  TPUKERNEL_ASSERT_INFO(false, "not implementated");
-  return 0;
+#endif
 }
 TPUKERNEL_FUNC_REGISTER(tpu_kernel_api_conj_multi_core);
-#endif

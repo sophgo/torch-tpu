@@ -31,10 +31,13 @@ Tensor &reciprocal_out_tpu(const at::Tensor &self, at::Tensor &out) {
      */
     TIMING_START;
     SHOW_TENSOR_OP(self, out);
-    auto status = sgdnnActive(
-        tpu::TPUGetDeviceResource(), tpu::TPUGenerateSgdnnTensor(self),
-        tpu::TPUGenerateSgdnnTensor(out), ACTIVE_RECIPROCAL);
-    TORCH_CHECK(status == SG_SUCCESS);
+    auto stream = c10_tpu::getCurrentTPUStream();
+    auto status = tpudnnActiveAsync(
+        stream,
+        tpu::TPUGenerateTpudnnTensor(stream, self),
+        tpu::TPUGenerateTpudnnTensor(stream, out),
+        TPUDNN_ACTIVE_RECIPROCAL);
+    TORCH_CHECK(status == TPUDNN_STATUS_SUCCESS);
         TIMING_END(tpu::RECIPROCAL)
   }
   SHOW_TENSOR_OP(self, out);

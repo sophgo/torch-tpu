@@ -108,10 +108,31 @@ data_type_t   dtype,
 int           active_type,
 float*        coef);
 
-int tpu_kernel_api_gelu ( const void * args )
+extern void nodechip_gelu_forward_multi_core (
+global_addr_t input_global_addr,
+global_addr_t output_global_addr,
+int*          shape,
+int           dims,
+data_type_t   dtype );
+
+int tpu_kernel_api_gelu_multi_core ( const void * args )
 {
   sg_api_gelu_t * api = ( sg_api_gelu_t * ) args;
   TPUKERNEL_ASSERT ( api->dtype == DT_FP32 || api->dtype == DT_FP16 || api->dtype == DT_BFP16 );
+#ifdef BACKEND_SG2260
+  tpu_initialize();
+#ifdef USING_PERF_MODE
+    tpu_sync_all();
+#endif
+  nodechip_gelu_forward_multi_core (
+    api->input_global_addr,
+    api->output_global_addr,
+    api->shape,
+    api->dim,
+    ( data_type_t ) api->dtype );
+  tpu_poll();
+  return 0;
+#else
   tpu_initialize();
   if ( api->dtype != DT_FP32 )
   {
@@ -135,33 +156,6 @@ int tpu_kernel_api_gelu ( const void * args )
   }
   tpu_poll();
   return 0;
-}
-TPUKERNEL_FUNC_REGISTER ( tpu_kernel_api_gelu );
-
-#ifdef BACKEND_SG2260
-extern void nodechip_gelu_forward_multi_core (
-global_addr_t input_global_addr,
-global_addr_t output_global_addr,
-int*          shape,
-int           dims,
-data_type_t   dtype );
-
-int tpu_kernel_api_gelu_multi_core ( const void * args )
-{
-  sg_api_gelu_t * api = ( sg_api_gelu_t * ) args;
-  TPUKERNEL_ASSERT ( api->dtype == DT_FP32 || api->dtype == DT_FP16 || api->dtype == DT_BFP16 );
-  tpu_initialize();
-#ifdef USING_PERF_MODE
-    tpu_sync_all();
 #endif
-  nodechip_gelu_forward_multi_core (
-    api->input_global_addr,
-    api->output_global_addr,
-    api->shape,
-    api->dim,
-    ( data_type_t ) api->dtype );
-  tpu_poll();
-  return 0;
 }
 TPUKERNEL_FUNC_REGISTER ( tpu_kernel_api_gelu_multi_core );
-#endif

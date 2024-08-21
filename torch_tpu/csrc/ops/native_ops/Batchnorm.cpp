@@ -81,20 +81,20 @@ double eps )
   auto output = torch::empty ( input.sizes(), input.options() );
   auto saved_mean = torch::empty ( { num_features }, input.options() );
   auto saved_invstd = torch::empty ( { num_features }, input.options() );
-  TIMING_START;
-  auto status = sgdnnBatchnorm2d (
-                       tpu::TPUGetDeviceResource(),
-                       tpu::TPUGenerateSgdnnTensor ( input ),
-                       weight.defined() ? tpu::TPUGenerateSgdnnTensor ( weight ) : sgdnnUndefinedTensor(),
-                       bias.defined() ? tpu::TPUGenerateSgdnnTensor ( bias ) : sgdnnUndefinedTensor(),
-                       eps,
-                       running_mean.defined() ? tpu::TPUGenerateSgdnnTensor ( running_mean ) : sgdnnUndefinedTensor(),
-                       running_var.defined() ? tpu::TPUGenerateSgdnnTensor ( running_var ) : sgdnnUndefinedTensor(),
-                       momentum,
-                       tpu::TPUGenerateSgdnnTensor ( output ),
-                       tpu::TPUGenerateSgdnnTensor ( saved_mean ),
-                       tpu::TPUGenerateSgdnnTensor ( saved_invstd ) );
-  TORCH_CHECK ( status == SG_SUCCESS );
+  auto stream = c10_tpu::getCurrentTPUStream();
+  auto status = tpudnnBatchnorm2dAsync(
+      stream,
+      tpu::TPUGenerateTpudnnTensor(stream, input),
+      weight.defined() ? tpu::TPUGenerateTpudnnTensor(stream, weight) : tpudnnUndefinedTensor(),
+      bias.defined() ? tpu::TPUGenerateTpudnnTensor(stream, bias) : tpudnnUndefinedTensor(),
+      eps,
+      running_mean.defined() ? tpu::TPUGenerateTpudnnTensor(stream, running_mean) : tpudnnUndefinedTensor(),
+      running_var.defined() ? tpu::TPUGenerateTpudnnTensor(stream, running_var) : tpudnnUndefinedTensor(),
+      momentum,
+      tpu::TPUGenerateTpudnnTensor(stream, output),
+      tpu::TPUGenerateTpudnnTensor(stream, saved_mean),
+      tpu::TPUGenerateTpudnnTensor(stream, saved_invstd));
+  TORCH_CHECK(status == TPUDNN_STATUS_SUCCESS);
   TIMING_END ( tpu::BATCHNORM );
 
   SHOW_TENSOR_OP(input, weight, bias, running_mean, running_var, output, saved_mean, saved_invstd);
@@ -165,17 +165,18 @@ std::array<bool, 3> output_mask )
     grad_bias = empty ( { weight.size ( 0 ) }, weight.options() );
   }
   TIMING_START;
-  auto status = sgdnnBatchnorm2dBackward (
-                       tpu::TPUGetDeviceResource(),
-                       tpu::TPUGenerateSgdnnTensor ( grad_out ),
-                       tpu::TPUGenerateSgdnnTensor ( input ),
-                       weight.defined() ? tpu::TPUGenerateSgdnnTensor ( weight ) : sgdnnUndefinedTensor(),
-                       saved_mean.defined() ? tpu::TPUGenerateSgdnnTensor ( saved_mean ) : sgdnnUndefinedTensor(),
-                       saved_invstd.defined() ? tpu::TPUGenerateSgdnnTensor ( saved_invstd ) : sgdnnUndefinedTensor(),
-                       output_mask[0] ? tpu::TPUGenerateSgdnnTensor ( grad_input ) : sgdnnUndefinedTensor(),
-                       output_mask[1] ? tpu::TPUGenerateSgdnnTensor ( grad_weight ) : sgdnnUndefinedTensor(),
-                       output_mask[2] ? tpu::TPUGenerateSgdnnTensor ( grad_bias ) : sgdnnUndefinedTensor() );
-  TORCH_CHECK ( status == SG_SUCCESS );
+  auto stream = c10_tpu::getCurrentTPUStream();
+  auto status = tpudnnBatchnorm2dBackwardAsync(
+      stream,
+      tpu::TPUGenerateTpudnnTensor(stream, grad_out),
+      tpu::TPUGenerateTpudnnTensor(stream, input),
+      weight.defined() ? tpu::TPUGenerateTpudnnTensor(stream, weight) : tpudnnUndefinedTensor(),
+      saved_mean.defined() ? tpu::TPUGenerateTpudnnTensor(stream, saved_mean) : tpudnnUndefinedTensor(),
+      saved_invstd.defined() ? tpu::TPUGenerateTpudnnTensor(stream, saved_invstd) : tpudnnUndefinedTensor(),
+      output_mask[0] ? tpu::TPUGenerateTpudnnTensor(stream, grad_input) : tpudnnUndefinedTensor(),
+      output_mask[1] ? tpu::TPUGenerateTpudnnTensor(stream, grad_weight) : tpudnnUndefinedTensor(),
+      output_mask[2] ? tpu::TPUGenerateTpudnnTensor(stream, grad_bias) : tpudnnUndefinedTensor());
+  TORCH_CHECK(status == TPUDNN_STATUS_SUCCESS);
   TIMING_END ( tpu::BATCHNORM_BACKWARD );
   SHOW_TENSOR_OP(grad_out, input, weight, saved_mean, saved_invstd, running_mean, running_var);
   return std::tuple<Tensor, Tensor, Tensor> ( grad_input, grad_weight, grad_bias );
@@ -231,17 +232,18 @@ double eps )
   auto mean = torch::empty ( stat_shape, input_.options() );
   auto rstd = torch::empty ( stat_shape, input_.options() );
   TIMING_START;
-  auto status = sgdnnLayernorm (
-                       tpu::TPUGetDeviceResource(),
-                       tpu::TPUGenerateSgdnnTensor ( input_ ),
-                       weight.defined() ? tpu::TPUGenerateSgdnnTensor ( weight ) : sgdnnUndefinedTensor(),
-                       bias.defined() ? tpu::TPUGenerateSgdnnTensor ( bias ) : sgdnnUndefinedTensor(),
-                       axis,
-                       eps,
-                       tpu::TPUGenerateSgdnnTensor ( output ),
-                       tpu::TPUGenerateSgdnnTensor ( mean ),
-                       tpu::TPUGenerateSgdnnTensor ( rstd ) );
-  TORCH_CHECK ( status == SG_SUCCESS );
+  auto stream = c10_tpu::getCurrentTPUStream();
+  auto status = tpudnnLayernormAsync(
+      stream,
+      tpu::TPUGenerateTpudnnTensor(stream, input_),
+      weight.defined() ? tpu::TPUGenerateTpudnnTensor(stream, weight) : tpudnnUndefinedTensor(),
+      bias.defined() ? tpu::TPUGenerateTpudnnTensor(stream, bias) : tpudnnUndefinedTensor(),
+      axis,
+      eps,
+      tpu::TPUGenerateTpudnnTensor(stream, output),
+      tpu::TPUGenerateTpudnnTensor(stream, mean),
+      tpu::TPUGenerateTpudnnTensor(stream, rstd));
+  TORCH_CHECK(status == TPUDNN_STATUS_SUCCESS);
   TIMING_END ( tpu::LAYERNORM );
   SHOW_TENSOR_OP(input, weight, bias);
   return std::tuple<Tensor, Tensor, Tensor> ( output, mean, rstd );
@@ -305,19 +307,20 @@ std::array<bool, 3> output_mask )
   const int axis = input_ndim - normalized_ndim;
 
   TIMING_START;
-  auto status = sgdnnLayernormBackward (
-                       tpu::TPUGetDeviceResource(),
-                       tpu::TPUGenerateSgdnnTensor ( grad_out ),
-                       tpu::TPUGenerateSgdnnTensor ( input.contiguous() ),
-                       weight.defined() ? tpu::TPUGenerateSgdnnTensor ( weight ) : sgdnnUndefinedTensor(),
-                       tpu::TPUGenerateSgdnnTensor ( mean ),
-                       tpu::TPUGenerateSgdnnTensor ( rstd ),
-                       axis,
-                       output_mask[0] ? tpu::TPUGenerateSgdnnTensor ( grad_input ) : sgdnnUndefinedTensor(),
-                       output_mask[1] ? tpu::TPUGenerateSgdnnTensor ( grad_weight ) : sgdnnUndefinedTensor(),
-                       output_mask[2] ? tpu::TPUGenerateSgdnnTensor ( grad_bias ) : sgdnnUndefinedTensor(),
-                       output_mask[0] ? 1 : 0);
-  TORCH_CHECK ( status == SG_SUCCESS );
+  auto stream = c10_tpu::getCurrentTPUStream();
+  auto status = tpudnnLayernormBackwardAsync(
+      stream,
+      tpu::TPUGenerateTpudnnTensor(stream, grad_out),
+      tpu::TPUGenerateTpudnnTensor(stream, input.contiguous()),
+      weight.defined() ? tpu::TPUGenerateTpudnnTensor(stream, weight) : tpudnnUndefinedTensor(),
+      tpu::TPUGenerateTpudnnTensor(stream, mean),
+      tpu::TPUGenerateTpudnnTensor(stream, rstd),
+      axis,
+      output_mask[0] ? tpu::TPUGenerateTpudnnTensor(stream, grad_input) : tpudnnUndefinedTensor(),
+      output_mask[1] ? tpu::TPUGenerateTpudnnTensor(stream, grad_weight) : tpudnnUndefinedTensor(),
+      output_mask[2] ? tpu::TPUGenerateTpudnnTensor(stream, grad_bias) : tpudnnUndefinedTensor(),
+      output_mask[0] ? 1 : 0);
+  TORCH_CHECK(status == TPUDNN_STATUS_SUCCESS);
   TIMING_END ( tpu::LAYERNORM_BACKWARD );
 
   SHOW_TENSOR_OP(grad_out, input, mean, rstd, grad_input, weight, bias);

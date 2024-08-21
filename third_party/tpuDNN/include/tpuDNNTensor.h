@@ -38,6 +38,52 @@ enum tpudnnReduceType_t {
 };
 
 typedef enum {
+  TPUDNN_ACTIVE_TANH = 0,
+  TPUDNN_ACTIVE_SIGMOID = 1,
+  TPUDNN_ACTIVE_RELU = 2,
+  TPUDNN_ACTIVE_EXP = 3,
+  TPUDNN_ACTIVE_ELU = 4,
+  TPUDNN_ACTIVE_SQRT = 5,
+  TPUDNN_ACTIVE_SQUARE = 6,
+  TPUDNN_ACTIVE_RSQRT = 7,
+  TPUDNN_ACTIVE_ABSVAL = 8,
+  TPUDNN_ACTIVE_LN = 9,
+  TPUDNN_ACTIVE_ROUND = 10,
+  TPUDNN_ACTIVE_CEIL = 11,
+  TPUDNN_ACTIVE_FLOOR = 12,
+  TPUDNN_ACTIVE_SIN = 13,
+  TPUDNN_ACTIVE_COS = 14,
+  TPUDNN_ACTIVE_IS_FINITE = 15,
+  TPUDNN_ACTIVE_MISH = 16,
+  TPUDNN_ACTIVE_SWISH = 17,
+  TPUDNN_ACTIVE_HSWISH = 18,
+  TPUDNN_ACTIVE_SILU = 19,
+  TPUDNN_ACTIVE_ARCSIN = 20,
+  TPUDNN_ACTIVE_ARCCOS = 21,
+  TPUDNN_ACTIVE_ARCSINH = 22,
+  TPUDNN_ACTIVE_ARCCOSH = 23,
+  TPUDNN_ACTIVE_ARCTANH = 24,
+  TPUDNN_ACTIVE_SINH = 25,
+  TPUDNN_ACTIVE_COSH = 26,
+  TPUDNN_ACTIVE_TAN = 27,
+  TPUDNN_ACTIVE_SIGN = 28,
+  TPUDNN_ACTIVE_GELU = 29,
+  TPUDNN_ACTIVE_ERF = 30,
+  TPUDNN_ACTIVE_HSIGMOID = 31,
+  TPUDNN_ACTIVE_LOG_SIGMOID = 32,
+  TPUDNN_ACTIVE_SOFT_PLUS = 33,
+  TPUDNN_ACTIVE_SOFT_SIGN = 34,
+  // only implemented in tpu-train
+  TPUDNN_ACTIVE_ERFC = 35,
+  TPUDNN_ACTIVE_ISINF = 36,
+  TPUDNN_ACTIVE_ISNAN = 37,
+  TPUDNN_ACTIVE_EXPM1 = 38,
+  TPUDNN_ACTIVE_RECIPROCAL = 39,
+  TPUDNN_ACTIVE_EXP2 = 40,
+  TPUDNN_ACTIVE_TRUNC = 41,
+} tensor_active_type_t;
+
+typedef enum {
   TPUDNN_LOG_E = 0,
   TPUDNN_LOG_1P = 1,
   TPUDNN_LOG_2 = 2,
@@ -417,6 +463,150 @@ tpudnnStatus_t tpudnnReduceProdAsync (
     int axis,
     int keepdim,
     tpudnnTensor_t output);
+
+tpudnnStatus_t tpudnnIndexSelectAsync(
+    tpudnnHandle_t handle,
+    tpudnnTensor_t input,
+    tpudnnTensor_t indices,
+    int dim,
+    tpudnnTensor_t output);
+
+tpudnnStatus_t tpudnnEmbeddingBackwardAsync(
+    tpudnnHandle_t handle,
+    tpudnnTensor_t grad_output,
+    tpudnnTensor_t indices,
+    tpudnnTensor_t grad_input);
+
+tpudnnStatus_t tpudnnConcatAsync (
+    tpudnnHandle_t handle ,
+    const tpudnnTensor_t * inputs,
+    int input_num,
+    int dim,
+    tpudnnTensor_t output);
+
+tpudnnStatus_t tpudnnGatherAsync(
+    tpudnnHandle_t handle,
+    tpudnnTensor_t input,
+    tpudnnTensor_t index,
+    tpudnnTensor_t output,
+    int axis);
+
+tpudnnStatus_t tpudnnArgAsync(
+    tpudnnHandle_t resource,
+    tpudnnTensor_t input,
+    int axis,
+    int mode,
+    tpudnnTensor_t values,
+    tpudnnTensor_t indices);
+
+tpudnnStatus_t tpudnnTopkAsync(
+    tpudnnHandle_t handle,
+    tpudnnTensor_t input,
+    int k,
+    int axis,
+    bool largest,
+    bool sorted,
+    tpudnnTensor_t value,
+    tpudnnTensor_t index);
+
+tpudnnStatus_t tpudnnConjAsync(
+    tpudnnHandle_t handle,
+    tpudnnTensor_t input,
+    tpudnnTensor_t output);
+
+tpudnnStatus_t tpudnnRealAsync(
+    tpudnnHandle_t handle,
+    tpudnnTensor_t input,
+    tpudnnTensor_t output);
+
+tpudnnStatus_t tpudnnBatchnorm2dAsync (
+    tpudnnHandle_t handle,
+    tpudnnTensor_t input,
+    tpudnnTensor_t weight,
+    tpudnnTensor_t bias,
+    float eps,
+    tpudnnTensor_t running_mean,
+    tpudnnTensor_t running_var,
+    float momentum,
+    tpudnnTensor_t output,
+    tpudnnTensor_t saved_mean,
+    tpudnnTensor_t saved_invstd);
+
+tpudnnStatus_t tpudnnBatchnorm2dBackwardAsync (
+    tpudnnHandle_t handle,
+    tpudnnTensor_t grad_output,
+    tpudnnTensor_t input,
+    tpudnnTensor_t weight,
+    tpudnnTensor_t saved_mean,
+    tpudnnTensor_t saved_invstd,
+    tpudnnTensor_t grad_input,
+    tpudnnTensor_t grad_weight,
+    tpudnnTensor_t grad_bias);
+
+tpudnnStatus_t tpudnnLayernormAsync (
+    tpudnnHandle_t handle,
+    tpudnnTensor_t input,
+    tpudnnTensor_t weight,
+    tpudnnTensor_t bias,
+    int start_dim,
+    float eps,
+    tpudnnTensor_t output,
+    tpudnnTensor_t mean,
+    tpudnnTensor_t rstd);
+
+tpudnnStatus_t tpudnnLayernormBackwardAsync (
+    tpudnnHandle_t handle,
+    tpudnnTensor_t grad_output,
+    tpudnnTensor_t input,
+    tpudnnTensor_t weight,
+    tpudnnTensor_t mean,
+    tpudnnTensor_t rstd,
+    int start_dim,
+    tpudnnTensor_t grad_input,
+    tpudnnTensor_t grad_weight,
+    tpudnnTensor_t grad_bias,
+    int requires_grad_input);
+
+tpudnnStatus_t tpudnnSignbitAsync (
+    tpudnnHandle_t handle,
+    tpudnnTensor_t input,
+    tpudnnTensor_t output);
+
+tpudnnStatus_t tpudnnReLUBackwardAsync(
+    tpudnnHandle_t handle,
+    tpudnnTensor_t grad_output,
+    tpudnnTensor_t input,
+    tpudnnTensor_t grad_input);
+
+tpudnnStatus_t tpudnnGELUAsync(
+    tpudnnHandle_t handle,
+    tpudnnTensor_t input,
+    tpudnnTensor_t output);
+
+tpudnnStatus_t tpudnnGELUBackwardAsync(
+    tpudnnHandle_t handle,
+    tpudnnTensor_t grad_output,
+    tpudnnTensor_t input,
+    tpudnnTensor_t grad_input);
+
+tpudnnStatus_t tpudnnLeakyReLUAsync(
+    tpudnnHandle_t handle,
+    tpudnnTensor_t input,
+    tpudnnTensor_t output,
+    float negative_slope);
+
+tpudnnStatus_t tpudnnHardtanhAsync(
+    tpudnnHandle_t handle,
+    tpudnnTensor_t input,
+    float min_value,
+    float max_value,
+    tpudnnTensor_t output);
+
+tpudnnStatus_t tpudnnActiveAsync(
+    tpudnnHandle_t handle,
+    tpudnnTensor_t input,
+    tpudnnTensor_t output,
+    tensor_active_type_t active_type);
 
 tpudnnStatus_t tpudnnC2CAllReduce(
     tpudnnHandle_t handle,

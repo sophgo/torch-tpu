@@ -34,6 +34,8 @@ extern void nodechip_batch_topk(system_addr_t bottom_value_addr,
                                 system_addr_t bottom_index_addr, // is always int32
                                 system_addr_t top_value_addr,
                                 system_addr_t top_index_addr, // is always int32
+                                system_addr_t buffer_value_addr,
+                                system_addr_t buffer_index_addr,
                                 bool bottom_index_valid, int k, int descending, int batchs,
                                 bool is_batch_same, int *batch_num, int batch_stride,
                                 data_type_t dtype);
@@ -56,10 +58,9 @@ int tpu_kernel_api_topk(const void *args) {
   int *batch_nums = (int *)malloc(batchs * sizeof(int));
   for (int i = 0; i < batchs; i++)
     batch_nums[i] = batch_stride;
-
   tpu_initialize();
   nodechip_batch_topk(api->input_global_addr, (system_addr_t)(-1),
-                      api->value_global_addr, api->index_global_addr, false,
+                      api->value_global_addr, api->index_global_addr, 0, 0, false,
                       api->k, api->largest, batchs, true, batch_nums,
                       batch_stride, api->dtype);
   tpu_poll();
@@ -86,12 +87,11 @@ int tpu_kernel_api_topk_multi_core(const void *args) {
   int *batch_nums = (int *)malloc(batchs * sizeof(int));
   for (int i = 0; i < batchs; i++)
     batch_nums[i] = batch_stride;
-
   tpu_initialize();
   int core_idx = tpu_core_index();
   if (core_idx == 0) {
     nodechip_batch_topk(api->input_global_addr, (system_addr_t)(-1),
-                        api->value_global_addr, api->index_global_addr, false,
+                        api->value_global_addr, api->index_global_addr, 0,0, false,
                         api->k, api->largest, batchs, true, batch_nums,
                         batch_stride, api->dtype);
   }

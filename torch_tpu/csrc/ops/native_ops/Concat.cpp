@@ -38,23 +38,24 @@ Tensor & cat_out_tpu ( const ITensorListRef & tensors, int64_t dim, Tensor & out
   }
   else
   {
-    std::vector<SgdnnTensor_t> inputs;
+    auto stream = c10_tpu::getCurrentTPUStream();
+    std::vector<tpudnnTensor_t> inputs;
     std::vector<Tensor> contiguous_tensors;
     for ( auto tensor : tensors )
     {
       CHECK_TENSOR_IN_DEVICE_NO_CONTIGUOUS ( tensor );
       contiguous_tensors.push_back ( tensor.contiguous() );
-      inputs.push_back ( tpu:: TPUGenerateSgdnnTensor ( contiguous_tensors.back() ) );
+      inputs.push_back ( tpu:: TPUGenerateTpudnnTensor (stream, contiguous_tensors.back() ) );
     }
 
     TIMING_START;
-
-    auto status = sgdnnConcat ( tpu::TPUGetDeviceResource(),
-                                inputs.data(),
-                                inputs.size(),
-                                dim,
-                                tpu:: TPUGenerateSgdnnTensor ( out ) );
-    TORCH_CHECK ( status == SG_SUCCESS );
+    auto status = tpudnnConcatAsync(
+    stream,
+    inputs.data(),
+    inputs.size(),
+    dim,
+    tpu::TPUGenerateTpudnnTensor(stream, out));
+    TORCH_CHECK(status == TPUDNN_STATUS_SUCCESS);
         TIMING_END ( tpu::CONCAT );
   }
   SHOW_TENSOR_OP(out);

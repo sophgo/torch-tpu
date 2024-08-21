@@ -33,12 +33,12 @@ namespace at
         else if (IS_TPU_TENSOR(self))
         {
             TIMING_START;
-
-            auto status = sgdnnConj(
-                tpu::TPUGetDeviceResource(),
-                tpu::TPUGenerateSgdnnTensorforComplex64(self),
-                tpu::TPUGenerateSgdnnTensorforComplex64(out));
-            TORCH_CHECK(status == SG_SUCCESS);
+            auto stream = c10_tpu::getCurrentTPUStream();
+            auto status = tpudnnConjAsync(
+                stream,
+                tpu::TPUGenerateTpudnnTensorforComplex64(stream, self),
+                tpu::TPUGenerateTpudnnTensorforComplex64(stream, out));
+            TORCH_CHECK(status == TPUDNN_STATUS_SUCCESS);
                         TIMING_END(tpu::CONJ);
         }
         else

@@ -31,6 +31,7 @@ int tpu_kernel_api_masked_fill ( const void * args )
 {
     sg_api_masked_fill_t *api = ( sg_api_masked_fill_t * ) args;
     tpu_initialize();
+    TPUKERNEL_ASSERT(api->mask_shape==api->input_shape);
     #if 0
     nodechip_masked_fill(
         api->input_global_addr,

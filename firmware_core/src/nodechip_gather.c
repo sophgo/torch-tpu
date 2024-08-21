@@ -91,15 +91,11 @@ static void nodechip_gather(
   }
 
 void cast_index_int64_to_int32(
-  global_addr_t in_global_addr,
-  global_addr_t out_global_addr,
+  global_addr_t in_global_addr1,
+  global_addr_t in_global_addr2,
   int dim,
   int *index_shape)
 {
-  local_addr_t in_local_addr = 0;
-  data_type_t src_dtype = DT_INT32;
-  data_type_t dst_dtype = DT_INT32;
-
   unsigned long long ele_num = 1;
   for (int i=0; i<dim; ++i) {
     ele_num *= index_shape[i];
@@ -113,69 +109,22 @@ void cast_index_int64_to_int32(
     src_stride.c *= 2;
     src_stride.h *= 2;
     src_stride.w *= 2;
-    tpu_gdma_cpy_S2L(
-        in_local_addr,
-        in_global_addr,
+    tpu_gdma_cpy_S2S(
+        in_global_addr2,
+        in_global_addr1,
         &in_shape,
         NULL,
         &src_stride,
-        src_dtype);
+        DT_INT32);
   }
-  tpu_sync_all();
 
-  if (ele_num > 0) {
-    tpu_gdma_cpy_L2S(
-        out_global_addr,
-        in_local_addr,
-        &in_shape,
-        NULL,
-        NULL,
-        dst_dtype);
-  }
-  tpu_sync_all();
 }
-int tpu_kernel_api_gather ( const void *args )
-{
-  sg_api_gather_t *api = ( sg_api_gather_t * ) args;
-  tpu_initialize();
-  //need to make sure the statement below is true
-  // TPUKERNEL_ASSERT ( api->dtype == DT_FP32 || api->dtype == DT_FP16 || api->dtype == DT_BFP16 );
-  int input_shape[api->dim];
-  int index_shape[api->dim];
-  for (int i = 0; i < api->dim; ++i)
-  {
-    input_shape[i] = api->input_shape[i];
-    index_shape[i] = api->index_shape[i];
-  }
-  if(api->is_index_int64){
-    cast_index_int64_to_int32(
-      api->index_global_addr,
-      api->index_global_addr,
-      api->dim,
-      index_shape);
-  }
-  if(api->axis != api->dim-1){
-    TPUKERNEL_ASSERT_INFO(false, "not support axis != dim-1 now");
-  }
-  nodechip_gather (
-  api->input_global_addr,
-  api->index_global_addr,
-  api->output_global_addr,
-  input_shape,
-  index_shape,
-  api->dim,
-  api->axis,
-  api->dtype );
-  tpu_poll();
-  return 0;
-}
-TPUKERNEL_FUNC_REGISTER ( tpu_kernel_api_gather );
 
-#ifdef BACKEND_SG2260
 int tpu_kernel_api_gather_multi_core ( const void *args )
 {
   sg_api_gather_t *api = ( sg_api_gather_t * ) args;
   tpu_initialize();
+#ifdef BACKEND_SG2260
   long long int inner_num = 1, gather_num = 1, gathered_num = 1, outer_num = 1;
   for (int i = 0; i < api->axis; ++i) {
     inner_num *= api->input_shape[i];
@@ -219,6 +168,37 @@ int tpu_kernel_api_gather_multi_core ( const void *args )
 
   tpu_poll();
   return 0;
+#else
+  //need to make sure the statement below is true
+  // TPUKERNEL_ASSERT ( api->dtype == DT_FP32 || api->dtype == DT_FP16 || api->dtype == DT_BFP16 );
+  int input_shape[api->dim];
+  int index_shape[api->dim];
+  for (int i = 0; i < api->dim; ++i)
+  {
+    input_shape[i] = api->input_shape[i];
+    index_shape[i] = api->index_shape[i];
+  }
+  if(api->is_index_int64){
+    cast_index_int64_to_int32(
+      api->index_global_addr,
+      api->buffer_global_addr,
+      api->dim,
+      index_shape);
+  }
+  if(api->axis != api->dim-1){
+    TPUKERNEL_ASSERT_INFO(false, "not support axis != dim-1 now");
+  }
+  nodechip_gather (
+  api->input_global_addr,
+  api->buffer_global_addr,
+  api->output_global_addr,
+  input_shape,
+  index_shape,
+  api->dim,
+  api->axis,
+  api->dtype );
+  tpu_poll();
+  return 0;
+#endif
 }
 TPUKERNEL_FUNC_REGISTER ( tpu_kernel_api_gather_multi_core );
-#endif

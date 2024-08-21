@@ -33,13 +33,14 @@ Tensor index_select_tpu ( const Tensor & self, int64_t dim, const Tensor & index
   auto out = torch::empty ( sizes, options );
   TIMING_START;
 
-  auto status = sgdnnIndexSelect (
-                       tpu::TPUGetDeviceResource(),
-                       tpu::TPUGenerateSgdnnTensor ( self ),
-                       tpu::TPUGenerateSgdnnTensor ( index ),
-                       dim,
-                       tpu::TPUGenerateSgdnnTensor ( out ) );
-  TORCH_CHECK ( status == SG_SUCCESS );
+  auto stream = c10_tpu::getCurrentTPUStream();
+  auto status = tpudnnIndexSelectAsync(
+                stream,
+                tpu::TPUGenerateTpudnnTensor(stream, self),
+                tpu::TPUGenerateTpudnnTensor(stream, index),
+                dim,
+                tpu::TPUGenerateTpudnnTensor(stream, out));
+  TORCH_CHECK(status == TPUDNN_STATUS_SUCCESS);
     TIMING_END ( tpu::INDEX_SELECT );
 #endif
   SHOW_TENSOR_OP(self, index, out);
@@ -63,12 +64,13 @@ Tensor embedding_dense_backward_tpu ( const Tensor & grad_output, const Tensor &
   // indices should not be int64_t
   auto indices_int32 = indices.to ( torch::kInt32 );
   TIMING_START;
-  auto status = sgdnnEmbeddingBackward (
-                       tpu::TPUGetDeviceResource(),
-                       tpu::TPUGenerateSgdnnTensor ( grad_output ),
-                       tpu::TPUGenerateSgdnnTensor ( indices_int32 ),
-                       tpu::TPUGenerateSgdnnTensor ( out ) );
-  TORCH_CHECK ( status == SG_SUCCESS );
+  auto stream = c10_tpu::getCurrentTPUStream();
+  auto status = tpudnnEmbeddingBackwardAsync(
+    stream,
+    tpu::TPUGenerateTpudnnTensor(stream, grad_output),
+    tpu::TPUGenerateTpudnnTensor(stream, indices_int32),
+    tpu::TPUGenerateTpudnnTensor(stream, out));
+  TORCH_CHECK(status == TPUDNN_STATUS_SUCCESS);
   TIMING_END ( tpu::EMBEDDING_BACKWARD );
 #endif
   SHOW_TENSOR_OP(grad_output, indices, out);

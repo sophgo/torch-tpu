@@ -36,14 +36,14 @@ namespace at
         {
         //need to consider broadcast later
             TIMING_START;
-
-            auto status = sgdnnGather(
-                tpu::TPUGetDeviceResource(),
-                tpu::TPUGenerateSgdnnTensor(self),
-                tpu::TPUGenerateSgdnnTensor(other),
-                tpu::TPUGenerateSgdnnTensor(out),
+            auto stream = c10_tpu::getCurrentTPUStream();
+            auto status = tpudnnGatherAsync(
+                stream,
+                tpu::TPUGenerateTpudnnTensor(stream, self),
+                tpu::TPUGenerateTpudnnTensor(stream, other),
+                tpu::TPUGenerateTpudnnTensor(stream, out),
                 axis);
-            TORCH_CHECK(status == SG_SUCCESS);
+            TORCH_CHECK(status == TPUDNN_STATUS_SUCCESS);
                         TIMING_END(tpu::GATHER);
         }
         else

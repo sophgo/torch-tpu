@@ -51,11 +51,14 @@ Tensor &argmax_out_tpu(const Tensor &self, c10::optional<int64_t> dim,
   TensorOptions options = TensorOptions ( self.device() ).dtype ( self.dtype() );
   Tensor values = empty({out.sizes()}, options);
   TIMING_START;
-  auto status = sgdnnArg(
-      tpu::TPUGetDeviceResource(), tpu::TPUGenerateSgdnnTensor(self),
+  auto stream = c10_tpu::getCurrentTPUStream();
+  auto status = tpudnnArgAsync(
+      stream,
+      tpu::TPUGenerateTpudnnTensor(stream, self),
       dim.has_value() ? dim.value() : self.dim(), ARGMAX_MODE,
-      tpu::TPUGenerateSgdnnTensor(values), tpu::TPUGenerateSgdnnTensor(out));
-  TORCH_CHECK(status == SG_SUCCESS);
+      tpu::TPUGenerateTpudnnTensor(stream, values),
+      tpu::TPUGenerateTpudnnTensor(stream, out));
+  TORCH_CHECK(status == TPUDNN_STATUS_SUCCESS);
   TIMING_END(tpu::ARGMAX);
 #endif
   SHOW_TENSOR_OP(self, out);
@@ -90,11 +93,14 @@ Tensor &argmin_out_tpu(const Tensor &self, c10::optional<int64_t> dim,
   TensorOptions options = TensorOptions ( self.device() ).dtype ( self.dtype() );
   Tensor values = empty({out.sizes()}, options);
   TIMING_START;
-  auto status = sgdnnArg(
-      tpu::TPUGetDeviceResource(), tpu::TPUGenerateSgdnnTensor(self),
+  auto stream = c10_tpu::getCurrentTPUStream();
+  auto status = tpudnnArgAsync(
+      stream,
+      tpu::TPUGenerateTpudnnTensor(stream, self),
       dim.has_value() ? dim.value() : self.dim(), ARGMIN_MODE,
-      tpu::TPUGenerateSgdnnTensor(values), tpu::TPUGenerateSgdnnTensor(out));
-  TORCH_CHECK(status == SG_SUCCESS);
+      tpu::TPUGenerateTpudnnTensor(stream, values),
+      tpu::TPUGenerateTpudnnTensor(stream, out));
+  TORCH_CHECK(status == TPUDNN_STATUS_SUCCESS);
   TIMING_END(tpu::ARGMIN);
 #endif
   return out;
@@ -130,11 +136,15 @@ std::tuple<Tensor &, Tensor &> max_dim_max_out_tpu(const Tensor &self,
   }
   TORCH_CHECK(dim >= 0 || dim < self.dim());
   TIMING_START;
-  auto status =
-      sgdnnArg(tpu::TPUGetDeviceResource(), tpu::TPUGenerateSgdnnTensor(self),
-               dim, MAX_DIM_MODE, tpu::TPUGenerateSgdnnTensor(values),
-               tpu::TPUGenerateSgdnnTensor(indices));
-  TORCH_CHECK(status == SG_SUCCESS);
+  auto stream = c10_tpu::getCurrentTPUStream();
+  auto status = tpudnnArgAsync(
+      stream,
+      tpu::TPUGenerateTpudnnTensor(stream, self),
+      dim, 
+      MAX_DIM_MODE,
+      tpu::TPUGenerateTpudnnTensor(stream, values),
+      tpu::TPUGenerateTpudnnTensor(stream, indices));
+  TORCH_CHECK(status == TPUDNN_STATUS_SUCCESS);
   TIMING_END(tpu::MAX_DIM);
 #endif
   return {values, indices};
@@ -170,11 +180,15 @@ std::tuple<Tensor &, Tensor &> min_dim_min_out_tpu(const Tensor &self,
   }
   TORCH_CHECK(dim >= 0 || dim < self.dim());
   TIMING_START;
-  auto status =
-      sgdnnArg(tpu::TPUGetDeviceResource(), tpu::TPUGenerateSgdnnTensor(self),
-               dim, MIN_DIM_MODE, tpu::TPUGenerateSgdnnTensor(values),
-               tpu::TPUGenerateSgdnnTensor(indices));
-  TORCH_CHECK(status == SG_SUCCESS);
+  auto stream = c10_tpu::getCurrentTPUStream();
+  auto status = tpudnnArgAsync(
+      stream,
+      tpu::TPUGenerateTpudnnTensor(stream, self),
+      dim, 
+      MIN_DIM_MODE,
+      tpu::TPUGenerateTpudnnTensor(stream, values),
+      tpu::TPUGenerateTpudnnTensor(stream, indices));
+  TORCH_CHECK(status == TPUDNN_STATUS_SUCCESS);
   TIMING_END(tpu::MIN_DIM);
 #endif
   return {values, indices};

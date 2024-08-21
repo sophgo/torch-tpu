@@ -17,7 +17,7 @@ data_type_t dtype )
   int npu_num=tpu_npu_num();
   int bank_num=tpu_bank_num();
   int bank_size = tpu_local_mem_size_per_npu()/bank_num;
-  int tensor_num=2+2+1; // 2 inputs, 2 outputs, 1 buffer
+  int tensor_num=2+2+0; // 2 inputs, 2 outputs, 1 buffer
   int coeff_bank_num=0; // 0 coeff
   int tensor_size = (bank_num-coeff_bank_num)/tensor_num * bank_size;
   TPUKERNEL_ASSERT(tensor_size>0);
@@ -27,7 +27,6 @@ data_type_t dtype )
 
   int dtype_size = tpu_data_type_size(dtype);
   int tensor_w = DIV_UP(MIN(length, tensor_size*npu_num/dtype_size), npu_num);
-
   int todo = length;
   int done = 0;
   dim4 shape = { .n = 1, .h = 1 };
@@ -84,23 +83,6 @@ data_type_t dtype )
   }
 }
 
-int tpu_kernel_api_signbit ( const void * args )
-{
-  sg_api_signbit_t * api = ( sg_api_signbit_t * ) args;
-  
-  int length = 1;
-  for ( int i = 0; i < api->dim; ++i )
-  {
-    length *= api->shape[i];
-  }
-  tpu_initialize();
-  nodechip_signbit ( api->input_global_addr, api->output_global_addr, length, ( data_type_t ) api->dtype );
-  tpu_poll();
-  return 0;
-}
-TPUKERNEL_FUNC_REGISTER ( tpu_kernel_api_signbit );
-
-#ifdef BACKEND_SG2260
 int tpu_kernel_api_signbit_multi_core ( const void * args )
 {
   sg_api_signbit_t * api = ( sg_api_signbit_t * ) args;
@@ -110,7 +92,7 @@ int tpu_kernel_api_signbit_multi_core ( const void * args )
     length *= api->shape[i];
   }
   tpu_initialize();
-
+#ifdef BACKEND_SG2260
   int core_num = tpu_core_num();
   int core_idx = tpu_core_index();
   int length_slice = DIV_UP(length, core_num);
@@ -119,14 +101,19 @@ int tpu_kernel_api_signbit_multi_core ( const void * args )
   int cur_length_slice = length_slice;
   if (core_idx == length_secs - 1)
     cur_length_slice = length - length_slice * (length_secs - 1);
+  if (core_idx * length_slice < length) {
   nodechip_signbit(
       api->input_global_addr + (length_slice * core_idx) * tpu_data_type_size(api->dtype),
       api->output_global_addr + (length_slice * core_idx) * tpu_data_type_size(api->dtype),
       cur_length_slice,
       (data_type_t)api->dtype);
-
+  }
   tpu_poll();
   return 0;
+#else
+  nodechip_signbit ( api->input_global_addr, api->output_global_addr, length, ( data_type_t ) api->dtype );
+  tpu_poll();
+  return 0;
+#endif
 }
 TPUKERNEL_FUNC_REGISTER ( tpu_kernel_api_signbit_multi_core );
-#endif

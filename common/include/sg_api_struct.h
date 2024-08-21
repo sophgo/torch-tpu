@@ -715,6 +715,7 @@ typedef struct
 {
   unsigned long long input_global_addr;
   unsigned long long index_global_addr;
+  unsigned long long buffer_global_addr;
   unsigned long long output_global_addr;
   int input_shape[FW_MAX_SHAPE_DIMS];
   int index_shape[FW_MAX_SHAPE_DIMS];

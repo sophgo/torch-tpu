@@ -12,25 +12,6 @@ int input_num,
 int concat_axis,
 data_type_t dtype );
 
-int tpu_kernel_api_concat ( const void * args )
-{
-  sg_api_concat_t * api = ( sg_api_concat_t * ) args;
-  int st_by_concatway[FW_MAX_CONCAT_NUM] = { 0 };
-  tpu_initialize();
-  nodechip_concat_nd ( api->input_global_addrs,
-                       api->output_global_addr,
-                       api->input_shapes,
-                       st_by_concatway,
-                       api->dim,
-                       api->input_num,
-                       api->axis,
-                       ( data_type_t ) api->dtype );
-  tpu_poll();
-  return 0;
-}
-TPUKERNEL_FUNC_REGISTER ( tpu_kernel_api_concat );
-
-#ifdef BACKEND_SG2260
 static inline int count_numel(const int* shape, int beg_axis, int end_axis) {
   int count = 1;
   for (int i = beg_axis; i < end_axis; ++i)
@@ -117,6 +98,7 @@ int tpu_kernel_api_concat_multi_core ( const void * args )
   sg_api_concat_t * api = ( sg_api_concat_t * ) args;
   int st_by_concatway[FW_MAX_CONCAT_NUM] = { 0 };
   tpu_initialize();
+#ifdef BACKEND_SG2260
 #ifdef USING_PERF_MODE
     tpu_sync_all();
 #endif
@@ -130,6 +112,17 @@ int tpu_kernel_api_concat_multi_core ( const void * args )
                       ( data_type_t ) api->dtype );
   tpu_poll();
   return 0;
+#else
+  nodechip_concat_nd ( api->input_global_addrs,
+                       api->output_global_addr,
+                       api->input_shapes,
+                       st_by_concatway,
+                       api->dim,
+                       api->input_num,
+                       api->axis,
+                       ( data_type_t ) api->dtype );
+  tpu_poll();
+  return 0;
+#endif
 }
 TPUKERNEL_FUNC_REGISTER ( tpu_kernel_api_concat_multi_core );
-#endif

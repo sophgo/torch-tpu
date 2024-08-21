@@ -58,11 +58,19 @@ std::tuple<Tensor &, Tensor &> topk_values_tpu(const Tensor &self, int64_t k,
 
     TIMING_START;
 
-    auto status = sgdnnTopk(
-        tpu::TPUGetDeviceResource(), tpu::TPUGenerateSgdnnTensor(self_temp), k,
-        axis, largest, sorted, tpu::TPUGenerateSgdnnTensor(values_temp),
-        tpu::TPUGenerateSgdnnTensor(indices_temp));
-    TORCH_CHECK(status == SG_SUCCESS);
+    auto stream = c10_tpu::getCurrentTPUStream();
+    auto status = tpudnnTopkAsync(
+        stream,
+        tpu::TPUGenerateTpudnnTensor(stream, self_temp),
+        k,
+        axis,
+        largest,
+        sorted,
+        tpu::TPUGenerateTpudnnTensor(stream, values_temp),
+        tpu::TPUGenerateTpudnnTensor(stream, indices_temp)
+    );
+TORCH_CHECK(status == TPUDNN_STATUS_SUCCESS);
+
     tpu::TPUCopyDeviceToDevice(values.data_ptr(),
                                values_temp.to(values.dtype()).data_ptr(),
                                values.nbytes());
@@ -113,12 +121,18 @@ sort_values_stable_tpu(const Tensor &self, c10::optional<bool> stable,
 
     TIMING_START;
 
-    auto status =
-        sgdnnTopk(tpu::TPUGetDeviceResource(),
-                  tpu::TPUGenerateSgdnnTensor(self_temp), self.size(axis), axis,
-                  descending, false, tpu::TPUGenerateSgdnnTensor(values_temp),
-                  tpu::TPUGenerateSgdnnTensor(indices_temp));
-    TORCH_CHECK(status == SG_SUCCESS);
+    auto stream = c10_tpu::getCurrentTPUStream();
+    auto status = tpudnnTopkAsync(
+        stream,
+        tpu::TPUGenerateTpudnnTensor(stream, self_temp),
+        self.size(axis),
+        axis,
+        descending,
+        false,
+        tpu::TPUGenerateTpudnnTensor(stream, values_temp),
+        tpu::TPUGenerateTpudnnTensor(stream, indices_temp)
+    );
+    TORCH_CHECK(status == TPUDNN_STATUS_SUCCESS);
 
     tpu::TPUCopyDeviceToDevice(values.data_ptr(),
                                values_temp.to(values.dtype()).data_ptr(),

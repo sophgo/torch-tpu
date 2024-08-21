@@ -17,13 +17,13 @@ Tensor & signbit_out_tpu ( const Tensor & self, Tensor & out )
   tpu::TPUCopyHostToDevice ( out.data_ptr(), out_cpu.contiguous().data_ptr(), out.nbytes() );
 #else
   TIMING_START;
-
-  auto status = sgdnnSignbit(
-                       tpu::TPUGetDeviceResource(),
-                       tpu::TPUGenerateSgdnnTensor ( self ),
-                       tpu::TPUGenerateSgdnnTensor ( out ) );
-  TORCH_CHECK ( status == SG_SUCCESS );
-    TIMING_END ( tpu::SIGNBIT );
+  auto stream = c10_tpu::getCurrentTPUStream();
+  auto status = tpudnnSignbitAsync(
+      stream,
+      tpu::TPUGenerateTpudnnTensor(stream, self),
+      tpu::TPUGenerateTpudnnTensor(stream, out));
+  TORCH_CHECK(status == TPUDNN_STATUS_SUCCESS);
+      TIMING_END ( tpu::SIGNBIT );
 #endif
   SHOW_TENSOR_OP(self, out);
   return out;

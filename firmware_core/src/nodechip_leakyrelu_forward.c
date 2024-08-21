@@ -24,8 +24,8 @@ data_type_t dtype )
   int tensor_size = tpu_bank_num()/tensor_num * bank_size;
   TPUKERNEL_ASSERT(tensor_size>0);
 
-  local_addr_t output_local_addr[2] = {0, 1 * bank_size};
-  local_addr_t input_local_addr[2] = {2* bank_size, 3 * bank_size};
+  local_addr_t output_local_addr[2] = {0, 2 * bank_size};
+  local_addr_t input_local_addr[2] = {4* bank_size, 6 * bank_size};
 
   int dtype_size = tpu_data_type_size(dtype);
   const unsigned int max_m_dim = (tpu_gdma_shape_limit(TENSOR_C_DIM) + 1) >> 1;
@@ -98,23 +98,6 @@ data_type_t dtype )
   }
 }
 
-int tpu_kernel_api_leakyrelu ( const void * args )
-{
-  sg_api_leakyrelu_t * api = ( sg_api_leakyrelu_t * ) args;
-  TPUKERNEL_ASSERT ( api->dtype == DT_FP32 || api->dtype == DT_FP16 || api->dtype == DT_BFP16 );
-  int length = 1;
-  for ( int i = 0; i < api->dim; ++i )
-  {
-    length *= api->shape[i];
-  }
-  tpu_initialize();
-  nodechip_leakyrelu ( api->output_global_addr, api->input_global_addr, (scalar_t)api->negative_slope, length, ( data_type_t ) api->dtype );
-  tpu_poll();
-  return 0;
-}
-TPUKERNEL_FUNC_REGISTER ( tpu_kernel_api_leakyrelu );
-
-#ifdef BACKEND_SG2260
 int tpu_kernel_api_leakyrelu_multi_core(const void *args)
 {
   sg_api_leakyrelu_t * api = ( sg_api_leakyrelu_t * ) args;
@@ -125,7 +108,7 @@ int tpu_kernel_api_leakyrelu_multi_core(const void *args)
     length *= api->shape[i];
   }
   tpu_initialize();
-
+#ifdef BACKEND_SG2260
   int core_num = tpu_core_num();
   int core_idx = tpu_core_index();
   int length_slice = DIV_UP(length, core_num);
@@ -143,6 +126,10 @@ int tpu_kernel_api_leakyrelu_multi_core(const void *args)
 
   tpu_poll();
   return 0;
+#else
+  nodechip_leakyrelu ( api->output_global_addr, api->input_global_addr, (scalar_t)api->negative_slope, length, ( data_type_t ) api->dtype );
+  tpu_poll();
+  return 0;
+#endif
 }
 TPUKERNEL_FUNC_REGISTER(tpu_kernel_api_leakyrelu_multi_core);
-#endif
