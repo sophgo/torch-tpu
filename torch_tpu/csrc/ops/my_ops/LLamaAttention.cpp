@@ -108,6 +108,7 @@ namespace at
 		const c10::optional<Tensor> &cos,
 		const c10::optional<Tensor> &sin,
 		const c10::optional<Tensor> &mask,
+		const c10::optional<Tensor> &softmax_lse,
 		int64_t mask_size, // mask_size
 		double C,
 		double dropout_rate,
@@ -156,6 +157,7 @@ namespace at
 			cos.has_value() ? tpu::TPUGenerateSgdnnTensor(cos.value()) : sgdnnUndefinedTensor(),
 			sin.has_value() ? tpu::TPUGenerateSgdnnTensor(sin.value()) : sgdnnUndefinedTensor(),
 			mask.has_value() ? tpu::TPUGenerateSgdnnTensor(mask.value()) : sgdnnUndefinedTensor(),
+			softmax_lse.has_value() ? tpu::TPUGenerateSgdnnTensor(softmax_lse.value()) : sgdnnUndefinedTensor(),
 			mask_size,
 			C,
 			dropout_rate,

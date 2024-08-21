@@ -172,6 +172,13 @@ class LLamaAttentionFunc(torch.autograd.Function):
                                         3 if attention_mode == 'decode' else 2)
 
         else:
+            softmax_lse = None
+            global Q_before_forward
+            Q_before_forward = Q.cpu().clone()
+            global K_before_forward
+            K_before_forward = K.cpu().clone()
+            global V_before_forward
+            V_before_forward = V.cpu().clone()
             torch.ops.my_ops.llama_attention_forward(output,
                                         Q,
                                         K,
@@ -179,10 +186,18 @@ class LLamaAttentionFunc(torch.autograd.Function):
                                         cos,
                                         sin,
                                         mask,
+                                        softmax_lse,
                                         max_s,
                                         softmax_scale,
                                         dropout_rate,
                                         len(input_length))
+            global Q_after_forward
+            Q_after_forward = Q.cpu().clone()
+            global K_after_forward
+            K_after_forward = K.cpu().clone()
+            global V_after_forward
+            V_after_forward = V.cpu().clone()
+
         return output
 
 class LLamaAttentionBlock(nn.Module):
@@ -438,18 +453,43 @@ def check_llama_attention_forward():
     # compare
     comparator = TensorComparator()
     status1 = comparator.cmp_result(out_cpu.detach().contiguous(), out_tpu.cpu().detach().float())
-    return status1
+    if not status1:
+        print(out_cpu.flatten()[:10])
+        print(out_tpu.cpu().detach().float().flatten()[:10])
+
+    status2 = torch.allclose(Q_before_forward, Q_after_forward)
+    if not status2:
+        print(Q_before_forward.flatten()[:10])
+        print(Q_after_forward.flatten()[:10])
+
+    status3 = torch.allclose(K_before_forward, K_after_forward)
+    if not status3:
+        print(K_before_forward.flatten()[:10])
+        print(K_after_forward.flatten()[:10])
+
+    status4 = torch.allclose(V_before_forward, V_after_forward)
+    if not status4:
+        print(V_before_forward.flatten()[:10])
+        print(V_after_forward.flatten()[:10])
+
+    return status1 and status2 and status3 and status4
 
 if __name__ == "__main__":
     status = check_llama_attention_prefill()
     if status == False:
         print(f"[Failed] llama prefill compare failed!")
         sys.exit(255)
+    else:
+        print(f"[Passed] llama prefill compare passed!")
     status = check_llama_attention_decode()
     if status == False:
         print(f"[Failed] llama decode compare failed!")
         sys.exit(255)
+    else:
+        print(f"[Passed] llama decode compare passed!")
     status = check_llama_attention_forward()
     if status == False:
         print(f"[Failed] llama forward compare failed!")
         sys.exit(255)
+    else:
+        print(f"[Passed] llama forward compare passed!")

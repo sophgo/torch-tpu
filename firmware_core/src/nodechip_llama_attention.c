@@ -142,6 +142,7 @@ void nodechip_llama_attention_forward_multi_core(
     global_addr_t RoPE_sin_global_addr,
     global_addr_t Mask_global_addr,
     global_addr_t Y_global_addr,
+    global_addr_t Softmax_lse_global_addr,
     float C,
     float dropout_rate,
     int batch,
@@ -151,7 +152,8 @@ void nodechip_llama_attention_forward_multi_core(
     int num_k_v_heads,
     int seq_len,
     data_type_t dtype,
-    int qkv_packed);
+    int qkv_packed,
+    int return_softmax);
 
 int tpu_kernel_llama_attention_forward_multi_core(const void* api_buf) {
     sg_api_llama_attention_forward_multi_core_t *api = (sg_api_llama_attention_forward_multi_core_t*)api_buf;
@@ -167,6 +169,7 @@ int tpu_kernel_llama_attention_forward_multi_core(const void* api_buf) {
         api-> sin_global_addr,
         api-> mask_global_addr,
         api-> Y_global_addr,
+        api-> Softmax_lse_global_addr,
         api-> C,
         api-> dropout_rate,
         api-> batch,
@@ -176,7 +179,8 @@ int tpu_kernel_llama_attention_forward_multi_core(const void* api_buf) {
         api-> num_k_v_heads,
         api-> seq_len,
         (data_type_t)api-> dtype,
-        api-> qkv_packed);
+        api-> qkv_packed,
+        api-> return_softmax);
     tpu_poll();
     return 0;
 }

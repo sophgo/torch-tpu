@@ -4119,6 +4119,7 @@ tpu_status_t sgdnnLlamaAttentionForward ( tpu_resource_t resource,
                                   SgdnnTensor_t cos,
                                   SgdnnTensor_t sin,
                                   SgdnnTensor_t mask,
+                                  SgdnnTensor_t softmax_lse,
                                   int mask_size,
                                   float C,
                                   float dropout_rate,
@@ -4136,6 +4137,7 @@ tpu_status_t sgdnnLlamaAttentionForward ( tpu_resource_t resource,
   SGDNN_CHECK ( Q.dim == 3 );
   SGDNN_CHECK ( K.dim == 3 );
   SGDNN_CHECK ( V.dim == 3 );
+  SGDNN_CHECK ( batch > 0 );
   if (cos.addr != 0){
     SGDNN_CHECK ( Q.dtype == cos.dtype );
     SGDNN_CHECK ( Q.dtype == sin.dtype );
@@ -4166,6 +4168,7 @@ tpu_status_t sgdnnLlamaAttentionForward ( tpu_resource_t resource,
   api.cos_global_addr = cos.addr;
   api.sin_global_addr = sin.addr;
   api.mask_global_addr = mask.addr;
+  api.Softmax_lse_global_addr = softmax_lse.addr;
   api.mask_max = mask_size;
   api.C = C;
   api.dropout_rate = dropout_rate;
@@ -4174,7 +4177,8 @@ tpu_status_t sgdnnLlamaAttentionForward ( tpu_resource_t resource,
   api.hidden_size = Q.shape[1] * Q.shape[2]; // heads * head_size
   api.num_attention_heads = Q.shape[1];
   api.num_k_v_heads = K.shape[1];
-  api.seq_len = Q.shape[0];
+  api.seq_len = Q.shape[0] / batch;
+  api.return_softmax = softmax_lse.addr != 0;
 #ifdef USE_QKV_PACKED
   api.qkv_packed = !sgdnnIsTensorContiguous(&Q);
 #endif
