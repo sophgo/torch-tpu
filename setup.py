@@ -274,6 +274,14 @@ def get_src_py_and_dst():
         os.makedirs(os.path.dirname(dst), exist_ok=True)
         ret.append((src, dst))
 
+    tool_files = walk_dir(os.path.join(BASE_DIR, "tools"))
+    for src in tool_files:
+        dst = os.path.join(
+            os.path.join(BASE_DIR, f"build/{get_build_type()}/packages/torch_tpu"),
+            os.path.relpath(src, BASE_DIR))
+        os.makedirs(os.path.dirname(dst), exist_ok=True)
+        ret.append((src, dst))
+
     header_files = [
         "torch_tpu/csrc/*.h",
         "torch_tpu/csrc/*/*.h",

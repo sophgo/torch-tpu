@@ -18,3 +18,5 @@ TORCH-TPU开发参考手册
    06_distribute
    07_custom_op
    09_dynamo
+   11_superParSel
+   
