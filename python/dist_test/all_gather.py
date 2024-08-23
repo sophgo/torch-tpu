@@ -7,8 +7,8 @@ import os
 TPU = "tpu"
 
 # get rank and world_size from env
-rank = os.environ.get("LOCAL_RANK")
-world_size = os.environ.get("LOCAL_WORLD_SIZE")
+rank = os.environ.get("RANK")
+world_size = os.environ.get("WORLD_SIZE")
 if rank == None:
     rank = os.environ.get("OMPI_COMM_WORLD_RANK", 0)
     world_size = os.environ.get("OMPI_COMM_WORLD_SIZE", 1)

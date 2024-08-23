@@ -12,7 +12,8 @@ TORCH-TPU快速入门手册
 
    01_introduction
    02_env
-   03_Tutorial0
+   03_Tutorial
+   04_Tutorial0
    04_Tutorial1
    04_Tutorial2
    04_Tutorial3

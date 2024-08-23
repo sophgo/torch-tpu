@@ -1887,7 +1887,7 @@ __attribute__((constructor)) void ProcessGroupSCCLHostConstructor() {
   py::object module = py::module::import("torch.distributed");
   py::object register_backend =
       module.attr("Backend").attr("register_backend");
-  register_backend("SCCLHOST", py::cpp_function(ProcessGroupSCCLHost::createProcessGroupSCCLHost));
+  register_backend("SCCLHOST", py::cpp_function(ProcessGroupSCCLHost::createProcessGroupSCCLHost), true, "tpu");
 }
 
 } // namespace c10d

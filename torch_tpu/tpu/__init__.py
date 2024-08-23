@@ -22,8 +22,6 @@ __all__ = [
     "is_initialized",
     "memory_usage",
     "set_device",
-    "read_rank_table",
-    "is_rank_table_valid",
     "set_stream",
     "set_sync_debug_mode",
     "stream",
@@ -32,6 +30,10 @@ __all__ = [
     "temperature",
     "power_draw",
     "clock_rate",
+
+    ## sccl related
+    "is_rank_table_valid",
+    "read_rank_table",
 
     ## amp related
     "amp",
@@ -134,5 +136,6 @@ if BACKEND == "SG2260":
 from .autocast_utils import *  # noqa: F403
 from .optimer_utils import * # noqa: F403
 from .custom_op import *
+from .gen_sccl_rank_table import _main
 
 default_generators: Tuple[torch._C.Generator] = ()

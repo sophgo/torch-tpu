@@ -139,53 +139,38 @@ def set_device(device):
         torch_tpu._C._tpu_setDevice(device_id)
 
 import json
-import subprocess
-
-def get_ip():
-    ip = subprocess.run(
-        "ifconfig -a|grep inet|grep -w -v 127.0.0.1 |grep -w -v 172.17.0.1 | grep -v inet6|awk '{print $2}'|tr -d 'addr:'",
-        shell=True, check=True, stdout=subprocess.PIPE).stdout.decode("utf-8").splitlines()[0]
-    assert ip, "unable to get IP"
-    return ip
-
-def check_server_count():
-    path = os.environ.get("RANK_TABLE_FILE")
-    with open(path,'r') as f:
-        data = json.load(f)
-
-    server_count = data["server_count"]
-    server_list_size = len(data["server_list"])
-    assert server_count == server_list_size
 
 def rank_table_valid():
     path = os.environ.get("RANK_TABLE_FILE")
     if path is None:
         print("RANK_TABLE_FILE not set\n")
-        return 0
+        return False
     if not os.path.exists(path):
         print("File not exist\n")
-        return 0
-    check_server_count()
-    return 1
+        return False
+    return True
 
 def read_rank_table():
-    if rank_table_valid() == 0:
+    world_rank = int(os.environ.get("RANK"))
+    if world_rank == None:
+        world_rank = int(os.environ.get("OMPI_COMM_WORLD_RANK", 0))
+    if not rank_table_valid():
         return None
     path = os.environ.get("RANK_TABLE_FILE")
     with open(path,'r') as f:
         data = json.load(f)
 
     chip_map = []
-    for server_info in data["server_list"]:
-        ip = get_ip()
-        assert server_info["server_ip"] == ip, "The machine ip is inconsistent with the config ip"
-        for device_info in server_info["device"]:
-            chip_map.append(int(device_info["device_id"]))
+    for node_info in data["node_list"]:
+        for device_info in node_info["device_list"]:
+            if int(device_info["world_rank"]) == world_rank:
+                chip_map = [int(device_info["device_id"]) for device_info in node_info["device_list"]]
+
     print(f'[chip_map] {chip_map}')
     return chip_map
 
 def is_rank_table_valid():
-    return "RANK_TABLE_FILE" in os.environ
+    return rank_table_valid()
 
 @lru_cache(maxsize=1)
 def device_count():
