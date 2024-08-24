@@ -15,11 +15,23 @@ namespace tpu
 {
 using Devptr = unsigned char *;
 
+static inline size_t alignTo(size_t s, size_t n)
+{
+  return (s + n - 1) / n * n;
+}
+
 size_t getTPUAllocatorFreeDelay()
 {
   const char *delay = getenv("TPU_ALLOCATOR_FREE_DELAY_IN_MS");
   if (!delay) return 0;
   return atoi(delay);
+}
+
+size_t getTPUAllocatorAlignSize(size_t defaultVal)
+{
+  const char *size = getenv("TPU_ALLOCATOR_ALIGN_SIZE");
+  if (!size) return defaultVal;
+  return atoi(size);
 }
 
 bool getEnableAllocatorReuse()
@@ -137,8 +149,8 @@ public:
     void *reusedPtr = nullptr;
     std::vector<void *> toRm;
     auto &freeTBDs = getFreeTBDs(index);
-    bool reuseEnabled = getEnableAllocatorReuse();
-    for (auto pair : freeTBDs)
+    static bool reuseEnabled = getEnableAllocatorReuse();
+    for (auto &pair : freeTBDs)
     {
       auto &event = pair.second.event;
       auto &tbd = pair.second;
@@ -147,7 +159,9 @@ public:
         if (tpuRtEventQuery(event) != tpuRtDevnotready)
         {
           tbd.freed_timestamp = now;
-        } else continue;
+        } else {
+            continue;
+        }
       }
 
       if (reuseEnabled && !reusedPtr && getSize(tbd.ptr, index) == size)
@@ -155,15 +169,17 @@ public:
         // Reuse it
         toRm.push_back(tbd.ptr);
         reusedPtr = tbd.ptr;
-        std::cout << "Re-use " << reusedPtr << std::endl;
-        continue;
+        //std::cout << "Re-use " << reusedPtr << std::endl;
+        break;
       }
 
       if (tbd.freed_timestamp + free_delay_ > now)
+      {
         continue;
+      }
 
-      std::cout << "Raw free " << tbd.ptr << std::endl;
       tpuRtFree(&tbd.ptr, NO_USE);
+      std::cout << "Free " << tbd.ptr << " of size " << getSize(tbd.ptr, index) << std::endl;
       getMemInfo(index).erase(tbd.ptr);
       toRm.push_back(tbd.ptr);
     }
@@ -180,6 +196,9 @@ public:
 
   void * Alloc ( size_t Size, int Index )
   {
+    static size_t alignSize = getTPUAllocatorAlignSize(0x100000);
+    Size = alignTo(Size, alignSize);
+
     auto reused = processFreeTBDs(Size, Index);
     if (reused) return reused;
 
@@ -197,7 +216,7 @@ public:
     std::lock_guard<std::mutex> lock(getMutex(Index));
     getMemInfo(Index)[ptr] = info;
 
-    std::cout << "Alloc " << ptr << std::endl;
+    std::cout << "Alloc " << ptr << " of size " << Size << std::endl;
 
     return ptr;
   }
@@ -208,8 +227,6 @@ public:
     {
       return;
     }
-
-    std::cout << "Free " << Ptr << std::endl;
 
     MemToFree tbd;
     tbd.stream = c10_tpu::getCurrentTPUStream();
