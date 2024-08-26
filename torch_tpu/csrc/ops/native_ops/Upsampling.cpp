@@ -41,15 +41,19 @@ Tensor upsample_bilinear2d_tpu(const at::Tensor &self,
 
   TIMING_START;
 
-  auto status = sgdnnUpsampling(
-      tpu::TPUGetDeviceResource(), tpu::TPUGenerateSgdnnTensor(self),
-      tpu::TPUGenerateSgdnnTensor(out), align_corners, UPSAMPLING_BILINEAR);
+  auto stream = c10_tpu::getCurrentTPUStream();
+  auto status = tpudnnUpsamplingAsync(
+    stream,
+    tpu::TPUGenerateTpudnnTensor(stream, self),
+    tpu::TPUGenerateTpudnnTensor(stream, out),
+    align_corners,
+    TPUDNN_UPSAMPLING_BILINEAR);
 
   if (scales_h.has_value() && scales_w.has_value()) {
     out = out.slice(2, c10::nullopt, size_ref[0])
               .slice(3, c10::nullopt, size_ref[1]);
   }
-  TORCH_CHECK(status == SG_SUCCESS);
+  TORCH_CHECK(status ==  TPUDNN_STATUS_SUCCESS);
   TIMING_END(tpu::UPSAMPLING_BILINEAR)
 #endif
   SHOW_TENSOR_OP(self, out);
@@ -89,16 +93,19 @@ Tensor upsample_nearest2d_tpu(const at::Tensor &self,
   auto self_ = self.is_contiguous() ? self : self.contiguous();
   TIMING_START;
 
-  auto status = sgdnnUpsampling(tpu::TPUGetDeviceResource(),
-                                tpu::TPUGenerateSgdnnTensor(self_),
-                                tpu::TPUGenerateSgdnnTensor(out),
-                                true /*align_corners*/, UPSAMPLING_NEAREST);
+  auto stream = c10_tpu::getCurrentTPUStream();
+  auto status = tpudnnUpsamplingAsync(
+    stream,
+    tpu::TPUGenerateTpudnnTensor(stream, self_),
+    tpu::TPUGenerateTpudnnTensor(stream, out),
+    true /*align_corners*/,
+    TPUDNN_UPSAMPLING_NEAREST);
 
   if (scales_h.has_value() && scales_w.has_value()) {
     out = out.slice(2, c10::nullopt, size_ref[0])
               .slice(3, c10::nullopt, size_ref[1]);
   }
-  TORCH_CHECK(status == SG_SUCCESS);
+  TORCH_CHECK(status == TPUDNN_STATUS_SUCCESS);
   TIMING_END(tpu::UPSAMPLING_NEAREST)
 #endif
   SHOW_TENSOR_OP(self, out);
@@ -128,7 +135,7 @@ Tensor &upsample_nearest2d_backward_out_tpu(
       scales_h, scales_w, T_input);
   grad_input = TENSOR_TO_TPU(input_r.to(input_type).contiguous());
 #else
-  PoolingDescriptor_t pooling_desc = {
+   TPUDNN_PoolingDescriptor_t pooling_desc = {
       .kh = int(scales_h.value()),
       .kw = int(scales_w.value()),
       .pad_h = 0,
@@ -137,14 +144,17 @@ Tensor &upsample_nearest2d_backward_out_tpu(
       .stride_w = int(scales_w.value()),
       .output_h = static_cast<int>(output_size[0]),
       .output_w = static_cast<int>(output_size[1]),
-      .mode = POOLING_AVG};
+      .mode = TPUDNN_POOLING_AVG};
   TIMING_START;
 
-  auto status = sgdnnUpsampleNearest2dBackward(
-      tpu::TPUGetDeviceResource(), tpu::TPUGenerateSgdnnTensor(grad_output_),
-      tpu::TPUGenerateSgdnnTensor(grad_input),
-      scales_h.value() * scales_w.value(), pooling_desc);
-  TORCH_CHECK(status == SG_SUCCESS);
+  auto stream = c10_tpu::getCurrentTPUStream();
+  auto status = tpudnnUpsampleNearest2dBackwardAsync(
+    stream,
+    tpu::TPUGenerateTpudnnTensor(stream, grad_output_),
+    tpu::TPUGenerateTpudnnTensor(stream, grad_input),
+    scales_h.value() * scales_w.value(),
+    pooling_desc);
+  TORCH_CHECK(status == TPUDNN_STATUS_SUCCESS);
   TIMING_END(tpu::UPSAMPLING_NEAREST_BACKWARD)
 #endif
   SHOW_TENSOR_OP(grad_output_, grad_input);

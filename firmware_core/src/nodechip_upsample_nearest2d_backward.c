@@ -1385,44 +1385,12 @@ void nodechip_upsample_nearest2d_backward_with_data_split(
         }
 }
 
-int tpu_kernel_api_upsample_nearest2d_backward(const void *args) {
-  sg_api_upsample2d_backward_t *api = (sg_api_upsample2d_backward_t *)args;
-  TPUKERNEL_ASSERT(api->dtype == DT_FP32 || api->dtype == DT_FP16 ||
-                   api->dtype == DT_BFP16);
-
-  nodechip_upsample_nearest2d_backward_with_data_split(
-        api->input_global_addr,
-        api->output_global_addr,
-        api->input_shape[0],
-        api->input_shape[1],
-        api->input_shape[2],
-        api->input_shape[3],
-        api->output_shape[2],
-        api->output_shape[3],
-        api->pooling_desc.kh,
-        api->pooling_desc.kw,
-        api->pooling_desc.pad_h,
-        api->pooling_desc.pad_w,
-        api->pooling_desc.pad_h,
-        api->pooling_desc.pad_w,
-        api->pooling_desc.stride_h,
-        api->pooling_desc.stride_w,
-        1/*dilation_h*/, 1/*dilation_w*/,
-        api->pooling_desc.mode == POOLING_AVG,
-        0/*avg_pooling_mode*/, 0/*if_relu*/,
-        -1/*relu_upper_limit*/,
-        api->scalar, api->dtype);
-  tpu_poll();
-  return 0;
-}
-TPUKERNEL_FUNC_REGISTER(tpu_kernel_api_upsample_nearest2d_backward);
-
-#ifdef BACKEND_SG2260
 int tpu_kernel_api_upsample_nearest2d_backward_multi_core(const void *args) {
   // todo: optimize the multi-core version
   sg_api_upsample2d_backward_t *api = (sg_api_upsample2d_backward_t *)args;
   TPUKERNEL_ASSERT(api->dtype == DT_FP32 || api->dtype == DT_FP16 ||
                    api->dtype == DT_BFP16);
+#ifdef BACKEND_SG2260
   tpu_initialize();
   int core_idx = tpu_core_index();
   if(core_idx==0){
@@ -1451,6 +1419,31 @@ int tpu_kernel_api_upsample_nearest2d_backward_multi_core(const void *args) {
   }
   tpu_poll();
   return 0;
+#else
+  nodechip_upsample_nearest2d_backward_with_data_split(
+        api->input_global_addr,
+        api->output_global_addr,
+        api->input_shape[0],
+        api->input_shape[1],
+        api->input_shape[2],
+        api->input_shape[3],
+        api->output_shape[2],
+        api->output_shape[3],
+        api->pooling_desc.kh,
+        api->pooling_desc.kw,
+        api->pooling_desc.pad_h,
+        api->pooling_desc.pad_w,
+        api->pooling_desc.pad_h,
+        api->pooling_desc.pad_w,
+        api->pooling_desc.stride_h,
+        api->pooling_desc.stride_w,
+        1/*dilation_h*/, 1/*dilation_w*/,
+        api->pooling_desc.mode == POOLING_AVG,
+        0/*avg_pooling_mode*/, 0/*if_relu*/,
+        -1/*relu_upper_limit*/,
+        api->scalar, api->dtype);
+  tpu_poll();
+  return 0;
+#endif
 }
 TPUKERNEL_FUNC_REGISTER(tpu_kernel_api_upsample_nearest2d_backward_multi_core);
-#endif

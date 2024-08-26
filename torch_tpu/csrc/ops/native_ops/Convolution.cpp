@@ -101,7 +101,7 @@ int64_t groups )
     TORCH_CHECK ( num_spatial_dims == 2, "TPU ", num_spatial_dims, "D convolution is not implemented" );
     auto output_shape = at::native::conv_output_size ( input.sizes(), weight.sizes(), padding, stride, dilation );
     output = torch::empty ( output_shape, input.options() );
-    SgdnnConv2dParam_t conv_param =
+    tpudnnConv2dParam_t conv_param =
     {
       .kernel_h = ( int ) weight.size ( 2 ),
       .kernel_w = ( int ) weight.size ( 3 ),
@@ -115,14 +115,15 @@ int64_t groups )
     };
 
     TIMING_START;
-    auto status = sgdnnConv2d (
-                         tpu::TPUGetDeviceResource(),
-                         tpu::TPUGenerateSgdnnTensor ( input ),
-                         tpu::TPUGenerateSgdnnTensor ( weight ),
-                         bias.defined() ? tpu::TPUGenerateSgdnnTensor ( bias ) : sgdnnUndefinedTensor(),
-                         conv_param,
-                         tpu::TPUGenerateSgdnnTensor ( output ) );
-    TORCH_CHECK ( status == SG_SUCCESS );
+    auto stream = c10_tpu::getCurrentTPUStream();
+    auto status = tpudnnConv2dAsync(
+      stream,
+      tpu::TPUGenerateTpudnnTensor(stream, input),
+      tpu::TPUGenerateTpudnnTensor(stream, weight),
+      bias.defined() ? tpu::TPUGenerateTpudnnTensor (stream, bias ) : tpudnnUndefinedTensor(),
+      conv_param,
+      tpu::TPUGenerateTpudnnTensor(stream, output));
+    TORCH_CHECK(status == TPUDNN_STATUS_SUCCESS);
     TIMING_END ( tpu::CONVOLUTION );
   }
   SHOW_TENSOR_OP(input_, weight, bias, output);
@@ -232,7 +233,7 @@ std::array<bool, 3> output_mask )
     {
       TORCH_CHECK ( num_spatial_dims == 2, "TPU ", num_spatial_dims, "D transposed convolution backward is not implemented" );
     }
-    SgdnnConv2dParam_t conv_param =
+    tpudnnConv2dParam_t conv_param =
     {
       .kernel_h = ( int ) weight.size ( 2 ),
       .kernel_w = ( int ) weight.size ( 3 ),
@@ -245,16 +246,17 @@ std::array<bool, 3> output_mask )
       .groups = ( int ) groups,
     };
     TIMING_START;
-    auto status = sgdnnConv2dBackward (
-                         tpu::TPUGetDeviceResource(),
-                         tpu::TPUGenerateSgdnnTensor ( grad_output_ ),
-                         tpu::TPUGenerateSgdnnTensor ( input ),
-                         tpu::TPUGenerateSgdnnTensor ( weight ),
-                         conv_param,
-                         output_mask[0] ? tpu::TPUGenerateSgdnnTensor ( grad_input ) : sgdnnUndefinedTensor(),
-                         output_mask[1] ? tpu::TPUGenerateSgdnnTensor ( grad_weight ) : sgdnnUndefinedTensor(),
-                         output_mask[2] ? tpu::TPUGenerateSgdnnTensor ( grad_bias ) : sgdnnUndefinedTensor() );
-    TORCH_CHECK ( status == SG_SUCCESS );
+    auto stream = c10_tpu::getCurrentTPUStream();
+    auto status = tpudnnConv2dBackwardAsync(
+      stream,
+      tpu::TPUGenerateTpudnnTensor(stream, grad_output_),
+      tpu::TPUGenerateTpudnnTensor(stream, input),
+      tpu::TPUGenerateTpudnnTensor (stream, weight ),
+      conv_param,
+      output_mask[0] ? tpu::TPUGenerateTpudnnTensor (stream,  grad_input ) : tpudnnUndefinedTensor(),
+      output_mask[1] ? tpu::TPUGenerateTpudnnTensor (stream,  grad_weight ) : tpudnnUndefinedTensor(),
+      output_mask[2] ? tpu::TPUGenerateTpudnnTensor (stream,  grad_bias ) : tpudnnUndefinedTensor() );
+    TORCH_CHECK(status == TPUDNN_STATUS_SUCCESS);
     TIMING_END ( tpu::CONVOLUTION_BACKWARD );
   }
   SHOW_TENSOR_OP(grad_output_, input, weight, grad_input, grad_weight, grad_bias);

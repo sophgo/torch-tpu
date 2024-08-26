@@ -57,44 +57,6 @@ int                 merge_coeff,
 int                 weight_is_coeff,
 nnvlc_common_spec_t nnvlc_param);
 
-int tpu_kernel_api_conv2d ( const void * args ) {
-  sg_api_conv2d_t * api = ( sg_api_conv2d_t * ) args;
-  TPUKERNEL_ASSERT ( api->dtype == DT_FP32 || api->dtype == DT_FP16 || api->dtype == DT_BFP16 );
-  dim4 input_shape =
-  {
-    api->input_shape[0], api->input_shape[1], api->input_shape[2], api->input_shape[3]
-  };
-  dim2 kernel = { api->kernel[0], api->kernel[1] };
-  dim2 stride = { api->stride[0], api->stride[1] };
-  dim2 dilation = { api->dilation[0], api->dilation[1] };
-  padding_t pad = { api->pad[0], api->pad[1], api->pad[2], api->pad[3] };
-  tpu_initialize();
-  nodechip_conv_float_parallel (
-  api->input_global_addr,
-  api->weight_global_addr,
-  api->bias_global_addr,
-  api->output_global_addr,
-  &input_shape,
-  api->groups,
-  api->output_c,
-  &kernel,
-  &stride,
-  &dilation,
-  &pad,
-  api->bias_global_addr != 0,
-  0,
-  -1.f,
-  0,
-  ( data_type_t ) api->dtype,
-  ( data_type_t ) api->dtype,
-  false );
-  tpu_poll();
-  return 0;
-}
-
-TPUKERNEL_FUNC_REGISTER ( tpu_kernel_api_conv2d );
-
-#ifdef BACKEND_SG2260
 int tpu_kernel_api_conv2d_multi_core ( const void * args ) {
   sg_api_conv2d_t * api = ( sg_api_conv2d_t * ) args;
   TPUKERNEL_ASSERT ( api->dtype == DT_FP32 || api->dtype == DT_FP16 || api->dtype == DT_BFP16 );
@@ -106,6 +68,7 @@ int tpu_kernel_api_conv2d_multi_core ( const void * args ) {
   dim2 stride = { api->stride[0], api->stride[1] };
   dim2 dilation = { api->dilation[0], api->dilation[1] };
   padding_t pad = { api->pad[0], api->pad[1], api->pad[2], api->pad[3] };
+#ifdef BACKEND_SG2260
   nnvlc_common_spec_t nnvlc_param = {false, false, 0, 0, false};
   tpu_initialize();
   nodechip_conv_float_multi_core (
@@ -138,6 +101,29 @@ int tpu_kernel_api_conv2d_multi_core ( const void * args ) {
   tpu_sync_all();
   tpu_poll();
   return 0;
+#else
+  tpu_initialize();
+  nodechip_conv_float_parallel (
+  api->input_global_addr,
+  api->weight_global_addr,
+  api->bias_global_addr,
+  api->output_global_addr,
+  &input_shape,
+  api->groups,
+  api->output_c,
+  &kernel,
+  &stride,
+  &dilation,
+  &pad,
+  api->bias_global_addr != 0,
+  0,
+  -1.f,
+  0,
+  ( data_type_t ) api->dtype,
+  ( data_type_t ) api->dtype,
+  false );
+  tpu_poll();
+  return 0;
+#endif
 }
 TPUKERNEL_FUNC_REGISTER(tpu_kernel_api_conv2d_multi_core);
-#endif

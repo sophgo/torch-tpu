@@ -266,44 +266,11 @@ const dim4      *shape
   dtype );
 }
 
-int tpu_kernel_api_conv_weight_reorder ( const void* args ) {
-  sg_api_conv_weight_reorder_t* api = ( sg_api_conv_weight_reorder_t* ) args;
-  dim4 shape = {api->shape[0], api->shape[1], api->shape[2], api->shape[3]};
-  tpu_initialize();
-  if ( api->mode == 0 ) {
-    nodechip_conv_weight_to_32ic_simluate (
-    api->input_global_addr,
-    api->output_global_addr,
-    &shape );
-  } else if ( api->mode == 1 ) {
-    nodechip_conv_weight_to_32oc_simluate (
-    api->input_global_addr,
-    api->output_global_addr,
-    &shape );
-  } else if ( api->mode == 2 ) {
-    int oc_w_offset = shape.n * (shape.h * shape.w) * DIV_UP(shape.c, 32) * 32 * tpu_data_type_size ( DT_FP16 );
-    nodechip_conv_weight_to_32ic_simluate (
-      api->input_global_addr,
-      api->output_global_addr,
-      &shape );
-    nodechip_conv_weight_to_32oc_simluate (
-      api->input_global_addr,
-      api->output_global_addr + oc_w_offset,
-      &shape);
-  } else {
-    TPUKERNEL_ASSERT ( 0 );
-  }
-  tpu_poll();
-  return 0;
-}
-
-TPUKERNEL_FUNC_REGISTER ( tpu_kernel_api_conv_weight_reorder );
-
-#ifdef BACKEND_SG2260
 int tpu_kernel_api_conv_weight_reorder_multi_core ( const void* args ) {
   sg_api_conv_weight_reorder_t* api = ( sg_api_conv_weight_reorder_t* ) args;
   dim4 shape = {api->shape[0], api->shape[1], api->shape[2], api->shape[3]};
   tpu_initialize();
+#ifdef BACKEND_SG2260
   int core_idx = tpu_core_index();
   if ( core_idx == 0 ) {
     if ( api->mode == 0 ) {
@@ -332,6 +299,32 @@ int tpu_kernel_api_conv_weight_reorder_multi_core ( const void* args ) {
   }
   tpu_poll();
   return 0;
+#else
+  if ( api->mode == 0 ) {
+    nodechip_conv_weight_to_32ic_simluate (
+    api->input_global_addr,
+    api->output_global_addr,
+    &shape );
+  } else if ( api->mode == 1 ) {
+    nodechip_conv_weight_to_32oc_simluate (
+    api->input_global_addr,
+    api->output_global_addr,
+    &shape );
+  } else if ( api->mode == 2 ) {
+    int oc_w_offset = shape.n * (shape.h * shape.w) * DIV_UP(shape.c, 32) * 32 * tpu_data_type_size ( DT_FP16 );
+    nodechip_conv_weight_to_32ic_simluate (
+      api->input_global_addr,
+      api->output_global_addr,
+      &shape );
+    nodechip_conv_weight_to_32oc_simluate (
+      api->input_global_addr,
+      api->output_global_addr + oc_w_offset,
+      &shape);
+  } else {
+    TPUKERNEL_ASSERT ( 0 );
+  }
+  tpu_poll();
+  return 0;
+#endif
 }
 TPUKERNEL_FUNC_REGISTER ( tpu_kernel_api_conv_weight_reorder_multi_core );
-#endif

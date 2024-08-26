@@ -96,6 +96,32 @@ typedef enum {
   TPUDNN_POOLING_AVG = 2,
 } tensor_pooling_mode_t;
 
+typedef enum {
+  TPUDNN_UPSAMPLING_NEAREST = 0,
+  TPUDNN_UPSAMPLING_BILINEAR = 1,
+} tensor_resize_mode_t;
+typedef struct
+{
+  int kernel_h;
+  int kernel_w;
+  int pad_h;
+  int pad_w;
+  int stride_h;
+  int stride_w;
+  int dilation_h;
+  int dilation_w;
+  int groups;
+}tpudnnConv2dParam_t;
+
+typedef enum
+{
+  TPUDNN_NO_FORMATED = 0,
+  TPUDNN_CONV_W_INFER_FORMAT  = 1,
+  TPUDNN_CONV_W_TRAIN_FORMAT  = 2,
+  TPUDNN_CONV_DW_TRAIN_FORMAT = 3,
+}
+TpudnnFormatedType_t;
+
 typedef struct
 {
     void *addr;
@@ -103,8 +129,8 @@ typedef struct
     int shape[8];
     int stride[8];
     tpudnnDataType_t dtype;
+    TpudnnFormatedType_t format_casted;
 } tpudnnTensor_t;
-
 typedef struct {
   int kh;
   int kw;
@@ -607,6 +633,57 @@ tpudnnStatus_t tpudnnActiveAsync(
     tpudnnTensor_t input,
     tpudnnTensor_t output,
     tensor_active_type_t active_type);
+
+tpudnnStatus_t tpudnnReorderConv2dWeightAsync (
+    tpudnnHandle_t handle,
+    tpudnnTensor_t input,
+    int mode,
+    tpudnnTensor_t output);
+
+tpudnnStatus_t tpudnnConv2dAsync (
+    tpudnnHandle_t handle,
+    tpudnnTensor_t input,
+    tpudnnTensor_t weight,
+    tpudnnTensor_t bias,
+    tpudnnConv2dParam_t param,
+    tpudnnTensor_t output);
+
+tpudnnStatus_t tpudnnConv2dBackwardAsync (
+    tpudnnHandle_t handle,
+    tpudnnTensor_t grad_output,
+    tpudnnTensor_t input,
+    tpudnnTensor_t weight,
+    tpudnnConv2dParam_t param,
+    tpudnnTensor_t grad_input,
+    tpudnnTensor_t grad_weight,
+    tpudnnTensor_t grad_bias);
+
+tpudnnStatus_t tpudnnUpsamplingAsync(
+    tpudnnHandle_t handle,
+    tpudnnTensor_t input,
+    tpudnnTensor_t output,
+    bool align_corners,
+    tensor_resize_mode_t upsampling_type);
+
+tpudnnStatus_t tpudnnUpsampleNearest2dBackwardAsync(
+    tpudnnHandle_t handle,
+    tpudnnTensor_t grad_output,
+    tpudnnTensor_t grad_input,
+    int scale,
+    TPUDNN_PoolingDescriptor_t pooling_desc);
+
+tpudnnStatus_t tpudnnFlipAsync (
+    tpudnnHandle_t handle,
+    tpudnnTensor_t input,
+    int axis,
+    tpudnnTensor_t output);
+
+tpudnnStatus_t tpudnnTriangularizeAsync(
+    tpudnnHandle_t handle,
+    tpudnnTensor_t self,
+    int is_upper,
+    int diagonal,
+    tpudnnTensor_t out);
 
 tpudnnStatus_t tpudnnC2CAllReduce(
     tpudnnHandle_t handle,

@@ -33,10 +33,13 @@ Tensor &flip_out_tpu(const Tensor &self, const c10::ArrayRef<int64_t> dims,
 
   auto temp_result = self;
   for (uint i = 0; i < dims.size(); i++) {
-    auto status = sgdnnFlip(tpu::TPUGetDeviceResource(),
-                                   tpu::TPUGenerateSgdnnTensor(temp_result),
-                                   dims[i], tpu::TPUGenerateSgdnnTensor(out));
-    TORCH_CHECK(status == SG_SUCCESS);
+    auto stream = c10_tpu::getCurrentTPUStream();
+    auto status = tpudnnFlipAsync(
+        stream,
+        tpu::TPUGenerateTpudnnTensor(stream, temp_result),
+        dims[i],
+        tpu::TPUGenerateTpudnnTensor(stream, out));
+    TORCH_CHECK(status == TPUDNN_STATUS_SUCCESS);
     temp_result = out;
   }
     TIMING_END(tpu::FLIP);
