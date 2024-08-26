@@ -284,6 +284,7 @@ static const char * OpTypeStr[OP_NUM] =
   "LLAMA_MLP_FORWARD",
   "LLAMA_A16_MLP_FORWARD",
   "RMSNORM_FORWARD",
+  "RMSNORM_BACKWARD",
   "binary_op",
   "binary_op_c",
   "binary_op_bcast",

@@ -694,6 +694,28 @@ tpudnnStatus_t tpudnnInfCheckAndUnscaleAsync(
     tpudnnTensor_t found_inf,
     float inv_scale);
 
+tpudnnStatus_t tpudnnRmsNormForwardAsync(
+    tpudnnHandle_t handle,
+    tpudnnTensor_t input,
+    tpudnnTensor_t scale,
+    tpudnnTensor_t bias,
+    tpudnnTensor_t output,
+    int axis,
+    float eps
+);
+
+tpudnnStatus_t tpudnnRmsNormBackwardAsync(
+    tpudnnHandle_t handle,
+    tpudnnTensor_t grad_output,
+    tpudnnTensor_t input,
+    tpudnnTensor_t scale,
+    tpudnnTensor_t rms,
+    tpudnnTensor_t grad_input,
+    tpudnnTensor_t grad_scale,
+    tpudnnTensor_t grad_bias,
+    int axis,
+    double eps);
+    
 tpudnnStatus_t tpudnnC2CAllReduce(
     tpudnnHandle_t handle,
     void *send_buff,

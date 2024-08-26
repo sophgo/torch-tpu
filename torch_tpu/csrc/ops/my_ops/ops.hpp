@@ -67,6 +67,18 @@ namespace at
 		int64_t axis,
 		double_t eps);
 
+	Tensor rmsnorm_backward(
+		Tensor &grad_output,
+		Tensor &input,
+		const c10::optional<Tensor> &scale,
+		const c10::optional<Tensor> &bias,
+		Tensor &rms,
+		const c10::optional<Tensor> &grad_input,
+		const c10::optional<Tensor> &grad_scale,
+		const c10::optional<Tensor> &grad_bias,
+		int64_t axis,
+		double_t eps);
+
 	Tensor llama_attention(
 		Tensor &OUT,
 		Tensor &Q,
