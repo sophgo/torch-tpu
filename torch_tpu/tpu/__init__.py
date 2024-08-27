@@ -132,6 +132,7 @@ from .utils import ( _lazy_call, _lazy_init, init,is_initialized, is_available,
                     )
 if BACKEND == "SG2260":
     from .streams import Stream, ExternalStream, Event
+    from .bmodel_runtime import BmodelRunner, dtype_map
 
 from .autocast_utils import *  # noqa: F403
 from .optimer_utils import * # noqa: F403

@@ -105,6 +105,9 @@ add_library(torch_tpu SHARED ${concated_src})
 target_link_libraries(torch_tpu TPU1686::tpuDNN c10 torch_cpu)
 
 get_filename_component(tpuDNNPath ${tpuDNN_LIBRARY} DIRECTORY)
+# print all include files path
+get_property(dirs DIRECTORY ${CMAKE_SOURCE_DIR} PROPERTY INCLUDE_DIRECTORIES)
+message(STATUS ">>>> Include directories: ${dirs}")
 
 if(BACKEND_1684X)
   include_directories(${RUNTIME_INCLUDE_PATH})
@@ -116,16 +119,13 @@ if(BACKEND_1684X)
 elseif(BACKEND_SG2260)
 
   if (EXISTS ${CMAKE_SOURCE_DIR}/../tpuv7-runtime)
-    # Use external repo path
-    # fix cmodel for tpuv7-runtime commit 1a6c1d7781a13d884b97046086927d1fb60acce0
-    message("Use external repo path")
-    include_directories(${CMAKE_SOURCE_DIR}/../tpuv7-runtime/cdmlib/host/cdm_runtime/include)
-    set(tpuv7_rpath "/opt/tpuv7/tpuv7-current/lib:$ORIGIN/../../../tpuv7-runtime/build/cdmlib/host/cdm_runtime")
-    # set(tpuv7_rpath "${TPUV7_DRIVER_CURRENT}/lib:$ORIGIN/../../../tpuv7-runtime/build/cdmlib/fw/ap/daemon")
-    # location for tpuv7_rt
-    target_link_directories(torch_tpu PRIVATE "${CMAKE_SOURCE_DIR}/../tpuv7-runtime/build/cdmlib/host/cdm_runtime")
-    # location for cdm_daemon_emulator
-    target_link_directories(torch_tpu PRIVATE "${CMAKE_SOURCE_DIR}/../tpuv7-runtime/build/cdmlib/fw/ap/daemon")
+    include_directories(${CMAKE_SOURCE_DIR}/../tpuv7-runtime/cdmlib/host/cdm_runtime/include
+                        ${CMAKE_SOURCE_DIR}/../tpuv7-runtime/model-runtime/runtime/include)
+    set(tpuv7_rpath "/opt/tpuv7/tpuv7-current/lib:$ORIGIN/../../../tpuv7-runtime/build/cdmlib/host/cdm_runtime:$ORIGIN/../../../tpuv7-runtime/build/model-runtime/runtime:$ORIGIN/../../../tpuv7-runtime/build/model-runtime/bmodel")
+    target_link_directories(torch_tpu PRIVATE "${CMAKE_SOURCE_DIR}/../tpuv7-runtime/build/cdmlib/host/cdm_runtime"
+                                              "${CMAKE_SOURCE_DIR}/../tpuv7-runtime/build/cdmlib/fw/ap/daemon"
+                                              "${CMAKE_SOURCE_DIR}/../tpuv7-runtime/build/model-runtime/runtime"
+                                              "${CMAKE_SOURCE_DIR}/../tpuv7-runtime/build/model-runtime/bmodel" )
   else()
   # Use tpu-train current repo third-party library path
     message("Use tpu-train current repo third-party library path")
@@ -136,9 +136,7 @@ elseif(BACKEND_SG2260)
   endif()
   set_target_properties(torch_tpu PROPERTIES INSTALL_RPATH
       "$ORIGIN;${tpuv7_rpath};${tpuDNNPath};${scclPath}")
-  target_link_libraries(torch_tpu sgdnn tpuv7_rt sophon TPU1686::sccl)
-  # target_link_directories(torch_tpu PRIVATE /workspace/tpu-train/third_party/tpuv7_runtime/tpuv7-emulator_0.1.0/lib)
-  message(STATUS "USING_CMODEL: ${USING_CMODEL}")
+  target_link_libraries(torch_tpu sgdnn tpuv7_rt tpuv7_modelrt sophon TPU1686::sccl)
   if (USING_CMODEL)
     target_link_libraries(torch_tpu cdm_daemon_emulator pthread)
   endif()
@@ -150,5 +148,3 @@ add_custom_command(TARGET torch_tpu POST_BUILD
     COMMAND patchelf --set-soname libtorch_tpu.so $<TARGET_FILE:torch_tpu>
     COMMENT "Change SONAME of libtorch_tpu.so"
     DEPENDS torch_tpu VERBATIM)
-
-

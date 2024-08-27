@@ -27,7 +27,7 @@ int64_t get_origin_format(const at::Tensor & self){
 }
 namespace {
   typedef enum {
-    FORMATCAST_UNSUPPORT = -1,// 
+    FORMATCAST_UNSUPPORT = -1,//
     Conv_W_ND_TO_32IC = 0,    // conv fp16 weight contiguous to 32IC
     Conv_W_32IC_TO_ND = 1,    // conv fp16 32IC weight to contiguous format(ND),
     Conv_W_ND_TO_32IC32OC = 2, // conv fp16 weight contiguous to 32IC32OC (train mode)
@@ -58,7 +58,7 @@ namespace {
         && (src_dtype == caffe2::TypeMeta::Make<at::Half>() || src_dtype == caffe2::TypeMeta::Make<at::BFloat16>()))
     {
       return Conv_W_32IC_TO_ND;
-    } 
+    }
     else if ((src_format == torch_tpu::TPU_DFORMAT_ND && dst_format == torch_tpu::TPU_DFORMAT_CONV_W_Train)
         && (src_dtype == caffe2::TypeMeta::Make<at::Half>() || src_dtype == caffe2::TypeMeta::Make<at::BFloat16>()))
     {
@@ -157,3 +157,20 @@ at::Tensor tpu_format_cast_back_to_origin(
 
 } // namespace TPUNativeFunctions
 } // namespace at_tpu
+namespace at
+{
+void FormatCast(
+    const at::Tensor& self,
+    const at::Tensor& dst,
+    int64_t tpu_format) {
+      // TODO check something later
+      // auto format_type = at_tpu::TPUNativeFunctions::FORMATCAST_TYPE (tpu_format);
+      // at_tpu::TPUNativeFunctions::format_cast_impl_out_tpu(dst, self, format_type);
+      auto status = sgdnnFormatCast(
+          tpu::TPUGetDeviceResource(),
+          tpu::TPUGenerateSgdnnTensor(self),
+          tpu::TPUGenerateSgdnnTensor(dst),
+          tpu_format);
+      TORCH_CHECK(status == SG_SUCCESS);
+  }
+}

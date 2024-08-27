@@ -60,5 +60,6 @@ namespace at
 		m.def("lora_matmul_forward",lora_matmul_forward);
 		m.def("tgi_input_ids_update_decode_phase",TGI_input_ids_update_decode_phase);
 		m.def("dynlib_execute",dynlib_execute);
+		m.def("format_cast", FormatCast);
 	}
 }

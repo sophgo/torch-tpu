@@ -219,7 +219,7 @@ tpu_status_t sgdnnInitialize( tpu_resource_t resource )
   tpu_kernel_module_t tpu_module = tpu_kernel_load_module ( resource , ( const char * ) p, length );
   tpu_kernel_module.insert ( std::pair<tpu_resource_t, tpu_kernel_module_t> ( resource , tpu_module ) );
 #elif defined BACKEND_SG2260
-  if (pkernel_launcher == nullptr) 
+  if (pkernel_launcher == nullptr)
   {
     pkernel_launcher = new TPUKernelLauncher();
   }
@@ -243,7 +243,7 @@ tpu_status_t sgdnnDeinitialize ( tpu_resource_t resource  )
   {
     SGDNN_CHECK ( pkernel_launcher->unload_kernel_module(resource) == SG_SUCCESS );
     delete pkernel_launcher;
-    pkernel_launcher = nullptr;    
+    pkernel_launcher = nullptr;
   }
 #else
   SGDNN_CHECK ( false );
@@ -1314,10 +1314,10 @@ tpu_status_t sgdnnRecoverConv2dWeight ( tpu_resource_t resource ,
   SGDNN_CHECK ( output.dim == 4 );
   if ( mode == 0 ) // 32 IC -> NCHW
   {
-    SGDNN_CHECK ( input.shape[0] == output.shape[0] );
-    SGDNN_CHECK ( input.shape[1] == output.shape[2] * output.shape[3] );
-    SGDNN_CHECK ( input.shape[2] == DIV_UP ( output.shape[1], 32 ) );
-    SGDNN_CHECK ( input.shape[3] == 32 );
+    // SGDNN_CHECK ( input.shape[0] == output.shape[0] );
+    // SGDNN_CHECK ( input.shape[1] == output.shape[2] * output.shape[3] );
+    // SGDNN_CHECK ( input.shape[2] == DIV_UP ( output.shape[1], 32 ) );
+    // SGDNN_CHECK ( input.shape[3] == 32 );
     SGDNN_CHECK ( sgdnnIsTensorContiguous ( &input ) );
     SGDNN_CHECK ( sgdnnIsTensorContiguous ( &output ) );
   }
@@ -1343,8 +1343,6 @@ tpu_status_t sgdnnRecoverConv2dWeight ( tpu_resource_t resource ,
   {
     SGDNN_CHECK ( false );
   }
-
-#if defined BACKEND_1684X
   sg_api_conv_weight_recover_t api;
   api.input_global_addr = input.addr;
   api.output_global_addr = output.addr;
@@ -1353,9 +1351,11 @@ tpu_status_t sgdnnRecoverConv2dWeight ( tpu_resource_t resource ,
     api.shape[i] = output.shape[i];
   }
   api.mode = mode;
+#if defined BACKEND_1684X
   SAFE_CALL ( sgdnnTPUKernelLaunch ( resource , "tpu_kernel_api_conv_weight_recover", &api, sizeof ( api ) ) );
 #elif defined BACKEND_SG2260
-  SGDNN_CHECK ( false );
+  // SGDNN_CHECK ( false );
+  SAFE_CALL( sgdnnTPUKernelLaunchMultiCore( resource, "tpu_kernel_api_conv_weight_recover_multi_core",  &api, sizeof(api), non_blocking));
 #else
   SGDNN_CHECK ( false );
 #endif

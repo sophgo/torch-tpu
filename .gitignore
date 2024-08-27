@@ -47,3 +47,7 @@ _C.cpython*.so
 torch_tpu/lib
 *.tar.gz
 site-packages
+*.mlir
+*.npz
+*.ref_files.json
+#*.tar.gz

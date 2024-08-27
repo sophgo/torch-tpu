@@ -6,8 +6,6 @@ import operator
 
 class State:
     TOP_F32 = 'TOP_F32'
-    TOP_F16 = 'TOP_F16'
-    TOP_BF16 = 'TOP_F32'
 
 class FxMIIRImportor(object):
     def __init__(self,model_name,weight_file,args):
@@ -24,8 +22,8 @@ class FxMIIRImportor(object):
         # self.F32Type = F32Type.get()
         self.mlir_type = {
               "F32": F32Type.get(),
-              "F16": F16Type.get(),
-              "BF16": BF16Type.get()
+              "F16": F32Type.get(),
+              "BF16": F32Type.get()
           }
 
     def __del__(self):
@@ -55,10 +53,7 @@ class FxMIIRImportor(object):
     # type: None => f32; or type
     def get_tensor_type(self, output_shapes, type=None):
         if type is None:
-            if self.args.fp == "fp16":
-                type = F16Type.get()
-            else:
-                type = F32Type.get()
+            type = F32Type.get()
         if output_shapes == []:
             return UnrankedTensorType.get(type)
         if output_shapes is None:
@@ -91,10 +86,7 @@ class FxMIIRImportor(object):
 
 
     def get_dtype(self, type1):
-        if self.args.fp == "fp16":
-            return F16Type.get()  #??? todo
-        else:
-            return F32Type.get()
+        return F32Type.get()
         # dtype = None
         if type1 == torch.float16:
             dtype = self.mlir_type['F16']
@@ -147,7 +139,8 @@ class FxMIIRImportor(object):
             shapes.append(list(node.meta['val'].size()))
 
         if self.nodeIsBelongToChanStyle(node):
-            shapes = [[1,i[0],1,1] if len(i) == 1 else i for i in shapes]
+            # shapes = [[1,i[0],1,1] if len(i) == 1 else i for i in shapes]
+            shapes = [i for i in shapes]
         # shapes = [[1] if i is not None and i == [] else i for i in shapes]
         for _ in range(exclude_num):
             shapes.pop()
@@ -169,7 +162,10 @@ class FxMIIRImportor(object):
         init_args["loc"] = self.get_loc(node)
         init_args["ip"] = self.insert_point
         init_args["input"] = func_arg
-        init_args["output"] = RankedTensorType.get(output_shapes[0], F16Type.get() if self.args.fp=="fp16" else F32Type.get()) #F16?
+        if output_shapes[0] == []:
+            init_args["output"] = RankedTensorType.get([1], F32Type.get())
+        else:
+            init_args["output"] = RankedTensorType.get(output_shapes[0], F32Type.get())
         input_op = top.InputOp(**init_args).output
         # if 'tensor_meta' in node.meta \
         #     and node.meta['tensor_meta'].requires_grad \
@@ -250,7 +246,7 @@ class FxMIIRImportor(object):
             }} loc(unknown)
         """.format(name=self.model_name,
                     weight_file=self.weight_file,
-                    state=State.TOP_F16 if self.args.fp == "fp16" else State.TOP_F32,
+                    state= State.TOP_F32,
                     chip="ALL",
                     train='true',
                     args=in_args_txt,

@@ -9,6 +9,7 @@
 #ifdef BACKEND_SG2260
 #include "torch_tpu/csrc/tpu/Stream.h"
 #include "torch_tpu/csrc/tpu/Event.h"
+#include "torch_tpu/csrc/tpu/Bmodel.h"
 #endif
 
 PyObject* module;
@@ -37,7 +38,9 @@ PyObject* initModule() {
     AddPyMethodDefs(methods, THPTModule_get_methods());
     AddPyMethodDefs(methods, THPTUtils_get_methods());
     AddPyMethodDefs(methods, torch_tpu::autocast::autocast_mode_functions());
-
+#ifdef BACKEND_SG2260
+    AddPyMethodDefs(methods, THPTBmodel_get_methods());
+#endif
     static struct PyModuleDef torchtpu_module = {
         PyModuleDef_HEAD_INIT,
         "torch_tpu._C",
@@ -65,5 +68,4 @@ PyMODINIT_FUNC PyInit__C(void){
     Py_AtExit(&deinit);
     return initModule();
 }
-
 }; //extern "C"

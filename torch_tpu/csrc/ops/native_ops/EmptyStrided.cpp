@@ -91,4 +91,7 @@ TORCH_LIBRARY_IMPL ( aten, TPU, m )
 {
   m.impl ( "empty.memory_format", empty_memory_format_tpu );
 }
+TORCH_LIBRARY(help, m){
+  m.def("build_tensor", empty_memory_format_tpu);
+}
 } // namespace at

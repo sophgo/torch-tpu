@@ -139,4 +139,27 @@ int tpu_kernel_api_conv_weight_recover ( const void* args ) {
   return 0;
 }
 
+int tpu_kernel_api_conv_weight_recover_multi_core ( const void* args ) {
+  sg_api_conv_weight_recover_t* api = ( sg_api_conv_weight_recover_t* ) args;
+  tpu_initialize();
+  int core_idx = tpu_core_index();
+  int core_num = tpu_core_num();
+  int oc_slice = (api->shape[0] + core_num - 1) / core_num;
+  oc_slice     = (oc_slice + 31) / 32 * 32;
+  int ic_32    = (api->shape[1] + 31) / 32;
+  if(core_idx * oc_slice < api->shape[0]) {
+    dim4 shape = {MIN(oc_slice, api->shape[0] - core_idx * oc_slice), api->shape[1], api->shape[2], api->shape[3]};
+    global_addr_t cur_input_gaddr  = api->input_global_addr  + core_idx * oc_slice * ic_32 * shape.h * shape.w * 32 * tpu_data_type_size(DT_FP16);
+    global_addr_t cur_output_gaddr = api->output_global_addr + core_idx * oc_slice * shape.h * shape.w * api->shape[1] * tpu_data_type_size(DT_FP16);
+    nodechip_conv_weight_32ic_to_normal_simluate(
+      cur_input_gaddr,
+      cur_output_gaddr,
+      &shape
+    );
+  }
+  tpu_poll();
+  return 0;
+}
+
+TPUKERNEL_FUNC_REGISTER ( tpu_kernel_api_conv_weight_recover_multi_core );
 TPUKERNEL_FUNC_REGISTER ( tpu_kernel_api_conv_weight_recover );
