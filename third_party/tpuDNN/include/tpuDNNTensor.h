@@ -773,4 +773,16 @@ tpudnnStatus_t tpudnnC2CAllToAll(
     int cur_rank,
     const int *chip_map);
 
+tpudnnStatus_t tpudnnMaskedFillAsync(
+    tpudnnHandle_t handle,
+    const tpudnnTensor_t input,
+    const tpudnnTensor_t mask,
+    float value,
+    tpudnnTensor_t out);
+
+tpudnnStatus_t tpudnnFillAsync(
+    tpudnnHandle_t handle,
+    const void * scalar_ptr,
+    tpudnnTensor_t output);
+
 } // extern "C"

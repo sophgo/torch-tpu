@@ -27,49 +27,11 @@ extern void nodechip_select_fp(
     data_type_t  cond_dtype,
     data_type_t  res_dtype);
 
-int tpu_kernel_api_masked_fill ( const void * args )
-{
-    sg_api_masked_fill_t *api = ( sg_api_masked_fill_t * ) args;
-    tpu_initialize();
-    TPUKERNEL_ASSERT(api->mask_shape==api->input_shape);
-    #if 0
-    nodechip_masked_fill(
-        api->input_global_addr,
-        api->mask_global_addr,
-        api->out_global_addr,
-        api->input_shape,
-        api->mask_shape,
-        api->input_dims,
-        api->mask_dims,
-        api->value,
-        api->dtype
-    );
-    #else
-    nodechip_select_fp(
-        /* cond_global_addr */ api->mask_global_addr,
-        /* res_global_addr */ api->out_global_addr,
-        /* sel0_global_addr */ 0,
-        /* sel0_is_const */ true,
-        /* sel0_const_val */ api->value,
-        /* sel1_global_addr */ api->input_global_addr,
-        /* sel1_is_const */ false,
-        /* sel1_const_val */ 0,
-        /* cond_shape */ api->mask_shape,
-        /* shape_dim */ api->mask_dims,
-        /* cond_dtype */ api->dtype,
-        /* res_dtype */ api->dtype
-    );
-    #endif
-    tpu_poll();
-    return 0;
-}
-TPUKERNEL_FUNC_REGISTER(tpu_kernel_api_masked_fill);
 
-#ifdef BACKEND_SG2260
 int tpu_kernel_api_masked_fill_multi_core ( const void * args )
 {
     sg_api_masked_fill_t *api = ( sg_api_masked_fill_t * ) args;
-
+#ifdef BACKEND_SG2260
     int is_bcast[FW_MAX_SHAPE_DIMS] = {0};
     for (int i = 0; i < api->mask_dims; ++i)
         is_bcast[api->input_dims-1-i] = (api->mask_shape[api->mask_dims-1-i] == 1) && api->mask_shape[api->mask_dims-1-i] != api->input_shape[api->input_dims-1-i];
@@ -146,6 +108,43 @@ int tpu_kernel_api_masked_fill_multi_core ( const void * args )
     }
     tpu_poll();
     return 0;
+#else
+    tpu_initialize();
+    for ( int i = 0; i < api->input_dims; i++ )
+    {
+        TPUKERNEL_ASSERT(api->mask_shape[i]==api->input_shape[i]);
+    }
+    #if 0
+    nodechip_masked_fill(
+        api->input_global_addr,
+        api->mask_global_addr,
+        api->out_global_addr,
+        api->input_shape,
+        api->mask_shape,
+        api->input_dims,
+        api->mask_dims,
+        api->value,
+        api->dtype
+    );
+    #else
+    nodechip_select_fp(
+        /* cond_global_addr */ api->mask_global_addr,
+        /* res_global_addr */ api->out_global_addr,
+        /* sel0_global_addr */ 0,
+        /* sel0_is_const */ true,
+        /* sel0_const_val */ api->value,
+        /* sel1_global_addr */ api->input_global_addr,
+        /* sel1_is_const */ false,
+        /* sel1_const_val */ 0,
+        /* cond_shape */ api->mask_shape,
+        /* shape_dim */ api->mask_dims,
+        /* cond_dtype */ api->dtype,
+        /* res_dtype */ api->dtype
+    );
+    #endif
+    tpu_poll();
+    return 0;
+#endif
 }
 TPUKERNEL_FUNC_REGISTER(tpu_kernel_api_masked_fill_multi_core);
 
@@ -205,4 +204,3 @@ TPUKERNEL_FUNC_REGISTER(tpu_kernel_api_masked_fill_multi_core);
 //     return 0;
 // }
 // TPUKERNEL_FUNC_REGISTER(tpu_kernel_api_masked_fill_multi_core);
-#endif

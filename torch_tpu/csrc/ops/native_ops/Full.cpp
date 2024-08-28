@@ -55,11 +55,12 @@ namespace at
             }
             TIMING_START;
 
-            auto status = sgdnnFill(
-                tpu::TPUGetDeviceResource(),
+            auto stream = c10_tpu::getCurrentTPUStream();
+            auto status = tpudnnFillAsync(
+                stream,
                 &value_,
-                tpu::TPUGenerateSgdnnTensor(self));
-            TORCH_CHECK(status == SG_SUCCESS);
+                tpu::TPUGenerateTpudnnTensor(stream, self));
+            TORCH_CHECK(status == TPUDNN_STATUS_SUCCESS);
                         TIMING_END(tpu::FULL);
         }
         else

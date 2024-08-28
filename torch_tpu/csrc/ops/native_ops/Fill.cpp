@@ -30,9 +30,12 @@ Tensor &fill__Scalar_tpu(Tensor &self, const Scalar &value) {
   }
   TIMING_START;
 
-  auto status = sgdnnFill(tpu::TPUGetDeviceResource(), &value_,
-                                 tpu::TPUGenerateSgdnnTensor(self_));
-  TORCH_CHECK(status == SG_SUCCESS);
+  auto stream = c10_tpu::getCurrentTPUStream();
+  auto status = tpudnnFillAsync(
+      stream,
+      &value_,
+      tpu::TPUGenerateTpudnnTensor(stream, self_));
+  TORCH_CHECK(status == TPUDNN_STATUS_SUCCESS);
     TIMING_END(tpu::CONST_FILL);
   // unsqueeze may cause different address between self_ and self:
   if (self.data_ptr() != self_.data_ptr()) {
@@ -79,12 +82,15 @@ Tensor &masked_fill_Scalar_tpu(Tensor &self, const Tensor &mask,
   Tensor &mask_int = maski;
   TIMING_START;
 
-  auto status = sgdnnMaskedFill ( tpu::TPUGetDeviceResource(),
-                                         tpu:: TPUGenerateSgdnnTensor ( self ),
-                                         tpu:: TPUGenerateSgdnnTensor ( mask_int ),
-                                         value.toDouble(),
-                                         tpu:: TPUGenerateSgdnnTensor(out) );
-  TORCH_CHECK( status == SG_SUCCESS );
+
+  auto stream = c10_tpu::getCurrentTPUStream();
+  auto status = tpudnnMaskedFillAsync(
+      stream,
+      tpu::TPUGenerateTpudnnTensor(stream, self),
+      tpu::TPUGenerateTpudnnTensor(stream, mask_int),
+      value.toDouble(),
+      tpu::TPUGenerateTpudnnTensor(stream, out));
+  TORCH_CHECK(status == TPUDNN_STATUS_SUCCESS);
     TIMING_END(tpu::MASKED_FILL);
   self = out.clone();
 #endif

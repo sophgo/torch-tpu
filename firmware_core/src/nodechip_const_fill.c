@@ -29,21 +29,6 @@ data_type_t filled_dtype )
   );
 }
 
-int tpu_kernel_api_const_fill ( const void * args ) {
-  sg_api_constant_fill_t *api = ( sg_api_constant_fill_t* ) args;
-  tpu_initialize();
-  nodechip_fill (
-  api->output_global_addr,
-  api->shape,
-  api->dim,
-  api->value,
-  ( data_type_t ) api->dtype );
-  tpu_poll();
-  return 0;
-}
-TPUKERNEL_FUNC_REGISTER ( tpu_kernel_api_const_fill );
-
-#ifdef BACKEND_SG2260
 void nodechip_constant_fill_multi_core(
     global_addr_t out_global_addr,
     const int* shape,
@@ -79,6 +64,7 @@ void nodechip_constant_fill_multi_core(
 int tpu_kernel_api_const_fill_multi_core ( const void * args ) {
   sg_api_constant_fill_t *api = ( sg_api_constant_fill_t* ) args;
   tpu_initialize();
+#ifdef BACKEND_SG2260
   nodechip_constant_fill_multi_core (
   api->output_global_addr,
   api->shape,
@@ -87,6 +73,15 @@ int tpu_kernel_api_const_fill_multi_core ( const void * args ) {
   (data_type_t)api->dtype );
   tpu_poll();
   return 0;
+#else
+  nodechip_fill (
+  api->output_global_addr,
+  api->shape,
+  api->dim,
+  api->value,
+  ( data_type_t ) api->dtype );
+  tpu_poll();
+  return 0;
+#endif
 }
 TPUKERNEL_FUNC_REGISTER ( tpu_kernel_api_const_fill_multi_core );
-#endif
