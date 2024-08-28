@@ -4,8 +4,12 @@ import copy
 import math
 import numpy as np
 import torch_tpu
-TPU_CORE_NUM = 1
+TPU_CORE_NUM = 8
 NPU_NUM = 64
+
+import os
+os.environ["CMODEL_FAST_EXEC"] = "1"
+
 np.set_printoptions(threshold=np.inf)
 def div_up(x, y):
     return (x + y - 1) // y
@@ -45,7 +49,7 @@ def flash_attention_backward_single_batch(q, k, v, o, do, l, idx_theta, mask):
         dV[kv_offset : kv_offset + kv_slice_size, :] = np.matmul(P_trans.detach(), do.detach())
         # 7.dp = do * VT [N, N]@[N,D]
         v_trans = v_slice.transpose(0, 1)
-        dP = np.matmul(do, v_trans)
+        dP = np.matmul(do, v_trans)#[N, slice]
         # 8.dO·O
         _D = torch.mul(do, o)
         # 9.D=rowsum(dO·O)
@@ -53,7 +57,7 @@ def flash_attention_backward_single_batch(q, k, v, o, do, l, idx_theta, mask):
         # 10.dp-D [N, N]
         dP_sub_D = torch.sub(dP, D)
         # 11.dS = p*(dp-D) [N, N]
-        dS = torch.mul(P, dP_sub_D)
+        dS = torch.mul(P, dP_sub_D)#[N, slice]
         # 12.dS*scale
         dS = dS * scale
         # 13.dq=dS*K [N, N] @ [N, D] => [N, D]
@@ -72,8 +76,8 @@ def flash_attention_backward_single_batch(q, k, v, o, do, l, idx_theta, mask):
 
 def flash_attention_backward_flatten(q, k, v, o, do, l,  batch, input_lens, num_attention_head, num_kv_head, idx_theta, mask):
     Ntotal = int(torch.sum(input_lens))
-    q = q * torch.cos(idx_theta).half() + rotate_every_two(q) * torch.sin(idx_theta).half()
-    k = k * torch.cos(idx_theta).half() + rotate_every_two(k) * torch.sin(idx_theta).half()
+    q = q * torch.cos(idx_theta) + rotate_every_two(q) * torch.sin(idx_theta)
+    k = k * torch.cos(idx_theta) + rotate_every_two(k) * torch.sin(idx_theta)
 
     # convert [NTotal, num_kv_head, d] to [num_kv_head, NTotal, d]
     q = q.transpose(0, 1)
@@ -95,10 +99,11 @@ def flash_attention_backward_flatten(q, k, v, o, do, l,  batch, input_lens, num_
         if core_idx == qhead_secs - 1:
             qhead_percore = num_attention_head - core_idx * qhead_percore
         for hidx in range(qhead_percore):
+            kv_head_index = (core_idx * qhead_percore + hidx) // heads_rep
             token_offset = 0
             for nidx in range(batch):
                 token = input_lens[nidx]
-                kv_head_index = core_idx * int(qhead_percore / heads_rep) + hidx // heads_rep
+                #kv_head_index = core_idx * int(qhead_percore / heads_rep) + hidx // heads_rep
                 q_head_index = core_idx * qhead_percore + hidx
                 q_per_core = q[q_head_index, token_offset:token_offset + token]
                 k_per_core = k[kv_head_index, token_offset:token_offset + token]
@@ -150,8 +155,21 @@ class GQA(torch.nn.Module):
         P = torch.softmax(S_, dim=1)
         # P @ v -> (seq_len, d)
         return torch.matmul(P, v), l
+    def repeat_kv(self, hidden_states: torch.Tensor, n_rep: int) -> torch.Tensor:
+        Ntotal, num_key_value_heads, head_dim = hidden_states.shape
+        if n_rep == 1:
+            return hidden_states
+        hidden_states = hidden_states[:, :, None, :].expand(Ntotal, num_key_value_heads, n_rep,  head_dim)
+        return hidden_states.reshape(Ntotal, num_key_value_heads * n_rep, head_dim)
 
     def forward(self, q, k, v):
+        Ntotal, num_head, _ = q.size()
+        num_kv_head = k.shape[-2]
+        self.num_key_value_groups = num_head // num_kv_head
+        k = self.repeat_kv(k, self.num_key_value_groups)
+        v = self.repeat_kv(v, self.num_key_value_groups)
+        self.num_kv_head = k.shape[-2]
+
         q_rope = q * torch.cos(self.idx_theta) + self.rotate_every_two(q) * torch.sin(self.idx_theta)
         k_rope = k * torch.cos(self.idx_theta) + self.rotate_every_two(k) * torch.sin(self.idx_theta)
         o = torch.zeros_like(q)
@@ -193,7 +211,7 @@ if __name__ == "__main__":
     # num_q_head = 32
     # num_kv_head = 32
     #for 1core
-    num_q_head = 4
+    num_q_head = 32
     num_kv_head = 4
 
     device = "tpu:0"
@@ -201,8 +219,8 @@ if __name__ == "__main__":
     head_dim = 128
     softmax_scale = head_dim**-0.5
 
-    batch = 2
-    seq_len = 855
+    batch = 8
+    seq_len = 512
     Ntotal = seq_len*batch
     input_lengths = torch.tensor([seq_len for _ in range(batch)], dtype=torch.int32)
 
@@ -252,10 +270,16 @@ if __name__ == "__main__":
     #4.cpu backward
     dq_cpu, dk_cpu, dv_cpu = flash_attention_backward_flatten(q_cpu, k_cpu, v_cpu, o_cpu, do_cpu, l_cpu, batch, input_lengths, num_q_head, num_kv_head, idx_theta, mask)
 
-    #5.compare cpu_backward with torch_auto_grad
+    ###5.compare cpu_backward with torch_auto_grad
     print("cpu:dq,dk,dv",dq_cpu[0,0,:10], dk_cpu[0,0,:10], dv_cpu[0,0,:10])
     print("torch:dq,dk,dv",dq_torch[0,0,:10], dk_torch[0,0,:10], dv_torch[0,0,:10])
     print("cpu vs torch", torch.max(torch.abs(dq_torch - dq_cpu)), torch.max(torch.abs(dk_torch - dk_cpu)), torch.max(torch.abs(dv_torch - dv_cpu)))
+    from python.utest_ops.top_utest import TensorComparator
+    comparator1 = TensorComparator()
+    status_q = comparator1.cmp_result(dq_cpu.cpu().float() , dq_torch)
+    status_k = comparator1.cmp_result(dk_cpu.cpu().float() , dk_torch)
+    status_v = comparator1.cmp_result(dv_cpu.cpu().float() , dv_torch)
+    print(f"flash vs torch: dq, dk, dv: {status_q}, {status_k}, {status_v}")
     breakpoint()
 
     #6. tpu backward
@@ -267,7 +291,14 @@ if __name__ == "__main__":
     torch.ops.my_ops.llama_attention_backward(q_tpu, k_tpu, v_tpu, o_tpu, do_tpu, l_tpu, dq_tpu, dk_tpu, dv_tpu, cos_tpu, sin_tpu, mask_tpu, input_lengths.to(device), mask_max, softmax_scale)
 
     #7.compare cpu_backward with torch_auto_grad
-    print("tpu:dq,dk,dv",dq_tpu.cpu()[0,0,:10], dk_tpu.cpu()[0,0,:10], dv_tpu.cpu()[0,0,:10])
-    print("torch:dq,dk,dv",dq_torch[0,0,:10], dk_torch[0,0,:10], dv_torch[0,0,:10])
+    print("tpu:dq,dk,dv",dq_tpu.cpu()[0,2,20:30], dk_tpu.cpu()[0,2,:10], dv_tpu.cpu()[0,3,:10])
+    print("torch:dq,dk,dv",dq_torch[0,2,20:30], dk_torch[0,2,:10], dv_torch[0,3,:10])
     print("tpu vs torch",torch.max(torch.abs(dq_tpu.cpu() - dq_torch)), torch.max(torch.abs(dk_tpu.cpu() - dk_torch)), torch.max(torch.abs(dv_tpu.cpu() - dv_torch)))
-    breakpoint()
+    #breakpoint()
+    from python.utest_ops.top_utest import TensorComparator
+    comparator = TensorComparator()
+    status_q = comparator.cmp_result(dq_tpu.cpu().float(), dq_torch)
+    status_k = comparator.cmp_result(dk_tpu.cpu().float(), dk_torch)
+    status_v = comparator.cmp_result(dv_tpu.cpu().float(), dv_torch)
+    print(f"nodechip vs torch: dq, dk, dv: {status_q}, {status_k}, {status_v}")
+    #breakpoint()
