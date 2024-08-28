@@ -78,6 +78,7 @@ double eps )
          TENSOR_TO_TPU ( std::get<1> ( outputs_cpu ) ),
          TENSOR_TO_TPU ( std::get<2> ( outputs_cpu ) ) );
 #else
+  TIMING_START;
   auto output = torch::empty ( input.sizes(), input.options() );
   auto saved_mean = torch::empty ( { num_features }, input.options() );
   auto saved_invstd = torch::empty ( { num_features }, input.options() );

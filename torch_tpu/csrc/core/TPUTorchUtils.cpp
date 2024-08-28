@@ -94,208 +94,219 @@ void TPUCompareResult ( const at::Tensor & Got, const at::Tensor & Exp,
 }
 
 
-
-static const char * OpTypeStr[OP_NUM] =
+static inline const char *OpTypeStr(int v)
 {
-  "CDMA D2S",
-  "CDMA S2D",
-  "CDMA C2C",
-  "Copy",
-  "Cpu Layer",
-  "Convolution",
-  "Convolution Backward",
-  "BatchNorm",
-  "BatchNorm Backward",
-  "LayerNorm",
-  "LayerNorm Backward",
-  "Avg Pooling",
-  "Max Pooling",
-  "ReLU",
-  "ReLU Backward",
-  "GeLU",
-  "GeLU Backward",
-  "Leaky ReLU",
-  "MatMul",
-  "Add MatMul",
-  "Batch MatMul",
-  "Linear",
-  "Softmax",
-  "Softmax Backward",
-  "Log Softmax",
-  "Permute",
-  "Transpose",
-  "Add",
-  "Sub",
-  "Mul",
-  "Div",
-  "Add Bcast",
-  "Index Select",
-  "DType Convert",
-  "Reduce Mean",
-  "Reduce Sum",
-  "REDUCE_PROD",
-  "Reduce Max",
-  "Reduce Min",
-  "Reduce var",
-  "Where",
-  "Strided Copy",
-  "Concat",
-  "Const Fill",
-  "Masked Fill",
-  "Sqrt",
-  "Rsqrt",
-  "Sign",
-  "Addcdiv",
-  "Addcmul",
-  "Embedding Backward",
-  "Malloc",
-  "Free",
-  "Cross Entropy Loss",
-  "Cross Entropy Loss Backward",
-  "AddC",
-  "MulC",
-  "CSub",
-  "CDiv",
-  "Norm2",
-  "Native Group Norm",
-  "Groupnorm backward",
-  "Bcast Add",
-  "MLP Forward",
-  "MLP Backward",
-  "Attention Forward",
-  "Attention Backward",
-  "BITWISE_XOR",
-  "BITWISE_XOR_BCAST",
-  "BITWISE_XOR_C",
-  "Abs Forward",
-  "Cos Forward",
-  "Sin Forward",
-  "Tan Forward",
-  "Log Forward",
-  "ACosH Forward",
-  "ASinH Forward",
-  "ATanH Forward",
-  "SinH Forward",
-  "CosH Forward",
-  "TanH Forward",
-  "Exp Forward",
-  "Asin",
-  "Acos",
-  "Atan",
-  "Sinh",
-  "Cosh",
-  "Tanh",
-  "Ceil",
-  "Floor",
-  "Round",
-  "Neg",
-  "Exp2",
-  "EXPM1",
-  "Expand",
-  "Flip",
-  "Squeeze",
-  "Unsqueeze",
-  "Isfinite",
-  "Isinf",
-  "Isnan",
-  "Bitwise_Not",
-  "Minimum",
-  "Maximum",
-  "Fmin",
-  "Fmax",
-  "Atan2",
-  "Logical And",
-  "Logical Or",
-  "BITWISE_AND",
-  "BITWISE_AND_BCAST",
-  "BITWISE_AND_C",
-  "BITWISE_OR",
-  "BITWISE_OR_BCAST",
-  "BITWISE_OR_C",
-  "EQUAL",
-  "EQUAL_BCAST",
-  "EQUAL_C",
-  "GREATER_OR_EQUAL",
-  "GREATER_OR_EQUAL_BCAST",
-  "GREATER_OR_EQUAL_C",
-  "GREATER",
-  "GREATER_BCAST",
-  "GREATER_C",
-  "LESS_THAN_OR_EQUAL",
-  "LESS_THAN_OR_EQUAL_BCAST",
-  "LESS_THAN_OR_EQUAL_C",
-  "SHIFT_LEFT",
-  "SHIFT_LEFT_BCAST",
-  "SHIFT_LEFT_C",
-  "SHIFT_RIGHT_ARITHMETIC",
-  "SHIFT_RIGHT_ARITHMETIC_BCAST",
-  "SHIFT_RIGHT_ARITHMETIC_C",
-  "LESS_THAN",
-  "LESS_THAN_BCAST",
-  "LESS_THAN_C",
-  "NOT_EQUAL",
-  "NOT_EQUAL_BCAST",
-  "NOT_EQUAL_C",
-  "SIGNBIT",
-  "FULL",
-  "Logical Not",
-  "Upsampl Bilinear2d",
-  "Upsampl nearest",
-  "Upsampl nearest2d Backward",
-  "Arrange",
-  "SiLU",
-  "Sigmoid",
-  "CLAMP",
-  "layernorm Matmul",
-  "ERF",
-  "ERFC",
-  "Pow",
-  "Pow_bcast",
-  "POW SCALAR",
-  "SCALAR POW",
-  "Add Layernorm Matmul",
-  "RECIPROCAL",
-  "TRUNC",
-  "layernorm Matmul Backward",
-  "Add layernorm Matmul Backward",
-  "TOPK",
-  "NonZero",
-  "REPEAT",
-  "Argmax",
-  "Argmin",
-  "Max_dim",
-  "Min_dim",
-  "HARDTANH",
-  "HYPOT",
-  "Nextafter",
-  "Triu",
-  "Cbrt",
-  "Constant_pad",
-  "Reflection_pad2d",
-  "Replication_pad2d",
-  "Replication_pad3d",
-  "GATHER",
-  "BADDBMM",
-  "MSE Loss",
-  "MSE Loss Backward",
-  "Slice_scatter",
-  "Inf Check And Unscale",
-  "LLAMA_ATTENTION",
-  "LLAMA_MLP_FORWARD",
-  "LLAMA_A16_MLP_FORWARD",
-  "RMSNORM_FORWARD",
-  "RMSNORM_BACKWARD",
-  "binary_op",
-  "binary_op_c",
-  "binary_op_bcast",
-  "real",
-  "Conj",
-  "Dummy",
-  "ENABLE_PMU",
-  "DISABLE_PMU",
-  "ADAM_BACKWARD"
-};
+  switch (v)
+  {
+#define __case(k)   \
+    case k:         \
+      return #k;
 
+    __case(CDMA_D2S)
+    __case(CDMA_S2D)
+    __case(CDMA_C2C)
+    __case(COPY)
+    __case(CPU_LAYER)
+    __case(CONVOLUTION)
+    __case(CONVOLUTION_BACKWARD)
+    __case(BATCHNORM)
+    __case(BATCHNORM_BACKWARD)
+    __case(LAYERNORM)
+    __case(LAYERNORM_BACKWARD)
+    __case(AVG_POOLING)
+    __case(MAX_POOLING)
+    __case(RELU)
+    __case(RELU_BACKWARD)
+    __case(GELU)
+    __case(GELU_BACKWARD)
+    __case(LEAKY_RELU)
+    __case(MM)
+    __case(LLama2A16MATMUL)
+    __case(ADDMM)
+    __case(BMM)
+    __case(LINEAR)
+    __case(SOFTMAX)
+    __case(SOFTMAX_BACKWARD)
+    __case(LOGSOFTMAX)
+    __case(PERMUTE)
+    __case(TRANSPOSE)
+    __case(ADD)
+    __case(SUB)
+    __case(MUL)
+    __case(DIV)
+    __case(ADDBCAST)
+    __case(INDEX_SELECT)
+    __case(DTYPE_CONVERT)
+    __case(REDUCE_MEAN)
+    __case(REDUCE_SUM)
+    __case(REDUCE_PROD)
+    __case(REDUCE_MAX)
+    __case(REDUCE_MIN)
+    __case(REDUCE_VAR)
+    __case(WHERE)
+    __case(STRIDED_COPY)
+    __case(CONCAT)
+    __case(CONST_FILL)
+    __case(MASKED_FILL)
+    __case(SQRT)
+    __case(RSQRT)
+    __case(SIGN)
+    __case(ADDCDIV)
+    __case(ADDCMUL)
+    __case(EMBEDDING_BACKWARD)
+    __case(MALLOC)
+    __case(FREE)
+    __case(CROSS_ENTROPY_LOSS)
+    __case(CROSS_ENTROPY_LOSS_BACKWARD)
+    __case(ADD_C)
+    __case(MUL_C)
+    __case(C_SUB)
+    __case(C_DIV)
+    __case(NORM2)
+    __case(NATIVE_GROUP_NORM)
+    __case(GROUPNORM_BACKWARD)
+    __case(BCAST_ADD)
+    __case(MLP_FORWARD)
+    __case(MLP_BACKWARD)
+    __case(ATTN_FORWARD)
+    __case(ATTN_BACKWARD)
+    __case(BITWISE_XOR)
+    __case(BITWISE_XOR_BCAST)
+    __case(BITWISE_XOR_C)
+    __case(ABS_FORWARD)
+    __case(COS_FORWARD)
+    __case(SIN_FORWARD)
+    __case(TAN_FORWARD)
+    __case(LOG_FORWARD)
+    __case(ACOSH_FORWARD)
+    __case(ASINH_FORWARD)
+    __case(ATANH_FORWARD)
+    __case(SINH_FORWARD)
+    __case(COSH_FORWARD)
+    __case(TANH_FORWARD)
+    __case(EXP_FORWARD)
+    __case(ASIN)
+    __case(ACOS)
+    __case(ATAN)
+    __case(SINH)
+    __case(COSH)
+    __case(TANH)
+    __case(CEIL)
+    __case(FLOOR)
+    __case(ROUND)
+    __case(NEG)
+    __case(EXP2)
+    __case(EXPM1)
+    __case(EXPAND)
+    __case(FLIP)
+    __case(SQUEEZE)
+    __case(UNSQUEEZE)
+    __case(ISFINITE)
+    __case(ISINF)
+    __case(ISNAN)
+    __case(BITWISE_NOT)
+    __case(MINIMUM)
+    __case(MAXIMUM)
+    __case(FMIN)
+    __case(FMAX)
+    __case(ATAN2)
+    __case(LOGICAL_AND)
+    __case(LOGICAL_OR)
+    __case(BITWISE_AND)
+    __case(BITWISE_AND_BCAST)
+    __case(BITWISE_AND_C)
+    __case(BITWISE_OR)
+    __case(BITWISE_OR_BCAST)
+    __case(BITWISE_OR_C)
+    __case(EQUAL)
+    __case(EQUAL_BCAST)
+    __case(EQUAL_C)
+    __case(GREATER_OR_EQUAL)
+    __case(GREATER_OR_EQUAL_BCAST)
+    __case(GREATER_OR_EQUAL_C)
+    __case(GREATER)
+    __case(GREATER_BCAST)
+    __case(GREATER_C)
+    __case(LESS_THAN_OR_EQUAL)
+    __case(LESS_THAN_OR_EQUAL_BCAST)
+    __case(LESS_THAN_OR_EQUAL_C)
+    __case(SHIFT_LEFT)
+    __case(SHIFT_LEFT_BCAST)
+    __case(SHIFT_LEFT_C)
+    __case(SHIFT_RIGHT_ARITHMETIC)
+    __case(SHIFT_RIGHT_ARITHMETIC_BCAST)
+    __case(SHIFT_RIGHT_ARITHMETIC_C)
+    __case(LESS_THAN)
+    __case(LESS_THAN_BCAST)
+    __case(LESS_THAN_C)
+    __case(NOT_EQUAL)
+    __case(NOT_EQUAL_BCAST)
+    __case(NOT_EQUAL_C)
+    __case(SIGNBIT)
+    __case(FULL)
+    __case(LOGICAL_NOT)
+    __case(UPSAMPLING_BILINEAR)
+    __case(UPSAMPLING_NEAREST)
+    __case(UPSAMPLING_NEAREST_BACKWARD)
+    __case(ARANGE)
+    __case(SILU)
+    __case(SIGMOID)
+    __case(CLAMP)
+    __case(LN_MM_FORWARD)
+    __case(ERF)
+    __case(ERFC)
+    __case(POW)
+    __case(POW_BCAST)
+    __case(POWC)
+    __case(CPOW)
+    __case(ADD_LN_MM_FORWARD)
+    __case(RECIPROCAL)
+    __case(TRUNC)
+    __case(LN_MM_BACKWARD)
+    __case(ADD_LN_MM_BACKWARD)
+    __case(TOPK)
+    __case(NONZERO)
+    __case(REPEAT)
+    __case(ARGMAX)
+    __case(ARGMIN)
+    __case(MAX_DIM)
+    __case(MIN_DIM)
+    __case(HARDTANH)
+    __case(HYPOT)
+    __case(NEXTAFTER)
+    __case(TRIU)
+    __case(CBRT)
+    __case(CONSTANT_PAD)
+    __case(REFLECTION_PAD2D)
+    __case(REPLICATION_PAD2D)
+    __case(REPLICATION_PAD3D)
+    __case(GATHER)
+    __case(BADDBMM)
+    __case(MSE_LOSS)
+    __case(MSE_LOSS_BACKWARD)
+    __case(SLICE_SCATTER)
+    __case(InfCheckAndUnscale)
+    __case(LLAMA_ATTENTION)
+    __case(LLAMA_MLP_FORWARD)
+    __case(LLAMA_A16_MLP_FORWARD)
+    __case(RMSNORM_FORWARD)
+    __case(RMSNORM_BACKWARD)
+    __case(BINARYOP)
+    __case(BINARYOP_C)
+    __case(BINARYOP_BCAST)
+    __case(REAL)
+    __case(CONJ)
+    __case(DUMMY)
+    __case(ENABLE_PMU)
+    __case(DISABLE_PMU)
+    __case(ADAM)
+    __case(OP_NUM)
+
+#undef __case
+    default:
+      return "UNKNOWN";
+  }
+}
 
 OpTimer * OpTimer::instance_ = nullptr;
 
@@ -337,7 +348,7 @@ OpTimer & OpTimer::AddTime ( OpType type, unsigned long time_us )
     #ifdef SHOW_EACH_OP_TIME
     if (is_start_)
     {
-      std::cout << std::setw ( 42 ) << OpTypeStr[type] << " Elapsed: " << std::setw ( 12 ) << time_us << "us" << "\n";
+      std::cout << std::setw ( 42 ) << OpTypeStr(type) << " Elapsed: " << std::setw ( 12 ) << time_us << "us" << "\n";
     }
     #endif
   }
@@ -359,7 +370,7 @@ void OpTimer::Dump() const
   {
     if ( elapsed_time_us_[i] > 0 )
     {
-      std::cout << std::setw ( 42 ) << OpTypeStr[i] << ": " << std::setw ( 12 ) << elapsed_time_us_[i] << "us, ";
+      std::cout << std::setw ( 42 ) << OpTypeStr(i) << ": " << std::setw ( 12 ) << elapsed_time_us_[i] << "us, ";
       std::cout << std::setw ( 8 ) << std::setprecision ( 3 ) << elapsed_time_us_[i] * 100. / ElapsedAll << "%" << std::endl;
     }
   }

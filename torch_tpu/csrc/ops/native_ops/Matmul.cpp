@@ -28,6 +28,7 @@ static inline bool is_transposed ( const Tensor & tensor )
 
 Tensor & addmm_out_tpu ( const Tensor & self, const Tensor & mat1, const Tensor & mat2, const Scalar & beta, const Scalar & alpha, Tensor & out )
 {
+  TIMING_START;
   CHECK_TENSOR_IN_DEVICE ( self );
   CHECK_TENSOR_IN_DEVICE_NO_CONTIGUOUS ( mat1 );
   CHECK_TENSOR_IN_DEVICE_NO_CONTIGUOUS ( mat2 );
@@ -41,7 +42,6 @@ Tensor & addmm_out_tpu ( const Tensor & self, const Tensor & mat1, const Tensor 
     auto mat1_ = mat1.is_contiguous() == false && is_transposed ( mat1 ) == false ? mat1.contiguous() : mat1;
     auto mat2_ = mat2.is_contiguous() == false && is_transposed ( mat2 ) == false ? mat2.contiguous() : mat2;
 
-    TIMING_START;
 
     auto stream = c10_tpu::getCurrentTPUStream();
     auto status = tpudnnMatmulAsync(
