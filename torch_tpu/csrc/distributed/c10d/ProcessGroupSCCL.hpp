@@ -2,9 +2,6 @@
 
 #include <c10/util/hash.h>
 #include <pybind11/chrono.h>
-#include <sophon/algorithm.h>
-#include <sophon/common/error.h>
-#include <sophon/transport/device.h>
 #include <torch/python.h>
 #include "tpuDNN.h"
 #include "TPUStream.h"
@@ -60,7 +57,7 @@ public:
       return c10::make_intrusive<Options>(timeout);
     }
 
-    std::vector<std::shared_ptr<::sophon::transport::Device>> devices;
+    std::vector<std::shared_ptr<::at::Device>> devices;
     std::vector<int> chip_map;
   };
 

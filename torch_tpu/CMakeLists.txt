@@ -92,7 +92,6 @@ if(BACKEND_SG2260)
   include_directories(${CMAKE_CURRENT_SOURCE_DIR}/csrc/distributed/c10d)
   list(APPEND concated_src
     ${CMAKE_CURRENT_SOURCE_DIR}/csrc/distributed/c10d/ProcessGroupSCCL.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/csrc/distributed/c10d/SCCLDeviceFactory.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/csrc/distributed/c10d/ProcessGroupSCCLHost.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/csrc/distributed/c10d/SCCLHostDeviceFactory.cpp
   )

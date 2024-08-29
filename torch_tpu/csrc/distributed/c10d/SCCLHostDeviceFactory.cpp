@@ -1,10 +1,7 @@
 #include <stdlib.h>
 
 #include <c10/util/Exception.h>
-
 #include <gloo/transport/tcp/device.h>
-
-
 #include "SCCLHostDeviceFactory.hpp"
 
 namespace c10d {

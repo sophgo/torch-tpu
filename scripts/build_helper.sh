@@ -1,12 +1,5 @@
 #!/bin/bash
 
-function openmpi()
-{
-  export PATH=$PATH:$TPUTRAIN_TOP/third_party/openmpi/bin
-  export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:$TPUTRAIN_TOP/third_party/openmpi/lib
-  export OPAL_PREFIX=$TPUTRAIN_TOP/third_party/openmpi
-}
-
 function new_build()
 {
   pip uninstall torch_tpu -y

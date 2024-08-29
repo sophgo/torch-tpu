@@ -4,61 +4,23 @@
 #include <exception>
 #include <ratio>
 #include <tuple>
-
-#ifdef _WIN32
-#include <sophon/common/win.h>
-#include <winsock2.h>
-#include <ws2tcpip.h>
-#else
 #include <netdb.h>
 #include <sys/socket.h>
 #include <unistd.h>
-#endif
+
 #include <ATen/SparseCsrTensorUtils.h>
 #include <c10/util/StringUtil.h>
 #include <c10/util/intrusive_ptr.h>
 #include <c10/util/irange.h>
-#include <sophon/config.h>
 #include <torch/csrc/distributed/c10d/PrefixStore.hpp>
 #include <sys/types.h>
 #include <type_traits>
 
 #include "ProcessGroupSCCL.hpp"
-#include "SCCLDeviceFactory.hpp"
 #include "TPUAddrHelper.h"
 #include "sccl.h"
 #include "tpuv7_rt.h"
 
-#ifdef _WIN32
-#define GENERATE_ALL_TYPES(type, func, ...)                                    \
-  switch (type) {                                                              \
-  case ::at::ScalarType::Float:                                                \
-    func<float>(__VA_ARGS__);                                                  \
-    break;                                                                     \
-  case ::at::ScalarType::Double:                                               \
-    func<double>(__VA_ARGS__);                                                 \
-    break;                                                                     \
-  case ::at::ScalarType::Half:                                                 \
-    func<sophon::float16>(__VA_ARGS__);                                        \
-    break;                                                                     \
-  case ::at::ScalarType::Char:                                                 \
-    func<int8_t>(__VA_ARGS__);                                                 \
-    break;                                                                     \
-  case ::at::ScalarType::Byte:                                                 \
-    func<uint8_t>(__VA_ARGS__);                                                \
-    break;                                                                     \
-  case ::at::ScalarType::Int:                                                  \
-    func<int32_t>(__VA_ARGS__);                                                \
-    break;                                                                     \
-  case ::at::ScalarType::Long:                                                 \
-    func<int64_t>(__VA_ARGS__);                                                \
-    break;                                                                     \
-  default:                                                                     \
-    TORCH_CHECK(false, "Invalid scalar type");                                 \
-  }
-
-#define HOST_NAME_MAX 256
-#else
 #define GENERATE_ALL_TYPES(type, func, args...)                                \
   switch (type) {                                                              \
   case ::at::ScalarType::Float:                                                \
@@ -85,7 +47,6 @@
   default:                                                                     \
     TORCH_CHECK(false, "Invalid scalar type");                                 \
   }
-#endif
 
 namespace c10d {
 
@@ -244,12 +205,6 @@ bool ProcessGroupSCCL::WorkSCCL::wait(std::chrono::milliseconds timeout) {
 
 ProcessGroupSCCL::Options::Options(std::chrono::milliseconds timeout)
     : ProcessGroup::Options(SCCL_BACKEND_NAME, timeout) {}
-
-void socketInitialize() {
-#ifdef _WIN32
-  ::sophon::init_winsock();
-#endif
-}
 
 void ProcessGroupSCCL::broadcastUniqueSCCLID(scclUniqueId *scclID,
                                                int rank) {
