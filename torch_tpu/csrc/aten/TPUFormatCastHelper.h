@@ -46,6 +46,7 @@ public:
   static TPUStorageDesc SetDesc(const caffe2::TypeMeta &dtype, const c10::IntArrayRef& size,
                                             const c10::IntArrayRef& strides, tpuFormat tpu_format);
   static void SetSgTensorAttributeWithFormat(const at::Tensor& self, SgdnnTensor_t& t);
+  static void SettpuTensorAttributeWithFormat(const at::Tensor& self, tpudnnTensor_t& t);
 
   // Check Part
   static bool IsBaseFormatType(tpuFormat format);

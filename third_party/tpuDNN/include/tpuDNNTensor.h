@@ -2,6 +2,7 @@
 
 #include <cstdint>
 #include <cstddef>
+#include<vector>
 
 extern "C"
 {
@@ -23,6 +24,7 @@ enum tpudnnDataType_t
     TPUDNN_DTYPE_FP8E5M2 = 12,
     TPUDNN_DTYPE_FP8E4M3 = 13,
     TPUDNN_DTYPE_INT64 = 14,
+    TPUDNN_DTYPE_TF32,
 
     TPUDNN_DTYPE_UNKNOWN = -1,
 };
@@ -244,7 +246,8 @@ static inline bool tpudnnIsSameShape ( const tpudnnTensor_t * tensor1, const tpu
 
 static inline tpudnnTensor_t tpudnnUndefinedTensor()
 {
-    tpudnnTensor_t tensor = { .addr = 0 };
+    tpudnnTensor_t tensor = {.addr = 0};
+
     return tensor;
 }
 
@@ -684,6 +687,12 @@ tpudnnStatus_t tpudnnTriangularizeAsync(
     int is_upper,
     int diagonal,
     tpudnnTensor_t out);
+
+tpudnnStatus_t tpudnnInfCheckAndUnscaleAsync(
+    tpudnnHandle_t handle,
+    std::vector<tpudnnTensor_t>& inputs,
+    tpudnnTensor_t found_inf,
+    float inv_scale);
 
 tpudnnStatus_t tpudnnC2CAllReduce(
     tpudnnHandle_t handle,

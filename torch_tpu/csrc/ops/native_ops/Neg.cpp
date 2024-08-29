@@ -24,10 +24,13 @@ Tensor & neg_out_tpu ( const Tensor & self, Tensor & out )
       out = neg(self.contiguous());
     } else {
       auto out_ = neg(self.contiguous());
-      TIMING_START;
-      sgdnnStridedCopy(tpu::TPUGetDeviceResource(),
-                       tpu::TPUGenerateSgdnnTensor(out_),
-                       tpu::TPUGenerateSgdnnTensor(out));
+      TIMING_START; 
+      auto stream = c10_tpu::getCurrentTPUStream();
+      auto status = tpudnnStridedCopyAsync(
+            stream,
+            tpu::TPUGenerateTpudnnTensor(stream, out_),
+            tpu::TPUGenerateTpudnnTensor(stream, out));
+      TORCH_CHECK(status == TPUDNN_STATUS_SUCCESS);
       TIMING_END(tpu::STRIDED_COPY);
     }
     SHOW_TENSOR_OP(self, out);

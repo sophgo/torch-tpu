@@ -213,6 +213,49 @@ void StorageDescHelper::SetSgTensorAttributeWithFormat(const at::Tensor& self, S
     }
 }
 
+void tpudnnContiguousStride ( const int * shape, int dim,  int * stride )
+{
+  int s = 1;
+  for ( int i = dim - 1; i >= 0; --i )
+  {
+    stride[i] = s;
+    s *= shape[i];
+  }
+}
+
+void StorageDescHelper::SettpuTensorAttributeWithFormat(const at::Tensor& self, tpudnnTensor_t& t)
+{
+    if (GetFormat(self) == TPU_DFORMAT_CONV_W_Infer){
+        t.dim = self.dim();
+        FormatShape f_shape = InferShapeConv_W_32IC(self.sizes());
+        for (int i = 0; i < t.dim; i++) { t.shape[i] = f_shape[i]; }
+        tpudnnContiguousStride(t.shape, 4, t.stride);
+        t.dtype = tpu::TPUConvertDtype<decltype(t.dtype)> ( self.dtype() );
+        t.format_casted = TPUDNN_CONV_W_INFER_FORMAT;
+    }
+    else if (GetFormat(self) == TPU_DFORMAT_CONV_W_Train){
+        FormatShape f_shape = InferShapeConv_W_32IC32OC(self.sizes());
+        t.dim = self.dim() * 2; // double dim half for 32IC, half for 32OC
+        for (int i = 0; i < t.dim; i++ ) { t.shape[i] = f_shape[i]; } // save 32ic shape and 32oc shape
+        tpudnnContiguousStride(t.shape, 4, t.stride); // 32ic 's stride
+        tpudnnContiguousStride(t.shape + 4, 4, t.stride + 4); // 32oc 's stride
+        t.dtype = tpu::TPUConvertDtype<decltype(t.dtype)>( self.dtype() );
+        t.format_casted = TPUDNN_CONV_W_TRAIN_FORMAT;
+    }
+    else if (GetFormat(self) == TPU_DFORMAT_CONV_DW){
+      t.dim = self.dim();
+      FormatShape f_shape = InferShapeConv_DW_32OC(self.sizes());
+      for (int i = 0; i < t.dim; i++) {t.shape[i] = f_shape[i];}
+      tpudnnContiguousStride(t.shape, 4, t.stride);
+      t.dtype = tpu::TPUConvertDtype<decltype(t.dtype)> ( self.dtype() );
+      t.format_casted = TPUDNN_CONV_DW_TRAIN_FORMAT;
+    }
+    else {
+        AT_ERROR("unsupport InferShape with format ", GetFormatName(self));
+        AT_ASSERT(false);
+    }
+}
+
 // ------------------------------------ Check
 bool StorageDescHelper::IsBaseFormatType(tpuFormat format)
 {

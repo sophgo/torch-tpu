@@ -19,7 +19,21 @@ def case1():
     print("inv_scale: ", inv_scale.cpu())
     for i in range(len(grads)):
        print("grad: ", grads[i].cpu()[:10])
-    import pdb;pdb.set_trace()
+    tensors = [torch.rand(3, 3, 3, 3).to(device) for i in range(15)]
+    found_inf = torch.tensor(0, device=device, dtype=torch.float)
+    inv_scale = torch.tensor(2.0, device=device, dtype=torch.float)
+    torch._amp_foreach_non_finite_check_and_unscale_(tensors, found_inf, inv_scale)
+    print("found_inf: ", found_inf.cpu())
+    print("inv_scale: ", inv_scale.cpu())
+    for i in range(len(grads)):
+       print("grad: ", grads[i].cpu()[:10])
+    grad = torch.tensor([1.0, 2.0, 3.0, 4.0, 5.0, 65536]).half().to(device)
+    grad1 = torch.tensor([1.0, 2.0, 3.0, 4.0, 5.0, 6.0]).half().to(device)
+    grad2 = torch.tensor([1.0, 2.0, 3.0, 4.0, 5.0, 6.0]).half().to(device)
+    found_inf = torch.tensor([0], dtype=torch.float).to(device)
+    inv_scale = torch.tensor([1.0], dtype=torch.float).to(device)
+    torch._amp_foreach_non_finite_check_and_unscale_([grad, grad1, grad2], found_inf, inv_scale)
+    print(found_inf.cpu())
     
 if __name__ == "__main__":
     case1()

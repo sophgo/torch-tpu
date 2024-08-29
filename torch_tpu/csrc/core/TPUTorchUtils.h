@@ -198,6 +198,7 @@ static inline T TPUGenerateDnnTensor ( const at::Tensor & Tensor )
     GetAddrByUnifiedAddr(( unsigned long long ) Tensor.data_ptr()));
   t.dtype =TPUConvertDtype<decltype(t.dtype)>( Tensor.dtype() );
   t.dim = Tensor.dim();
+
   for ( auto i = 0; i < Tensor.dim(); ++i )
   {
     t.shape[i] = Tensor.size ( i );
@@ -229,11 +230,27 @@ static inline SgdnnTensor_t TPUGenerateSgdnnTensor ( const at::Tensor & Tensor )
 using func_Sgdnn_t = SgdnnTensor_t (*)(const at::Tensor &);
 // constexpr const static func_Sgdnn_t TPUGenerateSgdnnTensor = TPUGenerateDnnTensor<SgdnnTensor_t>;
 
-static inline tpudnnTensor_t TPUGenerateTpudnnTensor(tpudnnHandle_t handle, const at::Tensor & tensor)
+static inline tpudnnTensor_t TPUGenerateTpudnnTensor(tpudnnHandle_t handle, const at::Tensor & Tensor)
 {
-  auto ret = TPUGenerateDnnTensor<tpudnnTensor_t>(tensor);
-  ret.addr = tpudnnPhysToVirt(handle, (unsigned long long)ret.addr);
-  return ret;
+  tpudnnTensor_t t = { 0 };
+  unsigned long long data_ptr;
+  if (at_tpu::StorageDescHelper::IsBaseFormatType(Tensor)) { 
+    data_ptr = (unsigned long long)Tensor.data_ptr();
+    t.dtype =TPUConvertDtype<decltype(t.dtype)>( Tensor.dtype() );
+    t.dim = Tensor.dim();
+    for ( auto i = 0; i < Tensor.dim(); ++i )
+    {
+      t.shape[i] = Tensor.size ( i );
+      t.stride[i] = Tensor.stride ( i );
+    }
+  }
+  else {
+    data_ptr = at_tpu::StorageDescHelper::GetDataPtrWithFormat(Tensor);
+    at_tpu::StorageDescHelper::SettpuTensorAttributeWithFormat(Tensor, t);
+   }
+  t.addr = reinterpret_cast<decltype(t.addr)>( GetAddrByUnifiedAddr( data_ptr ) );
+  t.addr = tpudnnPhysToVirt(handle, (unsigned long long)t.addr);
+  return t;
 }
 
 static inline std::string GetTensorInfo( const at::Tensor & Tensor )
