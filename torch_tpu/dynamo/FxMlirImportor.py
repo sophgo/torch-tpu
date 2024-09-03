@@ -10,9 +10,10 @@ class State:
     TOP_BF16 = 'TOP_F32'
 
 class FxMIIRImportor(object):
-    def __init__(self,model_name,weight_file):
+    def __init__(self,model_name,weight_file,args):
         self.model_name = model_name
         self.weight_file = weight_file
+        self.args = args
         self.ctx = Context()
         self.ctx.allow_unregistered_dialects = True
         self.loc = Location.unknown(self.ctx)
@@ -54,7 +55,10 @@ class FxMIIRImportor(object):
     # type: None => f32; or type
     def get_tensor_type(self, output_shapes, type=None):
         if type is None:
-            type = F32Type.get()
+            if self.args.fp == "fp16":
+                type = F16Type.get()
+            else:
+                type = F32Type.get()
         if output_shapes == []:
             return UnrankedTensorType.get(type)
         if output_shapes is None:
@@ -87,16 +91,23 @@ class FxMIIRImportor(object):
 
 
     def get_dtype(self, type1):
-        return F32Type.get()  #??? todo
-        dtype = None
+        if self.args.fp == "fp16":
+            return F16Type.get()  #??? todo
+        else:
+            return F32Type.get()
+        # dtype = None
         if type1 == torch.float16:
-            dtype = F16Type.get()
-        elif type1 == torch.float32:
-            dtype = F32Type.get()
-        elif type1 == torch.int64:
-            dtype = IntegerType.get_signless(64)
-        elif type1 == torch.int32:
-            dtype = IntegerType.get_signless(32)
+            dtype = self.mlir_type['F16']
+        else:
+            dtype = self.mlir_type['F32']
+        # elif type1 == torch.float32:
+        #     dtype = self.mlir_type['F32']
+        # elif type1 == torch.int64:
+        #     dtype = self.mlir_type['INT64']
+        # elif type1 == torch.int32:
+        #     dtype = self.mlir_type['INT32']
+        # elif type1 == torch.bool:
+        #     dtype = self.mlir_type['BOOL']
         return dtype
 
     def get_output_dtypes(self, node):
@@ -106,8 +117,8 @@ class FxMIIRImportor(object):
                 dtypes = [i.dtype if i is not None else None for i in node.meta['val'] ]
             else:
                 dtypes.append(node.meta['val'].dtype)
-        else:
-            dtypes.append(torch.float16)
+        # else:
+        #     dtypes.append(torch.float16)
         dtypes = [self.get_dtype(i) if i is not None else None for i in dtypes]
         # if len(dtypes) == 1:
         #     dtypes = dtypes[0]
@@ -123,6 +134,9 @@ class FxMIIRImportor(object):
             for user in node.users:
                 if user.target in ChanStyleOp:
                     return True
+                elif hasattr(node.meta['val'], 'size') and len(node.meta['val'].size())==1 and 'convolution' in user.name: #conv bias
+                    return True
+                # user.target in [torch.ops.aten.convolution]
         return False
 
     def get_output_shapes(self, node, exclude_num = 0):
@@ -134,7 +148,7 @@ class FxMIIRImportor(object):
 
         if self.nodeIsBelongToChanStyle(node):
             shapes = [[1,i[0],1,1] if len(i) == 1 else i for i in shapes]
-        shapes = [[1] if i is not None and i == [] else i for i in shapes]
+        # shapes = [[1] if i is not None and i == [] else i for i in shapes]
         for _ in range(exclude_num):
             shapes.pop()
         return shapes
@@ -155,17 +169,17 @@ class FxMIIRImportor(object):
         init_args["loc"] = self.get_loc(node)
         init_args["ip"] = self.insert_point
         init_args["input"] = func_arg
-        init_args["output"] = RankedTensorType.get(output_shapes[0], F32Type.get())
+        init_args["output"] = RankedTensorType.get(output_shapes[0], F16Type.get() if self.args.fp=="fp16" else F32Type.get()) #F16?
         input_op = top.InputOp(**init_args).output
-        if 'tensor_meta' in node.meta \
-            and node.meta['tensor_meta'].requires_grad \
-            and node.meta['tensor_meta'].dtype != torch.float32:
-            new_op2 = top.WeightReorderOp(*self.get_tensor_type(output_shapes, F32Type.get()),
-                                        input_op,
-                                        loc=self.get_loc(node),
-                                        ip=self.insert_point).output
-            operands[node] = new_op2
-            return
+        # if 'tensor_meta' in node.meta \
+        #     and node.meta['tensor_meta'].requires_grad \
+        #     and node.meta['tensor_meta'].dtype != torch.float32:
+        #     new_op2 = top.WeightReorderOp(*self.get_tensor_type(output_shapes, F16Type.get()),
+        #                                 input_op,
+        #                                 loc=self.get_loc(node),
+        #                                 ip=self.insert_point).output
+        #     operands[node] = new_op2
+        #     return
         operands[node] = input_op
 
     def create_return_op(self, Operands):
@@ -236,7 +250,7 @@ class FxMIIRImportor(object):
             }} loc(unknown)
         """.format(name=self.model_name,
                     weight_file=self.weight_file,
-                    state=State.TOP_F32,
+                    state=State.TOP_F16 if self.args.fp == "fp16" else State.TOP_F32,
                     chip="ALL",
                     train='true',
                     args=in_args_txt,

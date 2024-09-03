@@ -12,6 +12,17 @@ from TpuMlirModule import TpuMlirModule
 from FxGraphConvertor import fx2mlir
 from fx_pass import fx_pass_for_bmm_expand
 import pdb
+from torch.fx.experimental.proxy_tensor import maybe_disable_fake_tensor_mode
+import numpy as np
+from tools.model_transform import get_model_transform
+from utils.cache_tool import CacheTool
+from tools.gen_rand_input import run_from_mlir
+from tools.model_runner import mlir_inference, free_mlir_module, model_inference
+from utils.mlir_shell import mlir_opt_for_top, mlir_lowering, mlir_to_model, f32_blobs_compare
+from numpy_helper.npz_compare import npz_compare
+import gc
+import subprocess
+
 args = None
 graph_idx = 0
 
@@ -67,10 +78,10 @@ def _get_disc_decomp():
             # aten.native_group_norm,
             aten.native_group_norm_backward,
             # aten.native_layer_norm,
-            # aten.native_layer_norm_backward,
+            aten.native_layer_norm_backward,
             # aten.std_mean.correction,
             # aten._softmax,
-            # aten._softmax_backward_data,
+            aten._softmax_backward_data,
             # aten.stack,
             # aten.t,
             aten.tanh_backward,
@@ -96,6 +107,8 @@ def _get_disc_decomp():
             aten.nll_loss_backward,
             aten._log_softmax_backward_data,
             aten.nll_loss_forward,
+            aten.mse_loss,
+            aten.mse_loss_backward,
         ]
     )
     return decompositions_dict
@@ -115,6 +128,121 @@ def save_fxgraph_dot(name, module):
         g = FxGraphDrawer(module, name)
         with open(f'{name}.svg', "wb") as f:
             f.write(g.get_dot_graph().create_svg())
+def unified_compiler(fx_g,example_inputs):
+    ## print fx_g
+    print('run unified_compiler, original graph:')
+    fx_g.graph.print_tabular()
+    ## dump fx_g　
+    global graph_idx
+    graph_str = f'{graph_idx}'
+    name = args.model_name + "_"+graph_str
+    fx_g.to_folder(name)
+
+    ## get input shape
+    input_shape = []
+    input_dtype = []
+
+    for node in fx_g.graph.nodes:
+        if node.op == 'placeholder':
+            shape = list(node.meta['val'].size())
+            dtype = node.meta['val'].dtype
+            dtype_str = str(dtype).split('.')[-1]
+            input_shape.append(shape)
+            input_dtype.append(dtype_str)
+    ### gen inputs ###
+    with maybe_disable_fake_tensor_mode():
+        max = 1
+        min = -1
+        scale = max - min
+        input_tensors = []
+        for shape in input_shape:
+            inputs = (np.random.rand(*shape) * scale + min).astype('float32')
+            tensor = torch.from_numpy(inputs)
+            input_tensors.append(tensor)
+
+        ## jit trace(module -> pt)
+        import importlib
+        module = importlib.import_module(f'{name}.module')
+        FxModule = getattr(module, 'FxModule')
+        torch_model = FxModule()
+        pt_name = os.path.join(name,"torch_model.pt")
+        torch.jit.trace(torch_model, (input_tensors)).save(pt_name)
+
+        ## pt -> top mlir
+        args.input_shapes = input_shape
+        # args.mlir =  os.path.join(name,"origin.mlir")
+        args.mlir = "test.mlir"
+        args.model_def = pt_name
+        args.input_types = input_dtype
+        cache_tool = CacheTool(args.cache_skip)
+        tool = get_model_transform(args)
+        tool.model_transform(args.mlir, args.add_postprocess, args.patterns_count)
+
+        ## gen mlir input and ref data
+        # run_from_mlir(args)
+        subprocess.run(['python', 'gen_rand_input.py', '--mlir', args.mlir])
+        # args.test_input = ['input.npz']
+        # tool.model_validate(args.test_input, args.tolerance, args.excepts, args.test_result)
+
+        from tools.model_runner import torch_inference
+        input_data = dict(np.load("input.npz"))
+        ref_data = torch_inference(input_data, args.model_def)
+        np.savez("ref_data.npz",**ref_data)
+        in_ref_data = 'input.npz'
+        if args.cmp:
+            tensors = mlir_inference(input_data, args.mlir, True)
+            if os.path.exists('ref_data.npz'):
+                np.savez('top_ir_out_data.npz', **tensors)
+                npz_compare(['top_ir_out_data.npz', 'ref_data.npz', "--tolerance", "0.99,0.98", "-v"])
+            else:
+                np.savez('ref_data.npz', **tensors)
+            del tensors
+            free_mlir_module()
+            gc.collect()
+        tpu_ir = 'tpu_'+args.mlir
+        bmodel_path = os.path.join(name, tpu_ir+'.bmodel')
+        num_core = 8
+        if args.fp == "fp16":
+            mlir_lowering(args.mlir, tpu_ir, 'F16', args.chip, num_core = num_core) #F32
+        else:
+            mlir_lowering(args.mlir, tpu_ir, 'F32', args.chip, num_core = num_core)
+        if args.cmp:
+            tensors = mlir_inference(input_data, tpu_ir, True)
+            ### key adjust in ref_data###
+            if args.fp == "fp16":
+                new_ref_data = {}
+                for key in ref_data.keys():
+                    adjust_name = key+"_f32"
+                    if adjust_name in tensors:
+                        new_ref_data[adjust_name] = ref_data[key]
+                    else:
+                        new_ref_data[key] = ref_data[key]
+                np.savez("ref_data.npz",**new_ref_data)
+            np.savez('tpu_ir_out_data.npz', **tensors)
+            del tensors
+            free_mlir_module()
+            gc.collect()
+            npz_compare(['tpu_ir_out_data.npz', 'ref_data.npz', "--tolerance", "0.99,0.98", "-v"])
+
+        mlir_to_model(tpu_ir, bmodel_path, 'final_'+args.mlir, opt = 2, debug_cmd = f'--debug_cmd={args.debug}')
+        if args.cmp:
+            tensors = model_inference(input_data, bmodel_path)
+            np.savez('bmodel_out_data.npz', **tensors)
+            del tensors
+            gc.collect()
+            npz_compare(['bmodel_out_data.npz', 'ref_data.npz', "--tolerance", "0.95,0.80", "-v"])
+        ## top -> tpu
+        import pdb;pdb.set_trace()
+
+    # if args.test_input and cache_tool.do_top_validate(tool.mlir_file, tool.in_f32_npz, args.tolerance, args.debug):
+    #     assert (args.test_result)
+    #     tool.model_validate(args.test_input, args.tolerance, args.excepts, args.test_result)
+    # if not args.debug:
+    #     tool.cleanup()
+
+    # tool = TorchTransformer(args.model_name, args.model_def, args.input_shapes,
+    #                             args.input_types, args.output_names, preprocessor.to_dict(),
+    #                             dynamic=args.dynamic, shape_influencing_input_names=args.shape_influencing_input_names)
 
 def tpu_mlir_compiler(fx_g, example_inputs):
     if 'const_name' not in args.debug:
@@ -138,11 +266,52 @@ def tpu_mlir_compiler(fx_g, example_inputs):
     fx_g_bk = copy.deepcopy(fx_g)
 
     from torch.fx.passes.fake_tensor_prop import FakeTensorProp
-    FakeTensorProp(fx_g).propagate(*example_inputs)
+    # FakeTensorProp(fx_g).propagate(*example_inputs)
 
     if fx_pass_for_bmm_expand(fx_g):
         print('run tpu_mlir_compiler, updated graph:')
-        #fx_g.graph.print_tabular()
+        fx_g.graph.print_tabular()
+
+    # gen ref data
+    with maybe_disable_fake_tensor_mode():
+        inputs = []
+        for fake_tensor in example_inputs:
+            real_tensor = torch.randn(fake_tensor.shape)
+            if fake_tensor.dtype == torch.int64:
+                real_tensor = real_tensor.to(torch.int64)
+            inputs.append(real_tensor)
+        inputs_t = tuple(inputs)
+        # res = fx_module(input0,input1)
+        name = 'module_fx'
+        if os.path.exists(name):
+            # rename
+            os.mkdir(f'{name}_bwd')
+            name = f'{name}_bwd'
+        fx_g.to_folder(name)
+        if name == 'module_fx':
+            from module_fx.module import FxModule
+        else:
+            from module_fx_bwd.module import FxModule
+        mod = FxModule()
+        res = mod(*inputs_t)
+        # dump res
+        output_ref = {}
+        for node in fx_g.graph.nodes:
+            if node.op == "output":
+                output = node.args[0]
+                for idx,out in enumerate(output):
+                    name = out.name
+                    output_ref[name] = res[idx].detach().numpy()
+        np.savez('ref_data.npz', **output_ref)
+        # dump input
+        input_ref = {}
+        i = 0
+        for node in fx_g.graph.nodes:
+            if node.op == "placeholder":
+                name = node.name
+                input_ref[name] = inputs[i].detach().numpy()
+                i+=1
+        np.savez('input_ref.npz', **input_ref)
 
     with compilers._disable_jit_autocast():
         compilers.strip_overloads(fx_g) #删除掉node.target的重载,比如将aten.sum.dim_IntList变为aten.sum
@@ -168,15 +337,15 @@ def tpu_mlir_compiler(fx_g, example_inputs):
             # if node.target == torch.ops.aten.view:
             #     node.target = torch.ops.aten.reshape
 
-        for node in fx_g.graph.nodes:
-            new_kwargs = {}
-            for k, v in node.kwargs.items():
-                if isinstance(v, torch.device):
-                    v = v.type # device(type='cuda', index=0)
-                new_kwargs[k] = v #将device改为字符串形式, why?
-            node.kwargs = new_kwargs
-        fx_g.graph.lint()
-        fx_g.recompile()
+        # for node in fx_g.graph.nodes:
+        #     new_kwargs = {}
+        #     for k, v in node.kwargs.items():
+        #         if isinstance(v, torch.device):
+        #             v = v.type # device(type='cuda', index=0)
+        #         new_kwargs[k] = v #将device改为字符串形式, why?
+        #     node.kwargs = new_kwargs
+        # fx_g.graph.lint()
+        # fx_g.recompile()
 
         bwd_graph = len([node for node in fx_g.graph.nodes if node.op == 'placeholder' and node.name == 'tangents_1']) > 0
         # partitioned_module = partition(fx_g, min_block_size = 3)
@@ -198,3 +367,4 @@ def tpu_mlir_compiler(fx_g, example_inputs):
 
 #from functorch.compile import min_cut_rematerialization_partition
 aot_backend = aot_autograd(bw_compiler = tpu_mlir_compiler,fw_compiler=tpu_mlir_compiler,decompositions=_get_disc_decomp())#fw_compiler=skip_compiler,
+# aot_backend = aot_autograd(fw_compiler = unified_compiler)

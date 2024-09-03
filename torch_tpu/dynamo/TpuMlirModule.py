@@ -7,6 +7,7 @@ import copy
 import numpy as np
 import logging
 from tpu_mlir.python import pyruntime_bm
+from tpu_mlir.python.numpy_helper.npz_compare import npz_compare
 tpu_dev = "privateuseone:0"
 device = torch.device(tpu_dev)
 
@@ -23,7 +24,9 @@ def torch_dtype_from_tpu_mlir(dtype) -> torch.dtype:
 
 class TpuMlirModule(torch.nn.Module):
     def __init__(
-        self, args, model_file, in_tensor_name_to_idx_dict, output_changed_shapes, output_tensor_names = None, output_dtypes = None, return_none_count = 0
+        self, args, model_file, in_tensor_name_to_idx_dict, output_changed_shapes,\
+        output_tensor_names = None, output_dtypes = None, return_none_count = 0,\
+        in_ref_data = {}
     ):
         super(TpuMlirModule, self).__init__()
         print(f'TpuMlirModule __init__ output_dtypes:{output_dtypes}')
@@ -37,6 +40,8 @@ class TpuMlirModule(torch.nn.Module):
         self.in_tensor_name_to_idx_dict = in_tensor_name_to_idx_dict
         self.output_tensor_names = output_tensor_names
         self.output_tensor_names = None
+        self.in_ref_data = in_ref_data
+
         if model_file:
             self._initialize()
 
@@ -129,12 +134,15 @@ class TpuMlirModule(torch.nn.Module):
             with torch.autograd.profiler.record_function("TpuMlirModule:ProcessOutputs"):
                 # create output tensors
                 tpu_outputs: List[torch.Tensor] = []
+
                 dyn_idx = 0
+                output_dict = {}
                 for i in self.net.outputs:
                     if self.output_tensor_names is not None and i.name not in self.output_tensor_names:
                         print('skip:', i.name)
                         continue
                     output = np.array(i.data)
+                    output_dict[i.name] = np.array(i.data.astype(np.float32))
                     if dyn:
                         if output.shape != dyn_output_shapes[dyn_idx]:
                             dyn_len = np.prod(dyn_output_shapes[dyn_idx])
@@ -153,6 +161,15 @@ class TpuMlirModule(torch.nn.Module):
                         if dtype == torch.int64:
                             output = output.int()
                 print('forward output shape:', [i.shape for i in tpu_outputs])
+
+                ### bmodel out compare ###
+                if self.args.cmp:
+                    import pdb;pdb.set_trace()
+                    np.savez('bmodel_out_data.npz', **output_dict)
+                    del output_dict
+                    gc.collect()
+                    npz_compare(['bmodel_out_data.npz', 'ref_data.npz', "--tolerance", "0.99,0.98", "-v"])
+                
                 if self.return_none_count > 0:
                     tpu_outputs.extend([None for i in range(self.return_none_count)])
                     print('return_none_count:', self.return_none_count)
