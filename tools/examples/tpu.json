@@ -14,12 +14,9 @@
     "afc_bwu"    : 0.9,
     "mlp_bwu"    : 0.9,
 
-    "v_CDMA" : 64,
-    "v_ddr2CDMA" : 68.2,
-    "v_CDMA2ddr" : 68.2,
-    "v_CDMA2l2" : 64,
-    "v_ddr2l2" : 68.2,
-    "v_l22ddr" : 68.2,
+    "v_CDMA" : 32,
+    "v_ddr2l2" : 128,
+    "v_l22ddr" : 128,
     "v_SUM" : 512,
 
     "lt_fire" : 0.25,

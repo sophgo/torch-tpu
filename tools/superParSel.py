@@ -20,6 +20,12 @@ tpuMem = 128
 def roundup(x, div):
     return div*np.ceil(x/div)
 
+def rsum(*numbers):
+    return reduce(lambda s,x: s + (1./x if x!=0 else 0), numbers, 0)
+
+def btoi(abool: bool) -> int:
+    return 1 if abool else 0
+
 def addSelfPoint(s:str):
     if isinstance(s, str) and s[:5]!="self.":
         pattern = r"(\w+)(.?)"
@@ -41,10 +47,14 @@ class ProcessError(Exception):
 
 class LLM:
     Qtypes = ("f16", "f8", "w4a16")
+    f8 = False
+    w4a16 = False
     batch = 8
     tp = 1
     debug = False
     debugTime = False
+    mode = 'infer'
+    pp = 1
     def __init__(self, **kwargs) -> None:
         for k, v in kwargs.items():
             setattr(self, k, v)
@@ -60,10 +70,10 @@ class LLM:
         if not tpuJson:
             raise InitializationError(f"Please input the json file of device.")
 
-        if not self.initModel(modelJson, tpuJson):
+        if not self._initModel(modelJson, tpuJson):
             raise InitializationError("Reading model fail!")
 
-        if not self.checkAttr():
+        if not self._checkAttr():
             raise InitializationError("Model initialize fail!")
 
         print(f"{self.name} generate successfully!")
@@ -71,7 +81,7 @@ class LLM:
     def getName(self) -> str:
         return self.name
 
-    def usePredefinedModel(self) -> None:
+    def _usePredefinedModel(self) -> None:
         preDefinedModel = {
             "LLaMA-2-7B":{
                 "layer_num": 32,
@@ -96,7 +106,7 @@ class LLM:
             for k, v in preDefinedModel[self.name].items():
                 setattr(self, k, v)
 
-    def checkAttr(self) -> bool:
+    def _checkAttr(self) -> bool:
         check_items = ('name', 'layer_num', 'intermediate_size', 'head', 'kv_heads')
         for k in check_items:
             if not hasattr(self, k):
@@ -104,10 +114,12 @@ class LLM:
                 return False
         return True
     
-    def initModel(self, modelJson, tpuJson) -> bool:
+    def _initModel(self, modelJson, tpuJson) -> bool:
         if not os.path.exists(modelJson):
-            print(modelJson + ' not exist!')
-            return False
+            modelJson = 'examples/'+modelJson
+            if not os.path.exists(modelJson):
+                print(modelJson + ' not exist!')
+                return False
         
         if not os.path.exists(tpuJson):
             print(tpuJson + ' not exist!')
@@ -122,22 +134,31 @@ class LLM:
             for k, v in json.load(f).items():
                 setattr(self, k, v)
         if not hasattr(self, "layers"):
-            raise InitializationError("No layers in model json!")
+            print("INFO: No layers specified, reading LLaMA layer as default.")
+            with open("examples/LLaMA_layers.json") as f:
+                self.layers = json.load(f)
 
         self.hidden_size = self.head * self.block_size
         self.T_us = self.compute * TB / US #(self.compute<<10) * 1e3
         self.timeScale    = US/self.DRAMBW/GB
         self.calTimeScale = US/self.compute/TB /self.core_num
+        if self.mode in ('train', 'prefill'):
+            print(f"Note: {self.mode}'s seq_len will be {self.token_size}")
+            self.seq_len = self.token_size
+        else:
+            self.seq_len = 1
         
-        self.fullfillModule(self.layers)
+        self._fullfillModule(self.layers)
         
         if self.debug:
             with open("test.json", "w") as f:
                 json.dump(self.layers, f, indent=4)
 
+        if self.mode == "train" and (self.f8 or self.w4a16):
+            raise ProcessError("Temporary training cant use f8 or w4a16.")
         return True
     
-    def fullfillModule(self, d:dict):
+    def _fullfillModule(self, d:dict):
         for k, v in d.items():
             if isinstance(v, dict):
                 for s in MatrixProps + ("w4a16", "f8", "f16"):
@@ -154,7 +175,7 @@ class LLM:
                     if d.get(s, False) and "type" in v and s not in v:
                         v[s] = False
 
-                self.fullfillModule(v)
+                self._fullfillModule(v)
 
             elif isinstance(v, str):
                 if k in MatrixProps:
@@ -170,76 +191,108 @@ class LLM:
                         else:
                             print(f"Error! {MatrixProps[i]} has not been defined, plz check.")
     
-    def getTokenSChip(self, tp:int, batch:int, Qtype:str=None, t_infer:float=-1)    -> float:
-        if t_infer > 0:
-            return batch/t_infer*1e3 / tp
+    def getTokenSChip(self, tp:int, batch:int, Qtype:str=None, latency:float=-1)    -> float:
+        if latency > 0:
+            return self.seq_len * batch/latency*1e3 / tp
         else:
-            return batch/self.getInferTime(tp, batch, Qtype)*1e3 / tp
+            return self.seq_len * batch/self.getLatency(tp, batch, Qtype)*1e3 / tp
 
-    def setSuperPars(self, tp:int, batch:int, Qtype:str=None) -> None:
+    def _setSuperPars(self, tp:int, batch:int, Qtype:str=None) -> None:
         self.tp = tp
         self.batch = batch
         for t in self.Qtypes:
             setattr(self, t, Qtype==t)
 
-    def getInferTime(self, tp:int, batch:int, Qtype:str=None) -> float:
-        self.setSuperPars(tp, batch, Qtype)
+    def getLatency(self, tp:int, batch:int, Qtype:str=None) -> float:
+        self._setSuperPars(tp, batch, Qtype)
         modules = self.layers
-        if self.debug:
-            for k, v in modules.items():
-                print(f"alg debug time {k}:", self.getTime(v)/(self.layer_num*v.get("inLayer", 1./self.layer_num)))
-        
-        self.inferTime = self.getTime(modules) / 1e3 #ms
+
+        total_time = np.zeros(2) # 2: not, inLayer
+        for k, v in modules.items():
+            if isinstance(v, dict):
+                tmpTime = self._getTime(v)
+                total_time[btoi(v.get("inLayer", False))] += tmpTime
+                if self.debug:
+                    print(f"alg debug time   [us] {k}: {tmpTime:.2f}")
+        total_time[1] *= self.layer_num
+        total_time /= 1e3 # to ms
+
+        self.latency = total_time.sum() #ms
         if self.debugTime:
             with open("test_time.json", "w") as f:
                 json.dump(self.layers, f, indent=4)
 
-        return self.inferTime
+        return self.latency
     
-    def getInferMemory(self, tp:int, batch:int, Qtype:str=None) -> float:
-        return np.sum(self.getInferMemoryDetail(tp,batch,Qtype))
-    
-    def getInferMemoryDetail(self, tp:int, batch:int, Qtype:str=None) -> np.ndarray:
-        self.setSuperPars(tp, batch, Qtype)
-        modules = self.layers
-        if self.debug:
-            for k, v in modules.items():
-                if isinstance(v, dict):
-                    print(f"alg debug memory {k}:", self.getMemory(v)/(self.layer_num*v.get("inLayer", 1./self.layer_num)))
-        return self.getMemory(modules) / (1<<10) # GB
+    def getMemoryTotal(self, tp:int, batch:int, Qtype:str=None) -> float:
+        return np.sum(self.getMemory(tp,batch,Qtype))
 
-    def getMemory(self, d:dict, cache=False) -> np.ndarray:
-        mem = np.zeros(3) # cache, weight, other
+    def getMemory(self, tp:int, batch:int, Qtype:str=None) -> np.ndarray:
+        self._setSuperPars(tp, batch, Qtype)
+        modules = self.layers
+
+        mem = np.zeros((2,3)) # 2: not, inLayer; 3: cache/act, weight, other
+        for k, v in modules.items():
+            if isinstance(v, dict):
+                tmpMem = self._getMemory(v)
+                mem[btoi(v.get("inLayer", False))] += tmpMem
+                if self.debug:
+                    print(f"alg debug memory [MB] {k}: {self._getMemory(v)}")
+        mem /= 1024 # to GB
+        if self.mode == "train":
+            mem[..., 1] *= 8 # each training param -> 16 Bytes 
+
+        total_mem = np.zeros(3)
+        if self.pp <= 2:
+            mem[1] *= self.layer_num
+            total_mem = np.sum(mem, axis=0)/self.pp
+        else:
+            minMem = 1e9
+            memIO = mem[0].sum()/2
+            memSL = mem[1].sum() 
+            n_io = 0
+            ioGT = False
+            for n in range(self.layer_num):
+                tot_mid = self.layer_num-2*n
+                if tot_mid<0 or tot_mid%(self.pp-2)!=0:
+                    continue
+                tmpMem = max( memIO + memSL*n, memSL*(tot_mid//(self.pp-2)) )
+                if tmpMem < minMem:
+                    minMem = tmpMem
+                    n_io = n
+                    ioGT = (memIO + memSL*n) > (memSL*(tot_mid//(self.pp-2)))
+                else:
+                    break
+            print(f"INFO: Auto select {n_io} layers with I/O embedding.")
+            total_mem = mem[0]/2 + mem[1]*n_io if ioGT else mem[1]*( (self.layer_num-2*n_io)//(self.pp-2) ) 
+                    
+        return total_mem
+
+    def _getMemory(self, d:dict, cache=False) -> np.ndarray:
+        mem = np.zeros(3) # cache/activations, weight, other
         for k, v in d.items():
             if isinstance(v, dict) and k!="matrix" and k[:2]!="t_":
-                mem += self.getMemory(v, k=="cache")
+                mem += self._getMemory(v, k=="cache")
         
-        mem += self.getAlgDataSize(d, True, cache)/(1<<20)
+        mem += self._getAlgDataSize(d, True, cache)/(1<<20) # MB
+        return mem
 
-        inLayer = d.get("inLayer", False)
-        inTP    = d.get(   "inTP", False)
-        mem =  mem*self.layer_num if inLayer else mem
-        return mem/self.tp if inTP else mem
-
-    def getTime(self, d:dict) -> float:
+    def _getTime(self, d:dict, cache=False) -> float:
         tot = 0
         for k, v in d.items():
             if isinstance(v, dict) and k!="matrix" and k[:2]!="t_":
-                tot += self.getTime(v)
+                tot += self._getTime(v, k=="cache")
 
-        t_io = self.getAlgDataSize(d).sum()*self.timeScale
-        t_cal= self.getCalTime(d)
+        t_io = self._getAlgDataSize(d, False, cache).sum()*self.timeScale
+        t_cal= self._getCalTime(d)
         tot += max(t_cal, t_io)
         if self.debugTime:
             d["t_io"] = t_io
             d["t_cal"]= t_cal
 
-        inLayer = d.get("inLayer", False)
-        inTP    = d.get(   "inTP", False)
-        tot =  tot*self.layer_num if inLayer else tot
-        return tot/self.tp if inTP else tot
+        return tot
     
-    def getCalTime(self, alg:dict) -> float:
+    def _getCalTime(self, alg:dict) -> float:
         if alg.get("noCalTime", False):
             return 0
         
@@ -251,30 +304,38 @@ class LLM:
             return 0
         matrix = alg["matrix"]
         f8    = self.f8 and isinstance(matrix, dict) and matrix.get("f8",    False)
+        hasBias = isinstance(matrix, dict) and matrix.get("bias", False)
 
         if t in ("MM2", "MM2_NT"):
             if "out" not in matrix or "in1" not in matrix:
                 raise ProcessError(f"No output&in1 info in {matrix}")
             loop_i = -1
+            tmpmaxS = 1
             for i in (1,2,0): # C H N
-                if self.getValue(matrix["out"][i]) > 1:
+                if self._getValue(matrix["out"][i]) > tmpmaxS:
                     loop_i = i
-                    break
+                    tmpmaxS = self._getValue(matrix["out"][i])
+                    
             if loop_i < 0:
                 loop_i = 1
             
-            flops  = 2*reduce(lambda x,y: x*y, (self.getValue(matrix["out"][i]) if i!=loop_i else roundup(self.getValue(matrix["out"][i]), self.NPU_NUM) for i in range(len(MatrixProps))))
+            flops  = 2*reduce(lambda x,y: x*y, (self._getValue(matrix["out"][i]) if i!=loop_i else roundup(self._getValue(matrix["out"][i]), self.NPU_NUM) for i in range(len(MatrixProps))))
             tmpS = 'H' if t[-1]!='T' else 'W'
-            flops *= self.getValue(matrix["in1"][MatrixPropsOrders[tmpS]])
+            flops *= self._getValue(matrix["in1"][MatrixPropsOrders[tmpS]])
+
+            if hasBias:
+                flops += reduce(lambda x,y: x*y, (self._getValue(x) for x in matrix['out']))
             calT = flops*self.calTimeScale
+            if self.mode == "train" and alg.get("isParam", True):
+                calT *= 3 # forward 1 + backward 2
             return calT if not f8 else f8/2
         
-        elif t in ("Mix", "AR", "CDMA",):
+        elif t in ("Mix", "AR", "CDMA", "Act"):
             return 0
         else:
             raise ProcessError(f"Unexpected type {t}")
 
-    def getAlgDataSize(self, alg:dict, memOpt=False, cache=False):
+    def _getAlgDataSize(self, alg:dict, memOpt=False, cache=False):
         ds = np.zeros(3)
 
         if "matrix" not in alg:
@@ -282,7 +343,10 @@ class LLM:
         matrix = alg["matrix"]
 
         if cache:
-            ds[0] = self.getMatrixDataSize(matrix, memOpt=memOpt)
+            if self.mode in ('train', 'prefill'):
+                return ds
+
+            ds[0] = self.getMatrixDataBytes(matrix, memOpt=memOpt)
             return ds
         
         nm = alg.get("NM", False)
@@ -293,26 +357,41 @@ class LLM:
         cm = alg.get("CM", True) # calculation
         om = alg.get("OM", True) # output
         if "type" not in alg and (im or cm or om):
-            ds[2] = self.getMatrixDataSize(matrix, memOpt=memOpt)
+            if self.mode != "train":
+                ds[2] = self.getMatrixDataBytes(matrix, memOpt=memOpt)
             return ds
         
         t  = alg["type"]
+        if memOpt and t in ('AR', ):
+            return ds
+        
         if t in ("MM2", "Mix", "AR", "MM2_NT"):
+            save4Backward = False
+            if memOpt and self.mode == "train" and (t[:3] == "MM2" or t=="Mix") and alg.get("isParam", True):
+                save4Backward = True
+
             rw_list = ico_list.copy()
-            if not im:
-                rw_list.remove("in0")
-            if cm:
-                ds[1] = self.getMatrixDataSize(matrix, ("in1",), memOpt=memOpt)
-            rw_list.remove("in1")
-            if not om:
-                rw_list.remove("out")
+            if save4Backward:
+                ds[0] = self.getMatrixDataBytes(matrix, ("in0",), memOpt=memOpt)
+                ds[1] = self.getMatrixDataBytes(matrix, ("in1",), memOpt=memOpt)
+                if alg.get("saveOutput", False):
+                    ds[2] = self.getMatrixDataBytes(matrix, ("out",), memOpt=memOpt)
+                return ds
+            else:
+                if not im:
+                    rw_list.remove("in0")
+                if cm:
+                    ds[1] = self.getMatrixDataBytes(matrix, ("in1",), memOpt=memOpt)
+                rw_list.remove("in1")
+                if not om:
+                    rw_list.remove("out")
             if rw_list:
-                ds[2] = self.getMatrixDataSize(matrix, rw_list, memOpt=memOpt)
+                ds[2] = self.getMatrixDataBytes(matrix, rw_list, memOpt=memOpt)
             return ds
 
         elif t == "CDMA": # AllReduce
             if not memOpt:
-                ds[2] = self.getAllReduceTime()/self.timeScale
+                ds[2] = self.getAllReduceTime(self.getMatrixDataBytes(matrix, [1, ], ))/self.timeScale
             return ds
 
         else:
@@ -320,13 +399,14 @@ class LLM:
             print("Error! Not a defined calculation, plz check.")
             return np.ones_like(ds)*1e9
 
-    def getMatrixDataSize(self, matrix, l=None, memOpt=False):
+    def getMatrixDataBytes(self, matrix, l=None, memOpt=False):
         if isinstance(matrix, list):
             if not l:
                 return 0
-            return self.data_byte * len(l) * reduce(lambda x,y: x*y, (self.getValue(s) for s in matrix))
+            return self.data_byte * len(l) * reduce(lambda x,y: x*y, (self._getValue(s) for s in matrix))
         
         elif isinstance(matrix, dict):
+            hasBias = matrix.get("bias", False)
             if not l:
                 l = matrix.keys()
 
@@ -334,8 +414,8 @@ class LLM:
             w4a16 = self.w4a16 and matrix.get("w4a16", False)
             if f8 and w4a16:
                 raise ProcessError("Only one Qtype can be True in Alg, plz check json.")
+
             ds = 0
-            
             for s in l:
                 if s not in matrix:
                     raise ProcessError(f"Calculation key {s} from {l} not in {matrix}!")
@@ -348,12 +428,25 @@ class LLM:
                         if s in ("in0", "in1"): # in/w  1 + ignore scale 
                             scale = 1.
 
-                    ds += scale * reduce(lambda x,y: x*y, (self.getValue(x) for x in matrix[s]))
+                    ds += scale * reduce(lambda x,y: x*y, (self._getValue(x) for x in matrix[s]))
+                    if hasBias and s=="in1":
+                        ds += self.getOutFeature(matrix[s]) # Bias size too small to be calculated
             return ds
         else:
             raise ProcessError(f"Unknown matrix dtype! {matrix}")
+    
+    def getOutFeature(self, dims:list):
+        # Usually the second non-one dim
+        outfeature = self._getValue(dims[-1])
+        skipDim = True
+        for dim in dims:
+            if self._getValue(dim)!=1:
+                if not skipDim:
+                    outfeature = self._getValue(dim)
+                skipDim = False
+        return outfeature
 
-    def getValue(self, s):
+    def _getValue(self, s):
         num =  eval(s) if isinstance(s, str) else s
         return np.ceil(num)
     
@@ -363,147 +456,73 @@ class LLM:
             v = eval(v)
         return v
 
-    def getAllReduceTime(self) -> float:
+    def getAllReduceTime(self, db) -> float:
         tp = self.tp
-        batch = self.batch
-        ds = self.hidden_size*batch
-        data_GBus_per_tp = ds/tp *self.data_byte/(GB)*US
-        return (data_GBus_per_tp/self.v_ddr2CDMA + data_GBus_per_tp/self.v_CDMA + data_GBus_per_tp/self.v_CDMA2l2 + data_GBus_per_tp/self.v_ddr2l2 + data_GBus_per_tp/self.v_SUM + data_GBus_per_tp/self.v_l22ddr + self.lt_fire + self.lt_sync*4 ) * (tp/2-1) + data_GBus_per_tp/self.v_ddr2CDMA + data_GBus_per_tp/self.v_CDMA + data_GBus_per_tp/2/self.v_CDMA2l2 + data_GBus_per_tp/2/self.v_ddr2l2 + data_GBus_per_tp/2/self.v_SUM + data_GBus_per_tp/2/self.v_l22ddr + data_GBus_per_tp/2/self.v_CDMA2ddr + self.lt_fire + self.lt_sync*5 + (data_GBus_per_tp/self.v_ddr2CDMA + data_GBus_per_tp/self.v_CDMA + data_GBus_per_tp/self.v_CDMA2ddr + self.lt_fire + self.lt_sync)*(tp/2-1)
+        if tp == 1:
+            return 0
+        GBus = 1e-3 #US/GB
+        data_GBus_per_tp = db/tp*GBus
+        if tp == 2:
+            return          data_GBus_per_tp * rsum(self.v_CDMA,   self.v_ddr2l2,   self.v_SUM,   self.v_l22ddr) + self.lt_fire + self.lt_sync*2
+        else:
+            t0 = (tp/2-1) *(data_GBus_per_tp * rsum(self.v_CDMA,   self.v_ddr2l2,   self.v_SUM,   self.v_l22ddr) + self.lt_fire + self.lt_sync*4)
+            t1 =            data_GBus_per_tp * rsum(self.v_CDMA, 2*self.v_ddr2l2, 2*self.v_SUM, 2*self.v_l22ddr)
+            t2 = (tp/2-1) *(data_GBus_per_tp * rsum(self.v_CDMA) )
+            return t0 + t1 + t2
+        
 
-def drawMem3D(m:LLM, Qtype='w4a16', tps=2**np.arange(10), batches=2**np.arange(10)):
+def draw3D(m:LLM, flag="tps", Qtype='w4a16', tps=2**np.arange(10), batches=2**np.arange(10)):
     Qtypes = ('w4a16', 'f16', 'f8')
     if Qtype not in Qtypes:
         print(f"Error: Qtype={Qtype}. Select Qtype in {Qtypes}.")
         return
-
-    x, y = np.meshgrid(tps, batches)
-
-    mem = np.zeros((len(batches), len(tps)), dtype=float)
-
-    highlight_points=[]
-    for i in range(len(batches)):
-        for j in range(len(tps)):
-            mem[i,j] = m.getInferMemory(x[i,j], y[i,j], Qtype)
-            if mem[i, j] < tpuMem:
-                highlight_points.append((x[i,j], y[i,j]))
-    z1 = mem
-    z2 = tpuMem*np.ones_like(z1)
-    # ==========Plot==========
-    fig = go.Figure()
-    fig.add_trace(go.Surface(x=x, y=y, z=z1, colorscale='Blues'))
-
-    fig.add_trace(go.Surface(x=x, y=y, z=z2, colorscale=[[0, 'orange'], [1, 'orange']], opacity=0.4, showscale=False, name='Plane'))
-
-    for i in range(x.shape[0]):
-        for j in range(x.shape[1]):
-            fig.add_trace(go.Scatter3d(
-                x=[x[i, j]], y=[y[i, j]], z=[z1[i, j]],
-                mode='text',
-                text=[f'{z1[i, j]:.2f}'],
-                textposition='top center',
-                textfont=dict(size=13, color='black')
-            ))
-
-    for xi in np.unique(x):
-        yi = y[:, 0]
-        zi = z1[:, np.where(x[0] == xi)[0][0]]
-        fig.add_trace(go.Scatter3d(
-            x=[xi]*len(yi), y=yi, z=zi, mode='lines', name=f'X={xi}',line=dict(color='white', width=3),
-        ))
-    for yi in np.unique(y):
-        xi = x[0, :]
-        zi = z1[np.where(y[:, 0] == yi)[0][0], :]
-        fig.add_trace(go.Scatter3d(
-            x=xi, y=[yi]*len(xi), z=zi, mode='lines', name=f'Y={yi}',line=dict(color='white', width=3),
-        ))
-        
-    for point in highlight_points:
-        xi, yi = point
-        zi = z1[np.where(y[:, 0] == yi)[0][0], np.where(x[0] == xi)[0][0]]
-        fig.add_trace(go.Scatter3d(
-            x=[xi], y=[yi], z=[zi],
-            mode='markers',
-            marker=dict(color='purple', size=10),
-            name=f'Highlight ({xi}, {yi})'
-        ))
-
-    fig.update_layout(
-        scene=dict(
-            xaxis=dict(
-                type='log',
-                tickvals=tps,
-                ticktext=tps,
-                title='TP',
-                showgrid=True,
-                gridcolor='lightgrey',
-                gridwidth=1
-            ),
-            yaxis=dict(
-                type='log',
-                tickvals=batches,
-                ticktext=batches,
-                title='Batch',
-                showgrid=True,
-                gridcolor='lightgrey',
-                gridwidth=1
-            ),
-            zaxis=dict(
-                title='Memory / GB',
-                showgrid=True,
-                gridcolor='lightgrey',
-                gridwidth=1,
-                range = [0,520],
-                tickvals=np.linspace(0, 520, 5),
-                ticktext=np.linspace(0, 520, 5)
-            )
-        )
-    )
-
-    # ==========Save Fig==========
-    fig.write_html(f"{m.getName()}_{Qtype}_Memory.html")
-    pass
-
-def draw3D(m:LLM, Qtype='w4a16', tps=2**np.arange(10), batches=2**np.arange(10)):
-    Qtypes = ('w4a16', 'f16', 'f8')
-    if Qtype not in Qtypes:
-        print(f"Error: Qtype={Qtype}. Select Qtype in {Qtypes}.")
+    
+    flags = ('tps', 'mem')
+    if flag not in flags:
+        print(f"Error! flag={flag}, select in {flags}.")
         return
   
     x, y = np.meshgrid(tps, batches)
-    z2 = (13*y)/x
 
     latency = np.zeros_like(x, dtype=float)
     tokenSChip = np.zeros_like(x, dtype=float)
     mem = np.zeros_like(x, dtype=float)
     # ==========Gen point (latency<75)==========
     highlight_points=[]
-    maxTPS = 100
+    maxValue = 100
     for i in range(x.shape[0]):
         for j in range(x.shape[1]):
-            latency[i, j]  = m.getInferTime(x[i,j], y[i,j], Qtype)
+            latency[i, j]  = m.getLatency(x[i,j], y[i,j], Qtype)
             tokenSChip[i,j]=m.getTokenSChip(x[i,j], y[i,j], Qtype, latency[i, j])
-            mem[i,j] = m.getInferMemory(x[i,j], y[i,j], Qtype)
+            mem[i,j] = m.getMemoryTotal(x[i,j], y[i,j], Qtype)
             if mem[i,j] < tpuMem:
-                if tokenSChip[i, j] > maxTPS:
-                    maxTPS = tokenSChip[i, j]
+                if flag == 'tps' and tokenSChip[i, j] > maxValue:
+                    maxValue = tokenSChip[i, j]
 
-                if latency[i, j] < reqLatency:
+                if (flag == 'tps' and latency[i, j] < reqLatency) or (flag == 'mem' and mem[i,j]<tpuMem):
                     highlight_points.append((x[i,j], y[i,j]))
                 
     z1 = tokenSChip
-    print(f"============ {Qtype} latency<{reqLatency}ms (tp,batch) ============")
+    z2 = 1e3*y/x/reqLatency
+    highlight_str = f'latency<{reqLatency}ms'
+    if flag == 'mem':
+        z1 = mem
+        z2 = tpuMem*np.ones_like(z1)
+        highlight_str = f'memory<{tpuMem}GB'
+        maxValue = 520
+
+
+    print(f"============ {Qtype} {highlight_str} configs (tp,batch) ============")
     print(highlight_points)
 
     # ==========Plot==========
     fig = go.Figure()
-    # fig.add_trace(go.Surface(x=x, y=y, z=z1, colorscale='Viridis'))
     fig.add_trace(go.Surface(x=x, y=y, z=z1, colorscale='Blues'))
-
     fig.add_trace(go.Surface(x=x, y=y, z=z2, colorscale=[[0, 'orange'], [1, 'orange']], opacity=0.4, showscale=False, name='Plane'))
 
     for i in range(x.shape[0]):
         for j in range(x.shape[1]):
-            if mem[i,j]<tpuMem: # only mark memory under tpuMem
+            if mem[i,j]<tpuMem or flag=='mem': # only mark memory under tpuMem
                 fig.add_trace(go.Scatter3d(
                     x=[x[i, j]], y=[y[i, j]], z=[z1[i, j]],
                     mode='text',
@@ -524,7 +543,6 @@ def draw3D(m:LLM, Qtype='w4a16', tps=2**np.arange(10), batches=2**np.arange(10))
         fig.add_trace(go.Scatter3d(
             x=xi, y=[yi]*len(xi), z=zi, mode='lines', name=f'Y={yi}',line=dict(color='white', width=3),
         ))
-
 
     for point in highlight_points:
         xi, yi = point
@@ -557,39 +575,43 @@ def draw3D(m:LLM, Qtype='w4a16', tps=2**np.arange(10), batches=2**np.arange(10))
                 gridwidth=1
             ),
             zaxis=dict(
-                title='token/s/chip',
+                title='token/s/chip' if flag=='tps' else 'Memory / GB',
                 showgrid=True,
                 gridcolor='lightgrey',
                 gridwidth=1,
-                range = [0,maxTPS],
-                tickvals=np.linspace(0, maxTPS, 5),
-                ticktext=np.linspace(0, maxTPS, 5)
+                range = [0,maxValue],
+                tickvals=np.linspace(0, maxValue, 5),
+                ticktext=np.linspace(0, maxValue, 5)
             )
         )
     )
 
 
     # ==========Save Fig==========
-    fig.write_html(f"{m.getName()}_{Qtype}.html")
+    fig.write_html(f"{m.getName()}_{Qtype}_{flag}.html")
     pass
 
 def drawTimeLine(m:LLM, Qtype):
     import matplotlib
     matplotlib.use('Agg')
     import matplotlib.pyplot as plt
-    print(f"Now, drawing time consume lines for name={m.getName()}, batch={m.batch}, tp={m.tp}, Qtype={Qtype}.")
+    print(f"Now, drawing time consume lines for {m.mode} name={m.getName()}, batch={m.batch}, tp={m.tp}, Qtype={Qtype}.")
     plt.figure(figsize=(12, 6))
     
-    tot_time = m.inferTime*1e3
+    tot_time = m.latency*1e3
     inLayerScale = m.layer_num
-    def plot_segment(name: str, d: dict, start=0, height=0, scale=1.) -> float:        
+    def plot_segment(name: str, d: dict, start=0, height=0, scale=1., label_lower=False) -> float:        
         if "inLayer" in d:
             scale = inLayerScale
         
         delatT = 0
+        cur_lable_lower = label_lower
         for k, v in d.items():
             if isinstance(v, dict):
-                delatT += plot_segment(k, v, start+delatT, height+1, scale)
+                tmpT = plot_segment(k, v, start+delatT, height+1, scale, cur_lable_lower)
+                delatT += tmpT
+                if tmpT > 3e-2:
+                    cur_lable_lower = not cur_lable_lower
 
         if "t_io" in d:
             delatT += scale * max(d["t_io"], d["t_cal"])/tot_time
@@ -597,18 +619,17 @@ def drawTimeLine(m:LLM, Qtype):
         if delatT<1e-6:
             return 0
 
-        if delatT > 5e-2:
-            plt.text(start, height-0.3, name)
-            plt.text(start, height-0.18, f"{tot_time*delatT/1e3:.2f}")
+        if delatT > 3e-2:
+            plt.text(start, height-0.3-0.1*label_lower, name)
+            plt.text(start, height-0.18-0.06*label_lower, f"{tot_time*delatT/1e3:.2f}")
         plt.plot([start, start+delatT], [height, height], linewidth=10, solid_capstyle='butt')
         return delatT
 
-    plot_segment(f"{m.name}: {m.tp} tp, {m.batch} batch", m.layers)
+    plot_segment(f"{m.name} {m.mode}: {m.tp} tp, {m.batch} batch, quantization={Qtype}. Time unit: [ms]", m.layers)
 
     
     plt.axis('off')
-    # plt.show()
-    plt.savefig(f"{m.getName()}_tp{m.tp}_batch{m.batch}_{Qtype}.png")
+    plt.savefig(f"{m.getName()}_{m.mode}_tp{m.tp}_batch{m.batch}_{Qtype}.png")
 
 
 if __name__ == "__main__":
@@ -619,20 +640,29 @@ if __name__ == "__main__":
     parser.add_argument('--tpuJson', default='examples/tpu.json', type=str, help='Your tpu info json.')
     parser.add_argument('--Qtype', default='f16', type=str, help='Your quantization type.')
     parser.add_argument('--debug', default=0, type=int, help='Debug mode for simple check.')
+    parser.add_argument('--mode', default='infer', type=str, choices=('infer', 'train', 'prefill'), help='Training, Inference or prefill.')
     parser.add_argument('--reqLatency', default=75, type=int, help='The latency requirement (ms).')
     parser.add_argument('--reqMemory', default=128, type=int, help='The maximum memory in one device (GB).')
 
     parser.add_argument('--tp', default=-1, type=int, help='The number of device.')
+    parser.add_argument('--pp', default=1, type=int, help='The pipeline parallelism.')
     parser.add_argument('--batch', default=-1, type=int, help='Batch.')
     args = parser.parse_args()
 
     reqLatency = args.reqLatency
     tpuMem = args.reqMemory
 
+    m = LLM(**vars(args))
+
     if args.tp>0 and args.batch>0:
+        m.debug = True
+        m.debugTime = True
         print(f"Debug run for specific config, tp={args.tp}, batch={args.batch}, quantization type={args.Qtype}.")
-        m = LLM(modelJson=args.modelJson, tpuJson=args.tpuJson, debug=args.debug, debugTime=args.debug)
-        print(f"Inference latency = {m.getInferTime(args.tp, args.batch, args.Qtype):.2f} ms\ntotal memory usage = {(m.getInferMemory(args.tp, args.batch, args.Qtype)):.2f} GB\n[kvCache, weight, other] = {np.round(m.getInferMemoryDetail(args.tp, args.batch, args.Qtype),2)}GB\n")
+
+        latency = m.getLatency(args.tp, args.batch, args.Qtype)
+        memDetail = np.round(m.getMemory(args.tp, args.batch, args.Qtype),2)
+        memStr0 = "KVcache" if args.mode != "train" else "Activation"
+        print(f"Inference latency = {latency:.2f} ms\ntotal memory usage = {memDetail.sum():.2f} GB\n[{memStr0}, weight, other] = {memDetail}GB\ntps = {m.getTokenSChip(args.tp, args.batch, args.Qtype, latency):.2f}")
         drawTimeLine(m, args.Qtype)
         exit()
     
@@ -642,17 +672,16 @@ if __name__ == "__main__":
             with open(jsonFile) as f:
                 jsondata = json.load(f)
                 if "superParSel" in jsondata and "name" in jsondata:
-                    m = LLM(modelJson=jsonFile, tpuJson=args.tpuJson, debug=args.debug)
                     if args.Qtype == "all":
                         for s in ('f16', 'w4a16', 'f8'):
-                            draw3D(m, s)
-                            drawMem3D(m, s)
+                            for p in ('tps', 'mem'):
+                                draw3D(m, p, args.Qtype)
                     else:
-                        draw3D(m, args.Qtype)
-                        drawMem3D(m, args.Qtype)
+                        for p in ('tps', 'mem'):
+                            draw3D(m, p, args.Qtype)
 
     else:
-        m = LLM(modelJson=args.modelJson, tpuJson=args.tpuJson, debug=args.debug)
-        draw3D(m, args.Qtype)
-        drawMem3D(m, args.Qtype)
+        for p in ('tps', 'mem'):
+            draw3D(m, p, args.Qtype)
+        
 
