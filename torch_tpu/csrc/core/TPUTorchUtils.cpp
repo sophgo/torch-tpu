@@ -292,6 +292,7 @@ static const char * OpTypeStr[OP_NUM] =
   "Dummy",
   "ENABLE_PMU",
   "DISABLE_PMU",
+  "ADAM_BACKWARD"
 };
 
 

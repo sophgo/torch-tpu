@@ -794,4 +794,24 @@ tpudnnStatus_t tpudnnFillAsync(
     const void * scalar_ptr,
     tpudnnTensor_t output);
 
+tpudnnStatus_t tpudnnAdamBackwardMultiCoreAsync(
+    tpudnnHandle_t handle,
+    tpudnnTensor_t weight_out,
+    tpudnnTensor_t m_out,
+    tpudnnTensor_t v_out,
+    tpudnnTensor_t vmax_out,
+    tpudnnTensor_t grad_weight,
+    tpudnnTensor_t weight_in,
+    tpudnnTensor_t m_in,
+    tpudnnTensor_t v_in,
+    tpudnnTensor_t vmax_in,
+    tpudnnTensor_t t,
+    float lr,
+    float beta1,
+    float beta2,
+    float eps,
+    float weight_decay,
+    bool amsgrad,
+    bool maximize);
+
 } // extern "C"

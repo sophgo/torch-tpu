@@ -111,6 +111,7 @@ function update_tpuv7()
   cd build/emulator-onednn
   cmake -DCMAKE_INSTALL_PREFIX=$PWD/../install -DUSING_CMODEL=ON -DUSING_ONEDNN=ON ../..
   make -j$(nproc)
+  make driver
   make install
   popd
   rm -rf $TPUTRAIN_TOP/third_party/tpuv7_runtime/tpuv7-emulator_0.1.0/

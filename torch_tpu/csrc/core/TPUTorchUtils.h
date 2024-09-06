@@ -528,7 +528,8 @@ typedef enum
   DUMMY,
   ENABLE_PMU,
   DISABLE_PMU,
-  OP_NUM
+  OP_NUM,
+  ADAM
 }
 OpType;
 
