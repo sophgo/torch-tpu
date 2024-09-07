@@ -20,7 +20,7 @@ C++部分主要是对设备内存的管理，相关函数的注册和调用逻�
 
    代码组织
 
-其中,torch_tpu是PyTorch的接口部分，TPU的软件生态通过sgdnn接入到PyTorch软件中。
+其中，torch_tpu是PyTorch的接口部分，TPU的软件生态通过sgdnn接入到PyTorch软件中。
 
 sgdnn是对算子的封装，firmware_core是对算子的实现。
 

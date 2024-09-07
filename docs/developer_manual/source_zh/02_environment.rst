@@ -99,7 +99,7 @@ TORCH-TPU会从安装的PyTorch包导入头文件和库文件，请确保PyTorch
 .. code-block:: shell
 
    $ cd tpu-train
-   $ source scripts/envsetup.sh bm1684x stable #仅支持bm1684x
+   $ source scripts/envsetup.sh bm1684x stable
    $ new_build
 
 如果使用`CMODEL模式`进行开发，

@@ -6,16 +6,11 @@ Torch-TPU
 
 ### Prerequisites
 
-Firstly, get `tpu-train`, `tpuv7-runtime` and `TPU1686` repos cloned and orgnize them like so:
+Firstly, get 'tpu-train', 'tpuv7-runtime' and 'TPU1686' repos:
 
-```
-torch-tpu-dev/
-├── tpuv7-runtime
-├── TPU1686
-└── tpu-train
-```
+Clone 'TPU1686' && 'tpuv7-runtime' as normally.
 
-Install git-lfs and pull third-party dependencies:
+To clone 'tpu-train', you need first install git-lfs and pull third-party dependencies:
 
 ```bash
 sudo apt install git-lfs
@@ -23,13 +18,24 @@ sudo apt install git-lfs
 # MAKE SURE YOU ARE USING 2.x VERSION! Otherwise IT WILL NOT BE COMPATIBLE WITH GERRIT
 git-lfs --version
 
-# Extra configs to make Gerrit happy
+# To use Gerrit HTTP protocal, you nee extra configs like:
 export GIT_SSL_NO_VERIFY=1
 export GIT_LFS_SKIP_SMUDGE=1
 
+# Then clone 'tpu-train' with Gerrit HTTP protocal
+
+# After clone, use the following commands to get large files:
 cd tpu-train
 git lfs install
 git lfs pull --include '*' --exclude ''
+```
+
+# The three repos need orgnized as:
+```
+torch-tpu-dev/
+├── tpuv7-runtime
+├── TPU1686
+└── tpu-train
 ```
 
 Next, have docker installed and pull the latest torch-tpu dev docker image:

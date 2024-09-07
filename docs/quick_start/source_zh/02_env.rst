@@ -2,7 +2,7 @@
 开发环境配置
 ===================
 
-“torch-tpu”就是算能设备进入PyTorch框架的插件库，是利用了PyTorch的PRIVATEUSEONE后端对算能设备进行的支持。
+"Torch-TPU"是算能设备接入PyTorch框架的插件库，利用了PyTorch的PRIVATEUSEONE后端对算能设备进行支持。
 
 本章将详细描述如何安装torch_tpu以及其所依赖的环境。
 

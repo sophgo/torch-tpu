@@ -36,4 +36,7 @@
      - 说明
    * - v0.1.0
      - 2024.01.16
-     - 初版发布, 支持PyTorch2.1.0 单卡`eager mode`模式,并提供图像识别、Stable-Diffusion LORA示例。 
+     - 初版发布, 支持PyTorch 2.1.0, 支持BM1684X PCIE 形态。
+   * - v0.2.0
+     - 2024.04.30
+     - 支持BM1690指令集, 支持Megatron-Deepspeed-TPU、TGI。
