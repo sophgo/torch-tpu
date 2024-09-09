@@ -158,6 +158,9 @@ class CPPLibBuild(build_clib, ExtBase, object):
         build_dir = os.path.join(BASE_DIR, 'build', f'firmware_{arch}')
         src_dir = os.path.join(BASE_DIR, 'firmware_core')
         args = [self.cmake, src_dir]
+        extra_cmake_opts = os.environ.get('EXTRA_CONFIG')
+        if extra_cmake_opts:
+            args.append(extra_cmake_opts)
         def build_firmware():
             os.makedirs(build_dir, exist_ok=True)
             subprocess.check_call(args, cwd=build_dir, env=os.environ)

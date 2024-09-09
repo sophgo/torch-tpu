@@ -11,6 +11,10 @@ list(APPEND CMAKE_MODULE_PATH ${CMAKE_SOURCE_DIR}/../cmake)
 
 include(config.cmake)
 
+if (USING_LLM_PROFILE)
+    add_definitions(-DUSING_LLM_TICK_TOCK_PROFILE)
+endif()
+
 add_definitions(-Wno-address-of-packed-member
                 -fno-builtin-memcpy 
                 -fno-builtin-memset 

@@ -1,6 +1,9 @@
 #include "sg_api_struct.h"
 #include "tpu_kernel.h"
 
+void firmware_kernel_tick();
+void firmware_kernel_tock(int);
+
 
 #ifdef BACKEND_SG2260
 extern
@@ -20,6 +23,9 @@ void nodechip_rmsnorm_forward_multi_core(
 
 int tpu_kernel_rmsnorm_multi_core(const void * api_buf)
 {
+#ifdef USING_LLM_TICK_TOCK_PROFILE
+    firmware_kernel_tick();
+#endif
     sg_api_rmsnorm_multi_core_t *api = (sg_api_rmsnorm_multi_core_t*)api_buf;
     tpu_initialize();
     nodechip_rmsnorm_forward_multi_core(
@@ -36,6 +42,9 @@ int tpu_kernel_rmsnorm_multi_core(const void * api_buf)
         api->with_bias,
         ( data_type_t ) api->dtype );
     tpu_poll();
+#ifdef USING_LLM_TICK_TOCK_PROFILE
+    firmware_kernel_tock(3);
+#endif
     return 0;
 }
 

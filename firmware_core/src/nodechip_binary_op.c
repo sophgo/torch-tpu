@@ -457,7 +457,13 @@ int tpu_kernel_api_binary(const void *args) {
 
 #else // defined BACKEND_SG2260
 
+void firmware_kernel_tick();
+void firmware_kernel_tock(int);
+
 int tpu_kernel_api_binary_multi_core(const void *args) {
+#ifdef USING_LLM_TICK_TOCK_PROFILE
+  firmware_kernel_tick();
+#endif
   sg_api_binary_t *api = (sg_api_binary_t *)args;
   tpu_initialize();
 #ifdef USING_PERF_MODE
@@ -517,6 +523,9 @@ int tpu_kernel_api_binary_multi_core(const void *args) {
     }
   }
   tpu_poll();
+#ifdef USING_LLM_TICK_TOCK_PROFILE
+  firmware_kernel_tock(4);
+#endif
   return 0;
 }
 TPUKERNEL_FUNC_REGISTER(tpu_kernel_api_binary_multi_core);

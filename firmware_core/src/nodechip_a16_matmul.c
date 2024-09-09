@@ -4,6 +4,9 @@
 
 #ifdef BACKEND_SG2260
 
+void firmware_kernel_tick();
+void firmware_kernel_tock(int);
+
 extern void nodechip_llama2_a16_matmul(
     global_addr_t activation_global_addr,
     global_addr_t weight_global_addr,
@@ -25,6 +28,9 @@ int tpu_kernel_api_llama_a16_matmul ( const void * args )
 {
   sg_api_a16_matmul_t * api = ( sg_api_a16_matmul_t * ) args;
   TPUKERNEL_ASSERT((!api->has_bias || api->bias_dtype == api->io_dtype) && "for W x A mode, bias dtype has to be the same with io");
+#ifdef USING_LLM_TICK_TOCK_PROFILE
+  firmware_kernel_tick();
+#endif
   tpu_initialize();
   nodechip_llama2_a16_matmul(
     api->input_global_addr,
@@ -43,6 +49,9 @@ int tpu_kernel_api_llama_a16_matmul ( const void * args )
     true
   );
   tpu_poll();
+#ifdef USING_LLM_TICK_TOCK_PROFILE
+  firmware_kernel_tock(5);
+#endif
   return 0;
 }
 TPUKERNEL_FUNC_REGISTER ( tpu_kernel_api_llama_a16_matmul );
