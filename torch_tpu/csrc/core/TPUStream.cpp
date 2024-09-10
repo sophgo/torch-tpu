@@ -264,7 +264,14 @@ TPUStream TPUStreamForId(DeviceIndex device_index, StreamId stream_id) {
 }
 
 void tpuSynchronizeDevice() {
-  sgrt::SgrtDeviceSynchronize();
+  // Currently, we have async tasks which depend on
+  // specified executing order to work. Device sync
+  // API insert poll tasks for ALL streams which might
+  // interfere with OUR stream, causing device to hang.
+  //
+  // We have only one stream now, so it is safe to
+  // replace device sync with stream sync.
+  SgrtSynchronizeStream(getCurrentTPUStream());
 }
 
 TPUStream getStreamFromExternal(
