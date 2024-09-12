@@ -281,7 +281,7 @@ int tpu_kernel_api_embedding_backward ( const void* args ) {
 
 TPUKERNEL_FUNC_REGISTER ( tpu_kernel_api_embedding_backward );
 
-int tpu_kernel_api_embedding_backward_multicore ( const void* args ) {
+int tpu_kernel_api_embedding_backward_multi_core ( const void* args ) {
   sg_api_embedding_backward_t *api = ( sg_api_embedding_backward_t * ) args;
   tpu_initialize();
 
@@ -309,7 +309,7 @@ int tpu_kernel_api_embedding_backward_multicore ( const void* args ) {
   return 0;
 }
 
-TPUKERNEL_FUNC_REGISTER ( tpu_kernel_api_embedding_backward_multicore);
+TPUKERNEL_FUNC_REGISTER ( tpu_kernel_api_embedding_backward_multi_core);
 
 
 
