@@ -38,6 +38,9 @@ def case1():
     if torch_tpu.tpu.current_device() == device.index:
         tensor = tensor.to(device)
 
+    # barrier
+    # dist.barrier()
+
     # all_reduce
     dist.all_reduce(tensor, op=dist.ReduceOp.SUM)
 

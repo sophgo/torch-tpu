@@ -131,7 +131,7 @@ public:
 
   uint64_t getSequenceNumberForGroup() override;
 
-  void broadcastUniqueSCCLID(scclUniqueId *scclID, int rank);
+  void broadcastUniqueSCCLID(scclHandle_t handle, scclUniqueId *scclID, int rank);
 
   void getSCCLcomm(scclComm_t *comm);
 

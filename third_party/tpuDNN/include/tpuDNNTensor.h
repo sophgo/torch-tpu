@@ -839,4 +839,13 @@ tpudnnStatus_t tpudnnAdamBackwardMultiCoreAsync(
     bool amsgrad,
     bool maximize);
 
+tpudnnStatus_t tpudnnLoraMatmulForwardAsync(
+    tpudnnHandle_t handle,
+    tpudnnTensor_t input,
+    tpudnnTensor_t loraA,
+    tpudnnTensor_t loraB,
+    tpudnnTensor_t weight,
+    tpudnnTensor_t output,
+    float scale);
+
 } // extern "C"

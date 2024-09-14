@@ -17,9 +17,9 @@
 #include <type_traits>
 
 #include "ProcessGroupSCCL.hpp"
+#include "TPUDeviceManager.h"
 #include "TPUAddrHelper.h"
 #include "sccl.h"
-#include "tpuv7_rt.h"
 
 #define GENERATE_ALL_TYPES(type, func, args...)                                \
   switch (type) {                                                              \
@@ -206,13 +206,14 @@ bool ProcessGroupSCCL::WorkSCCL::wait(std::chrono::milliseconds timeout) {
 ProcessGroupSCCL::Options::Options(std::chrono::milliseconds timeout)
     : ProcessGroup::Options(SCCL_BACKEND_NAME, timeout) {}
 
-void ProcessGroupSCCL::broadcastUniqueSCCLID(scclUniqueId *scclID,
-                                               int rank) {
+void ProcessGroupSCCL::broadcastUniqueSCCLID(scclHandle_t handle,
+                                              scclUniqueId *scclID,
+                                              int rank) {
   const std::string key = "ProcessGroupSCCL";
   memset(scclID, 0x0, sizeof(scclUniqueId));
   if (rank == 0) {
-    TORCH_CHECK(tpuRtGetUniqueId(reinterpret_cast<char *>(scclID)) ==
-                    tpuRtSuccess,
+    TORCH_CHECK(scclGetUniqueId(handle, *scclID) ==
+                    scclSuccess,
                 "sccl get unique ID failed\n");
     auto vec = std::vector<uint8_t>(reinterpret_cast<uint8_t *>(scclID),
                                  reinterpret_cast<uint8_t *>(scclID) +
@@ -231,7 +232,12 @@ ProcessGroupSCCL::ProcessGroupSCCL(const c10::intrusive_ptr<Store> &store,
                                        c10::intrusive_ptr<Options> options)
     : ProcessGroup(rank, size), store_(store),
       options_(options), stop_(false) {
-  broadcastUniqueSCCLID(&scclID_, rank);
+  c10_tpu::TPUStream stream = c10_tpu::getCurrentTPUStream();
+  int deviceID = tpu::TPUGetDeviceIndex();
+  if (deviceID == 0) {
+    scclSetupC2C(stream, deviceID);
+  }
+  broadcastUniqueSCCLID(stream, &scclID_, rank);
   init();
 }
 
@@ -679,9 +685,10 @@ ProcessGroupSCCL::barrier(const BarrierOptions &opts) {
     for (auto device : opts.device_ids) {
       devices.emplace_back(at::kPrivateUse1, device);
     }
+  } else if (usedDeviceIdxs_.empty()) {
+    int device = tpu::TPUGetDeviceIndex();
+    devices.emplace_back(at::kPrivateUse1, device);
   } else {
-    TORCH_CHECK(usedDeviceIdxs_.empty() != true, "Ensure an SCCL collective is called prior to any other operations!\n");
-
     for (auto usedDeviceIdx : usedDeviceIdxs_) {
       devices.emplace_back(at::kPrivateUse1, usedDeviceIdx);
     }

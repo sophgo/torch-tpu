@@ -55,6 +55,8 @@ typedef struct {
 
 void *scclPhysToVirt(scclHandle_t handle, uint64_t addr);
 
+scclResult_t scclSetupC2C(scclHandle_t handle, int deviceID);
+
 scclResult_t scclGetUniqueId(scclHandle_t handle, scclUniqueId uniqueId);
 
 scclResult_t scclCommInitRank(scclComm_t *comm, int nRanks, scclUniqueId commId,
