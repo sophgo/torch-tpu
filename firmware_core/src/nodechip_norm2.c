@@ -2,6 +2,11 @@
 #include "tpu_kernel.h"
 
 
+uint64_t norm_tpu_aligned_feature_size(int h, int w, data_type_t dtype) {
+    uint64_t align_h_w = ALIGN(h * w, tpu_eu_num(dtype));
+    return ALIGN(align_h_w * (uint64_t) tpu_data_type_bits(dtype), 8) / 8;
+}
+
 void nodechip_norm2 (
 global_addr_t input_global_addr,
 global_addr_t output_global_addr,
@@ -27,12 +32,12 @@ bool do_sqrt )
   while ( true )
   {
     next = 0;
-    int input_size = tpu_aligned_feature_size ( DIV_UP ( wmax, tile ), tile, dtype );
-    int input_size_fp32 = tpu_aligned_feature_size ( DIV_UP ( wmax, tile ), tile, DT_FP32 );
-    int reduce_tile_size_fp32 = tpu_aligned_feature_size ( 1, tile, DT_FP32 );
-    int reduce_size_fp32 = tpu_aligned_feature_size ( 1, 1, DT_FP32 );
-    int reduce_cw_trans_size_fp32 = tpu_aligned_feature_size ( 1, NPU_NUM, DT_FP32 );
-    int output_fp32_size = tpu_aligned_feature_size ( 1, 1, DT_FP32 );
+    uint64_t input_size = norm_tpu_aligned_feature_size ( DIV_UP ( wmax, tile ), tile, dtype );
+    uint64_t input_size_fp32 = norm_tpu_aligned_feature_size ( DIV_UP ( wmax, tile ), tile, DT_FP32 );
+    uint64_t reduce_tile_size_fp32 = norm_tpu_aligned_feature_size ( 1, tile, DT_FP32 );
+    uint64_t reduce_size_fp32 = norm_tpu_aligned_feature_size ( 1, 1, DT_FP32 );
+    uint64_t reduce_cw_trans_size_fp32 = norm_tpu_aligned_feature_size ( 1, NPU_NUM, DT_FP32 );
+    uint64_t output_fp32_size = norm_tpu_aligned_feature_size ( 1, 1, DT_FP32 );
     input_local_addrs[0] = next; next += input_size;
     input_local_addrs[1] = next; next += input_size;
     input_fp32_local_addr = next; next += input_size_fp32;
