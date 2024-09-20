@@ -36,18 +36,17 @@ Tensor _copy_from_tpu(const Tensor &self, const Tensor &dst,
       if (self.is_contiguous() && dst.is_contiguous()) {
         TIMING_START;
         tpu::TPUCopyDeviceToDevice(dst.data_ptr(), self.data_ptr(),
-                                   dst.nbytes(), non_blocking);
+                                   dst.nbytes(), non_blocking=true);
         TIMING_END(tpu::COPY);
       } else {
         TIMING_START;
-
         auto stream = c10_tpu::getCurrentTPUStream();
         auto status = tpudnnStridedCopyAsync(
           stream,
           tpu::TPUGenerateTpudnnTensor(stream, self),
           tpu::TPUGenerateTpudnnTensor(stream, dst));
         TORCH_CHECK(status == TPUDNN_STATUS_SUCCESS);
-                TIMING_END(tpu::STRIDED_COPY);
+        TIMING_END(tpu::STRIDED_COPY);
       }
     } else {
       TORCH_CHECK(false, "Unsupported copy from device ", self.device(),
@@ -64,11 +63,42 @@ Tensor _copy_from_tpu(const Tensor &self, const Tensor &dst,
       tpu::TPUCopyHostToDevice ( dst.data_ptr(), dst_cpu.contiguous().data_ptr(), dst.nbytes(), non_blocking );
 #else
       if(tpu::TPUConvertDtype<SgdnnDataType_t>(self.dtype()) == SGDNN_DTYPE_INT64 && tpu::TPUConvertDtype<SgdnnDataType_t>(dst.dtype()) == SGDNN_DTYPE_INT32) {
-        sgdnnConvertInt64toInt32(
-          tpu::TPUGetDeviceResource(),
-          tpu::TPUGenerateSgdnnTensor(self),
-          tpu::TPUGenerateSgdnnTensor(dst),
-          non_blocking);
+        auto stream = c10_tpu::getCurrentTPUStream();
+        auto self_ = tpu::TPUGenerateTpudnnTensor(stream, self);
+        self_.dtype = TPUDNN_DTYPE_INT32;
+        for (int i = self_.dim - 1; i >=0; i--)
+        {
+          self_.stride[i] *= 2;
+        }
+        auto status = tpudnnStridedCopyAsync(
+          stream,
+          self_,
+          tpu::TPUGenerateTpudnnTensor(stream, dst));
+        TORCH_CHECK(status == TPUDNN_STATUS_SUCCESS);
+      }else if(tpu::TPUConvertDtype<SgdnnDataType_t>(self.dtype()) == SGDNN_DTYPE_INT32 && tpu::TPUConvertDtype<SgdnnDataType_t>(dst.dtype()) == SGDNN_DTYPE_INT64) {
+        auto stream = c10_tpu::getCurrentTPUStream();  
+        auto dst_t = tpu::TPUGenerateTpudnnTensor(stream, dst);
+        dst_t.dtype = TPUDNN_DTYPE_INT32;
+        dst_t.shape[dst_t.dim-1] = 2 * dst_t.shape[dst_t.dim-1];
+        for (int i = dst_t.dim - 2; i >=0; i--)
+        {
+          dst_t.stride[i] *= 2;
+        }
+        int32_t value_ = 0;
+        auto status = tpudnnFillAsync(
+          stream,
+          &value_,
+          dst_t);
+        TORCH_CHECK(status == TPUDNN_STATUS_SUCCESS);
+
+        dst_t.stride[dst_t.dim - 1 ] *= 2;
+        dst_t.shape[dst_t.dim - 1 ] /= 2;
+        status = tpudnnStridedCopyAsync(
+          stream,
+          tpu::TPUGenerateTpudnnTensor(stream, self),
+          dst_t
+        );
+        TORCH_CHECK(status == TPUDNN_STATUS_SUCCESS);
       } else if ( !tpu::IsSupportDtype(self.dtype()) || !tpu::IsSupportDtype( dst.dtype() ))
       {
         CPU_IMPL_WARNING("unsupport dtype.");
@@ -88,8 +118,7 @@ Tensor _copy_from_tpu(const Tensor &self, const Tensor &dst,
             tpu::TPUGenerateTpudnnTensor(stream, self_),
             tpu::TPUGenerateTpudnnTensor(stream, dst));
           TORCH_CHECK(status == TPUDNN_STATUS_SUCCESS);
-                    TIMING_END(tpu::DTYPE_CONVERT);
-                    TIMING_END(tpu::DTYPE_CONVERT);
+          TIMING_END(tpu::DTYPE_CONVERT);
           SHOW_TENSOR_OP(self_, dst);
         } else {
           dst.copy_(self_.to(dst.dtype()), non_blocking);

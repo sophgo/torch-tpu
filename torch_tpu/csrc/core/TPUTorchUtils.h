@@ -243,6 +243,7 @@ static inline tpudnnTensor_t TPUGenerateTpudnnTensor(tpudnnHandle_t handle, cons
       t.shape[i] = Tensor.size ( i );
       t.stride[i] = Tensor.stride ( i );
     }
+    if (t.dim == 0){ t.dim = 1; t.shape[0] = 1; t.stride[0] = 1;}
   }
   else {
     data_ptr = at_tpu::StorageDescHelper::GetDataPtrWithFormat(Tensor);

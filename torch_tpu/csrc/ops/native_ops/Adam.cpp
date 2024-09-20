@@ -95,8 +95,7 @@ void _fused_adam_out_tpu(
     }
     self = at::TensorList(output.data(), output.size());
     TIMING_END(tpu::ADAM_BACKWARD);
-    SHOW_TENSOR_OP(self);
-
+    //SHOW_TENSOR_OP(self);
 }
 TORCH_LIBRARY_IMPL(aten, TPU, m) {
     m.impl("_fused_adam_", _fused_adam_out_tpu);

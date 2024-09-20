@@ -14,7 +14,7 @@ Tensor & index_out_tpu( const Tensor & self, const c10::List<c10::optional<Tenso
 {
     CHECK_TENSOR_IN_DEVICE ( out );
     CHECK_TENSOR_IN_DEVICE ( self );
-#if 1
+#if 0
     CPU_IMPL_WARNING();
     c10::List<c10::optional<Tensor>> indices_cpu;
     for (size_t i = 0; i < indices.size(); i++)
@@ -45,7 +45,7 @@ Tensor & index_out_tpu( const Tensor & self, const c10::List<c10::optional<Tenso
       std::vector<int> no_broadcast_shape;
 
       std::vector<Tensor> indexes;
-      for (int i = 0; i < (int)indices.size(); ++i) {
+      for (size_t i = 0; i < indices.size(); ++i) {
         // check empty index (dim broadcast)
         auto size = indices[i].value().numel();
         if (!indices[i].has_value() or size == 0) {
@@ -73,7 +73,7 @@ Tensor & index_out_tpu( const Tensor & self, const c10::List<c10::optional<Tenso
       int change = 0;
       int start = 0;
       int end = self.dim();
-      for (int i = 0; i < broadcast.size() - 1; ++i) {
+      for (size_t i = 0; i < broadcast.size() - 1; ++i) {
         if (broadcast[i] != broadcast[i+1]) {
           ++change;
           if (broadcast[i])
