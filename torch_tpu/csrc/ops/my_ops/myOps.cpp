@@ -53,5 +53,6 @@ namespace at
 		m.def("add_ln_mm_backward", add_ln_mm_backward);
 		m.def("enable_pmu", enable_pmu);
 		m.def("disable_pmu", disable_pmu);
+		m.def("lora_matmul_forward",lora_matmul_forward);
 	}
 }

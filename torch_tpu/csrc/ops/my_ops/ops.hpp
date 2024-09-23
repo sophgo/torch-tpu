@@ -187,6 +187,14 @@ namespace at
         Tensor &grad_gamma,
         Tensor &grad_beta);
 
+	Tensor lora_matmul_forward(
+        Tensor &input,
+        Tensor &loraA,
+        Tensor &loraB,
+        Tensor &weight,
+        Tensor &output,
+        double_t scale);
+
 	void enable_pmu();
 
 	void disable_pmu();

@@ -530,6 +530,7 @@ typedef enum
   ENABLE_PMU,
   DISABLE_PMU,
   ADAM,
+  LORA_MATMUL_FORWARD,
   OP_NUM,
 }
 OpType;
