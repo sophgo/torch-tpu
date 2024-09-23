@@ -526,7 +526,8 @@ tpudnnStatus_t tpudnnArgAsync(
     int axis,
     int mode,
     tpudnnTensor_t values,
-    tpudnnTensor_t indices);
+    tpudnnTensor_t indices,
+    tpudnnTensor_t buffer);
 
 tpudnnStatus_t tpudnnTopkAsync(
     tpudnnHandle_t handle,
