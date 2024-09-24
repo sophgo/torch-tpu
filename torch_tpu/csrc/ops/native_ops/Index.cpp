@@ -31,14 +31,39 @@ Tensor & index_out_tpu( const Tensor & self, const c10::List<c10::optional<Tenso
       auto idx = indices[0].value();
       auto idx_value = idx.scalar_type() == torch::kInt64 || idx.scalar_type() == torch::kInt32 ? idx : idx.to(torch::kInt32);
 
+      if (tpu::TPUConvertDtype<SgdnnDataType_t>(self.dtype()) == SGDNN_DTYPE_INT64){
+        auto self_ = self.to(torch::kInt32);
+        auto out_  = out.to(torch::kInt32);
+        auto status = sgdnnIndexSelect(tpu::TPUGetDeviceResource(),
+                                      tpu::TPUGenerateSgdnnTensor(self_),
+                                      tpu::TPUGenerateSgdnnTensor(idx_value),
+                                      0,
+                                      tpu::TPUGenerateSgdnnTensor(out_));
+        TORCH_CHECK ( status == SG_SUCCESS );
+        out = out_.to(torch::kInt64);
+      }
+      else{
       auto status = sgdnnIndexSelect(tpu::TPUGetDeviceResource(),
                                             tpu::TPUGenerateSgdnnTensor(self),
                                             tpu::TPUGenerateSgdnnTensor(idx_value),
                                             0,
                                             tpu::TPUGenerateSgdnnTensor(out));
       TORCH_CHECK ( status == SG_SUCCESS );
-            TIMING_END ( tpu::INDEX_SELECT );
+      }
+
+      TIMING_END ( tpu::INDEX_SELECT );
     } else {
+    CPU_IMPL_WARNING();
+    c10::List<c10::optional<Tensor>> indices_cpu;
+    for (size_t i = 0; i < indices.size(); i++)
+    {
+        c10::optional<Tensor> indice = c10::nullopt;
+        if ( indices[i].has_value() ) { indice = indices[i].value().cpu(); }
+        indices_cpu.push_back(indice);
+    }
+    auto out_cpu = index( self.cpu(), indices_cpu );
+    out = out_cpu.to(out.device());
+#if 0
       int64_t index_size = -1;
       std::vector<bool> broadcast;
       std::vector<int> broadcast_shape;
@@ -121,6 +146,7 @@ Tensor & index_out_tpu( const Tensor & self, const c10::List<c10::optional<Tenso
         out = out_cpu.to(out.device());
         TIMING_END(tpu::CPU_LAYER);
       }
+#endif
     }
 #endif
     SHOW_TENSOR_OP(self, out);
