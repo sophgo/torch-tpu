@@ -78,6 +78,10 @@ Tensor _copy_from_tpu(const Tensor &self, const Tensor &dst,
       }else if(tpu::TPUConvertDtype<SgdnnDataType_t>(self.dtype()) == SGDNN_DTYPE_INT32 && tpu::TPUConvertDtype<SgdnnDataType_t>(dst.dtype()) == SGDNN_DTYPE_INT64) {
         auto stream = c10_tpu::getCurrentTPUStream();  
         auto dst_t = tpu::TPUGenerateTpudnnTensor(stream, dst);
+        if (dst_t.dim == 0){ dst_t.dim = 1; dst_t.shape[0] = 1; dst_t.stride[0] = 1;}
+        auto self_t = tpu::TPUGenerateTpudnnTensor(stream, self);
+        if (self_t.dim == 0){ self_t.dim = 1; self_t.shape[0] = 1; self_t.stride[0] = 1;}
+
         dst_t.dtype = TPUDNN_DTYPE_INT32;
         dst_t.shape[dst_t.dim-1] = 2 * dst_t.shape[dst_t.dim-1];
         for (int i = dst_t.dim - 2; i >=0; i--)
@@ -95,7 +99,7 @@ Tensor _copy_from_tpu(const Tensor &self, const Tensor &dst,
         dst_t.shape[dst_t.dim - 1 ] /= 2;
         status = tpudnnStridedCopyAsync(
           stream,
-          tpu::TPUGenerateTpudnnTensor(stream, self),
+          self_t,
           dst_t
         );
         TORCH_CHECK(status == TPUDNN_STATUS_SUCCESS);
