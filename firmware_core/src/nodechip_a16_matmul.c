@@ -10,6 +10,7 @@ void firmware_kernel_tock(int);
 extern void nodechip_llama2_a16_matmul(
     global_addr_t activation_global_addr,
     global_addr_t weight_global_addr,
+    global_addr_t bias_global_addr,
     l2_sram_addr_t L2_addr,
     int final_col_num,
     int final_row_num,
@@ -21,7 +22,8 @@ extern void nodechip_llama2_a16_matmul(
     int weight_bits,
     data_type_t weight_dtype,
     data_type_t out_dtype,
-    bool scale_zp_zip
+    bool scale_zp_zip,
+    bool has_bias
 );
 
 int tpu_kernel_api_llama_a16_matmul ( const void * args )
@@ -35,6 +37,7 @@ int tpu_kernel_api_llama_a16_matmul ( const void * args )
   nodechip_llama2_a16_matmul(
     api->input_global_addr,
     api->weight_global_addr,
+    api->bias_global_addr,
     0,
     api->final_col_num,
     api->final_row_num,
@@ -46,7 +49,8 @@ int tpu_kernel_api_llama_a16_matmul ( const void * args )
     api->weight_bits,
     api->weight_dtype,
     api->io_dtype,
-    true
+    true,
+    api->has_bias
   );
   tpu_poll();
 #ifdef USING_LLM_TICK_TOCK_PROFILE

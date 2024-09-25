@@ -38,6 +38,7 @@ namespace at
 	Tensor a16_matmul_forward(
 		Tensor &active,
 		Tensor &weight,
+		const c10::optional<Tensor> &bias,
 		Tensor &scale,
 		Tensor &zp,
         int8_t group_size,

@@ -10,16 +10,17 @@ class NativeMatmul(nn.Module):
     def __init__(self):
         super().__init__()
 
-    def forward(self, q, k):
-        return torch.matmul(q, k.transpose(-2,-1))
+    def forward(self, input, weight, bias=None):
+        return F.linear(input, weight, bias)
     
 class A16MatmulFunc(torch.autograd.Function):
     @staticmethod
-    def forward(ctx, active, weight, scale, zp, group_size, weight_bits):
+    def forward(ctx, active, weight, bias, scale, zp, group_size, weight_bits):
         output = torch.empty((active.shape[0], active.shape[1], active.shape[2], weight.shape[2]), dtype = active.dtype, device = weight.device)
 
         torch.ops.my_ops.a16_matmul_forward(active,
                                     weight,
+                                    bias,
                                     scale,
                                     zp,
                                     group_size,
@@ -35,14 +36,15 @@ class A16Matmul(nn.Module):
         self.group_size = group_size
         self.weight_bits = weight_bits
 
-    def forward(self, active, weight):
-        return A16MatmulFunc.apply(active, weight, self.scale, self.zp, self.group_size, self.weight_bits)
+    def forward(self, active, weight, bias):
+        return A16MatmulFunc.apply(active, weight, bias, self.scale, self.zp, self.group_size, self.weight_bits)
 
 def check_a16_matmul():
     device = "tpu"
     use_half = False
     quant_uint4 = True
     scale_zp_zip = True
+    has_bias = True
 
     # input: [1, 1, 16, 8192] * [1, 1, 8192, 1280]    8bit--pass   4bit--pass
     # input: [1, 1, 16, 8192] * [1, 1, 8192, 128]     8bit--pass   4bit--pass
@@ -58,6 +60,7 @@ def check_a16_matmul():
 
     q_cpu = torch.randn(b, m, l, d)
     k_cpu = torch.randn(b, m, n, d)
+    bias_cpu = torch.randn(n) if has_bias else None
 
     scale_t = torch.full([n, d // 128], 0.1, dtype=torch.float16)
     zp_t = torch.full([n, d // 128], 3, dtype=torch.uint8)
@@ -85,15 +88,17 @@ def check_a16_matmul():
     if (quant_uint4):
         print(k_int8_tensor)
     print(k_cpu_qt)
+    if (has_bias):
+        print(bias_cpu.half())
 
     if quant_uint4:
         net_cpu = NativeMatmul()
         k_deq = (k_int8_tensor - 3 - 1) * 0.1
-        out_cpu = net_cpu(q_cpu, k_deq)
+        out_cpu = net_cpu(q_cpu[0][0], k_deq, bias_cpu)
     else:
         net_cpu = NativeMatmul()
         k_deq = (k_cpu_qt - 3 - 1) * 0.1
-        out_cpu = net_cpu(q_cpu, k_deq)
+        out_cpu = net_cpu(q_cpu[0][0], k_deq, bias_cpu)
 
     weight_bits = 8
     if quant_uint4:
@@ -104,10 +109,13 @@ def check_a16_matmul():
 
 
     net_tpu = A16Matmul(scale_t.to(device), zp_t.to(device), 128, weight_bits)
-    out_tpu = net_tpu(q_cpu.half().to(device), k_cpu_qt.to(device)).cpu()
+    if (has_bias):
+        out_tpu = net_tpu(q_cpu.half().to(device), k_cpu_qt.to(device), bias_cpu.half().to(device)).cpu()
+    else:
+        out_tpu = net_tpu(q_cpu.half().to(device), k_cpu_qt.to(device), bias_cpu).cpu()
 
     print(out_cpu.shape, out_tpu.shape)
-    print(out_cpu[0][0])
+    print(out_cpu)
     print(out_tpu[0][0])
     print(torch.max(abs(out_cpu - out_tpu.cpu())))
 

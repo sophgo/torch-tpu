@@ -13,6 +13,7 @@ namespace at
 	Tensor a16_matmul_forward(
 		Tensor &active,
 		Tensor &weight,
+		const c10::optional<Tensor> &bias,
 		Tensor &scale,
 		Tensor &zp,
         int8_t group_size,
@@ -21,6 +22,8 @@ namespace at
 	{
 		CHECK_TENSOR_IN_DEVICE(active);
 		CHECK_TENSOR_IN_DEVICE(weight);
+		if (bias.has_value())
+			CHECK_TENSOR_IN_DEVICE(bias.value());
 		CHECK_TENSOR_IN_DEVICE(scale);
 		CHECK_TENSOR_IN_DEVICE(zp);
 		CHECK_TENSOR_IN_DEVICE(output);
@@ -30,6 +33,7 @@ namespace at
 			tpu::TPUGetDeviceResource(),
 			tpu::TPUGenerateSgdnnTensor(active),
 			tpu::TPUGenerateSgdnnTensor(weight),
+			bias.has_value() ? tpu::TPUGenerateSgdnnTensor(bias.value()) : sgdnnUndefinedTensor(),
 			tpu::TPUGenerateSgdnnTensor(scale),
 			tpu::TPUGenerateSgdnnTensor(zp),
             group_size,
