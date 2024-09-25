@@ -44,6 +44,6 @@ static struct PyMethodDef THPTOpTimer_methods[] = {
     {nullptr}
 };
 
-PyMethodDef* THPTOpTimer_get_methods() {
+PyMethodDef* THPTUtils_get_methods() {
   return THPTOpTimer_methods;
 }

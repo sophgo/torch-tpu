@@ -14,7 +14,7 @@ device = "tpu:0"
 np.set_printoptions(threshold=np.inf, precision=3,suppress=True)
 
 hex_dunc = np.vectorize(hex)
-
+import time
 class LLamaA16Mlp(nn.Module):
     def __init__(self, weight0_quant, weight1_quant, weight2_quant, q_group_size, weight_bits):
         super().__init__()
@@ -85,7 +85,16 @@ class LLamaA16MlpFunc(torch.autograd.Function):
         w2 = weight2["weight"]
         z2 = weight2["zp"]
         s2 = weight2["scale"]
+        LOOP = 1000
+        t0 = time.time_ns()
         torch.ops.my_ops.a16_llama_mlp_forward(x, w0, z0, s0, w1, z1, s1, w2, z2, s2, group_size, weight_bits, output)
+        t1 = time.time_ns()
+        for i in range(LOOP):
+            torch.ops.my_ops.a16_llama_mlp_forward(x, w0, z0, s0, w1, z1, s1, w2, z2, s2, group_size, weight_bits, output)
+        torch_tpu.tpu.synchronize()
+        t2 = time.time_ns()
+        print(f" warmup                time = {(t1 - t0)/(1e6)} ms")
+        print(f" loop {LOOP}, per loop time = {(t2 - t1)/(1e6 * LOOP)} ms")        
         return output
 
 class LLamaA16MlpBlock(nn.Module):

@@ -14,6 +14,10 @@ if rank == None:
     rank = os.environ.get("OMPI_COMM_WORLD_RANK", 0)
     world_size = os.environ.get("OMPI_COMM_WORLD_SIZE", 1)
 
+# tensor_len = 16080 * 76032
+dtype = torch.float16
+# tensor_len = 80 * 76032
+# tensor_len = 8192
 tensor_len = 4
 # init dist and logger
 options = torch_tpu.ProcessGroupSCCLOptions()
@@ -28,13 +32,13 @@ logger = logging.getLogger('sccl_logger')
 
 def case1():
 
-    input_tensor = torch.rand(tensor_len)
+    input_tensor = torch.rand(tensor_len, dtype=dtype)
     logger.info("rank: {}, {}".format(rank, input_tensor))
     device = torch.device(f"{TPU}:{chip_map[int(rank)]}")
     if torch_tpu.tpu.current_device() == device.index:
         input_tensor = input_tensor.to(device)
 
-    output_list = [torch.zeros(tensor_len) for _ in range(int(world_size))]
+    output_list = [torch.zeros(tensor_len, dtype=dtype) for _ in range(int(world_size))]
     logger.info("rank: {}, {}".format(rank, output_list))
     output_list = [tensor.to(device) for tensor in output_list if torch_tpu.tpu.current_device() == device.index]
 

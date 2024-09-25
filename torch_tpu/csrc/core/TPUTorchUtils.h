@@ -248,8 +248,11 @@ static inline tpudnnTensor_t TPUGenerateTpudnnTensor(tpudnnHandle_t handle, cons
     data_ptr = at_tpu::StorageDescHelper::GetDataPtrWithFormat(Tensor);
     at_tpu::StorageDescHelper::SettpuTensorAttributeWithFormat(Tensor, t);
    }
-  t.addr = reinterpret_cast<decltype(t.addr)>( GetAddrByUnifiedAddr( data_ptr ) );
-  t.addr = tpudnnPhysToVirt(handle, (unsigned long long)t.addr);
+  if (Tensor.device().type() ==  DeviceType::TPU)
+  {
+    t.addr = reinterpret_cast<decltype(t.addr)>( GetAddrByUnifiedAddr( data_ptr ) );
+    t.addr = tpudnnPhysToVirt(handle, (unsigned long long)t.addr);
+  }
   return t;
 }
 

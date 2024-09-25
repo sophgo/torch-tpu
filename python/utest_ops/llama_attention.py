@@ -13,6 +13,8 @@ device = "tpu:0"
 tpu_device = "tpu:0"
 torch.set_printoptions(profile="full")
 
+import time
+
 class LLamaAttention(nn.Module):
     def __init__(self, cos, sin, mask, hidden_size, num_attention_heads, embeddings, softmax_scale):
         super().__init__()
@@ -154,23 +156,22 @@ class LLamaAttentionFunc(torch.autograd.Function):
                 Kbuffer  = torch.empty(K.shape, dtype = K.dtype, device = K.device)
                 Vbuffer  = torch.empty(V.shape, dtype = V.dtype, device = V.device)
             torch.ops.my_ops.llama_attention(output,
-                                        Q,
-                                        K,
-                                        V,
-                                        Kcache,
-                                        Vcache,
-                                        cos,
-                                        sin,
-                                        input_length,
-                                        save_slots,
-                                        fetch_slots,
-                                        mask,
-                                        fetch_slots.size(1) if attention_mode == 'decode' else save_slots.size(1),
-                                        max_s,
-                                        block_size,
-                                        softmax_scale,
-                                        3 if attention_mode == 'decode' else 2)
-
+                                                    Q,
+                                                    K,
+                                                    V,
+                                                    Kcache,
+                                                    Vcache,
+                                                    cos,
+                                                    sin,
+                                                    input_length,
+                                                    save_slots,
+                                                    fetch_slots,
+                                                    mask,
+                                                    fetch_slots.size(1) if attention_mode == 'decode' else save_slots.size(1),
+                                                    max_s,
+                                                    block_size,
+                                                    softmax_scale,
+                                                    3 if attention_mode == 'decode' else 2) 
         else:
             softmax_lse = None
             global Q_before_forward
@@ -240,7 +241,8 @@ def check_llama_attention_decode():
     max_blocks = 20
     embeddings = 4096 # no use
     softmax_scale = 1. / np.sqrt(128)  # sqrt(128)
-    input_length = torch.tensor([10, 1, 28, 15, 14, 13, 12, 11, 25, 3, 5, 7, 2, 4, 6, 8], dtype=torch.int32)
+    input_length_list = [10, 1, 28, 15, 14, 13, 12, 11, 25, 3, 5, 7, 2, 4, 6, 8]
+    input_length = torch.tensor(input_length_list, dtype=torch.int32)
     max_s = input_length.max()
     Ntotal = torch.sum(input_length).item()
     slots_size = (max_s + block_size - 1) // block_size
@@ -279,7 +281,7 @@ def check_llama_attention_decode():
     V_tpu = copy.deepcopy(V).to(device).half()
     Kcache_tpu = copy.deepcopy(Kcache).to(device).half()
     Vcache_tpu = copy.deepcopy(Vcache).to(device).half()
-    input_length_tpu = copy.deepcopy(input_length).to(device)
+    input_length_tpu = copy.deepcopy(input_length)
     save_slots_tpu = copy.deepcopy(save_slots).to(device)
     fetch_slots_tpu = copy.deepcopy(fetch_slots).to(device)
     # inf_tensor = torch.tensor([-float('inf')], dtype=torch.float32)
@@ -329,7 +331,8 @@ def check_llama_attention_prefill():
     max_blocks = 20
     embeddings = 4096 # no use
     softmax_scale = 1. / np.sqrt(d)  # sqrt(128)
-    input_length = torch.tensor([10, 1, 28, 15, 14, 13, 12, 11, 25, 3, 5, 7, 2, 4, 6, 8], dtype=torch.int32)
+    input_length_list = [10, 1, 28, 15, 14, 13, 12, 11, 25, 3, 5, 7, 2, 4, 6, 8]
+    input_length = torch.tensor(input_length_list, dtype=torch.int32)
     max_s = input_length.max()
     Ntotal = torch.sum(input_length).item()
     slots_size = (max_s + block_size - 1) // block_size
@@ -361,7 +364,7 @@ def check_llama_attention_prefill():
     V_tpu = copy.deepcopy(V).to(device).half()
     Kcache_tpu = copy.deepcopy(Kcache).to(device).half()
     Vcache_tpu = copy.deepcopy(Vcache).to(device).half()
-    input_length_tpu = copy.deepcopy(input_length).to(device)
+    input_length_tpu = copy.deepcopy(input_length)
     save_slots_tpu = copy.deepcopy(save_slots).to(device)
 
     # init model
@@ -432,7 +435,7 @@ def check_llama_attention_forward():
     V_tpu = copy.deepcopy(V).to(device).half()
     Kcache_tpu = None
     Vcache_tpu = None
-    input_length_tpu = copy.deepcopy(input_length).to(device)
+    input_length_tpu = copy.deepcopy(input_length)
     save_slots_tpu = None
 
     # init model

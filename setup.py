@@ -376,6 +376,11 @@ class bdist_wheel(_bdist_wheel, ExtBase):
             else:
                 self.copy_file(lib, os.path.join(pkg_dir, f'lib/'))
 
+        base_fw_libs = glob.glob(os.path.join(TPUV7_RUNTIME_PATH, f'tpuv7-emulator_0.1.0/lib/libtpuv7_emulator.so'))
+        base_fw_libs.append(os.path.join(TPUV7_RUNTIME_PATH, 'tpuv7-emulator_0.1.0/lib/libdnnl.so.3'))
+        for lib in base_fw_libs:
+            self.copy_file(lib, os.path.join(pkg_dir, f'lib/'))
+
         super().run()
 
 include_directories = [
@@ -389,7 +394,7 @@ lib_directories = [
     os.path.join(BASE_DIR, f"build/{get_build_type()}/packages", "torch_tpu/lib"),
 ]
 
-DEBUG = 1 #DEBUG = (os.getenv('DEBUG', default='').upper() in ['ON', '1', 'YES', 'TRUE', 'Y'])
+DEBUG = os.getenv('TPUTRAIN_DEBUG', default='0').upper() in ['ON', '1', 'YES', 'TRUE', 'Y']
 
 extra_link_args = []
 extra_compile_args = [

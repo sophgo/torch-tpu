@@ -88,3 +88,14 @@ You can always execute `python setup.py develop` after changing source files to 
 \
 \
 \
+
+### Run
+
+#### JIT MODE( only support sg2260)
+You can run with JIT MODE( Instruction Cache MODE), with `export TPU_CACHE_BACKEND=/path/of/cmodel_fw`.
+example: `export TPU_CACHE_BACKEND=/workspace/tpu-train/build/firmware_sg2260_cmodel/libfirmware.so`.
+You can recover to Eager MODE( default mode), with `unset TPU_CACHE_BACKEND`.
+
+#### STORAGE FORMAT
+IF you want to make conv's weight with 32IC format on TPU, with `export TORCHTPU_STORAGE_CAST=ON`, then run.
+You can close it with `unset TPU_CACHE_BACKEND`.

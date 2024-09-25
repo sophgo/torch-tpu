@@ -30,16 +30,7 @@ namespace at
 		)
 	{
 		if (!Q.is_contiguous() || !K.is_contiguous() || !V.is_contiguous()){
-#ifndef USE_QKV_PACKED
-			LOG(WARNING) << "llama_attention not contiguous, change Q, K, V to contiguous.";
-			Q = Q.contiguous();
-			K = K.contiguous();
-			V = V.contiguous();
-#else
-
-			LOG(WARNING) << "llama_attention not contiguous, use QKV packed.";
-#endif
-
+			// LOG(WARNING) << "llama_attention not contiguous, use QKV packed.";
 		}
 		if (!Kcache.is_contiguous() || !Vcache.is_contiguous()){
 			LOG(WARNING) << "llama_attention not contiguous, change Kcache, Vcache to contiguous.";
@@ -48,18 +39,11 @@ namespace at
 		}
 
 		CHECK_TENSOR_IN_DEVICE(OUT);
-#ifndef USE_QKV_PACKED
-		CHECK_TENSOR_IN_DEVICE(Q);
-		CHECK_TENSOR_IN_DEVICE(K);
-		CHECK_TENSOR_IN_DEVICE(V);
-#else
 		CHECK_TENSOR_IN_DEVICE_NO_CONTIGUOUS(Q);
 		CHECK_TENSOR_IN_DEVICE_NO_CONTIGUOUS(K);
 		CHECK_TENSOR_IN_DEVICE_NO_CONTIGUOUS(V);
-#endif
 		CHECK_TENSOR_IN_DEVICE(Kcache);
 		CHECK_TENSOR_IN_DEVICE(Vcache);
-		CHECK_TENSOR_IN_DEVICE(input_lengths);
 		CHECK_TENSOR_IN_DEVICE(save_slots);
 		if (cos.has_value())
 			CHECK_TENSOR_IN_DEVICE(cos.value());
@@ -69,34 +53,49 @@ namespace at
 			CHECK_TENSOR_IN_DEVICE(fetch_slots.value());
 		if (mask.has_value())
 			CHECK_TENSOR_IN_DEVICE(mask.value());
+		if (attention_mode == 3 || attention_mode == 2){
+			TORCH_CHECK (tpu::TPUConvertDtype<SgdnnDataType_t>(input_lengths.dtype()) == SGDNN_DTYPE_INT32,
+						"LLammaAttention input lenghts must be int32 dtype");
+			TORCH_CHECK ( input_lengths.device().type() == DeviceType::CPU, 
+						"LLammaAttention input lenghts must on CPU device" );
+		}
 
-#ifdef TPU_OP_TIMING
-		auto timer = tpu::Timer().Start();
-#endif
-		tpu_status_t status = sgdnnLlamaAttention(
-			tpu::TPUGetDeviceResource(),
-			tpu::TPUGenerateSgdnnTensor(OUT),
-			tpu::TPUGenerateSgdnnTensor(Q),
-			tpu::TPUGenerateSgdnnTensor(K),
-			tpu::TPUGenerateSgdnnTensor(V),
-			tpu::TPUGenerateSgdnnTensor(Kcache),
-			tpu::TPUGenerateSgdnnTensor(Vcache),
-			cos.has_value() ? tpu::TPUGenerateSgdnnTensor(cos.value()) : sgdnnUndefinedTensor(),
-			sin.has_value() ? tpu::TPUGenerateSgdnnTensor(sin.value()) : sgdnnUndefinedTensor(),
-			tpu::TPUGenerateSgdnnTensor(input_lengths),
-			tpu::TPUGenerateSgdnnTensor(save_slots),
-			fetch_slots.has_value() ? tpu::TPUGenerateSgdnnTensor(fetch_slots.value()) : sgdnnUndefinedTensor(),
-			mask.has_value() ? tpu::TPUGenerateSgdnnTensor(mask.value()) : sgdnnUndefinedTensor(),
+		TIMING_START;
+		Tensor Qbuffer, Kbuffer, Vbuffer;
+		if (attention_mode == 2)
+		{
+			TensorOptions options = TensorOptions ( Q.device() ).dtype ( Q.dtype() );
+			Qbuffer = empty({Q.sizes()}, options);
+			Kbuffer = empty({K.sizes()}, options);
+			Vbuffer = empty({V.sizes()}, options);
+		}
+  		auto stream = c10_tpu::getCurrentTPUStream();
+		auto status = tpudnnLlamaAttentionAsync(
+			stream,
+			tpu::TPUGenerateTpudnnTensor(stream, OUT),
+			tpu::TPUGenerateTpudnnTensor(stream, Q),
+			tpu::TPUGenerateTpudnnTensor(stream, K),
+			tpu::TPUGenerateTpudnnTensor(stream, V),
+			tpu::TPUGenerateTpudnnTensor(stream, Kcache),
+			tpu::TPUGenerateTpudnnTensor(stream, Vcache),
+			cos.has_value() ? tpu::TPUGenerateTpudnnTensor(stream, cos.value()) : tpudnnUndefinedTensor(),
+			sin.has_value() ? tpu::TPUGenerateTpudnnTensor(stream, sin.value()) : tpudnnUndefinedTensor(),
+			tpu::TPUGenerateTpudnnTensor(stream, save_slots),
+			fetch_slots.has_value() ? tpu::TPUGenerateTpudnnTensor(stream, fetch_slots.value()) : tpudnnUndefinedTensor(),
+			mask.has_value() ? tpu::TPUGenerateTpudnnTensor(stream, mask.value()) : tpudnnUndefinedTensor(),
+			attention_mode == 2 ? tpu::TPUGenerateTpudnnTensor(stream, Qbuffer) : tpudnnUndefinedTensor(),
+			attention_mode == 2 ? tpu::TPUGenerateTpudnnTensor(stream, Kbuffer) : tpudnnUndefinedTensor(),
+			attention_mode == 2 ? tpu::TPUGenerateTpudnnTensor(stream, Vbuffer) : tpudnnUndefinedTensor(),
+			tpu::TPUGenerateTpudnnTensor(stream, input_lengths),
+			(int*)input_lengths.data_ptr(),
+      	    (int)(input_lengths.nbytes()/4),
 			slots_size,
 			mask_size,
 			block_size,
 			C,
 			attention_mode);
-		TORCH_CHECK(status == SG_SUCCESS);
-
-#ifdef TPU_OP_TIMING
-		tpu::OpTimer::Instance().AddTime(tpu::LLAMA_ATTENTION, timer.ElapsedUS());
-#endif
+		TORCH_CHECK ( status == TPUDNN_STATUS_SUCCESS );
+		TIMING_END( tpu::LLAMA_ATTENTION );
 		return OUT;
 	}
 
@@ -115,27 +114,13 @@ namespace at
 		int64_t batch)
 	{
 		if (!Q.is_contiguous() || !K.is_contiguous() || !V.is_contiguous()){
-#ifndef USE_QKV_PACKED
-			LOG(WARNING) << "llama_attention not contiguous, change Q, K, V to contiguous.";
-			Q = Q.contiguous();
-			K = K.contiguous();
-			V = V.contiguous();
-#else
-
-			LOG(WARNING) << "llama_attention not contiguous, use QKV packed.";
-#endif
+			// LOG(WARNING) << "llama_attention not contiguous, use QKV packed.";
 		}
 
 		CHECK_TENSOR_IN_DEVICE(OUT);
-#ifndef USE_QKV_PACKED
-		CHECK_TENSOR_IN_DEVICE(Q);
-		CHECK_TENSOR_IN_DEVICE(K);
-		CHECK_TENSOR_IN_DEVICE(V);
-#else
 		CHECK_TENSOR_IN_DEVICE_NO_CONTIGUOUS(Q);
 		CHECK_TENSOR_IN_DEVICE_NO_CONTIGUOUS(K);
 		CHECK_TENSOR_IN_DEVICE_NO_CONTIGUOUS(V);
-#endif
 
 		if (cos.has_value())
 			CHECK_TENSOR_IN_DEVICE(cos.value());

@@ -43,3 +43,13 @@ function soc_build()
   unset SOC_CROSS_MODE
   popd
 }
+
+function update_sg2260_third_party()
+{
+  pushd ${TPUTRAIN_TOP}
+  echo "update libtpudnn.so ..."
+  cp ../TPU1686/build_sg2260/tpuDNN/src/libtpudnn.so third_party/tpuDNN/sg2260_lib/
+  echo "update libtpuv7_emulator.so ..."
+  cp ../TPU1686/build_sg2260/firmware_core/libtpuv7_emulator.so ./third_party/tpuv7_runtime/tpuv7-emulator_0.1.0/lib/
+  popd
+}

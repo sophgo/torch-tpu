@@ -724,7 +724,7 @@ tpudnnStatus_t tpudnnRmsNormBackwardAsync(
 tpudnnStatus_t tpudnnC2CSend(
     tpudnnHandle_t handle,
     void *buff,
-    int count,
+    uint64_t count,
     tpudnnDataType_t dtype,
     int dst_rank,
     const char* uuid,
@@ -735,7 +735,7 @@ tpudnnStatus_t tpudnnC2CSend(
 tpudnnStatus_t tpudnnC2CRecv(
     tpudnnHandle_t handle,
     void *buff,
-    int count,
+    uint64_t count,
     tpudnnDataType_t dtype,
     int src_rank,
     const char* uuid,
@@ -747,19 +747,20 @@ tpudnnStatus_t tpudnnC2CAllReduce(
     tpudnnHandle_t handle,
     void *send_buff,
     void *recv_buff,
-    int count,
+    uint64_t count,
     tpudnnDataType_t dtype,
     tpudnnReduceType_t reduce_method,
     const char* uuid,
     int nranks,
     int cur_rank,
-    const int *chip_map);
+    const int *chip_map,
+    int loop);
 
 tpudnnStatus_t tpudnnC2CReduce(
     tpudnnHandle_t handle,
     void *send_buff,
     void *recv_buff,
-    int count,
+    uint64_t count,
     tpudnnDataType_t dtype,
     tpudnnReduceType_t reduce_method,
     int root,
@@ -771,9 +772,9 @@ tpudnnStatus_t tpudnnC2CReduce(
 tpudnnStatus_t tpudnnC2CGather(
     tpudnnHandle_t handle,
     void *send_buff,
-    int send_count,
+    uint64_t send_count,
     void *recv_buff,
-    int recv_count,
+    uint64_t recv_count,
     tpudnnDataType_t dtype,
     int root,
     const char* uuid,
@@ -784,9 +785,9 @@ tpudnnStatus_t tpudnnC2CGather(
 tpudnnStatus_t tpudnnC2CAllGather(
     tpudnnHandle_t handle,
     void *send_buff,
-    int send_count,
+    uint64_t send_count,
     void *recv_buff,
-    int recv_count,
+    uint64_t recv_count,
     const char* uuid,
     tpudnnDataType_t dtype,
     int nranks,
@@ -796,7 +797,7 @@ tpudnnStatus_t tpudnnC2CAllGather(
 tpudnnStatus_t tpudnnC2CBroadcast(
     tpudnnHandle_t handle,
     void *buff,
-    int count,
+    uint64_t count,
     tpudnnDataType_t dtype,
     int root,
     const char* uuid,
@@ -807,10 +808,9 @@ tpudnnStatus_t tpudnnC2CBroadcast(
 tpudnnStatus_t tpudnnC2CScatter(
     tpudnnHandle_t handle,
     void *send_mem,
-    int send_count,
     tpudnnDataType_t send_type,
     void *recv_mem,
-    int recv_count,
+    uint64_t recv_count,
     tpudnnDataType_t recv_type,
     int root,
     const char* uuid,
@@ -821,10 +821,9 @@ tpudnnStatus_t tpudnnC2CScatter(
 tpudnnStatus_t tpudnnC2CAllToAll(
     tpudnnHandle_t handle,
     void *send_mem,
-    int send_count,
     tpudnnDataType_t send_type,
     void *recv_mem,
-    int recv_count,
+    uint64_t recv_count,
     tpudnnDataType_t recv_type,
     const char* uuid,
     int nranks,
@@ -922,4 +921,9 @@ tpudnnStatus_t tpudnnLLamaA16MlpAsync (
     int weight_bits,
     tpudnnTensor_t output);
 
+tpudnnStatus_t tpudnnGDMAD2DAsync(
+    tpudnnHandle_t handle,
+    tpudnnTensor_t src,
+    tpudnnTensor_t dst,
+    size_t size);
 } // extern "C"

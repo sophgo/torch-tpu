@@ -14,7 +14,6 @@
 extern "C" {
 #endif
 
-#define USE_QKV_PACKED
 #define DIV_UP(a, b) ( ( ( a ) + ( b ) - 1 ) / ( b ) )
 
 typedef struct

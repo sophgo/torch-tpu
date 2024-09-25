@@ -3,7 +3,7 @@
 #include <torch/csrc/Generator.h>
 
 #include "torch_tpu/csrc/tpu/Module.h"
-#include "torch_tpu/csrc/tpu/OpTimer.h"
+#include "torch_tpu/csrc/tpu/UtilsFunc.h"
 #include "torch_tpu/csrc/utils/AutocastMode.h"
 
 #ifdef BACKEND_SG2260
@@ -35,7 +35,7 @@ PyObject* initModule() {
     at::internal::lazy_init_num_threads();
 
     AddPyMethodDefs(methods, THPTModule_get_methods());
-    AddPyMethodDefs(methods, THPTOpTimer_get_methods());
+    AddPyMethodDefs(methods, THPTUtils_get_methods());
     AddPyMethodDefs(methods, torch_tpu::autocast::autocast_mode_functions());
 
     static struct PyModuleDef torchtpu_module = {

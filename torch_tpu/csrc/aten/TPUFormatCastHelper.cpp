@@ -264,6 +264,7 @@ bool StorageDescHelper::IsBaseFormatType(tpuFormat format)
 
 bool StorageDescHelper::IsBaseFormatType(const at::Tensor &tensor)
 {
+    if (tensor.device().type() == DeviceType::CPU) return true;
     auto format = torch_tpu::GetTpuStorageImplDesc(tensor).tpu_format_;
     return IsBaseFormatType(format);
 }

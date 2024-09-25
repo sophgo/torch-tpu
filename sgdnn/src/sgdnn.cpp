@@ -4032,82 +4032,82 @@ tpu_status_t sgdnnLlamaAttention ( tpu_resource_t resource,
   SGDNN_CHECK ( sgdnnIsTensorContiguous ( &OUT ) );
 
 #if defined BACKEND_1684X
-  sg_api_llama2_qkv_t api;
-  api.OUT_global_addr = OUT.addr;
-  api.Q_global_addr = Q.addr;
-  api.K_global_addr = K.addr;
-  api.V_global_addr = V.addr;
-  api.Kcache_global_addr = Kcache.addr;
-  api.Vcache_global_addr = Vcache.addr;
-  api.input_lengths_global_addr = input_lengths.addr;
-  api.save_slots_global_addr = save_slots.addr;
-  api.fetch_slots_global_addr = fetch_slots.addr;
-  api.mask_global_addr = mask.addr;
-  api.slots_size = slots_size;
-  api.mask_size = mask_size;
-  api.block_size = block_size;
-  api.C = C;
+  // sg_api_llama2_qkv_t api;
+  // api.OUT_global_addr = OUT.addr;
+  // api.Q_global_addr = Q.addr;
+  // api.K_global_addr = K.addr;
+  // api.V_global_addr = V.addr;
+  // api.Kcache_global_addr = Kcache.addr;
+  // api.Vcache_global_addr = Vcache.addr;
+  // api.input_lengths_global_addr = input_lengths.addr;
+  // api.save_slots_global_addr = save_slots.addr;
+  // api.fetch_slots_global_addr = fetch_slots.addr;
+  // api.mask_global_addr = mask.addr;
+  // api.slots_size = slots_size;
+  // api.mask_size = mask_size;
+  // api.block_size = block_size;
+  // api.C = C;
 
-  api.attention_mode = attention_mode;
-  if (attention_mode == 2){
-    // prefill
-    api.attention_mode = 1;
-  } else if (attention_mode == 3){
-    // decode
-    api.attention_mode = 0;
-  }
+  // api.attention_mode = attention_mode;
+  // if (attention_mode == 2){
+  //   // prefill
+  //   api.attention_mode = 1;
+  // } else if (attention_mode == 3){
+  //   // decode
+  //   api.attention_mode = 0;
+  // }
 
-  api.dtype = sgdnnTPUKernelDType(Q.dtype);
-  api.batch = input_lengths.shape[0];
-  api.head_size = Q.shape[2];
-  api.q_heads = Q.shape[1];
-  api.kv_heads = K.shape[1];
-  SAFE_CALL ( sgdnnTPUKernelLaunch ( resource, "tpu_kernel_llama_attention", &api, sizeof ( api ) ) );
+  // api.dtype = sgdnnTPUKernelDType(Q.dtype);
+  // api.batch = input_lengths.shape[0];
+  // api.head_size = Q.shape[2];
+  // api.q_heads = Q.shape[1];
+  // api.kv_heads = K.shape[1];
+  // SAFE_CALL ( sgdnnTPUKernelLaunch ( resource, "tpu_kernel_llama_attention", &api, sizeof ( api ) ) );
 #elif defined BACKEND_SG2260
-  sg_api_llama2_qkv_multi_core_t api = {0};
-  api.OUT_global_addr = OUT.addr;
-  api.Q_global_addr = Q.addr;
-  api.K_global_addr = K.addr;
-  api.V_global_addr = V.addr;
-  api.Kcache_global_addr = Kcache.addr;
-  api.Vcache_global_addr = Vcache.addr;
-  api.cos_global_addr = cos.addr;
-  api.sin_global_addr = sin.addr;
-  api.input_lengths_global_addr = input_lengths.addr;
-  api.save_slots_global_addr = save_slots.addr;
-  api.fetch_slots_global_addr = fetch_slots.addr;
-  api.mask_global_addr = mask.addr;
-  api.slots_size = slots_size;
-  api.mask_size = mask_size;
-  api.block_size = block_size;
-  api.C = C;
-  api.attention_mode = attention_mode;
-  api.dtype = sgdnnTPUKernelDType(Q.dtype);
-  api.batch = input_lengths.shape[0];
-  api.hidden_size = Q.shape[1] * Q.shape[2]; // heads * head_size
-  api.q_heads = Q.shape[1];
-  api.kv_heads = K.shape[1];
-#ifdef USE_QKV_PACKED
-  api.qkv_packed = !sgdnnIsTensorContiguous(&Q);
-#endif
+//   sg_api_llama2_qkv_multi_core_t api = {0};
+//   api.OUT_global_addr = OUT.addr;
+//   api.Q_global_addr = Q.addr;
+//   api.K_global_addr = K.addr;
+//   api.V_global_addr = V.addr;
+//   api.Kcache_global_addr = Kcache.addr;
+//   api.Vcache_global_addr = Vcache.addr;
+//   api.cos_global_addr = cos.addr;
+//   api.sin_global_addr = sin.addr;
+//   api.input_lengths_global_addr = input_lengths.addr;
+//   api.save_slots_global_addr = save_slots.addr;
+//   api.fetch_slots_global_addr = fetch_slots.addr;
+//   api.mask_global_addr = mask.addr;
+//   api.slots_size = slots_size;
+//   api.mask_size = mask_size;
+//   api.block_size = block_size;
+//   api.C = C;
+//   api.attention_mode = attention_mode;
+//   api.dtype = sgdnnTPUKernelDType(Q.dtype);
+//   api.batch = input_lengths.shape[0];
+//   api.hidden_size = Q.shape[1] * Q.shape[2]; // heads * head_size
+//   api.q_heads = Q.shape[1];
+//   api.kv_heads = K.shape[1];
+// #ifdef USE_QKV_PACKED
+//   api.qkv_packed = !sgdnnIsTensorContiguous(&Q);
+// #endif
 
-  tpu_device_mem_t Qbuffer_dev_mem, Kbuffer_dev_mem, Vbuffer_dev_mem;
-  if (attention_mode == 2)
-  {
-    // prefill
-    SAFE_CALL(sgdnnMallocDeviceByte(resource, &Qbuffer_dev_mem, sgdnnTensorBytes(&Q)));
-    SAFE_CALL(sgdnnMallocDeviceByte(resource, &Kbuffer_dev_mem, sgdnnTensorBytes(&K)));
-    SAFE_CALL(sgdnnMallocDeviceByte(resource, &Vbuffer_dev_mem, sgdnnTensorBytes(&V)));
-  }
-  api.Qbuffer_global_addr = sgdnnGetDeviceAddr(Qbuffer_dev_mem);
-  api.Kbuffer_global_addr = sgdnnGetDeviceAddr(Kbuffer_dev_mem);
-  api.Vbuffer_global_addr = sgdnnGetDeviceAddr(Vbuffer_dev_mem);
-  SAFE_CALL ( sgdnnTPUKernelLaunchMultiCore ( resource, "tpu_kernel_llama_attention_multi_core", &api, sizeof ( api ) , non_blocking) );
-  if (attention_mode == 2){
-    sgdnnFreeDevice ( resource , Kbuffer_dev_mem );
-    sgdnnFreeDevice ( resource , Vbuffer_dev_mem );
-    sgdnnFreeDevice ( resource , Qbuffer_dev_mem );
-  }
+//   tpu_device_mem_t Qbuffer_dev_mem, Kbuffer_dev_mem, Vbuffer_dev_mem;
+//   if (attention_mode == 2)
+//   {
+//     // prefill
+//     SAFE_CALL(sgdnnMallocDeviceByte(resource, &Qbuffer_dev_mem, sgdnnTensorBytes(&Q)));
+//     SAFE_CALL(sgdnnMallocDeviceByte(resource, &Kbuffer_dev_mem, sgdnnTensorBytes(&K)));
+//     SAFE_CALL(sgdnnMallocDeviceByte(resource, &Vbuffer_dev_mem, sgdnnTensorBytes(&V)));
+//   }
+//   api.Qbuffer_global_addr = sgdnnGetDeviceAddr(Qbuffer_dev_mem);
+//   api.Kbuffer_global_addr = sgdnnGetDeviceAddr(Kbuffer_dev_mem);
+//   api.Vbuffer_global_addr = sgdnnGetDeviceAddr(Vbuffer_dev_mem);
+//   SAFE_CALL ( sgdnnTPUKernelLaunchMultiCore ( resource, "tpu_kernel_llama_attention_multi_core", &api, sizeof ( api ) , non_blocking) );
+//   if (attention_mode == 2){
+//     sgdnnFreeDevice ( resource , Kbuffer_dev_mem );
+//     sgdnnFreeDevice ( resource , Vbuffer_dev_mem );
+//     sgdnnFreeDevice ( resource , Qbuffer_dev_mem );
+//   }
 #else
   SGDNN_CHECK ( false );
 #endif

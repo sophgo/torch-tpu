@@ -35,8 +35,13 @@ Tensor _copy_from_tpu(const Tensor &self, const Tensor &dst,
     } else if (IS_TPU_TENSOR(self) && IS_TPU_TENSOR(dst)) {
       if (self.is_contiguous() && dst.is_contiguous()) {
         TIMING_START;
-        tpu::TPUCopyDeviceToDevice(dst.data_ptr(), self.data_ptr(),
-                                   dst.nbytes(), non_blocking=true);
+        auto stream = c10_tpu::getCurrentTPUStream();
+        auto status = tpudnnGDMAD2DAsync(
+          stream,
+          tpu::TPUGenerateTpudnnTensor(stream, self),
+          tpu::TPUGenerateTpudnnTensor(stream, dst),
+          dst.nbytes());
+        TORCH_CHECK(status == TPUDNN_STATUS_SUCCESS);
         TIMING_END(tpu::COPY);
       } else {
         TIMING_START;
