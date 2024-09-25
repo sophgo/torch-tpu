@@ -435,6 +435,8 @@ tpudnnStatus_t tpudnnCrossEntropyLossBackwardAsync(
     tpudnnTensor_t input,
     tpudnnTensor_t target,
     tpudnnTensor_t grad_output,
+    int ignore_index,
+    int batch,
     int reduction,
     float label_smoothing,
     tpudnnTensor_t grad_input);

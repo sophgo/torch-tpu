@@ -3,24 +3,29 @@
 
 
 extern void nodechip_batch_matmul_float (
-global_addr_t L_global_addr,
-global_addr_t R_global_addr,
-global_addr_t bias_global_addr,
-global_addr_t Y_global_addr,
-data_type_t in_dtype,
-data_type_t out_dtype,
-const int* L_shape,
-const int* R_shape,
-int L_dim,
-int R_dim,
-int* Y_shape,
-int* Y_dim,
-int L_trans,
-int R_trans,
-int hdim_is_batch,
-int has_bias,
-bool do_relu,
-float relu_upper_limit );
+  global_addr_t L_global_addr,
+  global_addr_t R_global_addr,
+  global_addr_t bias_global_addr,
+  global_addr_t rescale_global_addr,
+  global_addr_t Y_global_addr,
+  data_type_t left_dtype,
+  data_type_t right_dtype,
+  data_type_t out_dtype,
+  const int* L_shape,
+  const int* R_shape,
+  int L_dim,
+  int R_dim,
+  int* Y_shape,
+  int* Y_dim,
+  int L_trans,
+  int R_trans,
+  int hdim_is_batch,
+  int has_bias,
+  bool do_relu,
+  float relu_upper_limit,
+  bool do_rescale,
+  bool rescale_is_const,
+  int rescale_const_val);
 
 int tpu_kernel_api_batch_matmul ( const void * args )
 {
@@ -42,7 +47,9 @@ int tpu_kernel_api_batch_matmul ( const void * args )
   nodechip_batch_matmul_float ( api->left_global_addr,
                                 api->right_global_addr,
                                 api->bias_global_addr,
+                                0xffffffff,
                                 api->output_global_addr,
+                                ( data_type_t ) api->dtype,
                                 ( data_type_t ) api->dtype,
                                 ( data_type_t ) api->dtype,
                                 left_shape,
@@ -56,7 +63,10 @@ int tpu_kernel_api_batch_matmul ( const void * args )
                                 0,
                                 api->bias_global_addr != 0,
                                 0,
-                                0 );
+                                0,
+                                false,
+                                false,
+                                0);
   tpu_poll();
   return 0;
 }

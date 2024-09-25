@@ -41,6 +41,16 @@ typedef struct tpuRtLaunchOutput *tpuRtLaunchOutput_t;
 typedef struct timeval tpuRtTimeRecord;
 typedef int (*pTpuRtStreamCallback)(void *);
 
+struct c2c_port_info {
+	uint32_t chip_num;
+	uint16_t src_device_id;
+	uint16_t dst_device_id;
+	uint8_t src_pcie_id;
+	uint8_t dst_pcie_id;
+	int8_t send_port;
+	int8_t recv_port;
+};
+
 void sgTimeRecord(tpuRtTimeRecord *time);
 uint32_t sgTimeCalculate(tpuRtTimeRecord time_start, tpuRtTimeRecord time_end);
 
@@ -48,7 +58,6 @@ tpuRtStatus_t tpuRtInit(void);
 tpuRtStatus_t tpuRtGetDeviceCount(int *count);
 tpuRtStatus_t tpuRtGetDevice(int *device);
 tpuRtStatus_t tpuRtSetDevice(int device);
-tpuRtStatus_t tpuRtFreeDevice(int device);
 tpuRtStatus_t tpuRtDeviceSynchronize(void);
 tpuRtStatus_t tpuRtMalloc(void **devPtr, unsigned long long size, int parallel_num);
 tpuRtStatus_t tpuRtFree(void **devPtr, int free_num);
@@ -92,6 +101,9 @@ tpuRtStatus_t tpuRtKernelLaunchAsync(tpuRtKernelModule_t module, const char *fun
 tpuRtStatus_t tpuRtKernelLaunchCVOP(tpuRtKernelModule_t module, const char *func_name, void *args, uint32_t size,
 				uint32_t channel_num, uint32_t block_num,
 				tpuRtLaunchOutput_t output, tpuRtStream_t stream);
+tpuRtStatus_t tpuRtKernelLaunchCVEx(tpuRtKernelModule_t module, const char *func_name, void *args, uint32_t size,
+				uint32_t channel_num, uint32_t block_num,
+				tpuRtLaunchOutput_t output, tpuRtStream_t stream);
 tpuRtStatus_t tpuRtKernelUnloadModule(tpuRtKernelModule_t p_module, tpuRtStream_t stream);
 
 tpuRtStatus_t tpuRtGetUniqueId(char *uuid);
@@ -101,6 +113,9 @@ tpuRtStatus_t tpuRtKernelLaunchCDMA(tpuRtKernelModule_t module, const char *func
 tpuRtStatus_t tpuRtKernelLaunchCDMAAsync(tpuRtKernelModule_t module, const char *func_name,
 				void *args, uint32_t size, uint64_t block_num, tpuRtStream_t stream,
 				int cdma_only, char *uuid, int rank_id, int rank_num);
+tpuRtStatus_t tpuRtSetupC2C(int device_id);
+tpuRtStatus_t tpuRtSetupTopology(void);
+tpuRtStatus_t tpuRtGetTopology(struct c2c_port_info **topology);
 #ifdef __cplusplus
 }
 #endif

@@ -48,8 +48,14 @@ typedef struct tpu_stage_info_s {
   tpuRtShape_t *input_shapes;
   // output_shapes[0] / [1] / ... / [output_num-1]
   tpuRtShape_t *output_shapes;
-  void *input_mems;
-  void *output_mems;
+  // inputs device memory which has been malloc after the net is loaded, and
+  // user can reuse these device memory to store inputs' data which can decrease
+  // latency.
+  void **input_mems;
+  // outputs device memory which has been malloc after the net is loaded, and
+  // user can reuse these device memory to store outputs' data which can
+  // decrease latency.
+  void **output_mems;
 } tpuRtStageInfo_t;
 
 typedef struct {

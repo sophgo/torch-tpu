@@ -5,8 +5,22 @@
 
 #include "TPUTorchUtils.h"
 
-
+#include <vector>
+#include <algorithm>
 #include "common/config.h"
+
+template<typename T>
+int countValidElements(const at::Tensor& target, int ignore_index) {
+  SHOW_TENSOR_OP(target);
+  int valid_batch = 0;
+  const int64_t numel = target.numel();
+  for (int64_t i = 0; i < numel; ++i) {
+    if (target[i].item<T>() != ignore_index) {
+      ++valid_batch;
+    }
+  }
+  return valid_batch;
+}
 
 namespace torch {
 namespace autograd {
@@ -93,7 +107,8 @@ public:
     TORCH_CHECK ( reduction == 1 || reduction == 2 );
     TORCH_CHECK ( !weight_has_value );
     TORCH_CHECK ( ignore_index < 0 );
-
+    int valid_batch = 0;
+    valid_batch = countValidElements<int>(target, ignore_index);
     TIMING_START;
     auto stream = c10_tpu::getCurrentTPUStream();
     auto status = tpudnnCrossEntropyLossBackwardAsync(
@@ -101,6 +116,8 @@ public:
         tpu::TPUGenerateTpudnnTensor(stream, input),
         tpu::TPUGenerateTpudnnTensor(stream, target),
         tpu::TPUGenerateTpudnnTensor(stream, grad_outputs[0]),
+        ignore_index,
+        valid_batch,
         reduction - 1,
         label_smoothing,
         tpu::TPUGenerateTpudnnTensor(stream, grad_input));
