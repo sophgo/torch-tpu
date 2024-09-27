@@ -427,6 +427,7 @@ tpudnnStatus_t tpudnnCrossEntropyLossAsync(
     tpudnnTensor_t input,
     tpudnnTensor_t target,
     int reduction,
+    int ignore_index,
     float label_smoothing,
     tpudnnTensor_t output);
 

@@ -70,6 +70,7 @@ public:
         tpu::TPUGenerateTpudnnTensor(stream, self),
         tpu::TPUGenerateTpudnnTensor(stream, target),
         reduction - 1,
+        ignore_index,
         label_smoothing,
         tpu::TPUGenerateTpudnnTensor(stream, out));
     TORCH_CHECK(status == TPUDNN_STATUS_SUCCESS);

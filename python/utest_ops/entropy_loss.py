@@ -109,10 +109,46 @@ def case2():
     My_Tester.customized_execute_function = customized_execute_function
     return My_Tester.Torch_Test_Execution_Function(Test_Module(), input_data)
 
+def case3():
+    #step0:set seed
+    seed=10
+    set_bacis_info(seed)
+
+    #step1: define test model
+    batch = 639
+    sequence = 1
+    vtable_size =32000
+    class Test_Module(nn.Module):
+            def __init__(self):
+                super(Test_Module, self).__init__()
+                self.loss_fct = nn.CrossEntropyLoss(ignore_index=-100)
+                #remember to using nn.Parameter, otherwise model.to cannot correctly move it to TPU.
+                self.label =  nn.Parameter(torch.randint(0, vtable_size, (batch, )),requires_grad=False)
+                self.label[-5:]=-100
+
+                #register_buffer is also acceptable here, but still you need nn.Parameter
+                # self.label = self.register_buffer('label', nn.Parameter(torch.randint(0, vtable_size, (batch, sequence)),requires_grad=False))
+            def forward(self, inp):
+                return self.loss_fct(inp, self.label)
+    #step2: prepare input data, Notice that the input data will be adopted not only their shapes
+    input_data = [
+         [ torch.rand(batch,  vtable_size)],
+    ]
+    metric_table = ['max_diff','MAE']
+    chip_arch_dict = {"bm1684x":0, 'sg2260':1}
+    epsilon_dict = {'bm1684x':{'f32':1e-6,'f16':1e-2},'sg2260':{'f32':3e-6,'f16':1e-2}}
+    case_name =  __file__.split('.py')[0]# You can change your name
+    dump_flag = True #it will dump alll wrong cases
+    device = torch.device("privateuseone:0")
+
+    My_Tester = Tester_Basic(case_name, chip_arch_dict, device, metric_table, epsilon_dict,seed, dump_flag)
+    return My_Tester.Torch_Test_Execution_Function(Test_Module(), input_data)
+
 if __name__ == "__main__":
     #This example shows all  [], [[]] is acceptable
     case1()
     case2()
+    case3()
 
 #######################
 ##  case1():forward + backward [[T]]; Notice No set_requires_grad
