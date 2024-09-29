@@ -55,7 +55,11 @@ int tpu_kernel_llama_mlp_multi_core(const void* api_buf) {
 
     // set_file_dump_subdir("./Custom_MLP");
     sg_api_llama_mlp_multi_core_t *api = (sg_api_llama_mlp_multi_core_t*)api_buf;
+
+#ifndef REMOVE_POLLS_IN_LLM
     tpu_initialize();
+#endif
+
 #ifdef USING_PERF_MODE
         tpu_sync_all();
 #endif
@@ -90,7 +94,10 @@ int tpu_kernel_llama_mlp_multi_core(const void* api_buf) {
         api->scale1_addr,
         api->zp2_addr,
         api->scale2_addr);
+
+#ifndef REMOVE_POLLS_IN_LLM
     tpu_poll();
+#endif
 
 #ifdef USING_LLM_TICK_TOCK_PROFILE
     firmware_kernel_tock(2);

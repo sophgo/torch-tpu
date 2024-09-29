@@ -465,7 +465,11 @@ int tpu_kernel_api_binary_multi_core(const void *args) {
   firmware_kernel_tick();
 #endif
   sg_api_binary_t *api = (sg_api_binary_t *)args;
+
+#ifndef REMOVE_POLLS_IN_LLM
   tpu_initialize();
+#endif
+
 #ifdef USING_PERF_MODE
     tpu_sync_all();
 #endif
@@ -522,7 +526,11 @@ int tpu_kernel_api_binary_multi_core(const void *args) {
           (sg_binary_type_t)api->binary_type);
     }
   }
+
+#ifndef REMOVE_POLLS_IN_LLM
   tpu_poll();
+#endif
+
 #ifdef USING_LLM_TICK_TOCK_PROFILE
   firmware_kernel_tock(4);
 #endif

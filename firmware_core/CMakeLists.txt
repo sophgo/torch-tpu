@@ -14,6 +14,9 @@ include(config.cmake)
 if (USING_LLM_PROFILE)
     add_definitions(-DUSING_LLM_TICK_TOCK_PROFILE)
 endif()
+if (REMOVE_POLLS_IN_LLM)
+    add_definitions(-DREMOVE_POLLS_IN_LLM)
+endif()
 
 add_definitions(-Wno-address-of-packed-member
                 -fno-builtin-memcpy 

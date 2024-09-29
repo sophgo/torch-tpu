@@ -33,7 +33,11 @@ int tpu_kernel_api_llama_a16_matmul ( const void * args )
 #ifdef USING_LLM_TICK_TOCK_PROFILE
   firmware_kernel_tick();
 #endif
+
+#ifndef REMOVE_POLLS_IN_LLM
   tpu_initialize();
+#endif
+
   nodechip_llama2_a16_matmul(
     api->input_global_addr,
     api->weight_global_addr,
@@ -52,7 +56,11 @@ int tpu_kernel_api_llama_a16_matmul ( const void * args )
     true,
     api->has_bias
   );
+
+#ifndef REMOVE_POLLS_IN_LLM
   tpu_poll();
+#endif
+
 #ifdef USING_LLM_TICK_TOCK_PROFILE
   firmware_kernel_tock(5);
 #endif
