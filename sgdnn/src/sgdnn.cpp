@@ -2962,7 +2962,7 @@ tpu_status_t sgdnnLLamaA16Matmul ( tpu_resource_t handle,
                              bool non_blocking )
 {
 #if defined BACKEND_SG2260
-  if ( left.dtype == SGDNN_DTYPE_FP16 )
+  if ( left.dtype == SGDNN_DTYPE_FP16 || left.dtype == SGDNN_DTYPE_BF16)
   {
     sg_api_a16_matmul_t api;
     api.input_global_addr = left.addr;
@@ -3922,7 +3922,7 @@ tpu_status_t sgdnnLLamaA16Mlp ( tpu_resource_t  resource ,
   SGDNN_CHECK ( weight1.dtype == zp1.dtype );
   SGDNN_CHECK ( weight2.dtype == zp2.dtype );
   SGDNN_CHECK ( input.dtype == output.dtype );
-  SGDNN_CHECK ( input.dtype == SGDNN_DTYPE_FP16);
+  SGDNN_CHECK ( input.dtype == SGDNN_DTYPE_FP16 || input.dtype == SGDNN_DTYPE_BF16);
 
   SGDNN_CHECK ( sgdnnIsSameShape( &input, &output ) );
   SGDNN_CHECK ( input.dim == 2 );
