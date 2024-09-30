@@ -120,6 +120,9 @@ scclDataType_t toSCCLDtype(::at::ScalarType type) {
   case ::at::ScalarType::Half:
     dtype = SCCL_DTYPE_FP16;
     break;
+  case ::at::ScalarType::BFloat16:
+    dtype = SCCL_DTYPE_BF16;
+    break;
   case ::at::ScalarType::Char:
     dtype = SCCL_DTYPE_INT8;
     break;
