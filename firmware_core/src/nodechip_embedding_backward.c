@@ -68,6 +68,7 @@ const int     *out_shape,
 int           gradout_dim,
 int           idx_dim,
 int           out_dim,
+int           H_native,
 data_type_t   grad_dtype,
 bool is_index_int64 ) {
   TPUKERNEL_ASSERT ( is_index_int64 == false );
@@ -79,15 +80,16 @@ bool is_index_int64 ) {
   for ( int i = 0; i < out_dim - 1; i++ ) {
     o_shape.h *= out_shape[i];
   }
-  dim4 go_shape = {.n = 1, .c = 1, .h = 1, .w = gradout_shape[out_dim - 1]};
+  dim4 go_shape = {.n = 1, .c = 1, .h = 1, .w = gradout_shape[gradout_dim - 1]};
   for ( int i = 0; i < gradout_dim - 1; i++ ) {
     go_shape.h *= gradout_shape[i];
   }
+  dim4 gstride_o_shape = {.n = H_native * o_shape.h, .c = H_native * o_shape.h, .h = H_native, .w = 1};
   tpu_gdma_set_C_system (
   out_global_addr,
   zero_,
   &o_shape,
-  NULL,
+  &gstride_o_shape,
   grad_dtype );
   int NUM_index = 1;
   //printf("index_shape: ");
@@ -189,12 +191,12 @@ bool is_index_int64 ) {
       tpu_flush_cache ( from_index_global_addr, ALIGN ( sizeof ( int ) * window_cur, 64 ) );
       tpu_flush_cache ( to_index_global_addr, ALIGN ( sizeof ( int ) * window_cur, 64 ) );
       dim4 add_shape = {.n = 1, .c = window_cur, .h = 1, .w = o_shape.w};
-      dim4 from_stride = {.n = 0, .c = 0, .h = add_shape.w, .w = 1};
+      dim4 from_stride = {.n = 0, .c = 0, .h = H_native, .w = 1};
       tpu_gdma_h_gather_S2L ( from_local_addr, gradout_global_addr, from_index_global_addr, false, zero_, &add_shape, go_shape.h, NULL, &from_stride, NULL, grad_dtype );
-      dim4 to_stride = {.n = 0, .c = 0, .h = add_shape.w, .w = 1};
+      dim4 to_stride = {.n = 0, .c = 0, .h = H_native, .w = 1};
       tpu_gdma_h_gather_S2L ( to_local_addr, out_global_addr, to_index_global_addr, false, zero_, &add_shape, o_shape.h, NULL, &to_stride, NULL, grad_dtype );
       tpu_bdc_fp_add ( res_local_addr, from_local_addr, to_local_addr, &add_shape, NULL, NULL, NULL, grad_dtype );
-      dim4 scatter_out_stride = {.n = 0, .c = 0, .h = add_shape.w, .w = 1};
+      dim4 scatter_out_stride = {.n = 0, .c = 0, .h = H_native, .w = 1};
       dim4 scatter_oshape = {.n = o_shape.n, .c = window_cur, .h = o_shape.h, .w = o_shape.w};
       tpu_gdma_h_scatter_L2S ( out_global_addr, res_local_addr, to_index_global_addr, false, &scatter_oshape, 1, &scatter_out_stride, NULL, NULL, grad_dtype );
       window_cur = 0;
@@ -239,12 +241,12 @@ bool is_index_int64 ) {
     tpu_flush_cache ( from_index_global_addr, ALIGN ( sizeof ( int ) * window_cur, 64 ) );
     tpu_flush_cache ( to_index_global_addr, ALIGN ( sizeof ( int ) * window_cur, 64 ) );
     dim4 add_shape = {.n = 1, .c = window_cur, .h = 1, .w = o_shape.w};
-    dim4 from_stride = {.n = 0, .c = 0, .h = add_shape.w, .w = 1};
+    dim4 from_stride = {.n = 0, .c = 0, .h = H_native, .w = 1};
     tpu_gdma_h_gather_S2L ( from_local_addr, gradout_global_addr, from_index_global_addr, false, zero_, &add_shape, go_shape.h, NULL, &from_stride, NULL, grad_dtype );
-    dim4 to_stride = {.n = 0, .c = 0, .h = add_shape.w, .w = 1};
+    dim4 to_stride = {.n = 0, .c = 0, .h = H_native, .w = 1};
     tpu_gdma_h_gather_S2L ( to_local_addr, out_global_addr, to_index_global_addr, false, zero_, &add_shape, o_shape.h, NULL, &to_stride, NULL, grad_dtype );
     tpu_bdc_fp_add ( res_local_addr, from_local_addr, to_local_addr, &add_shape, NULL, NULL, NULL, grad_dtype );
-    dim4 scatter_out_stride = {.n = 0, .c = 0, .h = add_shape.w, .w = 1};
+    dim4 scatter_out_stride = {.n = 0, .c = 0, .h = H_native, .w = 1};
     dim4 scatter_oshape = {.n = o_shape.n, .c = window_cur, .h = o_shape.h, .w = o_shape.w};
     tpu_gdma_h_scatter_L2S ( out_global_addr, res_local_addr, to_index_global_addr, false, &scatter_oshape, 1, &scatter_out_stride, NULL, NULL, grad_dtype );
   }
@@ -258,6 +260,7 @@ bool is_index_int64 ) {
 int tpu_kernel_api_embedding_backward ( const void* args ) {
   sg_api_embedding_backward_t *api = ( sg_api_embedding_backward_t * ) args;
   tpu_initialize();
+  const int H_native =  api->grad_input_shape[api->grad_input_dim - 1];
   nodechip_embedding_backward (
   api->grad_output_global_addr,
   api->index_global_addr,
@@ -273,6 +276,7 @@ int tpu_kernel_api_embedding_backward ( const void* args ) {
   api->grad_output_dim,
   api->index_dim,
   api->grad_input_dim,
+  H_native,
   ( data_type_t ) api->grad_output_dtype,
   api->is_index_int64 );
   tpu_poll();
@@ -281,30 +285,130 @@ int tpu_kernel_api_embedding_backward ( const void* args ) {
 
 TPUKERNEL_FUNC_REGISTER ( tpu_kernel_api_embedding_backward );
 
+void nodechip_embedding_backward_multi_core_naive (
+  global_addr_t gradout_global_addr,
+  global_addr_t index_global_addr,
+  global_addr_t out_global_addr,
+  global_addr_t sorted_index_global_addr,
+  global_addr_t sorted_index_index_global_addr,
+  global_addr_t from_index_global_addr,
+  global_addr_t to_index_global_addr,
+  int           window_size,
+  const int     *gradout_shape,  //grad_Y [V, H]
+  const int     *index_shape,    //X~[BS]
+  const int     *out_shape,      //grad_W [BS, H]
+  int           gradout_dim,
+  int           idx_dim,
+  int           out_dim,
+  data_type_t   grad_dtype,
+  bool is_index_int64 ) {
+
+    const int data_size = tpu_data_type_size(grad_dtype);
+
+    TPUKERNEL_ASSERT ( is_index_int64 == false );
+    dim4 o_shape = {.n = 1, .c = 1, .h = 1, .w = out_shape[out_dim - 1]};
+    for ( int i = 0; i < out_dim - 1; i++ ) {
+      o_shape.h *= out_shape[i];
+    }
+    dim4 go_shape = {.n = 1, .c = 1, .h = 1, .w = gradout_shape[gradout_dim - 1]};
+    for ( int i = 0; i < gradout_dim - 1; i++ ) {
+      go_shape.h *= gradout_shape[i];
+    }
+
+    int NUM_index = 1;
+    //printf("index_shape: ");
+    for ( int i = 0; i < idx_dim; i++ ) {
+      NUM_index *= index_shape[i];
+      //printf("  %d,", index_shape[i]);
+    }
+
+    TPUKERNEL_ASSERT(go_shape.w ==  o_shape.w);
+    const int H  = o_shape.w;
+
+
+    const int core_num = tpu_core_num();
+    const int core_idx = tpu_core_index();
+    const unsigned long long H_avg_per_core = DIV_UP(H, core_num);
+    const int num_max_core_needed = DIV_UP(H, H_avg_per_core);
+    TPUKERNEL_ASSERT(num_max_core_needed <= core_num);
+    unsigned long long H_real = H_avg_per_core;
+    if (core_idx == num_max_core_needed - 1) {
+      H_real = H - H_avg_per_core * (num_max_core_needed - 1);
+    }
+
+    const int gradout_shape_h_sliced[2] = {go_shape.h,  H_real};
+    const int index_shape_h_sliced[1]   = {NUM_index};
+    const int out_shape_h_sliced[2]     = {o_shape.h, H_real};
+
+    // unsigned long long slice_max = __INT32_MAX__;
+    if (core_idx < num_max_core_needed){
+      nodechip_embedding_backward (
+        gradout_global_addr + core_idx * H_avg_per_core * data_size,
+        index_global_addr,
+        out_global_addr + core_idx * H_avg_per_core * data_size,
+        sorted_index_global_addr       + core_idx * NUM_index * data_size,
+        sorted_index_index_global_addr + core_idx * NUM_index * data_size,
+        from_index_global_addr         + core_idx * NUM_index * data_size,
+        to_index_global_addr           + core_idx * NUM_index * data_size,
+        window_size,
+        gradout_shape_h_sliced,
+        index_shape_h_sliced,
+        out_shape_h_sliced,
+        2,
+        1,
+        2,
+        H,
+        grad_dtype,
+        is_index_int64);
+    }
+}
+
 int tpu_kernel_api_embedding_backward_multi_core ( const void* args ) {
   sg_api_embedding_backward_t *api = ( sg_api_embedding_backward_t * ) args;
   tpu_initialize();
-
-  int core_idx = tpu_core_index();
-  // only support single core current
-  if (core_idx == 0)
-  nodechip_embedding_backward (
-  api->grad_output_global_addr,
-  api->index_global_addr,
-  api->grad_input_global_addr,
-  api->sorted_index_global_addr,
-  api->sorted_index_index_global_addr,
-  api->from_index_global_addr,
-  api->to_index_global_addr,
-  api->window_size,
-  api->grad_output_shape,
-  api->index_shape,
-  api->grad_input_shape,
-  api->grad_output_dim,
-  api->index_dim,
-  api->grad_input_dim,
-  ( data_type_t ) api->grad_output_dtype,
-  api->is_index_int64 );
+  #if 1
+    int core_idx = tpu_core_index();
+    // only support single core current
+    if (core_idx == 0) {
+        const int H_native =  api->grad_input_shape[api->grad_input_dim - 1];
+        nodechip_embedding_backward (
+          api->grad_output_global_addr,
+          api->index_global_addr,
+          api->grad_input_global_addr,
+          api->sorted_index_global_addr,
+          api->sorted_index_index_global_addr,
+          api->from_index_global_addr,
+          api->to_index_global_addr,
+          api->window_size,
+          api->grad_output_shape,
+          api->index_shape,
+          api->grad_input_shape,
+          api->grad_output_dim,
+          api->index_dim,
+          api->grad_input_dim,
+          H_native,
+          ( data_type_t ) api->grad_output_dtype,
+          api->is_index_int64 );
+    }
+  #else
+    nodechip_embedding_backward_multi_core_naive(
+          api->grad_output_global_addr,
+          api->index_global_addr,
+          api->grad_input_global_addr,
+          api->sorted_index_global_addr,
+          api->sorted_index_index_global_addr,
+          api->from_index_global_addr,
+          api->to_index_global_addr,
+          api->window_size,
+          api->grad_output_shape,
+          api->index_shape,
+          api->grad_input_shape,
+          api->grad_output_dim,
+          api->index_dim,
+          api->grad_input_dim,
+          ( data_type_t ) api->grad_output_dtype,
+          api->is_index_int64 );
+  #endif
   tpu_poll();
   return 0;
 }
