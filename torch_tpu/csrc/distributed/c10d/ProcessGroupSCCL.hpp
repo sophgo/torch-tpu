@@ -76,6 +76,7 @@ public:
   c10::intrusive_ptr<Work>
   broadcast(std::vector<at::Tensor> &tensors,
             const BroadcastOptions &opts = BroadcastOptions()) override;
+  
   c10::intrusive_ptr<Work>
   allreduce(std::vector<at::Tensor> &tensors,
             const AllreduceOptions &opts = AllreduceOptions()) override;
@@ -103,7 +104,8 @@ public:
           std::vector<std::vector<at::Tensor>> &inputs,
           const ScatterOptions &opts = ScatterOptions()) override;
 
-  c10::intrusive_ptr<Work> reduce_scatter(
+  c10::intrusive_ptr<Work>
+  reduce_scatter(
       std::vector<at::Tensor> &outputs,
       std::vector<std::vector<at::Tensor>> &inputs,
       const ReduceScatterOptions &opts = ReduceScatterOptions()) override;
@@ -114,13 +116,16 @@ public:
                 std::vector<int64_t> &inputCounts,
                 const AllToAllOptions &opts = AllToAllOptions()) override;
 
-  c10::intrusive_ptr<Work> send(std::vector<at::Tensor> &tensors, int dstRank,
+  c10::intrusive_ptr<Work>
+  send(std::vector<at::Tensor> &tensors, int dstRank,
                                 int tag) override;
 
-  c10::intrusive_ptr<Work> recv(std::vector<at::Tensor> &tensors, int srcRank,
+  c10::intrusive_ptr<Work>
+  recv(std::vector<at::Tensor> &tensors, int srcRank,
                                 int tag) override;
 
-  c10::intrusive_ptr<Work>barrier(
+  c10::intrusive_ptr<Work>
+  barrier(
     const BarrierOptions &opts = BarrierOptions()) override;
 
   const c10::intrusive_ptr<Store> &_getStore() const {

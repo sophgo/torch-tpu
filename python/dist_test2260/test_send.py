@@ -26,26 +26,25 @@ dist.init_process_group(backend="sccl", rank=int(rank), world_size=int(world_siz
 init_logger()
 logger = logging.getLogger('sccl_logger')
 
-if is_slave():
-    tensor = torch.zeros(tensor_len)
-    # tensor = torch.zeros(tensor_len).to(torch.bool)
-    logger.info(f"{int(rank)} input: {tensor}")
-    print(tensor)
-    device = torch.device(f"{TPU}:{chip_map[int(rank)]}")
-    if torch_tpu.tpu.current_device() == device.index:
-        tensor = tensor.to(device)
+device = torch.device(f"{TPU}:{chip_map[int(rank)]}")
 
-if is_master():
+if int(rank) == 0:
     tensor = torch.rand(tensor_len)
-    # tensor = torch.randint(0, 2, (tensor_len,), dtype=torch.bool)
     logger.info(f"{int(rank)} input: {tensor}")
-    print(tensor)
-    device = torch.device(f"{TPU}:{chip_map[int(rank)]}")
+    print("rank:", rank, tensor)
     if torch_tpu.tpu.current_device() == device.index:
         tensor = tensor.to(device)
+    dist.isend(tensor, dst=1)
+    # req.wait()
+    print('Rank 0 has sent the tensor to Rank 1')
+elif int(rank) == 1:
+    tensor = torch.zeros(tensor_len)
+    logger.info(f"{int(rank)} input: {tensor}")
+    print("rank:", rank, tensor)
+    if torch_tpu.tpu.current_device() == device.index:
+        tensor = tensor.to(device)
+    dist.irecv(tensor, src=0)
+    # req.wait()
+    print('Rank 1 has received the tensor:', tensor.cpu())
 
-dist.broadcast(tensor, src=0)
-
-logger.info(f"{int(rank)} result: {tensor.cpu()}")
-
-# mpirun --allow-run-as-root  -n 8 -output-filename log python test_broadcast.py 2>&1 | tee 1.log
+# mpirun --allow-run-as-root  -n 8 -output-filename log python test_send.py 2>&1 | tee 1.log

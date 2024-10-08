@@ -24,6 +24,7 @@ enum scclDataType_t
     SCCL_DTYPE_FP8E5M2 = 12,
     SCCL_DTYPE_FP8E4M3 = 13,
     SCCL_DTYPE_INT64 = 14,
+    SCCL_DTYPE_BOOL = 15,
     SCCL_DTYPE_UNKNOWN = -1,
 };
 
@@ -57,11 +58,9 @@ void *scclPhysToVirt(scclHandle_t handle, uint64_t addr);
 
 scclResult_t scclSetupC2C(scclHandle_t handle, int deviceID);
 
-scclHandle_t scclCreateHandle(int deviceID);
-
 scclResult_t scclGetUniqueId(scclHandle_t handle, scclUniqueId uniqueId);
 
-scclResult_t scclCommInitRank(scclComm_t *comm, int nRanks, scclUniqueId uniqueId,
+scclResult_t scclCommInitRank(scclComm_t *comm, int nRanks, scclUniqueId commId,
                               int rank, const int *chipMap);
 scclResult_t scclCommDestroy(scclComm_t comm);
 

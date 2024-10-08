@@ -21,33 +21,6 @@
 #include "TPUAddrHelper.h"
 #include "sccl.h"
 
-#define GENERATE_ALL_TYPES(type, func, args...)                                \
-  switch (type) {                                                              \
-  case ::at::ScalarType::Float:                                                \
-    func<float>(args);                                                         \
-    break;                                                                     \
-  case ::at::ScalarType::Double:                                               \
-    func<double>(args);                                                        \
-    break;                                                                     \
-  case ::at::ScalarType::Half:                                                 \
-    func<sophon::float16>(args);                                               \
-    break;                                                                     \
-  case ::at::ScalarType::Char:                                                 \
-    func<int8_t>(args);                                                        \
-    break;                                                                     \
-  case ::at::ScalarType::Byte:                                                 \
-    func<uint8_t>(args);                                                       \
-    break;                                                                     \
-  case ::at::ScalarType::Int:                                                  \
-    func<int32_t>(args);                                                       \
-    break;                                                                     \
-  case ::at::ScalarType::Long:                                                 \
-    func<int64_t>(args);                                                       \
-    break;                                                                     \
-  default:                                                                     \
-    TORCH_CHECK(false, "Invalid scalar type");                                 \
-  }
-
 namespace c10d {
 
 static const std::string SCCL_SOCKET_IFNAME_ENV = "SCCL_SOCKET_IFNAME";
@@ -131,6 +104,12 @@ scclDataType_t toSCCLDtype(::at::ScalarType type) {
     break;
   case ::at::ScalarType::Int:
     dtype = SCCL_DTYPE_INT32;
+    break;
+  case ::at::ScalarType::Long:
+    dtype = SCCL_DTYPE_INT64;
+    break;
+  case ::at::ScalarType::Bool:
+    dtype = SCCL_DTYPE_BOOL;
     break;
   default:
     TORCH_CHECK(false, "Invalid scalar type");
@@ -258,6 +237,76 @@ void ProcessGroupSCCL::getSCCLcomm(scclComm_t *comm){
               comm, ranks, scclID_, rank,
               options->chip_map.data()) == scclSuccess,
           "sccl comm init rank failed\n");
+}
+
+static inline at::Tensor &checkSingleTensor(std::vector<at::Tensor> &tensors) {
+  if (tensors.size() != 1) {
+    TORCH_CHECK(false, "ProcessGroupSCCL::send takes a single tensor");
+  }
+  auto &tensor = tensors[0];
+  if (!tensor.is_contiguous()) {
+    TORCH_CHECK(false, "input tensor has to be contiguous");
+  }
+  if (tensor.is_sparse()) {
+    TORCH_CHECK(false, "input tensor has to be dense");
+  }
+  return tensor;
+}
+
+c10::intrusive_ptr<Work>
+ProcessGroupSCCL::send(std::vector<at::Tensor> &inputs,
+                              int dstRank,
+                              int /* unused */) {
+  static auto invalidArgument = [](const std::string &msg) {
+    TORCH_CHECK(false, "ProcessGroupSCCL::send: " + msg);
+  };
+  assertRootRank(invalidArgument, dstRank, size_);
+  assertDense(invalidArgument, inputs);
+  assertTypeAndSizesMatch(invalidArgument, inputs);
+
+  auto& tensor = checkSingleTensor(inputs);
+  const auto &device = inputs[0].device();
+  if (device.type() != at::kPrivateUse1) {
+    invalidArgument(c10::str("unsupported device type", device.type()));
+  }
+
+  return collective(*this, tensor, tensor,
+    [&](at::Tensor &input, at::Tensor &output,
+        scclComm_t comm, scclHandle_t handle) {
+      void *sendBuff = scclPhysToVirt(handle, GetAddrByUnifiedAddr((uint64_t)input.data_ptr()));
+      return scclSend(
+          sendBuff,
+          input.numel(), toSCCLDtype(input.scalar_type()), dstRank,
+          comm, handle);
+    });
+}
+
+c10::intrusive_ptr<Work>
+ProcessGroupSCCL::recv(std::vector<at::Tensor> &inputs,
+                              int srcRank,
+                              int /* unused */) {
+  static auto invalidArgument = [](const std::string &msg) {
+    TORCH_CHECK(false, "ProcessGroupSCCL::recv: " + msg);
+  };
+  assertRootRank(invalidArgument, srcRank, size_);
+  assertDense(invalidArgument, inputs);
+  assertTypeAndSizesMatch(invalidArgument, inputs);
+
+  auto& tensor = checkSingleTensor(inputs);
+  const auto &device = inputs[0].device();
+  if (device.type() != at::kPrivateUse1) {
+    invalidArgument(c10::str("unsupported device type", device.type()));
+  }
+
+  return collective(*this, tensor, tensor,
+    [&](at::Tensor &input, at::Tensor &output,
+        scclComm_t comm, scclHandle_t handle) {
+      void *recvBuff = scclPhysToVirt(handle, GetAddrByUnifiedAddr((uint64_t)input.data_ptr()));
+      return scclRecv(
+          recvBuff,
+          input.numel(), toSCCLDtype(input.scalar_type()), srcRank,
+          comm, handle);
+    });
 }
 
 c10::intrusive_ptr<Work>
@@ -648,32 +697,6 @@ c10::intrusive_ptr<Work> ProcessGroupSCCL::alltoall_base(
           recvBuff,
           output.numel(), toSCCLDtype(output.scalar_type()), comm, handle);
     });
-}
-
-static inline at::Tensor &checkSingleTensor(std::vector<at::Tensor> &tensors) {
-  if (tensors.size() != 1) {
-    TORCH_CHECK(false, "ProcessGroupSCCL::send takes a single tensor");
-  }
-  auto &tensor = tensors[0];
-  if (!tensor.is_contiguous()) {
-    TORCH_CHECK(false, "input tensor has to be contiguous");
-  }
-  if (tensor.is_sparse()) {
-    TORCH_CHECK(false, "input tensor has to be dense");
-  }
-  return tensor;
-}
-
-c10::intrusive_ptr<Work>
-ProcessGroupSCCL::send(std::vector<at::Tensor> &tensors,int dstRank, int /* unused */) {
-  // to do
-  return c10::make_intrusive<Work>();
-}
-
-c10::intrusive_ptr<Work>
-ProcessGroupSCCL::recv(std::vector<at::Tensor> &tensors, int srcRank, int /* unused */) {
-  // to do
-  return c10::make_intrusive<Work>();
 }
 
 c10::intrusive_ptr<Work>

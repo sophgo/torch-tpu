@@ -5,4 +5,4 @@
 #         --nproc_per_node=8 \
 #         test_broadcast.py 2>&1 | tee 0.log
 
-torchrun --nproc_per_node 8 --nnodes 1 test_broadcast.py 2>&1 | tee 1.log
+torchrun --nproc_per_node 2 --nnodes 1 test_broadcast.py 2>&1 | tee 1.log

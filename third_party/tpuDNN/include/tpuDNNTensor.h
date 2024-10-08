@@ -24,7 +24,8 @@ enum tpudnnDataType_t
     TPUDNN_DTYPE_FP8E5M2 = 12,
     TPUDNN_DTYPE_FP8E4M3 = 13,
     TPUDNN_DTYPE_INT64 = 14,
-    TPUDNN_DTYPE_TF32,
+    TPUDNN_DTYPE_TF32 = 15,
+    TPUDNN_DTYPE_BOOL = 16,
 
     TPUDNN_DTYPE_UNKNOWN = -1,
 };
@@ -719,7 +720,29 @@ tpudnnStatus_t tpudnnRmsNormBackwardAsync(
     tpudnnTensor_t grad_bias,
     int axis,
     double eps);
-    
+
+tpudnnStatus_t tpudnnC2CSend(
+    tpudnnHandle_t handle,
+    void *buff,
+    int count,
+    tpudnnDataType_t dtype,
+    int dst_rank,
+    const char* uuid,
+    int nranks,
+    int cur_rank,
+    const int *chip_map);
+
+tpudnnStatus_t tpudnnC2CRecv(
+    tpudnnHandle_t handle,
+    void *buff,
+    int count,
+    tpudnnDataType_t dtype,
+    int src_rank,
+    const char* uuid,
+    int nranks,
+    int cur_rank,
+    const int *chip_map);
+
 tpudnnStatus_t tpudnnC2CAllReduce(
     tpudnnHandle_t handle,
     void *send_buff,
@@ -848,5 +871,55 @@ tpudnnStatus_t tpudnnLoraMatmulForwardAsync(
     tpudnnTensor_t weight,
     tpudnnTensor_t output,
     float scale);
+
+tpudnnStatus_t tpudnnLlamaAttentionAsync ( 
+    tpudnnHandle_t handle,
+    tpudnnTensor_t OUT,
+    tpudnnTensor_t Q,
+    tpudnnTensor_t K,
+    tpudnnTensor_t V,
+    tpudnnTensor_t Kcache,
+    tpudnnTensor_t Vcache,
+    tpudnnTensor_t cos,
+    tpudnnTensor_t sin,
+    tpudnnTensor_t save_slots,
+    tpudnnTensor_t fetch_slots,
+    tpudnnTensor_t mask,
+    tpudnnTensor_t Qbuffer,
+    tpudnnTensor_t Kbuffer,
+    tpudnnTensor_t Vbuffer,
+    tpudnnTensor_t input_lengths_tensor,
+    int*           input_lengths,
+    int            num_input_lengths,
+    int slots_size,
+    int mask_size,
+    int block_size,
+    float C,
+    int attention_mode // 2: prefile, 3: decode
+    ); 
+
+tpudnnStatus_t tpudnnLLamaMlpAsync ( 
+    tpudnnHandle_t handle,
+    tpudnnTensor_t input,
+    tpudnnTensor_t weight0,
+    tpudnnTensor_t weight1,
+    tpudnnTensor_t weight2,
+    tpudnnTensor_t output);
+
+tpudnnStatus_t tpudnnLLamaA16MlpAsync ( 
+    tpudnnHandle_t handle,
+    tpudnnTensor_t input,
+    tpudnnTensor_t weight0,
+    tpudnnTensor_t zp0,
+    tpudnnTensor_t scale0,
+    tpudnnTensor_t weight1,
+    tpudnnTensor_t zp1,
+    tpudnnTensor_t scale1,
+    tpudnnTensor_t weight2,
+    tpudnnTensor_t zp2,
+    tpudnnTensor_t scale2,
+    int group_size,
+    int weight_bits,
+    tpudnnTensor_t output);
 
 } // extern "C"
