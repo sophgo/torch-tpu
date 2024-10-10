@@ -178,7 +178,7 @@ public:
       }
 
       tpuRtFree(&tbd.ptr, NO_USE);
-      std::cout << "Free " << tbd.ptr << " of size " << getSize(tbd.ptr, index) << std::endl;
+      // std::cout << "Free " << tbd.ptr << " of size " << getSize(tbd.ptr, index) << std::endl;
       getMemInfo(index).erase(tbd.ptr);
       toRm.push_back(tbd.ptr);
     }
@@ -215,7 +215,7 @@ public:
     std::lock_guard<std::mutex> lock(getMutex(Index));
     getMemInfo(Index)[ptr] = info;
 
-    std::cout << "Alloc " << ptr << " of size " << Size << std::endl;
+    // std::cout << "Alloc " << ptr << " of size " << Size << std::endl;
 
     return ptr;
   }
