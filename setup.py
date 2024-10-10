@@ -33,8 +33,12 @@ SOC_CROSS = os.environ.get("SOC_CROSS_MODE", None)
 SOC_CROSS = True if SOC_CROSS == "ON" else False
 CROSS_TOOLCHAINS= os.environ.get("CROSS_TOOLCHAINS", None)
 if SOC_CROSS:
-    os.environ["CC"] = f"{CROSS_TOOLCHAINS}/gcc-arm-10.3-2021.07-x86_64-aarch64-none-linux-gnu/bin/aarch64-none-linux-gnu-gcc"
-    os.environ["CXX"] = f"{CROSS_TOOLCHAINS}/gcc-arm-10.3-2021.07-x86_64-aarch64-none-linux-gnu/bin/aarch64-none-linux-gnu-g++"
+    if os.environ["CHIP_ARCH"] == "sg2260":
+        os.environ["CC"] = f"{CROSS_TOOLCHAINS}/riscv64-linux-x86_64/bin/riscv64-unknown-linux-gnu-gcc"
+        os.environ["CXX"] = f"{CROSS_TOOLCHAINS}/riscv64-linux-x86_64/bin/riscv64-unknown-linux-gnu-g++"
+    else:
+        os.environ["CC"] = f"{CROSS_TOOLCHAINS}/gcc-arm-10.3-2021.07-x86_64-aarch64-none-linux-gnu/bin/aarch64-none-linux-gnu-gcc"
+        os.environ["CXX"] = f"{CROSS_TOOLCHAINS}/gcc-arm-10.3-2021.07-x86_64-aarch64-none-linux-gnu/bin/aarch64-none-linux-gnu-g++"
 
 def which(thefile):
     path = os.environ.get("PATH", os.defpath).split(os.pathsep)
@@ -215,7 +219,6 @@ class Build(build_ext, ExtBase, object):
             os.symlink(lib_fn, sym_fn)
 
         self.build_lib = os.path.relpath(os.path.join(BASE_DIR, f"build/{get_build_type()}/packages"))
-        self.build_temp = os.path.relpath(os.path.join(BASE_DIR, f"build/torch-plugin"))
         self.library_dirs.append(
             os.path.relpath(os.path.join(BASE_DIR, f"build/{get_build_type()}/packages/torch_tpu/lib")))
         super(Build, self).run()
@@ -225,12 +228,18 @@ class Build(build_ext, ExtBase, object):
     def finalize_options(self):
         build_ext.finalize_options(self)
         if SOC_CROSS:
-            self.plat_name = "aarch64"  # Example for ARM64
+            if os.environ["CHIP_ARCH"] == "sg2260":
+                self.plat_name = "riscv64"
+            else:
+                self.plat_name = "aarch64"  # Example for ARM64
 
     def get_ext_filename(self, ext_name):
         filename = super().get_ext_filename(ext_name)
         if 'x86_64-linux-gnu' in filename and SOC_CROSS:
-            return filename.replace('x86_64-linux-gnu', 'aarch64-linux-gnu')
+            if os.environ["CHIP_ARCH"] == "sg2260":
+                return filename.replace('x86_64-linux-gnu', 'riscv64-linux-gnu')
+            else:
+                return filename.replace('x86_64-linux-gnu', 'aarch64-linux-gnu')
         return filename
 
 class InstallCmd(install):
@@ -346,7 +355,10 @@ class bdist_wheel(_bdist_wheel, ExtBase):
     def finalize_options(self):
         _bdist_wheel.finalize_options(self)
         if SOC_CROSS:
-            self.plat_name = 'manylinux2014_aarch64'
+            if os.environ["CHIP_ARCH"] == "sg2260":
+                self.plat_name = 'linux_riscv64'
+            else:
+                self.plat_name = 'manylinux2014_aarch64'
 
     def run(self):
         self.run_command('build')

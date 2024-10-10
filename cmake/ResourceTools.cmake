@@ -2,6 +2,9 @@ function (compile_binary_file bin_path name)
     if (CMAKE_SYSTEM_PROCESSOR STREQUAL "x86_64")
         set(bfdarch "i386:x86-64")
         set(bfdname "elf64-x86-64")
+    elseif (CMAKE_SYSTEM_PROCESSOR STREQUAL "riscv64")
+        set(bfdarch "riscv:rv64")
+        set(bfdname "elf64-littleriscv")
     else ()
         message(FATAL_ERROR "Not implemented system processor \"${CMAKE_SYSTEM_PROCESSOR}\"")
     endif()
@@ -9,7 +12,7 @@ function (compile_binary_file bin_path name)
     add_custom_command(
         OUTPUT ${name}.o
         COMMAND ln -sf ${bin_path} ${name}
-        COMMAND objcopy -I binary -B ${bfdarch} -O ${bfdname}
+        COMMAND ${CMAKE_OBJCOPY} -I binary -B ${bfdarch} -O ${bfdname}
             --rename-section .data=.rodata ${name} ${name}.o
         DEPENDS ${bin_path}
         VERBATIM)

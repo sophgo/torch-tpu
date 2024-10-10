@@ -51,11 +51,6 @@ function set_v7runtime_env() {
     export TPUKERNEL_FIRMWARE_PATH=${root_path}/build/firmware_sg2260_cmodel/libfirmware.so
 }
 
-################ MODE CHOICE ###################
-export MODE_ASIC=stable        # stable: asic
-export MODE_CMODEL=local       # local: cmodel
-export MODE_PATTERN=${2:-$MODE_CMODEL}
-
 ######## ===== ENVS TO COMPILE TPUTRAIN ======########
 export TPUTRAIN_TOP=$(cd $(dirname "${BASH_SOURCE[0]}")/.. && pwd)
 export CHIP_ARCH=${1:-bm1684x}  #sg2260
