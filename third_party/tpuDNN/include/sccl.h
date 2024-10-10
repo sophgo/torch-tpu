@@ -57,12 +57,20 @@ void *scclPhysToVirt(scclHandle_t handle, uint64_t addr);
 
 scclResult_t scclSetupC2C(scclHandle_t handle, int deviceID);
 
+scclHandle_t scclCreateHandle(int deviceID);
+
 scclResult_t scclGetUniqueId(scclHandle_t handle, scclUniqueId uniqueId);
 
-scclResult_t scclCommInitRank(scclComm_t *comm, int nRanks, scclUniqueId commId,
+scclResult_t scclCommInitRank(scclComm_t *comm, int nRanks, scclUniqueId uniqueId,
                               int rank, const int *chipMap);
 scclResult_t scclCommDestroy(scclComm_t comm);
 
+scclResult_t scclSend(const void *send_buff, size_t send_count,
+                           scclDataType_t dtype, int dst_rank,
+                           scclComm_t comm, scclHandle_t handle);
+scclResult_t scclRecv(const void *recv_buff, size_t recv_count,
+                           scclDataType_t dtype, int src_rank,
+                           scclComm_t comm, scclHandle_t handle);
 scclResult_t scclAllGather(const void *sendBuff, void *recvBuff,
                            size_t send_count, scclDataType_t dtype,
                            scclComm_t comm, scclHandle_t handle);
