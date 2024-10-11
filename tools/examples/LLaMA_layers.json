@@ -1,13 +1,12 @@
 {
     "input_embedding":{
-        "C": 1,
         "MatMul":{
             "type": "MM2",
 
             "matrix":{
-                "in0": ["seq_len", -1, "batch",        "vocab_size" ],
-                "in1": [        1, -1, "vocab_size",   "hidden_size"],
-                "out": ["seq_len", -1, "batch",        "hidden_size"]
+                "in0": ["batch", 1, "seq_len",    "vocab_size" ],
+                "in1": [      1, 1, "vocab_size", "hidden_size"],
+                "out": ["batch", 1, "seq_len",    "hidden_size"]
             }
         }
     },
@@ -25,29 +24,26 @@
         "type": "MM2",
         "w4a16": true,
         "inLayer": true,
-        "IM": true,
-        "C": 1,
         "matrix":{
-            "in0": ["seq_len", -1, "batch", "hidden_size"],
-            "in1": [        1, -1, "hidden_size",  "hidden_size/tp+2*block_size*kv_heads/tp"],
-            "out": ["seq_len", -1, "batch",        "hidden_size/tp+2*block_size*kv_heads/tp"]
+            "in0": ["batch", 1, "seq_len", "hidden_size"],
+            "in1": [      1, 1, "hidden_size", "hidden_size/tp+2*block_size*kv_heads/tp"],
+            "out": ["batch", 1, "seq_len",     "hidden_size/tp+2*block_size*kv_heads/tp"]
         }
     },
     "ATT_QKV":{
         "inLayer": true,
         "cache":{
-            "matrix":{
-                "K_cache": ["batch", "kv_heads/tp", "token_size-1", "block_size"],
-                "V_cache": ["batch", "kv_heads/tp", "token_size-1", "block_size"]
-            }  
+            "K_cache": ["batch", "kv_heads/tp", "token_size-1", "block_size"],
+            "V_cache": ["batch", "kv_heads/tp", "token_size-1", "block_size"]
         },
             
         "IM": true,
-        "matrix":{
+        "input":{
             "common": false,
-            "in_Q": [ "seq_len", 1, "batch", "hidden_size/tp" ],
-            "in_K": [ "seq_len", 1, "batch", "block_size*kv_heads/tp"],
-            "in_V": [ "seq_len", 1, "batch", "block_size*kv_heads/tp"]
+            "Q": [ "batch", 1, "seq_len", "hidden_size/tp" ],
+            "K": [ "batch", 1, "seq_len", "block_size*kv_heads/tp"],
+            "V": [ "batch", 1, "seq_len", "block_size*kv_heads/tp"],
+            "dY": ["batch", "head/tp", "seq_len", "block_size"]
         },
         
         "Neg_Q":{
@@ -90,17 +86,17 @@
             "type":"AR",
             "matrix": [ "batch", "kv_heads/tp", "seq_len", "block_size" ]
         },
-        "MatMul_NT":{
+        "Score":{
             "IM": false,
             "CM": false,
             "OM": false,
             "type":"MM2_NT",
 
-            "N": "batch",
+            "isParam": false,
             "matrix":{
-                "in0":[-1, "head/tp", "seq_len", "block_size"],
-                "in1":[-1, "kv_heads/tp", "token_size", "block_size"],
-                "out":[-1, "head/tp", "seq_len", "token_size"]
+                "in0":["batch", "head/tp", "seq_len", "block_size"],
+                "in1":["batch", "kv_heads/tp", "token_size", "block_size"],
+                "out":["batch", "head/tp", "seq_len", "token_size"]
             }
         },
         "Div":{
@@ -116,32 +112,34 @@
         "SoftMax":{
             "NM": true,
             "type":"Mix",
+            "isParam": false,
             "matrix": [ "batch", "head/tp", "seq_len", "token_size" ]
         },
         "MatMul":{
+            "IM": false,
             "CM": false,
-            "OM": false,
             "type":"MM2",
+            "s_noMem": "out",
             
-            "N": "batch",
+            "isParam": false,
             "matrix":{
-                "in0":[-1, "head/tp", "seq_len", "token_size"],
-                "in1":[-1, "kv_heads/tp", "token_size", "block_size"],
-                "out":[-1, "head/tp", "seq_len", "block_size"]
+                "in0":["batch", "head/tp", "seq_len", "token_size"],
+                "in1":["batch", "kv_heads/tp", "token_size", "block_size"],
+                "out":["batch", "head/tp", "seq_len", "block_size"]
             }
         }
     },
     "ATT_FC":{
         "w4a16": true,
         "inLayer": true,
-        "C":1,
+
         "MatMul":{
             "type":"MM2",
 
             "matrix":{
-                "in0":["batch", -1, "seq_len", "hidden_size/tp"],
-                "in1":[      1, -1, "hidden_size/tp", "hidden_size"],
-                "out":["batch", -1, "seq_len", "hidden_size"]
+                "in0":["batch", 1, "seq_len",     "hidden_size/tp"],
+                "in1":[      1, 1, "hidden_size/tp", "hidden_size"],
+                "out":["batch", 1, "seq_len",        "hidden_size"]
             }
         }
     },
@@ -168,41 +166,30 @@
         "w4a16": true,
         "f8": true,
         "inLayer": true,
-        "C":1,
-        "MatMul":{
+        "MatMul13":{
             "OM": false,
             "type":"MM2",
             "matrix":{
-                "in0":["seq_len", -1, "batch", "hidden_size"],
-                "in1":[        1, -1, "hidden_size", "intermediate_size/tp"],
-                "out":["seq_len", -1, "batch", "intermediate_size/tp"]
+                "in0":["batch", 1, "seq_len", "hidden_size"],
+                "in1":[      1, 1, "hidden_size", "2*intermediate_size/tp"],
+                "out":["batch", 1, "seq_len",     "2*intermediate_size/tp"]
             }
         },
         "SiLU":{
             "NM": true,
             "type":"Act"
         },
-        "MatMul2":{
-            "IM": false,
-            "OM": false,
-            "type":"MM2",
-            "matrix":{
-                "in0":["seq_len", -1, "batch", "hidden_size"],
-                "in1":[        1, -1, "hidden_size", "intermediate_size/tp"],
-                "out":["seq_len", -1, "batch", "intermediate_size/tp"]
-            }
-        },
         "Mul":{
             "NM": true,
             "type":"AR"
         },
-        "MatMul3":{
+        "MatMul2":{
             "IM": false,
             "type":"MM2",
             "matrix":{
-                "in0":["seq_len", -1, "batch", "intermediate_size/tp"],
-                "in1":[        1, -1, "intermediate_size/tp", "hidden_size"],
-                "out":["seq_len", -1, "batch", "hidden_size"]
+                "in0":["batch", 1, "seq_len", "intermediate_size/tp"],
+                "in1":[      1, 1, "intermediate_size/tp", "hidden_size"],
+                "out":["batch", 1, "seq_len", "hidden_size"]
             }
         }
     },
@@ -228,11 +215,11 @@
         "MatMul":{
             "type":"MM2",
             
-            "C":1,
+            "saveOutput": true,
             "matrix":{
-                "in0":["seq_len", -1, "batch", "hidden_size"],
-                "in1":[        1, -1, "hidden_size", "vocab_size"],
-                "out":["seq_len", -1, "batch", "vocab_size"]
+                "in0":["batch", 1, "seq_len",    "hidden_size"],
+                "in1":[      1, 1, "hidden_size", "vocab_size"],
+                "out":["batch", 1, "seq_len",     "vocab_size"]
             }
         }
     }

@@ -26,13 +26,19 @@ def rsum(*numbers):
 def btoi(abool: bool) -> int:
     return 1 if abool else 0
 
-def addSelfPoint(s:str):
+def addSelfPoint(s:str) -> str:
     if isinstance(s, str) and s[:5]!="self.":
         pattern = r"(\w+)(.?)"
         matches = re.findall(pattern, s)
         return "".join( f"self.{m[0]}{m[1]}" if not m[0].isdigit() else m[0]+m[1] for m in matches )
     else:
         return s
+
+def isProper(x):
+    if isinstance(x, (int, float)):
+        return x>0
+    else:
+        return x
 
 MatrixProps = ('N', 'C', 'H', 'W')
 MatrixPropsOrders = {s:i for i, s in enumerate(MatrixProps)}
@@ -46,18 +52,20 @@ class ProcessError(Exception):
     pass
 
 class LLM:
-    Qtypes = ("f16", "f8", "w4a16")
-    f8 = False
-    w4a16 = False
+    Qtype = 'f16'
+    name = None
+
+    debug = False
+    mode = 'infer'
+    
     batch = 8
     tp = 1
-    debug = False
-    debugTime = False
-    mode = 'infer'
     pp = 1
+    nparams = 0
     def __init__(self, **kwargs) -> None:
         for k, v in kwargs.items():
-            setattr(self, k, v)
+            if isProper(v):
+                setattr(self, k, v)
 
         modelJson = getattr(self, "modelJson", None)
         if not modelJson:
@@ -76,10 +84,13 @@ class LLM:
         if not self._checkAttr():
             raise InitializationError("Model initialize fail!")
 
-        print(f"{self.name} generate successfully!")
+        print(f"INFO: {self.name} generate successfully!\n")
 
     def getName(self) -> str:
         return self.name
+    
+    def getNParam(self):
+        return self.nparams
 
     def _usePredefinedModel(self) -> None:
         preDefinedModel = {
@@ -112,6 +123,11 @@ class LLM:
             if not hasattr(self, k):
                 print(f"{k} not in init parameters!")
                 return False
+            
+        mode_choices = ('infer', 'backward', 'train', 'prefill')
+        if self.mode not in mode_choices:
+            raise InitializationError(f"{self.mode} not defined, select in {mode_choices}.")
+        
         return True
     
     def _initModel(self, modelJson, tpuJson) -> bool:
@@ -128,11 +144,18 @@ class LLM:
 
         with open(tpuJson) as f:
             for k, v in json.load(f).items():
+                if hasattr(self, k) and isProper(getattr(self, k)):
+                    print(f"WARN: {k} has been overwriten to be {getattr(self, k)}")
+                    continue
                 setattr(self, k, v)
 
         with open(modelJson) as f:
             for k, v in json.load(f).items():
+                if hasattr(self, k) and isProper(getattr(self, k)):
+                    print(f"WARN: {k} has been overwriten to be {getattr(self, k)}")
+                    continue
                 setattr(self, k, v)
+                
         if not hasattr(self, "layers"):
             print("INFO: No layers specified, reading LLaMA layer as default.")
             with open("examples/LLaMA_layers.json") as f:
@@ -154,7 +177,7 @@ class LLM:
             with open("test.json", "w") as f:
                 json.dump(self.layers, f, indent=4)
 
-        if self.mode == "train" and (self.f8 or self.w4a16):
+        if self.mode == "train" and self.Qtype in ('f8', 'w4a16'):
             raise ProcessError("Temporary training cant use f8 or w4a16.")
         return True
     
@@ -179,12 +202,12 @@ class LLM:
 
             elif isinstance(v, str):
                 if k in MatrixProps:
-                    d[k] = addSelfPoint(v)
+                    d[k] = self._getValue(addSelfPoint(v))
             
             elif isinstance(v, list):
                 for i, s in enumerate(v):
                     if isinstance(s, str):
-                        v[i] = addSelfPoint(s)
+                        v[i] = self._getValue(addSelfPoint(s))
                     elif s==-1:
                         if MatrixProps[i] in d:
                             v[i] = d[MatrixProps[i]]
@@ -200,28 +223,55 @@ class LLM:
     def _setSuperPars(self, tp:int, batch:int, Qtype:str=None) -> None:
         self.tp = tp
         self.batch = batch
-        for t in self.Qtypes:
-            setattr(self, t, Qtype==t)
+        self.Qtype = Qtype
 
     def getLatency(self, tp:int, batch:int, Qtype:str=None) -> float:
         self._setSuperPars(tp, batch, Qtype)
         modules = self.layers
 
         total_time = np.zeros(2) # 2: not, inLayer
-        for k, v in modules.items():
-            if isinstance(v, dict):
-                tmpTime = self._getTime(v)
-                total_time[btoi(v.get("inLayer", False))] += tmpTime
-                if self.debug:
-                    print(f"alg debug time   [us] {k}: {tmpTime:.2f}")
+        self.firstInfer_k = None
+        if self.mode != "backward":
+            for k, v in modules.items():
+                if isinstance(v, dict):
+                    self.getNParamFlag = self.layer_num if v.get("inLayer", False) else 1
+                    if self.firstInfer_k is None:
+                        self.firstInfer_k = k
+                    # X_l+1 = X_l @ W_l^T  ~~>  out = in0 @ in1  ~~>  [a,c] ~ [a,b] @ [b,c]  ~~> FLOPs: 2abc  ~~> IOsize: ab+bc+ac  !!!! be careful if MM is in a fusion operator 
+                    tmpTime = self._getTime(v)
+                    total_time[btoi(v.get("inLayer", False))] += tmpTime
+                    if self.debug:
+                        print(f"alg infer    time[us] {k}: {tmpTime:.2f}")
+        self.getNParamFlag = 0
+
+        if self.mode in ("backward", "train"):
+            for k, v in reversed(modules.items()):
+                if isinstance(v, dict):
+                    # GradX_l-1 = GradX_l @ W       ~~>  in0 ~ out @ in1^T  ~~>  [a,b] ~ [a,c] @ [c,b]  ~~> FLOPs: 2abc  ~~> IOsize: ab+bc+ac
+                    if k != self.firstInfer_k: # No previous layer
+                        t_GradX = self._getTime(v, backtype='X')
+                    # GradW_l^T = X_l-1^T @ GradX_l ~~>  in1 ~ in0^T @ out  ~~>  [b,c] ~ [b,a] @ [a,c]  ~~> FLOPs: 2abc  ~~> IOsize: ab+bc+ac
+                    t_GradW = self._getTime(v, backtype='W')
+                    total_time[btoi(v.get("inLayer", False))] += t_GradX + t_GradW
+                    if self.debug:
+                        print(f"alg backX    time[us] {k}: {t_GradX:.2f}")
+                        print(f"alg backW    time[us] {k}: {t_GradW:.2f}")
+                        
         total_time[1] *= self.layer_num
         total_time /= 1e3 # to ms
 
         self.latency = total_time.sum() #ms
-        if self.debugTime:
+        if self.mode in ("backward", "train"):
+            ### update params
+            t_upd = 2*self.getNParam()*self.timeScale/1e3 # to ms
+            self.latency += t_upd
+            if self.debug:
+                print(f"alg parameters update time [ms]: {t_upd:.2f}")
+
+        if self.debug:
             with open("test_time.json", "w") as f:
                 json.dump(self.layers, f, indent=4)
-
+        print()
         return self.latency
     
     def getMemoryTotal(self, tp:int, batch:int, Qtype:str=None) -> float:
@@ -265,36 +315,54 @@ class LLM:
                     break
             print(f"INFO: Auto select {n_io} layers with I/O embedding.")
             total_mem = mem[0]/2 + mem[1]*n_io if ioGT else mem[1]*( (self.layer_num-2*n_io)//(self.pp-2) ) 
-                    
+        
+        if self.debug:
+            with open("test_memory.json", "w") as f:
+                json.dump(self.layers, f, indent=4)
+        print()
         return total_mem
 
-    def _getMemory(self, d:dict, cache=False) -> np.ndarray:
+    def _getMemory(self, d:dict, keyname:str=None, backtype:str=None) -> np.ndarray:
         mem = np.zeros(3) # cache/activations, weight, other
         for k, v in d.items():
             if isinstance(v, dict) and k!="matrix" and k[:2]!="t_":
-                mem += self._getMemory(v, k=="cache")
+                mem += self._getMemory(v, k, backtype)
         
-        mem += self._getAlgDataSize(d, True, cache)/(1<<20) # MB
+        tmpMem = self._getAlgDataBytes(d, True, keyname, backtype)/(1<<20) # MB
+        mem += tmpMem
+        if self.debug:
+            d["mem"] = tmpMem.tolist()
         return mem
 
-    def _getTime(self, d:dict, cache=False) -> float:
+    def _getTime(self, d:dict, keyname:str=None, backtype:str=None) -> float:
         tot = 0
         for k, v in d.items():
             if isinstance(v, dict) and k!="matrix" and k[:2]!="t_":
-                tot += self._getTime(v, k=="cache")
+                tot += self._getTime(v, k, backtype)
 
-        t_io = self._getAlgDataSize(d, False, cache).sum()*self.timeScale
-        t_cal= self._getCalTime(d)
-        tot += max(t_cal, t_io)
-        if self.debugTime:
-            d["t_io"] = t_io
-            d["t_cal"]= t_cal
+        t_dma = self._getAlgDataBytes(d, False, keyname, backtype).sum()*self.timeScale
+        t_tiu = self._getCalTime(d, keyname, backtype)
+        t_use = max(t_dma, t_tiu)
+        tot += t_use
+        if self.debug and t_use>1:
+            tmpstr = 'infer' if backtype is None else f'back{backtype}'
+            d[f"t_dma_{tmpstr}"] = int(t_dma)
+            d[f"t_tiu_{tmpstr}"] = int(t_tiu)
 
         return tot
     
-    def _getCalTime(self, alg:dict) -> float:
+    def _getCalTime(self, alg:dict, keyname:str=None, backtype:str=None) -> float:
         if alg.get("noCalTime", False):
             return 0
+        
+        ### ATT_QKV's backward, get Q,K,V and dY(gradY), out dQ,dK,dV
+        ### S = Q@K^T, dS = dY@V^T, dQ = dS@K, dK = dS^T@Q, dV = S^T@dY
+        if keyname == "input":
+            if backtype=="X":
+                ### 3*Q@K^T + 2*S@V
+                return 3*self._getCalTime(self.layers["ATT_QKV"]["Score"]) + 2*self._getCalTime(self.layers["ATT_QKV"]["MatMul"])
+            else:
+                return 0
         
         if "type" not in alg:
             return 0
@@ -303,8 +371,8 @@ class LLM:
         if "matrix" not in alg:
             return 0
         matrix = alg["matrix"]
-        f8    = self.f8 and isinstance(matrix, dict) and matrix.get("f8",    False)
-        hasBias = isinstance(matrix, dict) and matrix.get("bias", False)
+        f8    = self.Qtype=='f8' and isinstance(matrix, dict) and matrix.get("f8",   False)
+        hasBias =                    isinstance(matrix, dict) and matrix.get("bias", False)
 
         if t in ("MM2", "MM2_NT"):
             if "out" not in matrix or "in1" not in matrix:
@@ -326,8 +394,8 @@ class LLM:
             if hasBias:
                 flops += reduce(lambda x,y: x*y, (self._getValue(x) for x in matrix['out']))
             calT = flops*self.calTimeScale
-            if self.mode == "train" and alg.get("isParam", True):
-                calT *= 3 # forward 1 + backward 2
+            # if self.mode == "train" and alg.get("isParam", True):
+            #     calT *= 3 # forward 1 + backward 2
             return calT if not f8 else f8/2
         
         elif t in ("Mix", "AR", "CDMA", "Act"):
@@ -335,96 +403,111 @@ class LLM:
         else:
             raise ProcessError(f"Unexpected type {t}")
 
-    def _getAlgDataSize(self, alg:dict, memOpt=False, cache=False):
+    def _getAlgDataBytes(self, alg:dict, memOpt:bool=False, keyname:str=None, backtype:str=None):
         ds = np.zeros(3)
 
-        if "matrix" not in alg:
-            return ds
-        matrix = alg["matrix"]
-
-        if cache:
-            if self.mode in ('train', 'prefill'):
-                return ds
-
-            ds[0] = self.getMatrixDataBytes(matrix, memOpt=memOpt)
+        ### ATT_QKV's input
+        if keyname == "input":
+            if backtype=="X":
+                ### get Q,K,V and dY(gradY), out dQ,dK,dV
+                ds[0] = self.getMatrixDataBytes(alg, tuple(alg.keys()) + ('Q', 'K', 'V'))
+            elif backtype=="W":
+                pass
+            else:
+                ds[0] = self.getMatrixDataBytes(alg, ('Q', 'K', 'V'))
             return ds
         
+        ### no KV cache in train/prefill
+        if keyname == "cache":
+            if self.mode not in ('train', 'prefill', 'backward'):
+                ds[0] = self.getMatrixDataBytes(alg)
+            return ds
+
         nm = alg.get("NM", False)
         if nm:
             return ds
         
-        im = alg.get("IM", True) # input
-        cm = alg.get("CM", True) # calculation
-        om = alg.get("OM", True) # output
-        if "type" not in alg and (im or cm or om):
+        if "matrix" not in alg:
+            return ds
+        matrix = alg["matrix"]
+        
+        # im = alg.get("IM", True) # input
+        # cm = alg.get("CM", True) # calculation
+        # om = alg.get("OM", True) # output
+        ico_m = [ alg.get(s, True) for s in ("IM", "CM", "OM")]
+        if "type" not in alg and sum(ico_m)>0:
             if self.mode != "train":
-                ds[2] = self.getMatrixDataBytes(matrix, memOpt=memOpt)
+                ds[2] = self.getMatrixDataBytes(matrix)
             return ds
         
         t  = alg["type"]
         if memOpt and t in ('AR', ):
             return ds
         
-        if t in ("MM2", "Mix", "AR", "MM2_NT"):
-            save4Backward = False
-            if memOpt and self.mode == "train" and (t[:3] == "MM2" or t=="Mix") and alg.get("isParam", True):
-                save4Backward = True
+        isParam = alg.get("isParam", True)
+        s_noMem   = alg.get("s_noMem", None)
+        if isParam and self.getNParamFlag>0 and (t[:3] == "MM2" or t=="Mix"):
+            self.nparams += self.getNParamFlag*self.getMatrixDataBytes(matrix, ("in1",))
 
+        if t in ("MM2", "Mix", "AR", "MM2_NT"):
             rw_list = ico_list.copy()
-            if save4Backward:
-                ds[0] = self.getMatrixDataBytes(matrix, ("in0",), memOpt=memOpt)
-                ds[1] = self.getMatrixDataBytes(matrix, ("in1",), memOpt=memOpt)
-                if alg.get("saveOutput", False):
-                    ds[2] = self.getMatrixDataBytes(matrix, ("out",), memOpt=memOpt)
+            if memOpt and s_noMem:
+                rw_list.remove(s_noMem)
+            
+            if backtype is not None:
+                if isParam:
+                    ds[0]  = self.getMatrixDataBytes(matrix, ("in0",))
+                    ds[1]  = self.getMatrixDataBytes(matrix, ("in1",))
+                    ds[0] += self.getMatrixDataBytes(matrix, ("out",))
+                return ds
+
+            if memOpt and self.mode in ("train", "backward") and (t[:3] == "MM2" or t=="Mix") and isParam:
+                for i, s in enumerate(ico_list):
+                    if i==2 and not alg.get("saveOutput", False):
+                        continue
+                    ds[i] = self.getMatrixDataBytes(matrix, (s,))
                 return ds
             else:
-                if not im:
-                    rw_list.remove("in0")
-                if cm:
-                    ds[1] = self.getMatrixDataBytes(matrix, ("in1",), memOpt=memOpt)
-                rw_list.remove("in1")
-                if not om:
-                    rw_list.remove("out")
+                for i, s in enumerate(ico_list):
+                    if not ico_m[i]:
+                        rw_list.remove(s)
+                    elif i==1:
+                        ds[i] = self.getMatrixDataBytes(matrix, (s,))
+                        rw_list.remove(s)
+
             if rw_list:
-                ds[2] = self.getMatrixDataBytes(matrix, rw_list, memOpt=memOpt)
-            return ds
+                ds[2] = self.getMatrixDataBytes(matrix, rw_list)
 
         elif t == "CDMA": # AllReduce
             if not memOpt:
-                ds[2] = self.getAllReduceTime(self.getMatrixDataBytes(matrix, [1, ], ))/self.timeScale
-            return ds
+                ds[2] = self.getAllReduceTime(self.getMatrixDataBytes(matrix))/self.timeScale
 
         else:
             print(alg)
             print("Error! Not a defined calculation, plz check.")
-            return np.ones_like(ds)*1e9
+            ds = np.ones_like(ds)*1e9
 
-    def getMatrixDataBytes(self, matrix, l=None, memOpt=False):
+        return ds
+
+    def getMatrixDataBytes(self, matrix:list|dict, keys:list|tuple=None):
         if isinstance(matrix, list):
-            if not l:
-                return 0
-            return self.data_byte * len(l) * reduce(lambda x,y: x*y, (self._getValue(s) for s in matrix))
+            tmplen = 1 if keys is None else len(keys)
+            return self.data_byte * tmplen * reduce(lambda x,y: x*y, (self._getValue(s) for s in matrix))
         
         elif isinstance(matrix, dict):
             hasBias = matrix.get("bias", False)
-            if not l:
-                l = matrix.keys()
-
-            f8    = self.f8    and matrix.get("f8",    False)
-            w4a16 = self.w4a16 and matrix.get("w4a16", False)
-            if f8 and w4a16:
-                raise ProcessError("Only one Qtype can be True in Alg, plz check json.")
+            keys = matrix.keys() if keys is None else keys
 
             ds = 0
-            for s in l:
+            for s in keys:
                 if s not in matrix:
-                    raise ProcessError(f"Calculation key {s} from {l} not in {matrix}!")
+                    raise ProcessError(f"Calculation key {s} from {keys} not in {matrix}!")
                 elif isinstance(matrix[s], list):
                     scale = self.data_byte
-                    if w4a16:
+                    if self.Qtype == "w4a16":
                         if s == "in1": #  w 1/2 + scale 2./gs + zp 1./gs/2
                             scale = (1./2 + self.data_byte/self.group_size + 1./self.group_size/2) 
-                    elif f8:
+                    elif self.Qtype == "f8":
                         if s in ("in0", "in1"): # in/w  1 + ignore scale 
                             scale = 1.
 
@@ -469,6 +552,14 @@ class LLM:
             t1 =            data_GBus_per_tp * rsum(self.v_CDMA, 2*self.v_ddr2l2, 2*self.v_SUM, 2*self.v_l22ddr)
             t2 = (tp/2-1) *(data_GBus_per_tp * rsum(self.v_CDMA) )
             return t0 + t1 + t2
+        
+    def dump(self, outf="network.json") -> None:
+        print("INFO: Print network info...")
+        ### todo: Only remain shape and time, mem info
+        # tmpJson = {}
+        # for k, v in self.layers.items():
+
+        print("INFO: Done.")
         
 
 def draw3D(m:LLM, flag="tps", Qtype='w4a16', tps=2**np.arange(10), batches=2**np.arange(10)):
@@ -643,6 +734,8 @@ if __name__ == "__main__":
     parser.add_argument('--mode', default='infer', type=str, choices=('infer', 'train', 'prefill'), help='Training, Inference or prefill.')
     parser.add_argument('--reqLatency', default=75, type=int, help='The latency requirement (ms).')
     parser.add_argument('--reqMemory', default=128, type=int, help='The maximum memory in one device (GB).')
+    
+    parser.add_argument('--token_size', default=-1, type=int, help='The token size of LLM. (Will overwrite the property from network json)')
 
     parser.add_argument('--tp', default=-1, type=int, help='The number of device.')
     parser.add_argument('--pp', default=1, type=int, help='The pipeline parallelism.')
@@ -656,14 +749,14 @@ if __name__ == "__main__":
 
     if args.tp>0 and args.batch>0:
         m.debug = True
-        m.debugTime = True
         print(f"Debug run for specific config, tp={args.tp}, batch={args.batch}, quantization type={args.Qtype}.")
 
         latency = m.getLatency(args.tp, args.batch, args.Qtype)
         memDetail = np.round(m.getMemory(args.tp, args.batch, args.Qtype),2)
         memStr0 = "KVcache" if args.mode != "train" else "Activation"
-        print(f"Inference latency = {latency:.2f} ms\ntotal memory usage = {memDetail.sum():.2f} GB\n[{memStr0}, weight, other] = {memDetail}GB\ntps = {m.getTokenSChip(args.tp, args.batch, args.Qtype, latency):.2f}")
+        print(f"{m.mode} latency = {latency:.2f} ms\ntotal memory usage = {memDetail.sum():.2f} GB\n[{memStr0}, weight, other] = {memDetail}GB\ntps = {m.getTokenSChip(args.tp, args.batch, args.Qtype, latency):.2f}")
         drawTimeLine(m, args.Qtype)
+        print("Network total parameter bytes =", m.getNParam()/GB, "GB")
         exit()
     
     if args.modelJson == "all" and args.tpuJson is not None:
