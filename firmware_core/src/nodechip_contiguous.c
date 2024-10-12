@@ -151,7 +151,7 @@ data_type_t   dtype )
       dtype );
     }
   }
-  else
+  else if ( dim <= 4 )
   {
 #if 0
     printf ( "****************************************************************\n" );
@@ -204,7 +204,7 @@ data_type_t   dtype )
       copy_out_stride.w = out_stride[3];
     }
     if ( copy_in_stride.w <= 128 / tpu_data_type_size ( dtype ) &&
-         copy_out_stride.w <= 128 / tpu_data_type_size ( dtype ) )
+        copy_out_stride.w <= 128 / tpu_data_type_size ( dtype ) )
     {
       tpu_gdma_cpy_S2S (
       out_global_addr,
@@ -240,6 +240,68 @@ data_type_t   dtype )
         &copy_in_stride,
         dtype );
       }
+    }
+  }
+  else /* dim > 4 */  
+  {
+    int loop_dim = dim - 4;
+    bool wstride_is_big = false;
+    if ( in_stride[dim-1] > 128 / tpu_data_type_size ( dtype ) ||
+          out_stride[dim-1] > 128 / tpu_data_type_size ( dtype ) ) {
+      wstride_is_big = true;
+      loop_dim += 1;
+    }
+    int loop_id[loop_dim];
+    int base[loop_dim];
+    int loop_num = 1;
+    for ( int i = 0; i < loop_dim; i++ ) {
+      loop_num *= shape[i];
+    }
+    base[loop_dim - 1] = 1;
+    for ( int i = loop_dim - 2; i > -1; i-- ) {
+      base[i] = base[i+1] * shape[i+1];
+    }
+
+    int cur;
+    int in_stride_offset;
+    int out_stride_offset;
+    for ( int i = 0; i < loop_num; i++ ) {
+      cur = i;
+      in_stride_offset = 0;
+      out_stride_offset = 0;
+      for ( int j = 0; j < loop_dim; j++ ) {
+        loop_id[j] = cur / base[j];
+        cur -= loop_id[j] * base[j]; 
+      }
+      for ( int j = 0; j < loop_dim; j++ ) {
+        in_stride_offset += loop_id[j] * in_stride[j];
+        out_stride_offset += loop_id[j] * out_stride[j];
+      } 
+
+      dim4 copy_shape = { .n = 1, .c = 1, .h = 1, .w = 1 };
+      dim4 copy_in_stride = { .n = 1, .c = 1, .h = 1, .w = 1 };
+      dim4 copy_out_stride = { .n = 1, .c = 1, .h = 1, .w = 1 };
+      copy_shape.n = shape[loop_dim];
+      copy_in_stride.n = in_stride[loop_dim];
+      copy_out_stride.n = out_stride[loop_dim];
+      copy_shape.c = shape[loop_dim+1];
+      copy_in_stride.c = in_stride[loop_dim+1];
+      copy_out_stride.c = out_stride[loop_dim+1];
+      copy_shape.h = shape[loop_dim+2];
+      copy_in_stride.h = in_stride[loop_dim+2];
+      copy_out_stride.h = out_stride[loop_dim+2];
+      if (wstride_is_big == false) {
+        copy_shape.w = shape[loop_dim+3];
+        copy_in_stride.w = in_stride[loop_dim+3];
+        copy_out_stride.w = out_stride[loop_dim+3];
+      }
+      tpu_gdma_cpy_S2S (
+        out_global_addr + out_stride_offset * tpu_data_type_size ( dtype ) ,
+        in_global_addr + in_stride_offset * tpu_data_type_size ( dtype ) ,
+        &copy_shape,
+        &copy_out_stride,
+        &copy_in_stride,
+        dtype );
     }
   }
 }
