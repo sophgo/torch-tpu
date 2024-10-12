@@ -91,6 +91,24 @@ RANK = int(os.getenv("RANK", -1))
 WORLD_SIZE = int(os.getenv("WORLD_SIZE", 1))
 GIT_INFO = check_git_info()
 
+def save_weights_and_gradients(model, optimizer, save_dir):
+    # 创建保存权重和梯度的目录
+    os.makedirs(save_dir, exist_ok=True)
+
+    # 保存模型权重
+    torch.save(model.state_dict(), os.path.join(save_dir, 'model_weights.pth'))
+
+    # 保存优化器状态
+    torch.save(optimizer.state_dict(), os.path.join(save_dir, 'optimizer_state.pth'))
+
+    # 保存模型的梯度
+    gradients = {}
+    for name, param in model.named_parameters():
+        if param.grad is not None:
+            gradients[name] = param.grad.clone().detach()
+        else:
+            gradients[name] = None
+    torch.save(gradients, os.path.join(save_dir, 'gradients.pth'))
 
 def train(hyp, opt, device, callbacks):
     """
@@ -335,7 +353,7 @@ def train(hyp, opt, device, callbacks):
             #         x["lr"] = np.interp(ni, xi, [hyp["warmup_bias_lr"] if j == 0 else 0.0, x["initial_lr"] * lf(epoch)])
             #         if "momentum" in x:
             #             x["momentum"] = np.interp(ni, xi, [hyp["warmup_momentum"], hyp["momentum"]])
-            
+
             # Forward
             pred = model(imgs)  # forward
             pred_f32 = [i.type(torch.float32) for i in pred]
@@ -343,6 +361,7 @@ def train(hyp, opt, device, callbacks):
             # check loss
             # Backward
             scaler.scale(loss).backward()
+            save_weights_and_gradients(model, optimizer, "./diff/cpu/{}_{}".format(epoch, i))
             # Optimize - https://pytorch.org/docs/master/notes/amp_examples.html
             if 1:
                 scaler.unscale_(optimizer)  # unscale gradients
@@ -429,7 +448,10 @@ def train(hyp, opt, device, callbacks):
 
         callbacks.run("on_train_end", last, best, epoch, results)
 
-    torch.cuda.empty_cache()
+    if device == "cuda":
+        torch.cuda.empty_cache()
+    elif device == "tpu":
+        torch.tpu.empty_cache()
     return results
 
 
@@ -457,7 +479,7 @@ def parse_opt(known=False):
     parser.add_argument("--bucket", type=str, default="", help="gsutil bucket")
     parser.add_argument("--cache", type=str, nargs="?", const="ram", help="image --cache ram/disk")
     parser.add_argument("--image-weights", action="store_true", help="use weighted image selection for training")
-    parser.add_argument("--device", default="", help="cuda device, i.e. 0 or 0,1,2,3 or cpu")
+    parser.add_argument("--device", default="", help="cuda device, i.e. 0 or 0,1,2,3 or cpu or tpu")
     parser.add_argument("--multi-scale", action="store_true", help="vary img-size +/- 50%%")
     parser.add_argument("--single-cls", action="store_true", help="train multi-class data as single-class")
     parser.add_argument("--optimizer", type=str, choices=["SGD", "Adam", "AdamW"], default="SGD", help="optimizer")

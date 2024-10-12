@@ -99,7 +99,14 @@ Docker环境配置
 安装测试
 ------------------
 
-在docker中，已经安装好了一个torch-tpu。我们可以通过如下python脚本验证是否可用：
+安装Torch-TPU插件：
+
+.. code-block:: shell
+
+   $ pip install torch_tpu-*.whl
+
+
+我们可以通过如下python脚本验证是否可用：
 
 .. code-block:: shell
 
