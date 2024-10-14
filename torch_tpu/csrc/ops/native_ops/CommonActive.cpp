@@ -55,7 +55,6 @@
 #include "common/config.h"
 
 namespace at {
-#define HACK_CPU_IMP 0
 
 #define IMP_ACTIVE(OP)                                                         \
   Tensor OP##_tpu(const Tensor &self) {                                        \
@@ -63,9 +62,9 @@ namespace at {
     return OP##_out_tpu(self, out);                                            \
   }
 
-#define IMP_ACTIVE_BOOL(OP)                                                         \
+#define IMP_ACTIVE_BOOL(OP)                                                    \
   Tensor OP##_tpu(const Tensor &self) {                                        \
-    auto out = empty(self.sizes(), self.options().dtype(at::kBool));                            \
+    auto out = empty(self.sizes(), self.options().dtype(at::kBool));           \
     return OP##_out_tpu(self, out);                                            \
   }
 
@@ -79,28 +78,24 @@ namespace at {
       CHECK_TENSOR_IN_DEVICE(self);                                            \
     }                                                                          \
     CHECK_TENSOR_IN_DEVICE(out);                                               \
-    if (HACK_CPU_IMP) {                                                        \
+    if (self.dim() == 0 || self.numel() == 1) {                                \
       auto self_cpu = OP(self.cpu());                                          \
-      tpu::TPUCopyHostToDevice(self.data_ptr(), self.contiguous().data_ptr(),  \
-                               self.nbytes());                                 \
+        tpu::TPUCopyHostToDevice(out.data_ptr(),                               \
+                                 self_cpu.contiguous().data_ptr(),             \
+                                 out.nbytes());                                \
+    } else if (IS_TPU_TENSOR(self)) {                                          \
+      auto self_ = self.contiguous();                                          \
+      TIMING_START;                                                            \
+      auto stream = c10_tpu::getCurrentTPUStream();                            \
+      auto status = tpudnnActiveAsync(                                         \
+          stream,                                                              \
+          tpu::TPUGenerateTpudnnTensor(stream, self_),                         \
+          tpu::TPUGenerateTpudnnTensor(stream, out),                           \
+          ACTIVE_TYPE);                                                        \
+      TORCH_CHECK(status == TPUDNN_STATUS_SUCCESS);                            \
+      TIMING_END(TIMING_NAME)                                                  \
     } else {                                                                   \
-      if (self.dim() == 0 || self.numel() == 1) {                              \
-        auto self_cpu = OP(self.cpu());                                        \
-        tpu::TPUCopyHostToDevice(out.data_ptr(),                              \
-                                 self_cpu.contiguous().data_ptr(), out.nbytes()); \
-      } else if (IS_TPU_TENSOR(self)) {                                        \
-        TIMING_START;                                                          \
-        auto stream = c10_tpu::getCurrentTPUStream();                          \
-        auto status = tpudnnActiveAsync(                                       \
-            stream,                                                            \
-            tpu::TPUGenerateTpudnnTensor(stream, self),                        \
-            tpu::TPUGenerateTpudnnTensor(stream, out),                         \
-            ACTIVE_TYPE);                                                      \
-        TORCH_CHECK(status == TPUDNN_STATUS_SUCCESS);                                     \
-        TIMING_END(TIMING_NAME)                                                \
-      } else {                                                                 \
-        TORCH_CHECK(false, "At least one input is required in TPU device");    \
-      }                                                                        \
+      TORCH_CHECK(false, "At least one input is required in TPU device");      \
     }                                                                          \
     SHOW_TENSOR_OP(self, out);                                                 \
     return out;                                                                \
