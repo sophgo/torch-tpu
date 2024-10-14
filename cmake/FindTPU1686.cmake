@@ -47,14 +47,14 @@ elseif ($ENV{CHIP_ARCH} STREQUAL "sg2260")
         NAMES sccl.h
         HINTS
         $ENV{TPUTRAIN_TOP}/../TPU1686/sccl/include
-        $ENV{TPUTRAIN_TOP}/third_party/tpuDNN/include)
+        $ENV{TPUTRAIN_TOP}/third_party/sccl/include)
 
     find_library(
         SCCL_LIBRARY
         NAMES sccl
         HINTS
         $ENV{TPUTRAIN_TOP}/../TPU1686/build_$ENV{CHIP_ARCH}/sccl/
-        $ENV{TPUTRAIN_TOP}/third_party/tpuDNN/$ENV{CHIP_ARCH}_lib/)
+        $ENV{TPUTRAIN_TOP}/third_party/sccl/$ENV{CHIP_ARCH}_lib/)
 
     list(APPEND additional_vars SCCL_INCLUDE_DIR SCCL_LIBRARY)
 

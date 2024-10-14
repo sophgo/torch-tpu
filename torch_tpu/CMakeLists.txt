@@ -100,6 +100,7 @@ if(BACKEND_SG2260)
     ${CMAKE_CURRENT_SOURCE_DIR}/csrc/distributed/c10d/ProcessGroupSCCLHost.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/csrc/distributed/c10d/SCCLHostDeviceFactory.cpp
   )
+  get_filename_component(scclPath ${SCCL_LIBRARY} DIRECTORY)
 endif()
 
 find_package(TPU1686 REQUIRED)
@@ -127,7 +128,7 @@ elseif(BACKEND_SG2260)
     set(tpuv7_rpath "/opt/tpuv7/tpuv7-current/lib:$ORIGIN/../../third_party/tpuv7_runtime/tpuv7-emulator_0.1.0/lib")
   endif()
   set_target_properties(torch_tpu PROPERTIES INSTALL_RPATH
-      "$ORIGIN;${tpuv7_rpath};${tpuDNNPath};${tpuDNNPath}/sccl")
+      "$ORIGIN;${tpuv7_rpath};${tpuDNNPath};${scclPath}")
   target_link_libraries(torch_tpu sgdnn tpuv7_rt sophon TPU1686::sccl)
   if (USING_CMODEL)
     target_link_libraries(torch_tpu cdm_daemon_emulator pthread)
