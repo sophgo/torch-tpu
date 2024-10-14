@@ -11,6 +11,8 @@ find_path(
     $ENV{TPUTRAIN_TOP}/../TPU1686/tpuDNN/include
     $ENV{TPUTRAIN_TOP}/third_party/tpuDNN/include)
 
+set(additional_vars)
+
 if ($ENV{CHIP_ARCH} STREQUAL "bm1684x")
     find_library(
         cmodel_firmware_LIBRARY
@@ -39,6 +41,23 @@ elseif ($ENV{CHIP_ARCH} STREQUAL "sg2260")
         HINTS
         $ENV{TPUTRAIN_TOP}/../TPU1686/build_fw_$ENV{CHIP_ARCH}/firmware_core/
         $ENV{TPUTRAIN_TOP}/third_party/firmware/$ENV{CHIP_ARCH}/)
+
+    find_path(
+        SCCL_INCLUDE_DIR
+        NAMES sccl.h
+        HINTS
+        $ENV{TPUTRAIN_TOP}/../TPU1686/sccl/include
+        $ENV{TPUTRAIN_TOP}/third_party/tpuDNN/include)
+
+    find_library(
+        SCCL_LIBRARY
+        NAMES sccl
+        HINTS
+        $ENV{TPUTRAIN_TOP}/../TPU1686/build_$ENV{CHIP_ARCH}/sccl/
+        $ENV{TPUTRAIN_TOP}/third_party/tpuDNN/$ENV{CHIP_ARCH}_lib/)
+
+    list(APPEND additional_vars SCCL_INCLUDE_DIR SCCL_LIBRARY)
+
 endif()
 
 find_library(
@@ -48,18 +67,9 @@ find_library(
     $ENV{TPUTRAIN_TOP}/../TPU1686/build_$ENV{CHIP_ARCH}/tpuDNN/src/
     $ENV{TPUTRAIN_TOP}/third_party/tpuDNN/$ENV{CHIP_ARCH}_lib/)
 
-if ($ENV{CHIP_ARCH} STREQUAL "sg2260")
-    find_library(
-        sccl_LIBRARY
-        NAMES sccl
-        HINTS
-        $ENV{TPUTRAIN_TOP}/../TPU1686/build_$ENV{CHIP_ARCH}/tpuDNN/src/sccl/
-        $ENV{TPUTRAIN_TOP}/third_party/tpuDNN/$ENV{CHIP_ARCH}_lib/)
-endif()
-
 find_package_handle_standard_args(
     TPU1686
-    REQUIRED_VARS tpuDNN_INCLUDE_DIR cmodel_firmware_LIBRARY firmware_LIBRARY tpuDNN_LIBRARY)
+    REQUIRED_VARS tpuDNN_INCLUDE_DIR cmodel_firmware_LIBRARY firmware_LIBRARY tpuDNN_LIBRARY ${additional_vars})
 
 if (TPU1686_FOUND)
     add_library(TPU1686::tpuDNN IMPORTED SHARED)
@@ -81,7 +91,7 @@ if (TPU1686_FOUND)
         add_library(TPU1686::sccl IMPORTED SHARED)
         set_target_properties(
             TPU1686::sccl PROPERTIES
-            INTERFACE_INCLUDE_DIRECTORIES ${tpuDNN_INCLUDE_DIR}
-            IMPORTED_LOCATION ${sccl_LIBRARY})
+            INTERFACE_INCLUDE_DIRECTORIES ${SCCL_INCLUDE_DIR}
+            IMPORTED_LOCATION ${SCCL_LIBRARY})
     endif()
 endif()
