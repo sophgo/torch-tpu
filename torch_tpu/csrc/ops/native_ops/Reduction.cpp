@@ -253,4 +253,66 @@ Tensor var_correction_tpu(const Tensor &self, OptionalIntArrayRef dims,
 //   m.impl("var.correction", var_correction_tpu);
 // }
 
+Tensor max_tpu(const Tensor &self) {
+
+  CHECK_TENSOR_IN_DEVICE(self);
+  std::vector<int> reduction_dim_vec;
+  TensorOptions options = TensorOptions ( self.device() ).dtype ( self.dtype() );
+  Tensor out = torch::scalar_tensor(0, options);
+  if (self.dim() == 0) {
+    TIMING_START;
+    tpu::TPUCopyDeviceToDevice(out.data_ptr(), self.data_ptr(), out.nbytes(),
+                               true);
+    TIMING_END(tpu::COPY);
+    return out;
+  }
+
+  for (auto i = 0; i < self.dim(); ++i) {
+      reduction_dim_vec.push_back(i);
+  }
+  TIMING_START;
+  auto stream = c10_tpu::getCurrentTPUStream();
+  auto status = tpudnnReduceMaxOrMinAsync(
+      stream, tpu::TPUGenerateTpudnnTensor(stream, self),
+      reduction_dim_vec.data(), reduction_dim_vec.size(), false, 0,
+      tpu::TPUGenerateTpudnnTensor(stream, out));
+  TORCH_CHECK(status == TPUDNN_STATUS_SUCCESS);
+  TIMING_END(tpu::REDUCE_MAX);
+  SHOW_TENSOR_OP(self, out);
+  return out;
+}
+
+TORCH_LIBRARY_IMPL(aten, TPU, m) { m.impl("max", max_tpu); }
+
+Tensor min_tpu(const Tensor &self) {
+
+  CHECK_TENSOR_IN_DEVICE(self);
+  std::vector<int> reduction_dim_vec;
+  TensorOptions options = TensorOptions ( self.device() ).dtype ( self.dtype() );
+  Tensor out = torch::scalar_tensor(0, options);
+  if (self.dim() == 0) {
+    TIMING_START;
+    tpu::TPUCopyDeviceToDevice(out.data_ptr(), self.data_ptr(), out.nbytes(),
+                               true);
+    TIMING_END(tpu::COPY);
+    return out;
+  }
+
+  for (auto i = 0; i < self.dim(); ++i) {
+      reduction_dim_vec.push_back(i);
+  }
+  TIMING_START;
+  torch::Device device(torch::kPrivateUse1);
+  auto stream = c10_tpu::getCurrentTPUStream();
+  auto status = tpudnnReduceMaxOrMinAsync(
+      stream, tpu::TPUGenerateTpudnnTensor(stream, self),
+      reduction_dim_vec.data(), reduction_dim_vec.size(), false, 1,
+      tpu::TPUGenerateTpudnnTensor(stream, out));
+  TORCH_CHECK(status == TPUDNN_STATUS_SUCCESS);
+  TIMING_END(tpu::REDUCE_MIN);
+  SHOW_TENSOR_OP(self, out);
+  return out;
+}
+
+TORCH_LIBRARY_IMPL(aten, TPU, m) { m.impl("min", min_tpu); }
 } // namespace at
