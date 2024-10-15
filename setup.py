@@ -26,6 +26,7 @@ BASE_DIR = os.path.dirname(os.path.realpath(__file__))
 SGDNN_PATH = os.path.join(BASE_DIR, "sgdnn")
 SGAPI_STRUCT_PATH = os.path.join(BASE_DIR, "common")
 THIRD_PARTY_PATH = os.path.join(BASE_DIR, "third_party")
+SCCL_PATH = os.path.join(THIRD_PARTY_PATH, "sccl")
 TPUV7_RUNTIME_PATH = os.path.join(THIRD_PARTY_PATH, "tpuv7_runtime")
 
 VERSION = '2.1.0.post1'
@@ -373,8 +374,9 @@ class bdist_wheel(_bdist_wheel, ExtBase):
             target = re.match('.+tpuDNN/(\w+)_lib.+', lib).group(1)
             if 'tpudnn' in lib:
                 self.copy_file(lib, os.path.join(pkg_dir, f'lib/libtpudnn.{target}.so'))
-            else:
-                self.copy_file(lib, os.path.join(pkg_dir, f'lib/'))
+        sccl_libs = glob.glob(os.path.join(BASE_DIR, 'third_party/sccl/*_lib/libsccl.so'))
+        for lib in sccl_libs:
+            self.copy_file(lib, os.path.join(pkg_dir, f'lib/'))
 
         base_fw_libs = glob.glob(os.path.join(TPUV7_RUNTIME_PATH, f'tpuv7-emulator_0.1.0/lib/libtpuv7_emulator.so'))
         base_fw_libs.append(os.path.join(TPUV7_RUNTIME_PATH, 'tpuv7-emulator_0.1.0/lib/libdnnl.so.3'))
@@ -386,6 +388,7 @@ class bdist_wheel(_bdist_wheel, ExtBase):
 include_directories = [
     BASE_DIR,
     os.path.join(BASE_DIR, 'third_party/tpuDNN/include'),
+    os.path.join(SCCL_PATH, 'include'),
     os.path.join(TPUV7_RUNTIME_PATH, "tpuv7-emulator_0.1.0", "include"),
     os.path.join(SGDNN_PATH, "include"),
     os.path.join(SGAPI_STRUCT_PATH, "include"),
