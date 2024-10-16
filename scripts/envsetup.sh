@@ -91,11 +91,11 @@ export TPU_SCALAER_EMULATOR_WORKDIR=${TPUTRAIN_TOP}/build
 
 function rebuild_TPU1686()
 {
-    CMODEL_FW_BINARY_DIR=build_${CHIP_ARCH} rebuild_firmware_cmodel_and_tpudnn || return -1
-    FW_BINARY_DIR=build_fw_${CHIP_ARCH} rebuild_firmware || return -1
     if [[ "$EXTRA_CONFIG" != *USING_TPUDNN_TESTS* ]]; then
         export EXTRA_CONFIG="$EXTRA_CONFIG -DUSING_TPUDNN_TESTS=OFF"
     fi
+    CMODEL_FW_BINARY_DIR=build_${CHIP_ARCH} rebuild_firmware_cmodel_and_tpudnn || return -1
+    FW_BINARY_DIR=build_fw_${CHIP_ARCH} rebuild_firmware || return -1
 }
 
 export PS1="\[\e[1;35m\]("train-"${CHIP_ARCH}):\[\e[1;33m\]\w\[\e[1;34m\]\$ \[\e[0m\]"
