@@ -753,8 +753,7 @@ tpudnnStatus_t tpudnnC2CAllReduce(
     const char* uuid,
     int nranks,
     int cur_rank,
-    const int *chip_map,
-    int loop);
+    const int *chip_map);
 
 tpudnnStatus_t tpudnnC2CReduce(
     tpudnnHandle_t handle,

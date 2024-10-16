@@ -50,7 +50,8 @@ function test_sccl() {
         echo "test_gather.py"
         echo "test_reduce.py"
         echo "test_scatter.py"
-        echo "test_alltoall.py"
+        echo "test_all_to_all.py"
+        echo "test_send.py"
         return
     fi
     TEST_DIR=$TPUTRAIN_TOP/python/dist_test2260/
@@ -58,7 +59,7 @@ function test_sccl() {
     echo "test dir: $TEST_DIR"
 
     echo "################################"
-    echo "Test sccl with mpi, NODES=$NODES"
+    echo "Test sccl with torchrun, NODES=$NODES"
     echo "################################"
 
     ret=0
@@ -79,10 +80,64 @@ function regression_for_sccl() {
         test_gather.py
         test_reduce.py
         test_scatter.py
-        test_alltoall.py
+        test_all_to_all.py
+        test_send.py
     )
     for case in ${local_cases[@]}; do
         test_sccl $case $1
+        if [ $? -ne 0 ]; then
+            return 1
+        fi
+    done
+}
+
+function test_scclHost() {
+    local NODES=8
+    if [ -n "$2" ]; then
+      NODES=$2
+    fi
+    if [ ! -n "$1" ]; then
+        echo "Usage: test_scclHost <test_name> [nodes]"
+        echo "test case is empty, please choose one from:"
+        echo "all_gather.py"
+        echo "all_reduce.py"
+        echo "broadcast.py"
+        echo "gather.py"
+        echo "reduce.py"
+        echo "scatter.py"
+        echo "all_to_all.py"
+        return
+    fi
+    TEST_DIR=$TPUTRAIN_TOP/python/dist_test/
+    pushd ${TEST_DIR} > /dev/null
+    echo "test dir: $TEST_DIR"
+
+    echo "################################"
+    echo "Test scclHost with torchrun, NODES=$NODES"
+    echo "################################"
+
+    ret=0
+    torchrun --nproc_per_node ${NODES} --nnodes 1 $TEST_DIR/$1 || ret=1
+    if [ $ret -ne 0 ]; then
+      echo "test scclHost case: $1 failed"
+      popd
+      return $ret
+    fi
+    popd
+}
+
+function regression_for_scclHost() {
+    local_cases=(
+        all_gather.py
+        all_reduce.py
+        broadcast.py
+        gather.py
+        reduce.py
+        scatter.py
+        all_to_all.py
+    )
+    for case in ${local_cases[@]}; do
+        test_scclHost $case $1
         if [ $? -ne 0 ]; then
             return 1
         fi
@@ -212,6 +267,15 @@ function run_online_regression_test() {
         return -1
       fi
     fi
+    if [ $test_CHIP_ARCH = 'sg2260' ]; then
+      regression_for_scclHost; ret_regression_for_scclHost=$?
+      if [ $ret_regression_for_scclHost -eq 0 ];then
+        echo "[RESULT-$test_CHIP_ARCH] ret_regression_for_scclHost is computed successfully!"
+      else
+        echo "[RESULT-$test_CHIP_ARCH] ret_regression_for_scclHost is computed failed!"
+        return -1
+      fi
+    fi
   fi
 }
 
@@ -269,6 +333,15 @@ function run_daily_regression_test() {
           echo "[RESULT-$test_CHIP_ARCH] all gpt3block results are computed, Please check Results above"
         else
           echo "[RESULT-$test_CHIP_ARCH] some gpt3block results are failed!"
+          return -1
+        fi
+      fi
+      if [ $test_CHIP_ARCH = 'sg2260' ]; then
+        regression_for_sccl; ret_regression_for_sccl=$?
+        if [ $ret_regression_for_sccl -eq 0 ];then
+          echo "[RESULT-$test_CHIP_ARCH] regression_for_sccl is computed successfully!"
+        else
+          echo "[RESULT-$test_CHIP_ARCH] regression_for_sccl is computed failed!"
           return -1
         fi
       fi
