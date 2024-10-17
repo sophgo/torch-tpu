@@ -150,12 +150,52 @@ Tensor & index_out_tpu( const Tensor & self, const c10::List<c10::optional<Tenso
     }
 #endif
     SHOW_TENSOR_OP(self, out);
+    SHOW_TENSOR_OP(indices[0].value());
     return out;
 }
 
 TORCH_LIBRARY_IMPL ( aten, TPU, m )
 {
  m.impl ( "index.Tensor_out",  index_out_tpu);
+}
+
+Tensor index_tpu(const at::Tensor & self, const c10::List<c10::optional<at::Tensor>> & indices)
+{
+  CHECK_TENSOR_IN_DEVICE ( self );
+  Tensor out;
+  if ( indices.size() == 1 )
+  {
+    auto idx = indices[0].value();
+    std::vector<int64_t> sizes_vec;
+    sizes_vec.push_back ( idx.size( 0 ) );    
+    for ( int i = 1; i <  self.dim(); i++ ) {
+      sizes_vec.push_back ( self.size ( i ) );
+    }
+
+    IntArrayRef sizes ( sizes_vec.data(), sizes_vec.size() );
+    TensorOptions options = TensorOptions ( self.device() ).dtype ( self.dtype() );
+    out = torch::empty( sizes, options);
+    out = index_out_tpu(self, indices, out);
+  }
+  else
+  {
+    c10::List<c10::optional<Tensor>> indices_cpu;
+    for (size_t i = 0; i < indices.size(); i++)
+    {
+        c10::optional<Tensor> indice = c10::nullopt;
+        if ( indices[i].has_value() ) { indice = indices[i].value().cpu(); }
+        indices_cpu.push_back(indice);
+    }
+    auto out_cpu = index( self.cpu(), indices_cpu );
+    out = out_cpu.to( self.device());
+  }
+
+  return out;
+}
+
+TORCH_LIBRARY_IMPL ( aten, TPU, m )
+{
+ m.impl ( "index.Tensor",  index_tpu);
 }
 
 // copied from torch source and modified

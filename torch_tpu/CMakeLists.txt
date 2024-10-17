@@ -118,7 +118,6 @@ if(BACKEND_1684X)
       "$ORIGIN;$ORIGIN/../../third_party/bmlib/lib;${tpuDNNPath}")
   install(TARGETS torch_tpu DESTINATION lib)
 elseif(BACKEND_SG2260)
-  get_filename_component(scclPath ${SCCL_LIBRARY} DIRECTORY)
 
   if (EXISTS ${CMAKE_SOURCE_DIR}/../tpuv7-runtime)
     include_directories(${CMAKE_SOURCE_DIR}/../tpuv7-runtime/cdmlib/host/cdm_runtime/include)
