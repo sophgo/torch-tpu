@@ -42,14 +42,15 @@ static inline void simplify ( int * shape, int * src_stride, int * dst_stride, i
   }
 }
 
-void nodechip_strided_copy (
+void nodechip_strided_copy_multi_core (
 global_addr_t in_global_addr,
 global_addr_t out_global_addr,
 int           dim,
 const int   * shape_org,
 const int   * in_stride_org,
 const int   * out_stride_org,
-data_type_t   dtype )
+data_type_t   dtype ,
+bool          multi_core)
 {
   const int dsize = tpu_data_type_size ( dtype );
   int shape[FW_MAX_SHAPE_DIMS];
@@ -63,6 +64,42 @@ data_type_t   dtype )
     out_stride[i] = out_stride_org[i];
   }
   simplify ( shape, in_stride, out_stride, &dim );
+
+  unsigned long long in_offset_for_current_core = 0;
+  unsigned long long out_offset_for_current_core = 0;
+  if ( multi_core ) {
+    const int core_num = tpu_core_num();
+    const int core_idx = tpu_core_index();
+    int split_dim = 0;
+    unsigned long long total_num;
+    unsigned long long avgnum_each_core;
+    int num_max_core_needed;
+    for ( int i = 0; i < dim; ++i )
+    {
+      total_num = shape[i];
+      avgnum_each_core = DIV_UP(total_num, core_num);
+      num_max_core_needed = DIV_UP(total_num, avgnum_each_core);
+      if (num_max_core_needed >= core_num -2) {
+        split_dim = i;
+        break;
+      } 
+    }
+    total_num = shape[split_dim];
+    avgnum_each_core = DIV_UP(total_num, core_num);
+    num_max_core_needed = DIV_UP(total_num, avgnum_each_core);
+    TPUKERNEL_ASSERT(num_max_core_needed <= core_num);
+    unsigned long long num_for_current_core = avgnum_each_core;
+    if (core_idx >= num_max_core_needed) {
+      return;
+    }
+    if (core_idx == num_max_core_needed - 1) {
+      num_for_current_core = total_num - avgnum_each_core * (num_max_core_needed - 1);
+    }
+    shape[split_dim] = num_for_current_core;
+    in_offset_for_current_core = avgnum_each_core * core_idx * in_stride[split_dim];
+    out_offset_for_current_core = avgnum_each_core * core_idx * out_stride[split_dim];
+  } 
+
   if ( dim == 2 && in_stride[0] == 1 && out_stride[1] == 1 )
   {
     dim4 copy_in_stride = { .n = 1, .c = in_stride[1], .h = 1, .w = in_stride[0] };
@@ -80,7 +117,13 @@ data_type_t   dtype )
       while ( wtodo != 0 )
       {
         copy_shape.w = MIN ( wtodo, wmax );
-        tpu_gdma_cpy_cw_trans_S2S ( out_global_addr + ( 1UL * cdone * copy_out_stride.c + 1UL * wdone * copy_out_stride.w ) * dsize, in_global_addr + ( 1UL * cdone * copy_in_stride.w + 1UL * wdone * copy_in_stride.c ) * dsize, &copy_shape, &copy_out_stride, &copy_in_stride, dtype );
+        tpu_gdma_cpy_cw_trans_S2S ( 
+        out_global_addr + ( 1UL * cdone * copy_out_stride.c + 1UL * wdone * copy_out_stride.w + out_offset_for_current_core) * dsize, 
+        in_global_addr + ( 1UL * cdone * copy_in_stride.w + 1UL * wdone * copy_in_stride.c + in_offset_for_current_core) * dsize, 
+        &copy_shape, 
+        &copy_out_stride, 
+        &copy_in_stride, 
+        dtype );
         wtodo -= copy_shape.w;
         wdone += copy_shape.w;
       }
@@ -111,7 +154,13 @@ data_type_t   dtype )
         while ( wtodo != 0 )
         {
           copy_shape.w = MIN ( wtodo, wmax );
-          tpu_gdma_cpy_cw_trans_S2S ( out_global_addr + ( 1UL * ndone * copy_out_stride.n + 1UL * cdone * copy_out_stride.c + 1UL * wdone * copy_out_stride.w ) * dsize, in_global_addr + ( 1UL * ndone * copy_in_stride.n + 1UL * cdone * copy_in_stride.w + 1UL * wdone * copy_in_stride.c ) * dsize, &copy_shape, &copy_out_stride, &copy_in_stride, dtype );
+          tpu_gdma_cpy_cw_trans_S2S ( 
+          out_global_addr + ( 1UL * ndone * copy_out_stride.n + 1UL * cdone * copy_out_stride.c + 1UL * wdone * copy_out_stride.w + out_offset_for_current_core) * dsize, 
+          in_global_addr + ( 1UL * ndone * copy_in_stride.n + 1UL * cdone * copy_in_stride.w + 1UL * wdone * copy_in_stride.c + in_offset_for_current_core) * dsize, 
+          &copy_shape, 
+          &copy_out_stride, 
+          &copy_in_stride, 
+          dtype );
           wtodo -= copy_shape.w;
           wdone += copy_shape.w;
         }
@@ -128,8 +177,8 @@ data_type_t   dtype )
     dim4 copy_in_stride = { .n = in_stride[1], .c = in_stride[0], .h = 1, .w = in_stride[2] };
     dim4 copy_out_stride = { .n = out_stride[0], .c = out_stride[1], .h = 1, .w = out_stride[2] };
     tpu_gdma_cpy_nc_trans_S2S (
-    out_global_addr,
-    in_global_addr,
+    out_global_addr + out_offset_for_current_core * dsize,
+    in_global_addr + in_offset_for_current_core * dsize,
     &copy_shape,
     &copy_out_stride,
     &copy_in_stride,
@@ -143,8 +192,8 @@ data_type_t   dtype )
     for ( int i = 0; i < shape[0]; ++i )
     {
       tpu_gdma_cpy_nc_trans_S2S (
-      out_global_addr + i * out_stride[0] * tpu_data_type_size ( dtype ),
-      in_global_addr + i * in_stride[0] * tpu_data_type_size ( dtype ),
+      out_global_addr + ( i * out_stride[0] + out_offset_for_current_core ) * dsize,
+      in_global_addr + ( i * in_stride[0] + in_offset_for_current_core ) * dsize,
       &copy_shape,
       &copy_out_stride,
       &copy_in_stride,
@@ -203,12 +252,12 @@ data_type_t   dtype )
       copy_in_stride.w = in_stride[3];
       copy_out_stride.w = out_stride[3];
     }
-    if ( copy_in_stride.w <= 128 / tpu_data_type_size ( dtype ) &&
-        copy_out_stride.w <= 128 / tpu_data_type_size ( dtype ) )
+    if ( copy_in_stride.w <= 128 / dsize &&
+        copy_out_stride.w <= 128 / dsize )
     {
       tpu_gdma_cpy_S2S (
-      out_global_addr,
-      in_global_addr,
+      out_global_addr + out_offset_for_current_core * dsize,
+      in_global_addr + in_offset_for_current_core * dsize,
       &copy_shape,
       &copy_out_stride,
       &copy_in_stride,
@@ -233,8 +282,8 @@ data_type_t   dtype )
       copy_out_stride.w = 1;
       for ( int i = 0; i < copy_shape_n; i++ ) {
         tpu_gdma_cpy_S2S (
-        out_global_addr + i * copy_out_stride_n * tpu_data_type_size ( dtype ),
-        in_global_addr + i * copy_in_stride_n * tpu_data_type_size ( dtype ),
+        out_global_addr + ( i * copy_out_stride_n + out_offset_for_current_core ) * dsize,
+        in_global_addr + ( i * copy_in_stride_n + in_offset_for_current_core ) * dsize,
         &copy_shape,
         &copy_out_stride,
         &copy_in_stride,
@@ -246,8 +295,8 @@ data_type_t   dtype )
   {
     int loop_dim = dim - 4;
     bool wstride_is_big = false;
-    if ( in_stride[dim-1] > 128 / tpu_data_type_size ( dtype ) ||
-          out_stride[dim-1] > 128 / tpu_data_type_size ( dtype ) ) {
+    if ( in_stride[dim-1] > 128 / dsize ||
+          out_stride[dim-1] > 128 / dsize ) {
       wstride_is_big = true;
       loop_dim += 1;
     }
@@ -296,8 +345,8 @@ data_type_t   dtype )
         copy_out_stride.w = out_stride[loop_dim+3];
       }
       tpu_gdma_cpy_S2S (
-        out_global_addr + out_stride_offset * tpu_data_type_size ( dtype ) ,
-        in_global_addr + in_stride_offset * tpu_data_type_size ( dtype ) ,
+        out_global_addr + (out_stride_offset + out_offset_for_current_core) * dsize ,
+        in_global_addr + (in_stride_offset + in_offset_for_current_core) * dsize ,
         &copy_shape,
         &copy_out_stride,
         &copy_in_stride,
@@ -308,6 +357,7 @@ data_type_t   dtype )
 
 
 
+
 int tpu_kernel_api_strided_copy_multi_core(const void *args) {
   sg_api_strided_copy_t *api = (sg_api_strided_copy_t*)args;
   tpu_initialize();
@@ -315,27 +365,27 @@ int tpu_kernel_api_strided_copy_multi_core(const void *args) {
 #ifdef USING_PERF_MODE
     tpu_sync_all();
 #endif
-  if (tpu_core_index() == 0) {
-    nodechip_strided_copy(
-        api->input_global_addr,
-        api->output_global_addr,
-        api->dim,
-        api->shape,
-        api->input_stride,
-        api->output_stride,
-        (data_type_t)api->dtype);
-    tpu_poll();
-  }
+  nodechip_strided_copy_multi_core(
+    api->input_global_addr,
+    api->output_global_addr,
+    api->dim,
+    api->shape,
+    api->input_stride,
+    api->output_stride,
+    (data_type_t)api->dtype,
+    true);
+  tpu_poll();
   return 0;
 #else
-  nodechip_strided_copy (
-  api->input_global_addr,
-  api->output_global_addr,
-  api->dim,
-  api->shape,
-  api->input_stride,
-  api->output_stride,
-  ( data_type_t ) api->dtype );
+  nodechip_strided_copy_multi_core (
+    api->input_global_addr,
+    api->output_global_addr,
+    api->dim,
+    api->shape,
+    api->input_stride,
+    api->output_stride,
+    ( data_type_t ) api->dtype, 
+    false);
   tpu_poll();
   return 0;
 #endif
