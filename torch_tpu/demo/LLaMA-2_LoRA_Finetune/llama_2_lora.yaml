@@ -1,0 +1,32 @@
+### model
+model_name_or_path: "meta-llama/Llama-2-7b-chat-hf"
+
+### method
+stage: sft
+do_train: true
+finetuning_type: lora
+lora_target: q_proj,v_proj
+
+### dataset
+dataset: alpaca_gpt4_zh
+template: llama2
+cutoff_len: 1024
+max_samples: 10
+overwrite_cache: false
+preprocessing_num_workers: 64
+
+### output
+output_dir: "output_dir_cuda"
+logging_steps: 1
+save_steps: 10
+plot_loss: true
+overwrite_output_dir: true
+
+### train
+per_device_train_batch_size: 1
+gradient_accumulation_steps: 1
+disable_gradient_checkpointing: true
+learning_rate: 1.0e-4
+num_train_epochs: 1.0
+lr_scheduler_type: cosine
+fp16: true

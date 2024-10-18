@@ -1,0 +1,13 @@
+{
+    "superParSel": true,
+    
+    "name": "QWen-2-72B",
+    "block_size": 128,
+
+    "layer_num": 80,
+    "intermediate_size": 29568,
+    "vocab_size": 152064,
+    "head": 64,
+    "kv_heads": 8,
+    "token_size" : 131072
+}

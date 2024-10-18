@@ -1,0 +1,35 @@
+# - Config file for the Sophon package
+# It defines the following variables
+#  SOPHON_INCLUDE_DIRS       - include directories for Sophon
+#  SOPHON_LIBRARIES          - libraries to link against
+#  SOPHON_CUDA_LIBRARIES     - cuda libraries to link against
+#  SOPHON_HIP_LIBRARIES      - hip libraries to link against
+
+# library version information
+
+set(SOPHON_VERSION_MAJOR @SOPHON_VERSION_MAJOR@)
+set(SOPHON_VERSION_MINOR @SOPHON_VERSION_MINOR@)
+set(SOPHON_VERSION_PATCH @SOPHON_VERSION_PATCH@)
+set(SOPHON_VERSION "@SOPHON_VERSION@")
+
+# import targets
+include ("${CMAKE_CURRENT_LIST_DIR}/SophonTargets.cmake")
+
+# include directory and libraries.
+#
+# Newer versions of CMake set the INTERFACE_INCLUDE_DIRECTORIES property
+# of the imported targets. It is hence not necessary to add this path
+# manually to the include search path for targets which link to gflags.
+# The following lines are here for backward compatibility, in case one
+# would like to use the old-style target names.
+
+get_filename_component(
+    CMAKE_CURRENT_LIST_DIR "${CMAKE_CURRENT_LIST_FILE}" PATH)
+# Note: the current list dir is _INSTALL_PREFIX/share/cmake/Sophon.
+get_filename_component(
+    _INSTALL_PREFIX "${CMAKE_CURRENT_LIST_DIR}/../../../" ABSOLUTE)
+set(SOPHON_INCLUDE_DIRS "${_INSTALL_PREFIX}/include")
+
+set(SOPHON_LIBRARIES sophon)
+set(SOPHON_CUDA_LIBRARIES sophon_cuda sophon)
+set(SOPHON_HIP_LIBRARIES sophon_hip sophon)

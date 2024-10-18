@@ -1,0 +1,226 @@
+{
+    "input_embedding":{
+        "MatMul":{
+            "type": "MM2",
+
+            "matrix":{
+                "in0": ["batch", 1, "seq_len",    "vocab_size" ],
+                "in1": [      1, 1, "vocab_size", "hidden_size"],
+                "out": ["batch", 1, "seq_len",    "hidden_size"]
+            }
+        }
+    },
+    "RMSNorm":{
+        "type":"Mix",
+        "inLayer": true,
+
+        "matrix":{
+            "in0": ["batch", 1, "seq_len", "hidden_size"],
+            "in1": [      1, 1,         1, "hidden_size"],
+            "out": ["batch", 1, "seq_len", "hidden_size"]
+        }
+    },
+    "MM_QKV":{
+        "type": "MM2",
+        "w4a16": true,
+        "inLayer": true,
+        "matrix":{
+            "in0": ["batch", 1, "seq_len", "hidden_size"],
+            "in1": [      1, 1, "hidden_size", "hidden_size/tp+2*block_size*kv_heads/tp"],
+            "out": ["batch", 1, "seq_len",     "hidden_size/tp+2*block_size*kv_heads/tp"]
+        }
+    },
+    "ATT_QKV":{
+        "inLayer": true,
+        "cache":{
+            "K_cache": ["batch", "kv_heads/tp", "token_size-1", "block_size"],
+            "V_cache": ["batch", "kv_heads/tp", "token_size-1", "block_size"]
+        },
+            
+        "IM": true,
+        "input":{
+            "common": false,
+            "Q": [ "batch", 1, "seq_len", "hidden_size/tp" ],
+            "K": [ "batch", 1, "seq_len", "block_size*kv_heads/tp"],
+            "V": [ "batch", 1, "seq_len", "block_size*kv_heads/tp"],
+            "dY": ["batch", "head/tp", "seq_len", "block_size"]
+        },
+        
+        "Neg_Q":{
+            "NM": true,
+            "type":"AR",
+            "matrix": [ "batch", "head/tp", "seq_len", "block_size/2" ]
+        },
+        "Neg_K":{
+            "NM": true,
+            "type":"AR",
+            "matrix": [ "batch", "kv_heads/tp", "seq_len", "block_size/2" ]
+        },
+        "Mul_Q":{
+            "NM": true,
+            "type":"AR",
+            "matrix": [ "batch", "head/tp", "seq_len", "block_size" ]
+        },
+        "Mul_Q2":{
+            "NM": true,
+            "type":"AR",
+            "matrix": [ "batch", "head/tp", "seq_len", "block_size" ]
+        },
+        "Mul_K":{
+            "NM": true,
+            "type":"AR",
+            "matrix": [ "batch", "kv_heads/tp", "seq_len", "block_size" ]
+        },
+        "Mul_K2":{
+            "NM": true,
+            "type":"AR",
+            "matrix": [ "batch", "kv_heads/tp", "seq_len", "block_size" ]
+        },
+        "Add_Q":{
+            "NM": true,
+            "type":"AR",
+            "matrix": [ "batch", "head/tp", "seq_len", "block_size" ]
+        },
+        "Add_K":{
+            "NM": true,
+            "type":"AR",
+            "matrix": [ "batch", "kv_heads/tp", "seq_len", "block_size" ]
+        },
+        "Score":{
+            "IM": false,
+            "CM": false,
+            "OM": false,
+            "type":"MM2_NT",
+
+            "isParam": false,
+            "matrix":{
+                "in0":["batch", "head/tp", "seq_len", "block_size"],
+                "in1":["batch", "kv_heads/tp", "token_size", "block_size"],
+                "out":["batch", "head/tp", "seq_len", "token_size"]
+            }
+        },
+        "Div":{
+            "NM": true,
+            "type":"AR",
+            "matrix": [ "batch", "head/tp", "seq_len", "token_size" ]
+        },
+        "Add":{
+            "NM": true,
+            "type":"AR",
+            "matrix": [ "batch", "head/tp", "seq_len", "token_size" ]
+        },
+        "SoftMax":{
+            "NM": true,
+            "type":"Mix",
+            "isParam": false,
+            "matrix": [ "batch", "head/tp", "seq_len", "token_size" ]
+        },
+        "MatMul":{
+            "IM": false,
+            "CM": false,
+            "type":"MM2",
+            "s_noMem": "out",
+            
+            "isParam": false,
+            "matrix":{
+                "in0":["batch", "head/tp", "seq_len", "token_size"],
+                "in1":["batch", "kv_heads/tp", "token_size", "block_size"],
+                "out":["batch", "head/tp", "seq_len", "block_size"]
+            }
+        }
+    },
+    "ATT_FC":{
+        "w4a16": true,
+        "inLayer": true,
+
+        "MatMul":{
+            "type":"MM2",
+
+            "matrix":{
+                "in0":["batch", 1, "seq_len",     "hidden_size/tp"],
+                "in1":[      1, 1, "hidden_size/tp", "hidden_size"],
+                "out":["batch", 1, "seq_len",        "hidden_size"]
+            }
+        }
+    },
+    "AllReduce":{
+        "inLayer": true,
+        "type":"CDMA",
+        "matrix": ["batch", 1, "seq_len", "hidden_size"]
+    },
+    "Add":{
+        "inLayer": true,
+        "type":"AR",
+        "matrix": ["batch", 1, "seq_len", "hidden_size"]
+    },
+    "RMSNorm2":{
+        "inLayer": true,
+        "type":"Mix",
+        "matrix":{
+            "in0": ["batch", 1, "seq_len", "hidden_size"],
+            "in1": [      1, 1,         1, "hidden_size"],
+            "out": ["batch", 1, "seq_len", "hidden_size"]
+        }
+    },
+    "MLP":{
+        "w4a16": true,
+        "f8": true,
+        "inLayer": true,
+        "MatMul13":{
+            "OM": false,
+            "type":"MM2",
+            "matrix":{
+                "in0":["batch", 1, "seq_len", "hidden_size"],
+                "in1":[      1, 1, "hidden_size", "2*intermediate_size/tp"],
+                "out":["batch", 1, "seq_len",     "2*intermediate_size/tp"]
+            }
+        },
+        "SiLU":{
+            "NM": true,
+            "type":"Act"
+        },
+        "Mul":{
+            "NM": true,
+            "type":"AR"
+        },
+        "MatMul2":{
+            "IM": false,
+            "type":"MM2",
+            "matrix":{
+                "in0":["batch", 1, "seq_len", "intermediate_size/tp"],
+                "in1":[      1, 1, "intermediate_size/tp", "hidden_size"],
+                "out":["batch", 1, "seq_len", "hidden_size"]
+            }
+        }
+    },
+    "AllReduce2":{
+        "inLayer": true,
+        "type":"CDMA",
+        "matrix": ["batch", 1, "seq_len", "hidden_size"]
+    },
+    "Add2":{
+        "inLayer": true,
+        "type":"AR",
+        "matrix": ["batch", 1, "seq_len", "hidden_size"]
+    },
+    "RMSNorm3":{
+        "type":"Mix",
+        "matrix":{
+            "in0": ["batch", 1, "seq_len", "hidden_size"],
+            "in1": [      1, 1,         1, "hidden_size"],
+            "out": ["batch", 1, "seq_len", "hidden_size"]
+        }
+    },
+    "output_embedding":{
+        "MatMul":{
+            "type":"MM2",
+            
+            "saveOutput": true,
+            "matrix":{
+                "in0":["batch", 1, "seq_len",    "hidden_size"],
+                "in1":[      1, 1, "hidden_size", "vocab_size"],
+                "out":["batch", 1, "seq_len",     "vocab_size"]
+            }
+        }
+    }
+}

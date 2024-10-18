@@ -1,0 +1,13 @@
+{
+    "superParSel": true,
+    
+    "name": "QWen-2-7B",
+    "block_size": 128,
+
+    "layer_num": 28,
+    "intermediate_size": 18944,
+    "vocab_size": 152064,
+    "head": 28,
+    "kv_heads": 4,
+    "token_size" : 131072
+}

@@ -1,0 +1,25 @@
+{
+    "superParSel": true,
+    
+    "DRAMBW" : 491.4,
+    "CDMABW" : 128,
+    "core_num": 8,
+    "NPU_NUM": 64,
+    "EU_NUM_FP16": 32,
+    "compute": 16,
+
+    "cal": 546,
+    "group_size" : 128,
+    "mmqkv_ddru" : 0.9,
+    "afc_bwu"    : 0.9,
+    "mlp_bwu"    : 0.9,
+
+    "v_CDMA" : 32,
+    "v_ddr2l2" : 128,
+    "v_l22ddr" : 128,
+    "v_SUM" : 512,
+
+    "lt_fire" : 0.25,
+    "lt_sync" : 0.3,
+    "data_byte" : 2
+}

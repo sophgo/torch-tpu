@@ -1,0 +1,13 @@
+{
+    "superParSel": true,
+    
+    "name": "LLaMA-3-405B",
+    "block_size": 128,
+
+    "layer_num": 126,
+    "intermediate_size": 53248,
+    "vocab_size": 128256,
+    "head": 128,
+    "kv_heads": 8,
+    "token_size" : 131072
+}

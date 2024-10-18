@@ -1,0 +1,177 @@
+超参选择工具使用指南
+====================
+
+开发理念
+--------
+现在大语言模型层出不穷，结构也不尽相同，模型也越来越大，使得内存占用越来越高和响应时间越来越长，但我们对这些性能参数均有严格的要求，最终目的是给予用户最流畅的AI体验。
+
+不同的大模型，其结构特征并不一致，尽管可以使用多卡多核心以及减少批数目等方法对推理速度进行加速，或者减少网络超参等方式…但我们需要一个指导性的工具，能够在条件允许的范围内给出合理的设置尽可能提高运算速度，这就是该工具的由来。
+
+模型与超参
+----------
+目前的超参选择工具是以LLaMA-2的7B、13B和70B模型为基础总结的，所以
+**不一定适用其它模型**，将在后续版本中持续更新。
+2024.08
+**提供了LLaMA-3.1的支持**。
+
+超参数有两种，一种是资源超参，也就是Batch和TP，分别是输入数据的批数目和设备数目，默认以这俩超参为自变量画出模型推理速度和内存占用情况。另一种是模型超参，例如head、kv_heads、layers等等，以及与设备参数相关的core_num，compute等，由于参数两过多，这些模型超参将在json文件中进行配置。
+
+
+
+使用方法
+-----------
+命令行支持多个参数，model、modelJson和tpuJson，分别是模型名称、模型配置文件和设备配置文件，以及量化类型Qtype（默认f16不量化）、延迟需求reqLatency、设备内存reqMemory，debug用的tp和batch：
+
+.. literalinclude:: ../../../tools/superParSel.py
+   :language: python
+   :linenos:
+   :lines: 618-626
+
+.. code-block:: python
+   :caption: 命令
+   :name: test1
+
+   python superParSel.py --modelJson LLaMA-2-70B.json --tpuJson tpu.json --Qtype w4a16
+
+运行后工具将输出2个html文件，分别对应模型的推理的时间和内存在不同batch和tp下的情况，推理时间图中表明数字的配置表示满足内存需求，同时还延迟还小于75ms的配置会被小球额外标记出来。
+.. 如下图：
+
+.. .. raw:: html
+
+..    <div style="display: grid; grid-template-columns: auto auto;">
+
+.. .. figure:: figures/f16_infer.png
+..    :alt: image 1
+   
+..    f16_infer
+
+.. .. figure:: figures/f16_memory.png
+..    :alt: image 2
+
+..    f16_memory
+
+.. .. figure:: figures/w4a16_infer.png
+..    :alt: image 3
+
+..    w4a16_infer
+
+.. .. figure:: figures/w4a16_memory.png
+..    :alt: image 4
+   
+..    w4a16_memory
+
+.. .. raw:: html
+
+..    </div>
+
+
+modelJson和tpuJson
+~~~~~~~~~~~~~~~~~~~~
+modelJson文件中将包含模型相关的信息，以LLaMA-2模型为例，其中包括：模型名称、头维度大小、层数等关键超参数，它们将决定layers中具体的模型结构大小。
+
+.. literalinclude:: ../../../tools/examples/LLaMA-2-70B.json
+   :language: json
+   :linenos:
+   :lines: 2-12
+
+tpuJson文件中包含了设备相关信息，包括核心数、算力、内存速度等一系列参数。
+
+.. literalinclude:: ../../../tools/examples/tpu.json
+
+**layers**
+^^^^^^^^^^^
+由于模型推理耗时基本用于数据搬运和计算，其中需要做大量数据搬运的是矩阵相乘MatMul，推理的耗时也基本在该项目上，计算也有耗时，但大多数情况会在数据搬运时间进行而被覆盖，工具会综合二者耗时并取其中最大项。
+
+layers包含了具体的模型结构和对应参数，使用字典嵌套的多叉树，每个叶子项目要包含"type"，否则其不是一个有效项目，将不会被计算耗时与内存，大部分情况下也需要"matrix"信息。例如一个典型的包含矩阵相乘项目MM2的结构信息如下：
+
+.. literalinclude:: ../../../tools/examples/LLaMA-2-70B.json
+   :language: json
+   :linenos:
+   :lines: 18-26
+
+其中"matrix"信息不可忽略，是计算数据量的关键信息，in1是权重矩阵。内部参数中，-1代表会从上层节点的通用矩阵参数传递过来，根据超参确定的值可以用字符串进行描述，但要确保在计算前对应变量已传入工具（通过增加和name同级的变量进行定义）。
+
+其它未显式标出的属性及其默认值如下：
+
+.. list-table:: 通用属性及其默认值
+    :widths: 15 12 30
+    :header-rows: 1
+
+    * - 属性
+      - 类型或默认值
+      - 描述
+
+    * - N, C, H, W
+      - 数字/字符串
+      - 矩阵的维度属性，会往叶节点传递
+    * - type
+      - 字符串
+      - 叶子项目信息
+    * - matrix
+      - 字典/列表
+      - 项目矩阵信息，列表长度必须是4
+
+    * - inLayer
+      - False
+      - 该项目是否连续layer_num次，若为True则子项目无须再设置该值
+    * - w4a16/f8
+      - False
+      - 该项目是否可以量化，会往叶节点传递
+
+    * - IM
+      - True
+      - 是否搬运in0数据
+    * - CM
+      - True
+      - 是否搬运in1数据
+    * - OM
+      - True
+      - 是否搬运out数据
+    * - NM
+      - False
+      - 不搬运数据或搬运耗时很少
+
+
+type
+""""""""""""
+type信息目前支持的有：矩阵相乘（MM2，MM2_NT），Mix，AR，CDMA，Act，
+其中MM2是主要考虑项目。
+
+MM2和MM2_NT（转置相乘）都需要在matrix属性中写明in0，in1和out矩阵的四维属性，如果三者的某一属性均一致，则可以填为-1，然后在更上层结构属性中写明即可。
+
+归一化操作属于Mix，与MM2类似，同样需要写明三类矩阵的四维属性。不同的是，由于大部分情况三类矩阵的属性相同，所以可以直接简化matrix为列表，直接写明四维属性；另外该操作有时会由于算子合并等，使得不必搬运读入或者输出矩阵数据，此时则需要手动声明对应属性，如下：
+
+.. literalinclude:: ../../../tools/examples/LLaMA-2-70B.json
+   :language: json
+   :linenos:
+   :lines: 28-33
+
+矩阵元素的加乘操作属于AR，与Mix类似，不过大部分情况数据搬运和计算时间都很少，可以忽略该项目的耗时，可以手动设置NM为true。
+
+.. literalinclude:: ../../../tools/examples/LLaMA-2-70B.json
+   :language: json
+   :linenos:
+   :lines: 87-91
+
+激活项目属于Act，由于大部分情况都可以原地激活，耗时可忽略，可以手动设置NM为true。
+
+.. literalinclude:: ../../../tools/examples/LLaMA-2-70B.json
+   :language: json
+   :linenos:
+   :lines: 211-214
+
+多设备同步属于CDMA，主要在数据搬运，与数据在各个电子元件上的搬运速度有关。
+
+.. literalinclude:: ../../../tools/examples/LLaMA-2-70B.json
+   :language: json
+   :linenos:
+   :lines: 182-186
+
+为了加速推理，通常会将数个相关的操作进行合并，整合成一个大模块，这样就能节省数据搬运时间，为简化配置，可以直接在大模块属性中写明"matrix"属性，若将IM设置为true，则工具会自动计算搬运耗时并将内部所有叶子项目的IM设置为false，OM同理。cache是特殊词条，统计内存单独列出，同样会被计算搬运耗时。
+
+.. literalinclude:: ../../../tools/examples/LLaMA-2-70B.json
+   :language: json
+   :linenos:
+   :lines: 71-85
+
+其中matrix内部的common属性为false，表明该matrix不会往叶节点传递。
