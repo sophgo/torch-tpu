@@ -16,7 +16,7 @@ Tensor & cat_out_tpu ( const ITensorListRef & tensors, int64_t dim, Tensor & out
   // if input.dtype != output.dtype , use cpu to convert.
   int flag = 0;
   for (auto tensor : tensors) {
-    if (tensor.cpu().scalar_type() != out.cpu().scalar_type()) {
+    if (tensor.scalar_type() != out.scalar_type()) {
       flag = 1;
       break;
     }
@@ -43,6 +43,9 @@ Tensor & cat_out_tpu ( const ITensorListRef & tensors, int64_t dim, Tensor & out
     std::vector<Tensor> contiguous_tensors;
     for ( auto tensor : tensors )
     {
+      if (tensor.numel() == 0) {
+        continue;
+      }
       CHECK_TENSOR_IN_DEVICE_NO_CONTIGUOUS ( tensor );
       contiguous_tensors.push_back ( tensor.contiguous() );
       inputs.push_back ( tpu:: TPUGenerateTpudnnTensor (stream, contiguous_tensors.back() ) );
