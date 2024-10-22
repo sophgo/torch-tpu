@@ -3233,7 +3233,17 @@ tpu_status_t sgdnnReLUBackward ( tpu_resource_t resource ,
   api.dtype = sgdnnTPUKernelDType ( input.dtype );
   SAFE_CALL ( sgdnnTPUKernelLaunch ( resource , "tpu_kernel_api_relu_backward", &api, sizeof ( api ) ) );
 #elif defined BACKEND_SG2260
-  SGDNN_CHECK ( false );
+  sg_api_relu_backward_t api;
+  api.input_global_addr = input.addr;
+  api.grad_output_global_addr = grad_output.addr;
+  api.grad_input_global_addr = grad_input.addr;
+  api.dim = input.dim;
+  for ( int i = 0; i < input.dim; ++i )
+  {
+    api.shape[i] = input.shape[i];
+  }
+  api.dtype = sgdnnTPUKernelDType ( input.dtype );
+  SAFE_CALL ( sgdnnTPUKernelLaunchMultiCore ( resource , "tpu_kernel_api_relu_backward_multi_core", &api, sizeof ( api ), non_blocking ) );
 #else
   SGDNN_CHECK ( false );
 #endif

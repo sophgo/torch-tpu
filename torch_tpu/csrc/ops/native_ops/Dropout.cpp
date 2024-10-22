@@ -5,57 +5,68 @@
 
 #include "TPUTorchUtils.h"
 
-
 #include "common/config.h"
 namespace torch{
-namespace autograd{
-class DropOutFunction : public torch::autograd::Function<DropOutFunction>
-{
-public:
-  static at::Tensor forward(AutogradContext *ctx, const at::Tensor& self,
-                            double p, bool train)
-  {
-  CHECK_TENSOR_IN_DEVICE ( self );
-  ctx->saved_data["p"] = p;
-  ctx->saved_data["train"] = train;
-  if ( p == 0 || !train ) {
-    return self;
-  } else {
-#if 1
-    CPU_IMPL_WARNING(Dropout);
-    TIMING_START;
-    TensorOptions option = TensorOptions( ).device("cpu").dtype ( self.dtype() );
-    at::Tensor mask_cpu = torch::rand_like(self, option) > p;
-    at::Tensor mask = mask_cpu.to(self.device()).to(self.dtype());
-    TIMING_END(tpu::CPU_LAYER);
-#else
-
+  namespace autograd{
+    class DropOutFunction : public torch::autograd::Function<DropOutFunction>
+    {
+    public:
+      static at::Tensor forward(AutogradContext *ctx, const at::Tensor& self,
+        double p, bool train)
+      {
+        CHECK_TENSOR_IN_DEVICE ( self );
+        ctx->saved_data["p"] = p;
+        ctx->saved_data["train"] = train;
+        if ( p == 0 || !train ) {
+          return self;
+        } else {
+    #if 0
+          CPU_IMPL_WARNING(Dropout);
+          TIMING_START;
+          TensorOptions option = TensorOptions( ).device("cpu").dtype ( self.dtype() );
+          at::Tensor mask_cpu = torch::rand_like(self, option) > p;
+          at::Tensor mask = mask_cpu.to(self.device()).to(self.dtype());
+          TIMING_END(tpu::CPU_LAYER);
+          ctx->save_for_backward( {mask} );
+          auto out = mask * self * (1/(1-p));
+    #else
+          at::Tensor out = torch::empty( self.sizes(), self.options() );
+          TIMING_START;
+          auto stream = c10_tpu::getCurrentTPUStream();
+          auto status = tpudnnDropoutMultiCoreAsync(
+            stream,
+            tpu::TPUGenerateTpudnnTensor(stream, self),
+            tpu::TPUGenerateTpudnnTensor(stream, out),
+            p
+          );
+          TORCH_CHECK(status == TPUDNN_STATUS_SUCCESS);
+          TIMING_END(tpu::DROPOUT);
+          auto mask = (out - self * (1/(1-p))).abs().to(torch::kFloat);
+          mask = (mask == 0.0f);
+          ctx->save_for_backward( { mask.to(self.dtype()) } );
     #endif
-    ctx->save_for_backward( {mask} );
-    auto out = mask * self * (1/(1-p));
-    SHOW_TENSOR_OP(self, out);
-    return out;
-  }
-  }
+          SHOW_TENSOR_OP(self, out);
+          return out;
+        }
+      }
 
-  static tensor_list backward(AutogradContext *ctx, tensor_list gradout)
-  {
-    auto p = ctx->saved_data["p"].toDouble();
-    auto train = ctx->saved_data["train"].toBool();
-    if (p == 0 || !train) {
-      return {gradout[0], at::Tensor(), at::Tensor(), at::Tensor(), at::Tensor(), at::Tensor() };
-    }else{
-      auto saved = ctx->get_saved_variables();
-      auto mask = saved[0];
-      auto gradinp = mask * gradout[0] * (1/(1-p));
-      SHOW_TENSOR_OP(gradinp);
-      return {gradinp, at::Tensor(), at::Tensor(), at::Tensor(), at::Tensor(), at::Tensor() };
-    }
-  }
-};
-} // namespace autograd
+      static tensor_list backward(AutogradContext *ctx, tensor_list gradout)
+      {
+        auto p = ctx->saved_data["p"].toDouble();
+        auto train = ctx->saved_data["train"].toBool();
+        if (p == 0 || !train) {
+          return {gradout[0], at::Tensor(), at::Tensor(), at::Tensor(), at::Tensor(), at::Tensor() };
+        }else{
+          auto saved = ctx->get_saved_variables();
+          auto mask = saved[0];
+          auto gradinp = mask * gradout[0] * (1/(1-p));
+          SHOW_TENSOR_OP(gradinp);
+          return {gradinp, at::Tensor(), at::Tensor(), at::Tensor(), at::Tensor(), at::Tensor() };
+        }
+      }
+    };
+  } // namespace autograd
 } // namespace torch
-
 
 namespace at
 {

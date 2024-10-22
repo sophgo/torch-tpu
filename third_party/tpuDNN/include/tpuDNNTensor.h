@@ -925,4 +925,11 @@ tpudnnStatus_t tpudnnGDMAD2DAsync(
     tpudnnTensor_t src,
     tpudnnTensor_t dst,
     size_t size);
+
+tpudnnStatus_t tpudnnDropoutMultiCoreAsync(
+    tpudnnHandle_t handle,
+    tpudnnTensor_t input,
+    tpudnnTensor_t output,
+    const float drop_rate);
+
 } // extern "C"
