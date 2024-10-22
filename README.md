@@ -92,14 +92,9 @@ You can always execute `python setup.py develop` after changing source files to 
 ### Run
 
 #### JIT MODE( only support sg2260)
-You can run with JIT MODE( Instruction Cache MODE), with `export TPU_CACHE_BACKEND=/path/of/cmodel_fw` and Add LD_LIBRARY_PATH of 'libtpuv7_emulator.so'.
-example 1 : `export TPU_CACHE_BACKEND=/workspace/tpu-train/build/firmware_sg2260_cmodel/libfirmware.so`.
-example 2 (if you in tgi docker container, and had pip install torch-tpu.whl):   
-    `export export TPU_CACHE_BACKEND=/usr/local/lib/python3.10/dist-packages/torch_tpu/lib/sg2260_cmodel_firmware.so`
-    `export LD_LIBRARY_PATH=/usr/local/lib/python3.10/dist-packages/torch_tpu/lib:$LD_LIBRARY_PATH`
-
-You can recover to Eager MODE( default mode), with `unset TPU_CACHE_BACKEND`.
+Torch-TPU defaults run in JIT MODE( Instruction Cache MODE).   
+You can force make it run in Eager MODE, just search `TPU_CACHE_BACKEND` in `__init__.py` and comment it out.
 
 #### STORAGE FORMAT
 IF you want to make conv's weight with 32IC format on TPU, with `export TORCHTPU_STORAGE_CAST=ON`, then run.
-You can close it with `unset TPU_CACHE_BACKEND`.
+You can close it with `unset TORCHTPU_STORAGE_CAST`.

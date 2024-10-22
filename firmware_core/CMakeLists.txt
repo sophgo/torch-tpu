@@ -46,6 +46,9 @@ find_package(TPU1686 REQUIRED)
 if (USING_CMODEL)
     target_compile_definitions(firmware PRIVATE -DUSING_CMODEL)
     target_link_libraries(firmware PRIVATE TPU1686::cmodel_firmware)
+    set_target_properties(firmware PROPERTIES BUILD_RPATH
+        "$ORIGIN;")
+    install(TARGETS firmware DESTINATION lib)
 else()
     set_target_properties(firmware PROPERTIES LINK_FLAGS -s)
     target_link_options(firmware PRIVATE -Wl,-allow-multiple-definition) # FIXME

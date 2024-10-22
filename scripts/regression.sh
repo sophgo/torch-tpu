@@ -207,6 +207,19 @@ function build_kernel_module() {
   fi
 }
 
+# currently, for sg2260 libfirmware_core.a must compiled with DE
+function check_third_party() {
+  strings third_party/firmware/sg2260/libfirmware_core.a | grep 'remove_polls_flag';
+  ret_firmware_check=$?
+  if [ $ret_firmware_check -eq 0 ]; then
+    return 0;
+  else
+    echo "[Error] Not Found 'remove_polls_flag' in third_party/firmware/sg2260/libfirmware_core.a !!!"
+    echo "[Error] You should rebuild_TPU1686, with export EXTRA_CONFIG='-DREMOVE_POLLS_IN_LLM=ON'"
+    return -1;
+  fi
+}
+
 function run_online_regression_test() {
   echo "[INFO]Ubuntu version"
   version_cmd="cat /etc/os-release"
@@ -229,6 +242,15 @@ function run_online_regression_test() {
   echo "[INFO]LIBSOPHON_LINK_PATTERN=$LIBSOPHON_LINK_PATTERN"
   echo "[INFO]TEST_PATTERN=$TEST_PATTERN"
   link_libsophon $LIBSOPHON_LINK_PATTERN $DEB_PATH_STABLE $VERSION_PATH_STABLE; ret_libsophon=$?
+
+  check_third_party; ret_check_third_party=$?
+  if [ $ret_check_third_party -eq 0 ];then
+    echo "[PRECHECK-$test_CHIP_ARCH] third_party's so lib check true!"
+  else
+    echo "[PRECHECK-$test_CHIP_ARCH] third_party's so lib check failed!"
+    return -1
+  fi
+
   if [ $ret_libsophon -eq 255 ]; then
     echo "[INFO]test_CHIP_ARCH:$test_CHIP_ARCH libsophon setting failed!"
     return -1

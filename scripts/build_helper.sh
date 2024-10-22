@@ -49,7 +49,11 @@ function update_sg2260_third_party()
   pushd ${TPUTRAIN_TOP}
   echo "update libtpudnn.so ..."
   cp ../TPU1686/build_sg2260/tpuDNN/src/libtpudnn.so third_party/tpuDNN/sg2260_lib/
+  echo "update libsccl.so ..."
+  cp ../TPU1686/build_sg2260/sccl/libsccl.so ./third_party/sccl/sg2260_lib/
   echo "update libtpuv7_emulator.so ..."
   cp ../TPU1686/build_sg2260/firmware_core/libtpuv7_emulator.so ./third_party/tpuv7_runtime/tpuv7-emulator_0.1.0/lib/
+  echo "update libfirmware_core.a ..."
+  cp ../TPU1686/build_fw_sg2260/firmware_core/libfirmware_core.a ./third_party/firmware/sg2260/
   popd
 }
