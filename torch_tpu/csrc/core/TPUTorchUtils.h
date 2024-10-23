@@ -537,6 +537,7 @@ typedef enum
   ADAM,
   LORA_MATMUL_FORWARD,
   OP_NUM,
+  COMPARISON_C
 }
 OpType;
 
