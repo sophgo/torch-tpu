@@ -49,7 +49,7 @@ if not os.environ.get('TPU_EMULATOR_PATH'):
     os.environ['TPU_EMULATOR_PATH'] = os.path.join(lib_pwd, f'{arch}_cmodel_firmware.so')
 
 # OPEN INS-CACHE default
-os.environ['TPU_CACHE_BACKEND'] = os.path.join(lib_pwd, f'{arch}_cmodel_firmware.so')
+os.environ['TPU_CACHE_BACKEND'] = os.environ['TPU_EMULATOR_PATH']
 
 import torch_tpu._C
 import torch_tpu.tpu
