@@ -101,13 +101,13 @@ namespace at
 		const c10::optional<Tensor> &softmax_lse,
 		const Tensor &input_lengths,
 		int64_t mask_size, // mask_size
-		double C,
+		double C,//softmax_scale
 		double dropout_rate,
 		int64_t batch)
 	{
-		if (!Q.is_contiguous() || !K.is_contiguous() || !V.is_contiguous()){
+		//if (!Q.is_contiguous() || !K.is_contiguous() || !V.is_contiguous()){
 			// LOG(WARNING) << "llama_attention not contiguous, use QKV packed.";
-		}
+		//}
 
 		CHECK_TENSOR_IN_DEVICE(OUT);
 		CHECK_TENSOR_IN_DEVICE_NO_CONTIGUOUS(Q);
@@ -121,31 +121,26 @@ namespace at
 		if (mask.has_value())
 			CHECK_TENSOR_IN_DEVICE(mask.value());
 
-#ifdef TPU_OP_TIMING
-		auto timer = tpu::Timer().Start();
-#endif
-
-		tpu_status_t status = sgdnnLlamaAttentionForward(
-			tpu::TPUGetDeviceResource(),
-			tpu::TPUGenerateSgdnnTensor(OUT),
-			tpu::TPUGenerateSgdnnTensor(Q),
-			tpu::TPUGenerateSgdnnTensor(K),
-			tpu::TPUGenerateSgdnnTensor(V),
-			cos.has_value() ? tpu::TPUGenerateSgdnnTensor(cos.value()) : sgdnnUndefinedTensor(),
-			sin.has_value() ? tpu::TPUGenerateSgdnnTensor(sin.value()) : sgdnnUndefinedTensor(),
-			mask.has_value() ? tpu::TPUGenerateSgdnnTensor(mask.value()) : sgdnnUndefinedTensor(),
-			softmax_lse.has_value() ? tpu::TPUGenerateSgdnnTensor(softmax_lse.value()) : sgdnnUndefinedTensor(),
+		TIMING_START;
+		auto stream =  c10_tpu::getCurrentTPUStream();
+		tpudnnStatus_t status = tpudnnLlamaAttentionForwardAsync(
+			stream,
+			tpu::TPUGenerateTpudnnTensor(stream, OUT),
+			tpu::TPUGenerateTpudnnTensor(stream, Q),
+			tpu::TPUGenerateTpudnnTensor(stream, K),
+			tpu::TPUGenerateTpudnnTensor(stream, V),
+			cos.has_value() ? tpu::TPUGenerateTpudnnTensor(stream, cos.value()) : tpudnnUndefinedTensor(),
+			sin.has_value() ? tpu::TPUGenerateTpudnnTensor(stream, sin.value()) : tpudnnUndefinedTensor(),
+			mask.has_value() ? tpu::TPUGenerateTpudnnTensor(stream, mask.value()) : tpudnnUndefinedTensor(),
+			softmax_lse.has_value() ? tpu::TPUGenerateTpudnnTensor(stream, softmax_lse.value()) : tpudnnUndefinedTensor(),
 			(int*)input_lengths.data_ptr(),
       	    (int)(input_lengths.nbytes()/4),
 			mask_size,
 			C,
 			dropout_rate,
 			batch);
-		TORCH_CHECK(status == SG_SUCCESS);
-
-#ifdef TPU_OP_TIMING
-		tpu::OpTimer::Instance().AddTime(tpu::LLAMA_ATTENTION, timer.ElapsedUS());
-#endif
+		TORCH_CHECK(status == TPUDNN_STATUS_SUCCESS);
+		TIMING_END(tpu::LLAMA_ATTENTION_FORWARD);
 		return OUT;
 
 	}
@@ -185,31 +180,27 @@ namespace at
 		if (mask.has_value())
 			CHECK_TENSOR_IN_DEVICE(mask.value());
 
-#ifdef TPU_OP_TIMING
-		auto timer = tpu::Timer().Start();
-#endif
-		tpu_status_t status = sgdnnLlamaAttentionBackward(
-			tpu::TPUGetDeviceResource(),
-			tpu::TPUGenerateSgdnnTensor(Q),
-			tpu::TPUGenerateSgdnnTensor(K),
-			tpu::TPUGenerateSgdnnTensor(V),
-			tpu::TPUGenerateSgdnnTensor(O),
-			tpu::TPUGenerateSgdnnTensor(dO),
-			tpu::TPUGenerateSgdnnTensor(l),
-			tpu::TPUGenerateSgdnnTensor(dQ),
-			tpu::TPUGenerateSgdnnTensor(dK),
-			tpu::TPUGenerateSgdnnTensor(dV),
-			cos.has_value() ? tpu::TPUGenerateSgdnnTensor(cos.value()) : sgdnnUndefinedTensor(),
-			sin.has_value() ? tpu::TPUGenerateSgdnnTensor(sin.value()) : sgdnnUndefinedTensor(),
-			mask.has_value() ? tpu::TPUGenerateSgdnnTensor(mask.value()) : sgdnnUndefinedTensor(),
-			tpu::TPUGenerateSgdnnTensor(input_lengths),
+		TIMING_START;
+		auto stream = c10_tpu::getCurrentTPUStream();
+		tpudnnStatus_t status = tpudnnLlamaAttentionBackwardAsync(
+			stream,
+			tpu::TPUGenerateTpudnnTensor(stream,Q),
+			tpu::TPUGenerateTpudnnTensor(stream,K),
+			tpu::TPUGenerateTpudnnTensor(stream,V),
+			tpu::TPUGenerateTpudnnTensor(stream,O),
+			tpu::TPUGenerateTpudnnTensor(stream,dO),
+			tpu::TPUGenerateTpudnnTensor(stream,l),
+			tpu::TPUGenerateTpudnnTensor(stream,dQ),
+			tpu::TPUGenerateTpudnnTensor(stream,dK),
+			tpu::TPUGenerateTpudnnTensor(stream,dV),
+			cos.has_value() ? tpu::TPUGenerateTpudnnTensor(stream, cos.value()) : tpudnnUndefinedTensor(),
+			sin.has_value() ? tpu::TPUGenerateTpudnnTensor(stream, sin.value()) : tpudnnUndefinedTensor(),
+			mask.has_value() ? tpu::TPUGenerateTpudnnTensor(stream, mask.value()) : tpudnnUndefinedTensor(),
+			tpu::TPUGenerateTpudnnTensor(stream, input_lengths),
 			mask_max,
 			C);
-		TORCH_CHECK(status == SG_SUCCESS);
-
-#ifdef TPU_OP_TIMING
-		tpu::OpTimer::Instance().AddTime(tpu::LLAMA_ATTENTION_BACKWARD, timer.ElapsedUS());
-#endif
+		TORCH_CHECK(status == TPUDNN_STATUS_SUCCESS);
+		TIMING_END(tpu::LLAMA_ATTENTION_BACKWARD); 
 		return std::tuple<Tensor, Tensor, Tensor>(dQ, dK, dV);
 	}
 

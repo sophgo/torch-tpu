@@ -920,6 +920,41 @@ tpudnnStatus_t tpudnnLlamaAttentionAsync (
     int attention_mode // 2: prefile, 3: decode
     );
 
+tpudnnStatus_t tpudnnLlamaAttentionForwardAsync(
+    tpudnnHandle_t handle,
+    tpudnnTensor_t O,
+    tpudnnTensor_t Q,
+    tpudnnTensor_t K,
+    tpudnnTensor_t V,
+    tpudnnTensor_t RoPE_cos,
+    tpudnnTensor_t RoPE_sin,
+    tpudnnTensor_t mask,
+    tpudnnTensor_t softmax_lse,
+    int* input_lengths,
+    int num_input_lengths,
+    int mask_max,
+    float C,
+    float dropout_rate,
+    int batch);
+
+tpudnnStatus_t tpudnnLlamaAttentionBackwardAsync(
+    tpudnnHandle_t handle,
+    tpudnnTensor_t Q,
+    tpudnnTensor_t K,
+    tpudnnTensor_t V,
+    tpudnnTensor_t O,
+    tpudnnTensor_t dO,
+    tpudnnTensor_t L,
+    tpudnnTensor_t dQ,
+    tpudnnTensor_t dK,
+    tpudnnTensor_t dV,
+    tpudnnTensor_t RoPE_cos,
+    tpudnnTensor_t RoPE_sin,
+    tpudnnTensor_t mask,
+    tpudnnTensor_t input_length,
+    int mask_max,
+    float C);
+
 tpudnnStatus_t tpudnnLLamaMlpAsync (
     tpudnnHandle_t handle,
     tpudnnTensor_t input,
