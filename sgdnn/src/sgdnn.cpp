@@ -200,10 +200,10 @@ tpu_kernel_module_t get_kernel_module(bm_handle_t handle)
   return tpu_kernel_module[handle];
 }
 #elif defined BACKEND_SG2260
-static TPUKernelLauncher kernel_launcher;
+static TPUKernelLauncher* pkernel_launcher = nullptr;
 tpuRtKernelModule_t get_kernel_module(tpuRtStream_t stream)
 {
-  return kernel_launcher.get_kernel_module(stream);
+  return pkernel_launcher->get_kernel_module(stream);
 }
 #endif
 
@@ -219,7 +219,11 @@ tpu_status_t sgdnnInitialize( tpu_resource_t resource )
   tpu_kernel_module_t tpu_module = tpu_kernel_load_module ( resource , ( const char * ) p, length );
   tpu_kernel_module.insert ( std::pair<tpu_resource_t, tpu_kernel_module_t> ( resource , tpu_module ) );
 #elif defined BACKEND_SG2260
-  SGDNN_CHECK( kernel_launcher.register_kernel_module(resource) == SG_SUCCESS);
+  if (pkernel_launcher == nullptr) 
+  {
+    pkernel_launcher = new TPUKernelLauncher();
+  }
+  SGDNN_CHECK( pkernel_launcher->register_kernel_module(resource) == SG_SUCCESS);
 #else
   SGDNN_CHECK ( false );
 #endif
@@ -235,7 +239,12 @@ tpu_status_t sgdnnDeinitialize ( tpu_resource_t resource  )
   }
   SGDNN_CHECK ( tpu_kernel_module.erase ( resource  ) );
 #elif defined BACKEND_SG2260
-  SGDNN_CHECK ( kernel_launcher.unload_kernel_module(resource) == SG_SUCCESS );
+  if ( pkernel_launcher )
+  {
+    SGDNN_CHECK ( pkernel_launcher->unload_kernel_module(resource) == SG_SUCCESS );
+    delete pkernel_launcher;
+    pkernel_launcher = nullptr;    
+  }
 #else
   SGDNN_CHECK ( false );
 #endif
@@ -263,9 +272,9 @@ tpu_status_t sgdnnTPUKernelLaunch (
     block_num = atoi(core_num_env);
   }
   if (non_blocking)
-    return kernel_launcher.launch_async( func_name, api, api_size, resource, group_num, block_num );
+    return pkernel_launcher->launch_async( func_name, api, api_size, resource, group_num, block_num );
   else
-    return kernel_launcher.launch_sync( func_name, api, api_size, resource, group_num, block_num );
+    return pkernel_launcher->launch_sync( func_name, api, api_size, resource, group_num, block_num );
 #else
   SGDNN_CHECK ( false );
 #endif
@@ -274,12 +283,12 @@ tpu_status_t sgdnnTPUKernelLaunch (
 #if defined BACKEND_SG2260
 tpu_status_t sgdnnCacheMalloc(void** dev_ptr, int64_t size)
 {
-  return kernel_launcher.cache_malloc(dev_ptr, size);
+  return pkernel_launcher->cache_malloc(dev_ptr, size);
 }
 
 tpu_status_t sgdnnCacheFree( void* dev_ptr, tpu_resource_t resource )
 {
-  return kernel_launcher.cache_free(dev_ptr, resource);
+  return pkernel_launcher->cache_free(dev_ptr, resource);
 }
 #endif
 
