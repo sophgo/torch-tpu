@@ -54,7 +54,7 @@ llama_config_dict = {
     "bos_token_id": 1,
     "eos_token_id": 2,
     "hidden_act": "silu",
-    "hidden_size": 1024,
+    "hidden_size": 1024, 
     "initializer_range": 0.02,
     "intermediate_size": 2048,
     "max_position_embeddings": 1024,
@@ -104,7 +104,7 @@ def case1():
     llama_config = LlamaConfig(**llama_config_dict)
     llama_tf_model = LlamaForCausalLM(llama_config).half()
     lora_model = get_peft_model(llama_tf_model, lora_config)
-    
+
     lora_model_cpu = lora_model.float()
     lora_model_tpu = copy.deepcopy(lora_model).to(device)
     

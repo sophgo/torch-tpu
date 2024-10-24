@@ -11,7 +11,7 @@ class LoraMatmulFunc(torch.autograd.Function):
         ctx.save_for_backward(x, loraA, loraB, weight)
         ctx.scale = scale
         output_shape = list(x.shape)
-        output_shape[-1] = loraB.shape[-1]
+        output_shape[-1] = loraB.shape[0]
         loraA = loraA.unsqueeze(0)#backend op only accept dim==3 of loraA/loraB
         loraB = loraB.unsqueeze(0)
         output = torch.empty(output_shape, dtype = x.dtype, device=x.device)
@@ -29,9 +29,9 @@ class LoraMatmulFunc(torch.autograd.Function):
         grad_output_half = grad_output.half()
         grad_loraA = None
         grad_loraB = None
-        weight_t = weight.t().contiguous()
-        loraA_t = loraA.t().contiguous()
-        loraB_t = loraB.t().contiguous()
+        weight_t = weight.contiguous()
+        loraA_t = loraA.contiguous()
+        loraB_t = loraB.contiguous()
         x_t = x.transpose(-1, -2).contiguous()
         if ctx.scale == 0:
             grad_input = torch.matmul(grad_output_half, weight_t)
@@ -87,10 +87,10 @@ def create_and_replace(lora_model, lora_config:LoraConfig, adapter_name:str = "d
         target_name = key.split(".")[-1]
         lora_A = peft_lora_module.lora_A[adapter_name]
         lora_B = peft_lora_module.lora_B[adapter_name]
-        #need transpose and fp16 to keep corresponding with backend op
-        weight = peft_lora_module.base_layer.weight.data.t().contiguous().half().to(device)
-        loraA_data = lora_A.weight.data.t().contiguous().half().to(device)
-        loraB_data = lora_B.weight.data.t().contiguous().half().to(device)
+        #need fp16 to keep corresponding with backend op
+        weight = peft_lora_module.base_layer.weight.data.contiguous().half().to(device)
+        loraA_data = lora_A.weight.data.contiguous().half().to(device)
+        loraB_data = lora_B.weight.data.contiguous().half().to(device)
         newlora_block = LoraMatmulBlock(lora_A.in_features, lora_B.out_features, weight,
                                         lora_A=loraA_data,lora_B=loraB_data,
                                         rank=lora_config.r, alpha=lora_config.lora_alpha, 
