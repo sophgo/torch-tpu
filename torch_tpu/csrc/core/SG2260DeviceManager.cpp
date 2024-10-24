@@ -188,6 +188,22 @@ public:
       freeTBDs.erase(ptr);
     }
 
+#ifdef PROFILE_MEMORY_REUSE
+    size_t sizeDefered = 0;
+    size_t sizeDelayed = 0;
+    for (auto &pair : freeTBDs)
+    {
+      auto &tbd = pair.second;
+      if (tbd.freed_timestamp == 0)
+        sizeDefered += getSize(tbd.ptr, index);
+      else
+        sizeDelayed += getSize(tbd.ptr, index);
+    }
+    std::cout << "===== Memory defered by TPU tasks " << sizeDefered
+              << ". Memory delayed by reuse strategy " << sizeDelayed
+              << std::endl;
+#endif
+
     return reusedPtr;
   }
 
@@ -211,7 +227,7 @@ public:
     info.size = Size;
     auto ptr = ( void * ) UnifiedAddr((unsigned long long) dev_ptr, Index);
     std::lock_guard<std::mutex> lock(getMutex(Index));
-    getMemInfo(Index)[ptr] = info;
+    getMemInfo(Index)[dev_ptr] = info;
 
     // std::cout << "Alloc " << ptr << " of size " << Size << std::endl;
 
