@@ -28,6 +28,7 @@ SGAPI_STRUCT_PATH = os.path.join(BASE_DIR, "common")
 THIRD_PARTY_PATH = os.path.join(BASE_DIR, "third_party")
 SCCL_PATH = os.path.join(THIRD_PARTY_PATH, "sccl")
 TPUV7_RUNTIME_PATH = os.path.join(THIRD_PARTY_PATH, "tpuv7_runtime")
+BMLIB_PATH = os.path.join(THIRD_PARTY_PATH, "bmlib")
 
 VERSION = '2.1.0.post1'
 SOC_CROSS = os.environ.get("SOC_CROSS_MODE", None)
@@ -382,6 +383,11 @@ class bdist_wheel(_bdist_wheel, ExtBase):
         base_fw_libs.append(os.path.join(TPUV7_RUNTIME_PATH, 'tpuv7-emulator_0.1.0/lib/libdnnl.so.3'))
         for lib in base_fw_libs:
             self.copy_file(lib, os.path.join(pkg_dir, f'lib/'))
+
+        bmlib_libs = glob.glob(os.path.join(BMLIB_PATH, f'lib/libbmlib.so*'))
+        for lib in bmlib_libs:
+            if "bmlib" in lib:
+                self.copy_file(lib, os.path.join(pkg_dir, f'lib/'))
 
         super().run()
 
