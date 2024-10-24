@@ -29,17 +29,19 @@ namespace at
 		CHECK_TENSOR_IN_DEVICE(output);
 
 		TIMING_START;
-		tpu_status_t status = sgdnnLLamaA16Matmul(
-			tpu::TPUGetDeviceResource(),
-			tpu::TPUGenerateSgdnnTensor(active),
-			tpu::TPUGenerateSgdnnTensor(weight),
-			bias.has_value() ? tpu::TPUGenerateSgdnnTensor(bias.value()) : sgdnnUndefinedTensor(),
-			tpu::TPUGenerateSgdnnTensor(scale),
-			tpu::TPUGenerateSgdnnTensor(zp),
-            group_size,
+		auto stream = c10_tpu::getCurrentTPUStream();
+		auto status = tpudnnLLamaA16MatmulAsync(
+			stream,
+			tpu::TPUGenerateTpudnnTensor( stream, active),
+			tpu::TPUGenerateTpudnnTensor( stream, weight),
+			bias.has_value() ? tpu::TPUGenerateTpudnnTensor( stream, bias.value()) : tpudnnUndefinedTensor(),
+			tpu::TPUGenerateTpudnnTensor( stream, scale),
+			tpu::TPUGenerateTpudnnTensor( stream, zp),
+			group_size,
 			weight_bits,
-			tpu::TPUGenerateSgdnnTensor(output));
-		TORCH_CHECK(status == SG_SUCCESS);
+			tpu::TPUGenerateTpudnnTensor( stream, output)
+			);
+		TORCH_CHECK(status == TPUDNN_STATUS_SUCCESS);
 		TIMING_END(tpu::LLama2A16MATMUL);
 		return output;
 	}

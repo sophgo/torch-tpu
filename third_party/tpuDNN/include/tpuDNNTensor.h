@@ -932,4 +932,15 @@ tpudnnStatus_t tpudnnDropoutMultiCoreAsync(
     tpudnnTensor_t output,
     const float drop_rate);
 
+tpudnnStatus_t tpudnnLLamaA16MatmulAsync( 
+    tpudnnHandle_t handle ,
+    tpudnnTensor_t left,
+    tpudnnTensor_t right,
+    tpudnnTensor_t bias,
+    tpudnnTensor_t scale,
+    tpudnnTensor_t zp,
+    int group_size,
+    int weight_bits,
+    tpudnnTensor_t output);
+
 } // extern "C"

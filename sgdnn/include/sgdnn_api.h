@@ -314,16 +314,6 @@ tpu_status_t sgdnnPoolingForward ( tpu_resource_t  stream,
  * 5. BIAS is optional
  */
 
-tpu_status_t sgdnnLLamaA16Matmul ( tpu_resource_t handle,
-                             SgdnnTensor_t left,
-                             SgdnnTensor_t right,
-                             SgdnnTensor_t bias,
-                             SgdnnTensor_t scale,
-                             SgdnnTensor_t zp,
-                             int group_size,
-                             int weight_bits,
-                             SgdnnTensor_t output,
-                             bool non_blocking = true );
 
 /*
  * OUTPUT = GATHER ( INPUT, AXIS, INDEX )
