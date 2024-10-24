@@ -20,7 +20,8 @@ def test_max():
     print("delta : ", torch.equal(output_cpu, output_tpu))
     print(output_cpu.item() == output_tpu.item())
 
-    a_origin=torch.rand(4, 6, 29).to(torch.float32)
+    #a_origin=torch.rand(4, 6, 29).to(torch.float32)
+    a_origin=torch.randn(2,1,1,50265, 256).float()
     a = a_origin.to(device)
     max_values  = torch.max(a_origin)
     max_values_tpu = torch.max(a)
@@ -43,7 +44,8 @@ def test_min():
     print("delta : ", torch.equal(output_cpu, output_tpu))
     print(output_cpu.item() == output_tpu.item())
 
-    a_origin=torch.rand(4, 6, 29).to(torch.float32)
+    a_origin=torch.rand(50265, 256).to(torch.float32)
+    #a_origin=torch.rand(4, 6, 29).to(torch.float32)
     a = a_origin.to(device)
     min_values  = torch.min(a_origin)
     min_values_tpu = torch.min(a)
