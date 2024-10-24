@@ -205,6 +205,35 @@ TORCH_LIBRARY_IMPL(aten, TPU, m) {
   m.impl("hardtanh.out", hardtanh_out_tpu);
 }
 
+Tensor & tanh_backward_grad_input_tpu(const Tensor& grad_output, const Tensor& output, Tensor& grad_input) {
+  CHECK_TENSOR_IN_DEVICE(grad_output);
+  CHECK_TENSOR_IN_DEVICE(output);
+  CHECK_TENSOR_IN_DEVICE(grad_input);
+#if 0
+  CPU_IMPL_WARNING();
+  TIMING_START;
+  auto grad_input_cpu = tanh_backward ( grad_output.cpu(), output.cpu() );
+  tpu::TPUCopyHostToDevice ( grad_input.data_ptr(), grad_input_cpu.contiguous().data_ptr(), grad_input.nbytes() );
+  TIMING_END(tpu::CPU_LAYER);
+#else
+  TIMING_START;
+  auto stream = c10_tpu::getCurrentTPUStream();
+  auto status = tpudnnTanhBackwardAsync(
+    stream,
+    tpu::TPUGenerateTpudnnTensor(stream, grad_output),
+    tpu::TPUGenerateTpudnnTensor(stream, output),
+    tpu::TPUGenerateTpudnnTensor(stream, grad_input));
+  TORCH_CHECK(status == TPUDNN_STATUS_SUCCESS);
+  TIMING_END(tpu::TANH_BACKWARD);
+#endif
+  SHOW_TENSOR_OP(grad_output, output, grad_input);
+  return grad_input;
+}
+
+TORCH_LIBRARY_IMPL(aten, TPU, m) {
+  m.impl("tanh_backward.grad_input", tanh_backward_grad_input_tpu);
+}
+
 //TODO TPU implement
 Tensor & sigmoid_backward_out_tpu(const Tensor & grad_output, const Tensor & output, Tensor & grad_input){
   CHECK_TENSOR_IN_DEVICE(grad_output);

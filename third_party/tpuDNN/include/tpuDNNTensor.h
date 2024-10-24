@@ -943,4 +943,21 @@ tpudnnStatus_t tpudnnLLamaA16MatmulAsync(
     int weight_bits,
     tpudnnTensor_t output);
 
+tpudnnStatus_t tpudnnLLamaA16MatmulAsync( 
+    tpudnnHandle_t handle ,
+    tpudnnTensor_t left,
+    tpudnnTensor_t right,
+    tpudnnTensor_t bias,
+    tpudnnTensor_t scale,
+    tpudnnTensor_t zp,
+    int group_size,
+    int weight_bits,
+    tpudnnTensor_t output);
+
+tpudnnStatus_t tpudnnTanhBackwardAsync(
+    tpudnnHandle_t handle,
+    tpudnnTensor_t grad_output,
+    tpudnnTensor_t output,
+    tpudnnTensor_t grad_input);
+
 } // extern "C"

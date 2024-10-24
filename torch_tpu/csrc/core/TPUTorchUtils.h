@@ -424,6 +424,7 @@ typedef enum
   SINH,
   COSH,
   TANH,
+  TANH_BACKWARD,
   CEIL,
   FLOOR,
   ROUND,
