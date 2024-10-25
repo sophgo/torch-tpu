@@ -67,9 +67,13 @@ void nodechip_constant_fill_multi_core(
     }
   } 
 }
-
+void firmware_kernel_tick();
+void firmware_kernel_tock(int);
 int tpu_kernel_api_const_fill_multi_core ( const void * args ) {
   sg_api_constant_fill_t *api = ( sg_api_constant_fill_t* ) args;
+#ifdef USING_LLM_TICK_TOCK_PROFILE
+  firmware_kernel_tick();
+#endif
   tpu_initialize();
 #ifdef BACKEND_SG2260
   nodechip_constant_fill_multi_core (
@@ -79,6 +83,9 @@ int tpu_kernel_api_const_fill_multi_core ( const void * args ) {
   api->value,
   (data_type_t)api->dtype );
   tpu_poll();
+#ifdef USING_LLM_TICK_TOCK_PROFILE
+  firmware_kernel_tock(10);
+#endif
   return 0;
 #else
   nodechip_fill (

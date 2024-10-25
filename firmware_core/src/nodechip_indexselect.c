@@ -1,6 +1,8 @@
 #include "sg_api_struct.h"
 #include "tpu_kernel.h"
 
+void firmware_kernel_tick();
+void firmware_kernel_tock(int);
 
 inline static void pipeline_move(unsigned long long *array, int num) {
   for (int i = num - 1; i > 0; i--) {
@@ -485,6 +487,9 @@ void nodechip_index_select_multi_core(
 int tpu_kernel_api_index_select_multi_core ( const void * args )
 {
   sg_api_index_select_t *api = ( sg_api_index_select_t * ) args;
+#ifdef USING_LLM_TICK_TOCK_PROFILE
+  firmware_kernel_tick();
+#endif
   tpu_initialize();
   int input_shape[8] = {1, 1, 1, 1, 1, 1, 1, 1};
   for ( int i = 0; i < api->dim; ++i ) {
@@ -548,8 +553,10 @@ int tpu_kernel_api_index_select_multi_core ( const void * args )
     0,
     ( data_type_t ) api->dtype );
   }
-
   tpu_poll();
+#ifdef USING_LLM_TICK_TOCK_PROFILE
+  firmware_kernel_tock(9);
+#endif
   return 0;
 }
 TPUKERNEL_FUNC_REGISTER ( tpu_kernel_api_index_select_multi_core );

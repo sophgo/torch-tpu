@@ -2,6 +2,8 @@
 #include "tpu_kernel.h"
 
 
+void firmware_kernel_tick();
+void firmware_kernel_tock(int);
 static inline bool is_contiguous ( const int * shape, const int * stride, int dim )
 {
   int s = 1;
@@ -360,8 +362,11 @@ bool          multi_core)
 
 int tpu_kernel_api_strided_copy_multi_core(const void *args) {
   sg_api_strided_copy_t *api = (sg_api_strided_copy_t*)args;
-  tpu_initialize();
 #ifdef BACKEND_SG2260
+#ifdef USING_LLM_TICK_TOCK_PROFILE
+  firmware_kernel_tick();
+#endif
+   tpu_initialize();
 #ifdef USING_PERF_MODE
     tpu_sync_all();
 #endif
@@ -375,6 +380,9 @@ int tpu_kernel_api_strided_copy_multi_core(const void *args) {
     (data_type_t)api->dtype,
     true);
   tpu_poll();
+#ifdef USING_LLM_TICK_TOCK_PROFILE
+  firmware_kernel_tock(8);
+#endif
   return 0;
 #else
   nodechip_strided_copy_multi_core (
