@@ -46,14 +46,62 @@ function soc_build()
 
 function update_sg2260_third_party()
 {
-  pushd ${TPUTRAIN_TOP}
-  echo "update libtpudnn.so ..."
-  cp ../TPU1686/build_sg2260/tpuDNN/src/libtpudnn.so third_party/tpuDNN/sg2260_lib/
-  echo "update libsccl.so ..."
-  cp ../TPU1686/build_sg2260/sccl/libsccl.so ./third_party/sccl/sg2260_lib/
-  echo "update libtpuv7_emulator.so ..."
-  cp ../TPU1686/build_sg2260/firmware_core/libtpuv7_emulator.so ./third_party/tpuv7_runtime/tpuv7-emulator_0.1.0/lib/
-  echo "update libfirmware_core.a ..."
-  cp ../TPU1686/build_fw_sg2260/firmware_core/libfirmware_core.a ./third_party/firmware/sg2260/
+  echo "updating tpuDNN.h ..."
+  cp ${TPU1686_PATH}/tpuDNN/include/tpuDNN.h ${TPUTRAIN_TOP}/third_party/tpuDNN/include/
+  echo "updating tpuDNNTensor.h ..."
+  cp ${TPU1686_PATH}/tpuDNN/include/tpuDNNTensor.h ${TPUTRAIN_TOP}/third_party/tpuDNN/include/
+  echo "updating sccl.h ..."
+  cp ${TPU1686_PATH}/sccl/include/sccl.h ${TPUTRAIN_TOP}/third_party/sccl/include/
+  echo "updating libtpudnn.so ..."
+  cp ${TPU1686_PATH}/build_sg2260/tpuDNN/src/libtpudnn.so ${TPUTRAIN_TOP}/third_party/tpuDNN/sg2260_lib/
+  echo "updating libsccl.so ..."
+  cp ${TPU1686_PATH}/build_sg2260/sccl/libsccl.so ${TPUTRAIN_TOP}/third_party/sccl/sg2260_lib/
+  echo "updating libtpuv7_emulator.so ..."
+  cp ${TPU1686_PATH}/build_sg2260/firmware_core/libtpuv7_emulator.so ${TPUTRAIN_TOP}/third_party/tpuv7_runtime/tpuv7-emulator_0.1.0/lib/
+  echo "updating libfirmware_core.a ..."
+  cp ${TPU1686_PATH}/build_fw_sg2260/firmware_core/libfirmware_core.a ${TPUTRAIN_TOP}/third_party/firmware/sg2260/
+}
+
+function update_bm1684x_third_party()
+{
+  echo "updating tpuDNN.h ..."
+  cp ${TPU1686_PATH}/tpuDNN/include/tpuDNN.h ${TPUTRAIN_TOP}/third_party/tpuDNN/include/
+  echo "updating tpuDNNTensor.h ..."
+  cp ${TPU1686_PATH}/tpuDNN/include/tpuDNNTensor.h ${TPUTRAIN_TOP}/third_party/tpuDNN/include/
+  echo "updating libtpudnn.so ..."
+  cp ${TPU1686_PATH}/build_bm1684x/tpuDNN/src/libtpudnn.so ${TPUTRAIN_TOP}/third_party/tpuDNN/bm1684x_lib/
+  echo "updating libcmodel_firmware.so ..."
+  cp ${TPU1686_PATH}/build_bm1684x/firmware_core/libcmodel_firmware.so ${TPUTRAIN_TOP}/third_party/firmware/bm1684x/
+  echo "updating libfirmware_core.a ..."
+  cp ${TPU1686_PATH}/build_fw_bm1684x/firmware_core/libfirmware_core.a ${TPUTRAIN_TOP}/third_party/firmware/bm1684x/
+}
+
+function rebuild_TPU1686()
+{
+    if [[ "$EXTRA_CONFIG" != *USING_TPUDNN_TESTS* ]]; then
+        export EXTRA_CONFIG="$EXTRA_CONFIG -DUSING_TPUDNN_TESTS=OFF -DREMOVE_POLLS_IN_LLM=ON"
+    fi
+    CMODEL_FW_BINARY_DIR=build_${CHIP_ARCH} rebuild_firmware_cmodel_and_tpudnn || return -1
+    FW_BINARY_DIR=build_fw_${CHIP_ARCH} rebuild_firmware || return -1
+    if [ "${CHIP_ARCH}" == "sg2260" ]; then
+        update_sg2260_third_party
+    elif [ "${CHIP_ARCH}" == "bm1684x" ]; then
+        update_bm1684x_third_party
+    fi
+}
+
+function update_tpuv7()
+{
+  export TPURT_TOP=$TPUTRAIN_TOP/../tpuv7-runtime
+  pushd $TPURT_TOP
+  rm -rf build/emulator-onednn
+  mkdir -p build/emulator-onednn
+  cd build/emulator-onednn
+  cmake -DCMAKE_INSTALL_PREFIX=$PWD/../install -DUSING_CMODEL=ON -DUSING_ONEDNN=ON ../..
+  make -j$(nproc)
+  make driver
+  make install
   popd
+  rm -rf $TPUTRAIN_TOP/third_party/tpuv7_runtime/tpuv7-emulator_0.1.0/
+  cp -r $TPURT_TOP/build/install/tpuv7-runtime-emulator-onednn_0.1.0 $TPUTRAIN_TOP/third_party/tpuv7_runtime/tpuv7-emulator_0.1.0/
 }

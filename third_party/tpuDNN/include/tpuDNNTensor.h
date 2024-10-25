@@ -933,38 +933,21 @@ tpudnnStatus_t tpudnnGDMAD2DAsync(
     tpudnnTensor_t dst,
     size_t size);
 
-tpudnnStatus_t tpudnnDropoutMultiCoreAsync(
-    tpudnnHandle_t handle,
-    tpudnnTensor_t input,
-    tpudnnTensor_t output,
-    const float drop_rate);
-
-tpudnnStatus_t tpudnnLLamaA16MatmulAsync( 
-    tpudnnHandle_t handle ,
-    tpudnnTensor_t left,
-    tpudnnTensor_t right,
-    tpudnnTensor_t bias,
-    tpudnnTensor_t scale,
-    tpudnnTensor_t zp,
-    int group_size,
-    int weight_bits,
-    tpudnnTensor_t output);
-
-tpudnnStatus_t tpudnnLLamaA16MatmulAsync( 
-    tpudnnHandle_t handle ,
-    tpudnnTensor_t left,
-    tpudnnTensor_t right,
-    tpudnnTensor_t bias,
-    tpudnnTensor_t scale,
-    tpudnnTensor_t zp,
-    int group_size,
-    int weight_bits,
-    tpudnnTensor_t output);
-
 tpudnnStatus_t tpudnnTanhBackwardAsync(
     tpudnnHandle_t handle,
     tpudnnTensor_t grad_output,
     tpudnnTensor_t output,
     tpudnnTensor_t grad_input);
-
+    
+tpudnnStatus_t tpudnnLLamaA16MatmulAsync( 
+    tpudnnHandle_t handle ,
+    tpudnnTensor_t left,
+    tpudnnTensor_t right,
+    tpudnnTensor_t bias,
+    tpudnnTensor_t scale,
+    tpudnnTensor_t zp,
+    int group_size,
+    int weight_bits,
+    tpudnnTensor_t output);
+    
 } // extern "C"

@@ -13,8 +13,9 @@ world_size = os.environ.get("WORLD_SIZE")
 if rank == None:
     rank = os.environ.get("OMPI_COMM_WORLD_RANK", 0)
     world_size = os.environ.get("OMPI_COMM_WORLD_SIZE", 1)
-
-# tensor_len = 16080 * 76032
+# torchrun --nproc_per_node 2 --nnodes 1 test_all_gather.py
+# tensor_len = 65536*76032
+# tensor_len = 16080*76032*2
 dtype = torch.float16
 # tensor_len = 80 * 76032
 # tensor_len = 8192
