@@ -361,6 +361,7 @@ typedef struct
   int dim;
   int input_dtype;
   int output_dtype;
+  int is_bool;
 } WITH_PLATFORM(sg_api_dtype_convert_t);
 
 typedef struct

@@ -345,7 +345,8 @@ tpudnnStatus_t tpudnnStridedCopyAsync(
 tpudnnStatus_t tpudnnConvertAsync(
     tpudnnHandle_t handle,
     tpudnnTensor_t input,
-    tpudnnTensor_t output);
+    tpudnnTensor_t output,
+    int is_bool);
 
 tpudnnStatus_t tpudnnNonzeroAsync(
     tpudnnHandle_t handle,

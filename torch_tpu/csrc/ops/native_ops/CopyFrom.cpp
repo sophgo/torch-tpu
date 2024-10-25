@@ -122,10 +122,12 @@ Tensor _copy_from_tpu(const Tensor &self, const Tensor &dst,
         if (dst.is_contiguous()) {
           TIMING_START;
           auto stream = c10_tpu::getCurrentTPUStream();
+          int is_bool = (dst.dtype() == caffe2::TypeMeta::Make<bool>());
           auto status = tpudnnConvertAsync(
             stream,
             tpu::TPUGenerateTpudnnTensor(stream, self_),
-            tpu::TPUGenerateTpudnnTensor(stream, dst));
+            tpu::TPUGenerateTpudnnTensor(stream, dst),
+            is_bool);
           TORCH_CHECK(status == TPUDNN_STATUS_SUCCESS);
           TIMING_END(tpu::DTYPE_CONVERT);
           SHOW_TENSOR_OP(self_, dst);
