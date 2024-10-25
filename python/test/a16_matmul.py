@@ -18,7 +18,7 @@ class A16MatmulFunc(torch.autograd.Function):
     def forward(ctx, active, weight, bias, scale, zp, group_size, weight_bits):
         output = torch.empty((active.shape[0], active.shape[1], active.shape[2], weight.shape[2]), dtype = active.dtype, device = weight.device)
 
-        torch.ops.my_ops.a16_matmul_forward(active,
+        torch.ops.my_ops.matmul_gptq_forward(active,
                                     weight,
                                     bias,
                                     scale,
@@ -94,11 +94,11 @@ def check_a16_matmul():
 
     if quant_uint4:
         net_cpu = NativeMatmul()
-        k_deq = (k_int8_tensor - 3 - 1) * 0.1
+        k_deq = (k_int8_tensor - 3) * 0.1
         out_cpu = net_cpu(q_cpu[0][0], k_deq, bias_cpu)
     else:
         net_cpu = NativeMatmul()
-        k_deq = (k_cpu_qt - 3 - 1) * 0.1
+        k_deq = (k_cpu_qt - 3) * 0.1
         out_cpu = net_cpu(q_cpu[0][0], k_deq, bias_cpu)
 
     weight_bits = 8
@@ -118,7 +118,7 @@ def check_a16_matmul():
     print(out_cpu.shape, out_tpu.shape)
     print(out_cpu)
     print(out_tpu[0][0])
-    print(torch.max(abs(out_cpu - out_tpu.cpu())))
+    print("max diff:",torch.max(abs(out_cpu - out_tpu.cpu())))
 
 
 

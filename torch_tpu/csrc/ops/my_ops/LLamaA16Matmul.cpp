@@ -10,7 +10,7 @@
 
 namespace at
 {
-	Tensor a16_matmul_forward(
+	Tensor matmul_gptq_forward(
 		Tensor &active,
 		Tensor &weight,
 		const c10::optional<Tensor> &bias,
