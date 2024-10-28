@@ -31,24 +31,27 @@ Tensor & index_out_tpu( const Tensor & self, const c10::List<c10::optional<Tenso
       auto idx = indices[0].value();
       auto idx_value = idx.scalar_type() == torch::kInt64 || idx.scalar_type() == torch::kInt32 ? idx : idx.to(torch::kInt32);
 
+      auto stream = c10_tpu::getCurrentTPUStream();
       if (tpu::TPUConvertDtype<SgdnnDataType_t>(self.dtype()) == SGDNN_DTYPE_INT64){
         auto self_ = self.to(torch::kInt32);
         auto out_  = out.to(torch::kInt32);
-        auto status = sgdnnIndexSelect(tpu::TPUGetDeviceResource(),
-                                      tpu::TPUGenerateSgdnnTensor(self_),
-                                      tpu::TPUGenerateSgdnnTensor(idx_value),
-                                      0,
-                                      tpu::TPUGenerateSgdnnTensor(out_));
-        TORCH_CHECK ( status == SG_SUCCESS );
+        auto status = tpudnnIndexSelectAsync(
+            stream,
+            tpu::TPUGenerateTpudnnTensor(stream, self_),
+            tpu::TPUGenerateTpudnnTensor(stream, idx_value),
+            0,
+            tpu::TPUGenerateTpudnnTensor(stream, out_));
+        TORCH_CHECK ( status == TPUDNN_STATUS_SUCCESS );
         out = out_.to(torch::kInt64);
       }
       else{
-      auto status = sgdnnIndexSelect(tpu::TPUGetDeviceResource(),
-                                            tpu::TPUGenerateSgdnnTensor(self),
-                                            tpu::TPUGenerateSgdnnTensor(idx_value),
-                                            0,
-                                            tpu::TPUGenerateSgdnnTensor(out));
-      TORCH_CHECK ( status == SG_SUCCESS );
+        auto status = tpudnnIndexSelectAsync(
+            stream,
+            tpu::TPUGenerateTpudnnTensor(stream, self),
+            tpu::TPUGenerateTpudnnTensor(stream, idx_value),
+            0,
+            tpu::TPUGenerateTpudnnTensor(stream, out));
+        TORCH_CHECK ( status == TPUDNN_STATUS_SUCCESS );
       }
 
       TIMING_END ( tpu::INDEX_SELECT );

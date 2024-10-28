@@ -998,4 +998,12 @@ tpudnnStatus_t tpudnnLLaVaMlpAsync (
     tpudnnTensor_t b1,
     tpudnnTensor_t b2,
     tpudnnTensor_t output);
+
+tpudnnStatus_t tpudnnIndexSelectAsync(
+    tpudnnHandle_t handle,
+    tpudnnTensor_t input,
+    tpudnnTensor_t indices,
+    int dim,
+    tpudnnTensor_t output);
+
 } // extern "C"
