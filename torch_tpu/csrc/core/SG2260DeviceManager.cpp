@@ -213,7 +213,8 @@ public:
     Size = alignTo(Size, alignSize);
 
     auto reused = processFreeTBDs(Size, Index);
-    if (reused) return reused;
+    if (reused)
+      return (void*)UnifiedAddr((unsigned long long) reused, Index);
 
     if ( Size == 0 )
     {
