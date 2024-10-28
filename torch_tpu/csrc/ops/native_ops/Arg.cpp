@@ -41,7 +41,6 @@ Tensor &argmax_out_tpu(const Tensor &self, c10::optional<int64_t> dim,
     TORCH_CHECK(dim.value() >= 0 || dim.value() < self.dim());
   }
   TensorOptions options = TensorOptions ( self.device() ).dtype ( self.dtype() );
-  Tensor values = empty({out.sizes()}, options);
   Tensor buffer = empty({out.sizes()}, options);
   TIMING_START;
   auto stream = c10_tpu::getCurrentTPUStream();
@@ -49,7 +48,7 @@ Tensor &argmax_out_tpu(const Tensor &self, c10::optional<int64_t> dim,
       stream,
       tpu::TPUGenerateTpudnnTensor(stream, self),
       dim.has_value() ? dim.value() : self.dim(), ARGMAX_MODE,
-      tpu::TPUGenerateTpudnnTensor(stream, values),
+      tpudnnUndefinedTensor(),
       tpu::TPUGenerateTpudnnTensor(stream, out),
       tpu::TPUGenerateTpudnnTensor(stream, buffer));
   TORCH_CHECK(status == TPUDNN_STATUS_SUCCESS);
@@ -77,7 +76,6 @@ Tensor &argmin_out_tpu(const Tensor &self, c10::optional<int64_t> dim,
     TORCH_CHECK(dim.value() >= 0 || dim.value() < self.dim());
   }
   TensorOptions options = TensorOptions ( self.device() ).dtype ( self.dtype() );
-  Tensor values = empty({out.sizes()}, options);
   Tensor buffer = empty({out.sizes()}, options);
   TIMING_START;
   auto stream = c10_tpu::getCurrentTPUStream();
@@ -85,7 +83,7 @@ Tensor &argmin_out_tpu(const Tensor &self, c10::optional<int64_t> dim,
       stream,
       tpu::TPUGenerateTpudnnTensor(stream, self),
       dim.has_value() ? dim.value() : self.dim(), ARGMIN_MODE,
-      tpu::TPUGenerateTpudnnTensor(stream, values),
+      tpudnnUndefinedTensor(),
       tpu::TPUGenerateTpudnnTensor(stream, out),
       tpu::TPUGenerateTpudnnTensor(stream, buffer));
   TORCH_CHECK(status == TPUDNN_STATUS_SUCCESS);
