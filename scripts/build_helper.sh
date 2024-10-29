@@ -1,7 +1,18 @@
 #!/bin/bash
 
+function open_remove_poll()
+{
+  if echo "$EXTRA_CONFIG" | grep -q "-DREMOVE_POLLS_IN_LLM=ON"; then
+    echo "$EXTRA_CONFIG"
+  else
+    export EXTRA_CONFIG="$EXTRA_CONFIG -DREMOVE_POLLS_IN_LLM=ON"
+    echo "$EXTRA_CONFIG"
+  fi
+}
+
 function new_build()
 {
+  open_remove_poll;
   pip uninstall torch_tpu -y
   pushd ${TPUTRAIN_TOP}
   python setup.py develop
@@ -11,6 +22,7 @@ function new_build()
 
 function bdist_wheel()
 {
+  open_remove_poll;
   python setup.py develop --uninstall
   pushd ${TPUTRAIN_TOP}
   python setup.py bdist_wheel
