@@ -22,25 +22,17 @@ Tensor & _log_softmax_out_tpu ( const Tensor & self, int64_t dim, bool half_to_f
   tpu::TPUCopyHostToDevice ( out.data_ptr(), out_cpu.contiguous().data_ptr(), out.nbytes() );
   TIMING_END(tpu::CPU_LAYER);
 #else
-  Tensor self_f = self;
-  Tensor out_f = out;
-  if (self.dtype() == caffe2::TypeMeta::Make<at::Half>() ||
-      self.dtype() == caffe2::TypeMeta::Make<at::BFloat16>()) {
-    self_f = self.to(torch::kFloat);
-    out_f = out.to(torch::kFloat);
-  }
 
   TIMING_START;
   auto stream = c10_tpu::getCurrentTPUStream();
   auto status = tpudnnLogSoftmaxAsync(
                 stream,
-                tpu::TPUGenerateTpudnnTensor ( stream,self_f ),
+                tpu::TPUGenerateTpudnnTensor ( stream, self ),
                 dim,
-                tpu::TPUGenerateTpudnnTensor ( stream,out_f ) );
+                tpu::TPUGenerateTpudnnTensor ( stream, out ) );
   TORCH_CHECK(status == TPUDNN_STATUS_SUCCESS );
-  tpu::TPUCopyDeviceToDevice(out.data_ptr(), out_f.to(out.dtype()).data_ptr(),
-                             out.nbytes());
-    TIMING_END(tpu::LOGSOFTMAX);
+  TIMING_END(tpu::LOGSOFTMAX);
+
 #endif
   SHOW_TENSOR_OP(self, out);
   return out;
@@ -83,7 +75,7 @@ Tensor & _softmax_out_tpu ( const Tensor & self, int64_t dim, bool half_to_float
                       dim,
                       tpu::TPUGenerateTpudnnTensor ( stream,out) );
   TORCH_CHECK ( status == TPUDNN_STATUS_SUCCESS  );
-    TIMING_END ( tpu::SOFTMAX );
+  TIMING_END ( tpu::SOFTMAX );
 #endif
   SHOW_TENSOR_OP(self, out);
   return out;
@@ -113,7 +105,7 @@ Tensor & _softmax_backward_data_out_tpu ( const Tensor & grad_output, const Tens
       dim,
       tpu::TPUGenerateTpudnnTensor(stream, grad_input));
   TORCH_CHECK(status == TPUDNN_STATUS_SUCCESS);
-    TIMING_END ( tpu::SOFTMAX_BACKWARD );
+  TIMING_END ( tpu::SOFTMAX_BACKWARD );
 #endif
   SHOW_TENSOR_OP(grad_output, output, grad_input);
   return grad_input;
