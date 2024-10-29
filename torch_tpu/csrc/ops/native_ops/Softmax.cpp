@@ -23,14 +23,25 @@ Tensor & _log_softmax_out_tpu ( const Tensor & self, int64_t dim, bool half_to_f
   TIMING_END(tpu::CPU_LAYER);
 #else
 
+  Tensor self_f = self;
+  Tensor out_f = out;
+  if (self.dtype() == caffe2::TypeMeta::Make<at::Half>() ||
+      self.dtype() == caffe2::TypeMeta::Make<at::BFloat16>()) {
+    self_f = self.to(torch::kFloat);
+    out_f = out.to(torch::kFloat);
+  }
+
   TIMING_START;
   auto stream = c10_tpu::getCurrentTPUStream();
   auto status = tpudnnLogSoftmaxAsync(
                 stream,
-                tpu::TPUGenerateTpudnnTensor ( stream, self ),
+                tpu::TPUGenerateTpudnnTensor ( stream, self_f ),
                 dim,
-                tpu::TPUGenerateTpudnnTensor ( stream, out ) );
+                tpu::TPUGenerateTpudnnTensor ( stream, out_f ) );
   TORCH_CHECK(status == TPUDNN_STATUS_SUCCESS );
+  tpu::TPUCopyDeviceToDevice(out.data_ptr(),
+                             out_f.to(out.dtype()).data_ptr(),
+                             out.nbytes());
   TIMING_END(tpu::LOGSOFTMAX);
 
 #endif
