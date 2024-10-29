@@ -36,14 +36,15 @@ void firmware_kernel_tick();
 void firmware_kernel_tock(int);
 
 int tpu_kernel_api_arg_muti_core(const void *args) {
-#ifdef USING_LLM_TICK_TOCK_PROFILE
-  firmware_kernel_tick();
-#endif
+
 
   sg_api_reduce_arg_t *api = (sg_api_reduce_arg_t *)args;
   // TPUKERNEL_ASSERT(api->dtype == DT_FP32);
-  tpu_initialize();
 #ifdef BACKEND_SG2260
+#ifdef USING_LLM_TICK_TOCK_PROFILE
+  firmware_kernel_tick();
+#endif
+  tpu_initialize();
   unsigned int slice_num = tpu_core_num();
   unsigned int slice_idx = tpu_core_index();
   // determine the length of each slice
