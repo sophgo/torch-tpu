@@ -14,12 +14,19 @@ namespace at
 		Tensor &weight0,
 		Tensor &weight1,
 		Tensor &weight2,
-		Tensor &output)
+		Tensor &silu,
+		Tensor &sigmoid,
+		Tensor &m0,
+		Tensor &output,
+		bool save_mid_res)
 	{
 		CHECK_TENSOR_IN_DEVICE(input);
 		CHECK_TENSOR_IN_DEVICE(weight0);
 		CHECK_TENSOR_IN_DEVICE(weight1);
 		CHECK_TENSOR_IN_DEVICE(weight2);
+		CHECK_TENSOR_IN_DEVICE(silu);
+		CHECK_TENSOR_IN_DEVICE(sigmoid);
+		CHECK_TENSOR_IN_DEVICE(m0);
 		CHECK_TENSOR_IN_DEVICE(output);
 
 		TIMING_START;
@@ -31,7 +38,11 @@ namespace at
 			tpu::TPUGenerateTpudnnTensor( stream, weight0),
 			tpu::TPUGenerateTpudnnTensor( stream, weight1),
 			tpu::TPUGenerateTpudnnTensor( stream, weight2),
-			tpu::TPUGenerateTpudnnTensor( stream, output));
+			tpu::TPUGenerateTpudnnTensor( stream, silu),
+			tpu::TPUGenerateTpudnnTensor( stream, sigmoid),
+			tpu::TPUGenerateTpudnnTensor( stream, m0),
+			tpu::TPUGenerateTpudnnTensor( stream, output),
+			save_mid_res);
 		TORCH_CHECK(status == TPUDNN_STATUS_SUCCESS);
 #elif defined BACKEND_1684X
 		TORCH_CHECK(false);

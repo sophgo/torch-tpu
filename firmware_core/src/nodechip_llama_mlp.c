@@ -22,6 +22,10 @@ void nodechip_llama_mlp_forward_multi_core(
     global_addr_t weight1_global_addr,
     global_addr_t weight2_global_addr,
     global_addr_t output_global_addr,
+    global_addr_t silu_global_addr,
+    global_addr_t sigmoid_global_addr,
+    global_addr_t m0_global_addr,
+    bool save_mid_res,
     int batch,
     int input_w,
     int middle_w,
@@ -64,12 +68,20 @@ int tpu_kernel_llama_mlp_multi_core(const void* api_buf) {
         tpu_sync_all();
 #endif
     global_addr_t *rmsnorm_useless = NULL;
+    bool save_mid_res = false;
+    if (api->save_mid_res) {
+        save_mid_res = true;
+    }
     nodechip_llama_mlp_forward_multi_core(
         api->input_addr,
         api->weight0_addr,
         api->weight1_addr,
         api->weight2_addr,
         api->output_addr,
+        api->silu_addr,
+        api->sigmoid_addr,
+        api->m0_addr,
+        save_mid_res,
         api->batch,
         api->input_w,
         api->middle_w,

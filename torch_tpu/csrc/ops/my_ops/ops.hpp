@@ -33,7 +33,11 @@ namespace at
 		Tensor &weight0,
 		Tensor &weight1,
 		Tensor &weight2,
-		Tensor &output);
+		Tensor &silu,
+		Tensor &sigmoid,
+		Tensor &m0,
+		Tensor &output,
+		bool save_mid_res);
 
 	Tensor matmul_gptq_forward(
 		Tensor &active,

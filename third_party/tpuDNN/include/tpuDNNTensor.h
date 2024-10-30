@@ -908,7 +908,11 @@ tpudnnStatus_t tpudnnLLamaMlpAsync (
     tpudnnTensor_t weight0,
     tpudnnTensor_t weight1,
     tpudnnTensor_t weight2,
-    tpudnnTensor_t output);
+    tpudnnTensor_t silu,
+    tpudnnTensor_t sigmoid,
+    tpudnnTensor_t m0,
+    tpudnnTensor_t output,
+    bool save_mid_res);
 
 tpudnnStatus_t tpudnnLLamaA16MlpAsync (
     tpudnnHandle_t handle,

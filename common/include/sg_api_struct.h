@@ -1238,6 +1238,10 @@ typedef struct {
   unsigned long long zp2_addr;
   unsigned long long scale2_addr;
   unsigned long long output_addr;
+  unsigned long long silu_addr;
+  unsigned long long sigmoid_addr;
+  unsigned long long m0_addr;
+  int save_mid_res;
   int batch;
   int input_w;
   int middle_w;
