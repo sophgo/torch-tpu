@@ -234,25 +234,66 @@ TORCH_LIBRARY_IMPL(aten, TPU, m) {
   m.impl("tanh_backward.grad_input", tanh_backward_grad_input_tpu);
 }
 
-//TODO TPU implement
-Tensor & sigmoid_backward_out_tpu(const Tensor & grad_output, const Tensor & output, Tensor & grad_input){
+Tensor & sigmoid_backward_grad_input_tpu(const Tensor& grad_output, const Tensor& output, Tensor& grad_input) {
   CHECK_TENSOR_IN_DEVICE(grad_output);
   CHECK_TENSOR_IN_DEVICE(output);
   CHECK_TENSOR_IN_DEVICE(grad_input);
-#if 1
+#if 0
   CPU_IMPL_WARNING();
   TIMING_START;
   auto grad_input_cpu = sigmoid_backward ( grad_output.cpu(), output.cpu() );
   tpu::TPUCopyHostToDevice ( grad_input.data_ptr(), grad_input_cpu.contiguous().data_ptr(), grad_input.nbytes() );
   TIMING_END(tpu::CPU_LAYER);
 #else
+  TIMING_START;
+  auto stream = c10_tpu::getCurrentTPUStream();
+  auto status = tpudnnSigmoidBackwardAsync(
+    stream,
+    tpu::TPUGenerateTpudnnTensor(stream, grad_output),
+    tpu::TPUGenerateTpudnnTensor(stream, output),
+    tpu::TPUGenerateTpudnnTensor(stream, grad_input));
+  TORCH_CHECK(status == TPUDNN_STATUS_SUCCESS);
+  TIMING_END(tpu::SIGMOID_BACKWARD);
 #endif
   SHOW_TENSOR_OP(grad_output, output, grad_input);
   return grad_input;
 }
 
 TORCH_LIBRARY_IMPL(aten, TPU, m) {
-  m.impl("sigmoid_backward.grad_input", sigmoid_backward_out_tpu);
+  m.impl("sigmoid_backward.grad_input", sigmoid_backward_grad_input_tpu);
+}
+
+
+/*
+* FIXME: The actual silu backward does not pass this route, as it is implemented by several sub-ops.
+*/
+Tensor & silu_backward_grad_input_tpu(const Tensor& grad_output, const Tensor& input, Tensor& grad_input) {
+  CHECK_TENSOR_IN_DEVICE(grad_output);
+  CHECK_TENSOR_IN_DEVICE(input);
+  CHECK_TENSOR_IN_DEVICE(grad_input);
+#if 0
+  CPU_IMPL_WARNING();
+  TIMING_START;
+  auto grad_input_cpu = silu_backward ( grad_output.cpu(), input.cpu() );
+  tpu::TPUCopyHostToDevice ( grad_input.data_ptr(), grad_input_cpu.contiguous().data_ptr(), grad_input.nbytes() );
+  TIMING_END(tpu::CPU_LAYER);
+#else
+  TIMING_START;
+  auto stream = c10_tpu::getCurrentTPUStream();
+  auto status = tpudnnSiluBackwardAsync(
+    stream,
+    tpu::TPUGenerateTpudnnTensor(stream, grad_output),
+    tpu::TPUGenerateTpudnnTensor(stream, input),
+    tpu::TPUGenerateTpudnnTensor(stream, grad_input));
+  TORCH_CHECK(status == TPUDNN_STATUS_SUCCESS);
+  TIMING_END(tpu::SILU_BACKWARD);
+#endif
+  SHOW_TENSOR_OP(grad_output, input, grad_input);
+  return grad_input;
+}
+
+TORCH_LIBRARY_IMPL(aten, TPU, m) {
+  m.impl("silu_backward.grad_input", silu_backward_grad_input_tpu);
 }
 
 } // namespace at

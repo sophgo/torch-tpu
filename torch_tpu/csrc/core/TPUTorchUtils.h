@@ -50,7 +50,7 @@ do{                                                     \
 #endif
 
 #ifdef SHOW_OP_INFO
-#define SHOW_TENSOR_OP(...) DEBUG_SHOW(Tensor, tpu::GetTensorInfo, __VA_ARGS__)
+#define SHOW_TENSOR_OP(...) DEBUG_SHOW(at::Tensor, tpu::GetTensorInfo, __VA_ARGS__)
 #define SHOW_EMPTY_INFO(Tensor) std::cout << __func__ << ": " << Tensor.data_ptr() << std::endl;
 #else
 #define SHOW_TENSOR_OP(...)
@@ -484,7 +484,9 @@ typedef enum
   UPSAMPLING_NEAREST_BACKWARD,
   ARANGE,
   SILU,
+  SILU_BACKWARD,
   SIGMOID,
+  SIGMOID_BACKWARD,
   CLAMP,
   LN_MM_FORWARD,
   ERF,
