@@ -27,6 +27,13 @@ size_t getTPUAllocatorFreeDelay()
   return atoi(delay);
 }
 
+size_t getTPUAllocatorForcedTTL()
+{
+  const char *delay = getenv("TPU_ALLOCATOR_FORCED_TTL_IN_MS");
+  if (!delay) return 0;
+  return atoi(delay);
+}
+
 size_t getTPUAllocatorAlignSize(size_t defaultVal)
 {
   const char *size = getenv("TPU_ALLOCATOR_ALIGN_SIZE");
@@ -48,7 +55,7 @@ private:
     void *ptr;
     tpuRtEvent_t event;
     tpuRtStream_t stream;
-    uint64_t freed_timestamp = 0;
+    uint64_t marked_timestamp = 0, freed_timestamp = 0;
   };
 
   struct MemInfo {
@@ -103,6 +110,7 @@ public:
       devices_init_[0] = 1; // tpuRtDeviceInit will default set idx = 0 device. that not a good idea.
     }
     SOPHON_LOG("TPU Device Manager init successfully\n");
+    forced_ttl_ = getTPUAllocatorForcedTTL();
     free_delay_ = getTPUAllocatorFreeDelay();
     init_flag_ = true;
     return INIT_SUCCESS;
@@ -135,11 +143,17 @@ public:
     return mem_info[ptr].size;
   }
 
-  void *processFreeTBDs(size_t size, int index)
+  inline static uint64_t gettime()
   {
     struct timeval t;
     gettimeofday ( &t, NULL );
     uint64_t now = (t.tv_sec * 1000000UL + t.tv_usec) / 1000UL;
+    return now;
+  }
+
+  void *processFreeTBDs(size_t size, int index)
+  {
+    auto now = gettime();
 
     std::lock_guard<std::mutex> lock(getMutex(index));
 
@@ -153,11 +167,18 @@ public:
       auto &tbd = pair.second;
       if (tbd.freed_timestamp == 0)
       {
-        if (tpuRtEventQuery(event) != tpuRtDevnotready)
+        if (forced_ttl_)
         {
-          tbd.freed_timestamp = now;
+            if (tbd.marked_timestamp + forced_ttl_ < now)
+              tbd.freed_timestamp = now;
+            else continue;
         } else {
-            continue;
+            if (tpuRtEventQuery(event) != tpuRtDevnotready)
+            {
+              tbd.freed_timestamp = now;
+            } else {
+                continue;
+            }
         }
       }
 
@@ -184,7 +205,8 @@ public:
     for (auto ptr : toRm)
     {
       auto &tbd = freeTBDs[ptr];
-      tpuRtEventFree(tbd.event, tbd.stream);
+      if (!forced_ttl_)
+        tpuRtEventFree(tbd.event, tbd.stream);
       freeTBDs.erase(ptr);
     }
 
@@ -255,6 +277,8 @@ public:
       return;
 
     tbd.ptr = Ptr;
+    if (forced_ttl_)
+      tbd.marked_timestamp = gettime();
 
     auto status = tpuRtEventCreate(&tbd.event);
     TORCH_CHECK (status == tpuRtSuccess, "Failed to create event");
@@ -327,7 +351,7 @@ private:
   std::vector<std::unordered_map<void *, MemInfo>> mem_info_;
 
   int device_count_;
-  size_t free_delay_;
+  size_t free_delay_, forced_ttl_;
   std::atomic<bool> init_flag_;
   std::vector<std::atomic<bool>> devices_init_;
 
@@ -430,7 +454,9 @@ void TPUCopyDeviceToDevice ( void * Dst, const void * Src, size_t Size, bool non
 }
 
 tpuRtStream_t TPUGetDeviceResource ( void ) {
-  return c10_tpu::getCurrentTPUStream();
+  auto stream = c10_tpu::getCurrentTPUStream();
+  tpudnnFlush(stream);
+  return stream;
 }
 
 } // namespace tpu

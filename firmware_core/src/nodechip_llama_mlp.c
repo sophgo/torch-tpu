@@ -62,6 +62,8 @@ int tpu_kernel_llama_mlp_multi_core(const void* api_buf) {
 
 #ifndef REMOVE_POLLS_IN_LLM
     tpu_initialize();
+#else
+    tpu_poll_descriptor();
 #endif
 
 #ifdef USING_PERF_MODE

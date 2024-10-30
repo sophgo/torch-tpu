@@ -134,6 +134,13 @@ typedef struct
     tpudnnDataType_t dtype;
     TpudnnFormatedType_t format_casted;
 } tpudnnTensor_t;
+
+typedef struct {
+    void* cmd;
+    unsigned cmd_num;
+    unsigned cmd_size;
+} tpudnnCmd_t;
+
 typedef struct {
   int kh;
   int kw;
@@ -1009,4 +1016,16 @@ tpudnnStatus_t tpudnnIndexSelectAsync(
     int dim,
     tpudnnTensor_t output);
 
+tpudnnStatus_t tpudnnC2CDescriptor(
+    tpudnnHandle_t handle,
+    tpudnnCmd_t* vsdma_cmd,
+    int vsdma_engine_num,
+    tpudnnCmd_t* cdma_cmd,
+    int cdma_engine_num,
+    tpudnnCmd_t gdma_cmd,
+    void* reduce_data,
+    int reduce_size,
+    int nranks,
+    int cur_rank,
+    const int *chip_map);
 } // extern "C"

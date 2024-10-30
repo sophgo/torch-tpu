@@ -36,6 +36,8 @@ int tpu_kernel_api_llama_a16_matmul ( const void * args )
 
 #ifndef REMOVE_POLLS_IN_LLM
   tpu_initialize();
+#else
+    tpu_poll_descriptor();
 #endif
 
   nodechip_llama2_a16_matmul(

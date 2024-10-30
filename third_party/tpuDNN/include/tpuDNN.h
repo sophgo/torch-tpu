@@ -15,6 +15,8 @@ extern "C"
     tpudnnHandle_t tpudnnCreate(int deviceID = 0);
     void tpudnnDestroy(tpudnnHandle_t handle);
 
+    tpudnnStatus_t tpudnnFlush(tpudnnHandle_t handle);
+
     void *tpudnnPhysToVirt(tpudnnHandle_t handle, uint64_t addr);
     uint64_t tpudnnVirtToPhys(tpudnnHandle_t handle, void *addr);
 

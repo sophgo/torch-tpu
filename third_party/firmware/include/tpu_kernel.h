@@ -214,6 +214,8 @@ void tpu_initialize();
 
 void tpu_poll();
 
+void tpu_poll_descriptor();
+
 void tpu_hau_poll();
 
 void tpu_cdma_initialize();
