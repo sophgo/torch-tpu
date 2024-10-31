@@ -51,7 +51,6 @@ def case2():
     print(torch.max(torch.abs(diff)))
 
 
-
 if __name__ == "__main__":
     case2()
     # case1()

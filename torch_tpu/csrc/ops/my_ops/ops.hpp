@@ -216,4 +216,8 @@ namespace at
 	void enable_pmu();
 
 	void disable_pmu();
+
+	void enable_profile(
+		const c10::optional<int64_t> max_record_num);
+	void disable_profile();
 }

@@ -960,5 +960,11 @@ tpudnnStatus_t tpudnnLLamaA16MatmulAsync(
     int group_size,
     int weight_bits,
     tpudnnTensor_t output);
-    
+
+tpudnnStatus_t tpudnnEnableProfile(
+    tpudnnHandle_t handle,
+    int max_record_num);
+
+tpudnnStatus_t tpudnnDisableProfile(
+    tpudnnHandle_t handle);
 } // extern "C"
