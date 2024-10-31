@@ -531,8 +531,7 @@ tpudnnStatus_t tpudnnArgAsync(
     int axis,
     int mode,
     tpudnnTensor_t values,
-    tpudnnTensor_t indices,
-    tpudnnTensor_t buffer);
+    tpudnnTensor_t indices);
 
 tpudnnStatus_t tpudnnTopkAsync(
     tpudnnHandle_t handle,
@@ -937,6 +936,18 @@ tpudnnStatus_t tpudnnTanhBackwardAsync(
     tpudnnHandle_t handle,
     tpudnnTensor_t grad_output,
     tpudnnTensor_t output,
+    tpudnnTensor_t grad_input);
+
+tpudnnStatus_t tpudnnSigmoidBackwardAsync(
+    tpudnnHandle_t handle,
+    tpudnnTensor_t grad_output,
+    tpudnnTensor_t output,
+    tpudnnTensor_t grad_input);
+
+tpudnnStatus_t tpudnnSiluBackwardAsync(
+    tpudnnHandle_t handle,
+    tpudnnTensor_t grad_output,
+    tpudnnTensor_t input,
     tpudnnTensor_t grad_input);
     
 tpudnnStatus_t tpudnnLLamaA16MatmulAsync( 

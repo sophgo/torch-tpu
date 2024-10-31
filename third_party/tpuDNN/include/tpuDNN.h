@@ -18,7 +18,7 @@ extern "C"
     void *tpudnnPhysToVirt(tpudnnHandle_t handle, uint64_t addr);
     uint64_t tpudnnVirtToPhys(tpudnnHandle_t handle, void *addr);
 
-#if defined(__sg2260__)
+#if defined(__sg2260__) || defined(__sg2262__)
     tpudnnStatus_t tpudnnGetUniqueId(tpudnnHandle_t handle, char* uniqueId);
     tpudnnStatus_t tpudnnSetupC2C(tpudnnHandle_t handle, int deviceID);
 #endif

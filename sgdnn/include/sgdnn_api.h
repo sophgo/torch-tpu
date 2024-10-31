@@ -1833,13 +1833,13 @@ tpu_status_t sgdnnReduceMaxOrMin ( tpu_resource_t  stream,
  * 3. The shape of VALUES and INDICES must be the same
  * 3. MODE must be 0 ( argmax ) or 1 ( argmin ) or 2 ( max.dim ) or 3 ( min.dim )
  */
-tpu_status_t sgdnnArg( tpu_resource_t  stream,
-                              SgdnnTensor_t input,
-                              int axis,
-                              int mode,
-                              SgdnnTensor_t values,
-                              SgdnnTensor_t indices,
-                              bool non_blocking = true);
+// tpu_status_t sgdnnArg( tpu_resource_t  stream,
+//                               SgdnnTensor_t input,
+//                               int axis,
+//                               int mode,
+//                               SgdnnTensor_t values,
+//                               SgdnnTensor_t indices,
+//                               bool non_blocking = true);
 
 
 /*
