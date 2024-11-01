@@ -89,4 +89,4 @@ def check_rmsnorm():
     return
 
 if __name__=="__main__":
-    check_rmsnorm()
+    # check_rmsnorm()

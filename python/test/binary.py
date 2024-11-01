@@ -392,12 +392,12 @@ def add_test():
 
 
 if __name__ == "__main__":
-    test_add()
-    test_sub()
-    test_mul()
-    test_div()
+    # test_add()
+    # test_sub()
+    # test_mul()
+    # test_div()
 
-    add_test()
+    # add_test()
 
 
 

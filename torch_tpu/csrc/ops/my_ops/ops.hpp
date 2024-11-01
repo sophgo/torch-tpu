@@ -15,6 +15,14 @@ namespace at
 		Tensor &p,
 		Tensor &out2);
 
+	Tensor llava_mlp(
+		Tensor &input,
+		Tensor &w1,
+		Tensor &w2,
+		const c10::optional<Tensor> &b1,
+		const c10::optional<Tensor> &b2,
+		Tensor &out);
+
 	std::tuple<Tensor, Tensor, Tensor, c10::optional<Tensor>, c10::optional<Tensor>> mlp_backward(
 		Tensor &grad_output,
 		Tensor &input,
@@ -147,6 +155,14 @@ namespace at
 		Tensor &softmax_out,
 		Tensor &soft_v,
 		Tensor &out);
+
+	Tensor llava_attention(
+	    Tensor &OUT,
+	    Tensor &Q,
+	    Tensor &K,
+	    Tensor &V,
+	    const c10::optional<Tensor> &mask,
+	    double C);
 
 	std::tuple<Tensor, Tensor, Tensor, c10::optional<Tensor>, c10::optional<Tensor>> attn_backward(
 		Tensor &grad_output,
