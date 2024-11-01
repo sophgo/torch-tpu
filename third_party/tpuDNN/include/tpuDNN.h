@@ -21,6 +21,7 @@ extern "C"
 #if defined(__sg2260__) || defined(__sg2262__)
     tpudnnStatus_t tpudnnGetUniqueId(tpudnnHandle_t handle, char* uniqueId);
     tpudnnStatus_t tpudnnSetupC2C(tpudnnHandle_t handle, int deviceID);
+    tpudnnStatus_t tpudnnSetupC2CTopology(tpudnnHandle_t handle);
 #endif
 
     tpudnnHandle_t tpudnnHandleFromStream(int deviceID, void* stream, void* module);

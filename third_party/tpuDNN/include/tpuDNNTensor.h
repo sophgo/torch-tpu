@@ -966,5 +966,5 @@ tpudnnStatus_t tpudnnEnableProfile(
     int max_record_num);
 
 tpudnnStatus_t tpudnnDisableProfile(
-    tpudnnHandle_t handle);
+    tpudnnHandle_t handle);  
 } // extern "C"
