@@ -120,6 +120,7 @@ namespace at
 		const c10::optional<Tensor> &sin,
 		const c10::optional<Tensor> &mask,
 		const c10::optional<Tensor> &softmax_lse,
+		const Tensor &input_lengths,
 		int64_t mask_size,
 		double C,
 		double dropout_rate,

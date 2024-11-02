@@ -62,14 +62,6 @@ namespace at
 		}
 
 		TIMING_START;
-		// Tensor Qbuffer, Kbuffer, Vbuffer;
-		// if (attention_mode == 2)
-		// {
-		// 	TensorOptions options = TensorOptions ( Q.device() ).dtype ( Q.dtype() );
-		// 	Qbuffer = empty({Q.sizes()}, options);
-		// 	Kbuffer = empty({K.sizes()}, options);
-		// 	Vbuffer = empty({V.sizes()}, options);
-		// }
   		auto stream = c10_tpu::getCurrentTPUStream();
 		auto status = tpudnnLlamaAttentionAsync(
 			stream,
@@ -84,9 +76,6 @@ namespace at
 			tpu::TPUGenerateTpudnnTensor(stream, save_slots),
 			fetch_slots.has_value() ? tpu::TPUGenerateTpudnnTensor(stream, fetch_slots.value()) : tpudnnUndefinedTensor(),
 			mask.has_value() ? tpu::TPUGenerateTpudnnTensor(stream, mask.value()) : tpudnnUndefinedTensor(),
-			// attention_mode == 2 ? tpu::TPUGenerateTpudnnTensor(stream, Qbuffer) : tpudnnUndefinedTensor(),
-			// attention_mode == 2 ? tpu::TPUGenerateTpudnnTensor(stream, Kbuffer) : tpudnnUndefinedTensor(),
-			// attention_mode == 2 ? tpu::TPUGenerateTpudnnTensor(stream, Vbuffer) : tpudnnUndefinedTensor(),
 			tpudnnUndefinedTensor(), tpudnnUndefinedTensor(), tpudnnUndefinedTensor(),
 			tpu::TPUGenerateTpudnnTensor(stream, input_lengths),
 			(int*)input_lengths.data_ptr(),
@@ -110,6 +99,7 @@ namespace at
 		const c10::optional<Tensor> &sin,
 		const c10::optional<Tensor> &mask,
 		const c10::optional<Tensor> &softmax_lse,
+		const Tensor &input_lengths,
 		int64_t mask_size, // mask_size
 		double C,
 		double dropout_rate,
@@ -145,6 +135,8 @@ namespace at
 			sin.has_value() ? tpu::TPUGenerateSgdnnTensor(sin.value()) : sgdnnUndefinedTensor(),
 			mask.has_value() ? tpu::TPUGenerateSgdnnTensor(mask.value()) : sgdnnUndefinedTensor(),
 			softmax_lse.has_value() ? tpu::TPUGenerateSgdnnTensor(softmax_lse.value()) : sgdnnUndefinedTensor(),
+			(int*)input_lengths.data_ptr(),
+      	    (int)(input_lengths.nbytes()/4),
 			mask_size,
 			C,
 			dropout_rate,

@@ -605,14 +605,14 @@ class TensorComparator:
 
         return 0, total
 
-    def cmp_result(self, tensor_target, tensor2_result):
+    def cmp_result(self, tensor_target, tensor2_result, prefix = None):
             compare_status = self.compare_float(tensor_target.view(-1), tensor2_result.view(-1), False)
-            if compare_status == -1:
+            if compare_status[0] == -1:
                 print("Error: Too many warnings detected.")
             cos_my = self.cosine_similarity(tensor_target.view(-1), tensor2_result.view(-1))
             euclidean_dist = self.euclidean_similarity(tensor_target.view(-1), tensor2_result.view(-1))
-            print("Result : cosine similarity:", cos_my)
-            print("Result : euclidean similarity:", euclidean_dist)
-            if(cos_my < 0.9 or euclidean_dist < 0.8 or compare_status == -1):
+            print(f"{prefix} Result : cosine similarity: {cos_my}")
+            print(f"{prefix} Result : euclidean similarity: {euclidean_dist}")
+            if(cos_my < 0.99 or euclidean_dist < 0.98 or compare_status[0] == -1):
                 return False
             return True

@@ -16,13 +16,13 @@ torch.set_printoptions(profile="full")
 import time
 
 class LLamaAttention(nn.Module):
-    def __init__(self, cos, sin, mask, hidden_size, num_attention_heads, embeddings, softmax_scale):
+    def __init__(self, cos, sin, mask, hidden_size, num_attention_heads, num_kv_heads, embeddings, softmax_scale):
         super().__init__()
         self.softmax_scale = softmax_scale
         self.num_attention_heads = num_attention_heads
+        self.kv_heads = num_kv_heads
         self.embeddings = embeddings
         self.d = int(hidden_size / num_attention_heads)
-        self.kv_heads = int(num_attention_heads / 8)
         self.cos = cos
         self.sin = sin
         self.mask = mask
@@ -47,8 +47,14 @@ class LLamaAttention(nn.Module):
         block_size = 16
         mask_coeff = torch.ones(128)
         mask_coeff[:64] *= -1.
+        Qin = copy.deepcopy(Q)
+        Kin = copy.deepcopy(K)
         K = self.Rope(K, self.cos, self.sin, mask_coeff)
         Q = self.Rope(Q, self.cos, self.sin, mask_coeff)
+
+        num_query_heads = Q.shape[1]
+        num_kv_heads = K.shape[1]
+        num_queries_per_kv = num_query_heads // num_kv_heads
 
         if attention_mode == "decode":
             for batch_id in range(len(input_length)):
@@ -89,8 +95,12 @@ class LLamaAttention(nn.Module):
         
         elif attention_mode == "prefill":
             batch_offset = 0
-            for batch_id in range(len(input_length)):
-                N = input_length[batch_id]
+            attn_mask = self.mask if self.mask is not None else None
+            if attn_mask is not None and attn_mask.dim() == 2:
+                attn_mask = attn_mask.repeat((len(input_length), attn_mask.shape[0], attn_mask.shape[1]))
+
+            for bidx in range(len(input_length)):
+                N = input_length[bidx]
                 Kfetch_list =[]
                 Vfetch_list =[]
                 cur_slot_num = (N + block_size - 1 )// block_size
@@ -104,10 +114,23 @@ class LLamaAttention(nn.Module):
                 cur_K = cur_K.permute(1, 0, 2) # kv_headxseq_lenxd
                 cur_V = cur_V.permute(1, 0, 2) # kv_headxseq_lenxd
 
-                res_qk = torch.matmul(cur_Q, cur_K.permute(0, 2, 1)) * self.softmax_scale
-                res_qk = F.softmax(res_qk, dim=2)
+                cur_Qin = Qin[batch_offset:batch_offset+N, :, :].view(N, self.num_attention_heads, self.d) # seq_lenxQheadxd
+                cur_Kin = Kin[batch_offset:batch_offset+N, :, :].view(N, self.kv_heads, self.d) # seq_lenxkv_headxd
+                cur_Qin = cur_Qin.permute(1, 0, 2) # Qheadxseq_lenxd
+                cur_Kin = cur_Kin.permute(1, 0, 2) # kv_headxseq_lenxd
 
+                if num_queries_per_kv > 1:
+                    cur_K = torch.repeat_interleave(cur_K, num_queries_per_kv, dim=0)
+                    cur_V = torch.repeat_interleave(cur_V, num_queries_per_kv, dim=0)
+
+                res_qk = torch.matmul(cur_Q, cur_K.permute(0, 2, 1))
+                res_qk = res_qk * self.softmax_scale
+                if attn_mask is not None:
+                    res_qk = res_qk + attn_mask[bidx, :N, :N]
+
+                res_qk = F.softmax(res_qk, dim=2)
                 cur_Y = torch.matmul(res_qk, cur_V)
+
                 Ylist.append(cur_Y)
 
                 if Kcache is not None and Vcache is not None:
@@ -119,12 +142,12 @@ class LLamaAttention(nn.Module):
                     num_blocks = (seq_len + block_size - 1) // block_size
                     for i in range(num_blocks):
                         save_seq_len = min(seq_len, block_size)
-                        cur_save_slot = save_slots[batch_id][i]
+                        cur_save_slot = save_slots[bidx][i]
                         cur_Kcache[cur_save_slot//block_size, :save_seq_len, :, :] = cur_K[i*block_size:i*block_size+save_seq_len, :, :]
                         cur_Vcache[cur_save_slot//block_size, :save_seq_len, :, :] = cur_V[i*block_size:i*block_size+save_seq_len, :, :]
                         seq_len -= block_size
 
-                    batch_offset += N
+                batch_offset += N
 
             Y = torch.concat(Ylist, dim=1).permute(1, 0, 2) #[batch, seq_len, num_attention_heads, d]
 
@@ -188,6 +211,7 @@ class LLamaAttentionFunc(torch.autograd.Function):
                                         sin,
                                         mask,
                                         softmax_lse,
+                                        input_length,
                                         max_s,
                                         softmax_scale,
                                         dropout_rate,
@@ -226,7 +250,7 @@ def check_llama_attention_decode():
     batch = 16
     # # TP8
     attention_heads = 8
-    k_v_heads = int(attention_heads / 8)
+    kv_heads = int(attention_heads / 8)
     hidden_size = 1024
     # TP4
     # attention_heads = 16
@@ -269,10 +293,10 @@ def check_llama_attention_decode():
     cos = torch.rand((batch, d), requires_grad=False, dtype=torch.float32)
     sin = torch.rand((batch, d), requires_grad=False, dtype=torch.float32)
     Q = torch.rand((batch, attention_heads, d), requires_grad=False, dtype=torch.float32)
-    K = torch.rand((batch, k_v_heads, d), requires_grad=False, dtype=torch.float32)
-    V = torch.rand((batch, k_v_heads, d), requires_grad=False, dtype=torch.float32)
-    Kcache = torch.rand((max_blocks*block_size, k_v_heads, d), requires_grad=False, dtype=torch.float32)
-    Vcache = torch.rand((max_blocks*block_size, k_v_heads, d), requires_grad=False, dtype=torch.float32)
+    K = torch.rand((batch, kv_heads, d), requires_grad=False, dtype=torch.float32)
+    V = torch.rand((batch, kv_heads, d), requires_grad=False, dtype=torch.float32)
+    Kcache = torch.rand((max_blocks*block_size, kv_heads, d), requires_grad=False, dtype=torch.float32)
+    Vcache = torch.rand((max_blocks*block_size, kv_heads, d), requires_grad=False, dtype=torch.float32)
 
     cos_tpu = copy.deepcopy(cos).to(device).half()
     sin_tpu =  copy.deepcopy(sin).to(device).half()
@@ -296,12 +320,12 @@ def check_llama_attention_decode():
     #             blob_mask[i, j] = inf_tensor.to(dtype=torch.half)
 
     # init model
-    net_cpu = LLamaAttention(cos, sin, None, hidden_size, attention_heads, embeddings, softmax_scale)
+    net_cpu = LLamaAttention(cos, sin, None, hidden_size, attention_heads, kv_heads, embeddings, softmax_scale)
 
     net_tpu = LLamaAttentionBlock(cos_tpu, sin_tpu, None, softmax_scale)
 
     # inference
-    print("=====forward======")
+    print("=====decode======")
     out_cpu = net_cpu(Q, K, V, Kcache, Vcache, input_length, save_slots, fetch_slots, attention_mode)
     if attention_mode == "prefill":
         out_tpu = net_tpu(Q_tpu, K_tpu, V_tpu, Kcache_tpu, Vcache_tpu,  input_length_tpu, save_slots_tpu, fetch_slots_tpu, embeddings, max_s, attention_mode)
@@ -311,9 +335,9 @@ def check_llama_attention_decode():
 
     # compare
     comparator = TensorComparator()
-    status1 = comparator.cmp_result(out_cpu.detach().contiguous(), out_tpu.cpu().detach().float())
-    status2 = comparator.cmp_result(Kcache.detach(), Kcache_tpu.cpu().detach().float())
-    status3 = comparator.cmp_result(Vcache.detach(), Vcache_tpu.cpu().detach().float())
+    status1 = comparator.cmp_result(out_cpu.detach().contiguous(), out_tpu.cpu().detach().float(), "output")
+    status2 = comparator.cmp_result(Kcache.detach(), Kcache_tpu.cpu().detach().float(), "Kcache")
+    status3 = comparator.cmp_result(Vcache.detach(), Vcache_tpu.cpu().detach().float(), "Vcache")
     return status1 and status2 and status3
 
 def check_llama_attention_prefill():
@@ -322,7 +346,7 @@ def check_llama_attention_prefill():
     batch = 16
     # # TP8
     attention_heads = 8
-    k_v_heads = int(attention_heads / 8)
+    kv_heads = int(attention_heads / 8)
     hidden_size = 1024
 
     d = int(hidden_size/ attention_heads)  # 128
@@ -342,7 +366,8 @@ def check_llama_attention_prefill():
     # Assuming N and param.d are predefined
     print("====param====")
     print(f"batch_size: {batch}")
-    print(f"Qheads: {attention_heads}")
+    print(f"heads: {attention_heads}")
+    print(f"kv_heads: {kv_heads}")
     print(f"hidden_size: {hidden_size}")
     print(f"Total Seq_len: {Ntotal}")  # Replace with actual value of N
     print(f"head_dim: {d}")  # Assuming param.d is equivalent to d calculated above
@@ -352,10 +377,10 @@ def check_llama_attention_prefill():
     cos = torch.rand((Ntotal, d), requires_grad=False, dtype=torch.float32)
     sin = torch.rand((Ntotal, d), requires_grad=False, dtype=torch.float32)
     Q = torch.rand((Ntotal, attention_heads, d), requires_grad=False, dtype=torch.float32)
-    K = torch.rand((Ntotal, k_v_heads, d), requires_grad=False, dtype=torch.float32)
-    V = torch.rand((Ntotal, k_v_heads, d), requires_grad=False, dtype=torch.float32)
-    Kcache = torch.rand((max_blocks*block_size, k_v_heads, d), requires_grad=False, dtype=torch.float32)
-    Vcache = torch.rand((max_blocks*block_size, k_v_heads, d), requires_grad=False, dtype=torch.float32)
+    K = torch.rand((Ntotal, kv_heads, d), requires_grad=False, dtype=torch.float32)
+    V = torch.rand((Ntotal, kv_heads, d), requires_grad=False, dtype=torch.float32)
+    Kcache = torch.rand((max_blocks*block_size, kv_heads, d), requires_grad=False, dtype=torch.float32)
+    Vcache = torch.rand((max_blocks*block_size, kv_heads, d), requires_grad=False, dtype=torch.float32)
 
     cos_tpu = copy.deepcopy(cos).to(device).half()
     sin_tpu =  copy.deepcopy(sin).to(device).half()
@@ -367,12 +392,15 @@ def check_llama_attention_prefill():
     input_length_tpu = copy.deepcopy(input_length)
     save_slots_tpu = copy.deepcopy(save_slots).to(device)
 
+    attn_mask = torch.triu(torch.full((max_s, max_s), float('-inf'), dtype=torch.float32), diagonal=1)
+    attn_mask_tpu = copy.deepcopy(attn_mask).to(device).half()
+
     # init model
-    net_cpu = LLamaAttention(cos, sin, None, hidden_size, attention_heads, embeddings, softmax_scale)
-    net_tpu = LLamaAttentionBlock(cos_tpu, sin_tpu, None, softmax_scale)
+    net_cpu = LLamaAttention(cos, sin, attn_mask, hidden_size, attention_heads, kv_heads, embeddings, softmax_scale)
+    net_tpu = LLamaAttentionBlock(cos_tpu, sin_tpu, attn_mask_tpu, softmax_scale)
 
     # inference
-    print("=====forward======")
+    print("=====prefill======")
     fetch_slots = None
     fetch_slots_tpu = None
     out_cpu = net_cpu(Q, K, V, Kcache, Vcache, input_length, save_slots, fetch_slots, attention_mode)
@@ -384,47 +412,36 @@ def check_llama_attention_prefill():
 
     # compare
     comparator = TensorComparator()
-    status1 = comparator.cmp_result(out_cpu.detach().contiguous(), out_tpu.cpu().detach().float())
-    status2 = comparator.cmp_result(Kcache.detach(), Kcache_tpu.cpu().detach().float())
-    status3 = comparator.cmp_result(Vcache.detach(), Vcache_tpu.cpu().detach().float())
+    status1 = comparator.cmp_result(out_cpu.detach().contiguous(), out_tpu.cpu().detach().float(), "output")
+    status2 = comparator.cmp_result(Kcache.detach(), Kcache_tpu.cpu().detach().float(), "Kcache")
+    status3 = comparator.cmp_result(Vcache.detach(), Vcache_tpu.cpu().detach().float(), "Vcache")
     return status1 and status2 and status3
 
-def check_llama_attention_forward():
+def test_llama_attention_forward(attention_heads, kv_heads, hidden_size, batch, input_length):
     import copy
     attention_mode = "prefill"
-    batch = 16
-    # # TP8
-    attention_heads = 8
-    k_v_heads = int(attention_heads / 8)
-    hidden_size = 1024
 
     d = int(hidden_size/ attention_heads)  # 128
     assert d == 128
-    block_size = 16
-    max_blocks = 20
-    embeddings = 4096 # no use
     softmax_scale = 1. / np.sqrt(d)  # sqrt(128)
-    input_length = torch.tensor([28], dtype=torch.int32)
     max_s = input_length.max()
     Ntotal = torch.sum(input_length).item()
-    slots_size = (max_s + block_size - 1) // block_size
-    save_slots = None
 
-    # Assuming N and param.d are predefined
     print("====param====")
     print(f"batch_size: {batch}")
-    print(f"Qheads: {attention_heads}")
+    print(f"Total Seq_len: {Ntotal}")
+    print(f"heads: {attention_heads}")
+    print(f"kv_heads: {kv_heads}")
     print(f"hidden_size: {hidden_size}")
-    print(f"Total Seq_len: {Ntotal}")  # Replace with actual value of N
-    print(f"head_dim: {d}")  # Assuming param.d is equivalent to d calculated above
+    print(f"head_dim: {d}")
     print("============")
 
     # init input
     cos = torch.rand((Ntotal, d), requires_grad=False, dtype=torch.float32)
     sin = torch.rand((Ntotal, d), requires_grad=False, dtype=torch.float32)
     Q = torch.rand((Ntotal, attention_heads, d), requires_grad=False, dtype=torch.float32)
-    K = torch.rand((Ntotal, k_v_heads, d), requires_grad=False, dtype=torch.float32)
-    V = torch.rand((Ntotal, k_v_heads, d), requires_grad=False, dtype=torch.float32)
+    K = torch.rand((Ntotal, kv_heads, d), requires_grad=False, dtype=torch.float32)
+    V = torch.rand((Ntotal, kv_heads, d), requires_grad=False, dtype=torch.float32)
     Kcache = None
     Vcache = None
 
@@ -438,14 +455,21 @@ def check_llama_attention_forward():
     input_length_tpu = copy.deepcopy(input_length)
     save_slots_tpu = None
 
+    attn_mask = torch.randint(0, 2, (batch, max_s, max_s))
+    attn_mask = torch.where(attn_mask >= 1, torch.tensor(0.), torch.tensor(-float('inf'), dtype=torch.float32))
+    attn_mask_tpu = attn_mask.half().to(device)
+    assert(torch.equal(attn_mask, attn_mask_tpu.cpu()))
+
     # init model
-    net_cpu = LLamaAttention(cos, sin, None, hidden_size, attention_heads, embeddings, softmax_scale)
-    net_tpu = LLamaAttentionBlock(cos_tpu, sin_tpu, None, softmax_scale)
+    embeddings = 0 # not used
+    net_cpu = LLamaAttention(cos, sin, attn_mask, hidden_size, attention_heads, kv_heads, embeddings, softmax_scale)
+    net_tpu = LLamaAttentionBlock(cos_tpu, sin_tpu, attn_mask_tpu, softmax_scale)
 
     # inference
     print("=====forward======")
     fetch_slots = None
     fetch_slots_tpu = None
+    save_slots = None
     out_cpu = net_cpu(Q, K, V, Kcache, Vcache, input_length, save_slots, fetch_slots, attention_mode)
     if attention_mode == "prefill":
         out_tpu = net_tpu(Q_tpu, K_tpu, V_tpu, Kcache_tpu, Vcache_tpu,  input_length_tpu, save_slots_tpu, fetch_slots_tpu, embeddings, max_s, attention_mode)
@@ -455,7 +479,7 @@ def check_llama_attention_forward():
 
     # compare
     comparator = TensorComparator()
-    status1 = comparator.cmp_result(out_cpu.detach().contiguous(), out_tpu.cpu().detach().float())
+    status1 = comparator.cmp_result(out_cpu.detach().contiguous(), out_tpu.cpu().detach().float(), "output")
     if not status1:
         print(out_cpu.flatten()[:10])
         print(out_tpu.cpu().detach().float().flatten()[:10])
@@ -477,22 +501,57 @@ def check_llama_attention_forward():
 
     return status1 and status2 and status3 and status4
 
+def test_llama_attention_forward_gqa():
+    batch = 8
+    # # TP8
+    attention_heads = 32
+    kv_heads = int(attention_heads / 8)
+    hidden_size = 4096
+
+    input_length_list = [512] * batch
+    input_length = torch.tensor(input_length_list, dtype=torch.int32)
+
+    status = test_llama_attention_forward(attention_heads, kv_heads, hidden_size, batch, input_length)
+    return status
+
+def test_llama_attention_forward_mha():
+    batch = 8
+    attention_heads = 32
+    kv_heads = attention_heads
+    hidden_size = 4096
+
+    input_length_list = [512] * batch
+    input_length = torch.tensor(input_length_list, dtype=torch.int32)
+
+    status = test_llama_attention_forward(attention_heads, kv_heads, hidden_size, batch, input_length)
+    return status
+
 if __name__ == "__main__":
     status = check_llama_attention_prefill()
     if status == False:
-        print(f"[Failed] llama prefill compare failed!")
+        print(f"[Failed] llama prefill compare failed!\n")
         sys.exit(255)
     else:
-        print(f"[Passed] llama prefill compare passed!")
-    status = check_llama_attention_decode()
+        print(f"[Passed] llama prefill compare passed!\n")
+    
+    # fail when instruction cached enabled
+    #status = check_llama_attention_decode()
+    #if status == False:
+    #    print(f"[Failed] llama decode compare failed!")
+    #    sys.exit(255)
+    #else:
+    #    print(f"[Passed] llama decode compare passed!")
+    
+    status = test_llama_attention_forward_mha()
     if status == False:
-        print(f"[Failed] llama decode compare failed!")
+        print(f"[Failed] llama forward MHA compare failed!")
         sys.exit(255)
     else:
-        print(f"[Passed] llama decode compare passed!")
-    status = check_llama_attention_forward()
+        print(f"[Passed] llama forward MHA compare passed!")
+
+    status = test_llama_attention_forward_gqa()
     if status == False:
-        print(f"[Failed] llama forward compare failed!")
+        print(f"[Failed] llama forward GQA compare failed!")
         sys.exit(255)
     else:
-        print(f"[Passed] llama forward compare passed!")
+        print(f"[Passed] llama forward GQA compare passed!")

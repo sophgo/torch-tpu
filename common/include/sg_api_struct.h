@@ -1300,10 +1300,14 @@ typedef struct
     int hidden_size;
     int num_attention_heads;
     int num_k_v_heads;
-    int seq_len;
     int dtype;
     int qkv_packed;
     int return_softmax;
+    int disable_RoPE;
+    int mask_batch;
+    int disable_mask;
+    char data[];  // dynamic data here
+                  // input_length[batch]
 #ifndef WIN32
 } __attribute__((packed)) sg_api_llama_attention_forward_multi_core_t;
 #else

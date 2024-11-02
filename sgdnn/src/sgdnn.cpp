@@ -4097,6 +4097,8 @@ tpu_status_t sgdnnLlamaAttentionForward ( tpu_resource_t resource,
                                   SgdnnTensor_t sin,
                                   SgdnnTensor_t mask,
                                   SgdnnTensor_t softmax_lse,
+                                  int* input_lengths,
+                                  int num_input_lengths,
                                   int mask_size,
                                   float C,
                                   float dropout_rate,
@@ -4124,7 +4126,7 @@ tpu_status_t sgdnnLlamaAttentionForward ( tpu_resource_t resource,
   }
   if (mask.addr != 0){
     SGDNN_CHECK ( Q.dtype == mask.dtype );
-    SGDNN_CHECK ( mask.dim == 2 );
+    SGDNN_CHECK ( mask.dim == 2 || mask.dim == 3 );
   }
 
 #ifndef USE_QKV_PACKED
@@ -4137,43 +4139,37 @@ tpu_status_t sgdnnLlamaAttentionForward ( tpu_resource_t resource,
 
 #if defined BACKEND_1684X
 #elif defined BACKEND_SG2260
-  sg_api_llama_attention_forward_multi_core_t api = {0};
-  api.Y_global_addr = OUT.addr;
-  api.Q_global_addr = Q.addr;
-  api.K_global_addr = K.addr;
-  api.V_global_addr = V.addr;
-  api.cos_global_addr = cos.addr;
-  api.sin_global_addr = sin.addr;
-  api.mask_global_addr = mask.addr;
-  api.Softmax_lse_global_addr = softmax_lse.addr;
-  api.mask_max = mask_size;
-  api.C = C;
-  api.dropout_rate = dropout_rate;
-  api.dtype = sgdnnTPUKernelDType(Q.dtype);
-  api.batch = batch;
-  api.hidden_size = Q.shape[1] * Q.shape[2]; // heads * head_size
-  api.num_attention_heads = Q.shape[1];
-  api.num_k_v_heads = K.shape[1];
-  api.seq_len = Q.shape[0] / batch;
-  api.return_softmax = softmax_lse.addr != 0;
+  uint32_t api_len = sizeof(sg_api_llama_attention_forward_multi_core_t);
+  api_len += num_input_lengths * sizeof(int32_t); // input_length[batch]
+  std::vector<char> buf(api_len, 0);
+  sg_api_llama_attention_forward_multi_core_t *api = (sg_api_llama_attention_forward_multi_core_t *)buf.data();
+  api->Y_global_addr = OUT.addr;
+  api->Q_global_addr = Q.addr;
+  api->K_global_addr = K.addr;
+  api->V_global_addr = V.addr;
+  api->cos_global_addr = cos.addr;
+  api->sin_global_addr = sin.addr;
+  api->mask_global_addr = mask.addr ? mask.addr : 0;
+  api->Softmax_lse_global_addr = softmax_lse.addr;
+  api->mask_max = mask_size;
+  api->C = C;
+  api->dropout_rate = dropout_rate;
+  api->dtype = sgdnnTPUKernelDType(Q.dtype);
+  api->batch = batch;
+  api->hidden_size = Q.shape[1] * Q.shape[2]; // heads * head_size
+  api->num_attention_heads = Q.shape[1];
+  api->num_k_v_heads = K.shape[1];
+  api->return_softmax = softmax_lse.addr != 0;
+  api->disable_RoPE = cos.addr == 0;
+  api->mask_batch = mask.addr && mask.dim == 3 ? mask.shape[0] : 1;
+  api->disable_mask = mask.addr == 0;
 #ifdef USE_QKV_PACKED
-  api.qkv_packed = !sgdnnIsTensorContiguous(&Q);
+  api->qkv_packed = !sgdnnIsTensorContiguous(&Q);
 #endif
 
-  tpu_device_mem_t Qbuffer_dev_mem, Kbuffer_dev_mem, Vbuffer_dev_mem;
+  memcpy(api->data, input_lengths, num_input_lengths * sizeof(int32_t));
 
-  // prefill
-  SAFE_CALL(sgdnnMallocDeviceByte(resource, &Qbuffer_dev_mem, sgdnnTensorBytes(&Q)));
-  SAFE_CALL(sgdnnMallocDeviceByte(resource, &Kbuffer_dev_mem, sgdnnTensorBytes(&K)));
-  SAFE_CALL(sgdnnMallocDeviceByte(resource, &Vbuffer_dev_mem, sgdnnTensorBytes(&V)));
-
-  api.Qbuffer_global_addr = sgdnnGetDeviceAddr(Qbuffer_dev_mem);
-  api.Kbuffer_global_addr = sgdnnGetDeviceAddr(Kbuffer_dev_mem);
-  api.Vbuffer_global_addr = sgdnnGetDeviceAddr(Vbuffer_dev_mem);
-  SAFE_CALL ( sgdnnTPUKernelLaunchMultiCore ( resource, "tpu_kernel_llama_attention_forward_multi_core", &api, sizeof ( api ) , non_blocking) );
-  sgdnnFreeDevice ( resource , Kbuffer_dev_mem );
-  sgdnnFreeDevice ( resource , Vbuffer_dev_mem );
-  sgdnnFreeDevice ( resource , Qbuffer_dev_mem );
+  SAFE_CALL ( sgdnnTPUKernelLaunchMultiCore ( resource, "tpu_kernel_llama_attention_forward_multi_core", api, api_len, non_blocking) );
 #else
   SGDNN_CHECK ( false );
 #endif

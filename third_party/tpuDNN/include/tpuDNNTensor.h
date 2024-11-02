@@ -994,10 +994,6 @@ tpudnnStatus_t tpudnnMultiHeadAttentionAsync(
     tpudnnTensor_t K, // {batch, seq, head, head_dim}
     tpudnnTensor_t V, // {batch, seq, head, head_dim}
     tpudnnTensor_t mask, // {batch, 1, head, head_dim}
-    // TODO: remove these buffers
-    tpudnnTensor_t Qbuffer,
-    tpudnnTensor_t Kbuffer,
-    tpudnnTensor_t Vbuffer,
     float scale);
 
 tpudnnStatus_t tpudnnLLaVaMlpAsync ( 

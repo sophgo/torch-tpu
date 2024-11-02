@@ -33,9 +33,6 @@ namespace at
 			tpu::TPUGenerateTpudnnTensor(stream, K),
 			tpu::TPUGenerateTpudnnTensor(stream, V),
 			mask.has_value() ? tpu::TPUGenerateTpudnnTensor(stream, mask.value()) : tpudnnUndefinedTensor(),
-			tpudnnUndefinedTensor(),//Qbuffer
-			tpudnnUndefinedTensor(),//Kbuffer
-			tpudnnUndefinedTensor(),//Vbuffer
 			C);
 		TORCH_CHECK ( status == TPUDNN_STATUS_SUCCESS);
 		TIMING_END(tpu::LLAVA_ATTENTION);
