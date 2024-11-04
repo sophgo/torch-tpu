@@ -405,6 +405,7 @@ void TPUFree ( void * Ptr )
 
 void TPUCopyHostToDevice ( void * Dst, const void * Src, size_t Size,  bool non_blocking)
 {
+  if ( Size == 0 ) return;
   unsigned long long dev_index = GetDeviceIndexByUnifiedAddr((unsigned long long)Dst);
   unsigned long long dst_ptr = GetAddrByUnifiedAddr((unsigned long long)Dst);
   TPUDeviceManager::GetInstance().CopyHostToDevice ( (void*)dst_ptr, Src, Size, dev_index, non_blocking );
@@ -412,6 +413,7 @@ void TPUCopyHostToDevice ( void * Dst, const void * Src, size_t Size,  bool non_
 
 void TPUCopyDeviceToHost ( void * Dst, const void * Src, size_t Size, bool non_blocking )
 {
+  if ( Size == 0 ) return;
   unsigned long long dev_index = GetDeviceIndexByUnifiedAddr((unsigned long long)Src);
   unsigned long long src_ptr = GetAddrByUnifiedAddr((unsigned long long)Src);
   TPUDeviceManager::GetInstance().CopyDeviceToHost ( Dst, (void*)src_ptr, Size, dev_index, non_blocking );
