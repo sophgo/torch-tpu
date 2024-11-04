@@ -951,7 +951,7 @@ tpudnnStatus_t tpudnnSiluBackwardAsync(
     tpudnnTensor_t grad_input);
     
 tpudnnStatus_t tpudnnLLamaA16MatmulAsync( 
-    tpudnnHandle_t handle ,
+    tpudnnHandle_t handle,
     tpudnnTensor_t left,
     tpudnnTensor_t right,
     tpudnnTensor_t bias,
@@ -960,6 +960,14 @@ tpudnnStatus_t tpudnnLLamaA16MatmulAsync(
     int group_size,
     int weight_bits,
     tpudnnTensor_t output);
+
+tpudnnStatus_t tpudnnTgiInputIdsUpdateAsync(
+    tpudnnHandle_t handle,
+    tpudnnTensor_t all_input_ids,
+    tpudnnTensor_t next_ids,
+    int* input_lengths,
+    int  n_input_lengths,
+    int  n_accept_ids);
 
 tpudnnStatus_t tpudnnEnableProfile(
     tpudnnHandle_t handle,

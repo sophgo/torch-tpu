@@ -213,6 +213,12 @@ namespace at
         Tensor &output,
         double_t scale);
 
+	void TGI_input_ids_update_decode_phase(
+		Tensor &all_input_ids,
+		Tensor &next_ids,
+		IntArrayRef input_lengths,
+		int64_t n_accept_ids = 1);
+
 	void enable_pmu();
 
 	void disable_pmu();
