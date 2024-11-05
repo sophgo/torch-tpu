@@ -25,7 +25,7 @@ download_riscv_toolchain(){
 
 
 CURRENT_DIR=$(cd $(dirname "${BASH_SOURCE[0]}") && pwd)
-PREBUILT_PATH=$CURRENT_DIR/../../bm_prebuilt_toolchains
+PREBUILT_PATH=$CURRENT_DIR/../bm_prebuilt_toolchains
 export ARM_TOOLCHAIN=$PREBUILT_PATH/gcc-arm-10.3-2021.07-x86_64-aarch64-none-linux-gnu
 export RISCV_TOOLCHAIN=$PREBUILT_PATH/riscv64-linux-x86_64
 
