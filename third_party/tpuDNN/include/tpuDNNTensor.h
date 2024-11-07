@@ -876,7 +876,7 @@ tpudnnStatus_t tpudnnLoraMatmulForwardAsync(
     tpudnnTensor_t output,
     float scale);
 
-tpudnnStatus_t tpudnnLlamaAttentionAsync ( 
+tpudnnStatus_t tpudnnLlamaAttentionAsync (
     tpudnnHandle_t handle,
     tpudnnTensor_t OUT,
     tpudnnTensor_t Q,
@@ -900,9 +900,9 @@ tpudnnStatus_t tpudnnLlamaAttentionAsync (
     int block_size,
     float C,
     int attention_mode // 2: prefile, 3: decode
-    ); 
+    );
 
-tpudnnStatus_t tpudnnLLamaMlpAsync ( 
+tpudnnStatus_t tpudnnLLamaMlpAsync (
     tpudnnHandle_t handle,
     tpudnnTensor_t input,
     tpudnnTensor_t weight0,
@@ -910,7 +910,7 @@ tpudnnStatus_t tpudnnLLamaMlpAsync (
     tpudnnTensor_t weight2,
     tpudnnTensor_t output);
 
-tpudnnStatus_t tpudnnLLamaA16MlpAsync ( 
+tpudnnStatus_t tpudnnLLamaA16MlpAsync (
     tpudnnHandle_t handle,
     tpudnnTensor_t input,
     tpudnnTensor_t weight0,
@@ -949,9 +949,9 @@ tpudnnStatus_t tpudnnSiluBackwardAsync(
     tpudnnTensor_t grad_output,
     tpudnnTensor_t input,
     tpudnnTensor_t grad_input);
-    
-tpudnnStatus_t tpudnnLLamaA16MatmulAsync( 
-    tpudnnHandle_t handle,
+
+tpudnnStatus_t tpudnnLLamaA16MatmulAsync(
+    tpudnnHandle_t handle ,
     tpudnnTensor_t left,
     tpudnnTensor_t right,
     tpudnnTensor_t bias,
@@ -975,5 +975,27 @@ tpudnnStatus_t tpudnnEnableProfile(
     bool enable_mcu);
 
 tpudnnStatus_t tpudnnDisableProfile(
-    tpudnnHandle_t handle);  
+    tpudnnHandle_t handle);
+
+tpudnnStatus_t tpudnnMultiHeadAttentionAsync(
+    tpudnnHandle_t handle,
+    tpudnnTensor_t OUT, // {batch, seq, head, head_dim}
+    tpudnnTensor_t Q, // {batch, seq, head, head_dim}
+    tpudnnTensor_t K, // {batch, seq, head, head_dim}
+    tpudnnTensor_t V, // {batch, seq, head, head_dim}
+    tpudnnTensor_t mask, // {batch, 1, head, head_dim}
+    // TODO: remove these buffers
+    tpudnnTensor_t Qbuffer,
+    tpudnnTensor_t Kbuffer,
+    tpudnnTensor_t Vbuffer,
+    float scale);
+
+tpudnnStatus_t tpudnnLLaVaMlpAsync ( 
+    tpudnnHandle_t handle,
+    tpudnnTensor_t input,
+    tpudnnTensor_t w1,
+    tpudnnTensor_t w2,
+    tpudnnTensor_t b1,
+    tpudnnTensor_t b2,
+    tpudnnTensor_t output);
 } // extern "C"
