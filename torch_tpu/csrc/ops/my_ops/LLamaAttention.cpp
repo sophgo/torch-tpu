@@ -29,6 +29,7 @@ namespace at
 		int64_t attention_mode // prefille 2, decode 3
 		)
 	{
+		TIMING_START;
 		if (!Q.is_contiguous() || !K.is_contiguous() || !V.is_contiguous()){
 			// LOG(WARNING) << "llama_attention not contiguous, use QKV packed.";
 		}

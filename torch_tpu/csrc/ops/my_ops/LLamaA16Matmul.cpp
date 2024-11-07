@@ -20,6 +20,8 @@ namespace at
 		int8_t weight_bits,
 		Tensor &output)
 	{
+		TIMING_START;
+
 		CHECK_TENSOR_IN_DEVICE(active);
 		CHECK_TENSOR_IN_DEVICE(weight);
 		if (bias.has_value())
@@ -28,7 +30,6 @@ namespace at
 		CHECK_TENSOR_IN_DEVICE(zp);
 		CHECK_TENSOR_IN_DEVICE(output);
 
-		TIMING_START;
 		auto stream = c10_tpu::getCurrentTPUStream();
 		auto status = tpudnnLLamaA16MatmulAsync(
 			stream,
@@ -42,6 +43,7 @@ namespace at
 			tpu::TPUGenerateTpudnnTensor( stream, output)
 			);
 		TORCH_CHECK(status == TPUDNN_STATUS_SUCCESS);
+
 		TIMING_END(tpu::LLama2A16MATMUL);
 		return output;
 	}

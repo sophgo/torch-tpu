@@ -304,6 +304,8 @@ static inline const char *OpTypeStr(int v)
     __case(ENABLE_PMU)
     __case(DISABLE_PMU)
     __case(ADAM)
+    __case(ADAM_BACKWARD)
+    __case(DROPOUT)
     __case(OP_NUM)
 
 #undef __case
@@ -320,7 +322,10 @@ OpTimer & OpTimer::Clear()
   for ( auto i = 0; i < OP_NUM; ++i )
   {
     elapsed_time_us_[i] = 0;
+    count_[i] = 0;
   }
+  is_paused_ = false;
+  is_start_  = true;
   mutex_.unlock();
   return *this;
 }
@@ -349,12 +354,11 @@ OpTimer & OpTimer::AddTime ( OpType type, unsigned long time_us )
   if ( is_paused_ == false )
   {
     elapsed_time_us_[type] += time_us;
-    #ifdef SHOW_EACH_OP_TIME
+    ++count_[type];
     if (is_start_)
     {
       std::cout << std::setw ( 42 ) << OpTypeStr(type) << " Elapsed: " << std::setw ( 12 ) << time_us << "us" << "\n";
     }
-    #endif
   }
   mutex_.unlock();
   return *this;
@@ -374,7 +378,7 @@ void OpTimer::Dump() const
   {
     if ( elapsed_time_us_[i] > 0 )
     {
-      std::cout << std::setw ( 42 ) << OpTypeStr(i) << ": " << std::setw ( 12 ) << elapsed_time_us_[i] << "us, ";
+      std::cout << std::setw ( 42 ) << OpTypeStr(i) << ": " << std::setw ( 12 ) << (elapsed_time_us_[i] / count_[i]) << "us avg, " << std::setw ( 12 ) << elapsed_time_us_[i] << "us total, ";
       std::cout << std::setw ( 8 ) << std::setprecision ( 3 ) << elapsed_time_us_[i] * 100. / ElapsedAll << "%" << std::endl;
     }
   }

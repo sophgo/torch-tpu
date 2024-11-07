@@ -55,6 +55,8 @@ namespace at
 		int64_t weight_bits,
 		Tensor &output)
 	{
+		TIMING_START;
+
 		CHECK_TENSOR_IN_DEVICE(input);
 		CHECK_TENSOR_IN_DEVICE(weight0);
 		CHECK_TENSOR_IN_DEVICE(zp0);
@@ -67,7 +69,6 @@ namespace at
 		CHECK_TENSOR_IN_DEVICE(scale2);
 		CHECK_TENSOR_IN_DEVICE(output);
 
-		TIMING_START;
 #if defined BACKEND_SG2260
 		auto stream = c10_tpu::getCurrentTPUStream();
 		auto status = tpudnnLLamaA16MlpAsync(

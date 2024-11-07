@@ -17,6 +17,8 @@ namespace at {
 
 Tensor &binary_op_tpu(const Tensor &self, const Tensor &other,
                       const Scalar &alpha, Tensor &out, int binary_type) {
+  TIMING_START;
+
   if (self.dim() > 0) {
     CHECK_TENSOR_IN_DEVICE(self);
   }
@@ -41,7 +43,6 @@ Tensor &binary_op_tpu(const Tensor &self, const Tensor &other,
   if (self.dim() == 0 || other.dim() == 0) {
     // tensor op scalar
     if (self.dim() == 0) {
-      TIMING_START;
       auto status = sgdnnBinaryC(
           tpu::TPUGetDeviceResource(), tpu::TPUGenerateSgdnnTensor(other_),
           self.item().toFloat() * alpha.toFloat(),
@@ -49,7 +50,6 @@ Tensor &binary_op_tpu(const Tensor &self, const Tensor &other,
       TORCH_CHECK(status == SG_SUCCESS);
       TIMING_END(tpu::BINARYOP_C);
     } else {
-      TIMING_START;
       auto status = sgdnnBinaryC(
           tpu::TPUGetDeviceResource(), tpu::TPUGenerateSgdnnTensor(self_),
           other.item().toFloat() * alpha.toFloat(),
@@ -66,7 +66,6 @@ Tensor &binary_op_tpu(const Tensor &self, const Tensor &other,
   }
 
   if (tpu::TPUIsSameShape(self, other)) {
-    TIMING_START;
     auto other_ =
         other.dtype() == self.dtype() ? other : other.to(self.dtype());
 
@@ -133,7 +132,6 @@ Tensor &binary_op_tpu(const Tensor &self, const Tensor &other,
       change_t.dim = max_dim;
     }
 
-    TIMING_START;
     auto status = sgdnnBinaryBcast(tpu::TPUGetDeviceResource(), self_t, other_t,
                                    alpha.toDouble(), out_t, binary_type);
     TORCH_CHECK(status == SG_SUCCESS);

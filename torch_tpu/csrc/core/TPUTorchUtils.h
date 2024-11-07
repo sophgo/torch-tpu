@@ -63,6 +63,14 @@ do{                                                     \
 #define CPU_IMPL_WARNING(...)
 #endif
 
+//#define PERF_MODE
+#ifdef PERF_MODE
+
+#define CHECK_TENSOR_IN_DEVICE(t)
+#define CHECK_TENSOR_IN_DEVICE_NO_CONTIGUOUS(t)
+
+#else
+
 #define CHECK_TENSOR_IN_DEVICE(t) \
 do \
 { \
@@ -77,6 +85,8 @@ do \
 TORCH_CHECK ( t.device().type() == DeviceType::TPU, #t, " is not in TPU device" ); \
 } \
 while ( 0 )
+
+#endif
 
 #define TENSOR_TO_CPU(t) ( ( t ).to ( torch::Device ( "cpu" ) ) )
 
@@ -537,6 +547,8 @@ typedef enum
   ENABLE_PMU,
   DISABLE_PMU,
   ADAM,
+  ADAM_BACKWARD,
+  DROPOUT,
   LORA_MATMUL_FORWARD,
   OP_NUM,
   COMPARISON_C
@@ -554,6 +566,7 @@ struct OpTimer
 private:
   OpTimer() {}
   unsigned long long elapsed_time_us_[OP_NUM];
+  unsigned count_[OP_NUM];
   bool is_paused_ = false;
   bool is_start_ = false;
   std::mutex mutex_;
