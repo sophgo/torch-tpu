@@ -10,6 +10,23 @@
 
 namespace at
 {
+Tensor& index_select_out_tpu ( const Tensor & self, int64_t dim, const Tensor & index, Tensor & out)
+{
+  CHECK_TENSOR_IN_DEVICE ( self );
+  CHECK_TENSOR_IN_DEVICE ( index );
+  auto stream = c10_tpu::getCurrentTPUStream();
+  auto status = tpudnnIndexSelectAsync(
+                stream,
+                tpu::TPUGenerateTpudnnTensor(stream, self),
+                tpu::TPUGenerateTpudnnTensor(stream, index),
+                dim,
+                tpu::TPUGenerateTpudnnTensor(stream, out));
+  TORCH_CHECK(status == TPUDNN_STATUS_SUCCESS);
+  TIMING_END ( tpu::INDEX_SELECT );
+  SHOW_TENSOR_OP(self, index, out);
+  return out;
+}
+
 Tensor index_select_tpu ( const Tensor & self, int64_t dim, const Tensor & index )
 {
   CHECK_TENSOR_IN_DEVICE ( self );
@@ -31,23 +48,14 @@ Tensor index_select_tpu ( const Tensor & self, int64_t dim, const Tensor & index
   }
   IntArrayRef sizes ( sizes_vec.data(), sizes_vec.size() );
   auto out = torch::empty ( sizes, options );
-  TIMING_START;
-
-  auto stream = c10_tpu::getCurrentTPUStream();
-  auto status = tpudnnIndexSelectAsync(
-                stream,
-                tpu::TPUGenerateTpudnnTensor(stream, self),
-                tpu::TPUGenerateTpudnnTensor(stream, index),
-                dim,
-                tpu::TPUGenerateTpudnnTensor(stream, out));
-  TORCH_CHECK(status == TPUDNN_STATUS_SUCCESS);
-    TIMING_END ( tpu::INDEX_SELECT );
+  index_select_out_tpu(self, dim, index, out);
 #endif
   SHOW_TENSOR_OP(self, index, out);
   return out;
 }
 TORCH_LIBRARY_IMPL ( aten, TPU, m )
 {
+  m.impl ( "index_select.out", index_select_out_tpu );
   m.impl ( "index_select", index_select_tpu );
 }
 

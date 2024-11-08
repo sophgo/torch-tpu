@@ -503,8 +503,8 @@ int tpu_kernel_api_index_select_multi_core ( const void * args )
       index_shape,
       2,
       RM_HALF_TO_EVEN);
+      tpu_sync_all();
   }
-  tpu_sync_all();
 
   int outer_num = 1;
   int select_num = 1;
