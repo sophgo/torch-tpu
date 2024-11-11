@@ -200,10 +200,10 @@ tpu_kernel_module_t get_kernel_module(bm_handle_t handle)
   return tpu_kernel_module[handle];
 }
 #elif defined BACKEND_SG2260
-static TPUKernelLauncher kernel_launcher;
+static TPUKernelLauncher* pkernel_launcher = nullptr;
 tpuRtKernelModule_t get_kernel_module(tpuRtStream_t stream)
 {
-  return kernel_launcher.get_kernel_module(stream);
+  return pkernel_launcher->get_kernel_module(stream);
 }
 #endif
 
@@ -219,7 +219,11 @@ tpu_status_t sgdnnInitialize( tpu_resource_t resource )
   tpu_kernel_module_t tpu_module = tpu_kernel_load_module ( resource , ( const char * ) p, length );
   tpu_kernel_module.insert ( std::pair<tpu_resource_t, tpu_kernel_module_t> ( resource , tpu_module ) );
 #elif defined BACKEND_SG2260
-  SGDNN_CHECK( kernel_launcher.register_kernel_module(resource) == SG_SUCCESS);
+  if (pkernel_launcher == nullptr) 
+  {
+    pkernel_launcher = new TPUKernelLauncher();
+  }
+  SGDNN_CHECK( pkernel_launcher->register_kernel_module(resource) == SG_SUCCESS);
 #else
   SGDNN_CHECK ( false );
 #endif
@@ -235,7 +239,12 @@ tpu_status_t sgdnnDeinitialize ( tpu_resource_t resource  )
   }
   SGDNN_CHECK ( tpu_kernel_module.erase ( resource  ) );
 #elif defined BACKEND_SG2260
-  SGDNN_CHECK ( kernel_launcher.unload_kernel_module(resource) == SG_SUCCESS );
+  if ( pkernel_launcher )
+  {
+    SGDNN_CHECK ( pkernel_launcher->unload_kernel_module(resource) == SG_SUCCESS );
+    delete pkernel_launcher;
+    pkernel_launcher = nullptr;    
+  }
 #else
   SGDNN_CHECK ( false );
 #endif
@@ -263,9 +272,9 @@ tpu_status_t sgdnnTPUKernelLaunch (
     block_num = atoi(core_num_env);
   }
   if (non_blocking)
-    return kernel_launcher.launch_async( func_name, api, api_size, resource, group_num, block_num );
+    return pkernel_launcher->launch_async( func_name, api, api_size, resource, group_num, block_num );
   else
-    return kernel_launcher.launch_sync( func_name, api, api_size, resource, group_num, block_num );
+    return pkernel_launcher->launch_sync( func_name, api, api_size, resource, group_num, block_num );
 #else
   SGDNN_CHECK ( false );
 #endif
@@ -274,12 +283,12 @@ tpu_status_t sgdnnTPUKernelLaunch (
 #if defined BACKEND_SG2260
 tpu_status_t sgdnnCacheMalloc(void** dev_ptr, int64_t size)
 {
-  return kernel_launcher.cache_malloc(dev_ptr, size);
+  return pkernel_launcher->cache_malloc(dev_ptr, size);
 }
 
 tpu_status_t sgdnnCacheFree( void* dev_ptr, tpu_resource_t resource )
 {
-  return kernel_launcher.cache_free(dev_ptr, resource);
+  return pkernel_launcher->cache_free(dev_ptr, resource);
 }
 #endif
 
@@ -2950,51 +2959,6 @@ bool non_blocking )
   return SG_SUCCESS;
 }
 
-tpu_status_t sgdnnLLamaA16Matmul ( tpu_resource_t handle,
-                             SgdnnTensor_t left,
-                             SgdnnTensor_t right,
-                             SgdnnTensor_t bias,
-                             SgdnnTensor_t scale,
-                             SgdnnTensor_t zp,
-                             int group_size,
-                             int weight_bits,
-                             SgdnnTensor_t output,
-                             bool non_blocking )
-{
-#if defined BACKEND_SG2260
-  if ( left.dtype == SGDNN_DTYPE_FP16 || left.dtype == SGDNN_DTYPE_BF16)
-  {
-    sg_api_a16_matmul_t api;
-    api.input_global_addr = left.addr;
-    api.weight_global_addr = right.addr;
-    api.bias_global_addr = bias.addr;
-    api.scale_global_addr = scale.addr;
-    api.zp_global_addr = zp.addr;
-    api.output_global_addr = output.addr;
-    api.R_trans = true;
-    api.sign = true;
-    api.has_bias = int(bias.addr != 0);
-    api.has_zp = true;
-    api.final_row_num = left.shape[left.dim-2];
-    api.inner_num = left.shape[left.dim-1];
-    api.final_col_num = right.shape[left.dim-2];
-    api.q_group_size = abs(group_size);
-    api.weight_bits = weight_bits;
-    api.io_dtype = sgdnnTPUKernelDType ( left.dtype );
-    api.weight_dtype = sgdnnTPUKernelDType (right.dtype);
-    if (bias.addr != 0) {
-      api.bias_dtype = sgdnnTPUKernelDType (bias.dtype);
-    }
-    SAFE_CALL ( sgdnnTPUKernelLaunchMultiCore ( handle, "tpu_kernel_api_llama_a16_matmul", &api, sizeof ( api ), non_blocking ) );
-    return SG_SUCCESS;
-  } else {
-    SGDNN_CHECK ( false );
-  }
-#else
-  SGDNN_CHECK ( false );
-#endif
-}
-
 tpu_status_t sgdnnEmbeddingBackward ( tpu_resource_t resource ,
                                      SgdnnTensor_t grad_output,
                                      SgdnnTensor_t indices,
@@ -3233,7 +3197,17 @@ tpu_status_t sgdnnReLUBackward ( tpu_resource_t resource ,
   api.dtype = sgdnnTPUKernelDType ( input.dtype );
   SAFE_CALL ( sgdnnTPUKernelLaunch ( resource , "tpu_kernel_api_relu_backward", &api, sizeof ( api ) ) );
 #elif defined BACKEND_SG2260
-  SGDNN_CHECK ( false );
+  sg_api_relu_backward_t api;
+  api.input_global_addr = input.addr;
+  api.grad_output_global_addr = grad_output.addr;
+  api.grad_input_global_addr = grad_input.addr;
+  api.dim = input.dim;
+  for ( int i = 0; i < input.dim; ++i )
+  {
+    api.shape[i] = input.shape[i];
+  }
+  api.dtype = sgdnnTPUKernelDType ( input.dtype );
+  SAFE_CALL ( sgdnnTPUKernelLaunchMultiCore ( resource , "tpu_kernel_api_relu_backward_multi_core", &api, sizeof ( api ), non_blocking ) );
 #else
   SGDNN_CHECK ( false );
 #endif
@@ -4200,6 +4174,88 @@ tpu_status_t sgdnnLlamaAttentionForward ( tpu_resource_t resource,
   sgdnnFreeDevice ( resource , Kbuffer_dev_mem );
   sgdnnFreeDevice ( resource , Vbuffer_dev_mem );
   sgdnnFreeDevice ( resource , Qbuffer_dev_mem );
+#else
+  SGDNN_CHECK ( false );
+#endif
+  return SG_SUCCESS;
+}
+
+tpu_status_t sgdnnLlamaAttentionBackward ( tpu_resource_t resource,
+                                  SgdnnTensor_t Q,
+                                  SgdnnTensor_t K,
+                                  SgdnnTensor_t V,
+                                  SgdnnTensor_t O,
+                                  SgdnnTensor_t dO,
+                                  SgdnnTensor_t l,
+                                  SgdnnTensor_t dQ,
+                                  SgdnnTensor_t dK,
+                                  SgdnnTensor_t dV,
+                                  SgdnnTensor_t cos,
+                                  SgdnnTensor_t sin,
+                                  SgdnnTensor_t mask,
+                                  SgdnnTensor_t input_lengths,
+                                  int mask_max,
+                                  float C,
+                                  bool non_blocking)
+{
+  SGDNN_CHECK ( Q.dtype == O.dtype );
+  SGDNN_CHECK ( Q.dtype == K.dtype );
+  SGDNN_CHECK ( Q.dtype == V.dtype );
+  SGDNN_CHECK ( Q.dtype == SGDNN_DTYPE_FP16 );
+  SGDNN_CHECK ( sgdnnIsSameShape( &Q, &O ) );
+  SGDNN_CHECK ( sgdnnIsSameShape( &K, &V ) );
+  SGDNN_CHECK ( sgdnnIsSameShape( &dO, &O ) );
+  SGDNN_CHECK ( sgdnnIsSameShape( &dQ, &Q ) );
+  SGDNN_CHECK ( sgdnnIsSameShape( &dK, &K ) );
+  SGDNN_CHECK ( sgdnnIsSameShape( &dV, &V ) );
+  SGDNN_CHECK ( Q.dim == 3 );
+  SGDNN_CHECK ( K.dim == 3 );
+  SGDNN_CHECK ( V.dim == 3 );
+  if (cos.addr != 0){
+    SGDNN_CHECK ( Q.dtype == cos.dtype );
+    SGDNN_CHECK ( Q.dtype == sin.dtype );
+    SGDNN_CHECK ( cos.dim == 3 );
+    SGDNN_CHECK ( sin.dim == 3 );
+    SGDNN_CHECK ( sgdnnIsSameShape( &cos, &sin ) );
+    SGDNN_CHECK ( sgdnnIsTensorContiguous ( &cos ) );
+    SGDNN_CHECK ( sgdnnIsTensorContiguous ( &sin ) );
+  }
+  if (mask.addr != 0){
+    SGDNN_CHECK ( Q.dtype == mask.dtype );
+    SGDNN_CHECK ( mask.dim == 2 );
+  }
+
+  SGDNN_CHECK ( sgdnnIsTensorContiguous ( &Q ) );
+  SGDNN_CHECK ( sgdnnIsTensorContiguous ( &K ) );
+  SGDNN_CHECK ( sgdnnIsTensorContiguous ( &V ) );
+  SGDNN_CHECK ( sgdnnIsTensorContiguous ( &O ) );
+  SGDNN_CHECK ( sgdnnIsTensorContiguous ( &dO ) );
+  SGDNN_CHECK ( sgdnnIsTensorContiguous ( &l ) );
+
+#if defined BACKEND_SG2260
+  sg_api_llama2_qkv_backward_multi_core_t api = {0};
+  api.Q_global_addr = Q.addr;
+  api.K_global_addr = K.addr;
+  api.V_global_addr = V.addr;
+  api.O_global_addr = O.addr;
+  api.dO_global_addr = dO.addr;
+  api.l_global_addr = l.addr;
+  api.dQ_global_addr = dQ.addr;
+  api.dK_global_addr = dK.addr;
+  api.dV_global_addr = dV.addr;
+  api.cos_global_addr = cos.addr;
+  api.sin_global_addr = sin.addr;
+  api.mask_global_addr = mask.addr;
+  api.input_lengths_global_addr = input_lengths.addr;
+  api.C = C;
+  api.mask_max = mask_max;
+  api.dtype = sgdnnTPUKernelDType(Q.dtype);
+  api.batch = input_lengths.shape[0];
+  api.hidden_size = Q.shape[1] * Q.shape[2];
+  api.q_heads = Q.shape[1];
+  api.kv_heads = K.shape[1];
+
+  SAFE_CALL ( sgdnnTPUKernelLaunchMultiCore ( resource, "tpu_kernel_llama_attention_backward_multi_core", &api, sizeof ( api ) , non_blocking) );
 #else
   SGDNN_CHECK ( false );
 #endif
@@ -6650,88 +6706,6 @@ tpu_status_t sgdnnRepeat ( tpu_resource_t resource ,
   SAFE_CALL ( sgdnnTPUKernelLaunchMultiCore ( resource , "tpu_kernel_api_repeat_multi_core", &api, sizeof( api ) , non_blocking) );
 #else
   SGDNN_CHECK ( false );
-#endif
-  return SG_SUCCESS;
-}
-
-tpu_status_t sgdnnArg(tpu_resource_t resource , SgdnnTensor_t input, int axis,
-                     int mode, SgdnnTensor_t values, SgdnnTensor_t indices,
-                     bool non_blocking ) {
-  // SGDNN_CHECK(input.dtype == SGDNN_DTYPE_FP32);
-  SGDNN_CHECK(input.dtype == values.dtype);
-  SGDNN_CHECK(sgdnnIsSameShape(&values, &indices));
-  SGDNN_CHECK(mode == 0 || mode == 1 || mode == 2 || mode == 3);
-
-#if defined BACKEND_1684X
-  sg_api_reduce_arg_t api;
-  api.input_global_addr = input.addr;
-  api.values_global_addr = values.addr;
-  api.indices_global_addr = indices.addr;
-  tpu_device_mem_t dev_mem;
-  SAFE_CALL(
-      sgdnnMallocDeviceByte(resource , &dev_mem, sgdnnTensorBytes(&indices)));
-  api.buffer_global_addr = sgdnnGetDeviceAddr(dev_mem);
-  // transform input to [1, c, h, w], h is the axis
-  api.shape[0] = 1;
-  api.shape[1] = 1;
-  api.shape[2] = 1;
-  api.shape[3] = 1;
-  if (axis == input.dim) {
-    for (int i = 0; i < input.dim; ++i) {
-      api.shape[2] *= input.shape[i];
-    }
-  } else {
-    for (int i = 0; i < axis; i++) {
-      api.shape[1] *= input.shape[i];
-    }
-    api.shape[2] = input.shape[axis];
-    for (int i = axis + 1; i < input.dim; ++i) {
-      api.shape[3] *= input.shape[i];
-    }
-  }
-  api.axis = 2;
-  api.dim = 4;
-  api.mode = mode;
-  api.dtype = sgdnnTPUKernelDType(input.dtype);
-  SAFE_CALL(
-      sgdnnTPUKernelLaunch(resource , "tpu_kernel_api_arg", &api, sizeof(api)));
-  sgdnnFreeDevice(resource , dev_mem);
-#elif defined BACKEND_SG2260
-  sg_api_reduce_arg_t api;
-  api.input_global_addr = input.addr;
-  api.values_global_addr = values.addr;
-  api.indices_global_addr = indices.addr;
-  tpu_device_mem_t dev_mem;
-  SAFE_CALL(
-      sgdnnMallocDeviceByte(resource , &dev_mem, sgdnnTensorBytes(&indices)));
-  api.buffer_global_addr = sgdnnGetDeviceAddr(dev_mem);
-  // transform input to [1, c, h, w], h is the axis
-  api.shape[0] = 1;
-  api.shape[1] = 1;
-  api.shape[2] = 1;
-  api.shape[3] = 1;
-  if (axis == input.dim) {
-    for (int i = 0; i < input.dim; ++i) {
-      api.shape[2] *= input.shape[i];
-    }
-  } else {
-    for (int i = 0; i < axis; i++) {
-      api.shape[1] *= input.shape[i];
-    }
-    api.shape[2] = input.shape[axis];
-    for (int i = axis + 1; i < input.dim; ++i) {
-      api.shape[3] *= input.shape[i];
-    }
-  }
-  api.axis = 2;
-  api.dim = 4;
-  api.mode = mode;
-  api.dtype = sgdnnTPUKernelDType(input.dtype);
-  SAFE_CALL(sgdnnTPUKernelLaunch(resource , "tpu_kernel_api_arg_muti_core", &api,
-                                 sizeof(api), non_blocking));
-  sgdnnFreeDevice(resource , dev_mem);
-#else
-  SGDNN_CHECK(false);
 #endif
   return SG_SUCCESS;
 }

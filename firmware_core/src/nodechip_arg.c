@@ -11,39 +11,39 @@ extern void nodechip_arg_Nd(global_addr_t input_global_addr,
                             int need_val, data_type_t dtype);
 
 void nodechip_arg(global_addr_t input_global_addr,
-                  global_addr_t buffer_global_addr,
                   global_addr_t values_global_addr,
                   global_addr_t indices_global_addr, int *shape, int dim,
                   int axis, int method, data_type_t dtype) {
-  nodechip_arg_Nd(input_global_addr, buffer_global_addr, values_global_addr,
+  nodechip_arg_Nd(input_global_addr, indices_global_addr, values_global_addr,
                   shape, dim, axis, method % 2, 1, 0, method >= 2, dtype);
-  dim4 shape_dim4 = {.n = 1, .c = shape[1], .h = 1, .w = shape[3]};
+  // dim4 shape_dim4 = {.n = 1, .c = shape[1], .h = 1, .w = shape[3]};
 
-  dim4 stride = {.n = shape_dim4.c * shape_dim4.h * shape_dim4.w * 2,
-                 .c = shape_dim4.h * shape_dim4.w * 2,
-                 .h = shape_dim4.w * 2,
-                 .w = 2};
-  // the indices should be int64, We can use tpu_gdma_cpy_S2S with stride = 2 to
-  // convert int32 to int64
-  tpu_gdma_cpy_S2S(indices_global_addr, buffer_global_addr, &shape_dim4,
-                   &stride, NULL, DT_INT32);
-  scalar_t zero_C = {.u32 = 0};
-  tpu_gdma_set_C_system(indices_global_addr + tpu_data_type_size(DT_INT32),
-                        zero_C, &shape_dim4, &stride, DT_INT32);
+  // dim4 stride = {.n = shape_dim4.c * shape_dim4.h * shape_dim4.w * 2,
+  //                .c = shape_dim4.h * shape_dim4.w * 2,
+  //                .h = shape_dim4.w * 2,
+  //                .w = 2};
+  // // the indices should be int64, We can use tpu_gdma_cpy_S2S with stride = 2 to
+  // // convert int32 to int64
+  // tpu_gdma_cpy_S2S(indices_global_addr, buffer_global_addr, &shape_dim4,
+  //                  &stride, NULL, DT_INT32);
+  // scalar_t zero_C = {.u32 = 0};
+  // tpu_gdma_set_C_system(indices_global_addr + tpu_data_type_size(DT_INT32),
+  //                       zero_C, &shape_dim4, &stride, DT_INT32);
 }
 
 void firmware_kernel_tick();
 void firmware_kernel_tock(int);
 
 int tpu_kernel_api_arg_muti_core(const void *args) {
-#ifdef USING_LLM_TICK_TOCK_PROFILE
-  firmware_kernel_tick();
-#endif
+
 
   sg_api_reduce_arg_t *api = (sg_api_reduce_arg_t *)args;
   // TPUKERNEL_ASSERT(api->dtype == DT_FP32);
-  tpu_initialize();
 #ifdef BACKEND_SG2260
+#ifdef USING_LLM_TICK_TOCK_PROFILE
+  firmware_kernel_tick();
+#endif
+  tpu_initialize();
   unsigned int slice_num = tpu_core_num();
   unsigned int slice_idx = tpu_core_index();
   // determine the length of each slice
@@ -62,11 +62,9 @@ int tpu_kernel_api_arg_muti_core(const void *args) {
   if (slice_idx * slice < length) {
     const int dsize = tpu_data_type_size(api->dtype);
     const int int32_size = tpu_data_type_size(DT_INT32);
-    const int int64_size = 2 * int32_size;
     nodechip_arg(api->input_global_addr + input_offset * dsize,
-                 api->buffer_global_addr + output_offset * int32_size,
                  api->values_global_addr + output_offset * dsize,
-                 api->indices_global_addr + output_offset * int64_size, shape,
+                 api->indices_global_addr + output_offset * int32_size, shape,
                  api->dim, api->axis, api->mode, api->dtype);
   }
   tpu_poll();
@@ -79,7 +77,7 @@ int tpu_kernel_api_arg_muti_core(const void *args) {
                    api->dtype == DT_BFP16);
 
   tpu_initialize();
-  nodechip_arg(api->input_global_addr, api->buffer_global_addr,
+  nodechip_arg(api->input_global_addr,
                api->values_global_addr, api->indices_global_addr, api->shape,
                api->dim, api->axis, api->mode, api->dtype);
   tpu_poll();

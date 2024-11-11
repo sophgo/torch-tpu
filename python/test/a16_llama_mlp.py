@@ -47,8 +47,6 @@ class LLamaA16Mlp(nn.Module):
                 zeros_split[:, j] = (qzeros[:, col_] >> self.weight_bits * (j - i)) & 0xF
             i += 8 // self.weight_bits
             col_ += 1
-        # z = z + 1
-        zeros_split = zeros_split +1
         # w = w - z
         zeros = torch.empty((zeros_split.shape[0], zeros_split.shape[1] * self.q_group_size), dtype=torch.int8)
         for i in range(zeros_split.shape[1]):
@@ -87,10 +85,10 @@ class LLamaA16MlpFunc(torch.autograd.Function):
         s2 = weight2["scale"]
         LOOP = 1000
         t0 = time.time_ns()
-        torch.ops.my_ops.a16_llama_mlp_forward(x, w0, z0, s0, w1, z1, s1, w2, z2, s2, group_size, weight_bits, output)
+        torch.ops.my_ops.llama_mlp_gptq_forward(x, w0, z0, s0, w1, z1, s1, w2, z2, s2, group_size, weight_bits, output)
         t1 = time.time_ns()
         for i in range(LOOP):
-            torch.ops.my_ops.a16_llama_mlp_forward(x, w0, z0, s0, w1, z1, s1, w2, z2, s2, group_size, weight_bits, output)
+            torch.ops.my_ops.llama_mlp_gptq_forward(x, w0, z0, s0, w1, z1, s1, w2, z2, s2, group_size, weight_bits, output)
         torch_tpu.tpu.synchronize()
         t2 = time.time_ns()
         print(f" warmup                time = {(t1 - t0)/(1e6)} ms")

@@ -77,8 +77,8 @@ tpuRtStatus_t TPUKernelLauncher::register_kernel_module(tpuRtStream_t stream){
 }
 
 tpuRtStatus_t TPUKernelLauncher::unload_kernel_module(tpuRtStream_t stream) {
-  for ( auto it : _stream_kernel_modules){
-    tpuRtKernelUnloadModule(it.second, it.first);
+  if (_stream_kernel_modules.find(stream) != _stream_kernel_modules.end()) {
+    tpuRtKernelUnloadModule(_stream_kernel_modules[stream], stream);
   }
   return tpuRtSuccess;
 }

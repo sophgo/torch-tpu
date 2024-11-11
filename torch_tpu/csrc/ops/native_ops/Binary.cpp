@@ -1549,31 +1549,54 @@ Tensor &nextafter_out_tpu(const Tensor &self, const Tensor &other,
 
 TORCH_LIBRARY_IMPL(aten, TPU, m) { m.impl("nextafter.out", nextafter_out_tpu); }
 
-Tensor &less_than_or_equal_scalar_out_tpu(const Tensor &self,
-                                          const Scalar &other, Tensor &out) {
+template<typename T>
+Tensor comparison_fn(const Tensor &self, const T &other, int mode) {
+  auto out = (mode == 0) ? eq(self, other) :
+             (mode == 1) ? ne(self, other) :
+             (mode == 2) ? gt(self, other) :
+             (mode == 3) ? ge(self, other) :
+             (mode == 4) ? lt(self, other) :
+                           le(self, other);
+  return out;
+}
+
+Tensor &comparison_scalar_out_tpu(const Tensor &self, const Scalar &other, Tensor &out, int mode) {
   if (self.dim() > 0) {
-    CHECK_TENSOR_IN_DEVICE(self);
+    CHECK_TENSOR_IN_DEVICE_NO_CONTIGUOUS(self);
   }
   CHECK_TENSOR_IN_DEVICE(out);
+
+  if (!self.is_contiguous()) {
+    out = comparison_fn(self.contiguous(), other, mode);
+    return out;
+  }
 
   if (self.dim() == 0) {
     CPU_IMPL_WARNING();
     TIMING_START;
-    auto out_cpu = le(self.cpu(), other);
-    tpu::TPUCopyHostToDevice(out.data_ptr(), out_cpu.contiguous().data_ptr(),
-                             out.nbytes());
+    auto out_cpu = comparison_fn(self.cpu(), other, mode);
+    tpu::TPUCopyHostToDevice(out.data_ptr(), out_cpu.contiguous().data_ptr(), out.nbytes());
     TIMING_END(tpu::CPU_LAYER);
   } else {
+    auto self_ = self;
+    if(self_.dtype() == torch::kInt64){
+      self_ = self.to(torch::kInt32);
+    } else if(self_.dtype() == torch::kFloat64){
+      self_ = self.to(torch::kFloat32);
+    }
     TIMING_START;
-
     // mode : 0 equal, 1 not equal, 2 greater, 3 greater or equal, 4 less than,
     // 5 less than or equal pos : 0 for self is scalar, 1 for other is scalar
-    auto status = sgdnnComparisionC(
-        tpu::TPUGetDeviceResource(), tpu::TPUGenerateSgdnnTensor(self),
-        other.toFloat(), 5, 1, tpu::TPUGenerateSgdnnTensor(out));
+    auto status = sgdnnComparisionC(tpu::TPUGetDeviceResource(), tpu::TPUGenerateSgdnnTensor(self_),
+                                    other.toFloat(), mode, 1, tpu::TPUGenerateSgdnnTensor(out));
     TORCH_CHECK(status == SG_SUCCESS);
-    TIMING_END(tpu::LESS_THAN_OR_EQUAL_C);
+    TIMING_END(tpu::COMPARISON_C);
   }
+  return out;
+}
+
+Tensor &less_than_or_equal_scalar_out_tpu(const Tensor &self, const Scalar &other, Tensor &out) {
+  comparison_scalar_out_tpu(self, other, out, 5);
   SHOW_TENSOR_OP(self, out);
   return out;
 }
@@ -1581,31 +1604,8 @@ TORCH_LIBRARY_IMPL(aten, TPU, m) {
   m.impl("le.Scalar_out", less_than_or_equal_scalar_out_tpu);
 }
 
-Tensor &less_than_scalar_out_tpu(const Tensor &self, const Scalar &other,
-                                 Tensor &out) {
-  if (self.dim() > 0) {
-    CHECK_TENSOR_IN_DEVICE(self);
-  }
-  CHECK_TENSOR_IN_DEVICE(out);
-
-  if (self.dim() == 0) {
-    CPU_IMPL_WARNING();
-    TIMING_START;
-    auto out_cpu = lt(self.cpu(), other);
-    tpu::TPUCopyHostToDevice(out.data_ptr(), out_cpu.contiguous().data_ptr(),
-                             out.nbytes());
-    TIMING_END(tpu::CPU_LAYER);
-  } else {
-    TIMING_START;
-
-    // mode : 0 equal, 1 not equal, 2 greater, 3 greater or equal, 4 less than,
-    // 5 less than or equal pos : 0 for self is scalar, 1 for other is scalar
-    auto status = sgdnnComparisionC(
-        tpu::TPUGetDeviceResource(), tpu::TPUGenerateSgdnnTensor(self),
-        other.toFloat(), 4, 1, tpu::TPUGenerateSgdnnTensor(out));
-    TORCH_CHECK(status == SG_SUCCESS);
-    TIMING_END(tpu::LESS_THAN_C);
-  }
+Tensor &less_than_scalar_out_tpu(const Tensor &self, const Scalar &other, Tensor &out) {
+  comparison_scalar_out_tpu(self, other, out, 4);
   SHOW_TENSOR_OP(self, out);
   return out;
 }
@@ -1613,31 +1613,8 @@ TORCH_LIBRARY_IMPL(aten, TPU, m) {
   m.impl("lt.Scalar_out", less_than_scalar_out_tpu);
 }
 
-Tensor &greater_or_equal_scalar_out_tpu(const Tensor &self, const Scalar &other,
-                                        Tensor &out) {
-  if (self.dim() > 0) {
-    CHECK_TENSOR_IN_DEVICE(self);
-  }
-  CHECK_TENSOR_IN_DEVICE(out);
-
-  if (self.dim() == 0) {
-    CPU_IMPL_WARNING();
-    TIMING_START;
-    auto out_cpu = ge(self.cpu(), other);
-    tpu::TPUCopyHostToDevice(out.data_ptr(), out_cpu.contiguous().data_ptr(),
-                             out.nbytes());
-    TIMING_END(tpu::CPU_LAYER);
-  } else {
-    TIMING_START;
-
-    // mode : 0 equal, 1 not equal, 2 greater, 3 greater or equal, 4 less than,
-    // 5 less than or equal pos : 0 for self is scalar, 1 for other is scalar
-    auto status = sgdnnComparisionC(
-        tpu::TPUGetDeviceResource(), tpu::TPUGenerateSgdnnTensor(self),
-        other.toFloat(), 3, 1, tpu::TPUGenerateSgdnnTensor(out));
-    TORCH_CHECK(status == SG_SUCCESS);
-    TIMING_END(tpu::GREATER_OR_EQUAL_C);
-  }
+Tensor &greater_or_equal_scalar_out_tpu(const Tensor &self, const Scalar &other, Tensor &out) {
+  comparison_scalar_out_tpu(self, other, out, 3);
   SHOW_TENSOR_OP(self, out);
   return out;
 }
@@ -1645,64 +1622,17 @@ TORCH_LIBRARY_IMPL(aten, TPU, m) {
   m.impl("ge.Scalar_out", greater_or_equal_scalar_out_tpu);
 }
 
-Tensor &greater_scalar_out_tpu(const Tensor &self, const Scalar &other,
-                               Tensor &out) {
-  auto self_ = self.is_contiguous() ? self : self.contiguous();
-  if (self.dim() > 0) {
-    CHECK_TENSOR_IN_DEVICE(self_);
-  }
-  CHECK_TENSOR_IN_DEVICE(out);
-
-  if (self_.dim() == 0) {
-    CPU_IMPL_WARNING();
-    TIMING_START;
-    auto out_cpu = gt(self_.cpu(), other);
-    tpu::TPUCopyHostToDevice(out.data_ptr(), out_cpu.contiguous().data_ptr(),
-                             out.nbytes());
-    TIMING_END(tpu::CPU_LAYER);
-  } else {
-    TIMING_START;
-
-    // mode : 0 equal, 1 not equal, 2 greater, 3 greater or equal, 4 less than,
-    // 5 less than or equal pos : 0 for self is scalar, 1 for other is scalar
-    auto status = sgdnnComparisionC(
-        tpu::TPUGetDeviceResource(), tpu::TPUGenerateSgdnnTensor(self_),
-        other.toFloat(), 2, 1, tpu::TPUGenerateSgdnnTensor(out));
-    TORCH_CHECK(status == SG_SUCCESS);
-    TIMING_END(tpu::GREATER_C);
-  }
-  SHOW_TENSOR_OP(self_, out);
+Tensor &greater_scalar_out_tpu(const Tensor &self, const Scalar &other, Tensor &out) {
+  comparison_scalar_out_tpu(self, other, out, 2);
+  SHOW_TENSOR_OP(self, out);
   return out;
 }
 TORCH_LIBRARY_IMPL(aten, TPU, m) {
   m.impl("gt.Scalar_out", greater_scalar_out_tpu);
 }
 
-Tensor &not_equal_scalar_out_tpu(const Tensor &self, const Scalar &other,
-                                 Tensor &out) {
-  if (self.dim() > 0) {
-    CHECK_TENSOR_IN_DEVICE(self);
-  }
-  CHECK_TENSOR_IN_DEVICE(out);
-
-  if (self.dim() == 0) {
-    CPU_IMPL_WARNING();
-    TIMING_START;
-    auto out_cpu = ne(self.cpu(), other);
-    tpu::TPUCopyHostToDevice(out.data_ptr(), out_cpu.contiguous().data_ptr(),
-                             out.nbytes());
-    TIMING_END(tpu::CPU_LAYER);
-  } else {
-    TIMING_START;
-
-    // mode : 0 equal, 1 not equal, 2 greater, 3 greater or equal, 4 less than,
-    // 5 less than or equal pos : 0 for self is scalar, 1 for other is scalar
-    auto status = sgdnnComparisionC(
-        tpu::TPUGetDeviceResource(), tpu::TPUGenerateSgdnnTensor(self),
-        other.toFloat(), 1, 1, tpu::TPUGenerateSgdnnTensor(out));
-    TORCH_CHECK(status == SG_SUCCESS);
-    TIMING_END(tpu::NOT_EQUAL_C);
-  }
+Tensor &not_equal_scalar_out_tpu(const Tensor &self, const Scalar &other, Tensor &out) {
+  comparison_scalar_out_tpu(self, other, out, 1);
   SHOW_TENSOR_OP(self, out);
   return out;
 }
@@ -1710,31 +1640,8 @@ TORCH_LIBRARY_IMPL(aten, TPU, m) {
   m.impl("ne.Scalar_out", not_equal_scalar_out_tpu);
 }
 
-Tensor &equal_scalar_out_tpu(const Tensor &self, const Scalar &other,
-                             Tensor &out) {
-  if (self.dim() > 0) {
-    CHECK_TENSOR_IN_DEVICE(self);
-  }
-  CHECK_TENSOR_IN_DEVICE(out);
-
-  if (self.dim() == 0) {
-    CPU_IMPL_WARNING();
-    TIMING_START;
-    auto out_cpu = eq(self.cpu(), other);
-    tpu::TPUCopyHostToDevice(out.data_ptr(), out_cpu.contiguous().data_ptr(),
-                             out.nbytes());
-    TIMING_END(tpu::CPU_LAYER);
-  } else {
-    TIMING_START;
-
-    // mode : 0 equal, 1 not equal, 2 greater, 3 greater or equal, 4 less than,
-    // 5 less than or equal pos : 0 for self is scalar, 1 for other is scalar
-    auto status = sgdnnComparisionC(
-        tpu::TPUGetDeviceResource(), tpu::TPUGenerateSgdnnTensor(self),
-        other.toFloat(), 0, 1, tpu::TPUGenerateSgdnnTensor(out));
-    TORCH_CHECK(status == SG_SUCCESS);
-    TIMING_END(tpu::EQUAL_C);
-  }
+Tensor &equal_scalar_out_tpu(const Tensor &self, const Scalar &other, Tensor &out) {
+  comparison_scalar_out_tpu(self, other, out, 0);
   SHOW_TENSOR_OP(self, out);
   return out;
 }

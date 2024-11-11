@@ -35,7 +35,7 @@ namespace at
 		Tensor &weight2,
 		Tensor &output);
 
-	Tensor a16_matmul_forward(
+	Tensor matmul_gptq_forward(
 		Tensor &active,
 		Tensor &weight,
 		const c10::optional<Tensor> &bias,
@@ -45,7 +45,7 @@ namespace at
 		int8_t weight_bits,
 		Tensor &output);
 
-	Tensor a16_llama_mlp_forward(
+	Tensor llama_mlp_gptq_forward(
 		Tensor &input,
 		Tensor &weight0,
 		Tensor &zp0,
@@ -112,6 +112,24 @@ namespace at
 		double C,
 		double dropout_rate,
 		int64_t batch);
+
+	std::tuple<Tensor, Tensor, Tensor> llama_attention_backward(
+		Tensor &Q,
+		Tensor &K,
+		Tensor &V,
+		Tensor &O,
+		Tensor &dO,
+		Tensor &l,
+		Tensor &dQ,
+		Tensor &dK,
+		Tensor &dV,
+		const c10::optional<Tensor> &cos,
+		const c10::optional<Tensor> &sin,
+		const c10::optional<Tensor> &mask,
+		const Tensor &input_lengths,
+		int64_t mask_max,
+		double C
+		);
 
 	Tensor attn_forward(
 		Tensor &input,
@@ -198,4 +216,8 @@ namespace at
 	void enable_pmu();
 
 	void disable_pmu();
+
+	void enable_profile(
+		const c10::optional<int64_t> max_record_num);
+	void disable_profile();
 }

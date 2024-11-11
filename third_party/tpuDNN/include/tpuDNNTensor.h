@@ -345,7 +345,8 @@ tpudnnStatus_t tpudnnStridedCopyAsync(
 tpudnnStatus_t tpudnnConvertAsync(
     tpudnnHandle_t handle,
     tpudnnTensor_t input,
-    tpudnnTensor_t output);
+    tpudnnTensor_t output,
+    int is_bool);
 
 tpudnnStatus_t tpudnnNonzeroAsync(
     tpudnnHandle_t handle,
@@ -530,8 +531,7 @@ tpudnnStatus_t tpudnnArgAsync(
     int axis,
     int mode,
     tpudnnTensor_t values,
-    tpudnnTensor_t indices,
-    tpudnnTensor_t buffer);
+    tpudnnTensor_t indices);
 
 tpudnnStatus_t tpudnnTopkAsync(
     tpudnnHandle_t handle,
@@ -753,8 +753,7 @@ tpudnnStatus_t tpudnnC2CAllReduce(
     const char* uuid,
     int nranks,
     int cur_rank,
-    const int *chip_map,
-    int loop);
+    const int *chip_map);
 
 tpudnnStatus_t tpudnnC2CReduce(
     tpudnnHandle_t handle,
@@ -862,6 +861,12 @@ tpudnnStatus_t tpudnnAdamBackwardMultiCoreAsync(
     bool amsgrad,
     bool maximize);
 
+tpudnnStatus_t tpudnnDropoutMultiCoreAsync(
+    tpudnnHandle_t handle,
+    tpudnnTensor_t input,
+    tpudnnTensor_t output,
+    const float drop_rate);
+
 tpudnnStatus_t tpudnnLoraMatmulForwardAsync(
     tpudnnHandle_t handle,
     tpudnnTensor_t input,
@@ -926,4 +931,48 @@ tpudnnStatus_t tpudnnGDMAD2DAsync(
     tpudnnTensor_t src,
     tpudnnTensor_t dst,
     size_t size);
+
+tpudnnStatus_t tpudnnTanhBackwardAsync(
+    tpudnnHandle_t handle,
+    tpudnnTensor_t grad_output,
+    tpudnnTensor_t output,
+    tpudnnTensor_t grad_input);
+
+tpudnnStatus_t tpudnnSigmoidBackwardAsync(
+    tpudnnHandle_t handle,
+    tpudnnTensor_t grad_output,
+    tpudnnTensor_t output,
+    tpudnnTensor_t grad_input);
+
+tpudnnStatus_t tpudnnSiluBackwardAsync(
+    tpudnnHandle_t handle,
+    tpudnnTensor_t grad_output,
+    tpudnnTensor_t input,
+    tpudnnTensor_t grad_input);
+    
+tpudnnStatus_t tpudnnLLamaA16MatmulAsync( 
+    tpudnnHandle_t handle,
+    tpudnnTensor_t left,
+    tpudnnTensor_t right,
+    tpudnnTensor_t bias,
+    tpudnnTensor_t scale,
+    tpudnnTensor_t zp,
+    int group_size,
+    int weight_bits,
+    tpudnnTensor_t output);
+
+tpudnnStatus_t tpudnnTgiInputIdsUpdateAsync(
+    tpudnnHandle_t handle,
+    tpudnnTensor_t all_input_ids,
+    tpudnnTensor_t next_ids,
+    int* input_lengths,
+    int  n_input_lengths,
+    int  n_accept_ids);
+
+tpudnnStatus_t tpudnnEnableProfile(
+    tpudnnHandle_t handle,
+    int max_record_num);
+
+tpudnnStatus_t tpudnnDisableProfile(
+    tpudnnHandle_t handle);  
 } // extern "C"

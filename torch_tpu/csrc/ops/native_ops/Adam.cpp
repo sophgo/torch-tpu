@@ -39,8 +39,10 @@ void _fused_adam_out_tpu(
     for (const auto& v : exp_avg_sqs) {
         CHECK_TENSOR_IN_DEVICE(v);
     }
-    for (const auto& m : max_exp_avg_sqs) {
-        CHECK_TENSOR_IN_DEVICE(m);
+    if(amsgrad){
+        for (const auto& m : max_exp_avg_sqs) {
+            CHECK_TENSOR_IN_DEVICE(m);
+        }
     }
     for (const auto& s : state_steps) {
         CHECK_TENSOR_IN_DEVICE(s);
@@ -48,25 +50,31 @@ void _fused_adam_out_tpu(
     // Check that all tensors are on the same shape
     TORCH_CHECK(self.size() == grads.size() &&
                 self.size() == exp_avgs.size() &&
-                self.size() == exp_avg_sqs.size() &&
-                self.size() == max_exp_avg_sqs.size(),
-                // self.size() == out.size(),
-                "All TensorLists must have the same size.");
-        // Get the current TPU stream
+                self.size() == exp_avg_sqs.size(), "All TensorLists must have the same size.");
+    if(amsgrad){
+        TORCH_CHECK(
+            self.size() == max_exp_avg_sqs.size(), "Parameter 'max_exp_avg_sqs' must have the same size with other TensorLists parameters."
+        )
+    }
+
+    // Get the current TPU stream
     auto stream = c10_tpu::getCurrentTPUStream();
 
     // Generate TPU-specific tensors
-    std::vector<at::Tensor> output;
-    std::vector<at::Tensor> output_m;
-    std::vector<at::Tensor> output_v;
+    std::vector<at::Tensor> output(self.size());
+    std::vector<at::Tensor> output_m(exp_avgs.size());
+    std::vector<at::Tensor> output_v(exp_avg_sqs.size());
     std::vector<at::Tensor> output_vmax;
-
+    if(amsgrad){
+        output_vmax.resize(max_exp_avg_sqs.size());
+    }
     // Initialize output vectors with empty tensors
     for (size_t i = 0; i < self.size(); ++i) {
-        output.push_back(torch::empty(self[i].sizes(), self[i].options()));
-        output_m.push_back(torch::empty(exp_avgs[i].sizes(), exp_avgs[i].options()));
-        output_v.push_back(torch::empty(exp_avg_sqs[i].sizes(), exp_avg_sqs[i].options()));
-        output_vmax.push_back(torch::empty(max_exp_avg_sqs[i].sizes(), max_exp_avg_sqs[i].options()));
+        output[i] = std::move(torch::empty(self[i].sizes(), self[i].options()));
+        output_m[i] = std::move(torch::empty(exp_avgs[i].sizes(), exp_avgs[i].options()));
+        output_v[i] = std::move(torch::empty(exp_avg_sqs[i].sizes(), exp_avg_sqs[i].options()));
+        if(amsgrad)
+            output_vmax[i]= std::move(torch::empty(max_exp_avg_sqs[i].sizes(), max_exp_avg_sqs[i].options()));
     }
 
     TIMING_START;
@@ -76,12 +84,12 @@ void _fused_adam_out_tpu(
             tpu::TPUGenerateTpudnnTensor(stream, output[i]),
             tpu::TPUGenerateTpudnnTensor(stream, output_m[i]),
             tpu::TPUGenerateTpudnnTensor(stream, output_v[i]),
-            tpu::TPUGenerateTpudnnTensor(stream, output_vmax[i]),
+            amsgrad ? tpu::TPUGenerateTpudnnTensor(stream, output_vmax[i]) : tpudnnUndefinedTensor(),
             tpu::TPUGenerateTpudnnTensor(stream, grads[i]),
             tpu::TPUGenerateTpudnnTensor(stream, self[i]),
             tpu::TPUGenerateTpudnnTensor(stream, exp_avgs[i]),
             tpu::TPUGenerateTpudnnTensor(stream, exp_avg_sqs[i]),
-            tpu::TPUGenerateTpudnnTensor(stream, max_exp_avg_sqs[i]),
+            amsgrad ? tpu::TPUGenerateTpudnnTensor(stream, max_exp_avg_sqs[i]) : tpudnnUndefinedTensor(),
             tpu::TPUGenerateTpudnnTensor(stream, state_steps[i]),
             lr,
             beta1,

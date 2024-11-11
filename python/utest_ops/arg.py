@@ -18,7 +18,7 @@ def case1():
     #step2: prepare input data, Notice that the input data will be adopted not only their shapes
     #Of course , 0-dim value is acceptable
     dim = 4
-    shape = [10,10,200,10,2,4,5]
+    shape = [10,10,20,10,2,4,5]
     input_origin = (torch.rand(shape)*(-200)+10)
     #list is also acceptable
     #Of course , 0-dim value is acceptable
@@ -50,7 +50,7 @@ def case2():
     #step2: prepare input data, Notice that the input data will be adopted not only their shapes
     #Of course , 0-dim value is acceptable
     dim = 1
-    shape = [100,500,200,100]
+    shape = [10,50,20,10]
     input_origin = (torch.rand(shape)*(-20000)+10000)
     #list is also acceptable
     #Of course , 0-dim value is acceptable

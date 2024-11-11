@@ -57,17 +57,15 @@ private:
     }
   }
 
-  static TPUDeviceManager * instance_;
+  TPUDeviceManager(const TPUDeviceManager&) = delete;
+  TPUDeviceManager& operator=(const TPUDeviceManager&) = delete;
 
 public:
 
-  static TPUDeviceManager & GetInstance()
+  static TPUDeviceManager& GetInstance()
   {
-    if ( instance_ == nullptr )
-    {
-      instance_ = new TPUDeviceManager();
-    }
-    return *instance_;
+    static TPUDeviceManager instance;
+    return instance;
   }
 
   int GetDeviceCount() const
@@ -220,8 +218,6 @@ private:
   std::vector<std::mutex> Mutexes_;
   std::vector<std::unordered_map<unsigned long long, sg_device_mem_t>> AddrMemMaps_;
 };
-
-TPUDeviceManager * TPUDeviceManager::instance_ = nullptr;
 
 static thread_local int kIndex = 0;
 

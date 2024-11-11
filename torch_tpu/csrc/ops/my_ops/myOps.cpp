@@ -8,7 +8,6 @@
 #include "common/config.h"
 #include "ops.hpp"
 #include "torch_tpu/csrc/aten/TPUNativeFunctions.h"
-
 namespace at {
 Tensor &dummy(Tensor &in) {
   CHECK_TENSOR_IN_DEVICE(in);
@@ -39,12 +38,13 @@ namespace at
 		m.def("mlp_forward", mlp_forward);
 		m.def("mlp_backward", mlp_backward);
 		m.def("llama_mlp_forward", llama_mlp_forward);
-		m.def("a16_matmul_forward", a16_matmul_forward);
-		m.def("a16_llama_mlp_forward", a16_llama_mlp_forward);
+		m.def("matmul_gptq_forward", matmul_gptq_forward);
+		m.def("llama_mlp_gptq_forward", llama_mlp_gptq_forward);
 		m.def("rmsnorm_forward", rmsnorm_forward);
 		m.def("rmsnorm_backward", rmsnorm_backward);
 		m.def("llama_attention", llama_attention);
 		m.def("llama_attention_forward", llama_attention_forward);
+		m.def("llama_attention_backward", llama_attention_backward);
 		m.def("attn_forward", attn_forward);
 		m.def("attn_backward", attn_backward);
 		m.def("ln_mm_forward", ln_mm_forward);
@@ -53,6 +53,8 @@ namespace at
 		m.def("add_ln_mm_backward", add_ln_mm_backward);
 		m.def("enable_pmu", enable_pmu);
 		m.def("disable_pmu", disable_pmu);
+		m.def("enable_profile", enable_profile);
+		m.def("disable_profile", disable_profile);
 		m.def("lora_matmul_forward",lora_matmul_forward);
 	}
 }

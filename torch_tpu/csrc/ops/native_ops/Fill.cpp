@@ -15,7 +15,6 @@ Tensor &fill__Scalar_tpu(Tensor &self, const Scalar &value) {
   self_cpu.fill_ ( value );
   tpu::TPUCopyHostToDevice ( self.data_ptr(), self_cpu.contiguous().data_ptr(), self.nbytes() );
 #else
-  auto self_ = self.dim() == 0 ? self.unsqueeze(0) : self;
   int64_t value_;
   if (self.dtype() == caffe2::TypeMeta::Make<float>()) {
     *(float *)(&value_) = value.toFloat();
@@ -34,14 +33,9 @@ Tensor &fill__Scalar_tpu(Tensor &self, const Scalar &value) {
   auto status = tpudnnFillAsync(
       stream,
       &value_,
-      tpu::TPUGenerateTpudnnTensor(stream, self_));
+      tpu::TPUGenerateTpudnnTensor(stream, self));
   TORCH_CHECK(status == TPUDNN_STATUS_SUCCESS);
     TIMING_END(tpu::CONST_FILL);
-  // unsqueeze may cause different address between self_ and self:
-  if (self.data_ptr() != self_.data_ptr()) {
-    tpu::TPUCopyDeviceToDevice(self.data_ptr(), self_.data_ptr(),
-                               self.nbytes(), true);
-  }
 #endif
   SHOW_TENSOR_OP(self);
   return self;

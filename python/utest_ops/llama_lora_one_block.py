@@ -13,7 +13,7 @@ for package, version in {"transformers": "4.41.2", "peft": "0.11.1"}.items():
         if pkg_resources.get_distribution(package).version != version:
             raise VersionConflict
     except (DistributionNotFound, VersionConflict):
-        os.system(f"python3 -m pip install {package}=={version}")
+        os.system(f"PIP_INDEX_URL=https://pypi.tuna.tsinghua.edu.cn/simple python3 -m pip install {package}=={version}")
 
 os.environ["CMODEL_FAST_EXEC"]="1"
 from transformers import LlamaForCausalLM, LlamaConfig

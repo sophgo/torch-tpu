@@ -40,18 +40,14 @@ Tensor &argmax_out_tpu(const Tensor &self, c10::optional<int64_t> dim,
     }
     TORCH_CHECK(dim.value() >= 0 || dim.value() < self.dim());
   }
-  TensorOptions options = TensorOptions ( self.device() ).dtype ( self.dtype() );
-  Tensor values = empty({out.sizes()}, options);
-  Tensor buffer = empty({out.sizes()}, options);
   TIMING_START;
   auto stream = c10_tpu::getCurrentTPUStream();
   auto status = tpudnnArgAsync(
       stream,
       tpu::TPUGenerateTpudnnTensor(stream, self),
       dim.has_value() ? dim.value() : self.dim(), ARGMAX_MODE,
-      tpu::TPUGenerateTpudnnTensor(stream, values),
-      tpu::TPUGenerateTpudnnTensor(stream, out),
-      tpu::TPUGenerateTpudnnTensor(stream, buffer));
+      tpudnnUndefinedTensor(),
+      tpu::TPUGenerateTpudnnTensor(stream, out));
   TORCH_CHECK(status == TPUDNN_STATUS_SUCCESS);
   TIMING_END(tpu::ARGMAX);
 #endif
@@ -59,6 +55,47 @@ Tensor &argmax_out_tpu(const Tensor &self, c10::optional<int64_t> dim,
   return out;
 }
 
+Tensor argmax_tpu(const Tensor &self, c10::optional<int64_t> dim, bool keepdim) {
+  CHECK_TENSOR_IN_DEVICE(self);
+
+  if (dim.has_value()) {
+    if (dim.value() < 0) {
+      dim = dim.value() + self.dim();
+    }
+    TORCH_CHECK(dim.value() >= 0 || dim.value() < self.dim());
+  }
+  TensorOptions options = TensorOptions ( self.device() ).dtype ( torch::kInt32 );
+  std::vector<int64_t> sizes_vec;
+  if ( keepdim )
+  {
+    if ( dim.has_value() )
+    {
+      for ( int i = 0; i < self.dim(); i++ ) { sizes_vec.push_back( self.size(i) ); }
+      sizes_vec[dim.value()] = 1;
+    }
+    else
+    {
+      for ( int i = 0; i < self.dim(); i++ ) { sizes_vec.push_back( 1 ); }
+    }
+  }
+  else
+  {
+    if (dim.has_value())
+    {
+      for (int i = 0; i < dim.value(); i++) { sizes_vec.push_back( self.size(i) ); }
+      for (int i = dim.value() + 1; i < self.dim(); i++) { sizes_vec.push_back( self.size(i) ); }
+    }
+    else
+    {
+      // sizes_vec.push_back( 1 );
+    }
+  }
+  IntArrayRef sizes(sizes_vec.data(), sizes_vec.size());
+  Tensor out = empty(sizes, options);
+  out = argmax_out_tpu(self, dim, keepdim, out);
+  return out;
+}
+TORCH_LIBRARY_IMPL(aten, TPU, m) { m.impl("argmax", argmax_tpu); }
 TORCH_LIBRARY_IMPL(aten, TPU, m) { m.impl("argmax.out", argmax_out_tpu); }
 
 Tensor &argmin_out_tpu(const Tensor &self, c10::optional<int64_t> dim,
@@ -76,24 +113,61 @@ Tensor &argmin_out_tpu(const Tensor &self, c10::optional<int64_t> dim,
     }
     TORCH_CHECK(dim.value() >= 0 || dim.value() < self.dim());
   }
-  TensorOptions options = TensorOptions ( self.device() ).dtype ( self.dtype() );
-  Tensor values = empty({out.sizes()}, options);
-  Tensor buffer = empty({out.sizes()}, options);
   TIMING_START;
   auto stream = c10_tpu::getCurrentTPUStream();
   auto status = tpudnnArgAsync(
       stream,
       tpu::TPUGenerateTpudnnTensor(stream, self),
       dim.has_value() ? dim.value() : self.dim(), ARGMIN_MODE,
-      tpu::TPUGenerateTpudnnTensor(stream, values),
-      tpu::TPUGenerateTpudnnTensor(stream, out),
-      tpu::TPUGenerateTpudnnTensor(stream, buffer));
+      tpudnnUndefinedTensor(),
+      tpu::TPUGenerateTpudnnTensor(stream, out));
   TORCH_CHECK(status == TPUDNN_STATUS_SUCCESS);
   TIMING_END(tpu::ARGMIN);
 #endif
   return out;
 }
 
+Tensor argmin_tpu(const Tensor &self, c10::optional<int64_t> dim, bool keepdim) {
+  CHECK_TENSOR_IN_DEVICE(self);
+
+  if (dim.has_value()) {
+    if (dim.value() < 0) {
+      dim = dim.value() + self.dim();
+    }
+    TORCH_CHECK(dim.value() >= 0 || dim.value() < self.dim());
+  }
+  TensorOptions options = TensorOptions ( self.device() ).dtype ( torch::kInt32 );
+  std::vector<int64_t> sizes_vec;
+  if ( keepdim )
+  {
+    if ( dim.has_value() )
+    {
+      for ( int i = 0; i < self.dim(); i++ ) { sizes_vec.push_back( self.size(i) ); }
+      sizes_vec[dim.value()] = 1;
+    }
+    else
+    {
+      for ( int i = 0; i < self.dim(); i++ ) { sizes_vec.push_back( 1 ); }
+    }
+  }
+  else
+  {
+    if (dim.has_value())
+    {
+      for (int i = 0; i < dim.value(); i++) { sizes_vec.push_back( self.size(i) ); }
+      for (int i = dim.value() + 1; i < self.dim(); i++) { sizes_vec.push_back( self.size(i) ); }
+    }
+    else
+    {
+      // sizes_vec.push_back( 1 );
+    }
+  }
+  IntArrayRef sizes(sizes_vec.data(), sizes_vec.size());
+  Tensor out = empty(sizes, options);
+  out = argmin_out_tpu(self, dim, keepdim, out);
+  return out;
+}
+TORCH_LIBRARY_IMPL(aten, TPU, m) { m.impl("argmin", argmin_tpu); }
 TORCH_LIBRARY_IMPL(aten, TPU, m) { m.impl("argmin.out", argmin_out_tpu); }
 
 std::tuple<Tensor &, Tensor &> max_dim_max_out_tpu(const Tensor &self,
@@ -114,8 +188,6 @@ std::tuple<Tensor &, Tensor &> max_dim_max_out_tpu(const Tensor &self,
   }
   TORCH_CHECK(dim >= 0 || dim < self.dim());
 
-  TensorOptions options = TensorOptions ( self.device() ).dtype ( self.dtype() );
-  Tensor buffer = empty({indices.sizes()}, options);
   TIMING_START;
   auto stream = c10_tpu::getCurrentTPUStream();
   auto status = tpudnnArgAsync(
@@ -124,14 +196,38 @@ std::tuple<Tensor &, Tensor &> max_dim_max_out_tpu(const Tensor &self,
       dim, 
       MAX_DIM_MODE,
       tpu::TPUGenerateTpudnnTensor(stream, values),
-      tpu::TPUGenerateTpudnnTensor(stream, indices),
-      tpu::TPUGenerateTpudnnTensor(stream, buffer));
+      tpu::TPUGenerateTpudnnTensor(stream, indices));
   TORCH_CHECK(status == TPUDNN_STATUS_SUCCESS);
   TIMING_END(tpu::MAX_DIM);
 #endif
   return {values, indices};
 }
-
+std::tuple<Tensor, Tensor> max_dim_tpu(const Tensor &self,
+                                       int64_t dim, bool keepdim)
+{
+  CHECK_TENSOR_IN_DEVICE(self);
+  if (dim < 0) { dim = dim + self.dim();}
+  TORCH_CHECK(dim >= 0 || dim < self.dim());
+  std::vector<int64_t> sizes_vec;
+  if ( keepdim )
+  {
+    for ( int i = 0; i < self.dim(); i++ ) { sizes_vec.push_back( self.size(i) ); }
+    sizes_vec[dim] = 1;
+  }
+  else
+  {
+    for (int i = 0; i < dim; i++) { sizes_vec.push_back( self.size(i) ); }
+    for (int i = dim + 1; i < self.dim(); i++) { sizes_vec.push_back( self.size(i) ); }
+  }
+  IntArrayRef sizes(sizes_vec.data(), sizes_vec.size());
+  TensorOptions idx_options = TensorOptions ( self.device() ).dtype ( torch::kInt32 );
+  TensorOptions val_options = TensorOptions ( self.device() ).dtype ( self.dtype() );
+  Tensor idx    = empty(sizes, idx_options);
+  Tensor values = empty(sizes, val_options); 
+  max_dim_max_out_tpu(self, dim, keepdim, values, idx);
+  return {values, idx};
+}
+TORCH_LIBRARY_IMPL(aten, TPU, m) { m.impl("max.dim", max_dim_tpu); }
 TORCH_LIBRARY_IMPL(aten, TPU, m) { m.impl("max.dim_max", max_dim_max_out_tpu); }
 
 std::tuple<Tensor &, Tensor &> min_dim_min_out_tpu(const Tensor &self,
@@ -151,8 +247,7 @@ std::tuple<Tensor &, Tensor &> min_dim_min_out_tpu(const Tensor &self,
     dim = dim + self.dim();
   }
   TORCH_CHECK(dim >= 0 || dim < self.dim());
-  TensorOptions options = TensorOptions ( self.device() ).dtype ( self.dtype() );
-  Tensor buffer = empty({indices.sizes()}, options);
+
   TIMING_START;
   auto stream = c10_tpu::getCurrentTPUStream();
   auto status = tpudnnArgAsync(
@@ -161,14 +256,39 @@ std::tuple<Tensor &, Tensor &> min_dim_min_out_tpu(const Tensor &self,
       dim, 
       MIN_DIM_MODE,
       tpu::TPUGenerateTpudnnTensor(stream, values),
-      tpu::TPUGenerateTpudnnTensor(stream, indices),
-      tpu::TPUGenerateTpudnnTensor(stream, buffer));
+      tpu::TPUGenerateTpudnnTensor(stream, indices));
   TORCH_CHECK(status == TPUDNN_STATUS_SUCCESS);
   TIMING_END(tpu::MIN_DIM);
 #endif
   return {values, indices};
 }
 
+std::tuple<Tensor, Tensor> min_dim_tpu(const Tensor &self,
+                                       int64_t dim, bool keepdim)
+{
+  CHECK_TENSOR_IN_DEVICE(self);
+  if (dim < 0) { dim = dim + self.dim();}
+  TORCH_CHECK(dim >= 0 || dim < self.dim());
+  std::vector<int64_t> sizes_vec;
+  if ( keepdim )
+  {
+    for ( int i = 0; i < self.dim(); i++ ) { sizes_vec.push_back( self.size(i) ); }
+    sizes_vec[dim] = 1;
+  }
+  else
+  {
+    for (int i = 0; i < dim; i++) { sizes_vec.push_back( self.size(i) ); }
+    for (int i = dim + 1; i < self.dim(); i++) { sizes_vec.push_back( self.size(i) ); }
+  }
+  IntArrayRef sizes(sizes_vec.data(), sizes_vec.size());
+  TensorOptions idx_options = TensorOptions ( self.device() ).dtype ( torch::kInt32 );
+  TensorOptions val_options = TensorOptions ( self.device() ).dtype ( self.dtype() );
+  Tensor idx    = empty(sizes, idx_options);
+  Tensor values = empty(sizes, val_options); 
+  min_dim_min_out_tpu(self, dim, keepdim, values, idx);
+  return {values, idx};
+}
+TORCH_LIBRARY_IMPL(aten, TPU, m) { m.impl("min.dim", min_dim_tpu); }
 TORCH_LIBRARY_IMPL(aten, TPU, m) { m.impl("min.dim_min", min_dim_min_out_tpu); }
 
 }  // namespace at

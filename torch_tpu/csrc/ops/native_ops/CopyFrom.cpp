@@ -38,8 +38,8 @@ Tensor _copy_from_tpu(const Tensor &self, const Tensor &dst,
         auto stream = c10_tpu::getCurrentTPUStream();
         auto status = tpudnnGDMAD2DAsync(
           stream,
-          tpu::TPUGenerateTpudnnTensor(stream, self),
-          tpu::TPUGenerateTpudnnTensor(stream, dst),
+          tpu::TPUGenerateTpudnnTensor(stream, self.view(-1).view(torch::kInt8)),
+          tpu::TPUGenerateTpudnnTensor(stream, dst.view(-1).view(torch::kInt8)),
           dst.nbytes());
         TORCH_CHECK(status == TPUDNN_STATUS_SUCCESS);
         TIMING_END(tpu::COPY);
@@ -67,7 +67,15 @@ Tensor _copy_from_tpu(const Tensor &self, const Tensor &dst,
       auto dst_cpu = self.cpu().to ( dst.dtype() );
       tpu::TPUCopyHostToDevice ( dst.data_ptr(), dst_cpu.contiguous().data_ptr(), dst.nbytes(), non_blocking );
 #else
-      if(tpu::TPUConvertDtype<SgdnnDataType_t>(self.dtype()) == SGDNN_DTYPE_INT64 && tpu::TPUConvertDtype<SgdnnDataType_t>(dst.dtype()) == SGDNN_DTYPE_INT32) {
+      if ( !tpu::IsSupportDtype(self.dtype()) || !tpu::IsSupportDtype( dst.dtype() ))
+      {
+        CPU_IMPL_WARNING("unsupport dtype.");
+        TIMING_START;
+        auto dst_cpu = self.cpu().to ( dst.dtype() );
+        tpu::TPUCopyHostToDevice ( dst.data_ptr(), dst_cpu.contiguous().data_ptr(), dst.nbytes(), non_blocking );
+        TIMING_END(tpu::CPU_LAYER);
+      }
+      else if(tpu::TPUConvertDtype<SgdnnDataType_t>(self.dtype()) == SGDNN_DTYPE_INT64 && tpu::TPUConvertDtype<SgdnnDataType_t>(dst.dtype()) == SGDNN_DTYPE_INT32) {
         auto stream = c10_tpu::getCurrentTPUStream();
         auto self_ = tpu::TPUGenerateTpudnnTensor(stream, self);
         self_.dtype = TPUDNN_DTYPE_INT32;
@@ -108,24 +116,18 @@ Tensor _copy_from_tpu(const Tensor &self, const Tensor &dst,
           dst_t
         );
         TORCH_CHECK(status == TPUDNN_STATUS_SUCCESS);
-      } else if ( !tpu::IsSupportDtype(self.dtype()) || !tpu::IsSupportDtype( dst.dtype() ))
-      {
-        CPU_IMPL_WARNING("unsupport dtype.");
-        TIMING_START;
-        auto dst_cpu = self.cpu().to ( dst.dtype() );
-        tpu::TPUCopyHostToDevice ( dst.data_ptr(), dst_cpu.contiguous().data_ptr(), dst.nbytes(), non_blocking );
-        TIMING_END(tpu::CPU_LAYER);
-      }
-      else
+      } else
       {
         auto self_ = self.contiguous();
         if (dst.is_contiguous()) {
           TIMING_START;
           auto stream = c10_tpu::getCurrentTPUStream();
+          int is_bool = (dst.dtype() == caffe2::TypeMeta::Make<bool>());
           auto status = tpudnnConvertAsync(
             stream,
             tpu::TPUGenerateTpudnnTensor(stream, self_),
-            tpu::TPUGenerateTpudnnTensor(stream, dst));
+            tpu::TPUGenerateTpudnnTensor(stream, dst),
+            is_bool);
           TORCH_CHECK(status == TPUDNN_STATUS_SUCCESS);
           TIMING_END(tpu::DTYPE_CONVERT);
           SHOW_TENSOR_OP(self_, dst);

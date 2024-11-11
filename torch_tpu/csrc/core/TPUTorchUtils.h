@@ -424,6 +424,7 @@ typedef enum
   SINH,
   COSH,
   TANH,
+  TANH_BACKWARD,
   CEIL,
   FLOOR,
   ROUND,
@@ -520,6 +521,7 @@ typedef enum
   SLICE_SCATTER,
   InfCheckAndUnscale,
   LLAMA_ATTENTION,
+  LLAMA_ATTENTION_BACKWARD,
   LLAMA_MLP_FORWARD,
   LLAMA_A16_MLP_FORWARD,
   RMSNORM_FORWARD,
@@ -535,6 +537,7 @@ typedef enum
   ADAM,
   LORA_MATMUL_FORWARD,
   OP_NUM,
+  COMPARISON_C
 }
 OpType;
 

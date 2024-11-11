@@ -40,7 +40,7 @@ namespace at
 		return output;
 	}
 
-	Tensor a16_llama_mlp_forward(
+	Tensor llama_mlp_gptq_forward(
 		Tensor &input,
 		Tensor &weight0,
 		Tensor &zp0,

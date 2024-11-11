@@ -118,6 +118,7 @@ if(BACKEND_1684X)
       "$ORIGIN;$ORIGIN/../../third_party/bmlib/lib;${tpuDNNPath}")
   install(TARGETS torch_tpu DESTINATION lib)
 elseif(BACKEND_SG2260)
+
   if (EXISTS ${CMAKE_SOURCE_DIR}/../tpuv7-runtime)
     include_directories(${CMAKE_SOURCE_DIR}/../tpuv7-runtime/cdmlib/host/cdm_runtime/include)
     set(tpuv7_rpath "/opt/tpuv7/tpuv7-current/lib:$ORIGIN/../../../tpuv7-runtime/build/cdmlib/host/cdm_runtime")

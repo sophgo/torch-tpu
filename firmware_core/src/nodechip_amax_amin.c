@@ -1,6 +1,7 @@
+#include <string.h>
 #include "sg_api_struct.h"
 #include "tpu_kernel.h"
-
+#include "nodechip_utils.h"
 
 extern void nodechip_reduce_full(
     global_addr_t input_global_addr, global_addr_t buffer_global_addr,
@@ -14,6 +15,27 @@ int tpu_kernel_api_reduce_max_or_min_multi_core(const void *args) {
                    api->dtype == DT_BFP16);
   TPUKERNEL_ASSERT(api->mode == 0 || api->mode == 1);
   int mode = api->mode == 0 ? REDUCE_MAX : REDUCE_MIN;
+
+  if(api->dim == api->reduction_dim_length) {   //reshape
+      uint64_t all_element_nums = 1;
+      for (int i = 0; i < api->dim; ++i) {
+          all_element_nums *= (unsigned int)api->shape[i];
+      }
+      int vecDivisors[200] = {0};
+      int nums =findAllDivisors(all_element_nums, vecDivisors, sizeof(vecDivisors)/sizeof(int));
+      int idx = findFactorsIndex(NPU_NUM, vecDivisors);
+      api->shape[0] = vecDivisors[idx];
+      uint64_t remain_elememts = all_element_nums/vecDivisors[idx];
+      memset(vecDivisors, 0, nums * sizeof(int));
+      findAllDivisors(remain_elememts, vecDivisors, sizeof(vecDivisors)/sizeof(int));
+      idx = findFactorsIndex(EU_NUM, vecDivisors);
+      api->shape[1] = remain_elememts / vecDivisors[idx];
+      api->shape[2] = vecDivisors[idx];
+      api->reduction_dim_length = 3;
+      api->dim = api->reduction_dim_length;
+      api->reduction_dim[api->reduction_dim_length-1] = api->reduction_dim_length -1;
+  }
+
 #ifdef BACKEND_SG2260
   int length = 1;
   if (api->dim > 0) {

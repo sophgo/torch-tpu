@@ -56,7 +56,9 @@ private:
   };
 
 public:
-  TPUDeviceManager() : init_flag_(false) {}
+  TPUDeviceManager() : init_flag_(false) {
+    this->initialize();
+  }
 
   ~TPUDeviceManager() {
     if (tpu_resource_t stream_ = c10_tpu::getDefaultTPUStream()) {
@@ -64,7 +66,6 @@ public:
       tpuRtStreamSynchronize(stream_);
       tpuRtStreamDestroy(stream_);
     }
-    if (instance_) delete instance_;
   }
 
   TPUMgrStatus Initialized() { return init_flag_ ? INIT_ALREADY : NOT_INIT;}
@@ -113,13 +114,10 @@ public:
     return INIT_SUCCESS;
   }
 
-  static TPUDeviceManager* GetInstance()
+  static TPUDeviceManager& GetInstance()
   {
-    if (instance_ == nullptr){
-      instance_ = new TPUDeviceManager();
-    }
-    instance_->initialize();
-    return instance_;
+    static TPUDeviceManager instance;
+    return instance;
   }
 
   int GetDeviceCount() const
@@ -190,6 +188,22 @@ public:
       freeTBDs.erase(ptr);
     }
 
+#ifdef PROFILE_MEMORY_REUSE
+    size_t sizeDefered = 0;
+    size_t sizeDelayed = 0;
+    for (auto &pair : freeTBDs)
+    {
+      auto &tbd = pair.second;
+      if (tbd.freed_timestamp == 0)
+        sizeDefered += getSize(tbd.ptr, index);
+      else
+        sizeDelayed += getSize(tbd.ptr, index);
+    }
+    std::cout << "===== Memory defered by TPU tasks " << sizeDefered
+              << ". Memory delayed by reuse strategy " << sizeDelayed
+              << std::endl;
+#endif
+
     return reusedPtr;
   }
 
@@ -199,7 +213,8 @@ public:
     Size = alignTo(Size, alignSize);
 
     auto reused = processFreeTBDs(Size, Index);
-    if (reused) return reused;
+    if (reused)
+      return (void*)UnifiedAddr((unsigned long long) reused, Index);
 
     if ( Size == 0 )
     {
@@ -213,7 +228,7 @@ public:
     info.size = Size;
     auto ptr = ( void * ) UnifiedAddr((unsigned long long) dev_ptr, Index);
     std::lock_guard<std::mutex> lock(getMutex(Index));
-    getMemInfo(Index)[ptr] = info;
+    getMemInfo(Index)[dev_ptr] = info;
 
     // std::cout << "Alloc " << ptr << " of size " << Size << std::endl;
 
@@ -316,13 +331,12 @@ private:
   std::atomic<bool> init_flag_;
   std::vector<std::atomic<bool>> devices_init_;
 
-  static TPUDeviceManager* instance_;
+  TPUDeviceManager(const TPUDeviceManager&) = delete;
+  TPUDeviceManager& operator=(const TPUDeviceManager&) = delete;
 };
 
-TPUDeviceManager* TPUDeviceManager::instance_ = nullptr;
-
 TPUDeviceManager* TPUGetInstance(){
-  return TPUDeviceManager::GetInstance();
+  return &TPUDeviceManager::GetInstance();
 }
 
 TPUMgrStatus InitTPUMgr()
@@ -343,12 +357,12 @@ TPUMgrStatus IsTPUMgrInited()
 
 TPUMgrStatus TPUDeviceInitialize( int Index ) {
   InitTPUMgr();
-  return TPUDeviceManager::GetInstance()->InitDevice(Index);
+  return TPUDeviceManager::GetInstance().InitDevice(Index);
 }
 
 int TPUGetDeviceCount ( void )
 {
-  return TPUDeviceManager::GetInstance()->GetDeviceCount();
+  return TPUDeviceManager::GetInstance().GetDeviceCount();
 }
 
 int TPUGetDeviceIndex ( void )
@@ -373,19 +387,19 @@ void TPUSetDeviceIndex ( int Index )
 
 void * TPUAlloc ( size_t Size )
 {
-  return TPUDeviceManager::GetInstance()->Alloc ( Size, TPUGetDeviceIndex() );
+  return TPUDeviceManager::GetInstance().Alloc ( Size, TPUGetDeviceIndex() );
 }
 
 void * TPUAlloc ( size_t Size, int Index )
 {
-  return TPUDeviceManager::GetInstance()->Alloc ( Size, Index );
+  return TPUDeviceManager::GetInstance().Alloc ( Size, Index );
 }
 
 void TPUFree ( void * Ptr )
 {
   unsigned long long dev_index = GetDeviceIndexByUnifiedAddr((unsigned long long)Ptr);
   unsigned long long data_ptr = GetAddrByUnifiedAddr((unsigned long long)Ptr);
-  TPUDeviceManager::GetInstance()->Free ( (void *)data_ptr, dev_index );
+  TPUDeviceManager::GetInstance().Free ( (void *)data_ptr, dev_index );
 }
 
 
@@ -393,14 +407,14 @@ void TPUCopyHostToDevice ( void * Dst, const void * Src, size_t Size,  bool non_
 {
   unsigned long long dev_index = GetDeviceIndexByUnifiedAddr((unsigned long long)Dst);
   unsigned long long dst_ptr = GetAddrByUnifiedAddr((unsigned long long)Dst);
-  TPUDeviceManager::GetInstance()->CopyHostToDevice ( (void*)dst_ptr, Src, Size, dev_index, non_blocking );
+  TPUDeviceManager::GetInstance().CopyHostToDevice ( (void*)dst_ptr, Src, Size, dev_index, non_blocking );
 }
 
 void TPUCopyDeviceToHost ( void * Dst, const void * Src, size_t Size, bool non_blocking )
 {
   unsigned long long dev_index = GetDeviceIndexByUnifiedAddr((unsigned long long)Src);
   unsigned long long src_ptr = GetAddrByUnifiedAddr((unsigned long long)Src);
-  TPUDeviceManager::GetInstance()->CopyDeviceToHost ( Dst, (void*)src_ptr, Size, dev_index, non_blocking );
+  TPUDeviceManager::GetInstance().CopyDeviceToHost ( Dst, (void*)src_ptr, Size, dev_index, non_blocking );
 }
 
 void TPUCopyDeviceToDevice ( void * Dst, const void * Src, size_t Size, bool non_blocking )
@@ -410,7 +424,7 @@ void TPUCopyDeviceToDevice ( void * Dst, const void * Src, size_t Size, bool non
   unsigned long long dst_index = GetDeviceIndexByUnifiedAddr((unsigned long long)Dst);
   unsigned long long dst_ptr = GetAddrByUnifiedAddr((unsigned long long)Dst);
   TORCH_CHECK ( dst_index == src_index, "D2D copy must in same device");
-  TPUDeviceManager::GetInstance()->CopyDeviceToDevice ( (void*)dst_ptr, (void*)src_ptr, Size, dst_index, non_blocking );
+  TPUDeviceManager::GetInstance().CopyDeviceToDevice ( (void*)dst_ptr, (void*)src_ptr, Size, dst_index, non_blocking );
 }
 
 tpuRtStream_t TPUGetDeviceResource ( void ) {

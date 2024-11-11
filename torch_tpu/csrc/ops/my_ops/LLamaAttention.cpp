@@ -156,4 +156,67 @@ namespace at
 
 	}
 
+	std::tuple<Tensor, Tensor, Tensor> llama_attention_backward(
+		Tensor &Q,
+		Tensor &K,
+		Tensor &V,
+		Tensor &O,
+		Tensor &dO,
+		Tensor &l,
+		Tensor &dQ,
+		Tensor &dK,
+		Tensor &dV,
+		const c10::optional<Tensor> &cos,
+		const c10::optional<Tensor> &sin,
+		const c10::optional<Tensor> &mask,
+		const Tensor &input_lengths,
+		int64_t mask_max, // mask_size
+		double C // softmax_scale
+		)
+	{
+		CHECK_TENSOR_IN_DEVICE(Q);
+		CHECK_TENSOR_IN_DEVICE(K);
+		CHECK_TENSOR_IN_DEVICE(V);
+		CHECK_TENSOR_IN_DEVICE(O);
+		CHECK_TENSOR_IN_DEVICE(dO);
+		CHECK_TENSOR_IN_DEVICE(l);
+		CHECK_TENSOR_IN_DEVICE(dQ);
+		CHECK_TENSOR_IN_DEVICE(dK);
+		CHECK_TENSOR_IN_DEVICE(dV);
+		CHECK_TENSOR_IN_DEVICE(input_lengths);
+		if (cos.has_value())
+			CHECK_TENSOR_IN_DEVICE(cos.value());
+		if (sin.has_value())
+			CHECK_TENSOR_IN_DEVICE(sin.value());
+		if (mask.has_value())
+			CHECK_TENSOR_IN_DEVICE(mask.value());
+
+#ifdef TPU_OP_TIMING
+		auto timer = tpu::Timer().Start();
+#endif
+		tpu_status_t status = sgdnnLlamaAttentionBackward(
+			tpu::TPUGetDeviceResource(),
+			tpu::TPUGenerateSgdnnTensor(Q),
+			tpu::TPUGenerateSgdnnTensor(K),
+			tpu::TPUGenerateSgdnnTensor(V),
+			tpu::TPUGenerateSgdnnTensor(O),
+			tpu::TPUGenerateSgdnnTensor(dO),
+			tpu::TPUGenerateSgdnnTensor(l),
+			tpu::TPUGenerateSgdnnTensor(dQ),
+			tpu::TPUGenerateSgdnnTensor(dK),
+			tpu::TPUGenerateSgdnnTensor(dV),
+			cos.has_value() ? tpu::TPUGenerateSgdnnTensor(cos.value()) : sgdnnUndefinedTensor(),
+			sin.has_value() ? tpu::TPUGenerateSgdnnTensor(sin.value()) : sgdnnUndefinedTensor(),
+			mask.has_value() ? tpu::TPUGenerateSgdnnTensor(mask.value()) : sgdnnUndefinedTensor(),
+			tpu::TPUGenerateSgdnnTensor(input_lengths),
+			mask_max,
+			C);
+		TORCH_CHECK(status == SG_SUCCESS);
+
+#ifdef TPU_OP_TIMING
+		tpu::OpTimer::Instance().AddTime(tpu::LLAMA_ATTENTION_BACKWARD, timer.ElapsedUS());
+#endif
+		return std::tuple<Tensor, Tensor, Tensor>(dQ, dK, dV);
+	}
+
 }
