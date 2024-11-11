@@ -225,9 +225,7 @@ TPUStream TPUStreamForId(DeviceIndex device_index, StreamId stream_id) {
     c10::DeviceIndex device_index = stream_.device_index();
     StreamId stream_id = stream_.id();
     StreamIdType st = streamIdType(stream_id);
-
-    TORCH_INTERNAL_ASSERT(st.isDefault());
-
+    TORCH_INTERNAL_ASSERT(st.isDefault(), "StreamIdType isn't the Default", st);
     return tpudnn_handles[device_index];
   }
 

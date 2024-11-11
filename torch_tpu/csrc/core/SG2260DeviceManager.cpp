@@ -81,14 +81,14 @@ public:
     if (DeviceCount == 0) {
       std::cout << "Device Count:" << DeviceCount << "\n";
       DeviceCount = 1;
-    }
-    // TODO multi-device
-    char* size = getenv("OMPI_COMM_WORLD_SIZE");
-    if (size == nullptr) {
-        size = getenv("LOCAL_WORLD_SIZE");
-    }
-    if(size != nullptr) {
-      DeviceCount = atoi(size);
+
+      char* size = getenv("OMPI_COMM_WORLD_SIZE");
+      if (size == nullptr) {
+          size = getenv("LOCAL_WORLD_SIZE");
+      }
+      if(size != nullptr) {
+        DeviceCount = atoi(size);
+      }
     }
 
     TORCH_CHECK ( Status == tpuRtSuccess, "Failed to get TPU device count" );

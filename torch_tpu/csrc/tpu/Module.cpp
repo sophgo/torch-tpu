@@ -111,8 +111,6 @@ PyObject* THPTModule_set_run_yet_variable_to_false_wrap(
   END_HANDLE_TH_ERRORS
 }
 
-
-
 void THPTModule_setDevice(c10::DeviceIndex device) {
   c10_tpu::set_device(device);
 }
