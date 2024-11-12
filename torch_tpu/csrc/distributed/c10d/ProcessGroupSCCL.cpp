@@ -194,7 +194,7 @@ void ProcessGroupSCCL::broadcastUniqueSCCLID(scclHandle_t handle,
   const std::string key = "ProcessGroupSCCL";
   memset(scclID, 0x0, sizeof(scclUniqueId));
   if (rank == 0) {
-    TORCH_CHECK(scclGetUniqueId(handle, *scclID) ==
+    TORCH_CHECK(scclGetUniqueId(handle, scclID) ==
                     scclSuccess,
                 "sccl get unique ID failed\n");
     auto vec = std::vector<uint8_t>(reinterpret_cast<uint8_t *>(scclID),

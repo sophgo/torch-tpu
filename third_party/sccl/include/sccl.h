@@ -60,7 +60,7 @@ scclResult_t scclSetupC2CTopology(scclHandle_t handle);
 
 scclHandle_t scclCreateHandle(int deviceID);
 
-scclResult_t scclGetUniqueId(scclHandle_t handle, scclUniqueId uniqueId);
+scclResult_t scclGetUniqueId(scclHandle_t handle, scclUniqueId *uniqueId);
 
 scclResult_t scclCommInitRank(scclComm_t *comm, int nRanks, scclUniqueId uniqueId,
                               int rank, const int *chipMap);
