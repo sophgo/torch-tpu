@@ -16,7 +16,7 @@ def test():
     params_grad = [torch.randn_like(params[i]).to(device) for i in range(num_step)]  
 
 
-    lr = 0.001
+    lr = 0.5
     beta1 = 0.9
     beta2 = 0.999
     weight_decay = 0.01
@@ -42,9 +42,7 @@ def test():
 
     params_fused = [params[i].clone().detach().requires_grad_().to(device) for i in range(num_step)]
     def tpu_adam(a, b, lr, beta1, beta2, weight_decay, eps, amsgrad=False, maximize=False):
-        from torch_tpu.tpu.custom_op.adam import fuse_torch_adam
-        fuse_torch_adam()
-        optimizer = torch.optim.Adam(a, lr=lr, betas=(beta1, beta2), weight_decay=weight_decay, eps=eps, amsgrad=amsgrad)
+        optimizer = torch.optim.Adam(a, lr=lr, betas=(beta1, beta2), weight_decay=weight_decay, eps=eps, amsgrad=amsgrad, fused=True)
         optimizer.zero_grad()
         for i in range(len(a)):
             a[i].grad = b[i]
