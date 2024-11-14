@@ -762,9 +762,9 @@ void nodechip_binary_bcast_div(global_addr_t input_global_addr,
 
           // Broadcast input if needed
           if (input_bcast[1]) {
-            input_local_shape.c = NPU_NUM;
+            dim4 bcast_shape = {.n = slice_shape.n, .c = NPU_NUM, .h = slice_shape.h, .w = slice_shape.w};
             tpu_bdc_npu_bcast(input_local_addr[index], input_local_addr[index],
-                              &input_local_shape, dtype);
+                              &bcast_shape, dtype);
           }
           if (input_bcast[0] || input_bcast[2] || input_bcast[3] ||
               (input_bcast[1] && slice_shape.c > NPU_NUM)) {
@@ -776,9 +776,9 @@ void nodechip_binary_bcast_div(global_addr_t input_global_addr,
 
           // Broadcast other if needed
           if (other_bcast[1]) {
-            other_local_shape.c = NPU_NUM;
+            dim4 bcast_shape = {.n = slice_shape.n, .c = NPU_NUM, .h = slice_shape.h, .w = slice_shape.w};
             tpu_bdc_npu_bcast(other_local_addr[index], other_local_addr[index],
-                              &other_local_shape, dtype);
+                              &bcast_shape, dtype);
           }
           if (other_bcast[0] || other_bcast[2] || other_bcast[3] ||
               (other_bcast[1] && slice_shape.c > NPU_NUM)) {
@@ -982,9 +982,9 @@ void nodechip_binary_bcast(global_addr_t input_global_addr,
 
           // Broadcast input if needed
           if (input_bcast[1]) {
-            input_local_shape.c = NPU_NUM;
+            dim4 bcast_shape = {.n = slice_shape.n, .c = NPU_NUM, .h = slice_shape.h, .w = slice_shape.w};
             tpu_bdc_npu_bcast(input_local_addr[index], input_local_addr[index],
-                              &input_local_shape, dtype);
+                              &bcast_shape, dtype);
           }
           if (input_bcast[0] || input_bcast[2] || input_bcast[3] ||
               (input_bcast[1] && slice_shape.c > NPU_NUM)) {
@@ -996,9 +996,9 @@ void nodechip_binary_bcast(global_addr_t input_global_addr,
 
           // Broadcast other if needed
           if (other_bcast[1]) {
-            other_local_shape.c = NPU_NUM;
+            dim4 bcast_shape = {.n = slice_shape.n, .c = NPU_NUM, .h = slice_shape.h, .w = slice_shape.w};
             tpu_bdc_npu_bcast(other_local_addr[index], other_local_addr[index],
-                              &other_local_shape, dtype);
+                              &bcast_shape, dtype);
           }
           if (other_bcast[0] || other_bcast[2] || other_bcast[3] ||
               (other_bcast[1] && slice_shape.c > NPU_NUM)) {
