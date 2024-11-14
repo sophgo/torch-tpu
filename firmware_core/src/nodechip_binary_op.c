@@ -722,11 +722,11 @@ void nodechip_binary_bcast_div(global_addr_t input_global_addr,
           slice_shape.w = MIN(wtodo, wmax);
 
           // Move input from global memory to local memory
-          tpu_aligned_stride(&input_local_stride, 0, &slice_shape, dtype);
           input_local_shape.n = input_bcast[0] ? 1 : slice_shape.n;
           input_local_shape.c = input_bcast[1] ? 1 : slice_shape.c;
           input_local_shape.h = input_bcast[2] ? 1 : slice_shape.h;
           input_local_shape.w = input_bcast[3] ? 1 : slice_shape.w;
+          tpu_aligned_stride(&input_local_stride, 0, &input_local_shape, dtype);
           global_addr_t input_global_addr_gdma =
               input_global_addr + ((input_bcast[0] ? 0 : ndone) *
                                        (long long)input_global_stride->n +
@@ -741,11 +741,11 @@ void nodechip_binary_bcast_div(global_addr_t input_global_addr,
                            &input_local_shape, &input_local_stride,
                            input_global_stride, dtype);
           // Move other from global memory to local memory
-          tpu_aligned_stride(&other_local_stride, 0, &slice_shape, dtype);
           other_local_shape.n = other_bcast[0] ? 1 : slice_shape.n;
           other_local_shape.c = other_bcast[1] ? 1 : slice_shape.c;
           other_local_shape.h = other_bcast[2] ? 1 : slice_shape.h;
           other_local_shape.w = other_bcast[3] ? 1 : slice_shape.w;
+          tpu_aligned_stride(&other_local_stride, 0, &other_local_shape, dtype);
           global_addr_t other_global_addr_gdma =
               other_global_addr + ((other_bcast[0] ? 0 : ndone) *
                                        (long long)other_global_stride->n +
@@ -942,11 +942,11 @@ void nodechip_binary_bcast(global_addr_t input_global_addr,
           slice_shape.w = MIN(wtodo, wmax);
 
           // Move input from global memory to local memory
-          tpu_aligned_stride(&input_local_stride, 0, &slice_shape, dtype);
           input_local_shape.n = input_bcast[0] ? 1 : slice_shape.n;
           input_local_shape.c = input_bcast[1] ? 1 : slice_shape.c;
           input_local_shape.h = input_bcast[2] ? 1 : slice_shape.h;
           input_local_shape.w = input_bcast[3] ? 1 : slice_shape.w;
+          tpu_aligned_stride(&input_local_stride, 0, &input_local_shape, dtype);
           global_addr_t input_global_addr_gdma =
               input_global_addr + ((input_bcast[0] ? 0 : ndone) *
                                        (long long)input_global_stride->n +
@@ -961,11 +961,11 @@ void nodechip_binary_bcast(global_addr_t input_global_addr,
                            &input_local_shape, &input_local_stride,
                            input_global_stride, dtype);
           // Move other from global memory to local memory
-          tpu_aligned_stride(&other_local_stride, 0, &slice_shape, dtype);
           other_local_shape.n = other_bcast[0] ? 1 : slice_shape.n;
           other_local_shape.c = other_bcast[1] ? 1 : slice_shape.c;
           other_local_shape.h = other_bcast[2] ? 1 : slice_shape.h;
           other_local_shape.w = other_bcast[3] ? 1 : slice_shape.w;
+          tpu_aligned_stride(&other_local_stride, 0, &other_local_shape, dtype);
           global_addr_t other_global_addr_gdma =
               other_global_addr + ((other_bcast[0] ? 0 : ndone) *
                                        (long long)other_global_stride->n +
