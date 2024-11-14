@@ -70,7 +70,6 @@ Docker环境配置
 创建容器如下：
 
 .. code-block:: shell
-  :linenos:
 
    docker run --cap-add SYS_ADMIN -itd --restart always --privileged \
       -e LD_LIBRARY_PATH=/opt/sophon/libsophon-current/lib:$LD_LIBRARY_PATH \
@@ -103,7 +102,7 @@ Docker环境配置
 
 .. code-block:: shell
 
-   $ pip install torch_tpu-*.whl
+   $ pip install torch_tpu-*.whl --force-reinstall
 
 
 我们可以通过如下python脚本验证是否可用：

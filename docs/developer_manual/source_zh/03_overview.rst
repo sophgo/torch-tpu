@@ -7,7 +7,7 @@ TORCH-TPU总体架构设计介绍
 TORCH-TPU总体架构设计
 --------------------
 
-TORCH-TPU使用PyTorch的第三方设备扩展支持方式，使用Python和C++两种语言的开发。
+TORCH-TPU使用PyTorch的第三方设备扩展支持方式，使用Python和C++两种语言开发。
 
 
 其中Python部分主要是对C++后端代码的绑定，实现对原始PyTorch函数的扩展，设备注册和初始化工作。
