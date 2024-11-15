@@ -92,7 +92,7 @@ class LLamaA16MlpFunc(torch.autograd.Function):
         torch_tpu.tpu.synchronize()
         t2 = time.time_ns()
         print(f" warmup                time = {(t1 - t0)/(1e6)} ms")
-        print(f" loop {LOOP}, per loop time = {(t2 - t1)/(1e6 * LOOP)} ms")        
+        print(f" loop {LOOP}, per loop time = {(t2 - t1)/(1e6 * LOOP)} ms")
         return output
 
 class LLamaA16MlpBlock(nn.Module):
@@ -145,7 +145,7 @@ def check_mlp_a16():
     weight2_quant["zp"] = torch.full((int(embed_dim), int(math.ceil(intermediate_size / group_size / 8 * weight_bits))), zp_value, dtype=torch.uint8)
     weight2_quant["scale"] = (torch.rand((int(embed_dim), int(intermediate_size / group_size)), dtype=torch.float32)*(0.005-0.002)+0.002).half()
     weight2_quant_tpu = {}
-    weight2_quant_tpu["weight"] = weight2_quant["weight"].to(device)
+    weight2_quant_tpu["weight"] = weight2_quant["weight"].t().view(-1,group_size,embed_dim).permute(0,2,1).contiguous().view(-1,group_size*embed_dim).to(device)
     weight2_quant_tpu["zp"] = weight2_quant["zp"].t().to(device)
     weight2_quant_tpu["scale"] = weight2_quant["scale"].t().to(device)
 
