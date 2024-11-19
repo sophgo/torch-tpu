@@ -33,9 +33,9 @@ namespace at
 		Tensor &weight0,
 		Tensor &weight1,
 		Tensor &weight2,
-		Tensor &silu,
-		Tensor &sigmoid,
-		Tensor &m0,
+		const c10::optional<Tensor> &silu,
+		const c10::optional<Tensor> &sigmoid,
+		const c10::optional<Tensor> &m0,
 		Tensor &output,
 		bool save_mid_res);
 

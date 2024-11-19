@@ -37,7 +37,11 @@ class LLamaMlpFunc(torch.autograd.Function):
                                     w0,
                                     w1,
                                     w2,
-                                    output)
+                                    None,
+                                    None,
+                                    None,
+                                    output,
+                                    False)
         return output
 
 class LLamaMlpBlock(nn.Module):
