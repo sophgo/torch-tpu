@@ -14,9 +14,9 @@ namespace at
 		Tensor &weight0,
 		Tensor &weight1,
 		Tensor &weight2,
-		Tensor &silu,
-		Tensor &sigmoid,
-		Tensor &m0,
+		const c10:optional<Tensor> &silu,
+		const c10:optional<Tensor> &sigmoid,
+		const c10:optional<Tensor> &m0,
 		Tensor &output,
 		bool save_mid_res)
 	{
@@ -24,9 +24,12 @@ namespace at
 		CHECK_TENSOR_IN_DEVICE(weight0);
 		CHECK_TENSOR_IN_DEVICE(weight1);
 		CHECK_TENSOR_IN_DEVICE(weight2);
-		CHECK_TENSOR_IN_DEVICE(silu);
-		CHECK_TENSOR_IN_DEVICE(sigmoid);
-		CHECK_TENSOR_IN_DEVICE(m0);
+                if (silu.has_value)
+		    CHECK_TENSOR_IN_DEVICE(silu.value());
+                if (sigmoid.has_value)
+		    CHECK_TENSOR_IN_DEVICE(sigmoid.value());
+                if (m0.has_value)
+		    CHECK_TENSOR_IN_DEVICE(m0.value());
 		CHECK_TENSOR_IN_DEVICE(output);
 
 		TIMING_START;
@@ -38,9 +41,9 @@ namespace at
 			tpu::TPUGenerateTpudnnTensor( stream, weight0),
 			tpu::TPUGenerateTpudnnTensor( stream, weight1),
 			tpu::TPUGenerateTpudnnTensor( stream, weight2),
-			tpu::TPUGenerateTpudnnTensor( stream, silu),
-			tpu::TPUGenerateTpudnnTensor( stream, sigmoid),
-			tpu::TPUGenerateTpudnnTensor( stream, m0),
+			silu.has_value() ? tpu::TPUGenerateTpudnnTensor( stream, silu.value()) : tpudnnUndefinedTensor(),
+			sigmoid.has_value() ? tpu::TPUGenerateTpudnnTensor( stream, sigmoid.value()) : tpudnnUndefinedTensor(),
+			mo.has_value() ? tpu::TPUGenerateTpudnnTensor( stream, m0.value()) : tpudnnUndefinedTensor(),
 			tpu::TPUGenerateTpudnnTensor( stream, output),
 			save_mid_res);
 		TORCH_CHECK(status == TPUDNN_STATUS_SUCCESS);
