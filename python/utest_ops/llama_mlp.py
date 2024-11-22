@@ -79,7 +79,6 @@ def check_mlp():
     return status_fwd, status_bwd
 
 if __name__ == "__main__":
-    return
     status_fwd, status_bwd = check_mlp()
     if (status_bwd and status_fwd):
         print(f"[Success] llama_mlp compare succeed!")

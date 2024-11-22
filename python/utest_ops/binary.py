@@ -43,7 +43,7 @@ def case1():
 
 
 if __name__ == "__main__":
-    # case1()
+    case1()
 
 #######################
 ##  case1():forward [[T,T]]

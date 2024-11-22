@@ -95,7 +95,6 @@ def check_rmsnorm():
     return status_forward,status_backward
 
 if __name__=="__main__":
-    return
     status_forward, status_backward = check_rmsnorm()
     print("================== Test rmsnorm forward ======================")
     if status_forward == False:

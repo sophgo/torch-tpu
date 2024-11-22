@@ -172,4 +172,4 @@ def case1():
     return status1 and status2
 
 if __name__ == "__main__":
-    # case1()
+    case1()
