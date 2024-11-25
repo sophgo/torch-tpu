@@ -1218,6 +1218,7 @@ typedef struct {
   int w1_dims;
   int in_dtype;
   int out_dtype;
+  int bias_dtype;
   int has_bias;
   int use_fast;
 #ifndef WIN32

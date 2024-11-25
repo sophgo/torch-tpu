@@ -19,6 +19,7 @@ void nodechip_mgm_multi_core(
     int             weight1_dims,
     data_type_t     in_dtype,
     data_type_t     out_dtype,
+    data_type_t     bias_dtype,
     int             has_bias,           // has_bias0 + 2 * has_bias1
     bool            use_fast            // gelu or gelu_fast
 );
@@ -42,6 +43,7 @@ int tpu_kernel_mlp_multi_core(const void* api_buf) {
         api->w1_dims,
         (data_type_t)api->in_dtype,
         (data_type_t)api->out_dtype,
+        (data_type_t)api->bias_dtype,
         api->has_bias,
         api->use_fast);
     tpu_poll();
