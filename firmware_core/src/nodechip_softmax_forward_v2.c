@@ -995,8 +995,8 @@ int tpu_kernel_api_log_softmax_multi_core(const void *args) {
     sliced_shape[1] = new_shape.c;
     sliced_shape[2] = new_shape.h;
     sliced_shape[3] = new_shape.w;
-    nodechip_softmax(api->input_global_addr + core_idx * outer_num_avg * new_shape.h * new_shape.w * tpu_data_type_size(api->dtype),
-                     api->output_global_addr + core_idx * outer_num_avg * new_shape.h * new_shape.w * tpu_data_type_size(api->dtype),
+    nodechip_softmax(api->input_global_addr + (global_addr_t)core_idx * outer_num_avg * new_shape.h * new_shape.w * tpu_data_type_size(api->dtype),
+                     api->output_global_addr + (global_addr_t)core_idx * outer_num_avg * new_shape.h * new_shape.w * tpu_data_type_size(api->dtype),
                      sliced_shape, 4, 3, 3, 1, 1.f, (data_type_t)api->dtype);
   }
   tpu_poll();

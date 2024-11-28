@@ -56,8 +56,8 @@ int tpu_kernel_api_arg_muti_core(const void *args) {
   int shape[4] = {api->shape[0], slice, api->shape[2], api->shape[3]};
   shape[1] = MIN(slice, length - slice_idx * slice);
   // determine the offset of input and output on each core
-  unsigned int input_offset = slice_idx * slice * shape[2] * shape[3];
-  unsigned int output_offset = slice_idx * slice * 1 * shape[3];
+  global_addr_t input_offset = (global_addr_t)slice_idx * slice * shape[2] * shape[3];
+  global_addr_t output_offset = (global_addr_t)slice_idx * slice * 1 * shape[3];
 
   if (slice_idx * slice < length) {
     const int dsize = tpu_data_type_size(api->dtype);
