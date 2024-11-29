@@ -715,6 +715,18 @@ tpudnnStatus_t tpudnnRmsNormForwardAsync(
     float eps
 );
 
+tpudnnStatus_t tpudnnAddRmsNormForwardAsync(
+    tpudnnHandle_t handle,
+    tpudnnTensor_t input,
+    tpudnnTensor_t residule,
+    tpudnnTensor_t scale,
+    tpudnnTensor_t bias,
+    tpudnnTensor_t output,
+    int add_residule,
+    int axis,
+    float eps
+);
+
 tpudnnStatus_t tpudnnRmsNormBackwardAsync(
     tpudnnHandle_t handle,
     tpudnnTensor_t grad_output,
@@ -996,7 +1008,7 @@ tpudnnStatus_t tpudnnMultiHeadAttentionAsync(
     tpudnnTensor_t mask, // {batch, 1, head, head_dim}
     float scale);
 
-tpudnnStatus_t tpudnnLLaVaMlpAsync ( 
+tpudnnStatus_t tpudnnLLaVaMlpAsync (
     tpudnnHandle_t handle,
     tpudnnTensor_t input,
     tpudnnTensor_t w1,

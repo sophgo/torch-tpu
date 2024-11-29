@@ -60,37 +60,39 @@ scclResult_t scclSetupC2CTopology(scclHandle_t handle);
 
 scclHandle_t scclCreateHandle(int deviceID);
 
+void scclDestoryHandle(scclHandle_t handle);
+
 scclResult_t scclGetUniqueId(scclHandle_t handle, scclUniqueId *uniqueId);
 
 scclResult_t scclCommInitRank(scclComm_t *comm, int nRanks, scclUniqueId uniqueId,
                               int rank, const int *chipMap);
 scclResult_t scclCommDestroy(scclComm_t comm);
 
-scclResult_t scclSend(const void *send_buff, size_t send_count,
+scclResult_t scclSend(const void *send_buff, uint64_t send_count,
                            scclDataType_t dtype, int dst_rank,
                            scclComm_t comm, scclHandle_t handle);
-scclResult_t scclRecv(const void *recv_buff, size_t recv_count,
+scclResult_t scclRecv(const void *recv_buff, uint64_t recv_count,
                            scclDataType_t dtype, int src_rank,
                            scclComm_t comm, scclHandle_t handle);
 scclResult_t scclAllGather(const void *sendBuff, void *recvBuff,
-                           size_t send_count, scclDataType_t dtype,
+                           uint64_t send_count, scclDataType_t dtype,
                            scclComm_t comm, scclHandle_t handle);
-scclResult_t scclBroadcast(void *buff, size_t count, scclDataType_t dtype,
+scclResult_t scclBroadcast(void *buff, uint64_t count, scclDataType_t dtype,
                            int root, scclComm_t comm, scclHandle_t handle);
-scclResult_t scclAllReduce(const void *sendBuff, void *recvBuff, size_t count,
+scclResult_t scclAllReduce(const void *sendBuff, void *recvBuff, uint64_t count,
                            scclDataType_t dtype, scclReduceType_t op,
                            scclComm_t comm, scclHandle_t handle);
-scclResult_t scclReduce(const void *sendBuff, void *recvBuff, size_t count,
+scclResult_t scclReduce(const void *sendBuff, void *recvBuff, uint64_t count,
                         scclDataType_t dtype, scclReduceType_t op, int root,
                         scclComm_t comm, scclHandle_t handle);
-scclResult_t scclGather(const void *sendBuff, void *recvBuff, size_t sendcount,
+scclResult_t scclGather(const void *sendBuff, void *recvBuff, uint64_t sendcount,
                         scclDataType_t dtype, int root, scclComm_t comm,
                         scclHandle_t handle);
 scclResult_t scclScatter(const void *sendBuff, void *recvBuff,
-                         size_t recv_count, scclDataType_t dtype, int root,
+                         uint64_t recv_count, scclDataType_t dtype, int root,
                          scclComm_t comm, scclHandle_t handle);
 scclResult_t scclAllToAll(const void *sendBuff, void *recvBuff,
-                          size_t recv_count, scclDataType_t dtype,
+                          uint64_t recv_count, scclDataType_t dtype,
                           scclComm_t comm, scclHandle_t handle);
 
 } // extern "C"

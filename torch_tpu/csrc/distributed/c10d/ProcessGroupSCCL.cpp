@@ -215,8 +215,7 @@ ProcessGroupSCCL::ProcessGroupSCCL(const c10::intrusive_ptr<Store> &store,
     : ProcessGroup(rank, size), store_(store),
       options_(options), stop_(false) {
   c10_tpu::TPUStream stream = c10_tpu::getCurrentTPUStream();
-  int deviceID = tpu::TPUGetDeviceIndex();
-  if (deviceID == 0) {
+  if (rank == 0) {
     scclSetupC2CTopology(stream);
   }
   broadcastUniqueSCCLID(stream, &scclID_, rank);
