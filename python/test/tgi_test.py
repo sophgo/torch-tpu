@@ -1799,7 +1799,7 @@ cd /workspace/tpu-mlir
 
 source envsetup.sh
 
-tpu_profile.py cdm_profile_data_dev0-0_{data_source} cdm_out_{data_source} --mode perfAI --arch BM1690
+tpu_profile.py cdm_profile_data_dev0-0_{data_source} cdm_out_{data_source} --mode time --arch BM1690
 
 cp -rf cdm_out_{data_source} /workspace/tpu-train/
 
@@ -1843,11 +1843,12 @@ if __name__ == "__main__":
         if is_prefill
         else f"w4a16_{test_case}" if is_w4a16 else f"decode_{test_case}"
     )
-    if os.path.exists(ins_folder):
-        shutil.rmtree(ins_folder)
-    os.mkdir(ins_folder)
-    os.chdir(ins_folder)
-    os.environ["FILE_DUMP_CMD"] = f"{ins_folder}"
+    if not is_cmd and not is_pmu:
+        if os.path.exists(ins_folder):
+            shutil.rmtree(ins_folder)
+        os.mkdir(ins_folder)
+        os.chdir(ins_folder)
+        os.environ["FILE_DUMP_CMD"] = f"{ins_folder}"
     current_module = sys.modules[__name__]
     func = getattr(current_module, func_name)
     cfg = getattr(current_module, f"{model_name}_cfg")

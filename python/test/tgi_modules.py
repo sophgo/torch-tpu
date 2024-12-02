@@ -209,7 +209,7 @@ class SophLlamaRMSNorm(nn.Module):
             torch.ops.my_ops.enable_profile(40960, True)
         elif self.is_pmu:
             torch.ops.my_ops.enable_profile(40960, False)
-        torch.ops.my_ops.rmsnorm_forward(
+        out=torch.ops.my_ops.rmsnorm_forward(
             hidden_states,
             weight,
             None,
@@ -217,6 +217,7 @@ class SophLlamaRMSNorm(nn.Module):
             hidden_states.dim() - 1,
             self.variance_epsilon,
         )
+        out.cpu()
         if self.is_cmd or self.is_pmu:
             torch.ops.my_ops.disable_profile()
         return output
@@ -256,6 +257,7 @@ class SophLlamaMMqkv(nn.Module):
         elif self.is_pmu:
             torch.ops.my_ops.enable_profile(40960, False)
         output = F.linear(hidden_states, weight, bias)
+        output.cpu()
         if self.is_cmd or self.is_pmu:
             torch.ops.my_ops.disable_profile()
         return output
@@ -295,7 +297,7 @@ class SophLlamaMMqkvW4a16(nn.Module):
             torch.ops.my_ops.enable_profile(40960, True)
         elif self.is_pmu:
             torch.ops.my_ops.enable_profile(40960, False)
-        torch.ops.my_ops.matmul_gptq_forward(
+        out=torch.ops.my_ops.matmul_gptq_forward(
             active,
             qweight,
             bias,
@@ -305,6 +307,7 @@ class SophLlamaMMqkvW4a16(nn.Module):
             self.weight_bits,
             output,
         )
+        out.cpu()
         if self.is_cmd or self.is_pmu:
             torch.ops.my_ops.disable_profile()
         return output
@@ -335,6 +338,7 @@ class SophLlamaAttentionFC(nn.Module):
         elif self.is_pmu:
             torch.ops.my_ops.enable_profile(40960, False)
         output = F.linear(hidden_states, weight, None)
+        output.cpu()
         if self.is_cmd or self.is_pmu:
             torch.ops.my_ops.disable_profile()
         return output
@@ -363,7 +367,7 @@ class SophLlamaAttentionFcW4a16(nn.Module):
             torch.ops.my_ops.enable_profile(40960, True)
         elif self.is_pmu:
             torch.ops.my_ops.enable_profile(40960, False)
-        torch.ops.my_ops.matmul_gptq_forward(
+        out=torch.ops.my_ops.matmul_gptq_forward(
             active,
             qweight,
             None,
@@ -373,6 +377,7 @@ class SophLlamaAttentionFcW4a16(nn.Module):
             self.weight_bits,
             output,
         )
+        out.cpu()
         if self.is_cmd or self.is_pmu:
             torch.ops.my_ops.disable_profile()
         return output
@@ -397,7 +402,8 @@ class SophLlamaMlp(nn.Module):
             torch.ops.my_ops.enable_profile(40960, True)
         elif self.is_pmu:
             torch.ops.my_ops.enable_profile(40960, False)
-        torch.ops.my_ops.llama_mlp_forward(hidden_states, w0, w1, w2, None, None, None,output, False)
+        out=torch.ops.my_ops.llama_mlp_forward(hidden_states, w0, w1, w2, None, None, None,output, False)
+        out.cpu()
         if self.is_cmd or self.is_pmu:
             torch.ops.my_ops.disable_profile()
         return output
@@ -430,7 +436,7 @@ class SophLlamaMlpW4a16(nn.Module):
             torch.ops.my_ops.enable_profile(40960, True)
         elif self.is_pmu:
             torch.ops.my_ops.enable_profile(40960, False)
-        torch.ops.my_ops.llama_mlp_gptq_forward(
+        out=torch.ops.my_ops.llama_mlp_gptq_forward(
             hidden_states,
             w0,
             z0,
@@ -445,6 +451,7 @@ class SophLlamaMlpW4a16(nn.Module):
             self.bits,
             output,
         )
+        out.cpu()
         if self.is_cmd or self.is_pmu:
             torch.ops.my_ops.disable_profile()
         return output
@@ -498,7 +505,7 @@ class SophLlamaAttention(nn.Module):
             torch.ops.my_ops.enable_profile(40960, True)
         elif self.is_pmu:
             torch.ops.my_ops.enable_profile(40960, False)
-        torch.ops.my_ops.llama_attention(
+        out=torch.ops.my_ops.llama_attention(
             attn_output,
             query,
             key,
@@ -517,6 +524,7 @@ class SophLlamaAttention(nn.Module):
             self.softmax_scale,
             2 if self.is_prefill else 3,
         )
+        out.cpu()
         if self.is_cmd or self.is_pmu:
             torch.ops.my_ops.disable_profile()
 
