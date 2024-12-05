@@ -216,6 +216,7 @@ def test_attn(CFG: MODEL_CFG, batch, seqlen, is_pmu, is_cmd):
     sin_cpu = sin_tpu.cpu()
     save_slots_cpu = save_slots_tpu.cpu()
     fetch_slots_cpu = fetch_slots_tpu.cpu()
+    mask_cpu = mask.cpu() if mask is not None else None
 
     logger.info(
         f"test_parameters:\n{output_tpu.shape}\n{query_tpu.shape=}\n{key_tpu.shape=}\n{value_tpu.shape=}\n\
@@ -247,6 +248,7 @@ def test_attn(CFG: MODEL_CFG, batch, seqlen, is_pmu, is_cmd):
         cos_cpu,
         sin_cpu,
         input_lengths_tpu.cpu(),
+        mask_cpu,
         save_slots_cpu,
         fetch_slots_cpu,
         CFG.DECODE_START,
@@ -321,6 +323,7 @@ def test_attn_prefill(CFG: MODEL_CFG, batch, seqlen, is_pmu, is_cmd):
     sin_cpu = sin_tpu.cpu()
     save_slots_cpu = save_slots_tpu.cpu()
     fetch_slots_cpu = None
+    mask_cpu = None
 
     logger.info(
         f"test_parameters:\n{output_tpu.shape}\n{query_tpu.shape=}\n{key_tpu.shape=}\n{value_tpu.shape=}\n\
@@ -352,6 +355,7 @@ def test_attn_prefill(CFG: MODEL_CFG, batch, seqlen, is_pmu, is_cmd):
         cos_cpu,
         sin_cpu,
         input_lengths_tpu.cpu(),
+        mask_cpu,
         save_slots_cpu,
         fetch_slots_cpu,
         seqlen,

@@ -31,6 +31,18 @@ class MODEL_CFG:
 
     MMQKV_BIAS: bool = False
 
+def my_batch_expand(A: torch.tensor, batch):
+    A_batch = A.shape[0]
+    row = A.shape[1]
+    col = A.shape[2]
+    assert A.dim() == 3
+    if A_batch == 1:
+        return A.expand(batch, row, col)
+    else:
+        rep = int(batch / A_batch)
+        A = A.reshape(A_batch, 1, row, col)
+        A = A.expand(A_batch, rep, row, col)
+        return A.reshape(batch, row, col)
 
 def my_matmul(A: torch.tensor, B: torch.tensor):
     print(f"{A.dtype=}, {B.dtype=}")
@@ -63,11 +75,13 @@ def my_matmul(A: torch.tensor, B: torch.tensor):
         # print(f'{A.dtype=}, {B.dtype=}')
         # print(f'{A.shape=}, {B.shape=}')
         if A.shape[0] > B.shape[0]:
-            B = B.expand(batch, r_row, r_col)
+            # B = B.expand(batch, r_row, r_col)
+            B = my_batch_expand(B, batch)
             print(f"{A.dtype=}, {B.dtype=}")
             print(f"{A.shape=}, {B.shape=}")
         elif A.shape[0] < B.shape[0]:
-            A = A.expand(B.shape[0], l_row, l_col)
+            A = my_batch_expand(A, B.shape[0])
+            # A = A.expand(B.shape[0], l_row, l_col)
         for b in range(result.shape[0]):
             for i in range(result.shape[1]):
                 for j in range(result.shape[2]):
@@ -568,6 +582,7 @@ class LlamaAttention(nn.Module):
         cos,
         sin,
         input_length,
+        mask,
         save_slots,
         fetch_slots,
         max_s,
@@ -630,6 +645,8 @@ class LlamaAttention(nn.Module):
                     )
                     * self.softmax_scale
                 )
+                if mask is not None:
+                    res_qk = res_qk * mask
                 res_qk = self.softmax(res_qk, dim=2)
 
                 cur_Y = my_matmul(
@@ -678,6 +695,8 @@ class LlamaAttention(nn.Module):
                 print(f"{cur_K.shape=}")
                 print(f"{cur_V.shape=}")
                 res_qk = my_matmul(cur_Q, cur_K.permute(0, 2, 1)) * self.softmax_scale
+                if mask is not None:
+                    res_qk = res_qk * mask
                 res_qk = self.softmax(res_qk, dim=2)
 
                 cur_Y = my_matmul(res_qk, cur_V)
