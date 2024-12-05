@@ -994,7 +994,7 @@ tpudnnStatus_t tpudnnTgiInputIdsUpdateAsync(
 tpudnnStatus_t tpudnnEnableProfile(
     tpudnnHandle_t handle,
     int max_record_num,
-    bool enable_mcu);
+    int mode);
 
 tpudnnStatus_t tpudnnDisableProfile(
     tpudnnHandle_t handle);

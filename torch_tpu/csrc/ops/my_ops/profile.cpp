@@ -12,19 +12,19 @@ namespace at
 {
     void enable_profile(
         c10::optional<int64_t> max_record_num,
-        c10::optional<bool> enable_mcu) {
+        c10::optional<int64_t> mode) {
 #ifdef TPU_OP_TIMING
 		auto timer = tpu::Timer().Start();
 #endif
 #if defined BACKEND_SG2260
     int32_t num = 40960;
-    bool en_mcu = true;
+    int32_t m = 1;
     if (max_record_num.has_value())
         num = max_record_num.value();
-    if (enable_mcu.has_value())
-        en_mcu = enable_mcu.value();
+    if (mode.has_value())
+        m = mode.value();
     auto stream = c10_tpu::getCurrentTPUStream();
-    tpudnnEnableProfile(stream, num, en_mcu);
+    tpudnnEnableProfile(stream, num, m);
 #else
     TORCH_CHECK(false);
 #endif

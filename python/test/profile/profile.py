@@ -19,22 +19,29 @@ def profile_case():
     a_tpu = a.half().to(device)
     b_tpu = b.half().to(device)
     # part 0
-    torch.ops.my_ops.enable_profile(max_record_num, True)  # enable profile with cmd
-    # torch.ops.my_ops.enable_profile(max_record_num, False)  # enable profile without cmd (pure pmu) 
+    torch.ops.my_ops.enable_profile(max_record_num, 0)  # enable profile without cmd info (pure pmu) 
     _ = a_tpu * b_tpu
     torch.ops.my_ops.disable_profile() # disable profile and dump data (cdm_profile_data_dev0-0)
 
     # part 1
-    torch.ops.my_ops.enable_profile(max_record_num, False)
+    torch.ops.my_ops.enable_profile(max_record_num, 1) # enable profile with condensed cmd info
     _ = a_tpu + b_tpu
     torch.ops.my_ops.disable_profile() # (cdm_profile_data_dev0-1)
+
+    # part 2
+    torch.ops.my_ops.enable_profile(max_record_num, 2) # enable profile with detailed cmd info
+    _ = a_tpu + b_tpu
+    torch.ops.my_ops.disable_profile() # (cdm_profile_data_dev0-2)
+
     # part ....
+    # ....
 
     # use tpu-mlir
     # cd tpu-mlir
     # source envsetup.sh
-    # tpu_profile.py cdm_profile_data_dev0-0/ cdm_out_0 --mode perfAI --arch BM1690
-    # tpu_profile.py cdm_profile_data_dev0-1/ cdm_out_1 --mode perfAI --arch BM1690
+    # tpu_profile.py cdm_profile_data_dev0-0/ cdm_out_0 --mode time --arch BM1690
+    # tpu_profile.py cdm_profile_data_dev0-1/ cdm_out_1 --mode time --arch BM1690
+    # tpu_profile.py cdm_profile_data_dev0-2/ cdm_out_2 --mode time --arch BM1690
     # ....
 
 if __name__ == "__main__":

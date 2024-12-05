@@ -246,6 +246,6 @@ namespace at
 
 	void enable_profile(
 		c10::optional<int64_t> max_record_num,
-		c10::optional<bool> enable_mcu);
+		c10::optional<int64_t> mode);
 	void disable_profile();
 }
