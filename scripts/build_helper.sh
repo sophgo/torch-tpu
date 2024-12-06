@@ -101,7 +101,7 @@ function update_bm1684x_third_party()
 function rebuild_TPU1686()
 {
     if [[ "$EXTRA_CONFIG" != *USING_TPUDNN_TESTS* ]]; then
-        export EXTRA_CONFIG="-DUSING_TPUDNN_TESTS=OFF -DREMOVE_POLLS_IN_LLM=ON $EXTRA_CONFIG"
+        export EXTRA_CONFIG="-DUSING_TPUDNN_TESTS=OFF $EXTRA_CONFIG"
     fi
     CMODEL_FW_BINARY_DIR=build_${CHIP_ARCH} rebuild_firmware_cmodel_and_tpudnn || return -1
     FW_BINARY_DIR=build_fw_${CHIP_ARCH} rebuild_firmware || return -1

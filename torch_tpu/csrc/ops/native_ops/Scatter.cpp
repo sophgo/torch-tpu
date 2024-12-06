@@ -90,4 +90,26 @@ TORCH_LIBRARY_IMPL(aten, TPU, m) {
   // m.impl("slice_scatter.out", slice_scatter_out_tpu);
 }
 
+Tensor &scatter_add_tpu(Tensor &self, int64_t dim, const Tensor &index,
+                       const Tensor &src) {
+#if defined BACKEND_SG2260
+  auto stream = c10_tpu::getCurrentTPUStream();
+  auto status = tpudnnScatterAddAsync(
+      stream,
+      tpu::TPUGenerateTpudnnTensor(stream, self),
+      tpu::TPUGenerateTpudnnTensor(stream, src),
+      tpu::TPUGenerateTpudnnTensor(stream, index),
+      dim);
+  TORCH_CHECK(status == TPUDNN_STATUS_SUCCESS);
+  SHOW_TENSOR_OP(self, self);
+  return self;
+#else
+  TORCH_CHECK(false, "Not implemented");
+#endif
+}
+
+TORCH_LIBRARY_IMPL(aten, TPU, m) {
+  m.impl("scatter_add_", scatter_add_tpu);
+}
+
 }  // namespace at
