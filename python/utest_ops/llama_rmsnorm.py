@@ -5,7 +5,8 @@ import copy
 import transformers.models
 from top_utest import TensorComparator
 from torch_tpu.tpu.custom_op.rmsnorm import RMSNormFunc
-
+import os
+os.environ["CMODEL_FAST_EXEC"]="1"
 import torch_tpu
 torch.manual_seed(10086)
 torch.set_printoptions(precision=6)

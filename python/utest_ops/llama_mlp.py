@@ -6,7 +6,8 @@ import sys
 import copy
 from top_utest import TensorComparator
 from torch_tpu.tpu.custom_op.llama_mlp import LLamaMlpFunc
-
+import os
+os.environ["CMODEL_FAST_EXEC"]="1"
 import torch_tpu
 torch.manual_seed(1000)
 torch.set_printoptions(precision=6)

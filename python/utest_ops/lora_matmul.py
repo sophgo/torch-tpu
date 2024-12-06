@@ -6,6 +6,8 @@ from top_utest import TensorComparator, set_bacis_info
 import pkg_resources
 from pkg_resources import  DistributionNotFound, VersionConflict
 import torch_tpu
+import os
+os.environ["CMODEL_FAST_EXEC"]="1"
 
 torch.manual_seed(10086)
 torch.set_printoptions(precision=6)
