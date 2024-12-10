@@ -1,18 +1,17 @@
 import torch
 import torch.nn as nn
 import os
-from nnmoduletools.module_debugger import print_log
 # now rmsnorm with CMODEL_FAST_EXEC=1 has problem
 class cmodel_slow_exec:
     def __init__(self, wait_tensor):
         self.prev = os.environ.get("CMODEL_FAST_EXEC", None)
         self.wait_tensor = wait_tensor
-        
+
     def __enter__(self):
         if not self.prev is None:
             self.wait_tensor.cpu()#wait for async:
             os.environ["CMODEL_FAST_EXEC"] = "0"
-        
+
     def __exit__(self, exc_type, exc_value, traceback):
         if self.prev is not None:
             if os.environ.get("ENABLE_PMU", "0") != "1":
@@ -35,7 +34,7 @@ class RMSNormFunc(torch.autograd.Function):
                                         axis,
                                         eps)
         return output
-    
+
     @staticmethod
     def backward(ctx, grad_output):
         x, scale, bias = ctx.saved_tensors
@@ -43,7 +42,7 @@ class RMSNormFunc(torch.autograd.Function):
         grad_scale = torch.zeros_like(scale) if scale is not None and scale.requires_grad else None
         grad_bias = torch.zeros_like(bias) if bias is not None and bias.requires_grad else None
         rms = torch.zeros_like(grad_output)
-        
+
         with cmodel_slow_exec(rms):
             torch.ops.my_ops.rmsnorm_backward(
                 grad_output,
@@ -74,14 +73,13 @@ class RMSNormBlock(nn.Module):
         return RMSNormFunc.apply(x, self.scale, self.bias, self.axis, self.eps)
 
 def llama_rmsnorm_forward(self, hidden_states):
-    print_log("I am using llama_rmsnorm_forward")
     dim = hidden_states.dim() - 1
     return RMSNormFunc.apply(hidden_states, self.weight, None, dim, self.variance_epsilon)
 
 def fuse_llama_rmsnorm():
     import transformers
     transformers.models.llama.modeling_llama.LlamaRMSNorm.forward = llama_rmsnorm_forward
-    
+
 def fuse_qwen2_rmsnorm():
     import megatron_patch
     from megatron_patch.model.qwen2.rms_norm import Qwen2RMSNorm
