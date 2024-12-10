@@ -46,3 +46,4 @@ toolchains_dir
 _C.cpython*.so
 torch_tpu/lib
 *.tar.gz
+site-packages
