@@ -85,6 +85,7 @@ public:
 
     int DeviceCount = 0;
     tpuRtStatus_t Status = tpuRtGetDeviceCount ( &DeviceCount );
+    TORCH_CHECK ( Status == tpuRtSuccess, "Failed to get TPU device count" );
     if (DeviceCount == 0) {
       std::cout << "Device Count:" << DeviceCount << "\n";
       DeviceCount = 1;
@@ -97,8 +98,9 @@ public:
         DeviceCount = atoi(size);
       }
     }
+    const char *visibe_tpu_num = getenv("TPU_VISIBLE_NUM");
+    if (visibe_tpu_num) DeviceCount = atoi(visibe_tpu_num);
 
-    TORCH_CHECK ( Status == tpuRtSuccess, "Failed to get TPU device count" );
     if ( DeviceCount > 0 )
     {
       mutexes_ = std::vector<std::mutex>(DeviceCount);;
@@ -402,7 +404,7 @@ int TPUGetDeviceIndex ( void )
   {
     TORCH_CHECK (Status == tpuRtSuccess, " sgGetDevice failed! Error Code : #", Status);
   }
-  return DevIndex;
+  return DevIndex % TPUGetDeviceCount();
 }
 
 void TPUSetDeviceIndex ( int Index )
