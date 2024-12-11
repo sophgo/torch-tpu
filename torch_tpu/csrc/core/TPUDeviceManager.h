@@ -20,6 +20,7 @@ enum TPUMgrStatus{
 
 class TPUDeviceManager;
 TPUDeviceManager* TPUGetInstance();
+void TPUDeleteInstance();
 
 TPUMgrStatus InitTPUMgr();
 TPUMgrStatus DestoryTpuMgr();

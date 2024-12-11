@@ -54,7 +54,15 @@ PyObject* initModule() {
     BindGetDeviceProperties(module);
     return module;
 }
+
+void deinit() {
+#ifdef BACKEND_SG2260
+  tpu::TPUDeleteInstance();
+#endif
+}
+
 PyMODINIT_FUNC PyInit__C(void){
+    Py_AtExit(&deinit);
     return initModule();
 }
 

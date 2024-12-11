@@ -41,6 +41,8 @@ size_t getTPUAllocatorAlignSize(size_t defaultVal)
   return atoi(size);
 }
 
+static std::shared_ptr<TPUDeviceManager> devMgrPtr;
+
 bool getEnableAllocatorReuse()
 {
   const char *reuseEnabled = getenv("TPU_ALLOCATOR_REUSE");
@@ -126,8 +128,18 @@ public:
 
   static TPUDeviceManager& GetInstance()
   {
-    static TPUDeviceManager instance;
-    return instance;
+    static std::once_flag flag;
+    std::call_once(
+      flag,
+      [&](){
+        devMgrPtr = std::make_shared<TPUDeviceManager>();
+      });
+    return *devMgrPtr;
+  }
+
+  static void DeleteInstance()
+  {
+    devMgrPtr.reset();
   }
 
   int GetDeviceCount() const
@@ -367,6 +379,11 @@ TPUDeviceManager* TPUGetInstance(){
   return &TPUDeviceManager::GetInstance();
 }
 
+void TPUDeleteInstance()
+{
+  TPUDeviceManager::DeleteInstance();
+}
+
 TPUMgrStatus InitTPUMgr()
 {
   return TPUGetInstance()->initialize();
@@ -404,7 +421,7 @@ int TPUGetDeviceIndex ( void )
   {
     TORCH_CHECK (Status == tpuRtSuccess, " sgGetDevice failed! Error Code : #", Status);
   }
-  return DevIndex % TPUGetDeviceCount();
+  return DevIndex;
 }
 
 void TPUSetDeviceIndex ( int Index )

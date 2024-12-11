@@ -225,6 +225,11 @@ TPUDeviceManager* TPUGetInstance(){
   return &TPUDeviceManager::GetInstance();
 }
 
+void TPUDeleteInstance()
+{
+  // Do nothing currently
+}
+
 TPUMgrStatus InitTPUMgr() { TPUSetDeviceIndex(0); return INIT_SUCCESS; }
 TPUMgrStatus DestoryTpuMgr() { return DESTORY_SUCCESS;}
 TPUMgrStatus IsTPUMgrInited() { return INIT_ALREADY; }
