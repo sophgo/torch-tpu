@@ -3,7 +3,7 @@
 #include <cstdint>
 #include <cstddef>
 #include<vector>
-
+#include<string>
 extern "C"
 {
 
@@ -1036,4 +1036,13 @@ tpudnnStatus_t tpudnnC2CDescriptor(
     int nranks,
     int cur_rank,
     const int *chip_map);
+
+tpudnnStatus_t tpudnnDynLibExecuteAsync(
+                    tpudnnHandle_t handle,
+                    const char *so_url,
+                    const char *func_name,
+                    std::vector<tpudnnTensor_t> tensors,
+                    std::vector<int64_t> tensors_index,
+                    std::vector<double> scalars,
+                    std::vector<int64_t> scalars_index);
 } // extern "C"
