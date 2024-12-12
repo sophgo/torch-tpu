@@ -41,14 +41,24 @@ size_t getTPUAllocatorAlignSize(size_t defaultVal)
   return atoi(size);
 }
 
-static std::shared_ptr<TPUDeviceManager> devMgrPtr;
-
 bool getEnableAllocatorReuse()
 {
   const char *reuseEnabled = getenv("TPU_ALLOCATOR_REUSE");
   if (!reuseEnabled) return true;
   return atoi(reuseEnabled);
 }
+
+int getVisibleDeviceCount()
+{
+  int DeviceCount = 0;
+  const char *visibe_tpu_num = getenv("TPU_VISIBLE_NUM");
+  if (visibe_tpu_num) DeviceCount = atoi(visibe_tpu_num);
+  return DeviceCount;
+}
+
+static std::shared_ptr<TPUDeviceManager> devMgrPtr;
+static int VISIBLE_DEVICE_NUM = getVisibleDeviceCount();
+
 
 class TPUDeviceManager
 {
@@ -100,8 +110,7 @@ public:
         DeviceCount = atoi(size);
       }
     }
-    const char *visibe_tpu_num = getenv("TPU_VISIBLE_NUM");
-    if (visibe_tpu_num) DeviceCount = atoi(visibe_tpu_num);
+
 
     if ( DeviceCount > 0 )
     {
@@ -421,7 +430,10 @@ int TPUGetDeviceIndex ( void )
   {
     TORCH_CHECK (Status == tpuRtSuccess, " sgGetDevice failed! Error Code : #", Status);
   }
-  return DevIndex;
+  if (!VISIBLE_DEVICE_NUM)
+    return DevIndex;
+  else
+    return DevIndex % VISIBLE_DEVICE_NUM;
 }
 
 void TPUSetDeviceIndex ( int Index )
