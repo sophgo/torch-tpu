@@ -374,7 +374,7 @@ void nodechip_index_select_multi_core_split_index(
 
   scalar_t const_filler = {.s32 = const_val};
   if (core_idx < allocated_core) {
-    int out_offset = index_sliced * core_idx * inner_num * tpu_data_type_size(dtype);
+    uint64_t out_offset = (uint64_t)index_sliced * core_idx * inner_num * tpu_data_type_size(dtype);
     int index_offset = index_sliced * core_idx * tpu_data_type_size(DT_INT32);
     dim4 real_oshape = {1, 1, real_index_sliced, inner_num};
 
