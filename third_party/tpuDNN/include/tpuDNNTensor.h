@@ -1043,6 +1043,8 @@ tpudnnStatus_t tpudnnDynLibExecuteAsync(
                     const char *func_name,
                     std::vector<tpudnnTensor_t> tensors,
                     std::vector<int64_t> tensors_index,
-                    std::vector<double> scalars,
-                    std::vector<int64_t> scalars_index);
+                    std::vector<double> fp_scalars,
+                    std::vector<int64_t> fp_scalars_index,
+                    std::vector<int64_t> fixed_scalars,
+                    std::vector<int64_t> fixed_scalars_index);
 } // extern "C"
