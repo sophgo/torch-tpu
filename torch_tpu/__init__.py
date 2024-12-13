@@ -25,7 +25,7 @@ import pkgutil
 pkg_path = os.path.dirname(pkgutil.get_loader('torch_tpu').get_filename())
 lib_pwd = os.path.join(pkg_path, 'lib/')
 
-arch = arch_env = os.environ.get('CHIP_ARCH', "sg2260")
+arch = arch_env = os.environ.get('CHIP_ARCH')
 if not arch:
     from ctypes import cdll
     try:

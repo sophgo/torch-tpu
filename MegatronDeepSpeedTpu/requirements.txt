@@ -1,0 +1,14 @@
+datasets
+transformers
+fire
+pytz
+loguru
+sh
+pytest
+tqdm
+six
+regex
+nltk
+packaging
+pybind11
+netifaces

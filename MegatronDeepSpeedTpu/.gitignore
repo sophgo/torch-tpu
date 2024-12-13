@@ -1,0 +1,11 @@
+.vscode
+**/__pycache__
+dist
+build
+*.egg-info
+examples/bert/experiment_deepspeed
+examples/bert/logs_*
+examples/gpt/data
+examples/gpt/ds_z*
+examples/gpt/logs_*
+examples/gpt/ds_config.json

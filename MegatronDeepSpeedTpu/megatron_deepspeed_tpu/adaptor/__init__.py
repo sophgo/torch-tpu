@@ -19,7 +19,5 @@ try:
     except ImportError: # megatron-lm
         if not environ_flag('DISABLE_ADAPTOR', default_override="0") and environ_flag('ENABLE_MEGATRON_LM_ADAPTOR'):
             from . import megatron_lm_adaptor
-finally:
-    pass
-# except ImportError:
-#     print("Trying to import megatron adaptor, but megatron is not found")
+except ImportError:
+    print("Trying to import megatron adaptor, but megatron is not found")

@@ -1,6 +1,4 @@
 """
-DeepSpeed
-
 Modified version of train_bert.py that adds DeepSpeed
 """
 

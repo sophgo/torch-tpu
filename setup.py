@@ -3,7 +3,9 @@ import sys
 import subprocess
 import platform
 import traceback
+import multiprocessing
 import glob
+import shutil
 import re
 from pathlib import Path
 
@@ -295,7 +297,11 @@ def get_src_py_and_dst():
         ret.append((src, dst))
 
     header_files = [
-        "torch_tpu/csrc/**/*.h",
+        "torch_tpu/csrc/*.h",
+        "torch_tpu/csrc/*/*.h",
+        "torch_tpu/csrc/*/*/*.h",
+        "torch_tpu/csrc/*/*/*/*.h",
+        "torch_tpu/csrc/*/*/*/*/*.h",
     ]
     glob_header_files = []
     for regex_pattern in header_files:
@@ -309,7 +315,11 @@ def get_src_py_and_dst():
         ret.append((src, dst))
 
     torch_header_files = [
-        "**/*.h",
+        "*/*.h",
+        "*/*/*.h",
+        "*/*/*/*.h",
+        "*/*/*/*/*.h",
+        "*/*/*/*/*/*.h"
     ]
     torch_glob_header_files = []
     for regex_pattern in torch_header_files:
@@ -369,15 +379,11 @@ class bdist_wheel(_bdist_wheel, ExtBase):
         for lib in sccl_libs:
             self.copy_file(lib, os.path.join(pkg_dir, f'lib/'))
 
-        # include all libraries for support both cmodel and device
-        base_fw_libs = glob.glob(os.path.join(TPUV7_RUNTIME_PATH, f'tpuv7-emulator_0.1.0/lib/*.so'))
+        base_fw_libs = glob.glob(os.path.join(TPUV7_RUNTIME_PATH, f'tpuv7-emulator_0.1.0/lib/libtpuv7_emulator.so'))
+        base_fw_libs.append(os.path.join(TPUV7_RUNTIME_PATH, 'tpuv7-emulator_0.1.0/lib/libdnnl.so.3'))
         for lib in base_fw_libs:
-            target = os.path.join(pkg_dir, f'lib/', os.path.basename(lib))
-            self.copy_file(lib, target)
-            # set rpath to $ORIGIN for cmodel
-            cmd = ['patchelf', '--set-rpath', '$ORIGIN', target]
-            subprocess.check_call(cmd)
-        
+            self.copy_file(lib, os.path.join(pkg_dir, f'lib/'))
+
         bmlib_libs = glob.glob(os.path.join(BMLIB_PATH, f'lib/libbmlib.so*'))
         for lib in bmlib_libs:
             if "bmlib" in lib:
@@ -466,6 +472,8 @@ setup(
         dependency_links = [
             "https://download.pytorch.org/whl/cpu",
         ],
+        extras_require={
+        },
         package_data={
             'torch_tpu': [
                 '*.so', 'lib/*.so*',

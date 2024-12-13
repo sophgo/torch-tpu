@@ -2,43 +2,21 @@
 
 function new_build()
 {
-  echo -e "\033[32m [warn] use develop_torch_tpu instead of new_build \033[0m"
-  develop_torch_tpu
-}
-
-function develop_torch_tpu(){
-  uninstall_torch_tpu_deploy
+  pip uninstall torch_tpu -y
   pushd ${TPUTRAIN_TOP}
-  python setup.py develop --user
+  python setup.py develop
   if [ $? -ne 0 ]; then popd; return -1; fi
   popd
 }
 
-
 function bdist_wheel()
 {
+  python setup.py develop --uninstall
   pushd ${TPUTRAIN_TOP}
   python setup.py bdist_wheel
-
-  if [ $# -ne 1 ]; then 
-    echo -e "\033[31m [warn] wheel not installed, use reinstall_torch_tpu to install wheel package \033[0m"
-  fi
+  if [ $? -ne 0 ]; then popd; return -1; fi
+  pip install dist/* --force-reinstall
   popd
-}
-
-function uninstall_torch_tpu_dev(){
-  python setup.py develop --uninstall  
-}
-
-function uninstall_torch_tpu_deploy(){
-  pip uninstall torch_tpu -y
-}
-
-function reinstall_torch_tpu(){
-  uninstall_torch_tpu_dev
-  uninstall_torch_tpu_deploy
-  bdist_wheel 1
-  pip install $(find dist/ -name "*.whl" ! -name "*+cmodel*")
 }
 
 function new_clean()
