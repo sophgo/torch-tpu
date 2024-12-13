@@ -54,7 +54,11 @@ function set_v7runtime_env() {
 ######## ===== ENVS TO COMPILE TPUTRAIN ======########
 export TPUTRAIN_TOP=$(cd $(dirname "${BASH_SOURCE[0]}")/.. && pwd)
 export CHIP_ARCH=${1:-bm1684x}  #sg2260
-export EXTRA_CONFIG="-DREMOVE_POLLS_IN_LLM=ON"
+export EXTRA_CONFIG=""
+
+if [ "${CHIP_ARCH}" == "sg2260" ]; then
+    export EXTRA_CONFIG="-DREMOVE_POLLS_IN_LLM=ON $EXTRA_CONFIG"
+fi
 
 ################cross toolchains###################
 source ${TPUTRAIN_TOP}/scripts/prepare_toolchains.sh
