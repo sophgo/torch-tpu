@@ -21,7 +21,7 @@ void nodechip_mgm_multi_core(
     data_type_t     out_dtype,
     data_type_t     bias_dtype,
     int             has_bias,           // has_bias0 + 2 * has_bias1
-    bool            use_fast            // gelu or gelu_fast
+    int             fast_mode           // gelu or gelu_fast
 );
 
 int tpu_kernel_mlp_multi_core(const void* api_buf) {
