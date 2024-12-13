@@ -26,17 +26,6 @@ function bdist_wheel()
   popd
 }
 
-function bdist_wheel_cmodel()
-{
-  pushd ${TPUTRAIN_TOP}
-  BUILD_CMODEL_WHEEL=ON python setup.py bdist_wheel
-
-  if [ $# -ne 1 ]; then 
-    echo -e "\033[31m [warn] wheel not installed, use reinstall_torch_tpu_cmodel to install wheel package build with cmodel \033[0m"
-  fi
-  popd
-}
-
 function uninstall_torch_tpu_dev(){
   python setup.py develop --uninstall  
 }
@@ -45,21 +34,12 @@ function uninstall_torch_tpu_deploy(){
   pip uninstall torch_tpu -y
 }
 
-function reinstall_torch_tpu_cmodel(){
-  uninstall_torch_tpu_dev
-  uninstall_torch_tpu_deploy
-  bdist_wheel_cmodel 1
-  pip install dist/*+cmodel*
-
-}
-
 function reinstall_torch_tpu(){
   uninstall_torch_tpu_dev
   uninstall_torch_tpu_deploy
   bdist_wheel 1
   pip install $(find dist/ -name "*.whl" ! -name "*+cmodel*")
 }
-
 
 function new_clean()
 {
