@@ -1,5 +1,5 @@
 # Copyright (c) 2023, NVIDIA CORPORATION.  All rights reserved.
-
+# megatron-deepspeed old version
 """Pretrain GPT"""
 
 import torch

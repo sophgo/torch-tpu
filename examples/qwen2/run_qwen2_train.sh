@@ -1,8 +1,11 @@
+# Pai-Megatron-Patch
 set -x
 if [[ $PYTHONPATH != *PAI-Megatron-LM-240718* ]]; then
         export PYTHONPATH=$(pwd)/PAI-Megatron-LM-240718:$PYTHONPATH
 fi
 export CUDA_DEVICE_MAX_CONNECTIONS=1
+export CMODEL_GLOBAL_MEM_SIZE=120000000000
+export CMODEL_FAST_EXEC=1
 
 TRAIN_ITERS=10
 BATCH_SIZE=8

@@ -25,7 +25,7 @@ import pkgutil
 pkg_path = os.path.dirname(pkgutil.get_loader('torch_tpu').get_filename())
 lib_pwd = os.path.join(pkg_path, 'lib/')
 
-arch = arch_env = os.environ.get('CHIP_ARCH')
+arch = arch_env = os.environ.get('CHIP_ARCH', "sg2260")
 if not arch:
     from ctypes import cdll
     try:
@@ -50,7 +50,8 @@ if not os.environ.get('TPU_EMULATOR_PATH'):
 
 # OPEN INS-CACHE default
 if os.environ.get('TPU_CACHE_BACKEND') is None:
-    os.environ['TPU_CACHE_BACKEND'] = os.environ['TPU_EMULATOR_PATH']
+    if not os.environ.get('DISABLE_CACHE'):
+        os.environ['TPU_CACHE_BACKEND'] = os.environ['TPU_EMULATOR_PATH']
 
 import torch_tpu._C
 import torch_tpu.tpu

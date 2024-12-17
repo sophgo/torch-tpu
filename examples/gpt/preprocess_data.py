@@ -1,5 +1,5 @@
 # Copyright (c) 2022, NVIDIA CORPORATION. All rights reserved.
-
+# megatron-deepspeed old version
 """Processing large data for pretraining."""
 import argparse
 import math
