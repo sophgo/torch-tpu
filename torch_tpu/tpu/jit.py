@@ -55,3 +55,28 @@ def jit(fn: Optional[T] = None):
         return decorator(fn)
     else:
         return decorator
+
+def CallCppDynLib(so_path, func_name, *args, **kwargs):
+    tensors = []
+    tensors_index = []
+    fp_scalars = []
+    fp_scalars_index = []
+    fixed_scalars = []
+    fixed_scalars_index = []
+    for index, tensor in enumerate(args):
+        if isinstance(tensor, torch.Tensor):
+            tensors.append(tensor)
+            tensors_index.append(index)
+        else: 
+            if isinstance(tensor, int) or isinstance(tensor, bool):
+                fixed_scalars.append(tensor)
+                fixed_scalars_index.append(index)
+            elif isinstance(tensor, float):
+                fp_scalars.append(tensor)
+                fp_scalars_index.append(index)
+            else:
+                assert False, "don't support"
+    torch.ops.my_ops.dynlib_execute(so_path, func_name, tensors, tensors_index,
+                                fp_scalars, fp_scalars_index, fixed_scalars,
+                                fixed_scalars_index)
+    return 0
