@@ -170,7 +170,7 @@ Tensor index_tpu(const at::Tensor & self, const c10::List<c10::optional<at::Tens
   {
     auto idx = indices[0].value();
     std::vector<int64_t> sizes_vec;
-    sizes_vec.push_back ( idx.size( 0 ) );    
+    sizes_vec.push_back ( idx.size( 0 ) );
     for ( int i = 1; i <  self.dim(); i++ ) {
       sizes_vec.push_back ( self.size ( i ) );
     }
@@ -318,6 +318,40 @@ Tensor & index_put_impl_tpu(Tensor & self, const torch::List<c10::optional<Tenso
 TORCH_LIBRARY_IMPL ( aten, TPU, m )
 {
  m.impl ( "_index_put_impl_",  index_put_impl_tpu);
+}
+
+Tensor & index_add_tpu( Tensor & self, int64_t dim, const Tensor & index, const Tensor & source, const Scalar &alpha)
+{
+    Tensor index_ = index;
+    if(index.dtype()== torch::kInt64) {
+      index_ = index.to(torch::kInt32);
+    }
+    CHECK_TENSOR_IN_DEVICE ( self );
+    CHECK_TENSOR_IN_DEVICE( index_ );
+    CHECK_TENSOR_IN_DEVICE( source );
+    TIMING_START;
+#if defined BACKEND_SG2260
+    auto stream = c10_tpu::getCurrentTPUStream();
+
+    tpudnnStatus_t status = tpudnnIndexAdd(
+                            stream,
+                            tpu::TPUGenerateTpudnnTensor(stream, self),
+                            tpu::TPUGenerateTpudnnTensor(stream, index_),
+                            tpu::TPUGenerateTpudnnTensor(stream, source),
+                            dim);
+    TORCH_CHECK ( status == TPUDNN_STATUS_SUCCESS );
+      // }
+#elif defined BACKEND_1684X
+		TORCH_CHECK(false);
+#endif
+    SHOW_TENSOR_OP(self, index, source);
+    TIMING_END ( tpu::INDEX_ADD_ );
+    return self;
+}
+
+TORCH_LIBRARY_IMPL ( aten, TPU, m )
+{
+ m.impl ( "index_add_",  index_add_tpu);
 }
 
 } //namespace at

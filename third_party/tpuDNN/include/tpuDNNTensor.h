@@ -1024,6 +1024,13 @@ tpudnnStatus_t tpudnnIndexSelectAsync(
     int dim,
     tpudnnTensor_t output);
 
+tpudnnStatus_t tpudnnIndexAdd(
+    tpudnnHandle_t handle,
+    tpudnnTensor_t io,
+    tpudnnTensor_t indices,
+    tpudnnTensor_t add,
+    int axis);
+
 tpudnnStatus_t tpudnnC2CDescriptor(
     tpudnnHandle_t handle,
     tpudnnCmd_t* vsdma_cmd,

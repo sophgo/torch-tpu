@@ -5,7 +5,7 @@ namespace tpu
 
 void print_python_code() {
     PyGILState_STATE gstate = PyGILState_Ensure();
-    
+
     PyThreadState *tstate = PyThreadState_Get();
     if (tstate && tstate->frame) {
         PyFrameObject *frame = tstate->frame;
@@ -136,6 +136,7 @@ static inline const char *OpTypeStr(int v)
     __case(DIV)
     __case(ADDBCAST)
     __case(INDEX_SELECT)
+    __case(INDEX_ADD_)
     __case(DTYPE_CONVERT)
     __case(REDUCE_MEAN)
     __case(REDUCE_SUM)

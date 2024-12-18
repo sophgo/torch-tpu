@@ -12,7 +12,7 @@
 #include <type_traits>
 
 #include <Python.h>
-#include <frameobject.h> 
+#include <frameobject.h>
 #include <execinfo.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -220,7 +220,7 @@ static inline SgdnnTensor_t TPUGenerateSgdnnTensor ( const at::Tensor & Tensor )
 {
   SgdnnTensor_t t = { 0 };
   unsigned long long data_ptr;
-  if (at_tpu::StorageDescHelper::IsBaseFormatType(Tensor)) { 
+  if (at_tpu::StorageDescHelper::IsBaseFormatType(Tensor)) {
     data_ptr = (unsigned long long)Tensor.data_ptr();
     t.dtype =TPUConvertDtype<decltype(t.dtype)>( Tensor.dtype() );
     t.dim = Tensor.dim();
@@ -244,7 +244,7 @@ static inline tpudnnTensor_t TPUGenerateTpudnnTensor(tpudnnHandle_t handle, cons
 {
   tpudnnTensor_t t = { 0 };
   unsigned long long data_ptr;
-  if (at_tpu::StorageDescHelper::IsBaseFormatType(Tensor)) { 
+  if (at_tpu::StorageDescHelper::IsBaseFormatType(Tensor)) {
     data_ptr = (unsigned long long)Tensor.data_ptr();
     t.dtype =TPUConvertDtype<decltype(t.dtype)>( Tensor.dtype() );
     t.dim = Tensor.dim();
@@ -379,6 +379,7 @@ typedef enum
   DIV,
   ADDBCAST,
   INDEX_SELECT,
+  INDEX_ADD_,
   DTYPE_CONVERT,
   REDUCE_MEAN,
   REDUCE_SUM,
