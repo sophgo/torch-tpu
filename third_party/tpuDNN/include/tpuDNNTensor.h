@@ -1047,4 +1047,11 @@ tpudnnStatus_t tpudnnDynLibExecuteAsync(
                     std::vector<int64_t> fp_scalars_index,
                     std::vector<int64_t> fixed_scalars,
                     std::vector<int64_t> fixed_scalars_index);
+
+tpudnnStatus_t tpudnnScatterAddAsync(
+    tpudnnHandle_t handle,
+    tpudnnTensor_t input,
+    tpudnnTensor_t src,
+    tpudnnTensor_t indices,
+    int dim);
 } // extern "C"
