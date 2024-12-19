@@ -248,4 +248,13 @@ namespace at
 		c10::optional<int64_t> max_record_num,
 		c10::optional<int64_t> mode);
 	void disable_profile();
+	void dynlib_execute(
+		const std::string &so_url,
+		const std::string &func_name,
+		const std::vector<Tensor> &tensors,
+		const std::vector<int64_t> &tensors_index,
+		const std::vector<double> &fp_scalars,
+		const std::vector<int64_t> &fp_scalars_index,
+		const std::vector<int64_t> &fixed_scalars,
+        const std::vector<int64_t> &fixed_scalars_index);
 }

@@ -54,7 +54,7 @@ if os.environ.get('TPU_CACHE_BACKEND') is None:
 
 import torch_tpu._C
 import torch_tpu.tpu
-
+from .tpu.jit import jit
 from torch_tpu.utils import ( apply_module_patch, \
                              add_storage_methods, add_serialization_methods, apply_device_patch)
 if arch == 'sg2260':

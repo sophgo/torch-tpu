@@ -553,7 +553,8 @@ typedef enum
   DROPOUT,
   LORA_MATMUL_FORWARD,
   OP_NUM,
-  COMPARISON_C
+  COMPARISON_C,
+  PPL_EXECUTE
 }
 OpType;
 

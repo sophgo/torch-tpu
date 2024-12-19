@@ -59,5 +59,6 @@ namespace at
 		m.def("disable_profile", disable_profile);
 		m.def("lora_matmul_forward",lora_matmul_forward);
 		m.def("tgi_input_ids_update_decode_phase",TGI_input_ids_update_decode_phase);
+		m.def("dynlib_execute",dynlib_execute);
 	}
 }

@@ -51,6 +51,40 @@ function set_v7runtime_env() {
     #export TPUKERNEL_FIRMWARE_PATH=${root_path}/build/firmware_sg2260_cmodel/libfirmware.so
 }
 
+function set_ppl_env() {
+     local chip=$1
+     local root_path=$2
+     local ppl_path=${root_path}/third_party/ppl
+     for item in "${ppl_path}"/*; do
+          if [ -d "$item" ]; then
+               rm -rf "$item"
+          fi
+     done
+
+     tar_gz_file=$(find "$ppl_path" -maxdepth 1 -name "*.tar.gz" -print -quit)
+     if [ -z "$tar_gz_file" ]; then
+          echo "can't find ppl release package"
+          exit 1
+     fi
+
+     tar -xzf "$tar_gz_file" -C "$ppl_path"
+     folder_name=$(basename "$tar_gz_file" .tar.gz)
+     ppl_lib_path="$ppl_path/$folder_name"
+     source ${ppl_lib_path}/envsetup.sh
+     case $chip in
+    "sg2260")
+        export CHIP=bm1690
+        export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:${root_path}/third_party/tpuv7_runtime/tpuv7-emulator_0.1.0/lib
+        ;;
+    "bm1684x")
+        export CHIP=bm1684x
+        ;;
+    *)
+        echo "unknow chip: $CHIP_ARCH"
+        ;;
+     esac
+}
+
 ######## ===== ENVS TO COMPILE TPUTRAIN ======########
 export TPUTRAIN_TOP=$(cd $(dirname "${BASH_SOURCE[0]}")/.. && pwd)
 export CHIP_ARCH=${1:-bm1684x}  #sg2260
@@ -85,6 +119,7 @@ if [ "${CHIP_ARCH}" == "sg2260" ]; then
      set_v7runtime_env ${TPUTRAIN_TOP}
 fi
 
+set_ppl_env $CHIP_ARCH ${TPUTRAIN_TOP}
 export TPU1686_PATH=$(realpath $TPUTRAIN_TOP/../TPU1686)
 if [ ! -d $TPU1686_PATH ]; then
     unset TPU1686_PATH
