@@ -43,7 +43,11 @@ int tpu_kernel_api_arg_muti_core(const void *args) {
 #ifdef USING_LLM_TICK_TOCK_PROFILE
   firmware_kernel_tick();
 #endif
+#ifndef REMOVE_POLLS_IN_LLM
   tpu_initialize();
+#else
+  tpu_poll_descriptor();
+#endif
   unsigned int slice_num = tpu_core_num();
   unsigned int slice_idx = tpu_core_index();
   // determine the length of each slice
@@ -67,7 +71,11 @@ int tpu_kernel_api_arg_muti_core(const void *args) {
                  api->indices_global_addr + output_offset * int32_size, shape,
                  api->dim, api->axis, api->mode, api->dtype);
   }
+  
+#ifndef REMOVE_POLLS_IN_LLM
   tpu_poll();
+#endif
+
 #ifdef USING_LLM_TICK_TOCK_PROFILE
   firmware_kernel_tock(6);
 #endif

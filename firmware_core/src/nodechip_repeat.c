@@ -199,7 +199,11 @@ bool is_last_dim_spec(sg_api_repeat_t *api, int* row, int* col, int* repeat) {
 int tpu_kernel_api_repeat_multi_core(const void *args) {
   sg_api_repeat_t *api = (sg_api_repeat_t *)args;
 #ifdef BACKEND_SG2260
+#ifndef REMOVE_POLLS_IN_LLM
   tpu_initialize();
+#else
+  tpu_poll_descriptor();
+#endif
 #ifdef USING_PERF_MODE
     tpu_sync_all();
 #endif
@@ -222,7 +226,9 @@ int tpu_kernel_api_repeat_multi_core(const void *args) {
   else if (core_idx == 0)
     nodechip_repeat(api->input_global_addr, api->output_global_addr, api->shape,
                     api->repeat_times, api->dim, api->repeat_dim, api->dtype);
+#ifndef REMOVE_POLLS_IN_LLM
   tpu_poll();
+#endif
   return 0;
 #else
   int rows = 1, cols = 1, repeats = 1;

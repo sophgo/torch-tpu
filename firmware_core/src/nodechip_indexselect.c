@@ -490,7 +490,11 @@ int tpu_kernel_api_index_select_multi_core ( const void * args )
 #ifdef USING_LLM_TICK_TOCK_PROFILE
   firmware_kernel_tick();
 #endif
+#ifndef REMOVE_POLLS_IN_LLM
   tpu_initialize();
+#else
+  tpu_poll_descriptor();
+#endif
   int input_shape[8] = {1, 1, 1, 1, 1, 1, 1, 1};
   for ( int i = 0; i < api->dim; ++i ) {
     input_shape[i] = api->input_shape[i];
@@ -553,7 +557,9 @@ int tpu_kernel_api_index_select_multi_core ( const void * args )
     0,
     ( data_type_t ) api->dtype );
   }
+#ifndef REMOVE_POLLS_IN_LLM
   tpu_poll();
+#endif
 #ifdef USING_LLM_TICK_TOCK_PROFILE
   firmware_kernel_tock(9);
 #endif
