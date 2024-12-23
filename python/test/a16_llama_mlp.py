@@ -107,17 +107,18 @@ class LLamaA16MlpBlock(nn.Module):
     def forward(self, x):
         return LLamaA16MlpFunc.apply(x, self.w0, self.w1, self.w2, self.group_size, self.weight_bits)
 
-def check_mlp_a16():
-    batch_size = 16
-    #for 70b TP1
-    # embed_dim = 8192
-    # intermediate_size = 3584*8
-    #for 70b TP8
-    embed_dim = 8192
-    intermediate_size = 3584# export TPUTRAIN_CORE_NUM=7 if needed
-    #for 7b TP1
-    # embed_dim = 4096
-    # intermediate_size = 11008
+def check_mlp_a16(model="qwen72b",batch=16,tp=2,seq_len=5):
+
+    batch_size = batch*seq_len
+    if model=="qwen72b":
+        embed_dim = 8192
+        intermediate_size = (int)(29696/tp)
+    elif model=="qwen7b":
+        embed_dim = 3584
+        intermediate_size = (int)(18944/tp)
+    elif model=="llama7b":
+        embed_dim = 4096
+        intermediate_size = (int)(11008/tp)
 
     group_size = 128
     weight_bits = 4
