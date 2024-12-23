@@ -54,23 +54,7 @@ function set_v7runtime_env() {
 function set_ppl_env() {
      local chip=$1
      local root_path=$2
-     local ppl_path=${root_path}/third_party/ppl
-     for item in "${ppl_path}"/*; do
-          if [ -d "$item" ]; then
-               rm -rf "$item"
-          fi
-     done
-
-     tar_gz_file=$(find "$ppl_path" -maxdepth 1 -name "*.tar.gz" -print -quit)
-     if [ -z "$tar_gz_file" ]; then
-          echo "can't find ppl release package"
-          exit 1
-     fi
-
-     tar -xzf "$tar_gz_file" -C "$ppl_path"
-     folder_name=$(basename "$tar_gz_file" .tar.gz)
-     ppl_lib_path="$ppl_path/$folder_name"
-     source ${ppl_lib_path}/envsetup.sh
+     pip install tpu-ppl -i https://pypi.tuna.tsinghua.edu.cn/simple
      case $chip in
     "sg2260")
         export CHIP=bm1690
