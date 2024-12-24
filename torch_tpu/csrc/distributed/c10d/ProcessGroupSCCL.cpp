@@ -497,7 +497,17 @@ ProcessGroupSCCL::allgather(std::vector<std::vector<at::Tensor>> &outputs,
     invalidArgument(c10::str("unsupported device type ", device.type()));
   }
 
-  at::Tensor flatOutputTensor = newLikeFlat(outputs[0]);
+  bool continous_addr = true;
+  for (size_t i = 0; i < outputs[0].size() - 1; ++i) {
+    auto addr = GetAddrByUnifiedAddr((uint64_t)outputs[0][i].data_ptr());
+    auto next_addr = GetAddrByUnifiedAddr((uint64_t)outputs[0][i + 1].data_ptr());
+    uint64_t bytes = outputs[0][i].numel() * outputs[0][i].element_size();
+    if (addr + bytes != next_addr) {
+      continous_addr = false;
+      break;
+    }
+  }
+  at::Tensor flatOutputTensor = continous_addr == false ? newLikeFlat(outputs[0]) : outputs[0][0];
 
   auto work = collective(
     *this, inputs[0], flatOutputTensor,
@@ -512,9 +522,11 @@ ProcessGroupSCCL::allgather(std::vector<std::vector<at::Tensor>> &outputs,
     });
 
   // Unflatten into output tensors.
-  for (auto &outputgroup : outputs) {
-    for (const auto j : c10::irange(outputgroup.size())) {
-      outputgroup[j].copy_(flatOutputTensor[j]);
+  if (continous_addr == false) {
+    for (auto &outputgroup : outputs) {
+      for (const auto j : c10::irange(outputgroup.size())) {
+        outputgroup[j].copy_(flatOutputTensor[j]);
+      }
     }
   }
 
