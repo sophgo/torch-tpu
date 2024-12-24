@@ -31,6 +31,8 @@ Torch.distributed 支持 SCCL 内置后端，SCCL 通信后端能够充分利用
     - ✓
   * - all_gather
     - ✓
+  * - all_gather_into_tensor
+    - ✓
   * - gather
     - ✓
   * - scatter

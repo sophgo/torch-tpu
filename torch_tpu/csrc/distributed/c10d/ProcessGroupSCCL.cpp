@@ -523,9 +523,9 @@ ProcessGroupSCCL::allgather(std::vector<std::vector<at::Tensor>> &outputs,
 
   // Unflatten into output tensors.
   if (continous_addr == false) {
-    for (auto &outputgroup : outputs) {
-      for (const auto j : c10::irange(outputgroup.size())) {
-        outputgroup[j].copy_(flatOutputTensor[j]);
+    for (auto &outputGroup : outputs) {
+      for (const auto j : c10::irange(outputGroup.size())) {
+        outputGroup[j].copy_(flatOutputTensor[j]);
       }
     }
   }
@@ -534,10 +534,35 @@ ProcessGroupSCCL::allgather(std::vector<std::vector<at::Tensor>> &outputs,
 }
 
 c10::intrusive_ptr<Work>
-ProcessGroupSCCL::_allgather_base(at::Tensor & /*unused */,
-                                    at::Tensor & /*unused */,
-                                    const AllgatherOptions & /*unused */) {
-  TORCH_CHECK(false, "no support for _allgather_base in SCCL process group");
+ProcessGroupSCCL::_allgather_base(at::Tensor &outputTensor,
+                                    at::Tensor &inputTensor,
+                                    const AllgatherOptions &opts) {
+  static auto invalidArgument = [](const std::string &msg) {
+    TORCH_CHECK(false, "ProcessGroupSCCL::_allgather_base: " + msg);
+  };
+
+  TORCH_CHECK(
+      outputTensor.device() == inputTensor.device(),
+      "output tensor and input tensor must be on the same type of device");
+
+  const auto &device = outputTensor.device();
+  if (device.type() != at::kPrivateUse1) {
+    invalidArgument(c10::str("unsupported device type ", device.type()));
+  }
+
+  auto work = collective(
+    *this, inputTensor, outputTensor,
+    [](at::Tensor &input, at::Tensor &output, scclComm_t comm,
+        scclHandle_t handle) {
+      const void * sendBuff = scclPhysToVirt(handle, GetAddrByUnifiedAddr((uint64_t)input.data_ptr()));
+      void *recvBuff = scclPhysToVirt(handle, GetAddrByUnifiedAddr((uint64_t)output.data_ptr()));
+      return scclAllGather(
+          sendBuff,
+          recvBuff,
+          input.numel(), toSCCLDtype(input.scalar_type()), comm, handle);
+    });
+
+  return work;
 }
 
 c10::intrusive_ptr<Work>

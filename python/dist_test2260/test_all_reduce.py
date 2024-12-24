@@ -29,9 +29,9 @@ torch_tpu.tpu.set_device(options.chip_map[rank])
 device = torch.device(f"{TPU}:{chip_map[rank]}")
 
 dist.init_process_group(
-    backend="sccl", 
-    rank=rank, 
-    world_size=world_size, 
+    backend="sccl",
+    rank=rank,
+    world_size=world_size,
     pg_options=options)
 
 init_logger()
