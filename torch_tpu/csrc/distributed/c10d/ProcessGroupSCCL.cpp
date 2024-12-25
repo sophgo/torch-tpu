@@ -191,7 +191,9 @@ ProcessGroupSCCL::Options::Options(std::chrono::milliseconds timeout)
 void ProcessGroupSCCL::broadcastUniqueSCCLID(scclHandle_t handle,
                                               scclUniqueId *scclID,
                                               int rank) {
-  const std::string key = "ProcessGroupSCCL";
+  const char* GROUP_IDX_env = getenv("TPU_GROUP_IDX");
+  std::string GROUP_IDX =  GROUP_IDX_env ? GROUP_IDX_env : "";
+  const std::string key = "ProcessGroupSCCL" + GROUP_IDX;
   memset(scclID, 0x0, sizeof(scclUniqueId));
   if (rank == 0) {
     TORCH_CHECK(scclGetUniqueId(handle, scclID) ==
