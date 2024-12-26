@@ -60,6 +60,9 @@ from torch_tpu.utils import ( apply_module_patch, \
                              add_storage_methods, add_serialization_methods, apply_device_patch)
 if arch == 'sg2260':
     from torch_tpu._C import ProcessGroupSCCLOptions
+    os.environ['CHIP'] = "bm1690"
+elif arch == 'bm1684x':
+    os.environ['CHIP'] = "bm1684x"
 
 __all__ = []
 

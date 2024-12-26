@@ -29,6 +29,7 @@ import ppl
 import ppl.language as pl
 
 @torch_tpu.jit
+@ppl.autotiling({'block_w': lambda nargs: nargs['block_w'] // 2 if nargs['block_w'] // 2 > 1 else 1})
 @ppl.jit
 def sub_kernel(x_ptr,
               y_ptr,
@@ -38,7 +39,6 @@ def sub_kernel(x_ptr,
               H:pl.constexpr,
               W:pl.constexpr,
               block_w:pl.constexpr):
-    pl.set_core_num(8)
     core_idx = pl.get_core_index()
     core_num = pl.get_core_num()
     #use pass, can't use return
@@ -66,6 +66,7 @@ def sub_kernel(x_ptr,
       pl.dma.store(o_global[:,:,:, slice_offset + w_idx:slice_offset + w_idx + tile_w], out)
 
 @torch_tpu.jit
+@ppl.autotiling({'block_w': lambda nargs: nargs['block_w'] // 2 if nargs['block_w'] // 2 > 1 else 1})
 @ppl.jit
 def add_kernel(x_ptr,
               y_ptr,
@@ -75,7 +76,6 @@ def add_kernel(x_ptr,
               H:pl.constexpr,
               W:pl.constexpr,
               block_w:pl.constexpr):
-    pl.set_core_num(8)
     core_idx = pl.get_core_index()
     core_num = pl.get_core_num()
     #use pass, can't use return
@@ -104,17 +104,17 @@ def add_kernel(x_ptr,
 
 def case2():
 
-    a1 = torch.randint(0, 5, (1, 1, 1, 9000), dtype=torch.int32)
+    a1 = torch.randint(0, 5, (2, 67, 10, 4800), dtype=torch.int32)
     a1_clone = a1.clone()
     a1_tpu = a1.clone().to(device)
-    a2 = torch.randint(1 ,5, (1, 1, 1, 9000), dtype=torch.int32)
+    a2 = torch.randint(1 ,5, (2, 67, 10, 4800), dtype=torch.int32)
     a2_clone = a2.clone()
     a2_tpu = a2.clone().to(device)
 
-    a3 = torch.randint(1 ,5, (1, 1, 1, 9000), dtype=torch.int32)
+    a3 = torch.randint(1 ,5, (2, 67, 10, 4800), dtype=torch.int32)
     a3_clone = a3.clone()
     a3_tpu = a3.clone().to(device)
-    a4 = torch.randint(1 ,5, (1, 1, 1, 9000), dtype=torch.int32)
+    a4 = torch.randint(1 ,5, (2, 67, 10, 4800), dtype=torch.int32)
     a4_clone = a4.clone()
     a4_tpu = a4.clone().to(device)
 
@@ -122,9 +122,9 @@ def case2():
     a1.add_(a3)
     a1.sub_(a4)
 
-    sub_kernel[(8,)](a1_tpu, a2_tpu, a1_tpu, 1, 1, 1, 9000, 1024)
-    add_kernel[(8,)](a1_tpu, a3_tpu, a1_tpu, 1, 1, 1, 9000, 1024)
-    sub_kernel[(8,)](a1_tpu, a4_tpu, a1_tpu, 1, 1, 1, 9000, 1024)
+    sub_kernel[(1, 8,)](a1_tpu, a2_tpu, a1_tpu, 2, 67, 10, 4800, 4800)
+    add_kernel[(1, 8,)](a1_tpu, a3_tpu, a1_tpu, 2, 67, 10, 4800, 4800)
+    sub_kernel[(1, 8,)](a1_tpu, a4_tpu, a1_tpu, 2, 67, 10, 4800, 4800)
     '''
     a1_tpu.sub_(a2_tpu)
     a1_tpu.add(a3_tpu)
