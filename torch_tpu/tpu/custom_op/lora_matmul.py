@@ -2,9 +2,9 @@ import torch
 import torch.nn as nn
 import math
 from peft import LoraConfig, TaskType
-import peft 
+import peft
 import re
-#now tpu lora matmul only support fp16
+
 class LoraMatmulFunc(torch.autograd.Function):
     @staticmethod
     def forward(ctx,x,loraA, loraB, weight,scale):
@@ -21,8 +21,8 @@ class LoraMatmulFunc(torch.autograd.Function):
                                         weight,
                                         output,
                                         scale)
-        return output.float()#convert to fp32
-    
+        return output.float()
+
     @staticmethod
     def backward(ctx, grad_output):
         x, loraA, loraB, weight = ctx.saved_tensors
@@ -40,7 +40,7 @@ class LoraMatmulFunc(torch.autograd.Function):
             grad_loraA = 1 / ctx.scale * torch.matmul(torch.matmul(x_t, grad_output_half), loraB_t)
             grad_loraB = 1 / ctx.scale * torch.matmul(torch.matmul(loraA_t, x_t), grad_output_half)
         return grad_input.float(), grad_loraA, grad_loraB, None, None, None
-    
+
 class LoraMatmulBlock(nn.Module):
     def __init__(self, in_feature, out_feature, weight,lora_A,lora_B, rank, alpha, dropout_rate) -> None:
         super(LoraMatmulBlock, self).__init__()
@@ -59,8 +59,8 @@ class LoraMatmulBlock(nn.Module):
             self.loraB = lora_B
             self.scale = alpha / rank
     def forward(self, x):
-        return LoraMatmulFunc.apply(self.dropout(x.half()),self.loraA, self.loraB, self.weight, self.scale)#x should be float16 to keep corresponding with backend op
-    
+        return LoraMatmulFunc.apply(self.dropout(x.half()),self.loraA, self.loraB, self.weight, self.scale)
+
 def create_and_replace(lora_model, lora_config:LoraConfig, adapter_name:str = "default"):
     """
     Args:
@@ -68,7 +68,7 @@ def create_and_replace(lora_model, lora_config:LoraConfig, adapter_name:str = "d
         lora_config (LoraConfig): which is same with peft lora config
         adapter_name (str): same with peft lora
     """
-    device = "tpu:0"
+    device = lora_model.device
     key_list = [key for key, _ in lora_model.named_modules()]
     exist_target_modules = False
     for key in key_list:
@@ -78,7 +78,7 @@ def create_and_replace(lora_model, lora_config:LoraConfig, adapter_name:str = "d
             target_module_found = True
         else:
             target_module_found = any(key.endswith(f".{target_key}") for target_key in lora_config.target_modules)
-        
+
         if not target_module_found:
             continue
         exist_target_modules = True
@@ -87,13 +87,13 @@ def create_and_replace(lora_model, lora_config:LoraConfig, adapter_name:str = "d
         target_name = key.split(".")[-1]
         lora_A = peft_lora_module.lora_A[adapter_name]
         lora_B = peft_lora_module.lora_B[adapter_name]
-        #need fp16 to keep corresponding with backend op
+
         weight = peft_lora_module.base_layer.weight.data.contiguous().half().to(device)
         loraA_data = lora_A.weight.data.contiguous().half().to(device)
         loraB_data = lora_B.weight.data.contiguous().half().to(device)
         newlora_block = LoraMatmulBlock(lora_A.in_features, lora_B.out_features, weight,
                                         lora_A=loraA_data,lora_B=loraB_data,
-                                        rank=lora_config.r, alpha=lora_config.lora_alpha, 
+                                        rank=lora_config.r, alpha=lora_config.lora_alpha,
                                         dropout_rate=lora_config.lora_dropout).to(device)
         setattr(parent, target_name, newlora_block)
     if not exist_target_modules:
