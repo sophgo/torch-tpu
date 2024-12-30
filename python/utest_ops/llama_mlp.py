@@ -49,8 +49,8 @@ def check_mlp():
     intermediate_size = 512
     net_cpu = LLamaMlp(embed_dim, intermediate_size)
 
-    w0_tpu = copy.deepcopy(net_cpu.mm0.weight.detach()).detach().transpose(0,1).contiguous().requires_grad_(True).to(device).half()
-    w1_tpu = copy.deepcopy(net_cpu.mm1.weight.detach()).detach().transpose(0,1).contiguous().requires_grad_(True).to(device).half()
+    w0_tpu = copy.deepcopy(net_cpu.mm0.weight.detach()).detach().requires_grad_(True).to(device).half()
+    w1_tpu = copy.deepcopy(net_cpu.mm1.weight.detach()).detach().requires_grad_(True).to(device).half()
     w2_tpu = copy.deepcopy(net_cpu.mm2.weight.detach()).detach().transpose(0,1).contiguous().requires_grad_(True).to(device).half()
     w2_tpu.retain_grad()
     w0_tpu.retain_grad()
@@ -72,8 +72,8 @@ def check_mlp():
     comparator = TensorComparator()
     status_fwd = comparator.cmp_result(out_cpu.detach(), out_tpu.cpu().detach().float())
     status_bwd_x = comparator.cmp_result(x.grad.detach(), x_tpu.grad.detach().cpu().float())
-    status_bwd_w0 = comparator.cmp_result(net_cpu.mm0.weight.grad.detach(), net_tpu.w0.grad.cpu().detach().t().contiguous().float())
-    status_bwd_w1 = comparator.cmp_result(net_cpu.mm1.weight.grad.detach(), net_tpu.w1.grad.cpu().detach().t().contiguous().float())
+    status_bwd_w0 = comparator.cmp_result(net_cpu.mm0.weight.grad.detach(), net_tpu.w0.grad.cpu().detach().float())
+    status_bwd_w1 = comparator.cmp_result(net_cpu.mm1.weight.grad.detach(), net_tpu.w1.grad.cpu().detach().float())
     status_bwd_w2 = comparator.cmp_result(net_cpu.mm2.weight.grad.detach(), net_tpu.w2.grad.cpu().detach().t().contiguous().float())
 
     status_bwd = status_bwd_x and status_bwd_w0 and status_bwd_w1 and status_bwd_w2

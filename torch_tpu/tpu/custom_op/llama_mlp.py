@@ -13,7 +13,7 @@ class LLamaMlpFunc(torch.autograd.Function):
         if x.dim() == 3:
            x = x.view(-1, x.size(2)).contiguous()
         output = torch.empty(x.shape, dtype = x.dtype, device = x.device)
-        silu_shape = (x.shape[0], w1.shape[1])
+        silu_shape = (x.shape[0], w1.shape[0])
         silu = torch.empty(silu_shape, dtype = x.dtype, device = x.device)
         sigmoid = torch.empty(silu_shape, dtype = x.dtype, device = x.device)
         m0 = torch.empty(silu_shape, dtype = x.dtype, device = x.device)
@@ -43,8 +43,9 @@ class LLamaMlpFunc(torch.autograd.Function):
         
         x_t =x.transpose(-1, -2).contiguous()
         w2_t = w2.t().contiguous()
-        # w0x = torch.matmul(x, w0) #
-        # w1x = torch.matmul(x,w1) #
+        
+        # w0x = torch.matmul(x, w0.transpose(-1, -2).contiguous()) #
+        # w1x = torch.matmul(x,w1.transpose(-1, -2).contiguous()) #
         
         # silu = F.silu(w1x) # 
         # sigmoid = F.sigmoid(w1x) #
@@ -56,9 +57,9 @@ class LLamaMlpFunc(torch.autograd.Function):
         grad_w2 = torch.matmul((w0x * silu).transpose(-1,-2).contiguous(), grad_output)
         grad_w1 = torch.matmul(x_t, grad_w1x)
         grad_w0 = torch.matmul(x_t, grad_w0x)
-        grad_input = torch.matmul(grad_w0x, w0.t().contiguous()) + torch.matmul(grad_w1x, w1.t().contiguous())
+        grad_input = torch.matmul(grad_w0x, w0) + torch.matmul(grad_w1x, w1)
 
-        return grad_input, grad_w0, grad_w1, grad_w2
+        return grad_input, grad_w0.transpose(-1,-2).contiguous(), grad_w1.transpose(-1,-2).contiguous(), grad_w2
 
 class LLamaMlpBlock(nn.Module):
     def __init__(self, embed_dim, intermediate_size):
