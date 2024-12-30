@@ -85,7 +85,7 @@ class Qwen2MlpFunc(torch.autograd.Function):
         # linear_fc2: [h, i] -> down_proj [h, i]
         gate_proj, up_proj = torch.chunk(linear_fc1_weight, chunks=2, dim=0)
         down_proj = linear_fc2_weight
-        gate_proj_t, up_proj_t, down_proj_t = gate_proj.t().contiguous(), up_proj.t().contiguous(), down_proj.t().contiguous()
+        down_proj_t = down_proj.t().contiguous()
 
         s, b, h = hidden_states.shape
         i = down_proj.shape[1]
@@ -100,8 +100,8 @@ class Qwen2MlpFunc(torch.autograd.Function):
         x = hidden_states.view(calc_shape_output)
 
         torch.ops.my_ops.llama_mlp_forward(x,
-                                           up_proj_t,
-                                           gate_proj_t,
+                                           up_proj,
+                                           gate_proj,
                                            down_proj_t,
                                            silu,
                                            sigmoid,

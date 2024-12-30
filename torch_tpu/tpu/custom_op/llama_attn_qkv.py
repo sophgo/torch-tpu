@@ -185,7 +185,6 @@ def fuse_llama_attn_qkv():
 
 import os
 from distutils.util import strtobool
-support_gqa = True
 whole_net_trans = strtobool(os.environ.get("QWEN2_WHOLE_NET_TRANS", "0"))
 class Qwen2AttentionQKVFunc(torch.autograd.Function):
     @staticmethod
@@ -205,14 +204,16 @@ class Qwen2AttentionQKVFunc(torch.autograd.Function):
             # q, k, v: (seq, batch, num_heads, head_dim)
             batch, seq_len, num_attn_head, head_dim = query_states.size()
             output_shape = (batch, seq_len, num_attn_head, head_dim)
-            cos = cos.to(query_states.dtype).view(1, seq_len, head_dim).repeat(batch, 1, 1, 1).view(batch * seq_len, 1, head_dim)
-            sin = sin.to(query_states.dtype).view(1, seq_len, head_dim).repeat(batch, 1, 1, 1).view(batch * seq_len, 1, head_dim)
+            cos = cos.to(query_states.dtype).view(seq_len, 1, head_dim)
+            sin = sin.to(query_states.dtype).view(seq_len, 1, head_dim)
+            input_length = torch.tensor([seq_len] * batch, dtype=torch.int32)#TODO:construct data in device 
         else:
             # q, k, v: (batch, seq, num_heads, head_dim)
             seq_len, batch, num_attn_head, head_dim = query_states.size()
             output_shape = (seq_len, batch, num_attn_head, head_dim)
             cos = cos.to(query_states.dtype).repeat(1, batch, 1, 1).view(batch * seq_len, 1, head_dim)
             sin = sin.to(query_states.dtype).repeat(1, batch, 1, 1).view(batch * seq_len, 1, head_dim)
+            input_length = torch.tensor([seq_len * batch], dtype=torch.int32)#TODO:construct data in device 
         num_kv_head = key_states.size(-2)
 
         query_states = query_states.view(batch * seq_len, num_attn_head, head_dim)
@@ -220,18 +221,18 @@ class Qwen2AttentionQKVFunc(torch.autograd.Function):
         value_states = value_states.view(batch * seq_len, num_kv_head, head_dim)
 
         if attention_mask is not None:
-            attention_mask_2d = torch.full((batch * seq_len, batch * seq_len), float("-inf"), dtype=attention_mask.dtype, device=attention_mask.device)
-            for i in range(batch):
-                if whole_net_trans:
-                    attention_mask_2d[i * seq_len:(i + 1) * seq_len, i * seq_len:(i + 1) * seq_len] = attention_mask[i][0]
-                else:
+            if whole_net_trans:
+                attention_mask_2d = attention_mask.view(batch, seq_len, seq_len)
+            else:
+                attention_mask_2d = torch.full((batch * seq_len, batch * seq_len), float("-inf"), dtype=attention_mask.dtype, device=attention_mask.device)
+                for i in range(batch):
                     attention_mask_2d[i::batch, i::batch] = attention_mask[i][0]
         else:
             attention_mask_2d = None
 
         attn_output = torch.empty(query_states.shape, dtype = query_states.dtype, device = query_states.device)
         softmax_lse = torch.empty([batch * seq_len, num_attn_head, 1], dtype=query_states.dtype, device=query_states.device)
-        input_length = torch.tensor([seq_len * batch], dtype=torch.int32)#TODO:construct data in device 
+        # input_length = torch.tensor([seq_len * batch], dtype=torch.int32)#TODO:construct data in device 
         max_s = input_length.max().item()
 
         torch.ops.my_ops.llama_attention_forward(attn_output,
@@ -255,70 +256,99 @@ class Qwen2AttentionQKVFunc(torch.autograd.Function):
     @staticmethod
     def backward(ctx, grad_output):
         query_states, key_states, value_states, cos, sin, lse, attn_output, attention_mask = ctx.saved_tensors
-        seq_len, batch, num_heads, head_dim = attn_output.size()
-        num_key_value_heads = key_states.shape[-2]
-
-        if not support_gqa:
-            groups = num_heads // num_key_value_heads
-            key_states = key_states.view(seq_len, batch, num_key_value_heads, head_dim).repeat_interleave(groups, dim=2)
-            value_states = value_states.view(seq_len, batch, num_key_value_heads, head_dim).repeat_interleave(groups, dim=2)
-
-        grad_query_states = torch.zeros_like(query_states)
-        grad_key_states = torch.zeros_like(key_states)
-        grad_value_states = torch.zeros_like(value_states)
-
-        query_states = query_states.view(batch * seq_len, num_heads, head_dim)
-        if support_gqa:
+        if whole_net_trans:
+            batch, seq_len, num_heads, head_dim = attn_output.size()
+            num_key_value_heads = key_states.shape[-2]
+            
+            query_states = query_states.view(batch * seq_len, num_heads, head_dim)
             key_states = key_states.view(batch * seq_len, num_key_value_heads, head_dim)
             value_states = value_states.view(batch * seq_len, num_key_value_heads, head_dim)
+            attn_output = attn_output.view(batch * seq_len, num_heads, head_dim)
+            grad_output = grad_output.view(batch * seq_len, num_heads, head_dim)
+            lse = lse.view(batch * seq_len, num_heads, 1)
+            cos = cos.view(1, seq_len, head_dim).repeat(batch, 1, 1).view(batch * seq_len, 1, head_dim)
+            sin = sin.view(1, seq_len, head_dim).repeat(batch, 1, 1).view(batch * seq_len, 1, head_dim)
+
+            grad_query_states = torch.zeros_like(query_states)
+            grad_key_states = torch.zeros_like(key_states)
+            grad_value_states = torch.zeros_like(value_states)
+
+            if attention_mask is not None:
+                attention_mask = attention_mask.view(batch * seq_len, seq_len)
+            else:
+                attention_mask = None
+            
+            input_lengths = torch.tensor([seq_len] * batch, dtype=torch.int32, device=query_states.device)  
+
+            torch.ops.my_ops.llama_attention_backward(
+                query_states,
+                key_states,
+                value_states,
+                attn_output,
+                grad_output,
+                lse,
+                grad_query_states,
+                grad_key_states,
+                grad_value_states,
+                cos,
+                sin,
+                attention_mask,
+                input_lengths,
+                seq_len,
+                ctx.softmax_scale)
+            
+            grad_query_states = grad_query_states.view(batch, seq_len, num_heads, head_dim)
+            grad_key_states = grad_key_states.view(batch, seq_len, num_key_value_heads, head_dim)
+            grad_value_states = grad_value_states.view(batch, seq_len, num_key_value_heads, head_dim)
+
+            return grad_query_states, grad_key_states, grad_value_states, None, None, None, None, None
         else:
-            key_states = key_states.view(batch * seq_len, num_heads, head_dim)
-            value_states = value_states.view(batch * seq_len, num_heads, head_dim)
-        
-        attn_output = attn_output.view(batch * seq_len, num_heads, head_dim)
-        grad_output = grad_output.view(batch * seq_len, num_heads, head_dim)
-        lse = lse.view(batch * seq_len, num_heads, 1)
-        cos = cos.view(batch * seq_len, 1, head_dim)
-        sin = sin.view(batch * seq_len, 1, head_dim)
-        
-        grad_query_states = grad_query_states.view(batch * seq_len, num_heads, head_dim)
-        if support_gqa:
+            seq_len, batch, num_heads, head_dim = attn_output.size()
+            assert seq_len * batch <= 4096, "batch size too large"
+            num_key_value_heads = key_states.shape[-2]
+
+            grad_query_states = torch.zeros_like(query_states)
+            grad_key_states = torch.zeros_like(key_states)
+            grad_value_states = torch.zeros_like(value_states)
+
+            query_states = query_states.view(batch * seq_len, num_heads, head_dim)
+            key_states = key_states.view(batch * seq_len, num_key_value_heads, head_dim)
+            value_states = value_states.view(batch * seq_len, num_key_value_heads, head_dim)
+            
+            attn_output = attn_output.view(batch * seq_len, num_heads, head_dim)
+            grad_output = grad_output.view(batch * seq_len, num_heads, head_dim)
+            lse = lse.view(batch * seq_len, num_heads, 1)
+            cos = cos.view(batch * seq_len, 1, head_dim)
+            sin = sin.view(batch * seq_len, 1, head_dim)
+            
+            grad_query_states = grad_query_states.view(batch * seq_len, num_heads, head_dim)
             grad_key_states = grad_key_states.view(batch * seq_len, num_key_value_heads, head_dim)
             grad_value_states = grad_value_states.view(batch * seq_len, num_key_value_heads, head_dim)
-        else:
-            grad_key_states = grad_key_states.view(batch * seq_len, num_heads, head_dim)
-            grad_value_states = grad_value_states.view(batch * seq_len, num_heads, head_dim)
-        
-        input_lengths = torch.tensor([seq_len * batch], dtype=torch.int32, device=query_states.device)
+            
+            input_lengths = torch.tensor([seq_len * batch], dtype=torch.int32, device=query_states.device)
 
-        torch.ops.my_ops.llama_attention_backward(
-            query_states,
-            key_states,
-            value_states,
-            attn_output,
-            grad_output,
-            lse,
-            grad_query_states,
-            grad_key_states,
-            grad_value_states,
-            cos,
-            sin,
-            attention_mask,
-            input_lengths,
-            batch * seq_len,
-            ctx.softmax_scale)
-        
-        grad_query_states = grad_query_states.view(seq_len, batch, num_heads, head_dim)
-        if not support_gqa:
-            grad_key_states = grad_key_states.view(seq_len, batch, num_key_value_heads, groups, head_dim)
-            grad_value_states = grad_value_states.view(seq_len, batch, num_key_value_heads, groups, head_dim)
-            grad_key_states = grad_key_states.cpu().sum(dim=3).to(grad_key_states.device)
-            grad_value_states = grad_value_states.cpu().sum(dim=3).to(grad_value_states.device)
-        else:
+            torch.ops.my_ops.llama_attention_backward(
+                query_states,
+                key_states,
+                value_states,
+                attn_output,
+                grad_output,
+                lse,
+                grad_query_states,
+                grad_key_states,
+                grad_value_states,
+                cos,
+                sin,
+                attention_mask,
+                input_lengths,
+                batch * seq_len,
+                ctx.softmax_scale)
+            
+            grad_query_states = grad_query_states.view(seq_len, batch, num_heads, head_dim)
             grad_key_states = grad_key_states.view(seq_len, batch, num_key_value_heads, head_dim)
             grad_value_states = grad_value_states.view(seq_len, batch, num_key_value_heads, head_dim)
 
-        return grad_query_states, grad_key_states, grad_value_states, None, None, None, None, None
+            return grad_query_states, grad_key_states, grad_value_states, None, None, None, None, None
 
 class Qwen2AttentionQKV(torch.nn.Module):
     def __init__(self):
