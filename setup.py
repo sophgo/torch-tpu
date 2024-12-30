@@ -369,16 +369,13 @@ class bdist_wheel(_bdist_wheel, ExtBase):
         for lib in sccl_libs:
             self.copy_file(lib, os.path.join(pkg_dir, f'lib/'))
 
-        # include all libraries for support both cmodel and device
-        base_fw_libs = glob.glob(os.path.join(TPUV7_RUNTIME_PATH, f'tpuv7-emulator_0.1.0/lib/*.so*'))
+        # include libraries just cmodel, for inst-cache use.
+        # tpuv7-emulator_0.1.0 is the cmodel version of runtime, no device version contained.
+        base_fw_libs = glob.glob(os.path.join(TPUV7_RUNTIME_PATH, f'tpuv7-emulator_0.1.0/lib/libtpuv7_emulator.so'))
+        base_fw_libs.append(os.path.join(TPUV7_RUNTIME_PATH, 'tpuv7-emulator_0.1.0/lib/libdnnl.so.3'))
         for lib in base_fw_libs:
             target = os.path.join(pkg_dir, f'lib/', os.path.basename(lib))
             self.copy_file(lib, target)
-            if "libtpuv7_rt.so" in lib:
-                cmd = ['patchelf', '--set-rpath', '$ORIGIN', target]
-                subprocess.check_call(cmd)
-
-            # set rpath to $ORIGIN for cmodel
         
         bmlib_libs = glob.glob(os.path.join(BMLIB_PATH, f'lib/libbmlib.so*'))
         for lib in bmlib_libs:
