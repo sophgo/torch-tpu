@@ -23,7 +23,7 @@ static inline void simplify ( int * shape, int * src_stride, int * dst_stride, i
   for ( int i = 0; i < ( *dim ) - 1; )
   {
     if ( src_stride[i + 1] * shape[i + 1] == src_stride[i] &&
-         dst_stride[i + 1] * shape[i + 1] == dst_stride[i] )
+         dst_stride[i + 1] * shape[i + 1] == dst_stride[i] && shape[i] * shape[i + 1] < (1<<16))
     {
       shape[i] *= shape[i + 1];
       for ( int j = i + 1; j < ( *dim ) - 1; ++j )
