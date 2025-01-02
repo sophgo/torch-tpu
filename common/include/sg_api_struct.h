@@ -7,7 +7,7 @@
 #define FW_MAX_SHAPE_DIMS      8
 #endif
 #ifndef FW_MAX_CONCAT_NUM
-#define FW_MAX_CONCAT_NUM     10
+#define FW_MAX_CONCAT_NUM     16
 #endif
 
 

@@ -97,10 +97,14 @@ int tpu_kernel_api_concat_multi_core ( const void * args )
 {
   sg_api_concat_t * api = ( sg_api_concat_t * ) args;
   int st_by_concatway[FW_MAX_CONCAT_NUM] = { 0 };
-  tpu_initialize();
 #ifdef BACKEND_SG2260
 #ifdef USING_PERF_MODE
     tpu_sync_all();
+#endif
+#ifndef REMOVE_POLLS_IN_LLM
+  tpu_initialize();
+#else
+  tpu_poll_descriptor();
 #endif
   nodechip_concat_nd_multi_core ( api->input_global_addrs,
                        api->output_global_addr,
@@ -110,9 +114,12 @@ int tpu_kernel_api_concat_multi_core ( const void * args )
                        api->input_num,
                        api->axis,
                       ( data_type_t ) api->dtype );
+#ifndef REMOVE_POLLS_IN_LLM
   tpu_poll();
+#endif
   return 0;
-#else
+#else  
+  tpu_initialize();
   nodechip_concat_nd ( api->input_global_addrs,
                        api->output_global_addr,
                        api->input_shapes,

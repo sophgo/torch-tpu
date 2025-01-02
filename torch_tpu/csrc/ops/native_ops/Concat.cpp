@@ -6,7 +6,7 @@
 #include "TPUTorchUtils.h"
 #include "common/config.h"
 
-#define TPU_MAX_CONCAT_NUM 10
+#define TPU_MAX_CONCAT_NUM 16
 
 namespace at
 {
