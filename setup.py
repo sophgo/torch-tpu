@@ -201,6 +201,10 @@ class CPPLibBuild(build_clib, ExtBase, object):
         if os.getenv('TPUTRAIN_DEBUG'):
             install_cmd = 'install'
             cmake_args.append('-DDEBUG=ON')
+        if arch == 'sg2260':
+            cmake_args.append('-DBACKEND_SG2260=ON')
+        elif arch == 'bm1684x':
+            cmake_args.append('-DBACKEND_1684X=ON')
         build_dir = os.path.join(BASE_DIR, 'build/torch-tpu')
         os.makedirs(build_dir, exist_ok=True)
         build_args = ['-j', str(os.cpu_count())]
