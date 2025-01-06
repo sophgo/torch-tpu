@@ -426,8 +426,8 @@ void nodechip_reduce_sum_2d_multi_core (
   const int core_idx = tpu_core_index();
   if (core_idx < min_cores_needed ) {
         int input_addr_fixed_move = axis == 0 ? 1 : fixed_dim_num;
-        global_addr_t input_global_addr_new = input_global_addr + core_idx * input_addr_fixed_move * expected_avg_slice * tpu_data_type_size(dtype);
-        global_addr_t output_global_addr_new = output_global_addr + core_idx * 1 * expected_avg_slice * tpu_data_type_size(dtype);
+        global_addr_t input_global_addr_new = input_global_addr + (unsigned long long)(core_idx) * input_addr_fixed_move * expected_avg_slice * tpu_data_type_size(dtype);
+        global_addr_t output_global_addr_new = output_global_addr + (unsigned long long)(core_idx) * 1 * expected_avg_slice * tpu_data_type_size(dtype);
         nodechip_reduce_sum_2d_multi_core_single_stage(
           input_global_addr_new,
           output_global_addr_new,
