@@ -3840,8 +3840,8 @@ tpu_status_t sgdnnLLamaMlp ( tpu_resource_t resource ,
   SGDNN_CHECK ( input.dim == 2 );
   SGDNN_CHECK ( weight0.dim == 2 );
   SGDNN_CHECK ( weight2.dim == 2 );
-  SGDNN_CHECK ( weight0.shape[0] == input.shape[1] );
-  SGDNN_CHECK ( weight2.shape[0] == weight0.shape[1] );
+  SGDNN_CHECK ( weight0.shape[1] == input.shape[1] );
+  SGDNN_CHECK ( weight2.shape[0] == weight0.shape[0] );
 
   SGDNN_CHECK ( sgdnnIsTensorContiguous ( &input ) );
   SGDNN_CHECK ( sgdnnIsTensorContiguous ( &weight0 ) );

@@ -61,8 +61,8 @@ def check_mlp():
     intermediate_size = 256
     net_cpu = LLamaMlp(embed_dim, intermediate_size)
 
-    w0 = net_cpu.state_dict()['mm0.weight'].clone().detach().transpose(0,1).contiguous().requires_grad_(False).to(device).half()
-    w1 = net_cpu.state_dict()['mm1.weight'].clone().detach().transpose(0,1).contiguous().requires_grad_(False).to(device).half()
+    w0 = net_cpu.state_dict()['mm0.weight'].clone().detach().requires_grad_(False).to(device).half()
+    w1 = net_cpu.state_dict()['mm1.weight'].clone().detach().requires_grad_(False).to(device).half()
     w2 = net_cpu.state_dict()['mm2.weight'].clone().detach().transpose(0,1).contiguous().requires_grad_(False).to(device).half()
 
     net_tpu = LLamaMlpBlock(w0, w1, w2)
