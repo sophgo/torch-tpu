@@ -81,17 +81,15 @@ Torch.distributed 支持 SCCL 内置后端，SCCL 通信后端能够充分利用
     rank = int(os.environ.get("RANK"))
     world_size = int(os.environ.get("WORLD_SIZE"))
 
-    # get chip_map
-    if torch_tpu.tpu.is_rank_table_valid():
-        chip_map = torch_tpu.tpu.read_rank_table()
+    options = torch_tpu.ProcessGroupSCCLOptions()
+    # there are three forms of rank_table setting: 1.read_rank_table 2.CHIP_MAP env 3. chip_map variable
+    torch_tpu.tpu.set_chip_map(options, use_rank_table=False, chip_map=[0,1,2,3,4,5,6,7])
 
     # init device
-    torch_tpu.tpu.set_device(chip_map[rank])
-    device = torch.device(f"{TPU}:{chip_map[rank]}")
+    torch_tpu.tpu.set_device(options.chip_map[rank])
+    device = torch.device(f"{TPU}:{options.chip_map[rank]}")
 
     # init backend
-    options = torch_tpu.ProcessGroupSCCLOptions()
-    options.chip_map = chip_map
     dist.init_process_group(
         backend="sccl", 
         rank=rank, 

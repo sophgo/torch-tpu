@@ -143,19 +143,15 @@ import json
 def rank_table_valid():
     path = os.environ.get("RANK_TABLE_FILE")
     if path is None:
-        print("RANK_TABLE_FILE not set\n")
-        return False
+        raise AssertionError("RANK_TABLE_FILE not set\n")
     if not os.path.exists(path):
-        print("File not exist\n")
-        return False
+        raise AssertionError("File not exist\n")
     return True
 
 def read_rank_table():
     world_rank = int(os.environ.get("RANK"))
     if world_rank == None:
         world_rank = int(os.environ.get("OMPI_COMM_WORLD_RANK", 0))
-    if not rank_table_valid():
-        return None
     path = os.environ.get("RANK_TABLE_FILE")
     with open(path,'r') as f:
         data = json.load(f)
@@ -171,6 +167,17 @@ def read_rank_table():
 
 def is_rank_table_valid():
     return rank_table_valid()
+
+def set_chip_map(options, use_rank_table=False, chip_map=[0,1,2,3,4,5,6,7]):
+    if use_rank_table and is_rank_table_valid():
+        chip_map = read_rank_table()
+        os.environ['CHIP_MAP'] = chip_map
+    else:
+        if os.environ.get('CHIP_MAP'):
+            chip_map = list(map(int, os.environ.get('CHIP_MAP').split(",")))
+        else:
+            os.environ["CHIP_MAP"] = ",".join(map(str, chip_map))
+    options.chip_map = chip_map
 
 @lru_cache(maxsize=1)
 def device_count():

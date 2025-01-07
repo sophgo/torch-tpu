@@ -17,10 +17,7 @@ if rank == None:
 tensor_len = 4
 # init dist and logger
 options = torch_tpu.ProcessGroupSCCLOptions()
-chip_map = [0,1,2,3,4,5,6,7]
-if torch_tpu.tpu.is_rank_table_valid():
-    chip_map = torch_tpu.tpu.read_rank_table()
-options.chip_map = chip_map
+torch_tpu.tpu.set_chip_map(options, use_rank_table=False)
 torch_tpu.tpu.set_device(options.chip_map[int(rank)])
 dist.init_process_group(backend="sccl", rank=int(rank), world_size=int(world_size), pg_options=options)
 init_logger()
@@ -31,7 +28,7 @@ if is_slave():
     # tensor = torch.zeros(tensor_len).to(torch.bool)
     logger.info(f"{int(rank)} input: {tensor}")
     print(tensor)
-    device = torch.device(f"{TPU}:{chip_map[int(rank)]}")
+    device = torch.device(f"{TPU}:{options.chip_map[int(rank)]}")
     if torch_tpu.tpu.current_device() == device.index:
         tensor = tensor.to(device)
 
@@ -40,7 +37,7 @@ if is_master():
     # tensor = torch.randint(0, 2, (tensor_len,), dtype=torch.bool)
     logger.info(f"{int(rank)} input: {tensor}")
     print(tensor)
-    device = torch.device(f"{TPU}:{chip_map[int(rank)]}")
+    device = torch.device(f"{TPU}:{options.chip_map[int(rank)]}")
     if torch_tpu.tpu.current_device() == device.index:
         tensor = tensor.to(device)
 
