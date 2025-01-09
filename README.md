@@ -14,6 +14,7 @@ Torch-TPU is a PyTorch extension that enables running PyTorch models on Sophgo T
     - [Download the required repositories](#download-the-required-repositories)
     - [Prepare Environment](#prepare-environment)
     - [Build and Install](#build-and-install)
+    - [Debugging](#debugging)
     - [Usage](#usage)
     - [Advanced Features](#advanced-features)
       - [JIT Mode (SG2260 only)](#jit-mode-sg2260-only)
@@ -41,10 +42,14 @@ docker run -it
         --name torch_tpu \
         --env HOME=$HOME \
         -v /etc/passwd:/etc/passwd:ro -v /etc/group:/etc/group:ro -v /etc/shadow:/etc/shadow:ro \
+        -v /etc/sudoers:/etc/sudoers:ro \
+        --shm-size=32G \
         -v $HOME:$HOME \
         -v /workspace:/workspace \
         -v /opt:/opt \
         sophgo/torch_tpu:v0.1  /bin/bash
+
+docker exec -it torch_tpu /bin/bash
 ```
 
 2. Install torch-tpu
@@ -149,6 +154,28 @@ If everything went well, now we have a editable development install.
 
 + If you change kernel source files in `firmware_core`, cd into `build/firmware_sg2260[_cmodel]` and execute `make`.
 
+### Debugging
+
+
+```bash
+cd tpu-train
+source scripts/envsetup.sh sg2260
+
+# Debug TPU1686, optional
+export EXTRA_CONFIG='-DDEBUG=ON -DUSING_FW_PRINT=ON -DUSING_FW_DEBUG=ON'
+
+# Build TPU base kernels
+rebuild_TPU1686
+
+# Make sure we have a clean env
+pip uninstall --yes torch-tpu
+
+# Debug torch-tpu, optional
+export TPUTRAIN_DEBUG=ON
+
+# Build torch-tpu and install editable
+develop_torch_tpu
+```
 
 ### Usage
 
@@ -165,7 +192,9 @@ Torch-TPU defaults to JIT Mode. To use Eager Mode:
 - Comment it out
 
 #### Storage Format
+
 To use 32IC format for convolution weights:
+
 ```bash
 export TORCHTPU_STORAGE_CAST=ON
 ```
