@@ -202,6 +202,36 @@ index 989a4438..06ce8f56 100644
                          fp32_params_this_group.append(param)
                          param_group['params'][i] = param
  
+diff --git a/PAI-Megatron-LM-240718/megatron/core/tensor_parallel/cross_entropy.py b/PAI-Megatron-LM-240718/megatron/core/tensor_parallel/cross_entropy.py
+index 45fa0751..8524b795 100644
+--- a/PAI-Megatron-LM-240718/megatron/core/tensor_parallel/cross_entropy.py
++++ b/PAI-Megatron-LM-240718/megatron/core/tensor_parallel/cross_entropy.py
+@@ -53,9 +53,12 @@ class VocabParallelCrossEntropy:
+         partition_vocab_size = vocab_parallel_logits.size()[-1]
+         logits_2d = vocab_parallel_logits.view(-1, partition_vocab_size)
+         masked_target_1d = masked_target.view(-1)
+-        arange_1d = torch.arange(start=0, end=logits_2d.size()[0], device=logits_2d.device)
+-        predicted_logits_1d = logits_2d[arange_1d, masked_target_1d]
+-        predicted_logits_1d = predicted_logits_1d.clone().contiguous()
++        # arange_1d = torch.arange(start=0, end=logits_2d.size()[0], device=logits_2d.device)
++        # predicted_logits_1d = logits_2d[arange_1d, masked_target_1d]
++        # predicted_logits_1d = predicted_logits_1d.clone().contiguous()
++        predicted_logits_1d = torch.empty(masked_target_1d.shape[0], 1, dtype = logits_2d.dtype, device = logits_2d.device)
++        torch.gather(logits_2d, 1, masked_target_1d.unsqueeze(1), out=predicted_logits_1d)
++        predicted_logits_1d = predicted_logits_1d.squeeze(1)
+         predicted_logits = predicted_logits_1d.view_as(target)
+         predicted_logits[target_mask] = 0.0
+ 
+@@ -107,7 +110,8 @@ class VocabParallelCrossEntropy:
+         grad_output: torch.Tensor,
+     ) -> torch.Tensor:
+ 
+-        grad_2d[arange_1d, masked_target_1d] -= softmax_update
++        #grad_2d[arange_1d, masked_target_1d] -= softmax_update
++        grad_2d.scatter_add_(dim=1, index=masked_target_1d.unsqueeze(1), src= -softmax_update.unsqueeze(1))
+ 
+         # Finally elementwise multiplication with the output gradients.
+         grad_input.mul_(grad_output.unsqueeze(dim=-1))
 diff --git a/PAI-Megatron-LM-240718/megatron/training/arguments.py b/PAI-Megatron-LM-240718/megatron/training/arguments.py
 index 2eeea3d5..ab2a1947 100644
 --- a/PAI-Megatron-LM-240718/megatron/training/arguments.py
@@ -218,26 +248,30 @@ index 2eeea3d5..ab2a1947 100644
      group.add_argument('--distributed-timeout-minutes', type=int, default=10,
                         help='Timeout minutes for torch.distributed.')
 diff --git a/PAI-Megatron-LM-240718/megatron/training/training.py b/PAI-Megatron-LM-240718/megatron/training/training.py
-index f8169d54..441a0344 100644
+index f8169d54..6181c199 100644
 --- a/PAI-Megatron-LM-240718/megatron/training/training.py
 +++ b/PAI-Megatron-LM-240718/megatron/training/training.py
-@@ -644,6 +644,7 @@ def setup_model_and_optimizer(
+@@ -644,6 +644,10 @@ def setup_model_and_optimizer(
  
  
  from megatron.core.distributed import ParamAndGradBuffer
-+from nnmoduletools.module_debugger import print_log
++try:
++    from nnmoduletools.module_debugger import print_log
++except ImportError:
++    print_log = print
  
  
  def __get_param_buffer_size(buffer: ParamAndGradBuffer) -> int:
-@@ -685,6 +686,7 @@ def train_step(
+@@ -685,6 +689,8 @@ def train_step(
  
      # Forward pass.
      forward_backward_func = get_forward_backward_func()
 +    timestamp = time.time()
++    
      losses_reduced = forward_backward_func(
          forward_step_func=forward_step_func,
          data_iterator=data_iterator,
-@@ -695,6 +697,8 @@ def train_step(
+@@ -695,6 +701,8 @@ def train_step(
          decoder_seq_length=args.decoder_seq_length,
          forward_only=False,
      )
@@ -246,24 +280,26 @@ index f8169d54..441a0344 100644
  
      # Empty unused memory.
      if args.empty_unused_memory_level >= 1:
-@@ -708,6 +712,7 @@ def train_step(
+@@ -708,6 +716,8 @@ def train_step(
          memory_stats_collector.sample_overall_data()
  
      # Update parameters.
 +    timestamp = time.time()
++    
      timers('optimizer', log_level=1).start(barrier=args.barrier_with_L1_time)
      if hasattr(optimizer, 'chunk_manager') and memory_stats_collector is not None:
          update_successful, grad_norm, num_zeros_in_grad = optimizer.step(
-@@ -723,6 +728,8 @@ def train_step(
-         )
+@@ -724,6 +734,9 @@ def train_step(
  
          memory_stats_collector.sample_overall_data()
+ 
 +    elapsed_time = time.time() - timestamp
 +    print_log(f"Time elapsed for iter {args.curr_iteration} update parameters: {elapsed_time}s")
- 
++
      # Vision momentum.
      if getattr(args, 'vision_pretraining', False) and args.vision_pretraining_type == "dino":
-@@ -996,7 +1003,7 @@ def training_log(
+         unwrapped_model = unwrap_model(model[0])
+@@ -996,7 +1009,7 @@ def training_log(
              if torch.distributed.get_rank() == 0:
                  num_microbatches = get_num_microbatches()
                  report_theoretical_memory(args, num_microbatches=num_microbatches, verbose=True)
@@ -294,10 +330,10 @@ index 5965d785..685f77c7 100644
  
         if args.pipeline_model_parallel_size == 1:
 diff --git a/examples/qwen2/pretrain_qwen.py b/examples/qwen2/pretrain_qwen.py
-index 8ab6be0..1e359d5 100644
+index 8ab6be0..0cc9005 100644
 --- a/examples/qwen2/pretrain_qwen.py
 +++ b/examples/qwen2/pretrain_qwen.py
-@@ -6,7 +6,19 @@ from functools import partial
+@@ -6,7 +6,22 @@ from functools import partial
  from typing import Union
  
  import torch
@@ -305,11 +341,14 @@ index 8ab6be0..1e359d5 100644
 +# import torch._dynamo
 +try:
 +    import torch_tpu
-+    import tpu_workarounds
++    from torch_tpu import accelerator
 +except ImportError:
-+    pass
++    import sys
++    sys.path.append(os.path.join(os.path.dirname(__file__), "..", "..", "..", "tpu-train", "torch_tpu"))
++    import accelerator
 +
-+import megatron_deepspeed_tpu
++# import megatron_deepspeed_tpu
++
 +
 +from distutils.util import strtobool
 +if strtobool(os.environ.get('ENABLE_FRAMEWORK_DEBUGGER', "0")):
@@ -318,7 +357,7 @@ index 8ab6be0..1e359d5 100644
  from megatron.core import mpu
  from megatron.core.datasets.blended_megatron_dataset_builder import (
      BlendedMegatronDatasetBuilder,
-@@ -37,7 +49,7 @@ from megatron_patch.model.qwen2.model import GPTModel
+@@ -37,7 +52,7 @@ from megatron_patch.model.qwen2.model import GPTModel
  from megatron_patch.model.qwen2.transformer_config import Qwen2TransformerConfig
  from megatron_patch.tokenizer import build_tokenizer, get_tokenizer
  
@@ -327,7 +366,7 @@ index 8ab6be0..1e359d5 100644
  
  
  def model_provider(
-@@ -78,6 +90,9 @@ def model_provider(
+@@ -78,6 +93,9 @@ def model_provider(
          seq_len_interpolation_factor=args.rotary_seq_len_interpolation_factor,
      )
  
