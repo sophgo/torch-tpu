@@ -40,8 +40,7 @@ class LoadDynLib(KernelInterface):
                         fp_scalars_index.append(index)
                     else:
                         assert False, "don't support"
-            torch.ops.my_ops.dynlib_execute(os.path.join(os.path.join(ret.path, "lib"),
-                                        '{name}.so'.format(name=ret.function_name)),
+            torch.ops.my_ops.dynlib_execute(ret.so_path,
                                         ret.function_name, tensors, tensors_index,
                                         fp_scalars, fp_scalars_index, fixed_scalars,
                                         fixed_scalars_index)

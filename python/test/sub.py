@@ -3,6 +3,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 
 import torch_tpu
+import functools
 torch.manual_seed(1000)
 torch.set_printoptions(precision=6)
 device = "tpu:0"
@@ -28,9 +29,26 @@ def case1():
 import ppl
 import ppl.language as pl
 
+@functools.lru_cache()
+def sub_kernel_tiling(fn,
+                      x_ptr,
+                      y_ptr,
+                      output_ptr,
+                      N:pl.constexpr,
+                      C:pl.constexpr,
+                      H:pl.constexpr,
+                      W:pl.constexpr,
+                      block_w:pl.constexpr):
+    while block_w > 0:
+        ret = fn(x_ptr, y_ptr, output_ptr, N, C, H, W, block_w)
+        if ret.errorCode == 0:
+            return ret
+        else:
+            block_w = block_w // 2
+    raise RuntimeError("tiling failed")
+
 @torch_tpu.jit
-@ppl.autotiling({'block_w': lambda nargs: nargs['block_w'] // 2 if nargs['block_w'] // 2 > 1 else 1})
-@ppl.jit
+@ppl.jit(tiling=sub_kernel_tiling)
 def sub_kernel(x_ptr,
               y_ptr,
               output_ptr,
@@ -65,9 +83,26 @@ def sub_kernel(x_ptr,
       out = x - y
       pl.dma.store(o_global[:,:,:, slice_offset + w_idx:slice_offset + w_idx + tile_w], out)
 
+@functools.lru_cache()
+def add_kernel_tiling(fn,
+                      x_ptr,
+                      y_ptr,
+                      output_ptr,
+                      N:pl.constexpr,
+                      C:pl.constexpr,
+                      H:pl.constexpr,
+                      W:pl.constexpr,
+                      block_w:pl.constexpr):
+    while block_w > 0:
+        ret = fn(x_ptr, y_ptr, output_ptr, N, C, H, W, block_w)
+        if ret.errorCode == 0:
+            return ret
+        else:
+            block_w = block_w // 2
+    raise RuntimeError("tiling failed")
+
 @torch_tpu.jit
-@ppl.autotiling({'block_w': lambda nargs: nargs['block_w'] // 2 if nargs['block_w'] // 2 > 1 else 1})
-@ppl.jit
+@ppl.jit(tiling=add_kernel_tiling)
 def add_kernel(x_ptr,
               y_ptr,
               output_ptr,
