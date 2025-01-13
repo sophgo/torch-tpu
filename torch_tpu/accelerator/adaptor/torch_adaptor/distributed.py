@@ -68,16 +68,14 @@ def all_reduce_wrapper(func):
         return func(tensor, op=op, group=group, async_op=async_op)
     return wrapper
 
-def all_gather_into_tensor_using_all_gather(output_tensor, input_tensor, group=None, async_op=False):
-    print_log(f"- {dist.get_backend()} {get_tensor_info(input_tensor)}: all_gather_into_tensor is not supported. Using All Gather instead.")
-    group_size = dist.get_world_size(group=group)
-    if group_size == 1:
-        output_tensor.copy_(input_tensor)
-        return Noop()
-    tensor_list = [torch.zeros_like(input_tensor) for _ in range(group_size)]
-    handle = dist.all_gather(tensor_list=tensor_list, tensor=input_tensor, group=group, async_op=async_op)
-    output_tensor.copy_(torch.cat(tensor_list, dim=0))
-    return handle
+def all_gather_into_tensor_wrapper(func):
+    @wraps(func)
+    def wrapper(output_tensor, input_tensor, group=None, async_op=False):
+        if dist.get_world_size(group=group) == 1:
+            return Noop()
+        print_log(f"- {dist.get_backend()}: {func.__name__} {get_tensor_info(input_tensor)}")
+        return func(output_tensor, input_tensor, group=group, async_op=async_op)
+    return wrapper
 
 def init_wrapper(func):
     @wraps(func)
@@ -111,8 +109,8 @@ def new_group_wrapper(func):
 torch.distributed.broadcast = broadcast_wrapper(torch.distributed.broadcast)
 torch.distributed.reduce = reduce_wrapper(torch.distributed.reduce)
 torch.distributed.all_reduce = all_reduce_wrapper(torch.distributed.all_reduce)
-torch.distributed.all_gather_into_tensor = all_gather_into_tensor_using_all_gather
-torch.distributed.distributed_c10d.all_gather_into_tensor = all_gather_into_tensor_using_all_gather
+torch.distributed.all_gather_into_tensor = all_gather_into_tensor_wrapper(torch.distributed.all_gather_into_tensor)
+torch.distributed.distributed_c10d.all_gather_into_tensor = all_gather_into_tensor_wrapper(torch.distributed.all_gather_into_tensor)
 torch.distributed.init_process_group = init_wrapper(torch.distributed.init_process_group)
 torch.distributed.new_group = new_group_wrapper(torch.distributed.new_group)
 
@@ -120,4 +118,3 @@ torch.distributed.isend = send_recv_wrapper(torch.distributed.isend)
 torch.distributed.irecv = send_recv_wrapper(torch.distributed.irecv)
 torch.distributed.distributed_c10d.isend = torch.distributed.isend
 torch.distributed.distributed_c10d.irecv = torch.distributed.irecv
-torch.distributed.barrier = lambda *args, **kwargs: None
