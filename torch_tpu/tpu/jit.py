@@ -27,19 +27,22 @@ class LoadDynLib(KernelInterface):
             fp_scalars_index = []
             fixed_scalars = []
             fixed_scalars_index = []
+            arg_index = 0
             for index, tensor in enumerate(args):
                 if isinstance(tensor, torch.Tensor):
                     tensors.append(tensor)
-                    tensors_index.append(index)
+                    tensors_index.append(arg_index)
+                    arg_index += 1
                 elif index not in ret.constexpr_index:
                     if isinstance(tensor, int) or isinstance(tensor, bool):
                         fixed_scalars.append(tensor)
-                        fixed_scalars_index.append(index)
+                        fixed_scalars_index.append(arg_index)
                     elif isinstance(tensor, float):
                         fp_scalars.append(tensor)
-                        fp_scalars_index.append(index)
+                        fp_scalars_index.append(arg_index)
                     else:
                         assert False, "don't support"
+                    arg_index += 1
             torch.ops.my_ops.dynlib_execute(ret.so_path,
                                         ret.function_name, tensors, tensors_index,
                                         fp_scalars, fp_scalars_index, fixed_scalars,
