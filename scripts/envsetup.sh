@@ -55,16 +55,6 @@ function set_ppl_env() {
      local chip=$1
      local root_path=$2
      pip install tpu-ppl -i https://pypi.tuna.tsinghua.edu.cn/simple
-     case $chip in
-    "sg2260")
-        export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:${root_path}/third_party/tpuv7_runtime/tpuv7-emulator_0.1.0/lib
-        ;;
-    "bm1684x")
-        ;;
-    *)
-        echo "unknow chip: $CHIP_ARCH"
-        ;;
-     esac
 }
 
 ######## ===== ENVS TO COMPILE TPUTRAIN ======########
