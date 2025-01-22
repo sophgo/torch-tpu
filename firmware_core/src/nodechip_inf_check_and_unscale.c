@@ -257,7 +257,7 @@ int tpu_kernel_api_inf_check_and_unscale_multi_core(const void *args){
 
     if (core_idx * length_slice < length) {
         nodechip_inf_check_and_unscale(
-            api->input_global_addr + (length_slice * core_idx) * tpu_data_type_size(api->idtype),
+            api->input_global_addr + (unsigned long long) length_slice * core_idx * tpu_data_type_size(api->idtype),
             api->found_inf_buffer_global_addr + core_idx * 64,
             cur_length_slice,
             api->inv_scale,

@@ -87,7 +87,7 @@ try:
         megatron.training.training.get_forward_backward_func = get_fb_func_wrapper(megatron.core.pipeline_parallel.schedules.get_forward_backward_func)
 
         # save results of all reduce
-        megatron.core.tensor_parallel.layers.LinearWithGradAccumulationAndAsyncCommunication = register_hook_for_Function(megatron.core.tensor_parallel.layers.LinearWithGradAccumulationAndAsyncCommunication)
+        # megatron.core.tensor_parallel.layers.LinearWithGradAccumulationAndAsyncCommunication = register_hook_for_Function(megatron.core.tensor_parallel.layers.LinearWithGradAccumulationAndAsyncCommunication)
         
         # will get error view+inplace when using hook
         def attention_mask_func(attention_scores, attention_mask):

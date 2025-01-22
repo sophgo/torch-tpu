@@ -8,6 +8,18 @@ index 2e86fdf..53406fc 100644
  Bigcode-Evaluation-Harness*
 +*__pycache__*
 Submodule PAI-Megatron-LM-240718 contains modified content
+diff --git a/PAI-Megatron-LM-240718/megatron/core/distributed/distributed_data_parallel.py b/PAI-Megatron-LM-240718/megatron/core/distributed/distributed_data_parallel.py
+index 7b95b858..c863eaa0 100644
+--- a/PAI-Megatron-LM-240718/megatron/core/distributed/distributed_data_parallel.py
++++ b/PAI-Megatron-LM-240718/megatron/core/distributed/distributed_data_parallel.py
+@@ -196,6 +196,7 @@ class DistributedDataParallel(MegatronModule):
+                 grad_acc = param_tmp.grad_fn.next_functions[0][0]
+                 grad_acc.register_hook(self._make_param_hook(param, self.param_to_buffer))
+                 self.grad_accs.append(grad_acc)
++                param_tmp.view(-1)[-1].cpu() # force sync; workaround for memory access violation between d2d and h2d
+ 
+     def forward(self, *inputs, **kwargs):
+         """
 diff --git a/PAI-Megatron-LM-240718/megatron/core/distributed/param_and_grad_buffer.py b/PAI-Megatron-LM-240718/megatron/core/distributed/param_and_grad_buffer.py
 index efed47c5..620bfb6c 100644
 --- a/PAI-Megatron-LM-240718/megatron/core/distributed/param_and_grad_buffer.py
@@ -181,7 +193,7 @@ index 708ccd01..b3edc26a 100644
  
      # Scale.
 diff --git a/PAI-Megatron-LM-240718/megatron/core/optimizer/optimizer.py b/PAI-Megatron-LM-240718/megatron/core/optimizer/optimizer.py
-index 989a4438..06ce8f56 100644
+index 989a4438..4be4193d 100644
 --- a/PAI-Megatron-LM-240718/megatron/core/optimizer/optimizer.py
 +++ b/PAI-Megatron-LM-240718/megatron/core/optimizer/optimizer.py
 @@ -502,7 +502,7 @@ class Float16OptimizerWithFloat16Params(MixedPrecisionOptimizer):
@@ -202,6 +214,58 @@ index 989a4438..06ce8f56 100644
                          fp32_params_this_group.append(param)
                          param_group['params'][i] = param
  
+@@ -553,10 +553,13 @@ class Float16OptimizerWithFloat16Params(MixedPrecisionOptimizer):
+         main_grads = []
+ 
+         # fp32 params from float16 ones.
+-        for main_group in self.fp32_from_float16_groups:
+-            for main_param in main_group:
+-                if main_param.grad is not None:
+-                    main_grads.append(main_param.grad.data)
++        # for main_group in self.fp32_from_float16_groups:
++        #     for main_param in main_group:
++        #         if main_param.grad is not None:
++        #             main_grads.append(main_param.grad.data)
++        chunk_size = 1073741824
++        for i in range(0, self._all_grad_data_fp32.numel(), chunk_size):
++            main_grads.append(self._all_grad_data_fp32[i : i + chunk_size])
+ 
+         # Append fp32 parameters.
+         for main_group in self.fp32_from_fp32_groups:
+@@ -576,14 +579,31 @@ class Float16OptimizerWithFloat16Params(MixedPrecisionOptimizer):
+         return model_data, main_data
+ 
+     def _copy_model_grads_to_main_grads(self):
++        cnt = 0
++        for model_group, main_group in zip(self.float16_groups, self.fp32_from_float16_groups):
++            for model_param, main_param in zip(model_group, main_group):
++                if hasattr(model_param, 'main_grad'):
++                    cnt += model_param.main_grad.numel()
++                else:
++                    cnt += model_param.grad.numel()
++        
++        self._all_grad_data_fp32 = torch.empty(cnt, dtype=torch.float, device='cuda')
++
++        offset = 0
+         # This only needs to be done for the float16 group.
+         for model_group, main_group in zip(self.float16_groups, self.fp32_from_float16_groups):
+             for model_param, main_param in zip(model_group, main_group):
+                 if hasattr(model_param, 'main_grad'):
+-                    main_param.grad = model_param.main_grad.float()
++                    # main_param.grad = model_param.main_grad.float()
++                    main_param.grad = self._all_grad_data_fp32[offset : offset + model_param.main_grad.numel()].view(model_param.main_grad.size())
++                    offset += model_param.main_grad.numel()
++                    main_param.grad.copy_(model_param.main_grad) # force dtype convert
+                 else:
+                     if model_param.grad is not None:
+-                        main_param.grad = model_param.grad.float()
++                        # main_param.grad = model_param.grad.float()
++                        main_param.grad = self._all_grad_data_fp32[offset : offset + model_param.grad.numel()].view(model_param.grad.size())
++                        offset += model_param.grad.numel()
++                        main_param.grad.copy_(model_param.grad) # force dtype convert
+ 
+                 # Safe to deallocate model's grad/main_grad after copying.
+                 # (If using contiguous buffers, main_grad's memory should
 diff --git a/PAI-Megatron-LM-240718/megatron/core/tensor_parallel/cross_entropy.py b/PAI-Megatron-LM-240718/megatron/core/tensor_parallel/cross_entropy.py
 index 45fa0751..8524b795 100644
 --- a/PAI-Megatron-LM-240718/megatron/core/tensor_parallel/cross_entropy.py
@@ -232,6 +296,42 @@ index 45fa0751..8524b795 100644
  
          # Finally elementwise multiplication with the output gradients.
          grad_input.mul_(grad_output.unsqueeze(dim=-1))
+diff --git a/PAI-Megatron-LM-240718/megatron/core/utils.py b/PAI-Megatron-LM-240718/megatron/core/utils.py
+index e4b06b93..6a3738b8 100644
+--- a/PAI-Megatron-LM-240718/megatron/core/utils.py
++++ b/PAI-Megatron-LM-240718/megatron/core/utils.py
+@@ -466,7 +466,30 @@ def local_multi_tensor_applier(op, noop_flag_buffer, tensor_lists, *args):
+ ## computes l2 norm for a list of contiguous tensors
+ ## works as a drop-in replacement for amp_C.multi_tensor_l2norm
+ def local_multi_tensor_l2_norm(chunk_size, noop_flag, tensor_lists, per_tensor, *args):
+-    l2 = [[(torch.norm(tensor)) for tensor in tensor_list] for tensor_list in tensor_lists]
++    # l2 = [[(torch.norm(tensor)) for tensor in tensor_list] for tensor_list in tensor_lists]
++    # l2_reduced = torch.norm(torch.tensor(l2))
++    # l2_cuda = torch.tensor([float(l2_reduced)], dtype=torch.float, device='cuda')
++    # return l2_cuda, None
++    
++    tensor_sizes = [((x, y), tensor_lists[x][y].numel()) for x in range(len(tensor_lists)) for y in range(len(tensor_lists[x]))]
++    tensor_sizes.sort(key=lambda x: -x[1])
++    chunk_size = 65536
++    combined_tensor_list = []
++    cnt = 0
++    to_combine = []
++    for (x, y), numel in tensor_sizes:
++        if numel >= chunk_size:
++            combined_tensor_list.append(tensor_lists[x][y])
++            continue
++        to_combine.append(tensor_lists[x][y].view(-1))
++        cnt += numel
++        if cnt >= chunk_size or len(to_combine) >= 16:
++            combined_tensor_list.append(torch.cat(to_combine))
++            to_combine = []
++            cnt = 0
++    if to_combine:
++        combined_tensor_list.append(torch.cat(to_combine))
++    l2 = [torch.norm(tensor) for tensor in combined_tensor_list]
+     l2_reduced = torch.norm(torch.tensor(l2))
+     l2_cuda = torch.tensor([float(l2_reduced)], dtype=torch.float, device='cuda')
+     return l2_cuda, None
 diff --git a/PAI-Megatron-LM-240718/megatron/training/arguments.py b/PAI-Megatron-LM-240718/megatron/training/arguments.py
 index 2eeea3d5..ab2a1947 100644
 --- a/PAI-Megatron-LM-240718/megatron/training/arguments.py
@@ -330,10 +430,10 @@ index 5965d785..685f77c7 100644
  
         if args.pipeline_model_parallel_size == 1:
 diff --git a/examples/qwen2/pretrain_qwen.py b/examples/qwen2/pretrain_qwen.py
-index 8ab6be0..0cc9005 100644
+index 8ab6be0..2797fc9 100644
 --- a/examples/qwen2/pretrain_qwen.py
 +++ b/examples/qwen2/pretrain_qwen.py
-@@ -6,7 +6,22 @@ from functools import partial
+@@ -6,7 +6,19 @@ from functools import partial
  from typing import Union
  
  import torch
@@ -347,9 +447,6 @@ index 8ab6be0..0cc9005 100644
 +    sys.path.append(os.path.join(os.path.dirname(__file__), "..", "..", "..", "tpu-train", "torch_tpu"))
 +    import accelerator
 +
-+# import megatron_deepspeed_tpu
-+
-+
 +from distutils.util import strtobool
 +if strtobool(os.environ.get('ENABLE_FRAMEWORK_DEBUGGER', "0")):
 +    from nnmoduletools.module_debugger import register_hook
@@ -357,7 +454,7 @@ index 8ab6be0..0cc9005 100644
  from megatron.core import mpu
  from megatron.core.datasets.blended_megatron_dataset_builder import (
      BlendedMegatronDatasetBuilder,
-@@ -37,7 +52,7 @@ from megatron_patch.model.qwen2.model import GPTModel
+@@ -37,7 +49,7 @@ from megatron_patch.model.qwen2.model import GPTModel
  from megatron_patch.model.qwen2.transformer_config import Qwen2TransformerConfig
  from megatron_patch.tokenizer import build_tokenizer, get_tokenizer
  
@@ -366,7 +463,7 @@ index 8ab6be0..0cc9005 100644
  
  
  def model_provider(
-@@ -78,6 +93,9 @@ def model_provider(
+@@ -78,6 +90,9 @@ def model_provider(
          seq_len_interpolation_factor=args.rotary_seq_len_interpolation_factor,
      )
  
