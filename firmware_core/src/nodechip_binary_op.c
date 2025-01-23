@@ -470,7 +470,6 @@ int tpu_kernel_api_binary_multi_core(const void *args) {
   tpu_initialize();
 #else
   tpu_poll_descriptor();
-  tpu_cdma_poll();
 #endif
 
 #ifdef USING_PERF_MODE
