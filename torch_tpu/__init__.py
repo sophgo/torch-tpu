@@ -27,25 +27,38 @@ lib_pwd = os.path.join(pkg_path, 'lib/')
 
 arch = arch_env = os.environ.get('CHIP_ARCH')
 
-arch = arch_env = os.environ.get('CHIP_ARCH', "sg2260")
+def make_symlinks(arch_sel):
+    tpudnn = f'libtpudnn.{arch_sel}.so'
+    sofn = f'libtorch_tpu.{arch_sel}.so'
+    symlink(sofn, os.path.join(lib_pwd, 'libtorch_tpu.so'))
+    symlink(tpudnn, os.path.join(lib_pwd, 'libtpudnn.so'))
+
+if arch_env:
+    # Env overrides everything
+    make_symlinks(arch_env)
+
 if not arch:
-    from ctypes import cdll
+    # Try existing symlinks
+    import re
     try:
-        cdll.LoadLibrary("libtpuv7_rt.so")
-        arch = 'sg2260'
-    except:
-        arch = 'bm1684x'
+        tpudnn = os.readlink(os.path.join(lib_pwd, 'libtpudnn.so'))
+        arch = re.match(r'^libtpudnn.(\w+).so$', 'libtpudnn.bm1684x.so').group(1)
+    except FileNotFoundError:
+        pass
 
-if arch_env or not os.path.exists(os.path.join(lib_pwd, 'libtorch_tpu.so')):
-    if arch == 'sg2260':
-        symlink('libtorch_tpu.sg2260.so', os.path.join(lib_pwd, 'libtorch_tpu.so'))
-        tpudnn = 'libtpudnn.sg2260.so'
-    else:
-        symlink('libtorch_tpu.bm1684x.so', os.path.join(lib_pwd, 'libtorch_tpu.so'))
-        tpudnn = 'libtpudnn.bm1684x.so'
-
-    if os.path.exists(os.path.join(lib_pwd, tpudnn)):
-        symlink(tpudnn, os.path.join(lib_pwd, 'libtpudnn.so'))
+if not arch:
+    # Select arch by checking if coresponding tpuDNN works
+    from ctypes import cdll
+    arch_list = ['sg2260', 'bm1684x']
+    for arch_iter in arch_list:
+        tpudnn = f'libtpudnn.{arch_iter}.so'
+        try:
+            cdll.LoadLibrary(os.path.join(lib_pwd, tpudnn))
+        except:
+            continue
+        arch = arch_iter
+        make_symlinks(arch_iter)
+        break
 
 if not os.environ.get('TPU_EMULATOR_PATH'):
     os.environ['TPU_EMULATOR_PATH'] = os.path.join(lib_pwd, f'{arch}_cmodel_firmware.so')
