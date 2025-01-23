@@ -55,6 +55,7 @@ data_type_t         odtype,
 bool                reshaped_bias,
 int                 merge_coeff,
 int                 weight_is_coeff,
+int                 use_3ic_optimize,
 nnvlc_common_spec_t nnvlc_param);
 
 int tpu_kernel_api_conv2d_multi_core ( const void * args ) {
@@ -97,6 +98,7 @@ int tpu_kernel_api_conv2d_multi_core ( const void * args ) {
     false,
     false,
     true,
+    0,
     nnvlc_param );
   tpu_sync_all();
   tpu_poll();
