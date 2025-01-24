@@ -1,6 +1,7 @@
 #pragma once
 
 #include <cstdint>
+#include <cstddef>
 
 extern "C"
 {
@@ -26,7 +27,9 @@ extern "C"
     tpudnnStatus_t tpudnnGetC2CRing(int world_size, int *chipMap);
     tpudnnStatus_t tpudnnGetUniqueId(tpudnnHandle_t handle, char* uniqueId);
     tpudnnHandle_t tpudnnHandleFromStream(int deviceID, void* stream, void* module);
-
+    tpudnnStatus_t tpudnnLaunchKernel(tpudnnHandle_t handle, const char *kernelName,
+                                      void *arg, size_t argBytes, int groupNum, int groupSize);
+    tpudnnStatus_t tpudnnSync(tpudnnHandle_t handle);
 }
 
 #include "tpuDNNTensor.h"

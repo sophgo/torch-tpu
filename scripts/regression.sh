@@ -249,8 +249,8 @@ function run_online_regression_test() {
   echo "[NOTE]Print_necessary_info"
   echo "[INFO]CURRENT_DIR:$CURRENT_DIR"
 
-  SKIP_DOC=true
   bash scripts/release.sh || return -1
+  export SKIP_DOC=true
 
   test_CHIP_ARCH=${1:-bm1684x}
   LIBSOPHON_LINK_PATTERN=${2:-local} #local or stable

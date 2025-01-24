@@ -294,6 +294,14 @@ tpudnnStatus_t tpudnnBinaryBcastAsync(
     tpudnnTensor_t output,
     int binary_type);
 
+tpudnnStatus_t tpudnnBinaryCAsync(
+    tpudnnHandle_t handle,
+    tpudnnTensor_t input,
+    float scalar,
+    tpudnnTensor_t output,
+    int binary_type,
+    bool inversed);
+
 tpudnnStatus_t tpudnnMatmulAsync(
     tpudnnHandle_t handle,
     tpudnnTensor_t left,

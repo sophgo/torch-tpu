@@ -358,13 +358,13 @@ int tpu_kernel_api_active_multi_core(const void *args) {
   }
 
   unsigned long long slice = DIV_UP(length, slice_num);
-  if (length < slice_num) {
-    slice = 1;
-  }
   unsigned int offset = slice_idx * slice;
   unsigned long long real_slice = MIN(slice, length - offset);
-  if (real_slice <= 0)
-    return -1;
+  if (offset >= length)
+  {
+    // No task for me? It's ok.
+    return 0;
+  }
   const int dsize = tpu_data_type_size(dtype);
 
   nodechip_active_v2(api->input_global_addr + offset * dsize,

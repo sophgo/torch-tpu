@@ -56,8 +56,6 @@
 
 namespace at {
 
-#define HACK_CPU_IMP (0)
-
 #define IMP_ACTIVE(OP)                                                         \
   Tensor OP##_tpu(const Tensor &self) {                                        \
     auto out = empty(self.sizes(), self.options());                            \
@@ -77,10 +75,10 @@ namespace at {
 #define IMP_ACTIVE_OUT(OP, ACTIVE_TYPE, TIMING_NAME)                           \
   Tensor &OP##_out_tpu(const Tensor &self, Tensor &out) {                      \
     if (self.dim() > 0) {                                                      \
-      CHECK_TENSOR_IN_DEVICE_NO_CONTIGUOUS(self);                                            \
+      CHECK_TENSOR_IN_DEVICE_NO_CONTIGUOUS(self);                              \
     }                                                                          \
     CHECK_TENSOR_IN_DEVICE(out);                                               \
-    if ( HACK_CPU_IMP ) {                                                      \
+    if (!IS_TPU_TENSOR(self)) {                                                \
       auto self_cpu = OP(self.cpu());                                          \
         tpu::TPUCopyHostToDevice(out.data_ptr(),                               \
                                  self_cpu.contiguous().data_ptr(),             \

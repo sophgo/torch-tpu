@@ -42,19 +42,20 @@ Tensor &binary_op_tpu(const Tensor &self, const Tensor &other,
 
   if (self.dim() == 0 || other.dim() == 0) {
     // tensor op scalar
+    auto stream = c10_tpu::getCurrentTPUStream();
     if (self.dim() == 0) {
-      auto status = sgdnnBinaryC(
-          tpu::TPUGetDeviceResource(), tpu::TPUGenerateSgdnnTensor(other_),
+      auto status = tpudnnBinaryCAsync(
+          stream, tpu::TPUGenerateTpudnnTensor(stream, other_),
           self.item().toFloat() * alpha.toFloat(),
-          tpu::TPUGenerateSgdnnTensor(out_), binary_type, 1);
-      TORCH_CHECK(status == SG_SUCCESS);
+          tpu::TPUGenerateTpudnnTensor(stream, out_), binary_type, 1);
+      TORCH_CHECK(status == TPUDNN_STATUS_SUCCESS);
       TIMING_END(tpu::BINARYOP_C);
     } else {
-      auto status = sgdnnBinaryC(
-          tpu::TPUGetDeviceResource(), tpu::TPUGenerateSgdnnTensor(self_),
+      auto status = tpudnnBinaryCAsync(
+          stream, tpu::TPUGenerateTpudnnTensor(stream, self_),
           other.item().toFloat() * alpha.toFloat(),
-          tpu::TPUGenerateSgdnnTensor(out_), binary_type, 0);
-      TORCH_CHECK(status == SG_SUCCESS);
+          tpu::TPUGenerateTpudnnTensor(stream, out_), binary_type, 0);
+      TORCH_CHECK(status == TPUDNN_STATUS_SUCCESS);
       TIMING_END(tpu::BINARYOP_C);
     }
     if(out.dtype() == torch::kInt64){
@@ -102,6 +103,9 @@ Tensor &binary_op_tpu(const Tensor &self, const Tensor &other,
         other_shape[i] = 1;
       }
     }
+
+    auto stream = c10_tpu::getCurrentTPUStream();
+
     for (int i = 0; i < max_dim; i++) {
       TORCH_CHECK(self_shape[i] == other_shape[i] || self_shape[i] == 1 ||
                       other_shape[i] == 1,
@@ -109,19 +113,19 @@ Tensor &binary_op_tpu(const Tensor &self, const Tensor &other,
                   "(%d) at non-signleton dimension %d",
                   self_shape[i], other_shape[i], i)
     }
-    SgdnnTensor_t other_t;
+    tpudnnTensor_t other_t;
     if (self.dtype() != other.dtype()) {
       // 创建一个新的 Tensor 对象，使用 self 的数据类型和 other 的大小和设备选项
       at::Tensor other_new = at::empty_like(other, self.options());
       other_new.copy_(other);
       // 使用新的 Tensor 对象进行操作，而不修改原始的 const Tensor &
-      other_t = tpu::TPUGenerateSgdnnTensor(other_new);
+      other_t = tpu::TPUGenerateTpudnnTensor(stream, other_new);
     } else {
-      other_t = tpu::TPUGenerateSgdnnTensor(other);
+      other_t = tpu::TPUGenerateTpudnnTensor(stream, other);
     }
-    SgdnnTensor_t self_t = tpu::TPUGenerateSgdnnTensor(self);
+    auto self_t = tpu::TPUGenerateTpudnnTensor(stream, self);
     // SgdnnTensor_t other_t = tpu::TPUGenerateSgdnnTensor(other);
-    SgdnnTensor_t out_t = tpu::TPUGenerateSgdnnTensor(out);
+    auto out_t = tpu::TPUGenerateTpudnnTensor(stream, out);
 
     if (self_dim != other_dim) {
       auto &change_t = self_dim > other_dim ? other_t : self_t;
@@ -135,9 +139,9 @@ Tensor &binary_op_tpu(const Tensor &self, const Tensor &other,
       change_t.dim = max_dim;
     }
 
-    auto status = sgdnnBinaryBcast(tpu::TPUGetDeviceResource(), self_t, other_t,
+    auto status = tpudnnBinaryBcastAsync(stream, self_t, other_t,
                                    alpha.toDouble(), out_t, binary_type);
-    TORCH_CHECK(status == SG_SUCCESS);
+    TORCH_CHECK(status == TPUDNN_STATUS_SUCCESS);
     TIMING_END(tpu::BINARYOP_BCAST)
   }
   return out;

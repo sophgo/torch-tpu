@@ -6,14 +6,14 @@ DIR="$( cd "$( dirname "${BASH_SOURCE[0]}")"/.. >/dev/null 2>&1 && pwd )"
 # ------------------------------------------------------------------------------
 pushd ${DIR}/docs/quick_start
 make clean
-make pdf
+make pdf || exit -1
 popd
 
 # generate torch-tpu_technical_manual
 # ------------------------------------------------------------------------------
 pushd ${DIR}/docs/developer_manual
 make clean
-make pdf
+make pdf || exit -1
 popd
 # ------------------------------------------------------------------------------
 
