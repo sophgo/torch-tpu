@@ -412,6 +412,7 @@ class SophLlamaMlp(nn.Module):
         self.is_cmd = is_cmd
 
     def forward(self, hidden_states, w0, w1, w2, output):
+        w0, w1 = w0.transpose(-1, -2).contiguous(), w1.transpose(-1, -2).contiguous()
         if self.is_cmd:
             torch.ops.my_ops.enable_profile(40960, True)
         elif self.is_pmu:
