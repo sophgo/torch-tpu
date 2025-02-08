@@ -461,7 +461,8 @@ setup(
             'console_scripts': [
                 'tpu_apply_all_patch=torch_tpu.utils:apply_all_patches',
                 'tpu_revert_all_patch=torch_tpu.utils:revert_all_patches',
-                'tpu_gen_sccl_rank_table=torch_tpu.tpu:_main'
+                'tpu_gen_sccl_rank_table=torch_tpu.utils:gen_sccl_rank_table',
+                'tpu_show_topology=torch_tpu.utils:show_topology'
             ],
         },
         python_requires=">=3.8",

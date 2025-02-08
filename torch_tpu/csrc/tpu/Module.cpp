@@ -153,6 +153,52 @@ PyObject* THPTModule_tpuSynchronize(PyObject* _unused, PyObject* noargs) {
   END_HANDLE_TH_ERRORS
 }
 
+PyObject* THPTModule_tpuGetTopology(PyObject* self, PyObject* args) {
+  HANDLE_TH_ERRORS
+  pybind11::gil_scoped_release no_gil;
+  PyObject* input_list = nullptr;
+
+  if (!PyArg_ParseTuple(args, "O", &input_list)) {
+    return nullptr;
+  }
+
+  if (!PyList_Check(input_list)) {
+    PyErr_SetString(PyExc_TypeError, "Input must be a list.");
+    return nullptr;
+  }
+  int dev_cnt = tpu::TPUGetDeviceCount();
+
+  if (PyList_Size(input_list) != dev_cnt) {
+    PyErr_SetString(PyExc_ValueError, "input_list size does not match device count.");
+    return nullptr;
+  }
+
+  std::vector<std::vector<int>> topology(dev_cnt, std::vector<int>(dev_cnt));
+  tpu::TPUGetTopology(&topology);
+
+  // Assign values from 'topology' to 'input_list'
+  pybind11::gil_scoped_acquire acquire_gil;
+  for (int i = 0; i < dev_cnt; ++i) {
+    PyObject* row = PyList_GetItem(input_list, i);
+    if (!PyList_Check(row) || PyList_Size(row) != dev_cnt) {
+      PyErr_SetString(PyExc_ValueError, "Each element of input_list must be a list of the correct size.");
+      return nullptr;
+    }
+    for (int j = 0; j < dev_cnt; ++j) {
+      PyObject* value = PyLong_FromLong(topology[i][j]); 
+      // Replace the existing item in the row with the new value
+      if (PyList_SetItem(row, j, value) != 0) {
+        PyErr_SetString(PyExc_RuntimeError, "Failed to set item in input_list.");
+        Py_DECREF(value);
+        return nullptr;
+      }
+    }
+  }
+
+  Py_RETURN_NONE;
+  END_HANDLE_TH_ERRORS
+}
+
 PyObject* THPTModule_tpuCanDeviceAccessPeer_wrap(PyObject* self, PyObject* args) {
   HANDLE_TH_ERRORS
   PyObject *value_1 = nullptr;
@@ -350,6 +396,7 @@ static struct PyMethodDef THPTModule_methods[] = {
     {"_tpu_getDeviceCount", (PyCFunction)THPTModule_getDeviceCount_wrap, METH_NOARGS, nullptr},
 #if defined BACKEND_SG2260
     {"_tpu_synchronize", (PyCFunction)THPTModule_tpuSynchronize, METH_NOARGS, nullptr},
+    {"_tpu_getTopology", (PyCFunction)THPTModule_tpuGetTopology, METH_VARARGS, nullptr},
     {"_tpu_canDeviceAccessPeer", (PyCFunction)THPTModule_tpuCanDeviceAccessPeer_wrap, METH_VARARGS, nullptr},
     {"_tpu_getDeviceUtilizationRate", (PyCFunction)THPTModule_getDeviceUtilizationRate_wrap, METH_O, nullptr},
     {"_tpu_getCurrentStream", (PyCFunction)THPTModule_getCurrentStream_wrap, METH_O, nullptr},

@@ -55,19 +55,31 @@ Torch.distributed 支持 SCCL 内置后端，SCCL 通信后端能够充分利用
 2. 初始化SCCL后端
 3. 调用集合通信函数
 
-（1）准备设备资源配置文件:
+（1）获取 c2c 连接拓扑信息:
 
-以下为本地8个 TPU 设备生成配置文件的命令:
+以下为生成多芯 c2c 连接拓扑可视化图片的命令:
 
 .. code-block:: shell
 
-    # 设置生成配置文路径
-    export RANK_TABLE_FILE=rank_table_file_path 
-    tpu_gen_sccl_rank_table --device_id "[[0, 1, 2, 3, 4, 5, 6, 7]]"
+    tpu_show_topology
 
-其中 device_id 为 TPU 设备在计算节点上的序列号和 rank 的对应列表，如 ``device_id[0][0]`` 表示第一个节点的 rank 0对应的 TPU 设备ID。
+多芯 c2c 连接拓扑可视化图片保存至名为 `c2c_topology.png` 的图片中，如：
 
-（2）``all_reduce`` 原语示例代码:
+.. figure:: ../assets/3_c2c_topology.png
+   :scale: 50%
+   :align: center
+   :alt: C2C Topology
+
+SCCL集合通信采用ring算法，四芯和八芯的chip_map须按照环的顺序填写，如：
+
+.. code-block:: c++
+
+    //four chips
+    chip_map=[7,6,2,3] // or [1,0,2,3] or [1,0,4,5]
+    //eight chips
+    chip_map=[0,2,6,7,3,1,5,4]
+
+（2）`all_reduce` 原语示例代码:
 
 .. code-block:: python
 

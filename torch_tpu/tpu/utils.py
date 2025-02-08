@@ -203,6 +203,9 @@ def synchronize(device = None):
     torch_tpu.tpu._lazy_init()
     with torch_tpu.tpu.device(device):
         return torch_tpu._C._tpu_synchronize()
+
+def get_topology(list = None):
+    return torch_tpu._C._tpu_getTopology(list)
     
 def current_stream(device=None):
     r"""Returns the currently selected :class:`Stream` for a given device.

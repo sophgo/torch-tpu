@@ -35,6 +35,7 @@ __all__ = [
     "is_rank_table_valid",
     "read_rank_table",
     "set_chip_map",
+    "get_topology",
 
     ## amp related
     "amp",
@@ -123,7 +124,7 @@ from .random import * # noqa: F403
 
 
 from .utils import ( _lazy_call, _lazy_init, init,is_initialized, is_available,
-                    device, device_of, device_count, current_device, set_device, read_rank_table,
+                    device, device_of, device_count, current_device, set_device, read_rank_table, get_topology,
                     is_rank_table_valid, set_chip_map, synchronize, current_stream, set_stream, default_stream,
                     StreamContext, current_blas_handle, can_device_access_peer, get_arch_list,
                     get_device_capability, get_device_name, get_device_properties,
@@ -138,6 +139,5 @@ if BACKEND == "SG2260":
 from .autocast_utils import *  # noqa: F403
 from .optimer_utils import * # noqa: F403
 from .custom_op import *
-from .gen_sccl_rank_table import _main
 
 default_generators: Tuple[torch._C.Generator] = ()

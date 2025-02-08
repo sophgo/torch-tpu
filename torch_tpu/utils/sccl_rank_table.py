@@ -80,7 +80,7 @@ def gen_sccl_json(device_id: list, emulator: bool = False, device_ip: list = [["
     with open(path, 'w', encoding="utf-8") as f:
         json.dump(sccl_config, f, indent=4, separators=(',', ':'))
 
-def _main():
+def gen_sccl_rank_table():
     # only support single-machine multi-card now
     parser = argparse.ArgumentParser(description='Gen sccl rank table')
     parser.add_argument('--device_id', type=str, help='device id list')
@@ -91,7 +91,5 @@ def _main():
 
     gen_sccl_json(args.device_id, args.emulator, args.device_ip)
 
-if __name__ == "__main__":
-    _main()
-
 # python3 torch_tpu/tpu/gen_sccl_rank_table.py --device_id "[['0', '1', '2', '3', '4', '5', '6', '7']]" --device_ip "[['127.0.0.1', '127.0.0.1', '127.0.0.1', '127.0.0.1', '127.0.0.1', '127.0.0.1', '127.0.0.1', '127.0.0.1']]"
+# tpu_gen_sccl_rank_table --device_id "[['0', '1', '2', '3', '4', '5', '6', '7']]" --device_ip "[['127.0.0.1', '127.0.0.1', '127.0.0.1', '127.0.0.1', '127.0.0.1', '127.0.0.1', '127.0.0.1', '127.0.0.1']]"
