@@ -289,8 +289,8 @@ class fx2mlir(object):
         # self.bmodel_path = os.path.join(self.work_dir, tpu_ir+'.bmodel')
         self.bmodel_path = f"{self.args.model}_{self.args.batch}.bmodel"
         quant_args = "--quant_input --quant_output " if "bwd" not in mlir_file else "--quant_input"
-        self.tpu_mlir = f"{self.model_name}_bm1690_f16_tpu.mlir"
-        string = f"model_deploy.py --mlir {mlir_file} --quantize F16 --chip bm1690 --num_core 8 --disable_layer_group {quant_args} --model {self.bmodel_path} --debug"
+        self.tpu_mlir = f"{self.model_name}_{self.args.chip}_f16_tpu.mlir"
+        string = f"model_deploy.py --mlir {mlir_file} --quantize F16 --chip {self.args.chip} --num_core {self.num_core} --disable_layer_group {quant_args} --model {self.bmodel_path} --debug"
         os.system(string)
         return self.bmodel_path
         # mlir_mod = None
@@ -683,178 +683,40 @@ class fx2mlir(object):
         if dtype[0] is None:
             dtype.pop(0)
         bias_op = self.mlir.none_op
-        if self.args.chip == "bm1690":
-            grad_out_shape = list(node.args[0].meta['val'].size())
-            input_shape = list(node.args[1].meta['val'].size())
-            kernel_shape = list(node.args[2].meta['val'].size())
-            shape0 = None if node.meta['val'][0]==None else list(node.meta['val'][0].size())
-            shape1 = None if node.meta['val'][1]==None else list(node.meta['val'][1].size())
-            shape2 = None if node.meta['val'][2]==None else list(node.meta['val'][2].size())
-            inserts = [0,0]
-            output = top.ConvbwdOp(
-                self.mlir.get_tensor_type([]),
-                self.mlir.get_tensor_type([]),#F32Type.get()
-                self.mlir.get_tensor_type([]),
-                grad_out,
-                input,
-                weight,
-                group,
-                input_shape,
-                grad_out_shape,
-                kernel_shape,
-                strides,
-                dilations,
-                pads,
-                inserts,
-                output_mask[0],
-                output_mask[1],
-                output_mask[2],
-                loc=self.get_loc([node.name+'.gradinput',
-                                 node.name+'.gradweight',
-                                 node.name+'.gradbias']),
-                ip=self.mlir.insert_point
-            )
-            if output_mask[0]:
-                grad_input = output.grad_input
-            if output_mask[1]:
-                transposed_grad_weight = output.grad_weight
-            if output_mask[2]:
-                grad_bias = output.grad_bias
-            self.operands[node] = [grad_input,transposed_grad_weight,grad_bias]
-        # else:
-        #     if output_mask[1]:
-        #         shape = list(node.args[0].meta['val'].size())
-        #         shape[0],shape[1] = shape[1],shape[0]
-        #         transposed_gradout = top.TransposeOp(self.mlir.get_tensor_type([]),
-        #                                 grad_out,
-        #                                 0,
-        #                                 1,
-        #                                 loc=self.get_loc(node.name+'_transposed_gradout'),
-        #                                 ip=self.mlir.insert_point).output
-        #         if shape[2]>32:
-        #             input_shape = list(node.args[1].meta['val'].size())
-        #             grad_out_shape = list(node.args[0].meta['val'].size())
-        #             transposed_grad_weight = top.ConvBwdWeightOp(self.mlir.get_tensor_type([]),
-        #                                                     input,
-        #                                                     grad_out,
-        #                                                     transposed_gradout, #weight
-        #                                                     group,
-        #                                                     input_shape,
-        #                                                     grad_out_shape,
-        #                                                     kernel_shape,
-        #                                                     strides,
-        #                                                     dilations,
-        #                                                     pads,
-        #                                                     output_mask[-1],
-        #                                                     loc=self.get_loc(node.name+'_grad_weight'),
-        #                                                     ip=self.mlir.insert_point).output
-        #             tmp = list(node.users.keys())
-        #             self.name_map[tmp[mask_to_users_idx[1]]] = node.name+'_grad_weight'
-        #         else:
-        #             shape = list(node.args[1].meta['val'].size())
-        #             shape[0],shape[1] = shape[1],shape[0]
-        #             transposed_input = top.TransposeOp(self.mlir.get_tensor_type([]),
-        #                                 input,
-        #                                 0,
-        #                                 1,
-        #                                 loc=self.get_loc(node.name+'_transposed_input'),
-        #                                 ip=self.mlir.insert_point).output
-        #             # kernel_shape_ = list(node.args[1].meta['val'].size())
-        #             grad_weight_kernel_shape = list(node.args[0].meta['val'].size())
-        #             grad_weight_kernel_shape = grad_weight_kernel_shape[2:]
-        #             grad_weight_shape = shape1
-        #             grad_weight_shape[0],grad_weight_shape[1] = grad_weight_shape[1],grad_weight_shape[0]
-        #             if pads[0]>0 and strides[0]>1:
-        #                 new_strides = [1,1]
-        #                 new_pads = copy.deepcopy(pads)
-        #                 input_shape = list(node.args[1].meta['val'].size())
-        #                 pad_cal = grad_weight_shape[2]-(pads[0]+input_shape[2]-strides[0]*(grad_weight_kernel_shape[0]-1))
-        #                 new_pads[2],new_pads[3] = pad_cal,pad_cal
-        #                 grad_weight = top.ConvOp(self.mlir.get_tensor_type([]),
-        #                                     transposed_input,
-        #                                     transposed_gradout,
-        #                                     bias_op,
-        #                                     kernel_shape=grad_weight_kernel_shape,
-        #                                     strides=new_strides,
-        #                                     dilations=strides,
-        #                                     pads = new_pads,
-        #                                     group=group,
-        #                                     do_relu=False,
-        #                                     loc=self.get_loc(node.name+'_grad_weight'),
-        #                                     ip=self.mlir.insert_point).output
-        #                 tmp = list(node.users.keys())
-        #                 self.name_map[tmp[mask_to_users_idx[1]]] = node.name+'_grad_weight'
-        #             else:
-        #                 input_shape = list(node.args[1].meta['val'].size())
-        #                 dilations_grad_weight = strides
-        #                 if input_shape[-1] % 2!=0: #!=
-        #                     strides = [1,1]
-        #                 grad_weight = top.ConvOp(self.mlir.get_tensor_type([]),
-        #                                     transposed_input,
-        #                                     transposed_gradout,
-        #                                     bias_op,
-        #                                     kernel_shape=grad_weight_kernel_shape,
-        #                                     strides=strides,
-        #                                     #strides = [1,1],
-        #                                     #dilations=strides,
-        #                                     dilations = dilations_grad_weight,
-        #                                     pads = pads,
-        #                                     group=group,
-        #                                     do_relu=False,
-        #                                     loc=self.get_loc(node.name+'_grad_weight'),
-        #                                     ip=self.mlir.insert_point).output
-        #                 tmp = list(node.users.keys())
-        #                 self.name_map[tmp[mask_to_users_idx[1]]] = node.name+'_grad_weight'
-        #             temp_shape = shape1
-        #             temp_shape[0],temp_shape[1] = temp_shape[1],temp_shape[0]
-        #             # shape = list(node.args[1].meta['val'].size())
-        #             transposed_grad_weight = top.TransposeOp(self.mlir.get_tensor_type([]),
-        #                                 grad_weight,
-        #                                 0,
-        #                                 1,
-        #                                 loc=self.get_loc(node.name+'_transposed_grad_weight'),
-        #                                 ip=self.mlir.insert_point).output
-        #             tmp = list(node.users.keys())
-        #             self.name_map[tmp[mask_to_users_idx[1]]] = node.name+'_transposed_grad_weight'
-        #     if output_mask[0]:
-        #         transposed_weight_shape = list(node.args[2].meta['val'].size())
-        #         transposed_weight_shape[0],transposed_weight_shape[1] = transposed_weight_shape[1],transposed_weight_shape[0]
-        #         transposed_weight = top.TransposeOp(self.mlir.get_tensor_type([]),
-        #                             weight,
-        #                             0,
-        #                             1,
-        #                             loc=self.get_loc(node.name+'_transposed_weight_2'),
-        #                             ip=self.mlir.insert_point).output
-        #         grad_input_kernel_shape = list(node.args[0].meta['val'].size())[-1]
-        #         grad_input_output_shape = list(node.args[1].meta['val'].size())[-1]
-        #         output_padding = grad_input_output_shape-strides[0]*(grad_input_kernel_shape-1)+2*pads[0]-kernel_shape[0]
-        #         output_padding = [output_padding]*2
-        #         grad_input = top.DeconvOp(self.mlir.get_tensor_type([]),
-        #                             grad_out,
-        #                             transposed_weight,
-        #                             bias_op,
-        #                             kernel_shape = kernel_shape,
-        #                             strides = strides,
-        #                             pads = pads,
-        #                             group = group,
-        #                             dilations = dilations,
-        #                             output_padding = output_padding,
-        #                             do_relu = False,
-        #                             loc=self.get_loc(node.name+'_grad_input'),
-        #                             ip=self.mlir.insert_point).output
-        #         tmp = list(node.users.keys())
-        #         self.name_map[tmp[mask_to_users_idx[0]]] = node.name+'_grad_input'
-        #     if output_mask[2]:
-        #         grad_bias = top.ReduceOp(self.mlir.get_tensor_type([]),
-        #                             grad_out,
-        #                             axes = [0,2,3],
-        #                             keepdims = False,
-        #                             mode = StringAttr.get("ReduceSum"),
-        #                             loc=self.get_loc(node.name+"_grad_bias"),
-        #                             ip=self.mlir.insert_point).output
-        #         tmp = list(node.users.keys())
-        #         self.name_map[tmp[mask_to_users_idx[2]]] = node.name+'_grad_bias'
-            self.operands[node] = [grad_input,transposed_grad_weight,grad_bias]
+        grad_out_shape = list(node.args[0].meta['val'].size())
+        input_shape = list(node.args[1].meta['val'].size())
+        kernel_shape = list(node.args[2].meta['val'].size())
+        inserts = [0,0]
+        output = top.ConvbwdOp(
+            self.mlir.get_tensor_type([]),
+            self.mlir.get_tensor_type([]),#F32Type.get()
+            self.mlir.get_tensor_type([]),
+            grad_out,
+            input,
+            weight,
+            group,
+            input_shape,
+            grad_out_shape,
+            kernel_shape,
+            strides,
+            dilations,
+            pads,
+            inserts,
+            output_mask[0],
+            output_mask[1],
+            output_mask[2],
+            loc=self.get_loc([node.name+'.gradinput',
+                                node.name+'.gradweight',
+                                node.name+'.gradbias']),
+            ip=self.mlir.insert_point
+        )
+        if output_mask[0]:
+            grad_input = output.grad_input
+        if output_mask[1]:
+            transposed_grad_weight = output.grad_weight
+        if output_mask[2]:
+            grad_bias = output.grad_bias
+        self.operands[node] = [grad_input,transposed_grad_weight,grad_bias]
 
     def convert_sum_op(self, node): #aten.sum.default                (getitem_6,)
         op0 = self.operands[node.args[0]]

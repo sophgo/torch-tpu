@@ -5,10 +5,10 @@ f5e30d4e32e5accef7de39a7e21f66292f3417d9
 
 ## intro
 该目录下是芯片设备控制相关接口的软件库-BMLIB。其中，
-- bmlib_runtime.h 
+- bmlib_runtime.h
 - libbmlib.so cmodel版本的库文件。
 
-注意: 
+注意:
 该目录下仅是CMODEL版本的相关软件库，真实芯片版本的需要通过deb包安装的方式，安装在/opt/libsophon下.
 
 ## how to update
@@ -32,3 +32,9 @@ ln -s libbmlib.so.0 libbmlib.so
 bmlib的编译，另外可以通过TPU1686工程下的相关脚本命令`rebuild_bmlib_cmodel`。
 
 注意：更新库完成后，请记得更新对应commit id
+
+## how to update arm so file
+
+最佳方式是，通过ftp下载libsophon包，然后解压后，将so文件copy出来
+
+当前版本：release-2025-02-08 日

@@ -82,7 +82,7 @@ echo "[INFO]EXTRA_CONFIG=$EXTRA_CONFIG"
 
 source ${TPUTRAIN_TOP}/scripts/build_helper.sh
 source ${TPUTRAIN_TOP}/scripts/regression.sh
-
+export SOC_CROSS_MODE="OFF"
 if [[ "$LD_LIBRARY_PATH" != *oneDNN* ]]; then
     export LD_LIBRARY_PATH=$TPUTRAIN_TOP/third_party/oneDNN/lib:$LD_LIBRARY_PATH
 fi

@@ -25,3 +25,6 @@ tpuv7的运行时库。参考对应的readme
 
 ### oneDNN
 sg2260 cmodel依赖库。
+
+### tpuDNN
+对于arm版本的tpudnn更新可以参考tpu1686的soc编译readme

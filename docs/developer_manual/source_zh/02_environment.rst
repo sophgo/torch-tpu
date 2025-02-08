@@ -160,6 +160,7 @@ SE7环境为python3.8，因此需要在x86 docker上安装python3.8。
 .. code-block:: shell
 
    $ source crossp/bin/activate
+   $ pip3 install wheel
 
 编译SE7的wheel包，
 

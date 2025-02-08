@@ -185,7 +185,8 @@ class CPPLibBuild(build_clib, ExtBase, object):
         build_dir += '_cmodel'
         if not build_fw:
             fw_path = os.path.join(build_dir, 'libfirmware.so')
-        args.append('-DUSING_CMODEL=ON')
+        if not SOC_CROSS:
+            args.append('-DUSING_CMODEL=ON')
         build_firmware()
 
         package_dir = self.get_package_dir()
@@ -368,6 +369,8 @@ class bdist_wheel(_bdist_wheel, ExtBase):
         for lib in tpuDNN_libs:
             target = re.match('.+tpuDNN/(\w+)_lib.+', lib).group(1)
             if 'tpudnn' in lib:
+                if 'bm1684x' in lib and SOC_CROSS:
+                    lib = os.path.join(BASE_DIR, 'third_party/tpuDNN/bm1684x_lib/arm/libtpudnn.so')
                 self.copy_file(lib, os.path.join(pkg_dir, f'lib/libtpudnn.{target}.so'))
         sccl_libs = glob.glob(os.path.join(BASE_DIR, 'third_party/sccl/*_lib/libsccl.so'))
         for lib in sccl_libs:
@@ -380,10 +383,12 @@ class bdist_wheel(_bdist_wheel, ExtBase):
         for lib in base_fw_libs:
             target = os.path.join(pkg_dir, f'lib/', os.path.basename(lib))
             self.copy_file(lib, target)
-        
+
         bmlib_libs = glob.glob(os.path.join(BMLIB_PATH, f'lib/libbmlib.so*'))
         for lib in bmlib_libs:
             if "bmlib" in lib:
+                if SOC_CROSS:
+                    lib = os.path.join(BMLIB_PATH, 'lib/arm/libbmlib.so')
                 self.copy_file(lib, os.path.join(pkg_dir, f'lib/'))
 
         super().run()

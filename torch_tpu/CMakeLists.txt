@@ -9,7 +9,7 @@ if(SOC_CROSS_MODE STREQUAL "ON")
     if (BACKEND_SG2260)
         set(CMAKE_TOOLCHAIN_FILE ${CMAKE_SOURCE_DIR}/firmware_core/sg2260-toolchain.cmake)
     else()
-        set(CMAKE_TOOLCHAIN_FILE ${CMAKE_SOURCE_DIR}/firmware_core/bm1684x-toolchain.cmake)
+        set(CMAKE_C_COMPILER $ENV{CROSS_TOOLCHAINS}/gcc-arm-10.3-2021.07-x86_64-aarch64-none-linux-gnu/bin/aarch64-none-linux-gnu-gcc)
     endif()
 endif()
 
@@ -113,8 +113,13 @@ if(BACKEND_1684X)
   include_directories(${RUNTIME_INCLUDE_PATH})
   target_link_directories(torch_tpu PRIVATE ${RUNTIME_LIB_PATH})
   target_link_libraries(torch_tpu sgdnn bmlib)
-  set_target_properties(torch_tpu PROPERTIES INSTALL_RPATH
-      "$ORIGIN;$ORIGIN/../../third_party/bmlib/lib;${tpuDNNPath}")
+  if(SOC_CROSS_MODE STREQUAL "ON")
+    set_target_properties(torch_tpu PROPERTIES INSTALL_RPATH
+        "$ORIGIN;$ORIGIN/../../third_party/bmlib/lib/arm;${tpuDNNPath}")
+  else()
+    set_target_properties(torch_tpu PROPERTIES INSTALL_RPATH
+        "$ORIGIN;$ORIGIN/../../third_party/bmlib/lib;${tpuDNNPath}")
+  endif()
   install(TARGETS torch_tpu DESTINATION lib)
 elseif(BACKEND_SG2260)
 
