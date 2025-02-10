@@ -1,8 +1,8 @@
-#if defined BACKEND_SG2260
 #include "Bmodel.h"
+
 #include <torch/csrc/utils/python_arg_parser.h>
 #include <torch/csrc/tensor/python_tensor.h>
-
+#include <assert.h>
 #include <ATen/ATen.h>
 #include <ATen/NativeFunctions.h>
 #include <torch/extension.h>
@@ -10,6 +10,23 @@
 #include "torch_tpu/csrc/utils/LazyInit.h"
 #include "torch_tpu/csrc/aten/TPUFormatCastHelper.h"
 
+
+static void ReportAndDelete(void *ptr)
+{
+  // do nothing
+  #ifdef DEBUG
+  // std::cout << "ReportAndDelete for prt : " << ptr  << std::endl;
+  // std::cout << "PLEASE BE CAREFUL, THIS FUNCTION SHOULD NOT CALLED" << std::endl;
+  #endif
+}
+
+at::DataPtr make_tensor_ptr(void *ptr)
+{
+  return {ptr, ptr, &ReportAndDelete, tpu::TPUGetCurrentDevice()};
+}
+
+
+#if defined BACKEND_SG2260
 PythonTensor::PythonTensor(tpuRtDataType_t dtype_, const char *name_, float scale_,
                                  int zero_point_, tpuRtShape_t shape) {
   name = std::string(name_);
@@ -22,48 +39,37 @@ PythonTensor::PythonTensor(tpuRtDataType_t dtype_, const char *name_, float scal
 void PythonTensor::fixDtype(tpuRtDataType_t fmt) {
     switch (fmt) {
     case TPU_FLOAT32:
-      pytype = py::dtype("single");
       dtype = "f32";
       break;
     case TPU_INT8:
-      pytype = py::dtype("int8");
       dtype = "i8";
       break;
     case TPU_UINT8:
-      pytype = py::dtype("uint8");
       dtype = "u8";
       break;
     case TPU_INT4:
-      pytype = py::dtype("int8");
       dtype = "i4";
       break;
     case TPU_UINT4:
-      pytype = py::dtype("uint8");
       dtype = "u4";
       break;
     case TPU_INT16:
-      pytype = py::dtype("int16");
       dtype = "i16";
       break;
     case TPU_UINT16:
-      pytype = py::dtype("uint16");
       dtype = "u16";
       break;
     case TPU_INT32:
-      pytype = py::dtype("int32");
       dtype = "i32";
       break;
     case TPU_UINT32:
-      pytype = py::dtype("uint32");
       dtype = "u32";
       break;
     case TPU_BFLOAT16:
       // numpy has no bf16 type, use uint16 instread of bf16.
-      pytype = py::dtype("uint16");
       dtype = "bf16";
       break;
     case TPU_FLOAT16:
-      pytype = py::dtype("float16");
       dtype = "f16";
       break;
     default:
@@ -107,20 +113,6 @@ int data_type_size(tpuRtDataType_t dtype) {
 
 int PythonNet::dataTypeSize(tpuRtDataType_t dtype) {
     return data_type_size(dtype);
-}
-
-static void ReportAndDelete(void *ptr)
-{
-  // do nothing
-  #ifdef DEBUG
-  // std::cout << "ReportAndDelete for prt : " << ptr  << std::endl;
-  // std::cout << "PLEASE BE CAREFUL, THIS FUNCTION SHOULD NOT CALLED" << std::endl;
-  #endif
-}
-
-at::DataPtr make_tensor_ptr(void *ptr)
-{
-  return {ptr, ptr, &ReportAndDelete, tpu::TPUGetCurrentDevice()};
 }
 
 // dtype convert into torch dtype
@@ -294,6 +286,7 @@ void PythonNet::printNetworkInfo(tpuRtNetInfo_t *info){
     printf("================ net info ===============\n");
 }
 
+
 PythonModel::PythonModel(const std::string &model_file, int dev_id,
                                 const std::string &decrypt_lib) {
     // tpuRtStatus_t ret = tpuRtSuccess;
@@ -312,6 +305,312 @@ PythonModel::PythonModel(const std::string &model_file, int dev_id,
     }
     tpuRtFreeNetNames(net_names);
 }
+
+PyObject* THPTPythonNet_getNetworkInfo(PyObject* self, PyObject* args) {
+  HANDLE_TH_ERRORS
+  PyObject* dict = PyDict_New();
+  PyObject* net_capsule;
+  if (!PyArg_ParseTuple(args, "O", &net_capsule)) {
+    return NULL;
+  }
+  auto net = (PythonNet*) PyCapsule_GetPointer(net_capsule, "PythonNet");
+  auto info = net->m_info;
+    PyDict_SetItemString(dict, "name", PyUnicode_FromString(info.name));
+    // is_dynamic
+    PyDict_SetItemString(dict, "is_dynamic", PyLong_FromLong(info.is_dynamic));
+    PyDict_SetItemString(dict, "stage_num",  PyLong_FromLong(info.stage_num));
+    PyDict_SetItemString(dict, "num_input",  PyLong_FromLong(info.input.num));
+    PyDict_SetItemString(dict, "num_output", PyLong_FromLong(info.output.num));
+    PyObject* inputs = PyList_New(info.input.num);
+    for (int i = 0; i < info.input.num; i++) {
+      PyObject* input = PyDict_New();
+      PyDict_SetItemString(input, "name",  PyUnicode_FromString(info.input.names[i]));
+      PyDict_SetItemString(input, "dtype", PyLong_FromLong(info.input.dtypes[i]));
+      auto num_dims = info.stages[0].input_shapes[i].num_dims;
+      PyDict_SetItemString(input, "shape", PyList_New(num_dims));
+      for (int j = 0; j < num_dims; j++) {
+        PyList_SetItem(PyDict_GetItemString(input, "shape"), j, PyLong_FromLong(info.stages[0].input_shapes[i].dims[j]));
+      }
+      PyList_SetItem(inputs, i, input);
+      // address
+      PyDict_SetItemString(input, "address", PyLong_FromLong((long)net->input_mems[i]));
+    }
+    PyDict_SetItemString(dict, "inputs", inputs);
+
+    PyObject* outputs = PyList_New(info.output.num);
+    for (int i = 0; i < info.output.num; i++) {
+      PyObject* output = PyDict_New();
+      PyDict_SetItemString(output, "name",  PyUnicode_FromString(info.output.names[i]));
+      PyDict_SetItemString(output, "dtype", PyLong_FromLong(info.output.dtypes[i]));
+      auto num_dims = info.stages[0].output_shapes[i].num_dims;
+      PyDict_SetItemString(output, "shape", PyList_New(num_dims));
+      for (int j = 0; j < num_dims; j++) {
+        PyList_SetItem(PyDict_GetItemString(output, "shape"), j, PyLong_FromLong(info.stages[0].output_shapes[i].dims[j]));
+      }
+      PyList_SetItem(outputs, i, output);
+      // address
+      PyDict_SetItemString(output, "address", PyLong_FromLong((long)net->output_mems[i]));
+    }
+    PyDict_SetItemString(dict, "outputs", outputs);
+    return dict;
+  END_HANDLE_TH_ERRORS
+}
+
+
+#elif defined BACKEND_1684X
+
+PythonTensor::PythonTensor(bm_data_type_t dtype_, const char *name_, float scale_,
+                                 int zero_point_, bm_shape_t shape) {
+  name = std::string(name_);
+  qscale = scale_;
+  qzero_point = zero_point_;
+  std::vector<size_t> s(shape.dims, shape.dims + shape.num_dims);
+  fixDtype(dtype_);
+}
+
+void PythonTensor::fixDtype(bm_data_type_t fmt){
+    switch (fmt) {
+    case BM_FLOAT32:
+      dtype = "f32";
+      break;
+    case BM_INT8:
+      dtype = "i8";
+      break;
+    case BM_UINT8:
+      dtype = "u8";
+      break;
+    case BM_INT4:
+      dtype = "i4";
+      break;
+    case BM_UINT4:
+      dtype = "u4";
+      break;
+    case BM_INT16:
+      dtype = "i16";
+      break;
+    case BM_UINT16:
+      dtype = "u16";
+      break;
+    case BM_INT32:
+      dtype = "i32";
+      break;
+    case BM_UINT32:
+      dtype = "u32";
+      break;
+    case BM_BFLOAT16:
+      // numpy has no bf16 type, use uint16 instread of bf16.
+      dtype = "bf16";
+      break;
+    case BM_FLOAT16:
+      dtype = "f16";
+      break;
+    default:
+      printf("error, bm_data_type_t : %d\n", fmt);
+      assert(0);
+    }
+}
+
+uint64_t shape_count(bm_shape_t &shape){
+    uint64_t count = 1;
+    for (int i = 0; i < shape.num_dims; i++) {
+      count *= shape.dims[i];
+    }
+    return count;
+}
+
+auto convert_dtype_to_torch_dtype(bm_data_type_t dtype){
+  switch (dtype) {
+    case BM_FLOAT32:
+      return at::kFloat;
+    case BM_INT32:
+      return at::kInt;
+    case BM_UINT32:
+      return at::kInt;
+    case BM_FLOAT16:
+      return at::kHalf;
+    case BM_BFLOAT16:
+      return at::kBFloat16;
+    case BM_INT16:
+      return at::kShort;
+    case BM_UINT16:
+      return at::kShort;
+    case BM_INT8:
+      return at::kChar;
+    case BM_UINT8:
+      return at::kByte;
+    case BM_INT4:
+      return at::kChar;
+    case BM_UINT4:
+      return at::kByte;
+    default:
+      return at::kFloat;
+  }
+}
+
+static auto make_tensor_from_ptr(bm_device_mem_t dev_mem, bm_shape_t shape, bm_data_type_t dtype){
+  auto ptr          = (void*) dev_mem.u.device.device_addr;
+  auto size         = shape_count(shape) * bmrt_data_type_size(dtype);
+  auto meta_dtype   = convert_dtype_to_torch_dtype(dtype);
+  auto tensor_dtype = at::scalarTypeToTypeMeta(meta_dtype);
+  at::detail::check_size_nonnegative(size);
+  #ifdef DEBUG
+  std::cout << "ptr : " << ptr << "  size : " << size << std::endl;
+  #endif
+  auto ptr_      = make_tensor_ptr(ptr);
+  auto allocator = c10::GetTPUAllocator();
+  c10::intrusive_ptr<c10::StorageImpl> storage_impl = c10::make_intrusive<torch_tpu::TPUStorageImpl>(
+                      c10::StorageImpl::use_byte_size_t(),
+                      size,
+                      std::move(ptr_),
+                      allocator,
+                      /*resizeable=*/false);
+  auto tensor    = at::detail::make_tensor<torch_tpu::TPUTensorImpl>(storage_impl, tensor_dtype);
+  std::vector<int64_t> sizes;
+  for (int i = 0; i < shape.num_dims; i++) {
+    sizes.push_back(shape.dims[i]);
+  }
+  tensor.unsafeGetTensorImpl()->set_sizes_contiguous(sizes);
+  return tensor;
+}
+
+PythonNet::PythonNet(void* bmrt_, const char* netname, bm_handle_t handle_, int stage){
+  p_bmrt     = bmrt_;
+  bm_handle  = handle_;
+  name       = std::string(netname);
+  m_info     = bmrt_get_network_info(p_bmrt, netname);
+  auto info  = m_info;
+  num_input  = info->input_num;
+  num_output = info->output_num;
+  for(int i = 0; i < num_input; i++){
+    auto &shape = info->stages[stage].input_shapes[i];
+    input_shapes.push_back(shape);
+  }
+  for(int i = 0; i < num_output; i++){
+    auto &shape = info->stages[stage].output_shapes[i];
+    output_shapes.push_back(shape);
+  }
+  input_mems  = info->stages[stage].input_mems;
+  output_mems = info->stages[stage].output_mems;
+}
+
+PythonModel::PythonModel(const std::string &model_file, int dev_id, const std::string &decrypt_lib){
+  m_dev_id    = dev_id;
+  bm_dev_request(&bm_handle, dev_id);
+  p_bmrt      = bmrt_create(bm_handle);
+  bool flag   = true;
+  if(decrypt_lib.empty()){
+    flag = bmrt_load_bmodel(p_bmrt, model_file.c_str());
+  }else{
+    assert(0);
+  }
+  assert(flag == true);
+  const char **net_names = NULL;
+  bmrt_get_network_names(p_bmrt, &net_names);
+  m_net_num     = bmrt_get_network_number(p_bmrt);
+  for (int i = 0; i < m_net_num; i++) {
+    networks.push_back(net_names[i]);
+  }
+  delete net_names;
+}
+
+void PythonNet::forward(std::vector<py::object>& inputs, std::vector<py::object>& outputs){
+  int input_size     = (int) inputs.size();
+  assert(input_size == num_input && "input size not match");
+  int output_size    = (int) outputs.size();
+  assert(output_size == num_output && "output size not match");
+  std::vector<bm_tensor_t> input_tensors( input_size);
+  std::vector<bm_tensor_t> output_tensors(output_size);
+
+  // bm_device_mem_t all_input_device_mem;
+  // bm_device_mem_t all_output_device_mem;
+  auto info   = m_info;
+  for(int idx = 0; idx < input_size; idx ++){
+    auto dtype    = info->input_dtypes[idx];
+    auto shape    = input_shapes[idx];
+    auto data_ptr = inputs[idx].attr("data_ptr")().cast<uintptr_t>();
+    input_tensors[idx].shape      = shape;
+    input_tensors[idx].dtype      = dtype;
+    input_tensors[idx].st_mode    = BM_STORE_1N;
+    input_tensors[idx].device_mem.u.device.device_addr = (unsigned long long) data_ptr;
+  }
+
+  for(int idx = 0; idx < output_size; idx ++){
+    auto dtype    = info->output_dtypes[idx];
+    auto shape    = output_shapes[idx];
+    auto data_ptr = outputs[idx].attr("data_ptr")().cast<uintptr_t>();
+    output_tensors[idx].shape      = shape;
+    output_tensors[idx].dtype      = dtype;
+    output_tensors[idx].st_mode    = BM_STORE_1N;
+    output_tensors[idx].device_mem.u.device.device_addr = (unsigned long long) data_ptr;
+  }
+
+  auto ret = bmrt_launch_tensor_ex(p_bmrt, name.c_str(), input_tensors.data(), num_input, output_tensors.data(), num_output, true, false);
+
+  assert(true == ret);
+  auto status = bm_thread_sync(bm_handle);
+  assert(BM_SUCCESS == status);
+}
+
+void PythonNet::forward_sync(std::vector<py::object>& inputs, std::vector<py::object>& outputs){
+  forward(inputs, outputs);
+}
+
+PyObject* THPTPythonNet_getNetworkInfo(PyObject* self, PyObject* args){
+
+  HANDLE_TH_ERRORS
+  PyObject* dict = PyDict_New();
+  PyObject* net_capsule;
+  if (!PyArg_ParseTuple(args, "O", &net_capsule)) {
+    return NULL;
+  }
+  auto net = (PythonNet*) PyCapsule_GetPointer(net_capsule, "PythonNet");
+  auto info = net->m_info;
+  PyDict_SetItemString(dict, "name",       PyUnicode_FromString(info->name));
+  PyDict_SetItemString(dict, "is_dynamic", PyLong_FromLong(info->is_dynamic));
+  PyDict_SetItemString(dict, "stage_num",  PyLong_FromLong(info->stage_num));
+  PyDict_SetItemString(dict, "num_input",  PyLong_FromLong(info->input_num));
+  PyDict_SetItemString(dict, "num_output", PyLong_FromLong(info->output_num));
+  PyDict_SetItemString(dict, "core_num",   PyLong_FromLong(info->core_num));
+  PyDict_SetItemString(dict, "addr_mode",  PyLong_FromLong(info->addr_mode));
+
+  auto stage_info  = info->stages[0];
+  PyObject* inputs = PyList_New(info->input_num);
+  for(int i = 0; i < info->input_num; i++){
+    PyObject* input = PyDict_New();
+    PyDict_SetItemString(input, "name",  PyUnicode_FromString(info->input_names[i]));
+    PyDict_SetItemString(input, "dtype", PyLong_FromLong(info->input_dtypes[i]));
+    PyDict_SetItemString(input, "shape", PyList_New(stage_info.input_shapes[i].num_dims));
+    for(int j = 0; j < stage_info.input_shapes[i].num_dims; j++){
+      PyList_SetItem(PyDict_GetItemString(input, "shape"), j, PyLong_FromLong(stage_info.input_shapes[i].dims[j]));
+    }
+    PyList_SetItem(inputs, i, input);
+    // address
+    PyDict_SetItemString(input, "address", PyLong_FromLong((long)stage_info.input_mems[i].u.device.device_addr));
+  }
+  PyDict_SetItemString(dict, "inputs", inputs);
+
+  PyObject* outputs = PyList_New(info->output_num);
+  for(int i = 0; i < info->output_num; i++){
+    PyObject* output = PyDict_New();
+    PyDict_SetItemString(output, "name",  PyUnicode_FromString(info->output_names[i]));
+    PyDict_SetItemString(output, "dtype", PyLong_FromLong(info->output_dtypes[i]));
+    PyDict_SetItemString(output, "shape", PyList_New(stage_info.output_shapes[i].num_dims));
+    for(int j = 0; j < stage_info.output_shapes[i].num_dims; j++){
+      PyList_SetItem(PyDict_GetItemString(output, "shape"), j, PyLong_FromLong(stage_info.output_shapes[i].dims[j]));
+    }
+    PyList_SetItem(outputs, i, output);
+    // address
+    PyDict_SetItemString(output, "address", PyLong_FromLong((long)stage_info.output_mems[i].u.device.device_addr));
+  }
+
+  PyDict_SetItemString(dict, "outputs", outputs);
+  return dict;
+  END_HANDLE_TH_ERRORS
+}
+
+#else
+// 
+#endif
 
 void PythonModel_deleter(PyObject* capsule) {
   printf("PythonModel_deleter\n");
@@ -342,9 +641,17 @@ PyObject* BmodelTensor_wrap(PyObject* self, PyObject* args) {
   at::Tensor tensor;
   if(is_input == 0)
   {
+    #if defined BACKEND_SG2260
     tensor = make_tensor_from_ptr(net->output_mems[input_idx], net->output_shapes[input_idx], net->m_info.output.dtypes[input_idx]);
+    #else
+    tensor = make_tensor_from_ptr(net->output_mems[input_idx], net->output_shapes[input_idx], net->m_info->output_dtypes[input_idx]);
+    #endif
   }else{
+    #if defined BACKEND_SG2260
     tensor = make_tensor_from_ptr(net->input_mems[input_idx], net->input_shapes[input_idx], net->m_info.input.dtypes[input_idx]);
+    #else
+    tensor = make_tensor_from_ptr(net->input_mems[input_idx], net->input_shapes[input_idx], net->m_info->input_dtypes[input_idx]);
+    #endif
   }
   PyObject* tensor_py = THPVariable_Wrap(tensor);
   if (!tensor_py) {
@@ -395,7 +702,11 @@ PyObject* THPTPythonModel_Net(PyObject* self, PyObject* args) {
     return NULL;
   }
   auto model = (PythonModel*) PyCapsule_GetPointer(model_capsule, "PythonModel");
+  #if defined BACKEND_SG2260
   auto net = new PythonNet(&model->m_net, net_name);
+  #else
+  auto net = new PythonNet(model->p_bmrt, net_name, model->bm_handle, 0);
+  #endif
   return PyCapsule_New(net, "PythonNet", PythonNet_deleter);
   END_HANDLE_TH_ERRORS
 }
@@ -463,56 +774,6 @@ PyObject* THPTPythonNet_dump(PyObject* self, PyObject* args) {
   END_HANDLE_TH_ERRORS
 }
 
-PyObject* THPTPythonNet_getNetworkInfo(PyObject* self, PyObject* args) {
-  HANDLE_TH_ERRORS
-  PyObject* dict = PyDict_New();
-  PyObject* net_capsule;
-  if (!PyArg_ParseTuple(args, "O", &net_capsule)) {
-    return NULL;
-  }
-  auto net = (PythonNet*) PyCapsule_GetPointer(net_capsule, "PythonNet");
-  auto info = net->m_info;
-    PyDict_SetItemString(dict, "name", PyUnicode_FromString(info.name));
-    // is_dynamic
-    PyDict_SetItemString(dict, "is_dynamic", PyLong_FromLong(info.is_dynamic));
-    PyDict_SetItemString(dict, "stage_num",  PyLong_FromLong(info.stage_num));
-    PyDict_SetItemString(dict, "num_input",  PyLong_FromLong(info.input.num));
-    PyDict_SetItemString(dict, "num_output", PyLong_FromLong(info.output.num));
-    PyObject* inputs = PyList_New(info.input.num);
-    for (int i = 0; i < info.input.num; i++) {
-      PyObject* input = PyDict_New();
-      PyDict_SetItemString(input, "name",  PyUnicode_FromString(info.input.names[i]));
-      PyDict_SetItemString(input, "dtype", PyLong_FromLong(info.input.dtypes[i]));
-      auto num_dims = info.stages[0].input_shapes[i].num_dims;
-      PyDict_SetItemString(input, "shape", PyList_New(num_dims));
-      for (int j = 0; j < num_dims; j++) {
-        PyList_SetItem(PyDict_GetItemString(input, "shape"), j, PyLong_FromLong(info.stages[0].input_shapes[i].dims[j]));
-      }
-      PyList_SetItem(inputs, i, input);
-      // address
-      PyDict_SetItemString(input, "address", PyLong_FromLong((long)net->input_mems[i]));
-    }
-    PyDict_SetItemString(dict, "inputs", inputs);
-
-    PyObject* outputs = PyList_New(info.output.num);
-    for (int i = 0; i < info.output.num; i++) {
-      PyObject* output = PyDict_New();
-      PyDict_SetItemString(output, "name",  PyUnicode_FromString(info.output.names[i]));
-      PyDict_SetItemString(output, "dtype", PyLong_FromLong(info.output.dtypes[i]));
-      auto num_dims = info.stages[0].output_shapes[i].num_dims;
-      PyDict_SetItemString(output, "shape", PyList_New(num_dims));
-      for (int j = 0; j < num_dims; j++) {
-        PyList_SetItem(PyDict_GetItemString(output, "shape"), j, PyLong_FromLong(info.stages[0].output_shapes[i].dims[j]));
-      }
-      PyList_SetItem(outputs, i, output);
-      // address
-      PyDict_SetItemString(output, "address", PyLong_FromLong((long)net->output_mems[i]));
-    }
-    PyDict_SetItemString(dict, "outputs", outputs);
-    return dict;
-  END_HANDLE_TH_ERRORS
-}
-
 static PyMethodDef THPTPythonBModel_methods[] = {
     // model
     {"Model" , (PyCFunction)THPTPythonModel_wrap, METH_VARARGS, nullptr},
@@ -532,5 +793,3 @@ static PyMethodDef THPTPythonBModel_methods[] = {
 PyMethodDef* THPTBmodel_get_methods(){
     return THPTPythonBModel_methods;
 }
-
-#endif // BACKEND_SG2260

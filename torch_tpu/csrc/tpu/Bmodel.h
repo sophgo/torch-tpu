@@ -1,4 +1,5 @@
 #pragma once
+#include <Python.h>
 #include <pybind11/iostream.h>
 #include <pybind11/numpy.h>
 #include <pybind11/pybind11.h>
@@ -6,10 +7,12 @@
 #include <pybind11/stl.h>
 #include <torch/csrc/Stream.h>
 #include <torch/csrc/python_headers.h>
-#if defined BACKEND_SG2260
 #include "torch_tpu/csrc/core/TPUStream.h"
-#include "tpuv7_modelrt.h"
 #include "torch_tpu/csrc/core/TPUDeviceManager.h"
+
+
+#if defined BACKEND_SG2260
+#include "tpuv7_modelrt.h"
 namespace py = pybind11;
 
 struct PythonTensor {
@@ -78,6 +81,54 @@ private:
   int m_dev_id = 0;
 };
 
-PyMethodDef* THPTBmodel_get_methods();
+#elif defined BACKEND_1684X
+#include "bmruntime_interface.h"
+namespace py = pybind11;
+struct PythonTensor {
+  PythonTensor(bm_data_type_t dtype_, const char *name_, float scale_,
+               int zero_point_, bm_shape_t shape);
 
+  std::string name;
+  std::string dtype; // f32/f16/bf16/i8/i16/i32/u8/u16/u32
+  float qscale;
+  int qzero_point;
+  void fixDtype(bm_data_type_t fmt);
+};
+
+struct PythonNet{
+  PythonNet(void* bmrt_, const char* netname, bm_handle_t handle_, int stage = 0);
+  void dump() { bmrt_print_network_info(m_info); }
+  void forward(std::vector<py::object> &inputs, std::vector<py::object> &outputs);
+  // void forward_dynamic(std::vector<> &inputs, std::vector<> &outputs);
+  void forward_sync(std::vector<py::object> &inputs, std::vector<py::object> &outputs);
+  std::string name;
+  int num_input;
+  int num_output;
+  void* p_bmrt;
+  bm_handle_t bm_handle;
+  const bm_net_info_t* m_info;
+  std::vector<bm_shape_t> input_shapes;
+  std::vector<bm_shape_t> output_shapes;
+  bm_device_mem_t *input_mems;
+  bm_device_mem_t *output_mems;
+};
+
+struct PythonModel{
+  PythonModel(const std::string &model_file, int dev_id, const std::string &decrypt_lib);
+  ~PythonModel(){
+    bmrt_destroy(p_bmrt);
+  }
+
+  std::vector<const char *> networks;
+  int m_net_num;
+  void* p_bmrt;
+  bm_handle_t bm_handle;
+  
+  int m_dev_id = 0;
+};
+
+#else
+// 
 #endif // BACKEND_SG2260
+
+PyMethodDef* THPTBmodel_get_methods();

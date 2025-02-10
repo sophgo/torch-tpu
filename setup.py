@@ -391,6 +391,14 @@ class bdist_wheel(_bdist_wheel, ExtBase):
                     lib = os.path.join(BMLIB_PATH, 'lib/arm/libbmlib.so')
                 self.copy_file(lib, os.path.join(pkg_dir, f'lib/'))
 
+        # bmruntime
+        bmruntime_libs = glob.glob(os.path.join(BASE_DIR, 'third_party/bmruntime/lib/bm1684x/libbmrt.so*'))
+        for lib in bmruntime_libs:
+            if "bmrt" in lib:
+                if SOC_CROSS:
+                    lib = os.path.join(BASE_DIR, 'third_party/bmruntime/lib/bm1684x/arm/libbmrt.so')
+                self.copy_file(lib, os.path.join(pkg_dir, f'lib/'))
+
         super().run()
 
 include_directories = [
