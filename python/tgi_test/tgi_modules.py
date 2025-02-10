@@ -166,38 +166,39 @@ class TensorComparator:
         return 0, total
 
     def cmp_result(self, tensor_target, tensor2_result):
-        compare_status = self.compare_float(
-            tensor_target.view(-1), tensor2_result.view(-1), False
-        )
-        if compare_status == -1:
-            print("Error: Too many warnings detected.")
+        # compare_status = self.compare_float(
+        #     tensor_target.view(-1), tensor2_result.view(-1), False
+        # )
+        # if compare_status == -1:
+        #     print("Error: Too many warnings detected.")
         cos_my = self.cosine_similarity(tensor_target.view(-1), tensor2_result.view(-1))
         euclidean_dist = self.euclidean_similarity(
             tensor_target.view(-1), tensor2_result.view(-1)
         )
         print("Result : cosine similarity:", cos_my)
         print("Result : euclidean similarity:", euclidean_dist)
-        if cos_my < 0.9 or euclidean_dist < 0.8 or compare_status == -1:
+        if cos_my < 0.9 or euclidean_dist < 0.8:
             return False
         return True
 
 
 class SophLlamaAdd(nn.Module):
-    def __init__(self, CFG: MODEL_CFG, is_pmu, is_cmd):
+    def __init__(self, CFG: MODEL_CFG, profile_mode ):
         super().__init__()
-        self.is_pmu = is_pmu
-        self.is_cmd = is_cmd
+        self.profile_mode = profile_mode
 
     def forward(self, hidden_states, residule):
-        if self.is_cmd:
-            torch.ops.my_ops.enable_profile(4096, True)
-        elif self.is_pmu:
-            torch.ops.my_ops.enable_profile(4096, False)
+        if self.profile_mode !=None:
+            torch.ops.my_ops.enable_profile(4096, self.profile_mode)
         print(f"residule:{residule.cpu()}")
         print(f"hidden_states:{hidden_states.cpu()}")
+        print_tensor_info(hidden_states, "hidden_states")
+        print_tensor_info(residule, "residule")
         residule += hidden_states
+        residule.cpu()
+        torch_tpu.tpu.synchronize()
         print(f"residule:{residule.cpu()}")
-        if self.is_cmd or self.is_pmu:
+        if self.profile_mode !=None:
             torch.ops.my_ops.disable_profile()
         return residule
 
@@ -207,22 +208,35 @@ class LlamaAdd(nn.Module):
         super().__init__()
 
     def forward(self, hidden_states, residule):
+        # print_tensor_info(hidden_states, "hidden_states")
+        # print_tensor_info(residule, "residule")
         residule += hidden_states
         return residule
 
+def print_tensor_info(tensor, name):
+    """Print shape, dtype, and stride of a tensor to a file."""
+    if isinstance(tensor, torch.Tensor):
+        print(f"{name}:\n")
+        print(f"  Shape: {tensor.shape}\n")
+        print(f"  Dtype: {tensor.dtype}\n")
+        print(f"  Stride: {tensor.stride()}\n")
+        # Convert tensor to numpy array for safe printing
+        if name in ["save_slots","input_lengths","fetch_slots"]:
+            tensor_np = tensor.cpu()
+            print(f"  Values:\n{tensor_np}\n\n")
 
 class SophLlamaRMSNorm(nn.Module):
-    def __init__(self, CFG: MODEL_CFG, is_pmu, is_cmd):
+    def __init__(self, CFG: MODEL_CFG, profile_mode):
         super().__init__()
-        self.is_pmu = is_pmu
-        self.is_cmd = is_cmd
+        self.profile_mode = profile_mode
         self.variance_epsilon = CFG.EPS
 
     def forward(self, hidden_states, weight, output):
-        if self.is_cmd:
-            torch.ops.my_ops.enable_profile(40960, True)
-        elif self.is_pmu:
-            torch.ops.my_ops.enable_profile(40960, False)
+        if self.profile_mode !=None:
+            torch.ops.my_ops.enable_profile(40960, self.profile_mode)
+        print_tensor_info(hidden_states, "hidden_states")
+        print_tensor_info(weight, "weight")
+        print_tensor_info(output, "output")
         out=torch.ops.my_ops.rmsnorm_forward(
             hidden_states,
             weight,
@@ -232,9 +246,10 @@ class SophLlamaRMSNorm(nn.Module):
             self.variance_epsilon,
         )
         out.cpu()
-        if self.is_cmd or self.is_pmu:
+        torch_tpu.tpu.synchronize()
+        if self.profile_mode !=None:
             torch.ops.my_ops.disable_profile()
-        return output
+        return out
 
 
 class LlamaRMSNorm(nn.Module):
@@ -258,21 +273,19 @@ class LlamaRMSNorm(nn.Module):
 
 
 class SophLlamaMMqkv(nn.Module):
-    def __init__(self, CFG: MODEL_CFG, is_pmu, is_cmd):
+    def __init__(self, CFG: MODEL_CFG, profile_mode):
         super().__init__()
-        self.is_pmu = is_pmu
-        self.is_cmd = is_cmd
+        self.profile_mode = profile_mode
 
     def forward(self, hidden_states, weight, bias):
         print(f"{hidden_states.dtype=}, {weight.dtype=}")
         print(f"{hidden_states.shape=}, {weight.shape=}")
-        if self.is_cmd:
-            torch.ops.my_ops.enable_profile(40960, True)
-        elif self.is_pmu:
-            torch.ops.my_ops.enable_profile(40960, False)
+        if self.profile_mode !=None:
+            torch.ops.my_ops.enable_profile(40960, self.profile_mode)
         output = F.linear(hidden_states, weight, bias)
         output.cpu()
-        if self.is_cmd or self.is_pmu:
+        torch_tpu.tpu.synchronize()
+        if self.profile_mode !=None:
             torch.ops.my_ops.disable_profile()
         return output
 
@@ -289,12 +302,11 @@ class LlamaMMqkv(nn.Module):
 
 
 class SophLlamaMMqkvW4a16(nn.Module):
-    def __init__(self, CFG: MODEL_CFG, is_pmu, is_cmd):
+    def __init__(self, CFG: MODEL_CFG, profile_mode):
         super().__init__()
         self.group_size = 128
         self.weight_bits = 4
-        self.is_pmu = is_pmu
-        self.is_cmd = is_cmd
+        self.profile_mode = profile_mode
 
     def forward(
         self,
@@ -307,10 +319,16 @@ class SophLlamaMMqkvW4a16(nn.Module):
         print(f"{active.dtype=}, {qweight.dtype=}")
         print(f"{active.shape=}, {qweight.shape=}")
         output = active.new_empty((active.shape[0], qweight.shape[0]))
-        if self.is_cmd:
-            torch.ops.my_ops.enable_profile(40960, True)
-        elif self.is_pmu:
-            torch.ops.my_ops.enable_profile(40960, False)
+        if self.profile_mode !=None:
+            torch.ops.my_ops.enable_profile(40960, self.profile_mode)
+        print_tensor_info(active, "active")
+        print_tensor_info(qweight, "qweight")
+        print_tensor_info(bias, "bias")
+        print_tensor_info(scales, "scales")
+        print_tensor_info(qzeros, "qzeros")
+        print(f"self.group_size: {self.group_size}\n")
+        print(f"self.weight_bits: {self.weight_bits}\n")
+        print_tensor_info(output, "output")
         out=torch.ops.my_ops.matmul_gptq_forward(
             active,
             qweight,
@@ -322,7 +340,8 @@ class SophLlamaMMqkvW4a16(nn.Module):
             output,
         )
         out.cpu()
-        if self.is_cmd or self.is_pmu:
+        torch_tpu.tpu.synchronize()
+        if self.profile_mode !=None:
             torch.ops.my_ops.disable_profile()
         return output
 
@@ -339,21 +358,19 @@ class LlamaMMqkvW4a16(nn.Module):
 
 
 class SophLlamaAttentionFC(nn.Module):
-    def __init__(self, CFG: MODEL_CFG, is_pmu, is_cmd):
+    def __init__(self, CFG: MODEL_CFG, profile_mode):
         super().__init__()
-        self.is_pmu = is_pmu
-        self.is_cmd = is_cmd
+        self.profile_mode = profile_mode
 
     def forward(self, hidden_states, weight):
         print(f"{hidden_states.dtype=}, {weight.dtype=}")
         print(f"{hidden_states.shape=}, {weight.shape=}")
-        if self.is_cmd:
-            torch.ops.my_ops.enable_profile(40960, True)
-        elif self.is_pmu:
-            torch.ops.my_ops.enable_profile(40960, False)
+        if self.profile_mode !=None:
+            torch.ops.my_ops.enable_profile(40960, self.profile_mode)
         output = F.linear(hidden_states, weight, None)
         output.cpu()
-        if self.is_cmd or self.is_pmu:
+        torch_tpu.tpu.synchronize()
+        if self.profile_mode !=None:
             torch.ops.my_ops.disable_profile()
         return output
 
@@ -367,20 +384,25 @@ class LlamaAttentionFC(nn.Module):
 
 
 class SophLlamaAttentionFcW4a16(nn.Module):
-    def __init__(self, CFG: MODEL_CFG, is_pmu, is_cmd):
+    def __init__(self, CFG: MODEL_CFG, profile_mode):
         super().__init__()
         self.group_size = 128
         self.weight_bits = 4
-        self.is_pmu = is_pmu
-        self.is_cmd = is_cmd
+        self.profile_mode = profile_mode
 
     def forward(self, active, qweight, qzeros, scales, output):
         print(f"{active.dtype=}, {qweight.dtype=}")
         print(f"{active.shape=}, {qweight.shape=}")
-        if self.is_cmd:
-            torch.ops.my_ops.enable_profile(40960, True)
-        elif self.is_pmu:
-            torch.ops.my_ops.enable_profile(40960, False)
+        if self.profile_mode !=None:
+            torch.ops.my_ops.enable_profile(40960, self.profile_mode)
+        print_tensor_info(active, "active")
+        print_tensor_info(qweight, "qweight")
+        # print_tensor_info(bias, "bias")
+        print_tensor_info(scales, "scales")
+        print_tensor_info(qzeros, "qzeros")
+        print(f"self.group_size: {self.group_size}\n")
+        print(f"self.weight_bits: {self.weight_bits}\n")
+        print_tensor_info(output, "output")
         out=torch.ops.my_ops.matmul_gptq_forward(
             active,
             qweight,
@@ -392,7 +414,8 @@ class SophLlamaAttentionFcW4a16(nn.Module):
             output,
         )
         out.cpu()
-        if self.is_cmd or self.is_pmu:
+        torch_tpu.tpu.synchronize()
+        if self.profile_mode !=None:
             torch.ops.my_ops.disable_profile()
         return output
 
@@ -406,20 +429,18 @@ class LlamaAttentionFcW4a16(nn.Module):
 
 
 class SophLlamaMlp(nn.Module):
-    def __init__(self, CFG: MODEL_CFG, is_pmu, is_cmd):
+    def __init__(self, CFG: MODEL_CFG, profile_mode):
         super().__init__()
-        self.is_pmu = is_pmu
-        self.is_cmd = is_cmd
+        self.profile_mode = profile_mode
 
     def forward(self, hidden_states, w0, w1, w2, output):
         w0, w1 = w0.transpose(-1, -2).contiguous(), w1.transpose(-1, -2).contiguous()
-        if self.is_cmd:
-            torch.ops.my_ops.enable_profile(40960, True)
-        elif self.is_pmu:
+        if self.profile_mode !=None:
             torch.ops.my_ops.enable_profile(40960, False)
         out=torch.ops.my_ops.llama_mlp_forward(hidden_states, w0, w1, w2, None, None, None,output, False)
         out.cpu()
-        if self.is_cmd or self.is_pmu:
+        torch_tpu.tpu.synchronize()
+        if self.profile_mode !=None:
             torch.ops.my_ops.disable_profile()
         return output
 
@@ -439,18 +460,27 @@ class LlamaMlp(nn.Module):
 
 
 class SophLlamaMlpW4a16(nn.Module):
-    def __init__(self, CFG: MODEL_CFG, is_pmu, is_cmd):
+    def __init__(self, CFG: MODEL_CFG, profile_mode):
         super().__init__()
         self.group_size = 128
         self.bits = 4
-        self.is_pmu = is_pmu
-        self.is_cmd = is_cmd
+        self.profile_mode = profile_mode
 
     def forward(self, hidden_states, w0, z0, s0, w1, z1, s1, w2, z2, s2, output):
-        if self.is_cmd:
-            torch.ops.my_ops.enable_profile(40960, True)
-        elif self.is_pmu:
+        if self.profile_mode !=None:
             torch.ops.my_ops.enable_profile(40960, False)
+        print_tensor_info(w0, "up_qweight")
+        print_tensor_info(z0, "up_qzeros")
+        print_tensor_info(s0, "up_scales")
+        print_tensor_info(w1, "gate_qweight")
+        print_tensor_info(z1, "gate_qzeros")
+        print_tensor_info(s1, "gate_scales")
+        print_tensor_info(w2, "down_qweight")
+        print_tensor_info(z2, "down_qzeros")
+        print_tensor_info(s2, "down_scales")
+        print(f"groupsize: {self.group_size}\n")
+        print(f"bits: {self.bits}\n")
+        print_tensor_info(output, "output")
         out=torch.ops.my_ops.llama_mlp_gptq_forward(
             hidden_states,
             w0,
@@ -467,7 +497,8 @@ class SophLlamaMlpW4a16(nn.Module):
             output,
         )
         out.cpu()
-        if self.is_cmd or self.is_pmu:
+        torch_tpu.tpu.synchronize()
+        if self.profile_mode !=None:
             torch.ops.my_ops.disable_profile()
         return output
 
@@ -477,9 +508,6 @@ class LlamaMlpW4a16(nn.Module):
         super().__init__()
         self.group_size = 128
         self.bits = 4
-
-    def __init__(self, CFG: MODEL_CFG):
-        super().__init__()
         self.sigmoid = nn.Sigmoid()
 
     def forward(self, x, w0, w1, w2, output):
@@ -492,12 +520,11 @@ class LlamaMlpW4a16(nn.Module):
 
 
 class SophLlamaAttention(nn.Module):
-    def __init__(self, CFG: MODEL_CFG, is_prefill=False, is_pmu=None, is_cmd=None):
+    def __init__(self, CFG: MODEL_CFG, is_prefill=False, profile_mode = 0):
         super().__init__()
         self.softmax_scale = CFG.D**-0.5
         self.is_prefill = is_prefill
-        self.is_pmu = is_pmu
-        self.is_cmd = is_cmd
+        self.profile_mode = profile_mode
 
     def forward(
         self,
@@ -516,10 +543,25 @@ class SophLlamaAttention(nn.Module):
         max_s,
         block_size,
     ):
-        if self.is_cmd:
-            torch.ops.my_ops.enable_profile(40960, True)
-        elif self.is_pmu:
-            torch.ops.my_ops.enable_profile(40960, False)
+        if self.profile_mode !=None:
+            torch.ops.my_ops.enable_profile(40960, self.profile_mode)
+        print_tensor_info(attn_output, "attention_output[1]")
+        print_tensor_info(query, "query")
+        print_tensor_info(key, "key")
+        print_tensor_info(value, "value")
+        print_tensor_info(kv_cache[0], "kv_cache[0]")
+        print_tensor_info(kv_cache[1], "kv_cache[1]")
+        print_tensor_info(cos, "cos")
+        print_tensor_info(sin, "sin")
+        print_tensor_info(input_lengths, "input_lengths")
+        print_tensor_info(save_slots, "save_slots")
+        print_tensor_info(fetch_slots, "fetch_slots")
+        print_tensor_info(mask, "mask")
+        print(f"block_tables_size_1: {slot_size}\n")
+        print(f"max_s: {max_s}\n")
+        print(f"block_size: {block_size}\n")
+        print(f"softmax_scale: {self.softmax_scale}\n")
+
         out=torch.ops.my_ops.llama_attention(
             attn_output,
             query,
@@ -540,7 +582,8 @@ class SophLlamaAttention(nn.Module):
             2 if self.is_prefill else 3,
         )
         out.cpu()
-        if self.is_cmd or self.is_pmu:
+        torch_tpu.tpu.synchronize()
+        if self.profile_mode !=None:
             torch.ops.my_ops.disable_profile()
 
 

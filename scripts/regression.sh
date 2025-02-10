@@ -91,6 +91,24 @@ function regression_for_sccl() {
     done
 }
 
+function regression_for_tgi() {
+  TEST_DIR=$TPUTRAIN_TOP/python/tgi_test/
+  pushd ${TEST_DIR} > /dev/null
+  echo "test dir: $TEST_DIR"
+  echo "################################"
+  echo "Test tgi op"
+  echo "################################"
+  ret=0
+  pip install -i https://pypi.tuna.tsinghua.edu.cn/simple loguru
+  python3 tgi_op.py
+  if [ $ret -ne 0 ]; then
+    echo "test tgi cases: $1 failed"
+    popd
+    return $ret
+  fi
+  popd
+}
+
 function test_scclHost() {
     local NODES=8
     if [ -n "$2" ]; then
@@ -267,6 +285,15 @@ function run_online_regression_test() {
       echo "[INFO]tpu_train_cmodel_path:$TPU_TRAIN_CMODEL_PATH"
       set_cmodel_firmware $TPU_TRAIN_CMODEL_PATH
       echo "*************** CMODEL IS SET *************"
+    fi
+    if [ $test_CHIP_ARCH = 'sg2260' ]; then
+      regression_for_tgi; ret_regression_for_tgi=$?
+      if [ $ret_regression_for_tgi -eq 0 ];then
+        echo "[RESULT-$test_CHIP_ARCH] regression_for_tgi is computed successfully!"
+      else
+        echo "[RESULT-$test_CHIP_ARCH] regression_for_tgi is computed failed!"
+        return -1
+      fi
     fi
     if [ $TEST_PATTERN = "online" ] || [ $TEST_PATTERN = "local" ];then
       # build_libtorch_plugin $TEST_PATTERN

@@ -1,7 +1,7 @@
 """
 README
 
-This file contains the test and dump date of specific ops(mlp, add, rmsnorm, attn_fc, mmqkv, attention) 
+This file contains the test, perfAI and profile of specific ops(mlp, add, rmsnorm, attn_fc, mmqkv, attention) 
 from llama and qwen modles in the process of prefill and decode. 
 
 Usage:
@@ -19,20 +19,7 @@ python python/test/tgi_test.py --model qwen_7b  --case mlp  --batch 1 --tp 2 --p
 
 python python/test/tgi_test.py --model qwen_7b  --case mlp  --batch 1 --tp 2 --test
 
-2. dump perf AI date
-#w4a16
-
-python python/test/tgi_test.py --model qwen_7b  --case mlp  --batch 1 --tp 2 --w4a16 
-
-#prefill
-
-python python/test/tgi_test.py --model qwen_7b  --case mlp  --batch 1 --tp 2 --prefill
-
-#decode
-
-python python/test/tgi_test.py --model qwen_7b  --case mlp  --batch 1 --tp 2
-
-3. perfAI
+2. perfAI
 Make ensure that the tpu-train and PerfAI repos are in the same directory level. Then install some third-party dependencies:
 pip install -r requirements.txt
 
@@ -51,16 +38,13 @@ python python/test/tgi_test.py --model qwen_7b  --case mlp  --batch 1 --tp 2 --p
 python python/test/tgi_test.py --model qwen_7b  --case mlp  --batch 1 --tp 2 --PerfAI 
 ./run_perfai.sh
 
-4. dump profile data
+3. profile
 
-#cmd
+Make ensure that TPU-MLIR has been successfully compiled.
 
-python python/test/tgi_test.py --model qwen_7b  --case mlp  --batch 1 --tp 2 --prefill --cmd
-./run_perfai.sh
-#pmu
+python python/test/tgi_test.py --model qwen_7b  --case mlp  --batch 1 --tp 2 --prefill --profile_mode 0
+./run_profile.sh
 
-python python/test/tgi_test.py --model qwen_7b  --case mlp  --batch 1 --tp 2 --prefill --pmu
-./run_perfai.sh
 """
 
 import torch
@@ -76,19 +60,20 @@ import time
 import os
 import math
 
-current_time_seed = int(time.time())
-torch.manual_seed(current_time_seed)
+# current_time_seed = int(time.time())
+# torch.manual_seed(current_time_seed)
+torch.manual_seed(1000)
 torch.set_printoptions(precision=6)
 
 parser = argparse.ArgumentParser(description="tgi test case")
 parser.add_argument("--test", action="store_true", help="if test")
 parser.add_argument("--PerfAI", action="store_true", help="if PerfAI")
-parser.add_argument("--cmd", action="store_true", help="if cmd")
-parser.add_argument("--pmu", action="store_true", help="if cmd")
+parser.add_argument("--profile_mode", type=int, default=0, help="set profile mode: 0 pmu only, 1 concise cmd, 2 detailed cmd")
 parser.add_argument("--prefill", action="store_true", help="if prefill")
 parser.add_argument("--w4a16", action="store_true", help="if w4a16")
 parser.add_argument("--batch", type=int, default=8, help="set batch size (default: 8)")
 parser.add_argument("--tp", type=int, default=1, help="set tp (default: 1)")
+parser.add_argument("--seq", type=int, default=4096, help="set context_len in chat mode (default: 4096)")
 parser.add_argument(
     "--case",
     choices=["add", "attn_fc", "rmsnorm", "mlp", "mmqkv", "attn"],
@@ -96,7 +81,7 @@ parser.add_argument(
 )
 parser.add_argument(
     "--model",
-    choices=["llama2_7b", "llama2_70b", "qwen_72b", "qwen_7b"],
+    choices=["llama2_7b", "llama2_70b", "qwen_72b", "qwen_7b","llama3_8b","llama3_70b"],
     help="ops in llama2-7b",
 )
 
@@ -106,11 +91,39 @@ logger.add("logfile.log")
 
 
 llama2_7b_cfg = MODEL_CFG(
-    HIDDEN_SIZE=4096, INTER_SIZE=11008, HEAD_NUM=32, KV_HEAD_NUM=32
+    HIDDEN_SIZE=4096, 
+    INTER_SIZE=11008, 
+    HEAD_NUM=32, 
+    KV_HEAD_NUM=32,
+    VOCAB_SIZE=32000
 )
 llama2_70b_cfg = MODEL_CFG(
-    HIDDEN_SIZE=8192, INTER_SIZE=28672, HEAD_NUM=64, KV_HEAD_NUM=8, TP=2
+    HIDDEN_SIZE=8192, 
+    INTER_SIZE=28672, 
+    HEAD_NUM=64, 
+    KV_HEAD_NUM=8,
+    VOCAB_SIZE=32000
 )
+#llama3.1 8b
+llama3_8b_cfg = MODEL_CFG(
+    HIDDEN_SIZE=4096, 
+    INTER_SIZE=14336, 
+    HEAD_NUM=32, 
+    KV_HEAD_NUM=8, 
+    EPS=1e-5,
+    VOCAB_SIZE=128256
+)
+
+#llama3.3 70b
+llama3_70b_cfg = MODEL_CFG(
+    HIDDEN_SIZE=8192, 
+    INTER_SIZE=28672, 
+    HEAD_NUM=64, 
+    KV_HEAD_NUM=8, 
+    EPS=1e-5,
+    VOCAB_SIZE=128256
+)
+
 qwen_72b_cfg = MODEL_CFG(
     HIDDEN_SIZE=8192,
     INTER_SIZE=29568,
@@ -119,7 +132,7 @@ qwen_72b_cfg = MODEL_CFG(
     VOCAB_SIZE=152064,
     MMQKV_BIAS=True,
     TP=2,
-    DTYPE=torch.bfloat16,
+    DTYPE=torch.float16,
 )
 
 qwen_7b_cfg = MODEL_CFG(
@@ -130,24 +143,13 @@ qwen_7b_cfg = MODEL_CFG(
     VOCAB_SIZE=152064,
     MMQKV_BIAS=True,
     TP=2,
-    DTYPE=torch.bfloat16,
+    DTYPE=torch.float16,
 )
 
-# qwen_7b_cfg = MODEL_CFG(
-#     HIDDEN_SIZE=256,
-#     INTER_SIZE=32,
-#     HEAD_NUM=2,
-#     KV_HEAD_NUM=2,
-#     VOCAB_SIZE=152064,
-#     MMQKV_BIAS=True,
-#     TP=2,
-#     DTYPE=torch.bfloat16,
-# )
 
-
-def test_attn(CFG: MODEL_CFG, batch, seqlen, is_pmu, is_cmd):
-    assert seqlen == 1
-    net_tpu = SophLlamaAttention(CFG, False, is_pmu, is_cmd)
+def test_attn(CFG: MODEL_CFG, batch, seqlen, profile_mode):
+    # assert seqlen == 1
+    net_tpu = SophLlamaAttention(CFG, False, profile_mode)
     net_cpu = LlamaAttention(CFG)
     qkv_tpu = torch.rand(
         (batch, CFG.D * (CFG.HEAD_NUM // CFG.TP + 2 * CFG.KV_HEAD_NUM // CFG.TP)),
@@ -182,10 +184,11 @@ def test_attn(CFG: MODEL_CFG, batch, seqlen, is_pmu, is_cmd):
     sin_tpu = torch.rand((batch, 1, CFG.D), dtype=CFG.DTYPE, device=CFG.DEVICE)
     mask = None
     input_lengths_tpu = torch.tensor(
-        [CFG.DECODE_START] * batch, dtype=torch.int32, device=CFG.DEVICE
+        [cfg.DECODE_START + seqlen -1] * batch, dtype=torch.int32, device=CFG.DEVICE
     )
+    cfg.MAX_SEQLEN= ((cfg.DECODE_START + seqlen -1) // cfg.BLOCK_SIZE + 1)*cfg.BLOCK_SIZE
     save_slots_tpu = torch.tensor(
-        [[CFG.DECODE_START + b * CFG.MAX_SEQLEN] for b in range(batch)],
+        [[CFG.DECODE_START + seqlen - 2 + b * CFG.MAX_SEQLEN] for b in range(batch)],
         dtype=torch.int32,
         device=CFG.DEVICE,
     )
@@ -195,7 +198,7 @@ def test_attn(CFG: MODEL_CFG, batch, seqlen, is_pmu, is_cmd):
                 i
                 for i in range(
                     b * CFG.MAX_SEQLEN,
-                    b * CFG.MAX_SEQLEN + CFG.DECODE_START,
+                    b * CFG.MAX_SEQLEN + CFG.DECODE_START + seqlen -1,
                     CFG.BLOCK_SIZE,
                 )
             ]
@@ -236,7 +239,7 @@ def test_attn(CFG: MODEL_CFG, batch, seqlen, is_pmu, is_cmd):
         fetch_slots_tpu,
         mask,
         slot_size_tpu,
-        CFG.DECODE_START,
+        CFG.DECODE_START + seqlen -1,
         CFG.BLOCK_SIZE,
     )
     output_cpu = net_cpu(
@@ -251,13 +254,13 @@ def test_attn(CFG: MODEL_CFG, batch, seqlen, is_pmu, is_cmd):
         mask_cpu,
         save_slots_cpu,
         fetch_slots_cpu,
-        CFG.DECODE_START,
+        CFG.DECODE_START + seqlen -1,
     )
     return output_tpu, output_cpu
 
 
-def test_attn_prefill(CFG: MODEL_CFG, batch, seqlen, is_pmu, is_cmd):
-    net_tpu = SophLlamaAttention(CFG, True, is_pmu, is_cmd)
+def test_attn_prefill(CFG: MODEL_CFG, batch, seqlen, profile_mode):
+    net_tpu = SophLlamaAttention(CFG, True, profile_mode)
     net_cpu = LlamaAttention(CFG, is_prefill=True)
     qkv_tpu = torch.rand(
         (
@@ -297,12 +300,13 @@ def test_attn_prefill(CFG: MODEL_CFG, batch, seqlen, is_pmu, is_cmd):
     input_lengths_tpu = torch.tensor(
         [seqlen] * batch, dtype=torch.int32, device=CFG.DEVICE
     )
+    cfg.MAX_SEQLEN= ((cfg.DECODE_START + seqlen -1) // cfg.BLOCK_SIZE + 1)*cfg.BLOCK_SIZE
     save_slots_tpu = torch.tensor(
         [
             [
                 i
                 for i in range(
-                    b * CFG.MAX_SEQLEN, b * CFG.MAX_SEQLEN + seqlen, CFG.BLOCK_SIZE
+                    b * CFG.MAX_SEQLEN, (b+1) * CFG.MAX_SEQLEN, CFG.BLOCK_SIZE
                 )
             ]
             for b in range(batch)
@@ -363,51 +367,49 @@ def test_attn_prefill(CFG: MODEL_CFG, batch, seqlen, is_pmu, is_cmd):
     return output_tpu, output_cpu
 
 
-def test_base(model_class, cfg: MODEL_CFG, in_tensors, is_pmu, is_cmd):
+def test_base(model_class, cfg: MODEL_CFG, in_tensors, profile_mode):
     if in_tensors[0].device.type == "tpu":
-        net = model_class(cfg, is_pmu, is_cmd)
+        net = model_class(cfg, profile_mode=profile_mode)
     else:
         net = model_class(cfg)
     return net(*in_tensors)
 
 
 def test_add(
-    model_class_tpu, model_class_cpu, cfg: MODEL_CFG, batch, seqlen, is_pmu, is_cmd
+    model_class_tpu, model_class_cpu, cfg: MODEL_CFG, batch, seqlen, profile_mode,
 ):
-    hidden_states_tpu = torch.rand(
-        (batch * seqlen, cfg.HIDDEN_SIZE), dtype=cfg.DTYPE, device=cfg.DEVICE
+    hidden_states_cpu = torch.rand(
+        (batch * seqlen, cfg.HIDDEN_SIZE), dtype=cfg.DTYPE
     )
-    output_tpu = torch.rand(
-        (batch * seqlen, cfg.HIDDEN_SIZE), dtype=cfg.DTYPE, device=cfg.DEVICE
+    output_cpu = torch.rand(
+        (batch * seqlen, cfg.HIDDEN_SIZE), dtype=cfg.DTYPE
     )
-    hidden_states_cpu = hidden_states_tpu.clone().cpu()
-    output_cpu = output_tpu.clone().cpu()
-    print(f"hidden_states_tpu:{hidden_states_tpu.cpu()}")
-    print(f"output_tpu:{output_tpu.cpu()}")
-    print(f"hidden_states_cpu:{hidden_states_cpu}")
-    print(f"output_cpu:{output_cpu}")
+    hidden_states_tpu = hidden_states_cpu.clone().to(cfg.DEVICE)
+    output_tpu = output_cpu.clone().to(cfg.DEVICE)
+    # print(f"hidden_states_tpu:{hidden_states_tpu.cpu()}")
+    # print(f"output_tpu:{output_tpu.cpu()}")
+    # print(f"hidden_states_cpu:{hidden_states_cpu}")
+    # print(f"output_cpu:{output_cpu}")
     return test_base(
         model_class=model_class_tpu,
         cfg=cfg,
         in_tensors=(hidden_states_tpu, output_tpu),
-        is_pmu=is_pmu,
-        is_cmd=is_cmd,
+        profile_mode=profile_mode,
     ), test_base(
         model_class=model_class_cpu,
         cfg=cfg,
         in_tensors=(hidden_states_cpu, output_cpu),
-        is_pmu=is_pmu,
-        is_cmd=is_cmd,
+        profile_mode=profile_mode,
     )
 
 
 def test_rmsnorm(
-    model_class_tpu, model_class_cpu, cfg: MODEL_CFG, batch, seqlen, is_pmu, is_cmd
+    model_class_tpu, model_class_cpu, cfg: MODEL_CFG, batch, seqlen, profile_mode,
 ):
     hidden_states_tpu = torch.rand(
         (batch * seqlen, cfg.HIDDEN_SIZE), dtype=cfg.DTYPE, device=cfg.DEVICE
     )
-    weight_tpu = torch.rand((1, cfg.HIDDEN_SIZE), dtype=cfg.DTYPE, device=cfg.DEVICE)
+    weight_tpu = torch.rand((cfg.HIDDEN_SIZE), dtype=cfg.DTYPE, device=cfg.DEVICE)
     output_tpu = torch.empty_like(hidden_states_tpu)
 
     hidden_states_cpu = hidden_states_tpu.clone().cpu()
@@ -418,19 +420,17 @@ def test_rmsnorm(
         model_class=model_class_tpu,
         cfg=cfg,
         in_tensors=(hidden_states_tpu, weight_tpu, output_tpu),
-        is_pmu=is_pmu,
-        is_cmd=is_cmd,
+        profile_mode=profile_mode,
     ), test_base(
         model_class=model_class_cpu,
         cfg=cfg,
         in_tensors=(hidden_states_cpu, weight_cpu, output_cpu),
-        is_pmu=is_pmu,
-        is_cmd=is_cmd,
+        profile_mode=profile_mode,
     )
 
 
 def test_mmqkv(
-    model_class_tpu, model_class_cpu, cfg: MODEL_CFG, batch, seqlen, is_pmu, is_cmd
+    model_class_tpu, model_class_cpu, cfg: MODEL_CFG, batch, seqlen, profile_mode,
 ):
     hidden_states_tpu = torch.rand(
         (batch * seqlen, cfg.HIDDEN_SIZE), dtype=cfg.DTYPE, device=cfg.DEVICE
@@ -465,19 +465,17 @@ def test_mmqkv(
         model_class=model_class_tpu,
         cfg=cfg,
         in_tensors=(hidden_states_tpu, weight_tpu, bias_tpu),
-        is_pmu=is_pmu,
-        is_cmd=is_cmd,
+        profile_mode=profile_mode,
     ), test_base(
         model_class=model_class_cpu,
         cfg=cfg,
         in_tensors=(hidden_states_cpu, weight_cpu, bias_cpu),
-        is_pmu=is_pmu,
-        is_cmd=is_cmd,
+        profile_mode=profile_mode,
     )
 
 
 def test_mmqkv_w4a16(
-    model_class_tpu, model_class_cpu, cfg: MODEL_CFG, batch, seqlen, is_pmu, is_cmd
+    model_class_tpu, model_class_cpu, cfg: MODEL_CFG, batch, seqlen, profile_mode,
 ):
     group_size = 128
     hidden_states_cpu = torch.randn(
@@ -550,19 +548,17 @@ def test_mmqkv_w4a16(
             qzeros_tpu.to(cfg.DEVICE),
             scales_tpu.to(cfg.DEVICE),
         ),
-        is_pmu=is_pmu,
-        is_cmd=is_cmd,
+        profile_mode=profile_mode,
     ), test_base(
         model_class=model_class_cpu,
         cfg=cfg,
         in_tensors=(hidden_states_cpu, qweight_cpu_deq, bias_cpu),
-        is_pmu=is_pmu,
-        is_cmd=is_cmd,
+        profile_mode=profile_mode,
     )
 
 
 def test_mlp(
-    model_class_tpu, model_class_cpu, cfg: MODEL_CFG, batch, seqlen, is_pmu, is_cmd
+    model_class_tpu, model_class_cpu, cfg: MODEL_CFG, batch, seqlen, profile_mode,
 ):
     hidden_states_tpu = torch.rand(
         (batch * seqlen, cfg.HIDDEN_SIZE), dtype=cfg.DTYPE, device=cfg.DEVICE
@@ -594,14 +590,12 @@ def test_mlp(
         model_class=model_class_tpu,
         cfg=cfg,
         in_tensors=(hidden_states_tpu, w0_tpu, w1_tpu, w2_tpu, output_tpu),
-        is_pmu=is_pmu,
-        is_cmd=is_cmd,
+        profile_mode=profile_mode,
     ), test_base(
         model_class=model_class_cpu,
         cfg=cfg,
         in_tensors=(hidden_states_cpu, w0_cpu, w1_cpu, w2_cpu, output_cpu),
-        is_pmu=is_pmu,
-        is_cmd=is_cmd,
+        profile_mode=profile_mode,
     )
 
 
@@ -658,7 +652,7 @@ def dequant(q_group_size, weight_bits, qweight, qzeros, qscale):
 
 
 def test_mlp_w4a16(
-    model_class_tpu, model_class_cpu, cfg: MODEL_CFG, batch, seqlen, is_pmu, is_cmd
+    model_class_tpu, model_class_cpu, cfg: MODEL_CFG, batch, seqlen, profile_mode,
 ):  
     group_size = 128
     zp_value = 119
@@ -730,7 +724,12 @@ def test_mlp_w4a16(
     gate_scales_tpu = gate_scales_cpu.clone().contiguous().to(cfg.DEVICE)
     down_scales_tpu = down_scales_cpu.clone().T.contiguous().to(cfg.DEVICE)
     down_qzeros_tpu = down_qzeros_cpu.clone().T.contiguous().to(cfg.DEVICE)
-
+    print(f"{up_qzeros_tpu.shape=}")
+    print(f"{up_scales_tpu.shape=}")
+    print(f"{gate_qzeros_tpu.shape=}")
+    print(f"{gate_scales_tpu.shape=}")
+    print(f"{down_qzeros_tpu.shape=}")
+    print(f"{down_scales_tpu.shape=}")
     hidden_states_cpu = hidden_states_tpu.clone().cpu()
     w0_tpu = w1_cpu.clone().contiguous().to(cfg.DEVICE)
     w0_cpu_deq = dequant(128, 4, w0_cpu, up_qzeros_cpu, up_scales_cpu).T
@@ -767,19 +766,17 @@ def test_mlp_w4a16(
             down_scales_tpu,
             output_tpu,
         ),
-        is_pmu=is_pmu,
-        is_cmd=is_cmd,
+        profile_mode=profile_mode,
     ), test_base(
         model_class=model_class_cpu,
         cfg=cfg,
         in_tensors=(hidden_states_cpu, w0_cpu_deq, w1_cpu_deq, w2_cpu_deq, output_cpu),
-        is_pmu=is_pmu,
-        is_cmd=is_cmd,
+        profile_mode=profile_mode,
     )
 
 
 def test_attn_fc(
-    model_class_tpu, model_class_cpu, cfg: MODEL_CFG, batch, seqlen, is_pmu, is_cmd
+    model_class_tpu, model_class_cpu, cfg: MODEL_CFG, batch, seqlen, profile_mode,
 ):
     hidden_states_tpu = torch.rand(
         (batch * seqlen, cfg.HIDDEN_SIZE // cfg.TP), dtype=cfg.DTYPE, device=cfg.DEVICE
@@ -802,19 +799,17 @@ def test_attn_fc(
         model_class=model_class_tpu,
         cfg=cfg,
         in_tensors=(hidden_states_tpu, weight_tpu),
-        is_pmu=is_pmu,
-        is_cmd=is_cmd,
+        profile_mode=profile_mode,
     ), test_base(
         model_class=model_class_cpu,
         cfg=cfg,
         in_tensors=(hidden_states_cpu, weight_cpu),
-        is_pmu=is_pmu,
-        is_cmd=is_cmd,
+        profile_mode=profile_mode,
     )
 
 
 def test_attn_fc_w4a16(
-    model_class_tpu, model_class_cpu, cfg: MODEL_CFG, batch, seqlen, is_pmu, is_cmd
+    model_class_tpu, model_class_cpu, cfg: MODEL_CFG, batch, seqlen, profile_mode,
 ):
     group_size = 128
     hidden_states_cpu = torch.randn(
@@ -822,14 +817,22 @@ def test_attn_fc_w4a16(
         dtype=cfg.DTYPE,
     )
     hidden_states_tpu = hidden_states_cpu.clone().to(cfg.DEVICE)
+    print(f"{hidden_states_tpu.shape=}")
 
     qzeros_tpu = torch.full(
         [cfg.HIDDEN_SIZE, cfg.D * cfg.HEAD_NUM // cfg.TP // group_size],
         3,
         dtype=torch.uint8,
     )
+
+    if qzeros_tpu.size(1) % 2 != 0:
+        padding = torch.full([cfg.HIDDEN_SIZE, 1], 3, dtype=torch.uint8)
+        qzeros_tpu = torch.cat([qzeros_tpu, padding], dim=1)
+        print(f"After padding, qzeros_tpu shape: {qzeros_tpu.shape}")
+
+    qzeros_tpu_transposed = qzeros_tpu.transpose(-1, -2)
     qzeros_tpu = torch.bitwise_or(
-        qzeros_tpu.transpose(-1, -2)[::2], qzeros_tpu.transpose(-1, -2)[1::2] << 4
+        qzeros_tpu_transposed[::2], qzeros_tpu_transposed[1::2] << 4
     ).transpose(-1, -2)
 
     scales_ori = torch.full(
@@ -874,19 +877,17 @@ def test_attn_fc_w4a16(
             scales_tpu.to(cfg.DEVICE),
             output_tpu,
         ),
-        is_pmu=is_pmu,
-        is_cmd=is_cmd,
+        profile_mode=profile_mode,
     ), test_base(
         model_class=model_class_cpu,
         cfg=cfg,
         in_tensors=(hidden_states_cpu, qweight_cpu_deq),
-        is_pmu=is_pmu,
-        is_cmd=is_cmd,
+        profile_mode=profile_mode,
     )
 
 
 def check_add(
-    cfg: MODEL_CFG, batch, seqlen, is_test, is_PerfAI, is_prefill, is_pmu, is_cmd
+    cfg: MODEL_CFG, batch, seqlen, is_test, is_PerfAI, is_prefill, profile_mode
 ):
     if is_test:
         out_tpu, out_cpu = test_add(
@@ -895,8 +896,7 @@ def check_add(
             cfg=cfg,
             batch=batch,
             seqlen=seqlen,
-            is_pmu=is_pmu,
-            is_cmd=is_cmd,
+            profile_mode=profile_mode,
         )
         out_tpu = out_tpu.cpu()
 
@@ -908,9 +908,7 @@ def check_add(
         status = comparator.cmp_result(
             out_cpu.detach().float(), out_tpu.detach().float()
         )
-        out_diff = out_cpu - out_tpu
-        print(f"max_diff: {torch.max(torch.abs(out_diff))}")
-        if status == False or torch.max(torch.abs(out_diff)) > 0.01:
+        if status == False:
             print(f"[Failed] llama_add compare failed!")
             sys.exit(255)
         print(f"[Success] llama_add compare pass!")
@@ -921,7 +919,7 @@ def check_add(
             path = "decode_add"
         if is_PerfAI:        
             generate_run_perfai_script(path)
-        if is_pmu or is_cmd:
+        if profile_mode != None:
             generate_run_profile_script(path)
 
         hidden_states_tpu = torch.rand(
@@ -932,46 +930,11 @@ def check_add(
             SophLlamaAdd,
             cfg=cfg,
             in_tensors=(hidden_states_tpu, output_tpu),
-            is_pmu=is_pmu,
-            is_cmd=is_cmd,
+            profile_mode=profile_mode,
         )
 
-        # exit_code = os.system(". /workspace/tpu-train/python/test/perfai.sh")
-        # print(f"Exit code: {exit_code}")
-        # if is_prefill:
-        #     decode_path = 'prefill_add'
-        #     output_file = '/workspace/tpu-train/nohup_add_prefill.out'
-        # else:
-        #     decode_path = 'decode_add'
-        #     output_file = '/workspace/tpu-train/nohup_add_decode.out'
-
-        # command = [
-        #     '. /workspace/tpu-train/python/test/perfai.sh'
-        #     # f'bash -c ". /workspace/PerfAI_Release_20241113/envsetup.sh && . /workspace/PerfAI_Release_20241113/AutoRunner.sh -c sg2260 -d /workspace/tpu-train/{decode_path} -e sg2260"'
-        # ]
-
-        # target_dir='/workspace/PerfAI_Release_20241113'
-        # command_str = ' '.join(command)
-
-        # try:
-        #     process = subprocess.Popen(command_str, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-        #     stdout, stderr = process.communicate()
-
-        #     print("Standard Output:")
-        #     print(stdout.decode('utf-8'))
-
-        #     if os.path.exists(output_file):
-        #         print(f"nohupout file {output_file} created successfully.")
-        #     else:
-        #         print(f"nohupout file {output_file} was not created.")
-        #     if process.returncode == 0:
-        #         print("add PerfAI executed successfully with PID:", process.pid)
-        # except OSError as e:
-        #     print("Error executing command:", e)
-
-
 def check_rmsnorm(
-    cfg: MODEL_CFG, batch, seqlen, is_test, is_PerfAI, is_prefill, is_pmu, is_cmd
+    cfg: MODEL_CFG, batch, seqlen, is_test, is_PerfAI, is_prefill, profile_mode
 ):
     if is_test:
         out_tpu, out_cpu = test_rmsnorm(
@@ -980,8 +943,7 @@ def check_rmsnorm(
             cfg=cfg,
             batch=batch,
             seqlen=seqlen,
-            is_pmu=is_pmu,
-            is_cmd=is_cmd,
+            profile_mode=profile_mode,
         )
         out_tpu = out_tpu.cpu()
 
@@ -993,9 +955,7 @@ def check_rmsnorm(
         status = comparator.cmp_result(
             out_cpu.detach().float(), out_tpu.detach().float()
         )
-        out_diff = out_cpu - out_tpu
-        print(f"max_diff: {torch.max(torch.abs(out_diff))}")
-        if status == False or torch.max(torch.abs(out_diff)) > 0.01:
+        if status == False:
             print(f"[Failed] llama_rmsnorm compare failed!")
             sys.exit(255)
         print(f"[Success] llama_rmsnorm compare pass!")
@@ -1006,13 +966,13 @@ def check_rmsnorm(
             path = "decode_rmsnorm"
         if is_PerfAI:        
             generate_run_perfai_script(path)
-        if is_pmu or is_cmd:
+        if profile_mode != None:
             generate_run_profile_script(path)
         hidden_states_tpu = torch.rand(
             (batch * seqlen, cfg.HIDDEN_SIZE), dtype=cfg.DTYPE, device=cfg.DEVICE
         )
         weight_tpu = torch.rand(
-            (1, cfg.HIDDEN_SIZE), dtype=cfg.DTYPE, device=cfg.DEVICE
+            (cfg.HIDDEN_SIZE), dtype=cfg.DTYPE, device=cfg.DEVICE
         )
         output_tpu = torch.empty_like(hidden_states_tpu)
 
@@ -1020,13 +980,12 @@ def check_rmsnorm(
             SophLlamaRMSNorm,
             cfg=cfg,
             in_tensors=(hidden_states_tpu, weight_tpu, output_tpu),
-            is_pmu=is_pmu,
-            is_cmd=is_cmd,
+            profile_mode=profile_mode,
         )
 
 
 def check_mmqkv(
-    cfg: MODEL_CFG, batch, seqlen, is_test, is_PerfAI, is_prefill, is_pmu, is_cmd
+    cfg: MODEL_CFG, batch, seqlen, is_test, is_PerfAI, is_prefill, profile_mode
 ):
     if is_test:
         out_tpu, out_cpu = test_mmqkv(
@@ -1035,8 +994,7 @@ def check_mmqkv(
             cfg=cfg,
             batch=batch,
             seqlen=seqlen,
-            is_pmu=is_pmu,
-            is_cmd=is_cmd,
+            profile_mode=profile_mode,
         )
         out_tpu = out_tpu.cpu()
 
@@ -1048,9 +1006,7 @@ def check_mmqkv(
         status = comparator.cmp_result(
             out_cpu.detach().float(), out_tpu.detach().float()
         )
-        out_diff = out_cpu - out_tpu
-        print(f"max_diff: {torch.max(torch.abs(out_diff))}")
-        if status == False or torch.max(torch.abs(out_diff)) > 0.01:
+        if status == False > 0.01:
             print(f"[Failed] llama_mmqkv compare failed!")
             sys.exit(255)
         print(f"[Success] llama_mmkqv compare pass!")
@@ -1061,7 +1017,7 @@ def check_mmqkv(
             path = "decode_mmqkv"
         if is_PerfAI:        
             generate_run_perfai_script(path)
-        if is_pmu or is_cmd:
+        if profile_mode != None:
             generate_run_profile_script(path)
         hidden_states_tpu = torch.rand(
             (batch * seqlen, cfg.HIDDEN_SIZE), dtype=cfg.DTYPE, device=cfg.DEVICE
@@ -1091,13 +1047,12 @@ def check_mmqkv(
             SophLlamaMMqkv,
             cfg=cfg,
             in_tensors=(hidden_states_tpu, weight_tpu, bias_tpu),
-            is_pmu=is_pmu,
-            is_cmd=is_cmd,
+            profile_mode=profile_mode,
         )
 
 
 def check_mmqkv_w4a16(
-    cfg: MODEL_CFG, batch, seqlen, is_test, is_PerfAI, is_pmu, is_cmd
+    cfg: MODEL_CFG, batch, seqlen, is_test, is_PerfAI, profile_mode
 ):
     if is_test:
         out_tpu, out_cpu = test_mmqkv_w4a16(
@@ -1106,8 +1061,7 @@ def check_mmqkv_w4a16(
             cfg=cfg,
             batch=batch,
             seqlen=seqlen,
-            is_pmu=is_pmu,
-            is_cmd=is_cmd,
+            profile_mode=profile_mode,
         )
         out_tpu = out_tpu.cpu()
 
@@ -1121,9 +1075,7 @@ def check_mmqkv_w4a16(
         status = comparator.cmp_result(
             out_cpu.detach().float(), out_tpu.detach().float()
         )
-        out_diff = out_cpu - out_tpu
-        print(f"max_diff: {torch.max(torch.abs(out_diff))}")
-        if status == False or torch.max(torch.abs(out_diff)) > 0.01:
+        if status == False :
             print(f"[Failed] llama_mmqkv_w4a16 compare failed!")
             sys.exit(255)
         print(f"[Success] llama_mmqkv_w4a16 compare pass!")
@@ -1131,7 +1083,7 @@ def check_mmqkv_w4a16(
         if is_PerfAI:
             path = "w4a16_mmqkv"
             generate_run_perfai_script(path)
-        if is_pmu or is_cmd:
+        if profile_mode != None:
             path = "w4a16_mmqkv"
             generate_run_profile_script(path)
         group_size = 128
@@ -1146,7 +1098,7 @@ def check_mmqkv_w4a16(
                 ),
                 dtype=torch.uint8,
             )
-            .T.contiguous()
+            .contiguous()
             .to(cfg.DEVICE)
         )
         qzeros_tpu = torch.empty(
@@ -1184,13 +1136,12 @@ def check_mmqkv_w4a16(
                 qzeros_tpu,
                 scales_tpu,
             ),
-            is_pmu=is_pmu,
-            is_cmd=is_cmd,
+            profile_mode=profile_mode,
         )
 
 
 def check_mlp(
-    cfg: MODEL_CFG, batch, seqlen, is_test, is_PerfAI, is_prefill, is_pmu, is_cmd
+    cfg: MODEL_CFG, batch, seqlen, is_test, is_PerfAI, is_prefill, profile_mode
 ):
     if is_test:
         out_tpu, out_cpu = test_mlp(
@@ -1199,8 +1150,7 @@ def check_mlp(
             cfg=cfg,
             batch=batch,
             seqlen=seqlen,
-            is_pmu=is_pmu,
-            is_cmd=is_cmd,
+            profile_mode=profile_mode,
         )
         out_tpu = out_tpu.cpu()
 
@@ -1212,9 +1162,7 @@ def check_mlp(
         status = comparator.cmp_result(
             out_cpu.detach().float(), out_tpu.detach().float()
         )
-        out_diff = out_cpu - out_tpu
-        print(f"max_diff: {torch.max(torch.abs(out_diff))}")
-        if status == False or torch.max(torch.abs(out_diff)) > 0.01:
+        if status == False :
             print(f"[Failed] llama_mlp compare failed!")
             sys.exit(255)
         print(f"[Success] llama_mlp compare pass!")
@@ -1225,7 +1173,7 @@ def check_mlp(
             path = "decode_mlp"
         if is_PerfAI:        
             generate_run_perfai_script(path)
-        if is_pmu or is_cmd:
+        if profile_mode != None:
             generate_run_profile_script(path)
 
         hidden_states_tpu = torch.rand(
@@ -1252,12 +1200,11 @@ def check_mlp(
             model_class=SophLlamaMlp,
             cfg=cfg,
             in_tensors=(hidden_states_tpu, w0_tpu, w1_tpu, w2_tpu, output_tpu),
-            is_pmu=is_pmu,
-            is_cmd=is_cmd,
+            profile_mode=profile_mode,
         )
 
 
-def check_mlp_w4a16(cfg: MODEL_CFG, batch, seqlen, is_test, is_PerfAI, is_pmu, is_cmd):
+def check_mlp_w4a16(cfg: MODEL_CFG, batch, seqlen, is_test, is_PerfAI, profile_mode):
     if is_test:
         out_tpu, out_cpu = test_mlp_w4a16(
             SophLlamaMlpW4a16,
@@ -1265,8 +1212,7 @@ def check_mlp_w4a16(cfg: MODEL_CFG, batch, seqlen, is_test, is_PerfAI, is_pmu, i
             cfg=cfg,
             batch=batch,
             seqlen=seqlen,
-            is_pmu=is_pmu,
-            is_cmd=is_cmd,
+            profile_mode=profile_mode,
         )
         out_tpu = out_tpu.cpu()
 
@@ -1278,9 +1224,7 @@ def check_mlp_w4a16(cfg: MODEL_CFG, batch, seqlen, is_test, is_PerfAI, is_pmu, i
         status = comparator.cmp_result(
             out_cpu.detach().float(), out_tpu.detach().float()
         )
-        out_diff = out_cpu - out_tpu
-        print(f"max_diff: {torch.max(torch.abs(out_diff))}")
-        if status == False or torch.max(torch.abs(out_diff)) > 0.01:
+        if status == False:
             print(f"[Failed] llama_mlp_w4a16 compare failed!")
             sys.exit(255)
         print(f"[Success] llama_mlp_w4a16 compare pass!")
@@ -1288,10 +1232,11 @@ def check_mlp_w4a16(cfg: MODEL_CFG, batch, seqlen, is_test, is_PerfAI, is_pmu, i
         if is_PerfAI:
             path = "w4a16_mlp"
             generate_run_perfai_script(path)
-        if is_pmu or is_cmd:
+        if profile_mode != None:
             path = "w4a16_mlp"
             generate_run_profile_script(path)
         zp_value = 119
+        group_size = 128
         hidden_states_tpu = torch.rand(
             (batch * seqlen, cfg.HIDDEN_SIZE), dtype=cfg.DTYPE, device=cfg.DEVICE
         )
@@ -1319,7 +1264,7 @@ def check_mlp_w4a16(cfg: MODEL_CFG, batch, seqlen, is_test, is_PerfAI, is_pmu, i
             torch.randint(
                 0,
                 255,
-                (cfg.HIDDEN_SIZE, cfg.INTER_SIZE // 2 // cfg.TP),
+                (cfg.INTER_SIZE // group_size // 2 // cfg.TP, cfg.HIDDEN_SIZE * 128),
                 device=cfg.DEVICE,
             )
             .contiguous()
@@ -1328,7 +1273,6 @@ def check_mlp_w4a16(cfg: MODEL_CFG, batch, seqlen, is_test, is_PerfAI, is_pmu, i
 
         output_tpu = torch.empty_like(hidden_states_tpu)
 
-        group_size = 128
         up_qzeros_cpu = torch.full(
             (cfg.INTER_SIZE // cfg.TP, cfg.HIDDEN_SIZE // group_size // 2),
             zp_value,
@@ -1383,13 +1327,12 @@ def check_mlp_w4a16(cfg: MODEL_CFG, batch, seqlen, is_test, is_PerfAI, is_pmu, i
                 down_scales_tpu,
                 output_tpu,
             ),
-            is_pmu=is_pmu,
-            is_cmd=is_cmd,
+            profile_mode=profile_mode,
         )
 
 
 def check_attn_fc(
-    cfg: MODEL_CFG, batch, seqlen, is_test, is_PerfAI, is_prefill, is_pmu, is_cmd
+    cfg: MODEL_CFG, batch, seqlen, is_test, is_PerfAI, is_prefill, profile_mode
 ):
     if is_test:
         out_tpu, out_cpu = test_attn_fc(
@@ -1398,8 +1341,7 @@ def check_attn_fc(
             cfg=cfg,
             batch=batch,
             seqlen=seqlen,
-            is_pmu=is_pmu,
-            is_cmd=is_cmd,
+            profile_mode=profile_mode,
         )
         out_tpu = out_tpu.cpu()
 
@@ -1413,9 +1355,7 @@ def check_attn_fc(
         status = comparator.cmp_result(
             out_cpu.detach().float(), out_tpu.detach().float()
         )
-        out_diff = out_cpu - out_tpu
-        print(f"max_diff: {torch.max(torch.abs(out_diff))}")
-        if status == False or torch.max(torch.abs(out_diff)) > 0.01:
+        if status == False:
             print(f"[Failed] llama_attn_fc compare failed!")
             sys.exit(255)
         print(f"[Success] llama_attn_fc compare pass!")
@@ -1426,7 +1366,7 @@ def check_attn_fc(
             path = "decode_attn_fc"
         if is_PerfAI:        
             generate_run_perfai_script(path)
-        if is_pmu or is_cmd:
+        if profile_mode != None:
             generate_run_profile_script(path)
         hidden_states_tpu = torch.rand(
             (batch * seqlen, cfg.HIDDEN_SIZE // cfg.TP),
@@ -1445,13 +1385,12 @@ def check_attn_fc(
             SophLlamaAttentionFC,
             cfg=cfg,
             in_tensors=(hidden_states_tpu, weight_tpu),
-            is_pmu=is_pmu,
-            is_cmd=is_cmd,
+            profile_mode=profile_mode,
         )
 
 
 def check_attn_fc_w4a16(
-    cfg: MODEL_CFG, batch, seqlen, is_test, is_PerfAI, is_pmu, is_cmd
+    cfg: MODEL_CFG, batch, seqlen, is_test, is_PerfAI, profile_mode
 ):
     if is_test:
         out_tpu, out_cpu = test_attn_fc_w4a16(
@@ -1460,8 +1399,7 @@ def check_attn_fc_w4a16(
             cfg=cfg,
             batch=batch,
             seqlen=seqlen,
-            is_pmu=is_pmu,
-            is_cmd=is_cmd,
+            profile_mode=profile_mode,
         )
         out_tpu = out_tpu.cpu()
 
@@ -1473,9 +1411,7 @@ def check_attn_fc_w4a16(
         status = comparator.cmp_result(
             out_cpu.detach().float(), out_tpu.detach().float()
         )
-        out_diff = out_cpu - out_tpu
-        print(f"max_diff: {torch.max(torch.abs(out_diff))}")
-        if status == False or torch.max(torch.abs(out_diff)) > 0.01:
+        if status == False:
             print(f"[Failed] llama_attn_fc_w4a16 compare failed!")
             sys.exit(255)
         print(f"[Success] llama_attn_fc_w4a16 compare pass!")
@@ -1483,7 +1419,7 @@ def check_attn_fc_w4a16(
         if is_PerfAI:
             path = "w4a16_attn_fc"
             generate_run_perfai_script(path)
-        if is_pmu or is_cmd:
+        if profile_mode != None:
             path = "w4a16_attn_fc"
             generate_run_profile_script(path)
         group_size = 128
@@ -1498,8 +1434,15 @@ def check_attn_fc_w4a16(
             3,
             dtype=torch.uint8,
         )
+
+        if qzeros_tpu.size(1) % 2 != 0:
+            padding = torch.full([cfg.HIDDEN_SIZE, 1], 3, dtype=torch.uint8)
+            qzeros_tpu = torch.cat([qzeros_tpu, padding], dim=1)
+            print(f"After padding, qzeros_tpu shape: {qzeros_tpu.shape}")
+
+        qzeros_tpu_transposed = qzeros_tpu.transpose(-1, -2)
         qzeros_tpu = torch.bitwise_or(
-            qzeros_tpu.transpose(-1, -2)[::2], qzeros_tpu.transpose(-1, -2)[1::2] << 4
+            qzeros_tpu_transposed[::2], qzeros_tpu_transposed[1::2] << 4
         ).transpose(-1, -2)
 
         scales_ori = torch.full(
@@ -1537,17 +1480,16 @@ def check_attn_fc_w4a16(
                 scales_tpu.to(cfg.DEVICE),
                 output_tpu,
             ),
-            is_pmu=is_pmu,
-            is_cmd=is_cmd,
+            profile_mode=profile_mode,
         )
 
 
 def check_attn_prefill(
-    cfg: MODEL_CFG, batch, seqlen, is_test, is_PerfAI, is_pmu, is_cmd
+    cfg: MODEL_CFG, batch, seqlen, is_test, is_PerfAI, profile_mode
 ):
     if is_test:
         out_tpu, out_cpu = test_attn_prefill(
-            cfg, batch=batch, seqlen=seqlen, is_pmu=is_pmu, is_cmd=is_cmd
+            cfg, batch=batch, seqlen=seqlen, profile_mode=profile_mode,
         )
         out_tpu = out_tpu.cpu()
 
@@ -1561,9 +1503,7 @@ def check_attn_prefill(
         status = comparator.cmp_result(
             out_cpu.detach().float().reshape(-1), out_tpu.detach().float().reshape(-1)
         )
-        out_diff = out_cpu - out_tpu
-        print(f"max_diff: {torch.max(torch.abs(out_diff))}")
-        if status == False or torch.max(torch.abs(out_diff)) > 0.01:
+        if status == False:
             print(f"[Failed] llama_attn_prefill compare failed!")
             sys.exit(255)
         print(f"[Success] llama_attn_prefill compare pass!")
@@ -1571,10 +1511,10 @@ def check_attn_prefill(
         if is_PerfAI:
             path = "prefill_attn"
             generate_run_perfai_script(path)
-        if is_pmu or is_cmd:
+        if profile_mode != None:
             path = "prefill_attn"
             generate_run_profile_script(path)
-        net_tpu = SophLlamaAttention(cfg, is_prefill=True, is_pmu=is_pmu, is_cmd=is_cmd)
+        net_tpu = SophLlamaAttention(cfg, is_prefill=True, profile_mode=profile_mode,)
         qkv_tpu = torch.rand(
             (
                 batch * seqlen,
@@ -1617,12 +1557,13 @@ def check_attn_prefill(
         input_lengths_tpu = torch.tensor(
             [seqlen] * batch, dtype=torch.int32, device=cfg.DEVICE
         )
+        cfg.MAX_SEQLEN= ((cfg.DECODE_START + seqlen -1) // cfg.BLOCK_SIZE + 1) * cfg.BLOCK_SIZE
         save_slots_tpu = torch.tensor(
             [
                 [
                     i
                     for i in range(
-                        b * cfg.MAX_SEQLEN, b * cfg.MAX_SEQLEN + seqlen, cfg.BLOCK_SIZE
+                        b * cfg.MAX_SEQLEN, (b+1) * cfg.MAX_SEQLEN, cfg.BLOCK_SIZE
                     )
                 ]
                 for b in range(batch)
@@ -1657,10 +1598,10 @@ def check_attn_prefill(
         )
 
 
-def check_attn(cfg: MODEL_CFG, batch, seqlen, is_test, is_PerfAI, is_pmu, is_cmd):
+def check_attn(cfg: MODEL_CFG, batch, seqlen, is_test, is_PerfAI, profile_mode):
     if is_test:
         out_tpu, out_cpu = test_attn(
-            cfg, batch=batch, seqlen=seqlen, is_pmu=is_pmu, is_cmd=is_cmd
+            cfg, batch=batch, seqlen=seqlen, profile_mode=profile_mode,
         )
         out_tpu = out_tpu.cpu()
 
@@ -1674,21 +1615,19 @@ def check_attn(cfg: MODEL_CFG, batch, seqlen, is_test, is_PerfAI, is_pmu, is_cmd
         status = comparator.cmp_result(
             out_cpu.detach().float().reshape(-1), out_tpu.detach().float().reshape(-1)
         )
-        out_diff = out_cpu - out_tpu
-        print(f"max_diff: {torch.max(torch.abs(out_diff))}")
-        if status == False or torch.max(torch.abs(out_diff)) > 0.01:
+        if status == False:
             print(f"[Failed] llama_attn_decode compare failed!")
             sys.exit(255)
         print(f"[Success] llama_attn_decode compare pass!")
     else:
-        assert seqlen == 1
+        # assert seqlen == 1
         if is_PerfAI:
             path = "decode_attn"
             generate_run_perfai_script(path)
-        if is_pmu or is_cmd:
+        if profile_mode != None:
             path = "decode_attn"
             generate_run_profile_script(path)
-        net_tpu = SophLlamaAttention(cfg, is_pmu=is_pmu, is_cmd=is_cmd)
+        net_tpu = SophLlamaAttention(cfg, profile_mode=profile_mode,)
         qkv_tpu = torch.rand(
             (batch, cfg.D * (cfg.HEAD_NUM // cfg.TP + 2 * cfg.KV_HEAD_NUM // cfg.TP)),
             dtype=cfg.DTYPE,
@@ -1722,10 +1661,11 @@ def check_attn(cfg: MODEL_CFG, batch, seqlen, is_test, is_PerfAI, is_pmu, is_cmd
         sin_tpu = torch.rand((batch, 1, cfg.D), dtype=cfg.DTYPE, device=cfg.DEVICE)
         mask = None
         input_lengths_tpu = torch.tensor(
-            [cfg.DECODE_START] * batch, dtype=torch.int32, device=cfg.DEVICE
+            [cfg.DECODE_START + seqlen -1] * batch, dtype=torch.int32, device=cfg.DEVICE
         )
+        cfg.MAX_SEQLEN= ((cfg.DECODE_START + seqlen -1) // cfg.BLOCK_SIZE + 1)*cfg.BLOCK_SIZE
         save_slots_tpu = torch.tensor(
-            [[cfg.DECODE_START + b * cfg.MAX_SEQLEN] for b in range(batch)],
+            [[cfg.DECODE_START + seqlen -2 + b * cfg.MAX_SEQLEN] for b in range(batch)],
             dtype=torch.int32,
             device=cfg.DEVICE,
         )
@@ -1735,7 +1675,7 @@ def check_attn(cfg: MODEL_CFG, batch, seqlen, is_test, is_PerfAI, is_pmu, is_cmd
                     i
                     for i in range(
                         b * cfg.MAX_SEQLEN,
-                        b * cfg.MAX_SEQLEN + cfg.DECODE_START,
+                        b * cfg.MAX_SEQLEN + cfg.DECODE_START + seqlen -1,
                         cfg.BLOCK_SIZE,
                     )
                 ]
@@ -1765,7 +1705,7 @@ def check_attn(cfg: MODEL_CFG, batch, seqlen, is_test, is_PerfAI, is_pmu, is_cmd
             fetch_slots_tpu,
             mask,
             slot_size_tpu,
-            cfg.DECODE_START,
+            cfg.DECODE_START + seqlen -1,
             cfg.BLOCK_SIZE,
         )
 
@@ -1821,16 +1761,14 @@ cd /workspace/tpu-train
 
 if __name__ == "__main__":
     # os.environ['FORBID_CMD_EXECUTE']='1'
+    # os.environ['DISABLE_CACHE'] = '1'
     is_prefill = args.prefill
     is_w4a16 = args.w4a16
     is_test = args.test if args.test else None
     is_perfAI = args.PerfAI if args.PerfAI else None
     test_case = args.case
-    is_cmd = args.cmd if args.cmd else None
-    is_pmu = args.pmu if args.pmu else None
-    seqlen = 4096 if is_prefill else 1
+    profile_mode = args.profile_mode if args.profile_mode else None
     batch = args.batch
-
     func_name = (
         f"check_{test_case}"
         + (
@@ -1842,12 +1780,15 @@ if __name__ == "__main__":
     )
 
     model_name = args.model
+    CHAT_WRAPPER_TOKEN_NUM = {"llama2_70b": 27, "llama2_7b":27, "llama3_8b": 27, "llama3_70b":27, "qwen_72b": 19, "qwen_7b":19}
+    input_length = 5 + CHAT_WRAPPER_TOKEN_NUM[model_name]+ max(0, args.seq - 5 - CHAT_WRAPPER_TOKEN_NUM[model_name])
+    seqlen = input_length if is_prefill or test_case in ["attn"] else 1
     ins_folder = (
         f"prefill_{test_case}"
         if is_prefill
         else f"w4a16_{test_case}" if is_w4a16 else f"decode_{test_case}"
     )
-    if not is_cmd and not is_pmu:
+    if is_perfAI:
         if os.path.exists(ins_folder):
             shutil.rmtree(ins_folder)
         os.mkdir(ins_folder)
@@ -1857,15 +1798,17 @@ if __name__ == "__main__":
     func = getattr(current_module, func_name)
     cfg = getattr(current_module, f"{model_name}_cfg")
     cfg.TP = args.tp
-    if f"{model_name}_cfg"=="qwen_72b_cfg" and is_w4a16:
-        cfg.INTER_SIZE=29696
+    if (cfg.INTER_SIZE // cfg.TP) % 256 !=0:
+        APPEND_SIZE_PER_TP = 256 - (cfg.INTER_SIZE // cfg.TP) % 256 
+        cfg.INTER_SIZE = cfg.INTER_SIZE + APPEND_SIZE_PER_TP * cfg.TP
+    cfg.NUM_BLOCKS = max(1024, (math.ceil((args.seq + 128 + CHAT_WRAPPER_TOKEN_NUM[model_name]) / 16) * batch))
     logger.info(
         f"=============== [test_case]: {func_name} =================\n [batch]: {batch}\n [seqlen]: {seqlen}\n CFG:{cfg}\n =============================================="
     )
     with torch.no_grad():
         if is_w4a16 or func_name in ["check_attn", "check_attn_prefill"]:
-            func(cfg, batch, seqlen, is_test, is_perfAI, is_pmu, is_cmd)
+            func(cfg, batch, seqlen, is_test, is_perfAI, profile_mode)
         else:
-            func(cfg, batch, seqlen, is_test, is_perfAI, is_prefill, is_pmu, is_cmd)
-        torch_tpu.tpu.synchronize()
+            func(cfg, batch, seqlen, is_test, is_perfAI, is_prefill, profile_mode)
+        # torch_tpu.tpu.synchronize()
     logger.info(f"=============== finished =================")

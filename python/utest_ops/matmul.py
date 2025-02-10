@@ -2,7 +2,6 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from top_utest import set_requires_grad,move_to, set_bacis_info, Tester_Basic
-
 def case1():
     #step0:set seed
     seed=1000

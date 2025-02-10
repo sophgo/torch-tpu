@@ -20,12 +20,12 @@ extern "C"
     void *tpudnnPhysToVirt(tpudnnHandle_t handle, uint64_t addr);
     uint64_t tpudnnVirtToPhys(tpudnnHandle_t handle, void *addr);
 
-#if defined(__sg2260__) || defined(__sg2262__)
+    tpudnnStatus_t tpudnnCheckChipMap(tpudnnHandle_t handle, int world_size, int *chipMap);
+    tpudnnStatus_t tpudnnGetC2CRing(tpudnnHandle_t handle, int world_size, int *chipMap);
     tpudnnStatus_t tpudnnGetUniqueId(tpudnnHandle_t handle, char* uniqueId);
     tpudnnStatus_t tpudnnSetupC2C(tpudnnHandle_t handle, int deviceID);
     tpudnnStatus_t tpudnnSetupC2CTopology(tpudnnHandle_t handle);
     tpudnnStatus_t tpudnnGetC2CTopology(tpudnnHandle_t handle, int *chipNum, const int **outTopology);
-#endif
 
     tpudnnHandle_t tpudnnHandleFromStream(int deviceID, void* stream, void* module);
 
