@@ -60,6 +60,15 @@ namespace at
 			TORCH_CHECK ( input_lengths.device().type() == DeviceType::CPU, 
 						"LLammaAttention input lenghts must on CPU device" );
 		}
+		auto kvcache_shape = Kcache.sizes();
+		int block_num = kvcache_shape[0];
+		int64_t block_need_num = 0;
+		int num_input_lengths = input_lengths.nbytes() / 4;
+		int* input_lengths_ptr = (int*)input_lengths.data_ptr();
+		for (int i = 0; i < num_input_lengths; ++i) {
+			block_need_num += (input_lengths_ptr[i] + block_size - 1) / block_size;
+		}
+		TORCH_CHECK ( block_num >= block_need_num, "LLamatAttention KVCache block_num must be larger than ", block_need_num);
 
 		TIMING_START;
   		auto stream = c10_tpu::getCurrentTPUStream();
