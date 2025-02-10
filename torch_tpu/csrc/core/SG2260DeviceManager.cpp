@@ -316,8 +316,8 @@ public:
     auto stream = c10_tpu::getDefaultTPUStream();
     tpudnnFlush(stream);
     if (!non_blocking) {
+      Status = tpuRtMemcpyS2DAsync( Dst, Src, Size, stream );
       tpuRtStreamSynchronize(stream);
-      Status = tpuRtMemcpyS2D( Dst, Src, Size );
     } else {
       // struct timeval timer, end, timer1;
       // gettimeofday ( &timer1, NULL );
@@ -336,9 +336,8 @@ public:
     auto stream = c10_tpu::getDefaultTPUStream();
     tpudnnFlush(stream);
     if(!non_blocking) {
-      // Status = tpuRtMemcpyD2SAsync( Dst, Src, Size, stream );
+      Status = tpuRtMemcpyD2SAsync( Dst, Src, Size, stream );
       tpuRtStreamSynchronize(stream);
-      Status = tpuRtMemcpyD2S(Dst, Src, Size);
     } else {
       // struct timeval timer1, timer, end;
       // gettimeofday ( &timer1, NULL );
