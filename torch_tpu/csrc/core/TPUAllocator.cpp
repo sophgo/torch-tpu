@@ -36,6 +36,10 @@ struct C10_API DefaultTPUAllocator final : at::Allocator
   at::DeleterFnPtr raw_deleter() const override {
     return &ReportAndDelete;
   }
+
+  void emptyCache() {
+    tpu::TPUEmptyCache( );
+  }
 };
 
 ProfiledTPUMemoryReporter & profiledTPUMemoryReporter()
@@ -56,6 +60,11 @@ static DefaultTPUAllocator g_tpu_alloc;
 at::Allocator * GetDefaultTPUAllocator()
 {
   return &g_tpu_alloc;
+}
+void EmptyCache()
+{
+  auto allocator = static_cast<DefaultTPUAllocator*>(GetTPUAllocator());
+  allocator->emptyCache();
 }
 
 REGISTER_ALLOCATOR ( DeviceType::TPU, &g_tpu_alloc );

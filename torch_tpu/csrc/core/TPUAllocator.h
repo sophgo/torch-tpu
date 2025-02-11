@@ -31,7 +31,8 @@ C10_API ProfiledTPUMemoryReporter & profiledTPUMemoryReporter();
 // Get the TPU Allocator.
 C10_API at::Allocator * GetTPUAllocator();
 
-
 // Get the Default TPU Allocator
 C10_API at::Allocator * GetDefaultTPUAllocator();
+
+void EmptyCache();
 } // namepsace c10

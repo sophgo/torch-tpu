@@ -287,6 +287,7 @@ void TPUFree ( void * Ptr )
   TPUDeviceManager::GetInstance().Free ( (void *)data_ptr, dev_index );
 }
 
+void TPUEmptyCache () {};
 
 void TPUCopyHostToDevice ( void * Dst, const void * Src, size_t Size, bool non_blocking /*= false */ )
 {

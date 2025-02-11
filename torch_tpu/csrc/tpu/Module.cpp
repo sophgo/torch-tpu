@@ -298,74 +298,13 @@ PyObject* THPTModule_setStream_wrap(
   END_HANDLE_TH_ERRORS
 }
 
-// We need to ensure that as long as a thread will NEVER loose the GIL as long as
-// it holds the TPU mutex. Otherwise another thread might be scheduled and try to
-// e.g. allocate a new tensor which will cause a deadlock. It's enough to have a
-// single global, because it can be only set once (npuMutex is not recursive)
-// by the thread that owns the mutex (obviously there can be only one such thread).
-// static PyGILState_STATE tpuMutexGILState;
-
-PyObject* THPTModule_tpuLockMutex(PyObject *module, PyObject *noargs)
-{
-  //TODO
-  return nullptr;
+PyObject* THPTModule_emptyCache(PyObject* _unused, PyObject* noargs) {
+  HANDLE_TH_ERRORS
+  c10::EmptyCache();
+  END_HANDLE_TH_ERRORS
+  Py_RETURN_NONE;
 }
 
-PyObject* THPTModule_tpuUnlockMutex(PyObject *module, PyObject *noargs)
-{
-  //TODO
-  return nullptr;
-}
-
-
-PyObject* THPTModule_tpu_set_sync_debug_mode(PyObject* _unused, PyObject* arg) {
-    HANDLE_TH_ERRORS
-    TORCH_WARN_ONCE(
-        "Synchronization debug mode is a prototype feature and does not yet detect all "
-        "synchronizing operations");
-    THPUtils_assert(
-        THPUtils_checkLong(arg), "invalid argument to set_sync_debug_mode, debug_mode type must long");
-    int64_t debug_mode = THPUtils_unpackLong(arg);
-    TORCH_CHECK(
-        debug_mode >= 0 && debug_mode <= 2,
-        "invalid value of debug_mode, expected one of 0,1,2");
-    // c10_tpu::SyncDebugMode level;
-    // switch (debug_mode) {
-    //     case 0:
-    //         level = c10_tpu::SyncDebugMode::L_DISABLED;
-    //         break;
-    //     case 1:
-    //         level = c10_tpu::SyncDebugMode::L_WARN;
-    //         break;
-    //     case 2:
-    //         level = c10_tpu::SyncDebugMode::L_ERROR;
-    //         break;
-    //     default:
-    //         level = c10_tpu::SyncDebugMode::L_DISABLED;
-    //         break;
-    // }
-    // c10_tpu::warning_state().set_sync_debug_mode(level);
-    Py_RETURN_NONE;
-    END_HANDLE_TH_ERRORS
-    return nullptr;
-}
-
-PyObject* THPTModule_tpu_get_sync_debug_mode(PyObject* self, PyObject* noargs) {
-    HANDLE_TH_ERRORS
-    // auto debug_mode = c10_tpu::warning_state().get_sync_debug_mode();
-    // switch (debug_mode) {
-    //     case c10_tpu::SyncDebugMode::L_DISABLED:
-    //         return THPUtils_packInt32(0);
-    //     case c10_tpu::SyncDebugMode::L_WARN:
-    //         return THPUtils_packInt32(1);
-    //     case c10_tpu::SyncDebugMode::L_ERROR:
-    //         return THPUtils_packInt32(2);
-    //     default:
-    //         return THPUtils_packInt32(-1); // can't happen
-    // }
-    END_HANDLE_TH_ERRORS
-    return nullptr;
-}
 #endif
 
 PyObject* THPTModule_tensor_construct_from_storage(PyObject* self, PyObject* args) {
@@ -403,11 +342,8 @@ static struct PyMethodDef THPTModule_methods[] = {
     {"_tpu_getDefaultStream", (PyCFunction)THPTModule_getDefaultStream_wrap, METH_O, nullptr},
     {"_tpu_setStream", (PyCFunction)THPTModule_setStream_wrap,  METH_VARARGS | METH_KEYWORDS, nullptr},
     // allocator related
-    {"_tpu_lock_mutex",   (PyCFunction)THPTModule_tpuLockMutex,   METH_NOARGS,  nullptr},
-    {"_tpu_unlock_mutex", (PyCFunction)THPTModule_tpuUnlockMutex, METH_NOARGS,  nullptr},
+    {"_tpu_emptyCache", THPTModule_emptyCache, METH_NOARGS, nullptr},
 
-    {"_tpu_set_sync_debug_mode", (PyCFunction)THPTModule_tpu_set_sync_debug_mode, METH_O, nullptr},
-    {"_tpu_get_sync_debug_mode", (PyCFunction)THPTModule_tpu_get_sync_debug_mode, METH_NOARGS, nullptr},
 #endif
     {"_tensor_construct_from_storage", (PyCFunction)THPTModule_tensor_construct_from_storage, METH_VARARGS, nullptr},
     {nullptr}

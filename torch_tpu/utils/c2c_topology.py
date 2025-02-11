@@ -1,7 +1,6 @@
 import torch
 import torch_tpu
-import networkx as nx
-import matplotlib.pyplot as plt
+
 import numpy as np
 
 def build_adjacency_list(topo_info):
@@ -54,6 +53,8 @@ def find_hamiltonian_cycle(graph):
         return None
 
 def show_topology():
+    import networkx as nx
+    import matplotlib.pyplot as plt
     torch_tpu.tpu.set_device(0)
     chip_num = torch.tpu.device_count()
     topo_info = [[0 for _ in range(chip_num)] for _ in range(chip_num)]

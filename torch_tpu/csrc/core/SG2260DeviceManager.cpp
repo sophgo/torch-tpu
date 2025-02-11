@@ -204,7 +204,6 @@ public:
             }
         }
       }
-
       if (reuseEnabled && !reusedPtr && getSize(tbd.ptr, index) == size)
       {
         // Reuse it
@@ -213,7 +212,6 @@ public:
         //std::cout << "Re-use " << reusedPtr << std::endl;
         break;
       }
-
       if (tbd.freed_timestamp + free_delay_ > now)
       {
         continue;
@@ -309,6 +307,36 @@ public:
     TORCH_CHECK (status == tpuRtSuccess, "Failed to record stream");
     freeTBDs[Ptr] = tbd;
   }
+
+  void EmptyCache( int Index )
+  {
+    std::lock_guard<std::mutex> lock(getMutex(Index));
+    auto &freeTBDs = getFreeTBDs(Index);
+    std::vector<void *> toRm;
+    for (auto &pair : freeTBDs)
+    {
+      auto &event = pair.second.event;
+      auto &tbd = pair.second;
+      if (tpuRtEventQuery(event) != tpuRtDevnotready)
+      {
+        tpuRtFree(&tbd.ptr, NO_USE);
+        // std::cout << "Free " << tbd.ptr << " of size " << getSize(tbd.ptr, index) << std::endl;
+        getMemInfo(Index).erase(tbd.ptr);
+        toRm.push_back(tbd.ptr);
+      } else {
+          continue;
+      }
+    }
+    for (auto ptr : toRm)
+    {
+      auto &tbd = freeTBDs[ptr];
+      tpuRtEventFree(tbd.event, tbd.stream);
+      freeTBDs.erase(ptr);
+    }
+  }
+
+
+  
 
   void CopyHostToDevice ( void * Dst, const void * Src, size_t Size, int Index, bool non_blocking )
   {
@@ -482,6 +510,11 @@ void TPUFree ( void * Ptr )
   unsigned long long dev_index = GetDeviceIndexByUnifiedAddr((unsigned long long)Ptr);
   unsigned long long data_ptr = GetAddrByUnifiedAddr((unsigned long long)Ptr);
   TPUDeviceManager::GetInstance().Free ( (void *)data_ptr, dev_index );
+}
+
+void TPUEmptyCache ()
+{
+  TPUDeviceManager::GetInstance().EmptyCache( TPUGetDeviceIndex() );
 }
 
 

@@ -54,6 +54,11 @@ void * TPUAlloc ( size_t Size, int Index );
 void TPUFree ( void * Ptr );
 
 /**
+ * Free cached Memory
+ */
+void TPUEmptyCache ();
+
+/**
  * Copy data from host to TPU device.
  */
 void TPUCopyHostToDevice ( void * Dst, const void * Src, size_t Size, bool non_blocking = false );
