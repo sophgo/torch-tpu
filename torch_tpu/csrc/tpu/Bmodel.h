@@ -8,7 +8,6 @@
 #include <torch/csrc/Stream.h>
 #include <torch/csrc/python_headers.h>
 #include "torch_tpu/csrc/core/TPUStream.h"
-#include "torch_tpu/csrc/core/TPUDeviceManager.h"
 
 
 #if defined BACKEND_SG2260
@@ -123,12 +122,12 @@ struct PythonModel{
   int m_net_num;
   void* p_bmrt;
   bm_handle_t bm_handle;
-  
+
   int m_dev_id = 0;
 };
 
 #else
-// 
+//
 #endif // BACKEND_SG2260
 
 PyMethodDef* THPTBmodel_get_methods();
