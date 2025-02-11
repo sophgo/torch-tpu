@@ -86,6 +86,24 @@ function update_sg2260_third_party()
   cp ${TPU1686_PATH}/build_fw_sg2260/firmware_core/libfirmware_core.a ${TPUTRAIN_TOP}/third_party/firmware/sg2260/
 }
 
+function update_sg2260_riscv_third_party()
+{
+  echo "updating tpuDNN.h ..."
+  cp ${TPU1686_PATH}/tpuDNN/include/tpuDNN.h ${TPUTRAIN_TOP}/third_party/tpuDNN/include/
+  echo "updating tpuDNNTensor.h ..."
+  cp ${TPU1686_PATH}/tpuDNN/include/tpuDNNTensor.h ${TPUTRAIN_TOP}/third_party/tpuDNN/include/
+  echo "updating sccl.h ..."
+  cp ${TPU1686_PATH}/sccl/include/sccl.h ${TPUTRAIN_TOP}/third_party/sccl/include/
+  echo "updating libtpudnn.so ..."
+  cp ${TPU1686_PATH}/build_sg2260_riscv/tpuDNN/src/libtpudnn.so ${TPUTRAIN_TOP}/third_party/tpuDNN/sg2260_lib/
+  echo "updating libsccl.so ..."
+  cp ${TPU1686_PATH}/build_sg2260_riscv/sccl/libsccl.so ${TPUTRAIN_TOP}/third_party/sccl/sg2260_lib/
+  echo "updating libtpuv7_emulator.so ..."
+  cp ${TPU1686_PATH}/build_sg2260_riscv/firmware_core/libtpuv7_emulator.so ${TPUTRAIN_TOP}/third_party/tpuv7_runtime/tpuv7-emulator_0.1.0/lib/
+  echo "updating libfirmware_core.a ..."
+  cp ${TPU1686_PATH}/build_fw_sg2260/firmware_core/libfirmware_core.a ${TPUTRAIN_TOP}/third_party/firmware/sg2260/
+}
+
 function update_bm1684x_third_party()
 {
   echo "updating tpuDNN.h ..."
@@ -98,6 +116,21 @@ function update_bm1684x_third_party()
   cp ${TPU1686_PATH}/build_bm1684x/firmware_core/libcmodel_firmware.so ${TPUTRAIN_TOP}/third_party/firmware/bm1684x/
   echo "updating libfirmware_core.a ..."
   cp ${TPU1686_PATH}/build_fw_bm1684x/firmware_core/libfirmware_core.a ${TPUTRAIN_TOP}/third_party/firmware/bm1684x/
+}
+
+function rebuild_TPU1686_riscv()
+{
+  unset skip_runtime
+  if [[ "$EXTRA_CONFIG" != *USING_TPUDNN_TESTS* ]]; then
+      export EXTRA_CONFIG="-DUSING_TPUDNN_TESTS=OFF $EXTRA_CONFIG"
+  fi
+  if [ "${CHIP_ARCH}" == "sg2260" ]; then
+      SOC_CROSS_COMPILE=1 CMODEL_FW_BINARY_DIR=build_${CHIP_ARCH}_riscv DISABLE_ONEDNN=ON rebuild_firmware_cmodel_and_tpudnn_soc || return -1
+      FW_BINARY_DIR=build_fw_${CHIP_ARCH} rebuild_firmware || return -1
+      update_sg2260_riscv_third_party
+  elif [ "${CHIP_ARCH}" == "bm1684x" ]; then
+      echo "not impl!!!"
+  fi
 }
 
 function rebuild_TPU1686()
