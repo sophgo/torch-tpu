@@ -24,6 +24,7 @@ extern "C"
     tpudnnStatus_t tpudnnGetUniqueId(tpudnnHandle_t handle, char* uniqueId);
     tpudnnStatus_t tpudnnSetupC2C(tpudnnHandle_t handle, int deviceID);
     tpudnnStatus_t tpudnnSetupC2CTopology(tpudnnHandle_t handle);
+    tpudnnStatus_t tpudnnGetC2CTopology(tpudnnHandle_t handle, int *chipNum, const int **outTopology);
 #endif
 
     tpudnnHandle_t tpudnnHandleFromStream(int deviceID, void* stream, void* module);
