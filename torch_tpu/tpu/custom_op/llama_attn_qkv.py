@@ -183,10 +183,50 @@ def fuse_llama_attn_qkv():
     transformers.models.llama.modeling_llama.LlamaAttention.__init__ = init_wrapper(transformers.models.llama.modeling_llama.LlamaAttention.__init__)
 
 
+def qwen2_attn_forward(self,
+        hidden_states: torch.Tensor,
+        attention_mask: Optional[torch.Tensor] = None,
+        position_ids: Optional[torch.LongTensor] = None,
+        past_key_value = None, #past_key_value: Optional[Cache] = None
+        output_attentions: bool = False,
+        use_cache: bool = False,
+    ):
+    bsz, q_len, _ = hidden_states.size()
+
+    if(not hasattr(self, 'attn_qkv')):
+        self.attn_qkv = LlamaAttentionQKV()
+
+    query_states = self.q_proj(hidden_states).view(bsz, q_len, self.num_heads, self.head_dim)
+    key_states = self.k_proj(hidden_states).view(bsz, q_len, self.num_key_value_heads, self.head_dim)
+    value_states = self.v_proj(hidden_states).view(bsz, q_len, self.num_key_value_heads, self.head_dim)
+
+    cos, sin = self.rotary_emb(value_states, seq_len=key_states.shape[1])
+    softmax_scale = 1.0 / self.head_dim ** 0.5
+    attn_output = self.attn_qkv(
+        query_states,
+        key_states,
+        value_states,
+        cos,
+        sin,
+        attention_mask,
+        softmax_scale,
+        self.attention_dropout)
+
+    attn_output = attn_output.reshape(bsz, q_len, self.hidden_size)
+    attn_output = self.o_proj(attn_output)
+
+    return attn_output, None, past_key_value
+
+def fuse_qwen2_attn_qkv():
+    import transformers
+    transformers.models.qwen2.modeling_qwen2.Qwen2Attention.forward = qwen2_attn_forward
+    transformers.models.qwen2.modeling_qwen2.Qwen2Attention.__init__ = init_wrapper(transformers.models.qwen2.modeling_qwen2.Qwen2Attention.__init__)
+
+
 import os
 from distutils.util import strtobool
 whole_net_trans = strtobool(os.environ.get("QWEN2_WHOLE_NET_TRANS", "0"))
-class Qwen2AttentionQKVFunc(torch.autograd.Function):
+class MegatronQwen2AttentionQKVFunc(torch.autograd.Function):
     @staticmethod
     def forward(ctx,
                 query_states,
@@ -350,7 +390,7 @@ class Qwen2AttentionQKVFunc(torch.autograd.Function):
 
             return grad_query_states, grad_key_states, grad_value_states, None, None, None, None, None
 
-class Qwen2AttentionQKV(torch.nn.Module):
+class MegatronQwen2AttentionQKV(torch.nn.Module):
     def __init__(self):
         super().__init__()
 
@@ -363,7 +403,7 @@ class Qwen2AttentionQKV(torch.nn.Module):
                 attention_mask,
                 softmax_scale,
                 attention_dropout = 0.0):
-        return Qwen2AttentionQKVFunc.apply(
+        return MegatronQwen2AttentionQKVFunc.apply(
             query_states,
             key_states,
             value_states,
@@ -386,7 +426,7 @@ def qwen2_attn_qkv_forward(
     assert packed_seq_params is None, "packed sequence is not supported in Qwen2AttentionQKV"
 
     if(not hasattr(self, 'attn_qkv')):
-        self.attn_qkv = Qwen2AttentionQKV()
+        self.attn_qkv = MegatronQwen2AttentionQKV()
 
     query, key, value = self.get_query_key_value_tensors(hidden_states, key_value_states) # (seq, batch, num_heads, head_dim)
     key, value, rotary_pos_emb, attn_mask_type = self._adjust_key_value_for_inference(
@@ -417,7 +457,7 @@ def qwen2_attn_qkv_forward(
 
     return attn_output, bias
 
-def fuse_qwen2_attn_qkv():
+def fuse_megatron_qwen2_attn_qkv():
     import megatron_patch
     from megatron_patch.model.qwen2.transformer.attention import Attention
     megatron_patch.model.qwen2.transformer.attention.Attention.forward = qwen2_attn_qkv_forward        

@@ -81,6 +81,10 @@ def fuse_llama_rmsnorm():
     transformers.models.llama.modeling_llama.LlamaRMSNorm.forward = llama_rmsnorm_forward
 
 def fuse_qwen2_rmsnorm():
+    import transformers
+    transformers.models.qwen2.modeling_qwen2.Qwen2RMSNorm.forward = llama_rmsnorm_forward
+
+def fuse_megatron_qwen2_rmsnorm():
     import megatron_patch
     from megatron_patch.model.qwen2.rms_norm import Qwen2RMSNorm
     megatron_patch.model.qwen2.rms_norm.Qwen2RMSNorm.forward = llama_rmsnorm_forward

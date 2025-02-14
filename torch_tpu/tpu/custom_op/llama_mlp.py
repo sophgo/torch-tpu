@@ -77,7 +77,7 @@ class LLamaMlpBlock(nn.Module):
     def forward(self, x):
         return LLamaMlpFunc.apply(x, self.w0, self.w1, self.w2)
 
-class Qwen2MlpFunc(torch.autograd.Function):
+class MegatronQwen2MlpFunc(torch.autograd.Function):
     @staticmethod
     def forward(ctx, hidden_states, linear_fc1_weight, linear_fc2_weight):
         # hidden_states: [s, b, h]
@@ -149,10 +149,17 @@ class Qwen2MlpFunc(torch.autograd.Function):
 def fuse_llama_mlp():
     import transformers
     def llama_mlp_forward(self, x):
-        return LLamaMlpFunc.apply(x, self.up_proj.weight.t().contiguous(), self.gate_proj.weight.t().contiguous(), self.down_proj.weight.t().contiguous())
+        return LLamaMlpFunc.apply(x, self.up_proj.weight, self.gate_proj.weight, self.down_proj.weight.t().contiguous())
     transformers.models.llama.modeling_llama.LlamaMLP.forward = llama_mlp_forward
 
+#transformers qwen2
 def fuse_qwen2_mlp():
+    import transformers
+    def qwen2_mlp_forward(self, x):
+        return LLamaMlpFunc.apply(x, self.up_proj.weight, self.gate_proj.weight, self.down_proj.weight.t().contiguous())
+    transformers.models.qwen2.modeling_qwen2.Qwen2MLP.forward = qwen2_mlp_forward
+
+def fuse_megatron_qwen2_mlp():
     import megatron
     from megatron.core.parallel_state import get_tensor_model_parallel_group
     def hook(grad):
@@ -162,8 +169,8 @@ def fuse_qwen2_mlp():
     def qwen2_tpu_mlp_forward(self, hidden_states):
         if self.config.bias_activation_fusion and self.activation_func == F.silu and self.config.gated_linear_unit:
             # note: megatron qwen2 hidden_states shape=(seq_len, batch, hidden_size), different from transformers llama_mlp (batch, seq_len, hidden_size)
-            output = Qwen2MlpFunc.apply(hidden_states, self.linear_fc1.weight, self.linear_fc2.weight)
-            if get_tensor_model_parallel_group():
+            output = MegatronQwen2MlpFunc.apply(hidden_states, self.linear_fc1.weight, self.linear_fc2.weight)
+            if get_tensor_model_parallel_group() and hidden_states.requires_grad:
                 torch.distributed.all_reduce(output, group=get_tensor_model_parallel_group())
                 hidden_states.register_hook(hook)
             return output, None
