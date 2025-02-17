@@ -14,8 +14,19 @@ max_pool2d_with_indices_tpu(const Tensor &self, IntArrayRef kernel_size,
                             IntArrayRef stride, IntArrayRef padding,
                             IntArrayRef dilation, bool ceil_mode) {
   CHECK_TENSOR_IN_DEVICE(self);
+  auto shape = self.sizes();
+  int64_t output_h = std::floor((shape[2] + 2 * padding[0] - kernel_size[0]) / stride[0]) + 1;
+  int64_t output_w = std::floor((shape[3] + 2 * padding[1] - kernel_size[1]) / stride[1]) + 1;
+  std::vector<int64_t> sizes_vec;
+  sizes_vec.push_back(shape[0]);
+  sizes_vec.push_back(shape[1]);
+  sizes_vec.push_back(output_h);
+  sizes_vec.push_back(output_w);
+  IntArrayRef sizes ( sizes_vec.data(), sizes_vec.size() );
+  auto output = torch::empty(sizes, self.options());
+  auto mask = torch::empty(sizes, self.options());
+#if 0
   std::tuple<Tensor, Tensor> outputs;
-#if 1
   CPU_IMPL_WARNING();
   TIMING_START;
   auto outputs_cpu =
@@ -25,38 +36,29 @@ max_pool2d_with_indices_tpu(const Tensor &self, IntArrayRef kernel_size,
       TENSOR_TO_TPU(std::get<0>(outputs_cpu)).to(self.dtype()),
       TENSOR_TO_TPU(std::get<1>(outputs_cpu)));
   TIMING_END(tpu::CPU_LAYER);
+  return outputs;
 #else
   TORCH_CHECK(ceil_mode == false);
   TORCH_CHECK(dilation[0] == 1 && dilation[1] == 1, "DILATION must be one");
-  float alpha = 1.f;
-  float beta = 0.f;
-  PoolingDescriptor_t pooling_desc = {.kh = (int)kernel_size[0],
+  TPUDNN_PoolingDescriptor_t pooling_desc = {.kh = (int)kernel_size[0],
                                              .kw = (int)kernel_size[1],
                                              .pad_h = (int)padding[0],
                                              .pad_w = (int)padding[1],
                                              .stride_h = (int)stride[0],
                                              .stride_w = (int)stride[1],
-                                             .mode = Pooling_MAX};
-  int output_h =
-      at::native::pooling_output_shape(self.size(2), kernel_size[0], padding[0],
-                                       stride[0], dilation[0], ceil_mode);
-  int output_w =
-      at::native::pooling_output_shape(self.size(3), kernel_size[1], padding[1],
-                                       stride[1], dilation[1], ceil_mode);
-  auto output =
-      empty({self.size(0), self.size(1), output_h, output_w}, self.options());
+                                             .mode = TPUDNN_POOLING_MAX};
   TIMING_START;
-
-  auto status = sgdnnPoolingForward(
-      tpu::TPUGetDeviceResource(), pooling_desc, &alpha,
-      tpu::TPUGenerateSgdnnTensor(self), ADDR_IN_DEVICE(self), &beta,
-      tpu::TPUGenerateSgdnnTensor(output), ADDR_IN_DEVICE(output));
-  TORCH_CHECK(status == SG_SUCCESS);
-  TIMING_END(tpu::MAX_POOLING);
-  outputs = std::tuple<Tensor, Tensor>(output, Tensor());
-  SHOW_TENSOR_OP(self, output);
+  auto stream = c10_tpu::getCurrentTPUStream();
+  auto status = tpudnnMaxPoolingWithMaskForwardAsync(
+    stream,
+    tpu::TPUGenerateTpudnnTensor(stream, self),
+    tpu::TPUGenerateTpudnnTensor(stream, output),
+    tpu::TPUGenerateTpudnnTensor(stream, mask),
+    pooling_desc);
+  TORCH_CHECK(status == TPUDNN_STATUS_SUCCESS);
+  TIMING_END(tpu::MAX_POOLING_WITH_MASK);
 #endif
-  return outputs;
+  return {output,mask};
 }
 TORCH_LIBRARY_IMPL(aten, TPU, m) {
   m.impl("max_pool2d_with_indices", max_pool2d_with_indices_tpu);
@@ -71,8 +73,8 @@ Tensor max_pool2d_with_indices_backward_tpu(
   CHECK_TENSOR_IN_DEVICE(grad_output_);
   CHECK_TENSOR_IN_DEVICE(self);
   CHECK_TENSOR_IN_DEVICE(indices);
-  Tensor grad_input;
-#if 1
+  Tensor grad_input = torch::empty(self.sizes(), self.options());
+#if 0
   CPU_IMPL_WARNING();
   TIMING_START;
   auto grad_input_cpu = max_pool2d_with_indices_backward(
@@ -83,42 +85,19 @@ Tensor max_pool2d_with_indices_backward_tpu(
 #else
   TORCH_CHECK(ceil_mode == false);
   TORCH_CHECK(dilation[0] == 1 && dilation[1] == 1, "DILATION must be one");
-  float alpha = 1.f;
-  float beta = 0.f;
-  PoolingDescriptor_t pooling_desc = {.kh = (int)kernel_size[0],
-                                      .kw = (int)kernel_size[1],
-                                      .pad_h = (int)padding[0],
-                                      .pad_w = (int)padding[1],
-                                      .stride_h = (int)stride[0],
-                                      .stride_w = (int)stride[1],
-                                      .mode = Pooling_MAX};
-  int output_h =
-      at::native::pooling_output_shape(self.size(2), kernel_size[0], padding[0],
-                                       stride[0], dilation[0], ceil_mode);
-  int output_w =
-      at::native::pooling_output_shape(self.size(3), kernel_size[1], padding[1],
-                                       stride[1], dilation[1], ceil_mode);
-  auto output =
-      empty({self.size(0), self.size(1), output_h, output_w}, self.options());
-  grad_input = empty(self.sizes(), self.options());
 
   TIMING_START;
-
-  auto status = sgdnn_pooling_forward(
-      tpu::TPUGetDeviceResource(), pooling_desc, &alpha,
-      tpu::TPUGenerateSgdnnTensor(self), ADDR_IN_DEVICE(self), &beta,
-      tpu::TPUGenerateSgdnnTensor(output), ADDR_IN_DEVICE(output));
-  TORCH_CHECK(status == SG_SUCCESS);
-  status = sgdnn_pooling_backward(
-      tpu::TPUGetDeviceResource(), pooling_desc, &alpha,
-      tpu::TPUGenerateSgdnnTensor(output), ADDR_IN_DEVICE(output),
-      tpu::TPUGenerateSgdnnTensor(grad_output), ADDR_IN_DEVICE(grad_output),
-      tpu::TPUGenerateSgdnnTensor(self), ADDR_IN_DEVICE(self), &beta,
-      tpu::TPUGenerateSgdnnTensor(grad_input), ADDR_IN_DEVICE(grad_input));
-  TORCH_CHECK(status == SG_SUCCESS);
-  TIMING_END(tpu::MAX_POOLING);
+  auto stream = c10_tpu::getCurrentTPUStream();
+  auto status = tpudnnMaxpoolingIndicesBwdAsync(
+    stream,
+    tpu::TPUGenerateTpudnnTensor(stream, grad_output_),
+    tpu::TPUGenerateTpudnnTensor(stream, indices),
+    tpu::TPUGenerateTpudnnTensor(stream, grad_input),
+    kernel_size[0], stride[0], padding[0]);
+  TORCH_CHECK(status == TPUDNN_STATUS_SUCCESS);
+  TIMING_END(tpu::MAX_POOLING_INDICES);
 #endif
-  SHOW_TENSOR_OP(grad_output_, self, grad_input);
+  SHOW_TENSOR_OP(grad_output_, indices, grad_input);
   return grad_input;
 }
 TORCH_LIBRARY_IMPL(aten, TPU, m) {

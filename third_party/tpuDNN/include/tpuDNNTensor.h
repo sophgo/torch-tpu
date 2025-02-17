@@ -463,6 +463,22 @@ tpudnnStatus_t tpudnnPoolingForwardAsync (
     tpudnnTensor_t output,
     TPUDNN_PoolingDescriptor_t pooling_desc);
 
+tpudnnStatus_t tpudnnMaxPoolingWithMaskForwardAsync (
+    tpudnnHandle_t handle,
+    tpudnnTensor_t input,
+    tpudnnTensor_t output,
+    tpudnnTensor_t max_mask_addr,
+    TPUDNN_PoolingDescriptor_t pooling_desc);
+
+tpudnnStatus_t tpudnnMaxpoolingIndicesBwdAsync (
+    tpudnnHandle_t handle,
+    tpudnnTensor_t grad,
+    tpudnnTensor_t indices,
+    tpudnnTensor_t output,
+    int kernel,
+    int stride,
+    int padding);
+
 tpudnnStatus_t tpudnnReduceMaxOrMinAsync (
     tpudnnHandle_t handle,
     tpudnnTensor_t input,
@@ -1096,4 +1112,13 @@ tpudnnStatus_t tpudnnScatterAddAsync(
     tpudnnTensor_t src,
     tpudnnTensor_t indices,
     int dim);
+
+
+tpudnnStatus_t tpudnnSyncDescriptor(
+    tpudnnHandle_t handle
+);
+
+tpudnnStatus_t tpudnnSyncPIO(
+    tpudnnHandle_t handle
+);
 } // extern "C"

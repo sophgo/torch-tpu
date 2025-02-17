@@ -52,6 +52,8 @@ echo "[INFO]export RISCV_TOOLCHAIN=$RISCV_TOOLCHAIN"
 
 function soc_build_env_prepare()
 {
+  mkdir -p ${TPUTRAIN_TOP}/toolchains_dir
+  export CROSS_TOOLCHAINS=${TPUTRAIN_TOP}/toolchains_dir/
   pushd $CROSS_TOOLCHAINS >>/dev/null
   soc_cross_chain="gcc-arm-10.3-2021.07-x86_64-aarch64-none-linux-gnu"
   if [ ! -d "${soc_cross_chain}" ]; then
