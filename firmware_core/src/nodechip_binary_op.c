@@ -455,6 +455,10 @@ int tpu_kernel_api_binary(const void *args) {
   return 0;
 }
 
+int tpu_kernel_api_binary_multi_core(const void *args) {
+  return tpu_kernel_api_binary(args);
+}
+
 #else // defined BACKEND_SG2260
 
 void firmware_kernel_tick();
@@ -539,12 +543,6 @@ int tpu_kernel_api_binary_multi_core(const void *args) {
   return 0;
 }
 TPUKERNEL_FUNC_REGISTER(tpu_kernel_api_binary_multi_core);
-
-int tpu_kernel_api_binary(const void *args)
-{
-    return tpu_kernel_api_binary_multi_core(args);
-}
-TPUKERNEL_FUNC_REGISTER(tpu_kernel_api_binary);
 #endif
 
 // judge two dim can be merged according to their shapes
