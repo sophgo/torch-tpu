@@ -38,6 +38,7 @@ function gpt3block_test() {
 
 function test_sccl() {
     local NODES=8
+    export CHIP_MAP=0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15
     if [ -n "$2" ]; then
       NODES=$2
     fi
@@ -69,6 +70,7 @@ function test_sccl() {
       popd
       return $ret
     fi
+    unset CHIP_MAP
     popd
 }
 

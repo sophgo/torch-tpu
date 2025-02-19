@@ -56,9 +56,7 @@ typedef struct {
 
 void *scclPhysToVirt(scclHandle_t handle, uint64_t addr);
 
-scclResult_t scclSetupC2CTopology(scclHandle_t handle);
-
-scclResult_t scclGetTopology(scclHandle_t handle, int *chipNum, const int **outTopology);
+scclResult_t scclSetupC2CTopology();
 
 scclHandle_t scclCreateHandle(int deviceID);
 

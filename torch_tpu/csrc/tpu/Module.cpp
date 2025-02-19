@@ -210,6 +210,127 @@ PyObject* THPTModule_tpuGetTopology(PyObject* self, PyObject* args) {
   END_HANDLE_TH_ERRORS
 }
 
+
+PyObject* THPTModule_setC2CTopology(PyObject* self, PyObject* noargs) {
+  HANDLE_TH_ERRORS
+  pybind11::gil_scoped_release no_gil;
+
+  tpu::TPUSetupC2CTopology();
+  Py_RETURN_NONE;
+  END_HANDLE_TH_ERRORS
+}
+
+PyObject* THPTModule_tpuCheckChipMap(PyObject* self, PyObject* args) {
+  HANDLE_TH_ERRORS
+  pybind11::gil_scoped_release no_gil;
+  PyObject* input_list = nullptr;
+  Py_ssize_t world_size = -1;
+
+  if (!PyArg_ParseTuple(args, "nO", &world_size, &input_list)) {
+      PyErr_Clear();
+      if (!PyArg_ParseTuple(args, "O", &input_list)) {
+          return nullptr;
+      }
+  }
+
+  if (!PySequence_Check(input_list)) {
+      PyErr_SetString(PyExc_TypeError, "Input must be a sequence (list/tuple)");
+      return nullptr;
+  }
+
+  const Py_ssize_t list_size = PySequence_Size(input_list);
+  if (list_size == -1) return nullptr;
+
+  if (world_size != -1 && world_size > list_size) {
+      PyErr_Format(PyExc_ValueError,
+          "Size mismatch: got %zd, expected %zd", list_size, world_size);
+      return nullptr;
+  }
+
+  int* chip_map = new int[world_size];
+  for (Py_ssize_t i = 0; i < world_size; ++i) {
+      PyObject* item = PySequence_GetItem(input_list, i);
+      if (!item) {
+          delete[] chip_map;
+          PyErr_SetString(PyExc_IndexError, "Sequence index out of range");
+          return nullptr;
+      }
+
+      if (!PyLong_Check(item)) {
+          delete[] chip_map;
+          Py_DECREF(item);
+          PyErr_SetString(PyExc_TypeError, "Non-integer value in sequence");
+          return nullptr;
+      }
+
+      const long value = PyLong_AsLong(item);
+      Py_DECREF(item);
+      if (value == -1 && PyErr_Occurred()) {
+          delete[] chip_map;
+          return nullptr;
+      }
+      chip_map[i] = static_cast<int>(value);
+  }
+  int status = tpu::TPUCheckChipMap(world_size, chip_map);
+  delete[] chip_map;
+
+  pybind11::gil_scoped_acquire acquire_gil;
+  return PyLong_FromLong(status);
+  END_HANDLE_TH_ERRORS
+}
+
+PyObject* THPTModule_tpuGetC2CRing(PyObject* self, PyObject* args) {
+  HANDLE_TH_ERRORS
+  pybind11::gil_scoped_release no_gil;
+  PyObject* input_list = nullptr;
+  Py_ssize_t world_size = -1;
+
+  if (!PyArg_ParseTuple(args, "nO", &world_size, &input_list)) {
+      PyErr_Clear();
+      if (!PyArg_ParseTuple(args, "O", &input_list)) {
+          return nullptr;
+      }
+  }
+
+  if (!PySequence_Check(input_list)) {
+      PyErr_SetString(PyExc_TypeError, "Input must be a sequence (list/tuple)");
+      return nullptr;
+  }
+
+  const Py_ssize_t list_size = PySequence_Size(input_list);
+  if (list_size == -1) return nullptr;
+
+  if (world_size != -1 && world_size != list_size) {
+      PyErr_Format(PyExc_ValueError,
+          "Size mismatch: got %zd, expected %zd", list_size, world_size);
+      return nullptr;
+  }
+
+  int* chip_map = new int[world_size];
+  tpu::TPUGetC2CRing(world_size, chip_map);
+
+  pybind11::gil_scoped_acquire acquire_gil;
+  for (Py_ssize_t i = 0; i < world_size; ++i) {
+      PyObject* value = PyLong_FromLong(chip_map[i]);
+      if (!value) {
+          delete[] chip_map;
+          PyErr_SetString(PyExc_RuntimeError, "Failed to create Python integer");
+          return nullptr;
+      }
+
+      if (PyList_SetItem(input_list, i, value) < 0) {
+          delete[] chip_map;
+          PyErr_SetString(PyExc_IndexError, "List assignment failed");
+          return nullptr;
+      }
+  }
+
+  delete[] chip_map;
+  Py_INCREF(input_list);
+  return input_list;
+  END_HANDLE_TH_ERRORS
+}
+
 PyObject* THPTModule_tpuCanDeviceAccessPeer_wrap(PyObject* self, PyObject* args) {
   HANDLE_TH_ERRORS
   PyObject *value_1 = nullptr;
@@ -348,6 +469,9 @@ static struct PyMethodDef THPTModule_methods[] = {
     {"_tpu_synchronize", (PyCFunction)THPTModule_tpuSynchronize, METH_NOARGS, nullptr},
     {"_tpu_flush", (PyCFunction)THPTModule_tpuFlush, METH_NOARGS, nullptr},
     {"_tpu_getTopology", (PyCFunction)THPTModule_tpuGetTopology, METH_VARARGS, nullptr},
+    {"_tpu_setC2CTopology", (PyCFunction)THPTModule_setC2CTopology, METH_NOARGS, nullptr},
+    {"_tpu_checkChipMap", (PyCFunction)THPTModule_tpuCheckChipMap, METH_VARARGS, nullptr},
+    {"_tpu_getC2CRing", (PyCFunction)THPTModule_tpuGetC2CRing, METH_VARARGS, nullptr},
     {"_tpu_canDeviceAccessPeer", (PyCFunction)THPTModule_tpuCanDeviceAccessPeer_wrap, METH_VARARGS, nullptr},
     {"_tpu_getDeviceUtilizationRate", (PyCFunction)THPTModule_getDeviceUtilizationRate_wrap, METH_O, nullptr},
     {"_tpu_getCurrentStream", (PyCFunction)THPTModule_getCurrentStream_wrap, METH_O, nullptr},

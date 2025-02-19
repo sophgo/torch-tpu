@@ -55,7 +55,6 @@ def find_hamiltonian_cycle(graph):
 def show_topology():
     import networkx as nx
     import matplotlib.pyplot as plt
-    torch_tpu.tpu.set_device(0)
     chip_num = torch.tpu.device_count()
     topo_info = [[0 for _ in range(chip_num)] for _ in range(chip_num)]
     torch_tpu.tpu.get_topology(topo_info)

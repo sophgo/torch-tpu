@@ -41,6 +41,25 @@ enum tpudnnReduceType_t {
 };
 
 typedef enum {
+    TPUDNN_INTRA_CARD = 0,
+    TPUDNN_INTER_CARD = 1,
+    TPUDNN_INTER_CHIP = 2
+} c2c_communication_type;
+
+typedef enum {
+    TPUDNN_DIRECT_LEFT2RIGHT = 0,
+    TPUDNN_DIRECT_RIGHT2LEFT = 1,
+    TPUDNN_DIRECT_BIDIR = 2,
+} c2c_direct_type;
+
+typedef enum {
+    TPUDNN_COPY_S2S = 0,
+    TPUDNN_COPY_S2L2 = 1,
+    TPUDNN_COPY_L22S = 2,
+    TPUDNN_COPY_L22L2 =3,
+} c2c_copy_type;
+
+typedef enum {
   TPUDNN_ACTIVE_TANH = 0,
   TPUDNN_ACTIVE_SIGMOID = 1,
   TPUDNN_ACTIVE_RELU = 2,
@@ -763,6 +782,19 @@ tpudnnStatus_t tpudnnRmsNormBackwardAsync(
     int axis,
     double eps);
 
+tpudnnStatus_t tpudnnC2CPerf(
+    tpudnnHandle_t handle,
+    uint64_t count,
+    c2c_communication_type comm_type,
+    c2c_direct_type direct_type,
+    c2c_copy_type copy_type,
+    void * info_buffer,
+    tpudnnDataType_t dtype,
+    const char* uuid,
+    int nranks,
+    int cur_rank,
+    const int *chip_map);
+
 tpudnnStatus_t tpudnnC2CSend(
     tpudnnHandle_t handle,
     void *buff,
@@ -1007,6 +1039,18 @@ tpudnnStatus_t tpudnnLLamaA16MlpAsync (
     int weight_bits,
     tpudnnTensor_t output);
 
+tpudnnStatus_t tpudnnMlpW8A16DqAsync (
+    tpudnnHandle_t handle,
+    tpudnnTensor_t input,
+    tpudnnTensor_t weight0,
+    tpudnnTensor_t weight1,
+    tpudnnTensor_t weight2,
+    tpudnnTensor_t scale0,
+    tpudnnTensor_t scale1,
+    tpudnnTensor_t scale2,
+    tpudnnTensor_t output,
+    int blocksize);
+
 tpudnnStatus_t tpudnnGDMAD2DAsync(
     tpudnnHandle_t handle,
     tpudnnTensor_t src,
@@ -1122,11 +1166,4 @@ tpudnnStatus_t tpudnnScatterAddAsync(
     int dim);
 
 
-tpudnnStatus_t tpudnnSyncDescriptor(
-    tpudnnHandle_t handle
-);
-
-tpudnnStatus_t tpudnnSyncPIO(
-    tpudnnHandle_t handle
-);
 } // extern "C"

@@ -70,7 +70,7 @@ Torch.distributed 支持 SCCL 内置后端，SCCL 通信后端能够充分利用
    :align: center
    :alt: C2C Topology
 
-SCCL集合通信采用ring算法，四芯和八芯的chip_map须按照环的顺序填写，如：
+SCCL集合通信采用ring算法，四芯和八芯的 chip_map 须按照环的顺序填写，如：
 
 .. code-block:: c++
 
@@ -78,6 +78,14 @@ SCCL集合通信采用ring算法，四芯和八芯的chip_map须按照环的顺�
     chip_map=[7,6,2,3] // or [1,0,2,3] or [1,0,4,5]
     //eight chips
     chip_map=[0,2,6,7,3,1,5,4]
+
+在设置 chip_map 时，确保其能够正确形成环。如果输入的 chip_map 无法形成有效的环，程序将抛出运行时错误，并打印以下提示信息：
+
+.. code-block:: shell
+
+    RuntimeError: The input chip_map is wrong, use the recommended chip_map: [0,2,6,7,3,1,5,4]
+
+可根据提示信息重新设置 chip_map 。
 
 （2）`all_reduce` 原语示例代码:
 

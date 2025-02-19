@@ -6,7 +6,6 @@
 #include <c10/core/DeviceType.h>
 #include <sys/time.h>
 #include "TPUDeviceManager.h"
-
 #ifdef BACKEND_SG2260
 #include "TPUStream.h"
 #include <sgdnn_api.h>
@@ -337,9 +336,6 @@ public:
     }
   }
 
-
-  
-
   void CopyHostToDevice ( void * Dst, const void * Src, size_t Size, int Index, bool non_blocking )
   {
     tpuRtStatus_t Status;
@@ -497,6 +493,24 @@ void TPUGetTopology(std::vector<std::vector<int>> *topo) {
           }
       }
   }
+}
+
+tpudnnStatus_t TPUCheckChipMap(int world_size, int *chipMap)
+{
+  tpudnnStatus_t status = tpudnnCheckChipMap(world_size, chipMap);
+  return status;
+}
+
+void TPUGetC2CRing(int world_size, int *chipMap)
+{
+  tpudnnStatus_t status = tpudnnGetC2CRing(world_size, chipMap);
+  TORCH_CHECK (status == TPUDNN_STATUS_SUCCESS, " TPUGetC2CRing failed! Error Code : #", status);
+}
+
+void TPUSetupC2CTopology()
+{
+  tpuRtStatus_t status = tpuRtSetupTopology();
+  TORCH_CHECK (status == tpuRtSuccess, " TPUSetupC2CTopology failed! Error Code : #", status);
 }
 
 void * TPUAlloc ( size_t Size )
