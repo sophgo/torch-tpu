@@ -129,6 +129,7 @@ static inline void SaveTensorToBinaryFile ( const at::Tensor & Tensor, const std
   define_converter_entry(T, PREFIX, DTYPE_UINT8)      \
   define_converter_entry(T, PREFIX, DTYPE_INT8)       \
   define_converter_entry(T, PREFIX, DTYPE_INT16)      \
+  define_converter_entry(T, PREFIX, DTYPE_FP8E4M3)    \
   define_converter_entry(T, PREFIX, DTYPE_UNKNOWN)
 
 template <typename T>
@@ -179,6 +180,9 @@ static inline T TPUConvertDtype ( caffe2::TypeMeta dtype )
   }
   else if ( dtype == caffe2::TypeMeta::Make<short>() ) {
     return dtypes<T>::DTYPE_INT16;
+  }
+  else if ( dtype == caffe2::TypeMeta::Make<at::Float8_e4m3fn>() ) {
+    return dtypes<T>::DTYPE_FP8E4M3;
   }
   else
   {
