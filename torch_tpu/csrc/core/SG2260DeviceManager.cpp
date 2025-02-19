@@ -343,6 +343,7 @@ public:
     tpuRtStatus_t Status;
     auto stream = c10_tpu::getDefaultTPUStream();
     tpudnnFlush(stream);
+    tpuRtStreamSynchronize(stream);
     if (!non_blocking) {
       Status = tpuRtMemcpyS2DAsync( Dst, Src, Size, stream );
       tpuRtStreamSynchronize(stream);
@@ -363,6 +364,7 @@ public:
     tpuRtStatus_t Status;
     auto stream = c10_tpu::getDefaultTPUStream();
     tpudnnFlush(stream);
+    tpuRtStreamSynchronize(stream);
     if(!non_blocking) {
       Status = tpuRtMemcpyD2SAsync( Dst, Src, Size, stream );
       tpuRtStreamSynchronize(stream);
