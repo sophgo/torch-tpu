@@ -42,7 +42,10 @@ if not arch:
     import re
     try:
         tpudnn = os.readlink(os.path.join(lib_pwd, 'libtpudnn.so'))
-        arch = re.match(r'^libtpudnn.(\w+).so$', 'libtpudnn.bm1684x.so').group(1)
+        m = re.match(r'^libtpudnn.(\w+).so$', tpudnn)
+        if not m:
+            re.match(r'.+TPU1686.+build_(\w+).+', tpudnn)
+        arch = m.group(1) if m else 'sg2260' # default to sg2260
     except FileNotFoundError:
         pass
 
