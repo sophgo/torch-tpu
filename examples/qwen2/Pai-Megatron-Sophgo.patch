@@ -193,7 +193,7 @@ index 708ccd01..b3edc26a 100644
  
      # Scale.
 diff --git a/PAI-Megatron-LM-240718/megatron/core/optimizer/optimizer.py b/PAI-Megatron-LM-240718/megatron/core/optimizer/optimizer.py
-index 989a4438..4be4193d 100644
+index 989a4438..238e59e8 100644
 --- a/PAI-Megatron-LM-240718/megatron/core/optimizer/optimizer.py
 +++ b/PAI-Megatron-LM-240718/megatron/core/optimizer/optimizer.py
 @@ -502,7 +502,7 @@ class Float16OptimizerWithFloat16Params(MixedPrecisionOptimizer):
@@ -232,7 +232,7 @@ index 989a4438..4be4193d 100644
  
          # Append fp32 parameters.
          for main_group in self.fp32_from_fp32_groups:
-@@ -576,14 +579,31 @@ class Float16OptimizerWithFloat16Params(MixedPrecisionOptimizer):
+@@ -576,14 +579,36 @@ class Float16OptimizerWithFloat16Params(MixedPrecisionOptimizer):
          return model_data, main_data
  
      def _copy_model_grads_to_main_grads(self):
@@ -243,8 +243,13 @@ index 989a4438..4be4193d 100644
 +                    cnt += model_param.main_grad.numel()
 +                else:
 +                    cnt += model_param.grad.numel()
-+        
-+        self._all_grad_data_fp32 = torch.empty(cnt, dtype=torch.float, device='cuda')
++
++        if not hasattr(self, '_all_grad_data_fp32'):
++            self._all_grad_data_fp32 = torch.empty(cnt, dtype=torch.float, device='cuda')
++        else:
++            # check if the size is enough
++            if self._all_grad_data_fp32.numel() < cnt:
++                self._all_grad_data_fp32 = torch.empty(cnt, dtype=torch.float, device='cuda')
 +
 +        offset = 0
          # This only needs to be done for the float16 group.
