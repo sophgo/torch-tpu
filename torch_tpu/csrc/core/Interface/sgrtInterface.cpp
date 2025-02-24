@@ -1,6 +1,7 @@
 #ifdef BACKEND_SG2260
 #include "sgrtInterface.h"
-
+#include "TPUStream.h"
+#include "tpuDNN.h"
 #define SGRT_CHECK(cmd) \
 do \
 { \
@@ -41,6 +42,8 @@ sgrtStreamStatus SgrtStreamQuery(sgrtStream_t stream) {
 }
 
 void SgrtSynchronizeStream(sgrtStream_t stream) {
+  auto tpudnnHandle = getDefaultTPUStream();
+  tpudnnFlush(tpudnnHandle);
   SGRT_CHECK(tpuRtStreamSynchronize(stream));
 }
 
