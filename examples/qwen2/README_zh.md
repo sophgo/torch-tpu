@@ -40,6 +40,7 @@ pip install https://github.com/sophgo/torch-tpu/releases/download/v0.1.0/torch_t
 git clone --recurse-submodules https://github.com/alibaba/Pai-Megatron-Patch.git /workspace/Pai-Megatron-Patch
 cd /workspace/Pai-Megatron-Patch
 git checkout v0.9.1
+git sudmodule update
 ```
 
 - 应用补丁
@@ -71,21 +72,25 @@ python -c "import megatron; print(megatron.__path__)"
 
 ## 步骤5: 获取数据集和检查点
 
-- 按照 `Pai-Megatron-Patch/examples/qwen2` 中的说明下载检查点和数据集
+- 按照 `Pai-Megatron-Patch/examples/qwen2` 中的说明下载数据集
+- 从huggingface网站下载Qwen2-7B模型作为参考模型, 将`config.json`文件中`torch_dtype`参数修改为`float16`
 
-- 将检查点、数据集文件夹和脚本 `run_qwen2_train.sh` 移动到 Pai-Megatron-Patch 目录。现在你的目录结构应该如下：
+- 将检查点、数据集文件夹、脚本 `run_qwen2_train.sh`与脚本`run_qwen2_evaluation.sh` 移动到 Pai-Megatron-Patch 目录。现在你的目录结构应该如下：
 ```
     /workspace/
-    ├─ Pai-Megatron-Patch/
+    ├─ TPU-Megatron-Patch/
     │  ├─ qwen-ckpts/
+    |  |  ├─Qwen2-7B
+    |  |  └─ ...
     │  ├─ qwen-datasets/
     |  ├─ Pai-Megatron-Sophgo.patch
     │  ├─ run_qwen2_train.sh
+    |  ├─ run_qwen2_evaluation.sh
     │  └─ ...
     ├─ ...
 ```
 
-## 步骤6: 运行训练脚本
+## 步骤6: 运行训练脚本并保存checkpoints
 
 - 设置超参数并运行预训练脚本
 
@@ -102,6 +107,39 @@ source run_qwen2_train.sh 7B 0 2 1
 ```bash
 source run_qwen2_train.sh 7B 1 2 1
 ```
+
+
+## Step7: 将MegatronCore格式的checkpoints转为HuggingFace格式，并评估该模型
+
+- 启动评估脚本环境
+
+```bash
+source run_qwen2_evaluation.sh
+```
+
+- 需要设置的参数为：将要保存的HuggingFace格式的checkpoints文件路径，训练保存的MegatronCore格式的checkpoints文件路径(默认)， 从HuggingFace下载的参考模型路径
+- 均使用默认参数，并运行下面命令：
+
+```bash
+mcore_to_hg
+```
+- 根据`Pai-Megatron-Patch/examples/qwen2`的指示下载评估数据集，或者您也可以直接运行下面命令：
+
+```bash
+cd /workspace
+wget https://atp-modelzoo-wlcb-pai.oss-cn-wulanchabu.aliyuncs.com/release/models/pai-megatron-patch/evaluation-datasets/ceval.tgz
+wget https://atp-modelzoo-wlcb-pai.oss-cn-wulanchabu.aliyuncs.com/release/models/pai-megatron-patch/evaluation-datasets/evaluate.tgz
+tar -xvzf ceval.tgz
+tar -xvzf evaluate.tgz
+```
+
+- 需要设置的参数为：保存的Huggingface格式的checkpoints文件路径
+- 均使用默认参数，并运行下面命令：
+
+```bash
+evaluate
+```
+
 
 ## 常见问题
 

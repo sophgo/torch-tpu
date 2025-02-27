@@ -7,6 +7,156 @@ index 2e86fdf..53406fc 100644
  LM-Evaluation-Harness*
  Bigcode-Evaluation-Harness*
 +*__pycache__*
+Submodule LM-Evaluation-Harness-240310 contains modified content
+diff --git a/LM-Evaluation-Harness-240310/lm_eval/models/huggingface.py b/LM-Evaluation-Harness-240310/lm_eval/models/huggingface.py
+index fc78b55a..740fdb36 100644
+--- a/LM-Evaluation-Harness-240310/lm_eval/models/huggingface.py
++++ b/LM-Evaluation-Harness-240310/lm_eval/models/huggingface.py
+@@ -34,6 +34,43 @@ from lm_eval.models.utils import (
+     stop_sequences_criteria,
+ )
+ 
++from torch_tpu.tpu.custom_op.llama_attn_qkv import fuse_qwen2_attn_qkv
++from torch_tpu.tpu.custom_op.rmsnorm import fuse_qwen2_rmsnorm
++from torch_tpu.tpu.custom_op.llama_mlp import fuse_qwen2_mlp
++#replace transformers func because lacking tril op
++from typing import Optional
++def make_causal_mask(
++    input_ids_shape: torch.Size,
++    dtype: torch.dtype,
++    device: torch.device,
++    past_key_values_length: int = 0,
++    sliding_window: Optional[int] = None,
++):
++    """
++    Make causal mask used for bi-directional self-attention.
++    """
++    bsz, tgt_len = input_ids_shape
++    mask = torch.full((tgt_len, tgt_len), torch.finfo(dtype).min, device=device)
++    mask_cond = torch.arange(mask.size(-1), device=device)
++    mask.masked_fill_(mask_cond < (mask_cond + 1).view(mask.size(-1), 1), 0)
++
++    mask = mask.to(dtype)
++
++    if past_key_values_length > 0:
++        mask = torch.cat([torch.zeros(tgt_len, past_key_values_length, dtype=dtype, device=device), mask], dim=-1)
++
++    # add lower triangular sliding window mask if necessary
++    if sliding_window is not None:
++        diagonal = past_key_values_length - sliding_window - 1
++
++        i = torch.arange(tgt_len, dtype=torch.int32, device=device).unsqueeze(1)
++        j = torch.arange(tgt_len, dtype=torch.int32, device=device).unsqueeze(0)
++        condition = j < torch.minimum(i + diagonal + 1, torch.tensor(tgt_len, device=device))
++        mask.masked_fill_(condition, torch.finfo(dtype).min)
++
++    return mask[None, None, :, :].expand(bsz, 1, tgt_len, tgt_len + past_key_values_length)
++import transformers
++transformers.modeling_attn_mask_utils.AttentionMaskConverter._make_causal_mask = staticmethod(make_causal_mask)
+ 
+ eval_logger = utils.eval_logger
+ 
+@@ -112,7 +149,9 @@ class HFLM(TemplateLM):
+         **kwargs,
+     ) -> None:
+         super().__init__()
+-
++        fuse_qwen2_attn_qkv()
++        fuse_qwen2_rmsnorm()
++        fuse_qwen2_mlp()
+         # optionally: take in an already-initialized transformers.PreTrainedModel
+         if not isinstance(pretrained, str):
+             eval_logger.warning(
+@@ -153,8 +192,9 @@ class HFLM(TemplateLM):
+             if not (parallelize or accelerator.num_processes > 1):
+                 # use user-passed device
+                 device_list = set(
+-                    ["cuda", "cpu"]
++                    ["cuda", "cpu", "tpu"]
+                     + [f"cuda:{i}" for i in range(torch.cuda.device_count())]
++                    + [f"tpu:{i}" for i in range(torch.tpu.device_count())]
+                     + ["mps", "mps:0"]
+                 )
+                 if device and device in device_list:
+@@ -168,10 +208,10 @@ class HFLM(TemplateLM):
+                         )
+                 else:
+                     eval_logger.info("Device not specified")
+-                    eval_logger.info(f"Cuda Available? {torch.cuda.is_available()}")
++                    eval_logger.info(f"TPU Available? {torch.tpu.is_available()}")
+                     self._device = (
+-                        torch.device("cuda")
+-                        if torch.cuda.is_available()
++                        torch.device("tpu")
++                        if torch.tpu.is_available()
+                         else torch.device("cpu")
+                     )
+             else:
+@@ -957,14 +997,14 @@ class HFLM(TemplateLM):
+                 if self.AUTO_MODEL_CLASS == transformers.AutoModelForCausalLM:
+                     inp = torch.tensor(
+                         (context_enc + continuation_enc)[-(self.max_length + 1) :][:-1],
+-                        dtype=torch.long,
++                        dtype=torch.int32,
+                         device=self.device,
+                     )
+                     (inplen,) = inp.shape
+                 elif self.AUTO_MODEL_CLASS == transformers.AutoModelForSeq2SeqLM:
+                     inp = torch.tensor(
+                         (context_enc)[-self.max_length :],
+-                        dtype=torch.long,
++                        dtype=torch.int32,
+                         device=self.device,
+                     )
+                     (inplen,) = inp.shape
+@@ -976,7 +1016,7 @@ class HFLM(TemplateLM):
+                         (continuation_enc)[-self.max_length :],
+                         # TODO: left-shift these?
+                         # TODO: our code assumes we never end up truncating conts for either model type
+-                        dtype=torch.long,
++                        dtype=torch.int32,
+                         device=self.device,
+                     )
+                     (contlen,) = cont.shape
+@@ -1025,6 +1065,7 @@ class HFLM(TemplateLM):
+                 self._model_call(batched_inps, **call_kwargs), dim=-1
+             )  # [batch, padding_length (inp or cont), vocab]
+ 
++            multi_logits = multi_logits.to("cpu")
+             for (request_str, ctx_tokens, _), logits, inplen, cont_toks in zip(
+                 chunk, multi_logits, inplens, cont_toks_list
+             ):
+@@ -1057,7 +1098,7 @@ class HFLM(TemplateLM):
+                     logits=logits,
+                 ):
+                     cont_toks = torch.tensor(
+-                        cont_toks, dtype=torch.long, device=self.device
++                        cont_toks, dtype=torch.int64
+                     ).unsqueeze(0)  # [1, seq]
+                     max_equal = (greedy_tokens == cont_toks).all()
+ 
+diff --git a/LM-Evaluation-Harness-240310/lm_eval/models/utils.py b/LM-Evaluation-Harness-240310/lm_eval/models/utils.py
+index 09818f4e..1419a577 100644
+--- a/LM-Evaluation-Harness-240310/lm_eval/models/utils.py
++++ b/LM-Evaluation-Harness-240310/lm_eval/models/utils.py
+@@ -165,7 +165,7 @@ def pad_and_concat(
+                         tensor,  # [seq]
+                         torch.zeros(
+                             max_length - tensor_len,
+-                            dtype=torch.long,
++                            dtype=torch.int32,
+                             device=tensor.device,
+                         ),  # [padding_length - seq]
+                     ],
+@@ -177,7 +177,7 @@ def pad_and_concat(
+                     [
+                         torch.zeros(
+                             max_length - tensor_len,
+-                            dtype=torch.long,
++                            dtype=torch.int32,
+                             device=tensor.device,
+                         ),  # [padding_length - seq]
+                         tensor,  # [seq]
 Submodule PAI-Megatron-LM-240718 contains modified content
 diff --git a/PAI-Megatron-LM-240718/megatron/core/distributed/distributed_data_parallel.py b/PAI-Megatron-LM-240718/megatron/core/distributed/distributed_data_parallel.py
 index 7b95b858..c863eaa0 100644
@@ -585,3 +735,129 @@ index fb4745a..3b3fd52 100755
  
          self._build_layers()
          self.num_layers_per_pipeline_rank = len(self.layers)
+diff --git a/toolkits/model_checkpoints_convertor/qwen/hf2mcore_qwen2_convertor.sh b/toolkits/model_checkpoints_convertor/qwen/hf2mcore_qwen2_convertor.sh
+index 9921466..84f7d26 100644
+--- a/toolkits/model_checkpoints_convertor/qwen/hf2mcore_qwen2_convertor.sh
++++ b/toolkits/model_checkpoints_convertor/qwen/hf2mcore_qwen2_convertor.sh
+@@ -2,7 +2,7 @@
+ set -e
+ export CUDA_VISIBLE_DEVICES=7
+ START_TIME=$SECONDS
+-MASTER_ADDR=localhost
++MASTER_ADDR=127.0.0.1
+ MASTER_PORT=$(shuf -n 1 -i 10000-65535)
+ 
+ MODEL_SIZE=$1
+@@ -18,7 +18,7 @@ HF_CKPT_PATH=${10}
+ 
+ CURRENT_DIR="$( cd "$( dirname "$0" )" && pwd )"
+ MEGATRON_PATH=$( dirname $(dirname $( dirname ${CURRENT_DIR})))
+-export PYTHONPATH=$PYTHONPATH:${MEGATRON_PATH}:${MEGATRON_PATH}/Megatron-LM-240612
++export PYTHONPATH=$PYTHONPATH:${MEGATRON_PATH}:${MEGATRON_PATH}/Megatron-LM-240718
+ 
+ 
+ if [ $MODEL_SIZE = 0.5B ]; then
+@@ -158,11 +158,17 @@ if [ $PR = fp16 ]; then
+ elif [ $PR = bf16 ]; then
+     pr_options=" \
+         --bf16"
+-
++    echo "PR = bf16"
+ fi
+ 
++# extra_options=" \
++#         --distributed-backend ${BACKEND}"
++fuse_options=" \
++        --no-gradient-accumulation-fusion \
++        --no-bias-gelu-fusion \
++        --no-bias-dropout-fusion"
+ 
+-DISTRIBUTED_ARGS="--nproc_per_node 1 --nnodes 1 --node_rank 0 --master_addr $MASTER_ADDR --master_port $MASTER_PORT"
++DISTRIBUTED_ARGS="--nproc_per_node 2 --nnodes 1 --master_addr $MASTER_ADDR --master_port 7000"
+ 
+ torchrun ${DISTRIBUTED_ARGS} hf2mcore_qwen2_dense_and_moe_gqa.py \
+     --load ${SOURCE_CKPT_PATH} \
+@@ -177,7 +183,7 @@ torchrun ${DISTRIBUTED_ARGS} hf2mcore_qwen2_dense_and_moe_gqa.py \
+     --ffn-hidden-size ${INTERMEDIATE_SIZE} \
+     --num-attention-heads ${NUM_ATTENTION_HEADS} \
+     --max-position-embeddings ${MAX_POSITION_EMBEDDINGS} \
+-    --seq-length 1 \
++    --seq-length 512 \
+     --no-async-tensor-model-parallel-allreduce \
+     --patch-tokenizer-type Qwen2Tokenizer \
+     --extra-vocab-size ${EXTRA_VOCAB_SIZE} \
+@@ -199,7 +205,8 @@ torchrun ${DISTRIBUTED_ARGS} hf2mcore_qwen2_dense_and_moe_gqa.py \
+     ${te_options} \
+     ${convert_options} \
+     ${pr_options} \
+-    ${cpu_options}
++    ${cpu_options} \
++    ${fuse_options}
+ 
+ 
+ ELAPSED_TIME=$(($SECONDS - $START_TIME))
+diff --git a/toolkits/model_checkpoints_convertor/qwen/hf2mcore_qwen2_dense_and_moe_gqa.py b/toolkits/model_checkpoints_convertor/qwen/hf2mcore_qwen2_dense_and_moe_gqa.py
+index 1e72483..ef749a6 100644
+--- a/toolkits/model_checkpoints_convertor/qwen/hf2mcore_qwen2_dense_and_moe_gqa.py
++++ b/toolkits/model_checkpoints_convertor/qwen/hf2mcore_qwen2_dense_and_moe_gqa.py
+@@ -11,7 +11,17 @@ from transformers import (
+     AutoTokenizer,
+ )
+ 
+-from transformers.modeling_utils import WEIGHTS_INDEX_NAME, WEIGHTS_NAME, shard_checkpoint, load_sharded_checkpoint
++import torch
++# import torch._dynamo
++try:
++    import torch_tpu
++    from torch_tpu import accelerator
++except ImportError:
++    import sys
++    sys.path.append(os.path.join(os.path.dirname(__file__), "..", "..", "..", "tpu-train", "torch_tpu"))
++    import accelerator
++
++from transformers.modeling_utils import SAFE_WEIGHTS_INDEX_NAME, SAFE_WEIGHTS_NAME, shard_checkpoint, load_sharded_checkpoint
+ from megatron.training.initialize import initialize_megatron
+ from megatron.training import get_args
+ from megatron.training.checkpointing import get_checkpoint_name, get_checkpoint_tracker_filename, read_metadata
+@@ -24,12 +34,12 @@ sys.path.append(os.path.join(path_dir, "examples"))
+ from qwen2.pretrain_qwen import model_provider
+ from megatron_patch.arguments import get_patch_args
+ 
+-torch.backends.cudnn.deterministic = True
+-torch.backends.cudnn.benchmark = False
+-torch.backends.cuda.matmul.allow_tf32 = False
+-torch.backends.cudnn.allow_tf32 = False
+-torch.backends.cuda.enable_mem_efficient_sdp(False)
+-torch.backends.cuda.enable_flash_sdp(False)
++# torch.backends.cudnn.deterministic = True
++# torch.backends.cudnn.benchmark = False
++# torch.backends.cuda.matmul.allow_tf32 = False
++# torch.backends.cudnn.allow_tf32 = False
++# torch.backends.cuda.enable_mem_efficient_sdp(False)
++# torch.backends.cuda.enable_flash_sdp(False)
+ 
+ def add_model_args(parser):
+ 
+@@ -752,6 +762,10 @@ def save_hfmodel(args, model):
+     os.makedirs(args.save, exist_ok=True)
+     for shard_file, shard in shards.items():
+         if args.save_safetensors:
++            for key, value in index["weight_map"].items():
++                new_value = value.replace("pytorch_", "")
++                new_value = new_value.replace(".bin", ".safetensors")
++                index["weight_map"][key] = new_value
+             shard_file = shard_file.replace("pytorch_", "")
+             shard_file = shard_file.replace(".bin", ".safetensors")
+             target_file = os.path.join(args.save, shard_file)
+@@ -766,9 +780,9 @@ def save_hfmodel(args, model):
+             torch.save(shard, target_file)
+ 
+     if index is None:
+-        print(f"Model weights saved in {os.path.join(args.save, WEIGHTS_NAME)}")
++        print(f"Model weights saved in {os.path.join(args.save, SAFE_WEIGHTS_NAME)}")
+     else:
+-        save_index_file = os.path.join(args.save, WEIGHTS_INDEX_NAME)
++        save_index_file = os.path.join(args.save, SAFE_WEIGHTS_INDEX_NAME)
+         # Save the index as well
+         with open(save_index_file, "w", encoding="utf-8") as f:
+             content = json.dumps(index, indent=2, sort_keys=True) + "\n"

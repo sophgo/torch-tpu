@@ -32,6 +32,7 @@ pip install https://github.com/sophgo/torch-tpu/releases/download/v0.1.0/torch_t
 git clone --recurse-submodules https://github.com/alibaba/Pai-Megatron-Patch.git /workspace/Pai-Megatron-Patch
 cd /workspace/Pai-Megatron-Patch
 git checkout v0.9.1
+git sudmodule update
 ```
 
 - Apply the patch
@@ -64,22 +65,26 @@ python -c "import megatron; print(megatron.__path__)"
 
 ## Step5: Get dataset and checkpoint
 
-- Download the checkpoint and dataset according to the instructions in `Pai-Megatron-Patch/examples/qwen2`
+- Download the dataset according to the instructions in `Pai-Megatron-Patch/examples/qwen2`
+- Download the Qwen2-7B checkpoint as reference model from huggingface, and modify `"torch_dtype"` parameter in `config.json` file from `bfloat16` to `float16`.
 
-- Move the checkpoint, dataset folder and script `run_qwen2_train.sh` into Pai-Megatron-Patch directory. Now your directories will be arranged like this:
+- Move the checkpoint, dataset folder, script `run_qwen2_train.sh` and script `run_qwen2_evaluation.sh` into Pai-Megatron-Patch directory. Now your directories will be arranged like this:
 ```
     /workspace/
     ├─ TPU-Megatron-Patch/
     │  ├─ qwen-ckpts/
+    |  |  ├─Qwen2-7B
+    |  |  └─ ...
     │  ├─ qwen-datasets/
     |  ├─ Pai-Megatron-Sophgo.patch
     │  ├─ run_qwen2_train.sh
+    |  ├─ run_qwen2_evaluation.sh
     │  └─ ...
     ├─ ...
 ```
 
 
-## Step6: Run training script
+## Step6: Run training script and save checkpoints
 
 - Set the hyperparameters and run the pretraining script
 
@@ -95,6 +100,38 @@ To run a smaller test, for example a 1-layer 7B model with TP=2, run
 
 ```bash
 source run_qwen2_train.sh 7B 1 2 1
+```
+
+
+## Step7: Convert checkpoints from MegatronCore to HuggingFace format and evaluate checkpoints
+
+- Source the evaluation script environmrnt
+
+```bash
+source run_qwen2_evaluation.sh
+```
+
+- The arguments that need to be set are:  the path for the HuggingFace checkpoints to be saved, the path for the MegatronCore checkpoints saved during training (default), and the reference model path downloaded from HuggingFace
+- Using default arguments and run to get HuggingFace format checkpints:
+
+```bash
+mcore_to_hg
+```
+- Download the evaluation datasets according to the instructions in `Pai-Megatron-Patch/examples/qwen2` or you can directly run:
+
+```bash
+cd /workspace
+wget https://atp-modelzoo-wlcb-pai.oss-cn-wulanchabu.aliyuncs.com/release/models/pai-megatron-patch/evaluation-datasets/ceval.tgz
+wget https://atp-modelzoo-wlcb-pai.oss-cn-wulanchabu.aliyuncs.com/release/models/pai-megatron-patch/evaluation-datasets/evaluate.tgz
+tar -xvzf ceval.tgz
+tar -xvzf evaluate.tgz
+```
+
+- The arguments that need to be set are: the path for the saved HuggingFace format checkpoints.
+- Using default arguments and evaluate:
+
+```bash
+evaluate
 ```
 
 

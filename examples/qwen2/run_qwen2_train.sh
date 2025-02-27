@@ -4,8 +4,6 @@ if [[ $PYTHONPATH != *PAI-Megatron-LM-240718* ]]; then
         export PYTHONPATH=$(pwd)/PAI-Megatron-LM-240718:$PYTHONPATH
 fi
 export CUDA_DEVICE_MAX_CONNECTIONS=1
-export CMODEL_GLOBAL_MEM_SIZE=120000000000
-export CMODEL_FAST_EXEC=1
 
 TRAIN_ITERS=10
 BATCH_SIZE=8
@@ -17,7 +15,9 @@ PAD_LEN=512
 LR=1e-4
 
 DATASET_PATH=qwen-datasets/wudao_qwenbpe_text_document
-DS_CONFIG=ds_config.json
+CKPT_DIR=qwen-ckpts/Qwen2-7B-ckpts
+rm -rf "${CKPT_DIR}"
+mkdir -p "${CKPT_DIR}"
 
 MODEL_SIZE=${1:-7B}
 LAYERS=${2:-0}
@@ -103,8 +103,6 @@ megatron_options="  \
         --log-interval 1 \
         --log-throughput \
         --log-progress \
-        --eval-iters 0 \
-        --save-interval 0 \
         --tensor-model-parallel-size ${TP} \
         --pipeline-model-parallel-size ${PP} \
         --no-load-optim \
@@ -124,7 +122,7 @@ megatron_options="  \
         --rotary-base 1000000 \
         --rotary-seq-len-interpolation-factor 1 \
         --no-save-optim \
-        --load qwen-ckpts/Qwen2-0.5B \
+        --load qwen-ckpts/Qwen2-7B\
         "
 
 fuse_options=" \
@@ -162,6 +160,12 @@ tensorboard_option=" \
 extra_options=" \
         --distributed-backend ${BACKEND}"
 
+eval_options=" \
+        --eval-iters 3 \
+        --eval-interval 10 \
+        --save ${CKPT_DIR} \
+        --save-interval 10"
+
 for rank in `seq 0 $((TP*PP-1))`;
 do
 # echo \
@@ -171,7 +175,7 @@ RANK=$rank \
 WORLD_SIZE=$((TP*PP)) \
 LOCAL_RANK=$rank \
 LOCAL_WORLD_SIZE=$((TP*PP)) \
-python examples/qwen2/pretrain_qwen.py \
+CMODEL_FAST_EXEC=1 CMODEL_GLOBAL_MEM_SIZE=120000000000 python examples/qwen2/pretrain_qwen.py \
     ${megatron_options} \
     ${fuse_options} \
     ${te_options} \
@@ -181,7 +185,8 @@ python examples/qwen2/pretrain_qwen.py \
     ${gqa_options} \
     ${extra_options} \
     ${comm_overlap_option} \
-    ${tensorboard_option} &
+    ${tensorboard_option} \
+    ${eval_options} &
 done
 
 set +x
