@@ -2,3 +2,11 @@ pybind11
 transformers==4.41.2
 accelerate==0.30.1
 datasets
+netifaces
+nnmoduletools>=0.1.1
+evaluate
+sacrebleu
+scikit-learn
+sqlitedict
+peft==0.10.0
+pytablewriter

@@ -52,8 +52,8 @@ git apply Pai-Megatron-Sophgo.patch
 After you get the PAI-Megatron-Patch, you should  install `megatron-patch` inside Pai-Megatron-Patch directory by running the following command:
 
 ```bash
-pip install pybind11 transformers==4.41.2 accelerate==0.30.1 datasets netifaces "nnmoduletools>=0.1.1"
-# pip install pybind11 transformers==4.41.2 accelerate==0.30.1 datasets netifaces nnmoduletools>=0.1.1 -i https://pypi.tuna.tsinghua.edu.cn/simple
+pip install pybind11 transformers==4.41.2 accelerate==0.30.1 datasets netifaces nnmoduletools>=0.1.1 evaluate sacrebleu scikit-learn sqlitedict peft==0.10.0 pytablewriter
+# pip install pybind11 transformers==4.41.2 accelerate==0.30.1 datasets netifaces nnmoduletools>=0.1.1 evaluate sacrebleu scikit-learn sqlitedict peft==0.10.0 pytablewriter -i https://pypi.tuna.tsinghua.edu.cn/simple
 cd /workspace/Pai-Megatron-Patch/PAI-Megatron-LM-240718
 python setup.py develop --user
 ```
@@ -71,7 +71,7 @@ python -c "import megatron; print(megatron.__path__)"
 - Move the checkpoint, dataset folder, script `run_qwen2_train.sh` and script `run_qwen2_evaluation.sh` into Pai-Megatron-Patch directory. Now your directories will be arranged like this:
 ```
     /workspace/
-    ├─ TPU-Megatron-Patch/
+    ├─ Pai-Megatron-Patch/
     │  ├─ qwen-ckpts/
     |  |  ├─Qwen2-7B
     |  |  └─ ...
