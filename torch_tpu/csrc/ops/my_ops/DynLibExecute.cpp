@@ -24,7 +24,7 @@ namespace at
 		TORCH_CHECK(fp_scalars.size() == fp_scalars_index.size());
 		TORCH_CHECK(fixed_scalars.size() == fixed_scalars_index.size());
 		for (size_t i = 0; i < tensors.size(); i++) {
-			CHECK_TENSOR_IN_DEVICE(tensors[i]);
+			CHECK_TENSOR_IN_DEVICE_NO_CONTIGUOUS(tensors[i]);
 		}
 		TIMING_START;
 #if defined BACKEND_SG2260
