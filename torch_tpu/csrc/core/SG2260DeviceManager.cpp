@@ -216,7 +216,9 @@ public:
       {
         continue;
       }
-
+      auto stream = c10_tpu::getCurrentTPUStream();
+      tpudnnFlush(stream); //Flush the stream before tpuRtFree to avoid assigning same memory to different tasks.
+      tpuRtStreamSynchronize(stream);
       tpuRtFree(&tbd.ptr, NO_USE);
       // std::cout << "Free " << tbd.ptr << " of size " << getSize(tbd.ptr, index) << std::endl;
       getMemInfo(index).erase(tbd.ptr);
