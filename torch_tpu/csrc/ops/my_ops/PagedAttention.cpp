@@ -51,8 +51,11 @@ namespace at
 			CHECK_TENSOR_IN_DEVICE(cos.value());
 		if (sin.has_value())
 			CHECK_TENSOR_IN_DEVICE(sin.value());
-		if (fetch_slots.has_value())
+		if (fetch_slots.has_value()) {
 			CHECK_TENSOR_IN_DEVICE(fetch_slots.value());
+			TORCH_CHECK (fetch_slots.value().dtype() == torch::kInt32,
+						"LLammaAttention fetch_slots must be int32 dtype");
+		}
 		if (mask.has_value())
 			CHECK_TENSOR_IN_DEVICE(mask.value());
 		if (attention_mode == 3 || attention_mode == 2){

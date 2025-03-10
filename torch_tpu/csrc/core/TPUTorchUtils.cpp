@@ -279,6 +279,8 @@ static inline const char *OpTypeStr(int v)
     __case(ADAM_BACKWARD)
     __case(DROPOUT)
     __case(OP_NUM)
+    __case(FUSED_MOE_GROUPED_TOPK)
+    __case(FUSED_MOE_FUSED_EXPERTS)
 
 #undef __case
     default:

@@ -265,6 +265,45 @@ namespace at
         Tensor &output,
         double_t scale);
 
+    Tensor fused_moe_grouped_topk(
+        Tensor &topk_experts_res,
+        Tensor &topk_weights_res_bf16,
+        Tensor &left_bf16,
+        Tensor &right_bf16,
+        Tensor &topk_weights_res,
+        Tensor &left,
+        Tensor &right,
+        Tensor &max,
+        Tensor &matmul_res,
+        Tensor &softmax_res);
+
+    Tensor fused_moe_fused_experts(
+        Tensor &output,
+        Tensor &input,
+        const c10::optional<Tensor> &output_sample,
+        const c10::optional<Tensor> &input_sample,
+        Tensor &gate_weights,
+        Tensor &up_weights,
+        Tensor &down_weights,
+        Tensor &gate_scales,
+        Tensor &up_scales,
+        Tensor &down_scales,
+        Tensor &select_experts,
+        Tensor &routing_weights,
+        const c10::optional<Tensor> &num_select_experts,
+        const c10::optional<Tensor> &select_experts_middle,
+        const c10::optional<Tensor> &routing_weights_middle,
+        int64_t blocksize,
+        int64_t num_experts,
+        int64_t num_experts_per_tok,
+        bool use_grouped_topk,
+        int64_t num_expert_group,
+        int64_t topk_group,
+        const c10::optional<Tensor> &silu,
+        const c10::optional<Tensor> &sigmoid,
+        const c10::optional<Tensor> &m0,
+        bool save_mid_res);
+
 	void TGI_input_ids_update_decode_phase(
 		Tensor &all_input_ids,
 		Tensor &next_ids,

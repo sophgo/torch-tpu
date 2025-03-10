@@ -63,5 +63,8 @@ namespace at
 		m.def("tgi_input_ids_update_decode_phase",TGI_input_ids_update_decode_phase);
 		m.def("dynlib_execute",dynlib_execute);
 		m.def("format_cast", FormatCast);
+		
+		m.def("fused_moe_grouped_topk", fused_moe_grouped_topk);
+		m.def("fused_moe_fused_experts", fused_moe_fused_experts);
 	}
 }

@@ -1174,5 +1174,45 @@ tpudnnStatus_t tpudnnScatterAddAsync(
     tpudnnTensor_t indices,
     int dim);
 
+tpudnnStatus_t tpudnnFusedMoEGroupedTopkMultiCoreAsync(
+    tpudnnHandle_t handle,
+    tpudnnTensor_t topk_experts_res,
+    tpudnnTensor_t topk_weights_res_bf16,
+    tpudnnTensor_t left_bf16,
+    tpudnnTensor_t right_bf16,
+    tpudnnTensor_t topk_weights_res,
+    tpudnnTensor_t left,
+    tpudnnTensor_t right,
+    tpudnnTensor_t max,
+    tpudnnTensor_t matmul_res,
+    tpudnnTensor_t softmax_res);
+
+tpudnnStatus_t tpudnnFusedMoEFusedExpertsMultiCoreAsync(
+    tpudnnHandle_t handle,
+    tpudnnTensor_t output,
+    tpudnnTensor_t input,
+    tpudnnTensor_t output_sample,
+    tpudnnTensor_t input_sample,
+    tpudnnTensor_t gate_weights, // [num_experts, middle_w, input_w]
+    tpudnnTensor_t up_weights, // [num_experts, middle_w, input_w]
+    tpudnnTensor_t down_weights, // [num_experts, middle_w, input_w]
+    tpudnnTensor_t gate_scales, // [num_experts, block_m, block_n]
+    tpudnnTensor_t up_scales, // [num_experts, block_m, block_n]
+    tpudnnTensor_t down_scales, // [num_experts, block_m, block_n]
+    tpudnnTensor_t select_experts, // [batch * seq_len, num_experts]
+    tpudnnTensor_t routing_weights,
+    tpudnnTensor_t num_select_experts,
+    tpudnnTensor_t select_experts_middle,
+    tpudnnTensor_t routing_weights_middle,
+    int blocksize,
+    int num_experts,
+    int num_experts_per_tok,
+    bool use_grouped_topk,
+    int num_expert_group,
+    int topk_group,
+    tpudnnTensor_t silu,
+    tpudnnTensor_t sigmoid,
+    tpudnnTensor_t m0,
+    bool save_mid_res);
 
 } // extern "C"
