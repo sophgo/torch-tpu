@@ -153,6 +153,17 @@ PyObject* THPTModule_tpuSynchronize(PyObject* _unused, PyObject* noargs) {
   END_HANDLE_TH_ERRORS
 }
 
+PyObject* THPTModule_tpuFlush(PyObject* _unused, PyObject* noargs) {
+  HANDLE_TH_ERRORS
+  pybind11::gil_scoped_release no_gil;
+
+  auto stream = c10_tpu::getCurrentTPUStream();
+  tpudnnFlush(stream);
+
+  Py_RETURN_NONE;
+  END_HANDLE_TH_ERRORS
+}
+
 PyObject* THPTModule_tpuGetTopology(PyObject* self, PyObject* args) {
   HANDLE_TH_ERRORS
   pybind11::gil_scoped_release no_gil;
@@ -335,6 +346,7 @@ static struct PyMethodDef THPTModule_methods[] = {
     {"_tpu_getDeviceCount", (PyCFunction)THPTModule_getDeviceCount_wrap, METH_NOARGS, nullptr},
 #if defined BACKEND_SG2260
     {"_tpu_synchronize", (PyCFunction)THPTModule_tpuSynchronize, METH_NOARGS, nullptr},
+    {"_tpu_flush", (PyCFunction)THPTModule_tpuFlush, METH_NOARGS, nullptr},
     {"_tpu_getTopology", (PyCFunction)THPTModule_tpuGetTopology, METH_VARARGS, nullptr},
     {"_tpu_canDeviceAccessPeer", (PyCFunction)THPTModule_tpuCanDeviceAccessPeer_wrap, METH_VARARGS, nullptr},
     {"_tpu_getDeviceUtilizationRate", (PyCFunction)THPTModule_getDeviceUtilizationRate_wrap, METH_O, nullptr},

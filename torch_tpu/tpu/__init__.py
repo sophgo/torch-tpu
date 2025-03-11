@@ -26,6 +26,7 @@ __all__ = [
     "set_sync_debug_mode",
     "stream",
     "synchronize",
+    "flush",
     "utilization",
     "temperature",
     "power_draw",
@@ -125,7 +126,7 @@ from .random import * # noqa: F403
 
 from .utils import ( _lazy_call, _lazy_init, init,is_initialized, is_available,
                     device, device_of, device_count, current_device, set_device, read_rank_table, get_topology,
-                    is_rank_table_valid, set_chip_map, synchronize, current_stream, set_stream, default_stream,
+                    is_rank_table_valid, set_chip_map, synchronize, flush, current_stream, set_stream, default_stream,
                     StreamContext, current_blas_handle, can_device_access_peer, get_arch_list,
                     get_device_capability, get_device_name, get_device_properties,
                     get_gencode_flags, get_sync_debug_mode, ipc_collect,
