@@ -75,10 +75,12 @@ def cast_weight(self, device):
         if isinstance(sub_module, torch.nn.Module):
             sub_module.cast_weight(device)
 
-
+def tensor_totype(t):
+    return t.to(dtype=torch.float)
 
 def apply_module_patch():
     torch.nn.Module.tpu = tpu
     torch.nn.Module.to = to
     torch.nn.Module.cast_weight = cast_weight
+    torch._tensor_str.tensor_totype = tensor_totype
     ##TODO: parallel, special module

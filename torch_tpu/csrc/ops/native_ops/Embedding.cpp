@@ -88,4 +88,21 @@ TORCH_LIBRARY_IMPL ( aten, TPU, m )
 {
   m.impl ( "embedding_dense_backward", embedding_dense_backward_tpu );
 }
+
+Tensor masked_select_tpu(const at::Tensor & self, const at::Tensor & mask) {
+  CHECK_TENSOR_IN_DEVICE ( self );
+  CHECK_TENSOR_IN_DEVICE ( mask );
+#if 1
+  LOG( WARNING ) << __func__ << " use cpu impl.";
+  auto out_cpu = masked_select( self.cpu(), mask.cpu() );
+  auto out = TENSOR_TO_TPU ( out_cpu );
+#endif
+  return out;
+}
+
+TORCH_LIBRARY_IMPL ( aten, TPU, m )
+{
+  m.impl ( "masked_select", masked_select_tpu );
+}
+
 } // namespace at

@@ -187,6 +187,10 @@ TORCH_LIBRARY_IMPL(aten, TPU, m) {
   m.impl("isnan", isnan_tpu);
 }
 
+TORCH_LIBRARY_IMPL(aten, AutogradPrivateUse1, m) {
+  m.impl("isfinite", isfinite_tpu);
+}
+
 IMP_ACTIVE_OUT(sign, TPUDNN_ACTIVE_SIGN, tpu::SIGN)
 IMP_ACTIVE(sign)
 IMP_ACTIVE_OUT(relu, TPUDNN_ACTIVE_RELU, tpu::RELU)
