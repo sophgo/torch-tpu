@@ -9,8 +9,9 @@
 
 namespace at
 {
-Tensor & arange_start_out_tpu( const at::Scalar & start, const at::Scalar & end, const at::Scalar & step, at::Tensor & out)
+Tensor & arange_start_out_tpu( const Scalar & start, const Scalar & end, const Scalar & step, Tensor & out)
 {
+    // LOG( WARNING ) << __func__ ;
     CHECK_TENSOR_IN_DEVICE ( out );
 #if 0
     CPU_IMPL_WARNING();
@@ -18,8 +19,6 @@ Tensor & arange_start_out_tpu( const at::Scalar & start, const at::Scalar & end,
     out = out_cpu.to(out.device()).to(out.dtype());
 #else
     if ((start.toInt() >= 0 && end.toInt() >= 0)){
-        int empty_length = (end.toInt()-start.toInt() - 1) / step.toInt() + 1;
-        out = empty({empty_length},out.options());
         TIMING_START;
         auto stream = c10_tpu::getCurrentTPUStream();
         auto status = tpudnnArangeAsync(
@@ -43,9 +42,45 @@ Tensor & arange_start_out_tpu( const at::Scalar & start, const at::Scalar & end,
     return out;
 }
 
+Tensor arange_start_step_tpu(const Scalar & start, const Scalar & end, const Scalar & step, c10::optional<ScalarType> dtype,
+                c10::optional<Layout> layout, c10::optional<Device> device, c10::optional<bool> pin_memory) {
+    if ( device.has_value()) { TORCH_CHECK( device.value().is_privateuseone()); }
+    TensorOptions options;
+    if ( dtype.has_value() ) { 
+        TORCH_CHECK( (dtype.value() == torch::kInt32) || (dtype.value() == torch::kFloat32),
+                    "arange only support int32 & float32 now" );
+        options = TensorOptions ( DeviceType::PrivateUse1 ).dtype ( dtype.value() );
+    } else{
+        options = TensorOptions ( DeviceType::PrivateUse1 ).dtype ( torch::kInt32 );
+    }
+
+    int empty_length = (end.toInt()-start.toInt() - 1) / step.toInt() + 1;
+    auto out = empty({empty_length}, options);
+    out = arange_start_out_tpu(start, end, step, out);
+    return out;
+}
+
+Tensor arange_start_tpu(const Scalar & start, const Scalar & end, c10::optional<ScalarType> dtype,
+                c10::optional<Layout> layout, c10::optional<Device> device, c10::optional<bool> pin_memory) {
+    // LOG( WARNING ) << __func__ ;
+    auto out = arange_start_step_tpu(start, end, 1, dtype, layout, device, pin_memory);
+    return out;
+}
+
+Tensor arange_tpu(const Scalar & end, c10::optional<ScalarType> dtype, c10::optional<Layout> layout,
+                c10::optional<Device> device, c10::optional<bool> pin_memory) {
+    // LOG( WARNING ) << __func__ ;
+    auto out = arange_start_step_tpu(0, end, 1, dtype, layout, device, pin_memory);
+    return out;
+}
+
+
 TORCH_LIBRARY_IMPL ( aten, TPU, m )
 {
  m.impl ( "arange.start_out",  arange_start_out_tpu);
+ m.impl ( "arange.start_step", arange_start_step_tpu);
+ m.impl ( "arange.start",      arange_start_tpu);
+ m.impl ( "arange",            arange_tpu);
 }
 }
 
