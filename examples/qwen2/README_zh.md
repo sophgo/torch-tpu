@@ -55,20 +55,13 @@ git apply Pai-Megatron-Sophgo.patch
 <!-- TODO: 添加发布演示的链接 -->
 - 你也可以在[这里](https://github.com/sophgo/torch-tpu/)下载完整的 PAI-Megatron-Patch
 
-## 步骤4: 安装 megatron-patch
+## 步骤4: 安装依赖包
 
-获取 PAI-Megatron-Patch 后，需要在 Pai-Megatron-Patch 目录下运行以下命令安装 `megatron-patch`：
+获取 PAI-Megatron-Patch 后，需要运行以下命令安装运行所需的依赖包`：
 
 ```bash
 pip install pybind11 transformers==4.41.2 accelerate==0.30.1 datasets netifaces nnmoduletools>=0.1.1 evaluate sacrebleu scikit-learn sqlitedict peft==0.10.0 pytablewriter
 # pip install pybind11 transformers==4.41.2 accelerate==0.30.1 datasets netifaces nnmoduletools>=0.1.1 evaluate sacrebleu scikit-learn sqlitedict peft==0.10.0 pytablewriter -i https://pypi.tuna.tsinghua.edu.cn/simple
-cd /workspace/Pai-Megatron-Patch/PAI-Megatron-LM-240718
-python setup.py develop --user
-```
-
-可以通过运行以下命令检查安装是否成功：
-```bash
-python -c "import megatron; print(megatron.__path__)"
 ```
 
 ## 步骤5: 获取数据集和检查点
@@ -148,4 +141,11 @@ evaluate
 
 ```bash
 python -m pip uninstall transformer_engine apex megatron-core -y
+```
+
+- 运行脚本报错`ModuleNotFoundError: No module named 'megatron'`:
+
+示例脚本中已经包含了添加`PYTHONPATH`的命令；如果仍然提示找不到`megatron`，可以尝试在`Pai-Megatron-Patch`目录下再次运行以下命令:
+```bash
+export PYTHONPATH=$(pwd)/PAI-Megatron-LM-240718:$PYTHONPATH
 ```

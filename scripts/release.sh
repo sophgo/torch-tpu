@@ -15,6 +15,10 @@ if [ -z $SKIP_DOC ]; then
     source scripts/release_doc.sh
 fi
 
+pushd $CUR_DIR/../dist
+cp -rf $CUR_DIR/../examples .
+popd
+
 # ------------------------------------------------------------------------------
 release_archive="./dist"
 BUILD_PATH=build/torch-tpu

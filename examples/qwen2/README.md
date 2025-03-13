@@ -47,20 +47,13 @@ git apply Pai-Megatron-Sophgo.patch
 <!-- TODO: add the link of the released demo -->
 - You can also download full PAI-Megatron-Patch in [here](https://github.com/sophgo/torch-tpu/)
 
-## Step4: Install megatron-patch
+## Step4: Install dependency packages
 
-After you get the PAI-Megatron-Patch, you should  install `megatron-patch` inside Pai-Megatron-Patch directory by running the following command:
+After you get the PAI-Megatron-Patch, you should install dependency packages by running the following command:
 
 ```bash
 pip install pybind11 transformers==4.41.2 accelerate==0.30.1 datasets netifaces nnmoduletools>=0.1.1 evaluate sacrebleu scikit-learn sqlitedict peft==0.10.0 pytablewriter
 # pip install pybind11 transformers==4.41.2 accelerate==0.30.1 datasets netifaces nnmoduletools>=0.1.1 evaluate sacrebleu scikit-learn sqlitedict peft==0.10.0 pytablewriter -i https://pypi.tuna.tsinghua.edu.cn/simple
-cd /workspace/Pai-Megatron-Patch/PAI-Megatron-LM-240718
-python setup.py develop --user
-```
-
-You can check if the installation is successful by running the following command:
-```bash
-python -c "import megatron; print(megatron.__path__)"
 ```
 
 ## Step5: Get dataset and checkpoint
@@ -151,4 +144,12 @@ export CMODEL_FAST_EXEC=1
 
 ```bash
 python -m pip uninstall transformer_engine apex megatron-core -y
+```
+
+- I ran the script and got an error `ModuleNotFoundError: No module named 'megatron'`:
+
+We have added the command to modify `PYTHONPATH` in the script.  If it still complains that `megatron` cannot be found, try running the following command under `Pai-Megatron-Patch` directory:
+
+```bash
+export PYTHONPATH=$(pwd)/PAI-Megatron-LM-240718:$PYTHONPATH
 ```
