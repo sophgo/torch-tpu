@@ -44,14 +44,15 @@ Tensor & arange_start_out_tpu( const Scalar & start, const Scalar & end, const S
 
 Tensor arange_start_step_tpu(const Scalar & start, const Scalar & end, const Scalar & step, c10::optional<ScalarType> dtype,
                 c10::optional<Layout> layout, c10::optional<Device> device, c10::optional<bool> pin_memory) {
-    if ( device.has_value()) { TORCH_CHECK( device.value().is_privateuseone()); }
-    TensorOptions options;
+    TensorOptions options = TensorOptions(DeviceType::PrivateUse1).dtype(torch::kInt32).layout(layout);
+    if ( device.has_value()) { 
+        TORCH_CHECK( device.value().is_privateuseone() );
+        options = options.device( device );
+    }
     if ( dtype.has_value() ) { 
         TORCH_CHECK( (dtype.value() == torch::kInt32) || (dtype.value() == torch::kFloat32),
                     "arange only support int32 & float32 now" );
-        options = TensorOptions ( DeviceType::PrivateUse1 ).dtype ( dtype.value() );
-    } else{
-        options = TensorOptions ( DeviceType::PrivateUse1 ).dtype ( torch::kInt32 );
+        options = options.dtype ( dtype );
     }
 
     int empty_length = (end.toInt()-start.toInt() - 1) / step.toInt() + 1;
