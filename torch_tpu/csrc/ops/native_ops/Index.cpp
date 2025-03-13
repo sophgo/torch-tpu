@@ -322,8 +322,10 @@ TORCH_LIBRARY_IMPL ( aten, TPU, m )
 
 Tensor & index_add_tpu( Tensor & self, int64_t dim, const Tensor & index, const Tensor & source, const Scalar &alpha)
 {
+    TORCH_CHECK( alpha.toFloat() == 1,  "index_add_ 's alpha now only support 1.");
     Tensor index_ = index;
     if(index.dtype()== torch::kInt64) {
+      LOG( WARNING ) << "index_add_ index's dtype is int64, please use int32 dtype get better performance.";
       index_ = index.to(torch::kInt32);
     }
     CHECK_TENSOR_IN_DEVICE ( self );
