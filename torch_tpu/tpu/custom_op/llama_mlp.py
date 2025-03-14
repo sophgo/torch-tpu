@@ -6,7 +6,7 @@ import transformers.models
 
 class LLamaMlpFunc(torch.autograd.Function):
     @staticmethod
-    def forward(ctx, x, w0, w1, w2):
+    def forward(ctx, x, w0, w1, w2, use_cpu=False, return_mid_tensor=False):
         x_ori = x
         #ctx.save_for_backward(x, w0, w1, w2)
         x_shape = x.shape
@@ -17,22 +17,35 @@ class LLamaMlpFunc(torch.autograd.Function):
         silu = torch.empty(silu_shape, dtype = x.dtype, device = x.device)
         sigmoid = torch.empty(silu_shape, dtype = x.dtype, device = x.device)
         m0 = torch.empty(silu_shape, dtype = x.dtype, device = x.device)
-        
-        torch.ops.my_ops.llama_mlp_forward(x,
-                                     w0,
-                                     w1,
-                                     w2,
-                                     silu,
-                                     sigmoid,
-                                     m0,
-                                     output,
-                                     True)
+
+        if use_cpu:
+            w1_trans = w1.transpose(0, 1)
+            fc1 = torch.matmul(x, w1_trans)
+            sigmoid = torch.sigmoid(fc1)
+            silu = fc1 * sigmoid
+            w0_trans = w0.transpose(0, 1)
+            fc0 = torch.matmul(x, w0_trans)
+            m0 = torch.mul(fc0, silu)
+            output = torch.matmul(m0, w2)
+        else:
+            torch.ops.my_ops.llama_mlp_forward(x,
+                                        w0,
+                                        w1,
+                                        w2,
+                                        silu,
+                                        sigmoid,
+                                        m0,
+                                        output,
+                                        True)
         if output.shape != x_shape:
            output = output.view(x_shape).contiguous()
         ctx.save_for_backward(x_ori, w0, w1, w2, silu, sigmoid, m0)
 
-        return output
-    
+        if return_mid_tensor:
+            return output, silu, sigmoid, m0
+        else:
+            return output
+
     @staticmethod
     def backward(ctx, grad_output):
         x, w0, w1, w2, silu, sigmoid, w0x = ctx.saved_tensors
@@ -40,26 +53,21 @@ class LLamaMlpFunc(torch.autograd.Function):
         silu = silu.view(silu_shape).contiguous()
         sigmoid = sigmoid.view(silu_shape).contiguous()
         w0x = w0x.view(silu_shape).contiguous()
-        
+
         x_t =x.transpose(-1, -2).contiguous()
         w2_t = w2.t().contiguous()
-        
-        # w0x = torch.matmul(x, w0.transpose(-1, -2).contiguous()) #
-        # w1x = torch.matmul(x,w1.transpose(-1, -2).contiguous()) #
-        
-        # silu = F.silu(w1x) # 
-        # sigmoid = F.sigmoid(w1x) #
+
         grad_silu_t = (sigmoid + silu * (1-sigmoid))
-        
-        grad_tmp = torch.matmul(grad_output, w2_t)  
-        grad_w1x = w0x * grad_tmp * grad_silu_t
+
+        grad_tmp = torch.matmul(grad_output, w2_t)
+        grad_w1x = (w0x / silu) * grad_tmp * grad_silu_t
         grad_w0x = grad_tmp * silu
-        grad_w2 = torch.matmul((w0x * silu).transpose(-1,-2).contiguous(), grad_output)
+        grad_w2 = torch.matmul(w0x.transpose(-1,-2).contiguous(), grad_output)
         grad_w1 = torch.matmul(x_t, grad_w1x)
         grad_w0 = torch.matmul(x_t, grad_w0x)
         grad_input = torch.matmul(grad_w0x, w0) + torch.matmul(grad_w1x, w1)
 
-        return grad_input, grad_w0.transpose(-1,-2).contiguous(), grad_w1.transpose(-1,-2).contiguous(), grad_w2
+        return grad_input, grad_w0.transpose(-1,-2).contiguous(), grad_w1.transpose(-1,-2).contiguous(), grad_w2, None, None
 
 class LLamaMlpBlock(nn.Module):
     def __init__(self, embed_dim, intermediate_size):
