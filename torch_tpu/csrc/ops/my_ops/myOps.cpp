@@ -40,6 +40,7 @@ namespace at
 		m.def("mlp_forward", mlp_forward);
 		m.def("mlp_backward", mlp_backward);
 		m.def("llama_mlp_forward", llama_mlp_forward);
+		m.def("mlp_w8a16_dq_forward", mlp_w8a16_dq_forward);
 		m.def("matmul_gptq_forward", matmul_gptq_forward);
 		m.def("llama_mlp_gptq_forward", llama_mlp_gptq_forward);
 		m.def("rmsnorm_forward", rmsnorm_forward);

@@ -57,6 +57,17 @@ namespace at
 		int8_t weight_bits,
 		Tensor &output);
 
+	Tensor mlp_w8a16_dq_forward(
+		Tensor &input,
+		Tensor &gate_weight,
+		Tensor &up_weight,
+		Tensor &down_weight,
+		Tensor &gate_scale,
+		Tensor &up_scale,
+		Tensor &down_scale,
+		Tensor &output,
+		int64_t blocksize);
+
 	Tensor llama_mlp_gptq_forward(
 		Tensor &input,
 		Tensor &weight0,
