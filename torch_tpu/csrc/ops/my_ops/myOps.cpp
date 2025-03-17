@@ -46,6 +46,7 @@ namespace at
 		m.def("rmsnorm_forward", rmsnorm_forward);
 		m.def("rmsnorm_backward", rmsnorm_backward);
 		m.def("llama_attention", llama_attention);
+		m.def("paged_attention", paged_attention);
 		m.def("llama_attention_forward", llama_attention_forward);
 		m.def("llama_attention_backward", llama_attention_backward);
 		m.def("attn_forward", attn_forward);

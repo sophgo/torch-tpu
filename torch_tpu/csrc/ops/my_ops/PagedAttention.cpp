@@ -9,7 +9,7 @@
 
 namespace at
 {
-	Tensor llama_attention(
+	Tensor paged_attention(
 		Tensor &OUT, // (tokens, heads, heads_size)
 		Tensor &Q, // (tokens, heads, heads_size)
 		Tensor &K, // (tokens, heads, heads_size)
@@ -22,6 +22,7 @@ namespace at
 		const Tensor &save_slots, //  prefill : [[0, 16], [32, 0], [48, 0]]  decode : [[17], [35], [50]]
 		const c10::optional<Tensor> &fetch_slots, // prefill : null, decode: [[0, 16], [32, 0], [48, 0]]
 		const c10::optional<Tensor> &mask, // prefill: (max_length, max_length), decode: None
+        int64_t rope_head_size,
 		int64_t	slots_size, // prefill: save_slots.size(1) decode: fetch_slots.size(1)
 		int64_t mask_size, // mask_size
 		int64_t block_size, // tokens num of one block
@@ -72,7 +73,7 @@ namespace at
 
 		TIMING_START;
   		auto stream = c10_tpu::getCurrentTPUStream();
-		auto status = tpudnnLlamaAttentionAsync(
+		auto status = tpudnnPagedAttentionAsync(
 			stream,
 			tpu::TPUGenerateTpudnnTensor(stream, OUT),
 			tpu::TPUGenerateTpudnnTensor(stream, Q),
@@ -87,6 +88,7 @@ namespace at
 			mask.has_value() ? tpu::TPUGenerateTpudnnTensor(stream, mask.value()) : tpudnnUndefinedTensor(),
 			tpudnnUndefinedTensor(), tpudnnUndefinedTensor(), tpudnnUndefinedTensor(),
 			tpu::TPUGenerateTpudnnTensor(stream, input_lengths),
+            rope_head_size,
 			(int*)input_lengths.data_ptr(),
       	    (int)(input_lengths.nbytes()/4),
 			slots_size,
@@ -97,6 +99,32 @@ namespace at
 		TORCH_CHECK ( status == TPUDNN_STATUS_SUCCESS );
 		TIMING_END( tpu::LLAMA_ATTENTION );
 		return OUT;
+	}
+
+	Tensor llama_attention(
+		Tensor &OUT, // (tokens, heads, heads_size)
+		Tensor &Q, // (tokens, heads, heads_size)
+		Tensor &K, // (tokens, heads, heads_size)
+		Tensor &V, // (tokens, heads, heads_size)
+		Tensor &Kcache, // (blocks, block_size, heads, heads_size)
+		Tensor &Vcache, // (blocks, block_size, heads, heads_size)
+		const c10::optional<Tensor> &cos, // (tokens, 1, 128)
+		const c10::optional<Tensor> &sin, // (tokens, 1, 128)
+		const Tensor &input_lengths, // [10, 11, 8]
+		const Tensor &save_slots, //  prefill : [[0, 16], [32, 0], [48, 0]]  decode : [[17], [35], [50]]
+		const c10::optional<Tensor> &fetch_slots, // prefill : null, decode: [[0, 16], [32, 0], [48, 0]]
+		const c10::optional<Tensor> &mask, // prefill: (max_length, max_length), decode: None
+		int64_t	slots_size, // prefill: save_slots.size(1) decode: fetch_slots.size(1)
+		int64_t mask_size, // mask_size
+		int64_t block_size, // tokens num of one block
+		double C, // softmax_scale
+		int64_t attention_mode // prefille 2, decode 3
+		)
+	{
+        return paged_attention(
+            OUT, Q, K, V, Kcache, Vcache, cos, sin,
+            input_lengths, save_slots, fetch_slots, mask,
+            V.size(-1), slots_size, mask_size, block_size, C, attention_mode);
 	}
 
 	Tensor llama_attention_forward(

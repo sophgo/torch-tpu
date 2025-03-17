@@ -103,6 +103,26 @@ namespace at
 		int64_t axis,
 		double_t eps);
 
+	Tensor paged_attention(
+		Tensor &OUT,
+		Tensor &Q,
+		Tensor &K,
+		Tensor &V,
+		Tensor &Kcache,
+		Tensor &Vcache,
+		const c10::optional<Tensor> &cos,
+		const c10::optional<Tensor> &sin,
+		const Tensor &input_lengths,
+		const Tensor &save_slots,
+		const c10::optional<Tensor> &fetch_slots,
+		const c10::optional<Tensor> &mask,
+        int64_t rope_head_size,
+		int64_t	slots_size,
+		int64_t mask_size,
+		int64_t block_size,
+		double C,
+		int64_t attention_mode);
+
 	Tensor llama_attention(
 		Tensor &OUT,
 		Tensor &Q,

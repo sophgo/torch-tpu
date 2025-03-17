@@ -950,7 +950,7 @@ tpudnnStatus_t tpudnnLoraMatmulForwardAsync(
     tpudnnTensor_t output,
     float scale);
 
-tpudnnStatus_t tpudnnLlamaAttentionAsync (
+tpudnnStatus_t tpudnnPagedAttentionAsync (
     tpudnnHandle_t handle,
     tpudnnTensor_t OUT,
     tpudnnTensor_t Q,
@@ -967,6 +967,7 @@ tpudnnStatus_t tpudnnLlamaAttentionAsync (
     tpudnnTensor_t Kbuffer,
     tpudnnTensor_t Vbuffer,
     tpudnnTensor_t input_lengths_tensor,
+    int            rope_head_size,
     int*           input_lengths,
     int            num_input_lengths,
     int slots_size,
