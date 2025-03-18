@@ -1119,6 +1119,14 @@ tpudnnStatus_t tpudnnMlpW8A16DqAsync (
     tpudnnTensor_t output,
     int blocksize);
 
+tpudnnStatus_t tpudnnMmW8A16DqAsync (
+    tpudnnHandle_t handle,
+    tpudnnTensor_t input,
+    tpudnnTensor_t weight,
+    tpudnnTensor_t scale,
+    tpudnnTensor_t output,
+    int blocksize);
+
 tpudnnStatus_t tpudnnGDMAD2DAsync(
     tpudnnHandle_t handle,
     tpudnnTensor_t src,

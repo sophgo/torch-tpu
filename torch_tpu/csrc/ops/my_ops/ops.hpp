@@ -68,6 +68,13 @@ namespace at
 		Tensor &output,
 		int64_t blocksize);
 
+	Tensor mm_w8a16_dq_forward(
+		Tensor &input,
+		Tensor &weight,
+		Tensor &scale,
+		Tensor &output,
+		int64_t blocksize);
+
 	Tensor llama_mlp_gptq_forward(
 		Tensor &input,
 		Tensor &weight0,
