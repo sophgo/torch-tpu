@@ -8,8 +8,9 @@
 #include "common/config.h"
 
 namespace at {
-Tensor & clamp_out_tpu( const at::Tensor & self, const c10::optional<at::Scalar> & min,
-                        const c10::optional<at::Scalar> & max, at::Tensor & out) {
+// ========== clamp
+Tensor & clamp_out_tpu( const Tensor & self, const c10::optional<Scalar> & min,
+                        const c10::optional<Scalar> & max, Tensor & out) {
   if ( self.dim() > 0 )  { CHECK_TENSOR_IN_DEVICE_NO_CONTIGUOUS ( self ); }
   CHECK_TENSOR_IN_DEVICE ( out );
   auto self_ = self.contiguous();
@@ -17,15 +18,7 @@ Tensor & clamp_out_tpu( const at::Tensor & self, const c10::optional<at::Scalar>
     auto out_cpu = clamp ( self.to(torch::kFloat32).cpu(), min, max );
     out = out_cpu.to(out.device()).to(out.dtype());
 #else
-    if (self_.dim() == 0)
-    {
-        CPU_IMPL_WARNING();
-        TIMING_START;
-        auto out_cpu = clamp ( self_.to(torch::kFloat32).cpu(), min, max );
-        tpu::TPUCopyHostToDevice ( out.data_ptr(), out_cpu.contiguous().data_ptr(), out.nbytes() );
-        TIMING_END(tpu::CPU_LAYER);
-    }
-    else if (IS_TPU_TENSOR(self_)){
+    if (IS_TPU_TENSOR(self_)){
         TIMING_START;
 
         auto stream = c10_tpu::getCurrentTPUStream();
@@ -47,30 +40,126 @@ Tensor & clamp_out_tpu( const at::Tensor & self, const c10::optional<at::Scalar>
     return out;
 }
 
-Tensor clamp_tpu( const at::Tensor & self, const c10::optional<at::Scalar> & min,
-                    const c10::optional<at::Scalar> & max) {
+Tensor& clamp_Tensor_out_tpu ( const Tensor & self, const c10::optional<Tensor> & min,
+                               const c10::optional<Tensor> & max, Tensor & out )
+{
+    CPU_IMPL_WARNING();
+    auto min_cpu = min.has_value() ? c10::optional<Tensor>(min.value().cpu()) : c10::nullopt;
+    auto max_cpu = max.has_value() ? c10::optional<Tensor>(max.value().cpu()) : c10::nullopt;
+    auto out_cpu = clamp ( self.to(torch::kFloat32).cpu(), min_cpu, max_cpu );
+    out = out_cpu.to(out.device()).to(out.dtype());
+    return out;
+}
+
+Tensor & clamp__tpu(Tensor & self, const c10::optional<Scalar> & min,
+                    const c10::optional<Scalar> & max) 
+{
+    return clamp_out_tpu(self, min, max, self);
+}
+
+Tensor & clamp__Tensor_tpu(Tensor & self, const c10::optional<Tensor> & min,
+                const c10::optional<Tensor> & max)
+{
+    return clamp_Tensor_out_tpu(self, min, max, self);
+}
+
+Tensor clamp_tpu( const Tensor & self, const c10::optional<Scalar> & min,
+                    const c10::optional<Scalar> & max) {
   auto out = empty(self.sizes(), self.options());
   return clamp_out_tpu ( self, min, max, out );
 }
 
-Tensor & clamp_min_out_tpu(const Tensor & self, const Scalar & min, Tensor & out)
+Tensor clamp_Tensor_tpu(const Tensor & self, const c10::optional<Tensor> & min,
+                    const c10::optional<Tensor> & max)
 {
-#if 0
-    CPU_IMPL_WARNING();
-    auto out_cpu = clamp_min( self.to(torch::kFloat).cpu(), min);
-    out = out_cpu.to(out.device()).to(out.dtype());
-#else
-    out = self.clamp(c10::optional<at::Scalar>( min ), c10::nullopt );
-#endif
-    return out;
+    auto out = empty(self.sizes(), self.options());
+    return clamp_Tensor_out_tpu(self, min, max, out );
 }
 
+// ========== clamp_min
+Tensor & clamp_min_out_tpu(const Tensor & self, const Scalar & min, Tensor & out)
+{
+    return clamp_out_tpu(self, c10::optional<Scalar>( min ), c10::nullopt, out);
+}
+
+Tensor & clamp_min_Tensor_out_tpu(const Tensor & self, const Tensor & min, Tensor & out)
+{
+    return clamp_Tensor_out_tpu(self, c10::optional<Tensor>( min ) , c10::nullopt, out);
+}
+
+inline Tensor & clamp_min___tpu(Tensor & self, const Scalar & min)
+{
+    return clamp__tpu(self, c10::optional<Scalar>( min ), c10::nullopt);
+}
+
+inline Tensor & clamp_min__Tensor_tpu(Tensor & self, const Tensor & min)
+{
+    return clamp__Tensor_tpu(self, c10::optional<Tensor>( min ), c10::nullopt);
+}
+
+inline Tensor clamp_min_tpu(const Tensor & self, const Scalar & min)
+{
+    return clamp_tpu(self, c10::optional<Scalar>( min ), c10::nullopt);
+}
+
+inline Tensor clamp_min_Tensor_tpu(const Tensor & self, const Tensor & min)
+{
+    return clamp_Tensor_tpu( self,  c10::optional<Tensor>( min ), c10::nullopt);
+}
+
+// ========== clamp_max
+Tensor & clamp_max_out_tpu(const Tensor & self, const Scalar & max, Tensor & out)
+{
+    return clamp_out_tpu(self, c10::nullopt, c10::optional<Scalar>( max ), out);
+}
+
+Tensor & clamp_max_Tensor_out_tpu(const Tensor & self, const Tensor & max, Tensor & out)
+{
+    return clamp_Tensor_out_tpu(self, c10::nullopt, c10::optional<Tensor>( max ), out);
+}
+
+inline Tensor & clamp_max___tpu(Tensor & self, const Scalar & max)
+{
+    return clamp__tpu(self,  c10::nullopt, c10::optional<Scalar>( max ));
+}
+
+inline Tensor & clamp_max__Tensor_tpu(Tensor & self, const Tensor & max)
+{
+    return clamp__Tensor_tpu(self, c10::nullopt, c10::optional<Tensor>( max ));
+}
+
+inline Tensor clamp_max_tpu(const Tensor & self, const Scalar & max)
+{
+    return clamp_tpu(self, c10::nullopt, c10::optional<Scalar>( max ));
+}
+
+inline Tensor clamp_max_Tensor_tpu(const Tensor & self, const Tensor & max)
+{
+    return clamp_Tensor_tpu( self, c10::nullopt, c10::optional<Tensor>( max ));
+}
 
 TORCH_LIBRARY_IMPL ( aten, TPU, m )
 {
- m.impl ( "clamp.out",  clamp_out_tpu);
- m.impl ( "clamp",  clamp_tpu);
- m.impl ( "clamp_min.out", clamp_min_out_tpu);
+ m.impl ( "clamp.out",         clamp_out_tpu);
+ m.impl ( "clamp.Tensor_out",  clamp_Tensor_out_tpu);
+ m.impl ( "clamp_",            clamp__tpu);
+ m.impl ( "clamp_.Tensor",     clamp__Tensor_tpu);
+ m.impl ( "clamp",             clamp_tpu);
+ m.impl ( "clamp.Tensor",      clamp_Tensor_tpu);
+
+ m.impl ( "clamp_min.out",          clamp_min_out_tpu);
+ m.impl ( "clamp_min.Tensor_out",   clamp_min_Tensor_out_tpu);
+ m.impl ( "clamp_min_",             clamp_min___tpu);
+ m.impl ( "clamp_min_.Tensor",      clamp_min__Tensor_tpu);
+ m.impl ( "clamp_min",              clamp_min_tpu);
+ m.impl ( "clamp_min.Tensor",       clamp_min_Tensor_tpu);
+
+ m.impl ( "clamp_max.out",          clamp_max_out_tpu);
+ m.impl ( "clamp_max.Tensor_out",   clamp_max_Tensor_out_tpu);
+ m.impl ( "clamp_max_",             clamp_max___tpu);
+ m.impl ( "clamp_max_.Tensor",      clamp_max__Tensor_tpu);
+ m.impl ( "clamp_max",              clamp_max_tpu);
+ m.impl ( "clamp_max.Tensor",       clamp_max_Tensor_tpu);
 }
 
 } // namespace at
