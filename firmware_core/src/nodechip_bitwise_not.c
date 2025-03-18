@@ -75,7 +75,6 @@ void nodechip_bitwise_not(global_addr_t input_global_addr,
 
 int tpu_kernel_api_bitwise_not_multi_core(const void* args) {
   sg_api_bitwise_not_t* api = (sg_api_bitwise_not_t*)args;
-  TPUKERNEL_ASSERT(api->dtype == DT_INT32);
 
   int length = 1;
   for (int i = 0; i < api->dim; ++i) {

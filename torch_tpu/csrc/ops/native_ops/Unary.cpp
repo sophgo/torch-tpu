@@ -15,10 +15,8 @@ Tensor &bitwise_not_out_tpu(const Tensor &self, Tensor &out) {
     CHECK_TENSOR_IN_DEVICE(self);
   }
   CHECK_TENSOR_IN_DEVICE(out);
-#if 0
 
-#else
-  if (self.dim() == 0) {
+  if ( 0 ) {
     auto out_cpu = bitwise_not(self.cpu());
     tpu::TPUCopyHostToDevice(out.data_ptr(), out_cpu.contiguous().data_ptr(),
                              out.nbytes());
@@ -33,7 +31,6 @@ Tensor &bitwise_not_out_tpu(const Tensor &self, Tensor &out) {
 
     TIMING_END(tpu::BITWISE_NOT);
   }
-#endif
   SHOW_TENSOR_OP(self, out);
   return out;
 }
