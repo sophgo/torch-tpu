@@ -32,7 +32,7 @@ pip install https://github.com/sophgo/torch-tpu/releases/download/v0.1.0/torch_t
 git clone --recurse-submodules https://github.com/alibaba/Pai-Megatron-Patch.git /workspace/Pai-Megatron-Patch
 cd /workspace/Pai-Megatron-Patch
 git checkout v0.9.1
-git sudmodule update
+git submodule update
 ```
 
 - Apply the patch

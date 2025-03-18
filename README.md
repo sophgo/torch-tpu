@@ -37,7 +37,7 @@ Torch-TPU is a PyTorch extension that enables running PyTorch models on Sophgo T
 
 1. Enter the Docker container:
 ```bash
-docker run -it  
+docker run -it  \
         --user `id -u`:`id -g` --privileged --cap-add SYS_ADMIN \
         --name torch_tpu \
         --env HOME=$HOME \
