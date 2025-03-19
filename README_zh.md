@@ -62,7 +62,7 @@ device = "tpu:0"
 a = torch.randn(3, 3).to(device)
 b = torch.randn(3, 3).to(device)
 c = a + b
-print(c.cpu())
+print(c)
 ```
 
 你将看到类似以下输出：
