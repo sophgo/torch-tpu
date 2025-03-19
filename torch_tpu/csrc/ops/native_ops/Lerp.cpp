@@ -37,7 +37,7 @@ Tensor & lerp_tensor_out_tpu(const at::Tensor & self, const at::Tensor & end, co
 #if 1
     CPU_IMPL_WARNING();
     TIMING_START;
-    auto out_cpu = lerp(self.cpu(), end.cpu(), weight);
+    auto out_cpu = lerp(self.cpu(), end.cpu(), weight.cpu());
     tpu::TPUCopyHostToDevice(out.data_ptr(), out_cpu.data_ptr(), out.nbytes());
     TIMING_END(tpu::CPU_LAYER);
 #else
