@@ -44,7 +44,11 @@ Tensor & arange_start_out_tpu( const Scalar & start, const Scalar & end, const S
 
 Tensor arange_start_step_tpu(const Scalar & start, const Scalar & end, const Scalar & step, c10::optional<ScalarType> dtype,
                 c10::optional<Layout> layout, c10::optional<Device> device, c10::optional<bool> pin_memory) {
-    TensorOptions options = TensorOptions(DeviceType::PrivateUse1).dtype(torch::kInt32).layout(layout);
+    TensorOptions options = TensorOptions(DeviceType::PrivateUse1).dtype(
+                                                            end.type() == ScalarType::Double ? 
+                                                                ScalarType::Float : end.type() == ScalarType::Long ?
+                                                                                        ScalarType::Int : ScalarType::Int
+                                                            ).layout(layout);
     if ( device.has_value()) { 
         TORCH_CHECK( device.value().is_privateuseone() );
         options = options.device( device );
