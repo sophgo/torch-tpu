@@ -33,34 +33,50 @@ std::tuple<Tensor &, Tensor &> topk_values_tpu(const Tensor &self, int64_t k,
   if (axis < 0) {
     axis += self.dim();
   }
+
   TORCH_CHECK(axis <= self.dim())
   TORCH_CHECK(k <= self.size(axis));
 
-  Tensor self_temp = self;
-  Tensor values_temp = values;
-  if (self.dtype() == caffe2::TypeMeta::Make<Half>() ||
-      self.dtype() == caffe2::TypeMeta::Make<BFloat16>()) {
-    self_temp = self_temp.to(torch::kFloat);
-    values_temp = values_temp.to(torch::kFloat);
-  }
+  if (at::numel(self) < 1024*8) {
+    auto stream = c10_tpu::getCurrentTPUStream();
+    auto status = tpudnnTopkAsync(
+        stream,
+        tpu::TPUGenerateTpudnnTensor(stream, self),
+        k,
+        axis,
+        largest,
+        sorted,
+        tpu::TPUGenerateTpudnnTensor(stream, values),
+        tpu::TPUGenerateTpudnnTensor(stream, indices)
+    );
+    TORCH_CHECK(status == TPUDNN_STATUS_SUCCESS);
+  } else {
+    Tensor self_temp = self;
+    Tensor values_temp = values;
+    if (self.dtype() == caffe2::TypeMeta::Make<Half>() ||
+        self.dtype() == caffe2::TypeMeta::Make<BFloat16>()) {
+      self_temp = self_temp.to(torch::kFloat);
+      values_temp = values_temp.to(torch::kFloat);
+    }
 
-  TIMING_START;
-  auto stream = c10_tpu::getCurrentTPUStream();
-  auto status = tpudnnTopkAsync(
-      stream,
-      tpu::TPUGenerateTpudnnTensor(stream, self_temp),
-      k,
-      axis,
-      largest,
-      sorted,
-      tpu::TPUGenerateTpudnnTensor(stream, values_temp),
-      tpu::TPUGenerateTpudnnTensor(stream, indices)
-  );
-  TORCH_CHECK(status == TPUDNN_STATUS_SUCCESS);
+    TIMING_START;
+    auto stream = c10_tpu::getCurrentTPUStream();
+    auto status = tpudnnTopkAsync(
+        stream,
+        tpu::TPUGenerateTpudnnTensor(stream, self_temp),
+        k,
+        axis,
+        largest,
+        sorted,
+        tpu::TPUGenerateTpudnnTensor(stream, values_temp),
+        tpu::TPUGenerateTpudnnTensor(stream, indices)
+    );
+    TORCH_CHECK(status == TPUDNN_STATUS_SUCCESS);
 
-  if (self.dtype() == caffe2::TypeMeta::Make<Half>() ||
-      self.dtype() == caffe2::TypeMeta::Make<BFloat16>()) {
-    values = values_temp.to(values.dtype());
+    if (self.dtype() == caffe2::TypeMeta::Make<Half>() ||
+        self.dtype() == caffe2::TypeMeta::Make<BFloat16>()) {
+      values = values_temp.to(values.dtype());
+    }
   }
   TIMING_END(tpu::TOPK);
 
