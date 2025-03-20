@@ -28,62 +28,68 @@ std::tuple<Tensor &, Tensor &> topk_values_tpu(const Tensor &self, int64_t k,
   }
   CHECK_TENSOR_IN_DEVICE(values);
   CHECK_TENSOR_IN_DEVICE(indices);
+  TORCH_CHECK( indices.dtype() == caffe2::TypeMeta::Make<int>(), "indeices should be int32 dtype" );
 
-  if (self.dim() == 0) {
-    CPU_IMPL_WARNING();
-    TIMING_START;
-    auto out_cpu = topk(self.cpu(), k, axis, largest, sorted);
-    tpu::TPUCopyHostToDevice(values.data_ptr(),
-                             std::get<0>(out_cpu).contiguous().data_ptr(),
-                             values.nbytes());
-    tpu::TPUCopyHostToDevice(indices.data_ptr(),
-                             std::get<1>(out_cpu).contiguous().data_ptr(),
-                             indices.nbytes());
-    TIMING_END(tpu::CPU_LAYER);
-  } else {
-    if (axis < 0) {
-      axis += self.dim();
-    }
-    TORCH_CHECK(axis <= self.dim())
-    TORCH_CHECK(k <= self.size(axis));
-
-    Tensor self_temp = self;
-    Tensor values_temp = values;
-    Tensor indices_temp = indices.to(torch::kInt32);
-    if (self.dtype() == caffe2::TypeMeta::Make<at::Half>() ||
-        self.dtype() == caffe2::TypeMeta::Make<at::BFloat16>()) {
-      self_temp = self_temp.to(torch::kFloat);
-      values_temp = values_temp.to(torch::kFloat);
-    }
-
-    TIMING_START;
-
-    auto stream = c10_tpu::getCurrentTPUStream();
-    auto status = tpudnnTopkAsync(
-        stream,
-        tpu::TPUGenerateTpudnnTensor(stream, self_temp),
-        k,
-        axis,
-        largest,
-        sorted,
-        tpu::TPUGenerateTpudnnTensor(stream, values_temp),
-        tpu::TPUGenerateTpudnnTensor(stream, indices_temp)
-    );
-TORCH_CHECK(status == TPUDNN_STATUS_SUCCESS);
-
-    tpu::TPUCopyDeviceToDevice(values.data_ptr(),
-                               values_temp.to(values.dtype()).data_ptr(),
-                               values.nbytes());
-    tpu::TPUCopyDeviceToDevice(indices.data_ptr(),
-                               indices_temp.to(indices.dtype()).data_ptr(),
-                               indices.nbytes());
-    TIMING_END(tpu::TOPK);
+  if (axis < 0) {
+    axis += self.dim();
   }
+  TORCH_CHECK(axis <= self.dim())
+  TORCH_CHECK(k <= self.size(axis));
+
+  Tensor self_temp = self;
+  Tensor values_temp = values;
+  if (self.dtype() == caffe2::TypeMeta::Make<Half>() ||
+      self.dtype() == caffe2::TypeMeta::Make<BFloat16>()) {
+    self_temp = self_temp.to(torch::kFloat);
+    values_temp = values_temp.to(torch::kFloat);
+  }
+
+  TIMING_START;
+  auto stream = c10_tpu::getCurrentTPUStream();
+  auto status = tpudnnTopkAsync(
+      stream,
+      tpu::TPUGenerateTpudnnTensor(stream, self_temp),
+      k,
+      axis,
+      largest,
+      sorted,
+      tpu::TPUGenerateTpudnnTensor(stream, values_temp),
+      tpu::TPUGenerateTpudnnTensor(stream, indices)
+  );
+  TORCH_CHECK(status == TPUDNN_STATUS_SUCCESS);
+
+  if (self.dtype() == caffe2::TypeMeta::Make<Half>() ||
+      self.dtype() == caffe2::TypeMeta::Make<BFloat16>()) {
+    values = values_temp.to(values.dtype());
+  }
+  TIMING_END(tpu::TOPK);
+
   SHOW_TENSOR_OP(self, values, indices);
   return {values, indices};
 }
-TORCH_LIBRARY_IMPL(aten, TPU, m) { m.impl("topk.values", topk_values_tpu); }
 
+std::tuple<Tensor,Tensor>
+topk_tpu(const Tensor & self, int64_t k, int64_t dim, bool largest, bool sorted) {
+  TensorOptions val_options     = self.options();
+  TensorOptions indices_options = self.options().dtype(ScalarType::Int);
+  int64_t dim_ = dim < 0 ? dim + self.dim() : dim;
+  std::vector<int64_t> sizes_vec;
+  for (int i =0; i < self.dim(); i++)
+  {
+    if ( i == dim_ ) { sizes_vec.push_back(k); }
+    else { sizes_vec.push_back( self.size(i) ); }
+  }
+  IntArrayRef sizes(sizes_vec.data(), sizes_vec.size());
+  auto values  = empty(sizes, val_options);
+  auto indices = empty(sizes, indices_options);
+  topk_values_tpu(self, k, dim, largest, sorted, values, indices);
+  return std::tuple<Tensor,Tensor>(values, indices);
+}
+TORCH_LIBRARY_IMPL(aten, TPU, m) {
+  m.impl("topk.values", topk_values_tpu);
+  m.impl("topk", topk_tpu);
+}
+// =========== sort
 std::tuple<Tensor &, Tensor &>
 sort_values_stable_tpu(const Tensor &self, c10::optional<bool> stable,
                        int64_t axis, bool descending, Tensor &values,
@@ -93,61 +99,100 @@ sort_values_stable_tpu(const Tensor &self, c10::optional<bool> stable,
   }
   CHECK_TENSOR_IN_DEVICE(values);
   CHECK_TENSOR_IN_DEVICE(indices);
+  TORCH_CHECK( indices.dtype() == caffe2::TypeMeta::Make<int>(), "indeices should be int32 dtype" );
 
-  if (self.dim() == 0) {
-    TIMING_START;
-    auto out_cpu = sort(self.cpu(), stable, axis, descending);
-    tpu::TPUCopyHostToDevice(values.data_ptr(),
-                             std::get<0>(out_cpu).contiguous().data_ptr(),
-                             values.nbytes());
-    tpu::TPUCopyHostToDevice(indices.data_ptr(),
-                             std::get<1>(out_cpu).contiguous().data_ptr(),
-                             indices.nbytes());
-    TIMING_END(tpu::CPU_LAYER);
-  } else {
-    if (axis < 0) {
-      axis += self.dim();
-    }
-    TORCH_CHECK(axis <= self.dim())
+  if (axis < 0) { axis += self.dim(); }
+  TORCH_CHECK(axis <= self.dim())
 
-    Tensor self_temp = self;
-    Tensor values_temp = values;
-    Tensor indices_temp = indices.to(torch::kInt32);
-    if (self.dtype() == caffe2::TypeMeta::Make<at::Half>() ||
-        self.dtype() == caffe2::TypeMeta::Make<at::BFloat16>()) {
-      self_temp = self_temp.to(torch::kFloat);
-      values_temp = values_temp.to(torch::kFloat);
-    }
-
-    TIMING_START;
-
-    auto stream = c10_tpu::getCurrentTPUStream();
-    auto status = tpudnnTopkAsync(
-        stream,
-        tpu::TPUGenerateTpudnnTensor(stream, self_temp),
-        self.size(axis),
-        axis,
-        descending,
-        false,
-        tpu::TPUGenerateTpudnnTensor(stream, values_temp),
-        tpu::TPUGenerateTpudnnTensor(stream, indices_temp)
-    );
-    TORCH_CHECK(status == TPUDNN_STATUS_SUCCESS);
-
-    tpu::TPUCopyDeviceToDevice(values.data_ptr(),
-                               values_temp.to(values.dtype()).data_ptr(),
-                               values.nbytes());
-    tpu::TPUCopyDeviceToDevice(indices.data_ptr(),
-                               indices_temp.to(indices.dtype()).data_ptr(),
-                               indices.nbytes());
-    TIMING_END(tpu::TOPK);
+  Tensor self_temp = self;
+  Tensor values_temp = values;
+  if (self.dtype() == caffe2::TypeMeta::Make<Half>() ||
+      self.dtype() == caffe2::TypeMeta::Make<BFloat16>()) {
+    self_temp = self_temp.to(torch::kFloat);
+    values_temp = values_temp.to(torch::kFloat);
   }
 
+  TIMING_START;
+  auto stream = c10_tpu::getCurrentTPUStream();
+  auto status = tpudnnTopkAsync(
+      stream,
+      tpu::TPUGenerateTpudnnTensor(stream, self_temp),
+      self.size(axis),
+      axis,
+      descending,
+      false,
+      tpu::TPUGenerateTpudnnTensor(stream, values_temp),
+      tpu::TPUGenerateTpudnnTensor(stream, indices)
+  );
+  TORCH_CHECK(status == TPUDNN_STATUS_SUCCESS);
+
+  if (self.dtype() == caffe2::TypeMeta::Make<Half>() ||
+      self.dtype() == caffe2::TypeMeta::Make<BFloat16>()) {
+    values = values_temp.to(values.dtype());
+  }
+  TIMING_END(tpu::TOPK);
+
+  return {values, indices};
+}
+
+std::tuple<Tensor &,Tensor &>
+sort_values_tpu(const Tensor & self, int64_t dim, bool descending, Tensor & values, Tensor & indices) {
+  return sort_values_stable_tpu(self, c10::nullopt, dim, descending, values, indices);
+}
+
+std::tuple<Tensor,Tensor>
+sort_stable_tpu(const Tensor & self, c10::optional<bool> stable,
+                int64_t dim, bool descending)
+{
+  TORCH_CHECK(!stable.has_value(), "[OP] sort not support [ARG]-stable");
+  TensorOptions val_options     = self.options();
+  TensorOptions indices_options = self.options().dtype(ScalarType::Int);
+  auto values  = empty(self.sizes(), val_options);
+  auto indices = empty(self.sizes(), indices_options);
+  sort_values_stable_tpu(self, stable, dim, descending, values, indices);
+  return {values, indices};
+}
+
+std::tuple<Tensor,Tensor>
+sort_tpu(const Tensor & self, int64_t dim, bool descending) {
+  TensorOptions val_options     = self.options();
+  TensorOptions indices_options = self.options().dtype(ScalarType::Int);
+  auto values  = empty(self.sizes(), val_options);
+  auto indices = empty(self.sizes(), indices_options);
+  sort_values_stable_tpu(self, c10::nullopt, dim, descending, values, indices);
   return {values, indices};
 }
 
 TORCH_LIBRARY_IMPL(aten, TPU, m) {
   m.impl("sort.values_stable", sort_values_stable_tpu);
+  m.impl("sort.values", sort_values_tpu);
+  m.impl("sort.stable", sort_stable_tpu);
+  m.impl("sort", sort_tpu);
+}
+
+// =========== argsort
+Tensor & argsort_stable_out_tpu(const Tensor & self, bool stable, int64_t dim, bool descending, Tensor & out) {
+  TORCH_CHECK(false, "should not be called now");
+  return out;
+}
+Tensor argsort_stable_tpu(const Tensor & self, bool stable, int64_t dim, bool descending) {
+  auto values_indices = sort_stable_tpu(self, c10::optional<bool>(stable), dim, descending);
+  return std::get<1> ( values_indices );
+}
+Tensor argsort_tpu(const Tensor & self, int64_t dim, bool descending) {
+  // values is no use, can be optimized.
+  auto values_indices = sort_tpu(self, dim, descending);
+  return std::get<1> ( values_indices );
+}
+
+
+TORCH_LIBRARY_IMPL(aten, TPU, m) {
+  m.impl("argsort.stable_out", argsort_stable_out_tpu);
+  m.impl("argsort.stable", argsort_stable_tpu);
+  m.impl("argsort", argsort_tpu);
+}
+TORCH_LIBRARY_IMPL(aten, AutogradPrivateUse1, m) {
+  m.impl("argsort", argsort_tpu);
 }
 
 } // namespace at
