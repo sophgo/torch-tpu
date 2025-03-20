@@ -3,6 +3,8 @@ import traceback
 import threading
 import warnings
 import contextlib
+import sys
+import logging
 from functools import lru_cache
 
 import torch
@@ -12,6 +14,10 @@ from torch._utils import _get_device_index
 
 import torch_tpu
 import torch_tpu._C
+
+utils_log = logging.getLogger(__name__)
+# set time and highlight the log
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 
 _initialized = False
 _tls = threading.local()
@@ -169,10 +175,8 @@ def is_rank_table_valid():
     return rank_table_valid()
 
 def set_chip_map(options, use_rank_table=False, chip_map=None):
-    is_chip_map = True
-    size = int(os.environ.get("LOCAL_WORLD_SIZE", None))
-    rank = int(os.environ.get("LOCAL_RANK", None))
-    torch_tpu._C._tpu_setC2CTopology()
+    size = int(os.environ.get("LOCAL_WORLD_SIZE", 1))
+    rank = int(os.environ.get("LOCAL_RANK", 0))
 
     if use_rank_table and is_rank_table_valid():
         chip_map = read_rank_table()
@@ -182,19 +186,29 @@ def set_chip_map(options, use_rank_table=False, chip_map=None):
             chip_map = list(map(int, os.environ.get("CHIP_MAP").split(",")))
         elif chip_map is not None:
             os.environ["CHIP_MAP"] = ",".join(map(str, chip_map))
-        else:
-            is_chip_map = False
-    if is_chip_map:
-        status = torch_tpu._C._tpu_checkChipMap(size, chip_map)
-        if status:
-            is_chip_map = False
-    if not is_chip_map:
+        elif size in (1,2):
+            chip_map = [0,1]
+            options.chip_map = chip_map
+            return
+
+    if size == 1:
+        options.chip_map = chip_map
+        return
+
+    torch_tpu._C._tpu_setC2CTopology()
+    chip_valid = chip_map is not None and not torch_tpu._C._tpu_checkChipMap(size, chip_map)
+
+    if not chip_valid:
         chip_map = [-1] * size
         torch_tpu._C._tpu_getC2CRing(size, chip_map)
-        if (rank == 0):
-            raise RuntimeError(
-                    "The input chip_map is wrong, use the recommended chip_map: [" + ",".join(map(str, chip_map)) + "]")
-
+        os.environ["CHIP_MAP"] = ",".join(map(str, chip_map))
+        if rank == 0:
+            msg = (
+                    "Use the recommended chip_map: ["
+                    + ",".join(map(str, chip_map))
+                    + "]"
+                )
+            utils_log.info(msg)
     options.chip_map = chip_map
 
 @lru_cache(maxsize=1)

@@ -57,35 +57,41 @@ Torch.distributed 支持 SCCL 内置后端，SCCL 通信后端能够充分利用
 
 （1）获取 c2c 连接拓扑信息:
 
-以下为生成多芯 c2c 连接拓扑可视化图片的命令:
+  SCCL 初始化需要配置c2c 连接拓扑信息（即 chip_map ）。目前，SCCL 支持自动配置和手动配置 chip_map 两种形式。
 
-.. code-block:: shell
+  以下为手动获取 chip_map 方式：
 
-    tpu_show_topology
+  生成多芯 c2c 连接拓扑可视化图片的命令:
 
-多芯 c2c 连接拓扑可视化图片保存至名为 `c2c_topology.png` 的图片中，如：
+  .. code-block:: shell
 
-.. figure:: ../assets/3_c2c_topology.png
-   :scale: 50%
-   :align: center
-   :alt: C2C Topology
+      tpu_show_topology
 
-SCCL集合通信采用ring算法，四芯和八芯的 chip_map 须按照环的顺序填写，如：
+  多芯 c2c 连接拓扑可视化图片保存至名为 `c2c_topology.png` 的图片中，如：
 
-.. code-block:: c++
+  .. figure:: ../assets/3_c2c_topology.png
+    :scale: 50%
+    :align: center
+    :alt: C2C Topology
+  
+  .. raw:: latex
 
-    //four chips
-    chip_map=[7,6,2,3] // or [1,0,2,3] or [1,0,4,5]
-    //eight chips
-    chip_map=[0,2,6,7,3,1,5,4]
+   \pagebreak
 
-在设置 chip_map 时，确保其能够正确形成环。如果输入的 chip_map 无法形成有效的环，程序将抛出运行时错误，并打印以下提示信息：
+  SCCL 集合通信采用ring算法，四芯和八芯的 chip_map 须按照环的顺序填写，如：
 
-.. code-block:: shell
+  .. code-block:: c++
 
-    RuntimeError: The input chip_map is wrong, use the recommended chip_map: [0,2,6,7,3,1,5,4]
+      //four chips
+      chip_map=[7,6,2,3] // or [1,0,2,3] or [1,0,4,5]
+      //eight chips
+      chip_map=[0,2,6,7,3,1,5,4]
 
-可根据提示信息重新设置 chip_map 。
+  在设置 chip_map 时，确保其能够正确形成环。如果输入的 chip_map 无法形成有效的环，程序将自动获取正确的 chip_map 并打印提示信息：
+
+  .. code-block:: shell
+
+      torch_tpu.tpu.utils - INFO - Use the recommended chip_map: [0,2,6,7,3,1,5,4]
 
 （2）`all_reduce` 原语示例代码:
 
@@ -102,8 +108,8 @@ SCCL集合通信采用ring算法，四芯和八芯的 chip_map 须按照环的�
     world_size = int(os.environ.get("WORLD_SIZE"))
 
     options = torch_tpu.ProcessGroupSCCLOptions()
-    # there are three forms of rank_table setting: 1.read_rank_table 2.CHIP_MAP env 3. chip_map variable
-    torch_tpu.tpu.set_chip_map(options, use_rank_table=False, chip_map=[0,1,2,3,4,5,6,7])
+    # there are three forms of rank_table mamual setting: 1.read_rank_table 2.CHIP_MAP env 3. chip_map variable
+    torch_tpu.tpu.set_chip_map(options, use_rank_table=False)
 
     # init device
     torch_tpu.tpu.set_device(options.chip_map[rank])
