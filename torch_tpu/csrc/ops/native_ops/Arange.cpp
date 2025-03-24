@@ -59,6 +59,10 @@ Tensor arange_start_step_tpu(const Scalar & start, const Scalar & end, const Sca
         options = options.dtype ( dtype );
     }
 
+    TORCH_CHECK( (start.isIntegral() && end.isIntegral()) ||
+                 (start.toDouble() - (int)start.toDouble() == 0.0 && end.toDouble() - (int)end.toDouble() == 0.0),
+                 "arange Decimal places are not supported now" )
+
     int empty_length = (end.toInt()-start.toInt() - 1) / step.toInt() + 1;
     auto out = empty({empty_length}, options);
     out = arange_start_out_tpu(start, end, step, out);
