@@ -9,6 +9,10 @@ function new_build()
 function develop_torch_tpu(){
   uninstall_torch_tpu_deploy
   pushd ${TPUTRAIN_TOP}
+  echo " - Create torch_tpu/sg2260 ..."
+  mkdir -p torch_tpu/sg2260
+  echo " - Create torch_tpu/bm1684x ..."
+  mkdir -p torch_tpu/bm1684x
   python setup.py develop --user
   if [ $? -ne 0 ]; then popd; return -1; fi
   popd
@@ -52,8 +56,12 @@ function new_clean()
   rm -rf torch_tpu.egg-info
   echo " - Delete torch_tpu/lib ..."
   rm -rf torch_tpu/lib
-  echo " - Delete torch_tpu/_C.cpython-310-x86_64-linux-gnu.so ..."
-  rm -rf torch_tpu/_C.cpython-310-x86_64-linux-gnu.so
+  # echo " - Delete torch_tpu/_C.cpython-310-x86_64-linux-gnu.so ..."
+  # rm -rf torch_tpu/_C.cpython-310-x86_64-linux-gnu.so
+  echo " - Delete torch_tpu/sg2260 ..."
+  rm -rf torch_tpu/sg2260
+  echo " - Delete torch_tpu/bm1684x ..."
+  rm -rf torch_tpu/bm1684x
   popd
 }
 

@@ -44,6 +44,8 @@ python/**/*.so
 torch_tpu/tpu/backend.py
 toolchains_dir
 _C.cpython*.so
+torch_tpu/sg2260
+torch_tpu/bm1684x
 torch_tpu/lib
 *.tar.gz
 site-packages

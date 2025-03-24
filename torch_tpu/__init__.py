@@ -1,7 +1,7 @@
 import sys
 import types
 from functools import wraps
-
+import importlib
 import torch
 
 import os
@@ -71,6 +71,33 @@ if os.environ.get('TPU_CACHE_BACKEND') is None:
     if not os.environ.get('DISABLE_CACHE'):
         os.environ['TPU_CACHE_BACKEND'] = os.environ['TPU_EMULATOR_PATH']
 
+def modify_backend_py(arch:str):
+    backend_f = os.path.join(pkg_path, "tpu/backend.py")
+    with open(backend_f, 'w') as f:
+        if arch == 'bm1684x':
+            f.write("BACKEND='1684X'")
+        elif arch == 'sg2260':
+            f.write("BACKEND='SG2260'")
+        else:
+            raise RuntimeError("Failed to modify backend.py")
+modify_backend_py(arch)
+
+if arch == 'sg2260':
+    try:
+        _C_impl = importlib.import_module('torch_tpu.sg2260._C')
+    except ImportError:
+        raise ImportError("Failed to import BM1690 implement. "
+                          "Please check if the torch-tpu is built with BM1690 backend.")
+elif arch == 'bm1684x':
+    try:
+        _C_impl = importlib.import_module('torch_tpu.bm1684x._C')
+    except ImportError:
+        raise ImportError("Failed to import BM1684X implement. "
+                          "Please check if the torch-tpu is built with BM1684X backend.")
+else:
+    raise RuntimeError("unsupported arch: {arch}")
+sys.modules['torch_tpu._C'] = _C_impl
+_C = _C_impl
 import torch_tpu._C
 import torch_tpu.tpu
 from .tpu.jit import (jit, CallCppDynLib)

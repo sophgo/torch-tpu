@@ -427,15 +427,15 @@ extra_compile_args = [
     '-D_GLIBCXX_USE_CXX11_ABI=0'
 ]
 
-if os.environ.get("CHIP_ARCH", None) == 'sg2260':
-    extra_compile_args += ["-DBACKEND_SG2260"]
-
 if DEBUG:
     extra_compile_args += ['-O0', '-g']
     extra_link_args += ['-O0', '-g', '-Wl,-z,now']
 else:
     extra_compile_args += ['-DNDEBUG']
     extra_link_args += ['-Wl,-z,now,-s']
+
+extra_compile_args_sg2260 = extra_compile_args.copy() + ["-DBACKEND_SG2260"]
+extra_compile_args_bm1684x = extra_compile_args
 
 from setuptools.command.develop import develop as _develop
 class CustomDevelop(_develop):
@@ -463,13 +463,22 @@ setup(
         package_dir={'': os.path.relpath(os.path.join(BASE_DIR, f"build/{get_build_type()}/packages"))},
         ext_modules=[
             CppExtension(
-                'torch_tpu._C',
+                'torch_tpu.sg2260._C',
                 sources=["torch_tpu/csrc/InitTpuBindings.cpp"],
                 libraries=["torch_tpu"],
                 include_dirs=include_directories,
-                extra_compile_args=extra_compile_args + ['-fstack-protector-all'],
+                extra_compile_args=extra_compile_args_sg2260 + ['-fstack-protector-all'],
                 library_dirs=lib_directories,
-                extra_link_args=extra_link_args + ['-Wl,-rpath,$ORIGIN/lib'],
+                extra_link_args=extra_link_args + ['-Wl,-rpath,$ORIGIN/../lib'],
+            ),
+            CppExtension(
+                'torch_tpu.bm1684x._C',
+                sources=["torch_tpu/csrc/InitTpuBindings.cpp"],
+                libraries=["torch_tpu"],
+                include_dirs=include_directories,
+                extra_compile_args=extra_compile_args_bm1684x + ['-fstack-protector-all'],
+                library_dirs=lib_directories,
+                extra_link_args=extra_link_args + ['-Wl,-rpath,$ORIGIN/../lib'],
             )
         ],
         entry_points={
@@ -485,9 +494,13 @@ setup(
         dependency_links = [
             "https://download.pytorch.org/whl/cpu",
         ],
+        include_package_data=True,
         package_data={
             'torch_tpu': [
-                '*.so', 'lib/*.so*',
+                '*.so', 
+                'lib/*.so*',
+                'sg2260/*.so',
+                'bm1684x/*.so',
             ],
         },
         cmdclass={
