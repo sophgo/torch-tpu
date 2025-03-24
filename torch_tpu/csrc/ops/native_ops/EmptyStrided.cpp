@@ -40,10 +40,6 @@ Tensor empty_strided_tpu ( IntArrayRef                size,
   SHOW_EMPTY_INFO(tensor);
   return tensor;
 }
-TORCH_LIBRARY_IMPL ( aten, TPU, m )
-{
-  m.impl ( "empty_strided", empty_strided_tpu );
-}
 
 Tensor empty_memory_format_tpu (
 IntArrayRef                       size,
@@ -89,8 +85,10 @@ c10::optional<c10::MemoryFormat>  memory_format_opt )
 }
 TORCH_LIBRARY_IMPL ( aten, TPU, m )
 {
+  m.impl ( "empty_strided",       empty_strided_tpu );
   m.impl ( "empty.memory_format", empty_memory_format_tpu );
 }
+
 TORCH_LIBRARY(help, m){
   m.def("build_tensor", empty_memory_format_tpu);
 }
