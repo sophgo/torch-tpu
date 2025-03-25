@@ -1,6 +1,6 @@
 #include "sg_api_struct.h"
 #include "tpu_kernel.h"
-
+#include "debug.h"
 
 static inline bool is_local_mem_enough(
         int *size,
@@ -1081,12 +1081,12 @@ void nodechip_conv_backward_input(
     if ( dtype == DT_FP32 ) weight_global_addr = forward_weight_global_addr;
     else
     {
-        if ( weight_formated ) 
+        if ( weight_formated )
         {
             unsigned long long offset = ic * (kh * kw) * DIV_UP(oc, 32) * 32 * tpu_data_type_size ( DT_FP16 ); // 32ic offset
             weight_global_addr = forward_weight_global_addr + offset;
         }
-        else 
+        else
             weight_global_addr = weight_reordered_global_addr;
     }
     global_addr_t output_global_addr = grad_input_global_addr;
@@ -1274,6 +1274,89 @@ void nodechip_conv_backward_input(
     }
 }
 
+// [ic, oc, kh, kw] => [1, oc, DIV_UP(ic, 32) * kh * kw, 32]
+// for oc:  for ic;  for part_h
+// [ic_32, npu_num, part_h, kw] ==> [1, npu_num, ic_32, part_h*kw] ==> [1, npu_num, part_h*kw, 32]
+//  have to split h w
+static void nodechip_grad_output_reorder_huge_shape(
+    gaddr_t grad_out, gaddr_t grad_out_reorder,
+    int ic, int oc, int kh, int kw, data_type_t dtype)
+{
+    gtensor_t grad_out_t       = init_gtensor(grad_out,         (dim4){ic, oc, kh, kw},                       dtype);
+    gtensor_t grad_reorder_t   = init_gtensor(grad_out_reorder, (dim4){1,  oc, DIV_UP(ic, 32) * kh * kw, 32}, dtype);
+    int part_h                 = 4;
+    ltensor_t grad_out_l0      = init_ltensor((dim4){NPU_NUM/2,  NPU_NUM, part_h, kw},    dtype);
+    ltensor_t grad_out_l1      = init_ltensor((dim4){NPU_NUM/2,  NPU_NUM, part_h, kw},    dtype);
+    ltensor_t reorder_l0       = init_ltensor((dim4){1, NPU_NUM, part_h * kw, NPU_NUM/2}, dtype);
+    ltensor_t reorder_l1       = init_ltensor((dim4){1, NPU_NUM, part_h * kw, NPU_NUM/2}, dtype);
+
+    malloc_after(reorder_l1, grad_out_l0, 64);
+    malloc_after(grad_out_l1, reorder_l1, 64);
+    malloc_after(reorder_l0, grad_out_l1, 64);
+
+    ltensor_t load_pp[2]       = {grad_out_l0, grad_out_l1};
+    ltensor_t store_pp[2]      = {reorder_l0, reorder_l1};
+
+    inner_loop(ic_idx, ic, NPU_NUM / 2){
+
+        int cur_ic_size = MIN(NPU_NUM / 2, ic - ic_idx);
+
+        inner_loop(oc_idx, oc, NPU_NUM){
+            int cur_oc_size            = MIN(NPU_NUM, oc - oc_idx);
+            int cur_idx[3]             = {0, 0, 0};
+            int cur_slice[3]           = {0, 0, 0};
+            int stage_idx              = 0;
+            int draning_idx            = 0;
+            tpu_bdc_set_C( grad_out_l0.addr, scaler_cast(0.0f, dtype), &grad_out_l0.shape, &grad_out_l0.stride, dtype);
+            tpu_bdc_set_C( grad_out_l1.addr, scaler_cast(0.0f, dtype), &grad_out_l1.shape, &grad_out_l1.stride, dtype);
+
+            while( cur_idx[2] < kh ){
+                tpu_parallel_start();
+                if(draning_idx < 1){
+                    cur_slice[0] = MIN(part_h, kh - cur_idx[2]);
+                }
+                if(stage_idx > 1){
+                    // store
+                    gtensor_t cur_store_g    = get_gtensor_slice(&grad_reorder_t,
+                                                    (dim4){0, oc_idx,      cur_idx[2] * kw * DIV_UP(ic_idx + cur_ic_size, NPU_NUM/2), 0},
+                                                    (dim4){1, cur_oc_size, cur_slice[2] * kw,                 NPU_NUM / 2});
+                    ltensor_t cur_store_l    = store_pp[stage_idx & 1];
+                    tpu_gdma_cpy_L2S(cur_store_g.addr, cur_store_l.addr, &cur_store_g.shape, &cur_store_g.stride, &cur_store_l.stride, dtype);
+                }
+                if(stage_idx > 0 && draning_idx < 2){
+                    // compute
+                    ltensor_t cur_load_l     = load_pp[(stage_idx - 1) & 1];
+                    ltensor_t cur_store_l    = store_pp[(stage_idx - 1) & 1];
+                    ltensor_t cur_load_rs    = get_ltensor_with_reshape(&cur_load_l, (dim4){1, NPU_NUM, NPU_NUM / 2, part_h * kw});
+                    dim4 cur_load_cpy_stride = { cur_load_rs.stride.n, cur_load_rs.stride.c, cur_load_rs.stride.w, cur_load_rs.stride.h};
+                    tpu_bdc_cpy(cur_store_l.addr, cur_load_rs.addr, &cur_store_l.shape, &cur_store_l.stride, &cur_load_cpy_stride, dtype);
+                }
+                if(draning_idx < 1){
+                    // load
+                    gtensor_t cur_load_g = get_gtensor_slice(&grad_out_t, (dim4){ic_idx, oc_idx, cur_idx[0], 0}, (dim4){cur_ic_size, cur_oc_size, cur_slice[0], kw});
+                    ltensor_t cur_load_l = load_pp[stage_idx & 1];
+                    tpu_gdma_cpy_S2L(cur_load_l.addr, cur_load_g.addr, &cur_load_g.shape, &cur_load_l.stride, &cur_load_g.stride, dtype);
+                }
+
+                tpu_parallel_end();
+                pipeline_move(cur_slice, 3);
+                pipeline_move(cur_idx, 3);
+                if(draning_idx < 1){
+                    cur_idx[0] += cur_slice[0];
+                    if(cur_idx[0] >= kh){
+                        draning_idx ++;
+                    }
+                }else{
+                    draning_idx++;
+                }
+                stage_idx ++;
+            }
+
+        }
+
+    }
+}
+
 //grad_output reorder
 // [ic, oc, kh, kw] => [1, oc, DIV_UP(ic, 32) * kh * kw, 32]
 /*
@@ -1309,7 +1392,8 @@ void nodechip_grad_output_reorder(
         while (!valid) {
             if (icsecs == ic) {
                 TPUKERNEL_LOG("grad output transposed need to split h&w!");
-                TPUKERNEL_ASSERT(false);
+                nodechip_grad_output_reorder_huge_shape(grad_out_global_addr, grad_out_reordered_global_addr, ic, oc, kh, kw, dtype);
+                return;
                 }
             icsecs++;
             icslice = DIV_UP(ic, icsecs);
@@ -1873,7 +1957,7 @@ void nodechip_conv_backward_weight(
                         last_oslice_local_stride.n = DIV_UP(last_ocslice, NPU_NUM) * last_oslice_local_stride.c;
                         tpu_gdma_cpy_cw_trans_L2S(
                             output_global_addr +
-                                (last_nstart * o_32oc_stride.n + 
+                                (last_nstart * o_32oc_stride.n +
                                 last_ocstart) * tpu_data_type_size(odtype),
                             ping_out ? oaddr_pong : oaddr_ping,
                             &last_oslice_shape,
@@ -1890,7 +1974,7 @@ void nodechip_conv_backward_weight(
                             &last_oslice_shape,
                             &ostride_nc_trans,//&ostride,
                             NULL,
-                            odtype);                        
+                            odtype);
                     }
                     if (grad_bias_enable && nidx == 0 && ocidx > 0) {
                         bool do_cw_trans = last_ocslice > 1;
@@ -1949,7 +2033,7 @@ void nodechip_conv_backward_weight(
             last_oslice_local_stride.n = DIV_UP(last_ocslice, NPU_NUM) * last_oslice_local_stride.c;
             tpu_gdma_cpy_cw_trans_L2S(
                 output_global_addr +
-                    (last_nstart * o_32oc_stride.n + 
+                    (last_nstart * o_32oc_stride.n +
                     last_ocstart) * tpu_data_type_size(odtype),
                 ping_out ? oaddr_pong : oaddr_ping,
                 &last_oslice_shape,

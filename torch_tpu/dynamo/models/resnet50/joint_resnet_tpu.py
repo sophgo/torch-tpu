@@ -110,7 +110,6 @@ def convert_module_fx(
 def dump_info(kwargs, name="input.json"):
     with open(name, 'w') as f:
         json.dump(kwargs, f)
-    # new_ordered_dict = json.loads(json_str, object_pairs_hook = OrderedDict)
 
 def dump_npz(kwargs,name="dump_input.npz"):
     if not dump_io:
@@ -150,7 +149,7 @@ class SophonJointCompile:
         self.info['user_outputs']  = self.user_outputs
         self.info['user_inputs']   = self.user_inputs
         dump_info(self.info, name  = "info.json")
-        self.input_num             = len(self.input_maps) + len(self.user_inputs)
+        self.input_num             = len(self.input_maps)  + len(self.user_inputs)
         self.output_num            = len(self.output_maps) + len(self.user_outputs)
         self.model                 = model
         self.model_state           = self.model.state_dict()

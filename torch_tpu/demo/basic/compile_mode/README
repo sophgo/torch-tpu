@@ -1,0 +1,44 @@
+## 简介
+
+当前目录用于存放编译模式的示例代码。
+
+在1684x和1690上，compile 模式理论上会快于 eager 模式。但是 compile 模式依赖于tpu-mlir. 而tpu-mlir目前需要x86环境以及较大内存。
+
+## 文件结构说明
+
+- `TPUCompile.py` 为处理模型加载、运行和调度的核心代码，提供`TPUCompile`装饰器用于编译模式的类装饰.
+- `vgg.py` 是一个vgg 编译模式的demo。
+- `vgg_x86_prepare.py` 是在x86平台上做vgg模型编译模式的代码，用于生成bmodel文件、
+
+## 使用说明
+
+在x86平台上，安装 `scompile` 依赖库。使用tpumlir的镜像，运行`vgg_x86_prepare.py`，生成bmodel文件, info.json文件.
+
+对于编译模式的python流程，使用如下代码做初始化:
+
+```python
+class Model(torch.nn.Module):
+    def __init__(self) -> None:
+        super().__init__()
+        self.model = models.vgg16(pretrained=False)
+        self.loss_fn = nn.CrossEntropyLoss()
+
+    def forward(self, input, target):
+        predict = self.model(input)
+        loss = self.loss_fn(predict.float(), target.long())
+        return loss, predict.detach()
+```
+
+对于 c++的流程来说，可以实现一个网络或者将初始化后的网络保存为pt文件，使用如下保存方法:
+
+```python
+model = Model()
+torch.jit.script(model).save("model.pt")
+```
+保存初始化的权重、buffer等信息。
+
+
+## 约束
+
+目前 编译模式代码 没有考虑不同的shape输入，只能支持固定shape的输入。对于想多shape，可以编译多个bmodel，然后combine起来。
+这一套流程目前没有实现。

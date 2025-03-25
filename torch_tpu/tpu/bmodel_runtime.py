@@ -42,7 +42,7 @@ class BmodelRunner:
         print("BmodelRunner delete")
         del self.nets
         del self.model
-        import gc; gc.collect()
+        # import gc; gc.collect()
 
     def load_model(self):
         self.model      = torch_tpu._C.Model(self.model_path, self.device_id, self.decrypt_lib)

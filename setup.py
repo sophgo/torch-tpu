@@ -310,6 +310,21 @@ def get_src_py_and_dst():
         os.makedirs(os.path.dirname(dst), exist_ok=True)
         ret.append((src, dst))
 
+    other_header_files = [
+        "sgdnn/include/*.h",
+        "third_party/bmlib/include/*.h",
+        "third_party/bmruntime/include/*.h",
+    ]
+
+    other_glob_header_files = []
+    for regex_pattern in other_header_files:
+        other_glob_header_files += glob.glob(os.path.join(BASE_DIR, regex_pattern), recursive=True)
+
+    for src in other_glob_header_files:
+        dst = os.path.join(BASE_DIR, f"build/{get_build_type()}/packages/torch_tpu/include")
+        os.makedirs(dst, exist_ok=True)
+        ret.append((src, os.path.join(dst, os.path.basename(src))))
+
     torch_header_files = [
         "**/*.h",
     ]

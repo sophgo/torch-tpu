@@ -1,0 +1,8 @@
+
+- `basic.py` 是一个简单的demo，可以参考来写tpu 训练的 libtorch代码，同时验证tpu和torchtpu是否正常工作
+
+- `resnet.py` 是一个resnet的demo
+
+- `vgg.py` 是一个vgg的demo
+
+目前提供基础的训练代码，如需通过数据集训练，可自行修改代码。

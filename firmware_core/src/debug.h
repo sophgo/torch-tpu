@@ -11,11 +11,17 @@
 extern "C" {
 #endif
 
+#define NBYTE_ALIGN   0
+#define LINE_ALIGN    1
+#define COMPACT_ALIGN 2
+
 // static void weight_reorder_multicore()
 typedef global_addr_t gaddr_t;
 typedef local_addr_t  laddr_t;
 typedef data_type_t   dtype_t;
 #define unuse(x)      (void)(x)
+
+#define scaler_cast(x, dtype) tpu_cast( (scalar_t){.f32=x}, dtype, DT_FP32, RM_HALF_TO_EVEN)
 
 #ifndef pipeline_move
 #define pipeline_move(array, num) do { \
@@ -26,9 +32,9 @@ typedef data_type_t   dtype_t;
 #endif
 
 typedef struct {
-    gaddr_t addr;
-    dim4    shape;
-    dim4    stride;
+    gaddr_t     addr;
+    dim4        shape;
+    dim4        stride;
     data_type_t dtype;
 } gtensor_t;
 
@@ -173,11 +179,14 @@ static inline void global_stride(gtensor_t *gtensor){
     gtensor->stride.n = gtensor->shape.c * gtensor->stride.c;
 }
 
-
-static inline ltensor_t init_ltensor(dim4 shape, data_type_t dtype){
+static inline ltensor_t init_ltensor_stride( dim4 shape, data_type_t dtype, int align_method){
     ltensor_t ltensor = {0, shape, {0}, dtype};
-    stride_assign(&ltensor, 0);
+    stride_assign(&ltensor, align_method);
     return ltensor;
+}
+
+static inline ltensor_t init_ltensor(dim4 shape, data_type_t dtype) {// we can add more func later with va_list
+    return init_ltensor_stride(shape, dtype, NBYTE_ALIGN);
 }
 
 static inline gtensor_t init_gtensor(global_addr_t addr, dim4 shape, data_type_t dtype){
@@ -186,6 +195,16 @@ static inline gtensor_t init_gtensor(global_addr_t addr, dim4 shape, data_type_t
     return gtensor;
 }
 
+static inline ltensor_t get_ltensor_with_reshape(ltensor_t* ltensor, dim4 shape){
+    // reshape ltensor -> res_tensor, we need to check, the process is valid and safe
+    // how to check? todo! currrent the caller should make sure the shape is valid
+    ltensor_t res_tensor = *ltensor;
+    res_tensor.shape     = shape;
+    stride_assign(&res_tensor, NBYTE_ALIGN);
+    return res_tensor;
+}
+
+
 #define show_tensor(ltensor) \
     do { \
         printf(">>>>>>>>>>>>>>>>>> show %s\n", get_var_name(ltensor)); \
@@ -193,15 +212,10 @@ static inline gtensor_t init_gtensor(global_addr_t addr, dim4 shape, data_type_t
         printf("shape:  %d %d %d %d\n", ltensor.shape.n, ltensor.shape.c, ltensor.shape.h, ltensor.shape.w); \
         printf("stride: %d %d %d %d\n", ltensor.stride.n, ltensor.stride.c, ltensor.stride.h, ltensor.stride.w); \
         printf("dtype: %d\n", ltensor.dtype); \
-        printf("addr:  %llu\n", ltensor.addr); \
+        printf("addr:  %u\n", (unsigned int) ltensor.addr); \
         printf(">>>>>>>>>>>>>>>>>> end\n"); \
     } while (0)
 
-// #define global_reshape(gtensor, new_shape) \
-//     do { \
-//         (gtensor).shape = new_shape; \
-//         global_stride(&gtensor); \
-//     } while (0)
 
 static inline void global_reshape(gtensor_t *gtensor, dim4 new_shape){
     gtensor->shape = new_shape;
@@ -223,6 +237,10 @@ static inline bool check_gtensor(gtensor_t gtensor0, gtensor_t gtensor1){
 }
 // if you want to open dump function, you should open in TPU1686 and copy so file into tputrain
 void logfordebug(const char* fmt, ...);
+void dl(laddr_t addr, dim4 shape, dim4 stride, int size, const char* fname);
+void dg(gaddr_t addr, dim4 shape, int size, const char* fname);
+void dlm(laddr_t addr, dim4 shape, dim4 stride, int size, int len, const char* fname, ...);
+void dgm(gaddr_t addr, dim4 shape, int size, int len, const char* fname, ...);
 
 void dump_local_data_into_file(local_addr_t addr, dim4* stride, dim4* shape, int size, const char* fname);
 void dump_local_data_into_file_with_idx(local_addr_t addr, dim4* stride, dim4* shape, int size, const char* fname, int idx);

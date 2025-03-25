@@ -70,6 +70,7 @@ do \
 { \
 TORCH_CHECK ( t.device().type() == DeviceType::TPU, ":", __func__, ": ", #t, " is not in TPU device" ); \
 TORCH_CHECK ( t.is_contiguous() == true, __FILE__ ,":" ,__func__, ": ", #t, " is not contiguous" ); \
+SHOW_TENSOR_OP(t); \
 } \
 while ( 0 )
 

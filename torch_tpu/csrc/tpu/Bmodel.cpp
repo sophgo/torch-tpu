@@ -12,6 +12,7 @@
 #include "torch_tpu/csrc/utils/LazyInit.h"
 #include "torch_tpu/csrc/aten/TPUFormatCastHelper.h"
 #include "torch_tpu/csrc/aten/TPUNativeFunctions.h"
+#include "TPUDeviceUtils.h"
 
 
 #if defined BACKEND_SG2260
@@ -482,6 +483,14 @@ void PythonTensor::fixDtype(bm_data_type_t fmt){
     }
 }
 
+uint64_t shape_count(bm_shape_t &shape){
+  uint64_t count = 1;
+  for (int i = 0; i < shape.num_dims; i++) {
+    count *= shape.dims[i];
+  }
+  return count;
+}
+
 at::ScalarType convert_dtype_to_torch_dtype(bm_data_type_t dtype){
   switch (dtype) {
     case BM_FLOAT32:
@@ -549,6 +558,10 @@ PythonModel::PythonModel(const std::string &model_file, int dev_id, const std::s
   }else{
     assert(0);
   }
+
+  at::Device device(at::DeviceType::TPU, dev_id);
+  torch_tpu::utils::maybe_initialize_tpu(device);
+
   assert(flag == true);
   const char **net_names = NULL;
   bmrt_get_network_names(p_bmrt, &net_names);
@@ -574,6 +587,7 @@ void PythonNet::forward(std::vector<py::object>& inputs, std::vector<py::object>
     auto dtype    = info->input_dtypes[idx];
     auto shape    = input_shapes[idx];
     auto data_ptr = inputs[idx].attr("data_ptr")().cast<uintptr_t>();
+    input_tensors[idx].device_mem.size       = shape_count(shape) * bmrt_data_type_size(dtype);
     input_tensors[idx].shape      = shape;
     input_tensors[idx].dtype      = dtype;
     input_tensors[idx].st_mode    = BM_STORE_1N;
@@ -584,6 +598,7 @@ void PythonNet::forward(std::vector<py::object>& inputs, std::vector<py::object>
     auto dtype    = info->output_dtypes[idx];
     auto shape    = output_shapes[idx];
     auto data_ptr = outputs[idx].attr("data_ptr")().cast<uintptr_t>();
+    output_tensors[idx].device_mem.size       = shape_count(shape) * bmrt_data_type_size(dtype);
     output_tensors[idx].shape      = shape;
     output_tensors[idx].dtype      = dtype;
     output_tensors[idx].st_mode    = BM_STORE_1N;

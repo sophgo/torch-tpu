@@ -1,0 +1,60 @@
+## 训推一体
+
+为了高性能推理，一般会将模型导出静态图，使用编译器优化后，得到针对某一芯片的二进制文件（bmodel），再进行推理。但是编译器优化对内存、平台和内存资源的要求较高，难以在边缘侧实现。
+
+然后模型结构一般变化不大，变化的是权重。另外 bmodel 主要由三部分构成：`元信息`、`权重`和`指令`。 对于只有权重在变化的模型，可以通过更新权重的方式实现模型的更新。
+
+可以通过 `scompile` 库实现这一功能。
+
+```sh
+pip3 install scompile-0.0.1-py3-none-any.whl --force-reinstall
+```
+
+安装后，可以在shell中通过 `gen_match_table` 命令生成匹配表.
+
+```sh
+$ gen_match_table --help
+usage: gen_match_table [-h] -b BMODEL -t TENSOR_LOCATION_PATH -s SRC_PT -o OUTPUT
+
+options:
+  -h, --help            show this help message and exit
+  -b BMODEL, --bmodel BMODEL
+                        bmodel path
+  -t TENSOR_LOCATION_PATH, --tensor_location_path TENSOR_LOCATION_PATH
+                        the bmodel corresponding tensor location path
+  -s SRC_PT, --src_pt SRC_PT
+                        source pt file path
+  -o OUTPUT, --output OUTPUT
+                        output match table path
+```
+
+对于需要生成match table的推理模型，如vgg.pt，可以通过如下命令生成match table。
+```sh
+$ gen_match_table -b vgg.bmodel -t xxxx/tensor_location.json -s vgg.pt -o vgg_match_table.json
+```
+
+其中 `xxxx/tensor_location.json` 通常位于编译模型时的目录里面。
+
+生成后的match table 可以copy到soc上。（注意gen_match_table也可以在soc上运行，但是推荐在x86上执行。）在soc平台上安装 `scompile` 库，然后可以通过如下代码更新模型。
+
+```sh
+$ apply_match_table --help
+usage: apply_match_table [-h] -b BMODEL_PATH -t MATCH_TABLE_PATH -s SRC_PT -o OUTPUT
+
+options:
+  -h, --help            show this help message and exit
+  -b BMODEL_PATH, --bmodel_path BMODEL_PATH
+                        bmodel path
+  -t MATCH_TABLE_PATH, --match_table_path MATCH_TABLE_PATH
+                        the match table corresponding with bmodel and pt file
+  -s SRC_PT, --src_pt SRC_PT
+                        source pt file path
+  -o OUTPUT, --output OUTPUT
+                        output bmodel path
+```
+
+在soc上运行如下命令，可以更新模型。
+
+## 约束
+
+目前 `renset` 和 `vgg` 模型在f16 f32时可以支持更新模型。其他模型暂未验证。

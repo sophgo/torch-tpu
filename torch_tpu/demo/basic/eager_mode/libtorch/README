@@ -1,0 +1,57 @@
+## 简介
+
+本目录是libtorch的训练代码，主要是用来测试tpu和torchtpu是否正常工作，以及一些基本训练demo。
+
+目前脚本为基本的训练流程代码，如需通过数据集训练，可自行修改代码。
+
+## 文件结构说明
+
+- `include` 为编译说需要的头文件: `compile.h` 为 编译模式所需要的头文件; `help.h` 为一些辅助函数的头文件(包括时间戳宏); `net_help.h` 为网络模型的头文件; `pt_help.h` 为读取权重的头文件。
+
+- `basic_with_device.cpp` 可以用来测试tpu和torchtpu是否正常工作。
+
+- `basic_net.cpp`和`basic_net_with_device.cpp` 是基本demo，可以参考来写tpu 训练的 libtorch代码。
+
+- `basic_resnet_with_device.cpp`是一个resnet的demo。
+
+- `basic_vgg_with_device.cpp`是一个vgg的demo。
+
+- `basic_compile_mode.cpp`是一个编译模式的demo，编译模式需要传一个模型文件路径，用于权重初始化.
+
+- `envsetup.h` 是一个环境变量设置的文件. 在编译阶段和运行阶段都会被用到。
+
+
+## 编译
+
+```shell
+mkdir build && cd build
+cmake ..
+make -j
+```
+
+环境要求：预期需要10G以及更多的内存.
+
+当前库依赖于 `pytorch` 和 `torchtpu`，需要先安装这两个库。当前编译脚本，通过环境变量设置库的路径。
+
+可以通过 source envsetup.sh，设置环境变量。source 使用`prepare_env` 函数获取`pytorch`和`torchtpu`的路径。
+
+若实现方式有不同，可以自行修改`envsetup.sh`文件。
+
+## 交叉编译
+
+对于 SoC 平台环境，可以采用交叉环境编译. 如下提供在x86上交叉编译的方式:
+
+需要准备内容为:
+
+1. ARM版本的pytorch安装包;
+2. ARM版本的torchtpu安装包;
+3. 交叉编译器:gcc-arm-10.3-2021.07-x86_64-aarch64-none-linux-gnu
+
+准备内容的下载地址：
+
+1. pytorch安装包: https://pypi.tuna.tsinghua.edu.cn/packages/c3/83/67aba34223e77556ebe7d49d6d93eccfbea847f37a95f41a961b62476569/torch-2.1.0-cp38-cp38-manylinux2014_aarch64.whl
+3. python3 -m dfss --url=open@sophgo.com:/toolchains/gcc-arm-10.3-2021.07-x86_64-aarch64-none-linux-gnu.tar.xz
+
+需要将1和2解压(unzip *whl)， `PYTORCH_INSTALL_DIR` 为 pytorch 安装包解压后的路径，`ARM_COMPILE` 为交叉编译器解压后的路径。
+
+可以参考 envsetup.sh 文件 `prepare_cross_env`函数,修改`TPUTRAIN_INSTALL_TOP`,`PYTORCH_INSTALL_DIR`,`ARM_COMPILE`等环境变量对应的路径值。

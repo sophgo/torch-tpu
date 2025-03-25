@@ -181,33 +181,34 @@ std::array<bool, 3> output_mask )
   CHECK_TENSOR_IN_DEVICE ( grad_output_ );
   CHECK_TENSOR_IN_DEVICE ( input );
   CHECK_TENSOR_IN_DEVICE ( weight );
-  auto flag = check_output_shape_is_satified ( input, weight, stride, padding, dilation, output_padding, groups );
-  if ( flag == false )
-  {
-    CPU_IMPL_WARNING();
-    TIMING_START;
-    auto input_dtype = input.scalar_type();
-    // change dtype into f32
-    auto outputs_cpu = torch::convolution_backward (
-                       grad_output.cpu().to ( at::kFloat ),
-                       input.cpu().to ( at::kFloat ),
-                       weight.cpu().to ( at::kFloat ),
-                       at::OptionalIntArrayRef ( { weight.size ( 0 ) } ),
-                       stride,
-                       padding,
-                       dilation,
-                       transposed,
-                       output_padding,
-                       groups,
-                       output_mask );
-    TIMING_END ( tpu::CONVOLUTION_BACKWARD );
-    Tensor grad_input, grad_weight, grad_bias;
-    grad_input  = output_mask[0] ? TENSOR_TO_TPU ( std::get<0> ( outputs_cpu ).to ( input_dtype ) ) : Tensor();
-    grad_weight = output_mask[1] ? TENSOR_TO_TPU ( std::get<1> ( outputs_cpu ).to ( input_dtype ) ) : Tensor();
-    grad_bias   = output_mask[2] ? TENSOR_TO_TPU ( std::get<2> ( outputs_cpu ).to ( input_dtype ) ) : Tensor();
-    SHOW_TENSOR_OP(grad_output_, input, weight, grad_input, grad_weight, grad_bias);
-    return std::tuple<Tensor, Tensor, Tensor> ( grad_input, grad_weight, grad_bias);
-  }
+  // auto flag = check_output_shape_is_satified ( input, weight, stride, padding, dilation, output_padding, groups );
+  // if ( flag == false )
+  // {
+  //   CPU_IMPL_WARNING();
+  //   std::cout << "123>>>>>>>>>>>>>>" << std::endl;
+  //   TIMING_START;
+  //   auto input_dtype = input.scalar_type();
+  //   // change dtype into f32
+  //   auto outputs_cpu = torch::convolution_backward (
+  //                      grad_output.cpu().to ( at::kFloat ),
+  //                      input.cpu().to ( at::kFloat ),
+  //                      weight.cpu().to ( at::kFloat ),
+  //                      at::OptionalIntArrayRef ( { weight.size ( 0 ) } ),
+  //                      stride,
+  //                      padding,
+  //                      dilation,
+  //                      transposed,
+  //                      output_padding,
+  //                      groups,
+  //                      output_mask );
+  //   TIMING_END ( tpu::CONVOLUTION_BACKWARD );
+  //   Tensor grad_input, grad_weight, grad_bias;
+  //   grad_input  = output_mask[0] ? TENSOR_TO_TPU ( std::get<0> ( outputs_cpu ).to ( input_dtype ) ) : Tensor();
+  //   grad_weight = output_mask[1] ? TENSOR_TO_TPU ( std::get<1> ( outputs_cpu ).to ( input_dtype ) ) : Tensor();
+  //   grad_bias   = output_mask[2] ? TENSOR_TO_TPU ( std::get<2> ( outputs_cpu ).to ( input_dtype ) ) : Tensor();
+  //   SHOW_TENSOR_OP(grad_output_, input, weight, grad_input, grad_weight, grad_bias);
+  //   return std::tuple<Tensor, Tensor, Tensor> ( grad_input, grad_weight, grad_bias);
+  // }
 #if 0
     CPU_IMPL_WARNING();
     TIMING_START;
