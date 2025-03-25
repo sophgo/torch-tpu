@@ -244,14 +244,19 @@ static inline void nodechip_reduce_sum_2d_multi_core_single_stage(
   dim4 l2s_shape;
   int cmax = cw_trans ? column : row;
   int wmax = cw_trans ? row : column;
-  local_addr_t next = 0;
-  while ( true )
+  uint64_t next = 0;
+  uint64_t size =0;
+  uint64_t size_fp32 = 0;
+  uint64_t tsize_fp32 = 0;
+  uint64_t rsize = 0;
+  while (true)
   {
+    // uint64_t hw_size = DIV_UP(wmax, tile) * (uint64_t)tile;
     next = 0;
-    int size = DIV_UP ( cmax, NPU_NUM ) * tpu_aligned_feature_size ( DIV_UP ( wmax, tile ), tile, dtype );
-    int size_fp32 = DIV_UP ( cmax, NPU_NUM ) * tpu_aligned_feature_size ( DIV_UP ( wmax, tile ), tile, DT_FP32 );
-    int tsize_fp32 = DIV_UP ( cmax, NPU_NUM ) * tpu_aligned_feature_size ( 1, tile, DT_FP32 );
-    int rsize = DIV_UP ( cmax, NPU_NUM ) * tpu_aligned_feature_size ( 1, 1, dtype );
+    size = (uint64_t)DIV_UP ( cmax, NPU_NUM ) * tpu_aligned_feature_size ( DIV_UP ( wmax, tile ), tile, dtype );
+    size_fp32 = (uint64_t)DIV_UP ( cmax, NPU_NUM ) * tpu_aligned_feature_size ( DIV_UP ( wmax, tile ), tile, DT_FP32 );
+    tsize_fp32 = (uint64_t)DIV_UP ( cmax, NPU_NUM ) * tpu_aligned_feature_size ( 1, tile, DT_FP32 );
+    rsize = (uint64_t)DIV_UP ( cmax, NPU_NUM ) * tpu_aligned_feature_size ( 1, 1, dtype );
     input_local_addrs[0] = next; next += size;
     input_local_addrs[1] = next; next += size;
     output_local_addrs[0] = next; next += rsize;
@@ -262,7 +267,7 @@ static inline void nodechip_reduce_sum_2d_multi_core_single_stage(
     }
     reduce_tile_fp32_addrs[0] = next; next += tsize_fp32;
     reduce_tile_fp32_addrs[1] = next; next += tsize_fp32;
-    if ( ( uint32_t ) next <= ( uint32_t )LOCAL_MEM_SIZE )
+    if ( next <= ( uint64_t )LOCAL_MEM_SIZE && (dtype == DT_FP32 || size_fp32 <= (uint64_t)LOCAL_MEM_SIZE))
     {
       break;
     }

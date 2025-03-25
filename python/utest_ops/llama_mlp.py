@@ -4,7 +4,7 @@ import torch.nn.functional as F
 import numpy as np
 import sys
 import copy
-from top_utest import TensorComparator
+from python.utest_ops.top_utest import TensorComparator
 from torch_tpu.tpu.custom_op.llama_mlp import LLamaMlpFunc
 import os
 os.environ["CMODEL_FAST_EXEC"]="1"
@@ -39,17 +39,17 @@ class LLamaMlp(nn.Module):
             return x
 
 class LLamaMlpBlock(nn.Module):
-    def __init__(self, w0, w1, w2, use_cpu=False, return_mid_tensor=False):
+    def __init__(self, w0, w1, w2, use_cpu_fw=False, return_mid_tensor=False, use_cpu_bw=False):
         super().__init__()
         self.w0 = w0
         self.w1 = w1
-
         self.w2 = w2
-        self.use_cpu = use_cpu
+        self.use_cpu_fw = use_cpu_fw
+        self.use_cpu_bw = use_cpu_bw
         self.return_mid_tensor = return_mid_tensor
 
     def forward(self, x):
-        return LLamaMlpFunc.apply(x, self.w0, self.w1, self.w2, self.use_cpu, self.return_mid_tensor)
+        return LLamaMlpFunc.apply(x, self.w0, self.w1, self.w2, self.use_cpu_fw, self.return_mid_tensor, self.use_cpu_bw)
 
 
 def check_mlp():

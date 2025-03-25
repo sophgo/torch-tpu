@@ -104,6 +104,7 @@ typedef enum {
   TPUDNN_ACTIVE_RECIPROCAL = 39,
   TPUDNN_ACTIVE_EXP2 = 40,
   TPUDNN_ACTIVE_TRUNC = 41,
+  TPUDNN_ACTIVE_ARCTAN = 42,
 } tensor_active_type_t;
 
 typedef enum {

@@ -23,19 +23,6 @@ namespace at
 		const c10::optional<Tensor> &b2,
 		Tensor &out);
 
-	std::tuple<Tensor, Tensor, Tensor, c10::optional<Tensor>, c10::optional<Tensor>> mlp_backward(
-		Tensor &grad_output,
-		Tensor &input,
-		Tensor &w1,
-		Tensor &w2,
-		Tensor &out1,
-		Tensor &p,
-		Tensor &grad_input,
-		Tensor &grad_w1,
-		Tensor &grad_w2,
-		const c10::optional<Tensor> &grad_b1,
-		const c10::optional<Tensor> &grad_b2);
-
 	Tensor llama_mlp_forward(
 		Tensor &input,
 		Tensor &weight0,
@@ -45,7 +32,22 @@ namespace at
 		const c10::optional<Tensor> &sigmoid,
 		const c10::optional<Tensor> &m0,
 		Tensor &output,
-		bool save_mid_res);
+    bool save_mid_res);
+
+  std::tuple<Tensor, Tensor, Tensor, Tensor> mlp_backward(
+    Tensor& input,
+    Tensor& weight0,
+    Tensor& weight1,
+    Tensor& weight2,
+    Tensor& w0x,
+    Tensor& output,
+    const c10::optional<Tensor>& silu,
+    const c10::optional<Tensor>& sigmoid,
+    Tensor& grad_input,
+    Tensor& grad_weight0,
+    Tensor& grad_weight1,
+    Tensor& grad_weight2);
+
 
 	Tensor matmul_gptq_forward(
 		Tensor &active,
@@ -228,7 +230,7 @@ namespace at
         Tensor &cos,
         Tensor &sin,
         const c10::optional<Tensor> &mask, // decode: None
-        const Tensor &input_lengths, 
+        const Tensor &input_lengths,
         int64_t head,
         int64_t q_lora_rank,
         int64_t kv_lora_rank,

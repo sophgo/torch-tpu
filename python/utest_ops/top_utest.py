@@ -1,5 +1,6 @@
 import torch
 import torch.nn as nn
+import torch.nn.functional as F
 import torchgen
 import yaml
 import copy
@@ -555,7 +556,7 @@ class TensorComparator:
             else:
                 return 0.0
         return numerator / denominator
-    
+
     @staticmethod
     def euclidean_similarity(x, y):
         ed = torch.sqrt(torch.sum(torch.pow(x - y, 2)))
@@ -566,7 +567,7 @@ class TensorComparator:
             res = 1 - ed / sr
         return res
 
-    def compare_float(self, exp_tensor, got_tensor, only_warning):
+    def compare_float(self, exp_tensor, got_tensor, only_warning, prefix = ""):
 
         total = 0
         max_error_count = 128
@@ -596,23 +597,37 @@ class TensorComparator:
         # Count warnings and print messages
         for idx in np.where(warning_mask | abs_warning_mask)[0]:
             if warning_mask[idx]:
-                print(f"rel warning at index {idx} exp {exp_tensor[idx]:.20f} got {got_tensor[idx]:.20f}")
+                print(f"{prefix} rel warning at index {idx}, exp {exp_tensor[idx]:.20f} got {got_tensor[idx]:.20f}")
             elif abs_warning_mask[idx]:
-                print(f"abs warning at index {idx} exp {exp_tensor[idx]:.20f} got {got_tensor[idx]:.20f}")
+                print(f"{prefix} abs warning at index {idx}, exp {exp_tensor[idx]:.20f} got {got_tensor[idx]:.20f}")
             total += 1
             if total > max_error_count and not only_warning:
                 return -1, total
 
         return 0, total
 
-    def cmp_result(self, tensor_target, tensor2_result, prefix = None):
-            compare_status = self.compare_float(tensor_target.view(-1), tensor2_result.view(-1), False)
+
+    @staticmethod
+    def filter_valid(a, b):
+      mask = torch.isfinite(a) & torch.isfinite(b)
+      num_total = a.numel()
+      num_valid = mask.sum().item()
+      num_removed = num_total - num_valid
+      return a[mask], b[mask], num_removed
+
+    def cmp_result(self, tensor_target, tensor2_result, prefix =""):
+            tensor_target, tensor2_result, num_removed = self.filter_valid(tensor_target,tensor2_result)
+
+            compare_status = self.compare_float(tensor_target.view(-1), tensor2_result.view(-1), False,prefix)
             if compare_status[0] == -1:
                 print("Error: Too many warnings detected.")
-            cos_my = self.cosine_similarity(tensor_target.view(-1), tensor2_result.view(-1))
-            euclidean_dist = self.euclidean_similarity(tensor_target.view(-1), tensor2_result.view(-1))
+
+            cos_my = F.cosine_similarity(tensor_target.view(-1).to(torch.float64), tensor2_result.view(-1).to(torch.float64),dim=0)
+            euclidean_dist = self.euclidean_similarity(tensor_target.view(-1).to(torch.float64), tensor2_result.view(-1).to(torch.float64))
             print(f"{prefix} Result : cosine similarity: {cos_my}")
             print(f"{prefix} Result : euclidean similarity: {euclidean_dist}")
+            if num_removed > 0:
+               print(f"{prefix} {num_removed} values removed due to nan or inf")
             if(cos_my < 0.99 or euclidean_dist < 0.98 or compare_status[0] == -1):
                 return False
             return True

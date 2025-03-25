@@ -1,11 +1,14 @@
 import os
 import torch
+import torch_tpu
 import torch.nn as nn
 import torch.nn.functional as F
-
+import copy
+import transformers.models
+import pdb
 class LLamaMlpFunc(torch.autograd.Function):
     @staticmethod
-    def forward(ctx, x, w0, w1, w2, use_cpu=False, return_mid_tensor=False):
+    def forward(ctx, x, w0, w1, w2, use_cpu_fw=False, return_mid_tensor=False, use_cpu_bw=False):
         x_ori = x
         #ctx.save_for_backward(x, w0, w1, w2)
         x_shape = x.shape
@@ -17,7 +20,7 @@ class LLamaMlpFunc(torch.autograd.Function):
         sigmoid = torch.empty(silu_shape, dtype = x.dtype, device = x.device)
         m0 = torch.empty(silu_shape, dtype = x.dtype, device = x.device)
 
-        if use_cpu:
+        if use_cpu_fw:
             w1_trans = w1.transpose(0, 1)
             fc1 = torch.matmul(x, w1_trans)
             sigmoid = torch.sigmoid(fc1)
@@ -38,7 +41,9 @@ class LLamaMlpFunc(torch.autograd.Function):
                                         True)
         if output.shape != x_shape:
            output = output.view(x_shape).contiguous()
+
         ctx.save_for_backward(x_ori, w0, w1, w2, silu, sigmoid, m0)
+        ctx.use_cpu_bw = use_cpu_bw
 
         if return_mid_tensor:
             return output, silu, sigmoid, m0
@@ -48,25 +53,51 @@ class LLamaMlpFunc(torch.autograd.Function):
     @staticmethod
     def backward(ctx, grad_output):
         x, w0, w1, w2, silu, sigmoid, w0x = ctx.saved_tensors
-        silu_shape = (x.shape[0], x.shape[1], silu.shape[-1])
-        silu = silu.view(silu_shape).contiguous()
-        sigmoid = sigmoid.view(silu_shape).contiguous()
-        w0x = w0x.view(silu_shape).contiguous()
+        use_cpu_bw = ctx.use_cpu_bw
+        x_shape = x.shape
+        if use_cpu_bw:
+          silu_shape = (x.shape[0], x.shape[1], silu.shape[-1])
+          silu = silu.view(silu_shape).contiguous()
+          sigmoid = sigmoid.view(silu_shape).contiguous()
+          w0x = w0x.view(silu_shape).contiguous()
 
-        x_t =x.transpose(-1, -2).contiguous()
-        w2_t = w2.t().contiguous()
+          x_t =x.transpose(-1, -2).contiguous()
+          w2_t = w2.t().contiguous()
 
-        grad_silu_t = (sigmoid + silu * (1-sigmoid))
+          grad_silu_t = (sigmoid + silu * (1-sigmoid))
+          grad_tmp = torch.matmul(grad_output, w2_t)
+          grad_w1x = (w0x / silu) * grad_tmp * grad_silu_t
 
-        grad_tmp = torch.matmul(grad_output, w2_t)
-        grad_w1x = (w0x / silu) * grad_tmp * grad_silu_t
-        grad_w0x = grad_tmp * silu
-        grad_w2 = torch.matmul(w0x.transpose(-1,-2).contiguous(), grad_output)
-        grad_w1 = torch.matmul(x_t, grad_w1x)
-        grad_w0 = torch.matmul(x_t, grad_w0x)
-        grad_input = torch.matmul(grad_w0x, w0) + torch.matmul(grad_w1x, w1)
+          grad_w0x = grad_tmp * silu
+          grad_w2 = torch.matmul(w0x.transpose(-1,-2).contiguous(), grad_output)
+          grad_w1 = torch.matmul(x_t, grad_w1x)
+          grad_w0 = torch.matmul(x_t, grad_w0x)
+          grad_input = torch.matmul(grad_w0x, w0) + torch.matmul(grad_w1x, w1)
+        else:
+          if x.dim() == 3:
+            x = x.view(-1, x.size(2)).contiguous()
+          if grad_output.shape != x.shape:
+            grad_output = grad_output.view(x.shape).contiguous()
+          grad_input = torch.empty_like(x)
+          grad_w0 = torch.empty(w0.T.size(), device=x.device, dtype=x.dtype)
+          grad_w1 = torch.empty(w1.T.size(), device=x.device, dtype=x.dtype)
+          grad_w2 = torch.empty(w2.size(), device=x.device, dtype=x.dtype)
+          torch.ops.my_ops.mlp_backward(x,
+                                          w0,
+                                          w1,
+                                          w2,
+                                          w0x,
+                                          grad_output,
+                                          silu,
+                                          sigmoid,
+                                          grad_input,
+                                          grad_w0,
+                                          grad_w1,
+                                          grad_w2)
+        if(grad_input.shape != x_shape):
+          grad_input = grad_input.view(x_shape).contiguous()
 
-        return grad_input, grad_w0.transpose(-1,-2).contiguous(), grad_w1.transpose(-1,-2).contiguous(), grad_w2, None, None
+        return grad_input, grad_w0.transpose(-1,-2).contiguous(), grad_w1.transpose(-1,-2).contiguous(), grad_w2, None, None, None
 
 class LLamaMlpBlock(nn.Module):
     def __init__(self, embed_dim, intermediate_size):
@@ -126,7 +157,7 @@ class MegatronQwen2MlpFunc(torch.autograd.Function):
 
         grad_silu_t = (sigmoid + silu * (1 - sigmoid)) # [s * b, i]
         grad_tmp = torch.matmul(y, down_proj) # [s * b, h] @ [h, i] = [s * b, i]
-        grad_w1x = w0x * grad_tmp * grad_silu_t # [s * b, i]
+        grad_w1x = w0x/silu * grad_tmp * grad_silu_t # [s * b, i]
         grad_w0x = grad_tmp * silu # [s * b, i]
 
         # x_t = x.t() # [s * b, h] -> [h, s * b]
@@ -137,7 +168,7 @@ class MegatronQwen2MlpFunc(torch.autograd.Function):
         ## a @ b = c <=> b.T @ a.T = c.T
         ## Use this property to avoid .t().contiguous() operation
         ## .t() in matmul is supported so we do not need to .contiguous() after .t()
-        grad_w2 = torch.matmul(y.t(), w0x * silu) # [h, s * b] @ [s * b, i] = [h, i]
+        grad_w2 = torch.matmul(y.t(), w0x) # [h, s * b] @ [s * b, i] = [h, i]
         grad_w1 = torch.matmul(grad_w1x.t(), x) # [i, s * b] @ [s * b, h] = [i, h]
         grad_w0 = torch.matmul(grad_w0x.t(), x) # [i, s * b] @ [s * b, h] = [i, h]
 
