@@ -8,7 +8,7 @@ This folder hosts the `Dockerfile` to build docker images with various platforms
 
 ```Shell
 cd tpu-train/docker
-docker build -t sophgo/torch_tpu:v0.1 .
+source build.sh py310
 ```
 
 this docker is already built, you can directly use it by `docker pull sophgo/torch_tpu:v0.1`.
@@ -18,6 +18,8 @@ this docker is already built, you can directly use it by `docker pull sophgo/tor
 Generally, you can enter the docker container by running the following command:
 
 ```Shell
+# docker run -v $(pwd):/workspace --restart always -td --name mt sophgo/torch_tpu:v0.1-py11 bash
+
 docker run -it  --user `id -u`:`id -g` --privileged --cap-add SYS_ADMIN \
                 --name torch_tpu \
                 --env HOME=$HOME \
