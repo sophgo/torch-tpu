@@ -3,38 +3,6 @@
 namespace tpu
 {
 
-void print_python_code() {
-    PyGILState_STATE gstate = PyGILState_Ensure();
-
-    PyThreadState *tstate = PyThreadState_Get();
-    if (tstate && tstate->frame) {
-        PyFrameObject *frame = tstate->frame;
-        while (frame) {
-            PyCodeObject *code = frame->f_code;
-            PyObject *filename = code->co_filename;
-            PyObject *name = code->co_name;
-            int lineno = PyFrame_GetLineNumber(frame);
-            if (filename && PyUnicode_Check(filename) && name && PyUnicode_Check(name)) {
-                const char *filename_str = PyUnicode_AsUTF8(filename);
-                const char *name_str = PyUnicode_AsUTF8(name);
-                printf("File: \"%s\", line %d, in %s\n", filename_str, lineno, name_str);
-                std::ifstream file(filename_str);
-                std::string line;
-                for (int i = 1; std::getline(file, line); i++) {
-                  if (i == lineno) {
-                    std::cout << line << std::endl;
-                    break;
-                  }
-                }
-            }
-            // Clean up references
-            frame = frame->f_back;
-        }
-    }
-
-    PyGILState_Release(gstate);
-}
-
 void TPUCompareResult ( const at::Tensor & Got, const at::Tensor & Exp,
                         double Threshold, double ErrScale )
 {
