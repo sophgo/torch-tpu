@@ -65,22 +65,22 @@ class LLamaAttention(nn.Module):
 
                 fetch_tokens = N - 1
                 cur_Q = Q[batch_id, :, :] # 1xQheadxd
-                cur_K = K[batch_id, :, :].view(1,self.kv_heads, self.d) # 1xkv_headxd
-                cur_V = V[batch_id, :, :].view(1,self.kv_heads, self.d) # 1xkv_headxd
+                cur_K = K[batch_id, :, :].view(1,self.kv_heads, self.d).permute(1,0,2) # kv_headx1xd
+                cur_V = V[batch_id, :, :].view(1,self.kv_heads, self.d).permute(1,0,2) # kv_headx1xd
                 for slot_id in range(cur_slot_num):
                     cur_slot = fetch_slots[batch_id][slot_id]
                     tokens_cur_block = min(fetch_tokens, block_size)
-                    Kfetch_list.append(Kcache[cur_slot:cur_slot+tokens_cur_block, :, :])
-                    Vfetch_list.append(Vcache[cur_slot:cur_slot+tokens_cur_block, :, :])
+                    Kfetch_list.append(Kcache[cur_slot:cur_slot+1*block_size, :, :].view(self.kv_heads, -1, self.d)[:,0:tokens_cur_block,:])
+                    Vfetch_list.append(Vcache[cur_slot:cur_slot+1*block_size, :, :].view(self.kv_heads, -1, self.d)[:,0:tokens_cur_block,:])
                     fetch_tokens -= tokens_cur_block
                 Kfetch_list.append(cur_K)
                 Vfetch_list.append(cur_V)
-                Kconcat = torch.concat(Kfetch_list, dim=0) # Nxkv_headxd
-                Vconcat = torch.concat(Vfetch_list, dim=0) # Nxkv_headxd
-                
+                Kconcat = torch.concat(Kfetch_list, dim=1).permute(1,0,2) # Nxkv_headxd
+                Vconcat = torch.concat(Vfetch_list, dim=1).permute(1,0,2) # Nxkv_headxd
+
                 Kconcat = Kconcat.repeat((1, int(self.num_attention_heads / self.kv_heads), 1)) # Nxnum_attention_headsxd
                 Vconcat = Vconcat.repeat((1, int(self.num_attention_heads / self.kv_heads), 1)) # Nxnum_attention_headsxd
-                
+
                 res_qk = torch.matmul(cur_Q.view(self.num_attention_heads, 1, self.d), Kconcat.permute(1,2,0)) * self.softmax_scale
                 res_qk = F.softmax(res_qk, dim=2)
 
@@ -88,11 +88,18 @@ class LLamaAttention(nn.Module):
                 Ylist.append(cur_Y)
 
                 cur_save_slot = save_slots[batch_id][0]
-                Kcache[cur_save_slot, :, :] = cur_K
-                Vcache[cur_save_slot, :, :] = cur_V
+                '''
+                [max_blocks * block_size, kv_heads, d] -> [max_blocks, block_size, kv_heads, d] -> [max_blocks, kv_heads, block_size, d],
+                 aligned with nodechip_llama2_qkv_multi_core
+                '''
+                Kcache.view(-1, block_size, self.kv_heads, self.d).view(-1,self.kv_heads,block_size,self.d)[cur_save_slot//block_size, :,
+                            cur_save_slot%block_size:cur_save_slot%block_size+1, :] = cur_K
+
+                Vcache.view(-1, block_size, self.kv_heads, self.d).view(-1,self.kv_heads,block_size,self.d)[cur_save_slot//block_size, :,
+                            cur_save_slot%block_size:cur_save_slot%block_size+1, :] = cur_V
 
             Y = torch.concat(Ylist, dim=1).permute(1, 0, 2) #[batch, num_attention_heads, d]
-        
+
         elif attention_mode == "prefill":
             batch_offset = 0
             attn_mask = self.mask if self.mask is not None else None
@@ -533,15 +540,14 @@ if __name__ == "__main__":
         sys.exit(255)
     else:
         print(f"[Passed] llama prefill compare passed!\n")
-    
-    # fail when instruction cached enabled
-    #status = check_llama_attention_decode()
-    #if status == False:
-    #    print(f"[Failed] llama decode compare failed!")
-    #    sys.exit(255)
-    #else:
-    #    print(f"[Passed] llama decode compare passed!")
-    
+
+    status = check_llama_attention_decode()
+    if status == False:
+        print(f"[Failed] llama decode compare failed!")
+        sys.exit(255)
+    else:
+        print(f"[Passed] llama decode compare passed!")
+
     status = test_llama_attention_forward_mha()
     if status == False:
         print(f"[Failed] llama forward MHA compare failed!")
