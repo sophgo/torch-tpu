@@ -38,6 +38,10 @@ include_directories($ENV{TPUTRAIN_TOP}/sgdnn/include)
 link_directories($ENV{TPUTRAIN_TOP}/build/sgdnn)
 
 ## torch_tpu
+
+if(SOC_CROSS_MODE STREQUAL "ON")
+include_directories($ENV{CROSS_TOOLCHAINS}/riscv64-linux-x86_64/python3.10)
+endif()
 include_directories($ENV{TPUTRAIN_TOP})
 include_directories(${CMAKE_CURRENT_SOURCE_DIR})
 include_directories(${CMAKE_CURRENT_SOURCE_DIR}/csrc)

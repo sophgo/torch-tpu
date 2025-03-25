@@ -185,8 +185,8 @@ class CPPLibBuild(build_clib, ExtBase, object):
         build_dir += '_cmodel'
         if not build_fw:
             fw_path = os.path.join(build_dir, 'libfirmware.so')
-        if not SOC_CROSS:
-            args.append('-DUSING_CMODEL=ON')
+        # if not SOC_CROSS:
+        args.append('-DUSING_CMODEL=ON')
         build_firmware()
 
         package_dir = self.get_package_dir()
@@ -409,6 +409,8 @@ include_directories = [
     os.path.join(SGDNN_PATH, "include"),
     os.path.join(SGAPI_STRUCT_PATH, "include"),
 ]
+if SOC_CROSS:
+    include_directories.append(os.path.join(CROSS_TOOLCHAINS, "riscv64-linux-x86_64/python3.10"))
 lib_directories = [
     os.path.join(BASE_DIR, f"build/{get_build_type()}/packages", "torch_tpu/lib"),
 ]
