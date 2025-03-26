@@ -1,8 +1,6 @@
 #pragma once
 
 #include <c10/util/hash.h>
-#include <pybind11/chrono.h>
-#include <torch/python.h>
 #include "tpuDNN.h"
 #include "TPUStream.h"
 #include "sccl.h"

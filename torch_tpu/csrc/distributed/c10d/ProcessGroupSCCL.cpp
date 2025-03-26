@@ -800,11 +800,4 @@ ProcessGroupSCCL::createProcessGroupSCCL(
       c10::make_intrusive<Options>(options));
 }
 
-__attribute__((constructor)) void ProcessGroupSCCLConstructor() {
-  py::object module = py::module::import("torch.distributed");
-  py::object register_backend =
-      module.attr("Backend").attr("register_backend");
-  register_backend("SCCL", py::cpp_function(ProcessGroupSCCL::createProcessGroupSCCL), true, "tpu");
-}
-
 } // namespace c10d

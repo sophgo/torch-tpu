@@ -20,12 +20,6 @@
 #include <torch/csrc/distributed/c10d/Store.hpp>
 #include <torch/csrc/distributed/c10d/Types.hpp>
 #include <torch/csrc/distributed/c10d/Utils.hpp>
-
-
-#include <torch/python.h>
-#include <pybind11/chrono.h>
-
-
 namespace c10d {
 
 constexpr const char* SCCL_HOST_BACKEND_NAME = "scclHost";

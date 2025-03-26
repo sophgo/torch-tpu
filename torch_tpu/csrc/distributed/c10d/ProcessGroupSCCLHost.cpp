@@ -1878,16 +1878,4 @@ c10::intrusive_ptr<ProcessGroup> ProcessGroupSCCLHost::createProcessGroupSCCLHos
   return c10::make_intrusive<ProcessGroupSCCLHost>(
       store, rank, size, options);
 }
-
-PYBIND11_MODULE(TORCH_EXTENSION_NAME, m) {
-  m.def("createProcessGroupSCCLHost", &ProcessGroupSCCLHost::createProcessGroupSCCLHost);
-}
-
-__attribute__((constructor)) void ProcessGroupSCCLHostConstructor() {
-  py::object module = py::module::import("torch.distributed");
-  py::object register_backend =
-      module.attr("Backend").attr("register_backend");
-  register_backend("SCCLHOST", py::cpp_function(ProcessGroupSCCLHost::createProcessGroupSCCLHost));
-}
-
 } // namespace c10d
