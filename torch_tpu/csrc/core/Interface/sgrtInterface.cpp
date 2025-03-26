@@ -101,6 +101,8 @@ bool can_device_access_peer(c10::DeviceIndex device_id, c10::DeviceIndex peer_de
 }
 
 tpuRtStatus_t SgrtDeviceSynchronize() {
+  auto stream = c10_tpu::getCurrentTPUStream();
+  tpudnnFlush(stream);
   SGRT_CHECK(tpuRtDeviceSynchronize());
   return tpuRtSuccess;
 }

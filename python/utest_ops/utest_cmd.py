@@ -40,7 +40,7 @@ class Global_Regression_Tester():
         self.any_utest_files_list =  os.listdir("./")
         self.utest_files_list =[]
         self.top_python_file_list = ['top_utest.py', 'utest_cmd.py']
-        self.global_skip_utest_manifest_multi_arch = {"bm1684x":['mlp.py','slice.py','stack.py',  'assignment.py', 'llama_attention.py'], 
+        self.global_skip_utest_manifest_multi_arch = {"bm1684x":['mlp.py','slice.py','stack.py',  'assignment.py', 'llama_attention.py', 'mla.py'], 
                                                                                      "sg2260":['mlp.py','slice.py','stack.py',  'assignment.py']}
         self.global_skip_utest_manifest=self.global_skip_utest_manifest_multi_arch[self.chip]
         self.global_skip_utest_chip_arch=[]

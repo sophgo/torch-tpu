@@ -196,6 +196,29 @@ namespace at
 	    const c10::optional<Tensor> &mask,
 	    double C);
 
+	Tensor mla(
+		Tensor &OUT, 
+		Tensor &Q, 
+		Tensor &KV, 
+		Tensor &PE, 
+		Tensor &WUQ,
+		Tensor &WUKV,
+		Tensor &KVcache,
+		Tensor &PEcache,
+		Tensor &cos,
+		Tensor &sin,
+		const c10::optional<Tensor> &mask,
+		const Tensor &input_lengths,
+		int64_t head,
+		int64_t q_lora_rank,
+		int64_t kv_lora_rank,
+		int64_t qk_nope_head_dim,
+		int64_t qk_rope_head_dim,
+		int64_t v_head_dim,
+		int64_t mask_size,
+		double C,
+		int64_t attention_mode);
+
 	std::tuple<Tensor, Tensor, Tensor, c10::optional<Tensor>, c10::optional<Tensor>> attn_backward(
 		Tensor &grad_output,
 		Tensor &input,

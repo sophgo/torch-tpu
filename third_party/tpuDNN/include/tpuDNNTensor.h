@@ -154,6 +154,39 @@ typedef struct
     TpudnnFormatedType_t format_casted;
 } tpudnnTensor_t;
 
+/**
+ * @brief tpudnnCreateDeviceTensor
+ *
+ * @param data if not null means allocating memory on device
+ * @param stride can be null
+ * @return tpudnnTensor_t
+ */
+tpudnnTensor_t tpudnnCreateDeviceTensor(tpudnnHandle_t handle, const void *data,
+                                        const int dim, const int *shape, const int *stride,
+                                        tpudnnDataType_t dtype);
+
+/**
+ * @brief tpudnnCreateDeviceTensorLike create a device tensor based on an existed tensor (device or host)
+ *
+ * @param copyData copy the existed tensor data to the created tensor if copyData is 1
+ * @return tpudnnTensor_t
+ */
+tpudnnTensor_t tpudnnCreateDeviceTensorLike(tpudnnHandle_t handle, const tpudnnTensor_t tensor, int copyData);
+
+void tpudnnDestroyDeviceTensor(tpudnnHandle_t handle, tpudnnTensor_t tensor);
+
+/**
+ * @brief tpudnnCopyTensorData supports memory copy between device and host
+ *
+ * @return tpudnnStatus_t
+ */
+tpudnnStatus_t tpudnnCopyTensorData(tpudnnHandle_t handle, const tpudnnTensor_t src, tpudnnTensor_t dst);
+
+/**
+ * @brief tpudnnPrintTensor print tensor shape, stride, and data
+ */
+void tpudnnPrintTensor(tpudnnHandle_t handle, tpudnnTensor_t tensor);
+
 typedef struct {
     void* cmd;
     unsigned cmd_num;
@@ -984,6 +1017,32 @@ tpudnnStatus_t tpudnnPagedAttentionAsync (
     float C,
     int attention_mode // 2: prefile, 3: decode
     );
+
+tpudnnStatus_t tpudnnMLAAsync ( 
+    tpudnnHandle_t handle,
+    tpudnnTensor_t OUT,
+    tpudnnTensor_t Q,
+    tpudnnTensor_t KV,
+    tpudnnTensor_t PE,
+    tpudnnTensor_t WUQ,
+    tpudnnTensor_t WUKV,
+    tpudnnTensor_t KVcache,
+    tpudnnTensor_t PEcache,
+    tpudnnTensor_t cos,
+    tpudnnTensor_t sin,
+    tpudnnTensor_t mask,
+    int*           input_lengths,
+    int            num_input_lengths,
+    int n_heads,
+    int q_lora_rank,
+    int kv_lora_rank,
+    int qk_nope_head_dim,
+    int qk_rope_head_dim,
+    int v_head_dim,
+    int mask_size,
+    float C,
+    int attention_mode
+);
 
 tpudnnStatus_t tpudnnLlamaAttentionForwardAsync(
     tpudnnHandle_t handle,
