@@ -72,10 +72,11 @@ private:
   struct MemInfo {
     size_t size;
   };
-
+  bool disable_ins_cache = false;
 public:
   TPUDeviceManager() : init_flag_(false) {
     this->initialize();
+    disable_ins_cache = std::getenv("DISABLE_CACHE") != nullptr;
   }
 
   ~TPUDeviceManager() {
@@ -215,7 +216,7 @@ public:
       {
         continue;
       }
-      if (!std::getenv("DISABLE_CACHE")){
+      if (!disable_ins_cache){
         auto stream = c10_tpu::getCurrentTPUStream();
         tpudnnFlush(stream); //Flush the stream before tpuRtFree to avoid assigning same memory to different tasks.
         tpuRtStreamSynchronize(stream);
