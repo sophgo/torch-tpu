@@ -75,6 +75,7 @@ function test_sccl() {
 }
 
 function regression_for_sccl() {
+    ulimit -n 65535
     local_cases=(
         test_all_gather.py
         test_all_reduce.py
@@ -90,6 +91,8 @@ function regression_for_sccl() {
         if [ $? -ne 0 ]; then
             return 1
         fi
+        echo "sleep 15s to release socket resources(TIME_WAIT limit)... maybe have good methods"
+        sleep 15
     done
 }
 

@@ -313,6 +313,14 @@ void TPUCopyDeviceToDevice ( void * Dst, const void * Src, size_t Size, bool non
   TPUDeviceManager::GetInstance().CopyDeviceToDevice ( (void*)dst_ptr, (void*)src_ptr, Size, dst_index );
 }
 
+/**
+ * multi-chip Topology utils 
+ */
+void TPUSetupC2CTopology() {}
+void TPUGetTopology(std::vector<std::vector<int>> *topo) {}
+void TPUGetC2CRing(int world_size, int *chipMap) {}
+int TPUCheckChipMap(int world_size, int *chipMap) { return 1; }
+
 } // namespace tpu
 
 #endif // BACKEND_1684X

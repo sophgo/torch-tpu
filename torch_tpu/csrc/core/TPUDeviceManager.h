@@ -79,4 +79,12 @@ bm_handle_t TPUGetDeviceResource ( void );
 tpuRtStream_t TPUGetDeviceResource ( void );
 #endif
 
+/**
+ * multi-chip Topology utils 
+ */
+void TPUSetupC2CTopology();
+void TPUGetTopology(std::vector<std::vector<int>> *topo);
+void TPUGetC2CRing(int world_size, int *chipMap);
+int  TPUCheckChipMap(int world_size, int *chipMap);
+
 } // namespace tpu

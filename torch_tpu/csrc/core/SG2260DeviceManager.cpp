@@ -473,49 +473,6 @@ void TPUSetDeviceIndex ( int Index )
   TORCH_CHECK (Status == tpuRtSuccess, " sgSetDevice failed! Error Code : #", Status);
 }
 
-void TPUGetTopology(std::vector<std::vector<int>> *topo) {
-  int dev_cnt = 0;
-  tpuRtStatus_t Status = tpuRtGetDeviceCount( &dev_cnt );
-  TORCH_CHECK ( Status == tpuRtSuccess, "Failed to get TPU device count" );
-
-  for (int i = 0; i < dev_cnt; ++i) {
-      for (int j = 0; j < dev_cnt; ++j) {
-          (*topo)[i][j] = -1; 
-      }
-  }
-
-  struct c2c_port_info topology[dev_cnt][dev_cnt];
-  Status = tpuRtGetTopology((struct c2c_port_info **)topology);
-  TORCH_CHECK (Status == tpuRtSuccess, " sgGetTopology failed! Error Code : #", Status);
-
-  for (int i = 0; i < dev_cnt; i++) {
-      for (int j = 0; j < dev_cnt; j++) {
-          auto info = topology[i][j];
-          if (info.send_port != -1) {
-              (*topo)[info.src_device_id][info.dst_device_id]=info.send_port;
-          }
-      }
-  }
-}
-
-tpudnnStatus_t TPUCheckChipMap(int world_size, int *chipMap)
-{
-  tpudnnStatus_t status = tpudnnCheckChipMap(world_size, chipMap);
-  return status;
-}
-
-void TPUGetC2CRing(int world_size, int *chipMap)
-{
-  tpudnnStatus_t status = tpudnnGetC2CRing(world_size, chipMap);
-  TORCH_CHECK (status == TPUDNN_STATUS_SUCCESS, " TPUGetC2CRing failed! Error Code : #", status);
-}
-
-void TPUSetupC2CTopology()
-{
-  tpuRtStatus_t status = tpuRtSetupTopology();
-  TORCH_CHECK (status == tpuRtSuccess, " TPUSetupC2CTopology failed! Error Code : #", status);
-}
-
 void * TPUAlloc ( size_t Size )
 {
   return TPUDeviceManager::GetInstance().Alloc ( Size, TPUGetDeviceIndex() );
@@ -569,6 +526,49 @@ tpuRtStream_t TPUGetDeviceResource ( void ) {
   auto stream = c10_tpu::getCurrentTPUStream();
   tpudnnFlush(stream);
   return stream;
+}
+
+void TPUGetC2CRing(int world_size, int *chipMap)
+{
+  tpudnnStatus_t status = tpudnnGetC2CRing(world_size, chipMap);
+  TORCH_CHECK (status == TPUDNN_STATUS_SUCCESS, " TPUGetC2CRing failed! Error Code : #", status);
+}
+
+void TPUSetupC2CTopology()
+{
+  tpuRtStatus_t status = tpuRtSetupTopology();
+  TORCH_CHECK (status == tpuRtSuccess, " TPUSetupC2CTopology failed! Error Code : #", status);
+}
+
+void TPUGetTopology(std::vector<std::vector<int>> *topo) {
+  int dev_cnt = 0;
+  tpuRtStatus_t Status = tpuRtGetDeviceCount( &dev_cnt );
+  TORCH_CHECK ( Status == tpuRtSuccess, "Failed to get TPU device count" );
+
+  for (int i = 0; i < dev_cnt; ++i) {
+      for (int j = 0; j < dev_cnt; ++j) {
+          (*topo)[i][j] = -1; 
+      }
+  }
+
+  struct c2c_port_info topology[dev_cnt][dev_cnt];
+  Status = tpuRtGetTopology((struct c2c_port_info **)topology);
+  TORCH_CHECK (Status == tpuRtSuccess, " sgGetTopology failed! Error Code : #", Status);
+
+  for (int i = 0; i < dev_cnt; i++) {
+      for (int j = 0; j < dev_cnt; j++) {
+          auto info = topology[i][j];
+          if (info.send_port != -1) {
+              (*topo)[info.src_device_id][info.dst_device_id]=info.send_port;
+          }
+      }
+  }
+}
+
+int TPUCheckChipMap(int world_size, int *chipMap)
+{
+  tpudnnStatus_t status = tpudnnCheckChipMap(world_size, chipMap);
+  return (int) status;
 }
 
 } // namespace tpu

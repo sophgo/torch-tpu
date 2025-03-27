@@ -29,8 +29,10 @@ arch = arch_env = os.environ.get('CHIP_ARCH')
 
 def make_symlinks(arch_sel):
     tpudnn = f'libtpudnn.{arch_sel}.so'
-    sofn = f'libtorch_tpu.{arch_sel}.so'
-    symlink(sofn, os.path.join(lib_pwd, 'libtorch_tpu.so'))
+    sofn   = f'libtorch_tpu.{arch_sel}.so'
+    pysofn = f'libtorch_tpu_python.{arch_sel}.so'
+    symlink(pysofn, os.path.join(lib_pwd, 'libtorch_tpu_python.so'))
+    symlink(sofn,   os.path.join(lib_pwd, 'libtorch_tpu.so'))
     symlink(tpudnn, os.path.join(lib_pwd, 'libtpudnn.so'))
 
 if arch_env:
@@ -123,8 +125,3 @@ apply_class_patches()
 ## init TPU's Extension
 # torch_tpu.torch_tpu._initExtension()
 
-# #### distributed
-# # init and register hccl backend
-# torch.distributed.is_sccl_available = lambda : True
-# torch.distributed.Backend.register_backend("sccl", lambda store, group_rank, group_size, timeout:
-#     torch_tpu._C._distributed_c10d.ProcessGroupSCCL(store, group_rank, group_size, timeout), devices=["tpu"])

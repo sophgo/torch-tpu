@@ -56,6 +56,23 @@ namespace TPUNativeFunctions{
         return empty_with_format(size, dtype_opt, layout_opt, device_opt, pin_memory_opt, dst_format);
     }
 
+    static void DummyReportAndDelete(void *ptr){}
+    at::Tensor make_tensor_from_ptr(void *ptr, std::vector<int64_t>& sizes, at::ScalarType dtype)
+    {
+        auto tensor_dtype = at::scalarTypeToTypeMeta(dtype);
+        at::DataPtr ptr_ = {ptr, ptr, &DummyReportAndDelete, tpu::TPUGetCurrentDevice()};
+        auto allocator = c10::GetTPUAllocator();
+        c10::intrusive_ptr<c10::StorageImpl> storage_impl = c10::make_intrusive<torch_tpu::TPUStorageImpl> (
+                            c10::StorageImpl::use_byte_size_t(),
+                            0,
+                            std::move(ptr_),
+                            allocator,
+                            /*resizeable=*/false );
+        auto tensor = at::detail::make_tensor<torch_tpu::TPUTensorImpl> ( storage_impl, tensor_dtype );
+        tensor.unsafeGetTensorImpl()->set_sizes_contiguous ( sizes );
+        return tensor;
+    }
+
 
 } // namespace TPUNativeFunctions
 } // namespace at_tpu

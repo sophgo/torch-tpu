@@ -18,6 +18,7 @@ add_compile_options(-std=c++17 -Wno-attributes -Wall -fPIC)
 add_definitions("-D_GLIBCXX_USE_CXX11_ABI=0")
 add_definitions("-DPYBIND11_BUILD_ABI=\"_cxxabi1011\"")
 
+#################### DEPENDS #######################
 ## pytorch
 if (DEFINED PYTORCH_INSTALL_DIR)
   include_directories(${PYTORCH_INSTALL_DIR}/include/torch/csrc/api/include)
@@ -37,53 +38,37 @@ include_directories($ENV{TPUTRAIN_TOP}/common/include)
 include_directories($ENV{TPUTRAIN_TOP}/sgdnn/include)
 link_directories($ENV{TPUTRAIN_TOP}/build/sgdnn)
 
-## torch_tpu
+## runtime & model-runtime
+include_directories( ${RUNTIME_INCLUDE_PATH} ${MODELRUNTIME_INCLUDE_PATH} )
 
-if(SOC_CROSS_MODE STREQUAL "ON")
-include_directories($ENV{CROSS_TOOLCHAINS}/riscv64-linux-x86_64/python3.10)
+### tpudnn && sccl
+find_package(TPU1686 REQUIRED)
+get_filename_component(tpuDNNPath ${tpuDNN_LIBRARY} DIRECTORY)
+if($ENV{CHIP_ARCH} STREQUAL "sg2260")
+get_filename_component(scclPath   ${SCCL_LIBRARY}   DIRECTORY)
 endif()
+#################### END DEPENDS ####################
+
+######## torch-tpu inc/src
 include_directories($ENV{TPUTRAIN_TOP})
 include_directories(${CMAKE_CURRENT_SOURCE_DIR})
 include_directories(${CMAKE_CURRENT_SOURCE_DIR}/csrc)
 include_directories(${CMAKE_CURRENT_SOURCE_DIR}/csrc/core)
+include_directories(${CMAKE_CURRENT_SOURCE_DIR}/csrc/distributed/c10d)
 
-if(JIT_TRAIN_ENABLE)
-  message(STATUS "JIT_TRAIN_ENABLE")
-  file(GLOB_RECURSE SRCS
-    csrc/core/TPUGuardImpl.cpp
-    csrc/core/TPUAllocator.cpp
-    csrc/core/TPUDeviceManager.cpp
-    csrc/core/TPUTorchUtils.cpp
-    csrc/core/TPUCtypeApi.cpp
-    csrc/jit/*.cpp
-  )
-else()
-  file(GLOB_RECURSE SRCS
-    csrc/core/*.cpp
-    csrc/core/Interface/*.cpp
-    csrc/ops/native_ops/*.cpp
-    csrc/ops/my_ops/*.cpp
-    csrc/ops/autocast_ops/*.cpp
-  )
-endif()
+file(GLOB_RECURSE SRCS
+  csrc/core/*.cpp
+  csrc/core/Interface/*.cpp
+  csrc/ops/native_ops/*.cpp
+  csrc/ops/my_ops/*.cpp
+  csrc/ops/autocast_ops/*.cpp
+  csrc/aten/*.cpp
+  csrc/aten/*/*.cpp
+)
 
-if (BUILD_LIBTORCH)
-  message(STATUS "PYTHON API DISABLE, ONLY C INTERFACE")
-  file(GLOB_RECURSE CSRC_SRCS
-    csrc/libtorch/*.cpp
-  )
-  LIST(APPEND SRCS ${CSRC_SRCS})
-else()
-  include_directories(${PYTHON_INCLUDE_DIR})
-  message(STATUS "PYTHON API ENABLE")
-  file(GLOB_RECURSE CSRC_SRCS
-    csrc/aten/*.cpp
-    csrc/aten/*/*.cpp
-    csrc/tpu/*.cpp
-    csrc/utils/*.cpp
-  )
-  LIST(APPEND SRCS ${CSRC_SRCS})
-endif()
+file(GLOB_RECURSE DIST_SRCS
+  csrc/distributed/c10d/*.cpp
+)
 
 set(concated_src all_in_one.cpp)
 add_custom_command(
@@ -94,65 +79,36 @@ add_custom_command(
     VERBATIM)
 
 if(BACKEND_SG2260)
-  include_directories(${CMAKE_CURRENT_SOURCE_DIR}/csrc/distributed/c10d)
-  list(APPEND concated_src
-    ${CMAKE_CURRENT_SOURCE_DIR}/csrc/distributed/c10d/ProcessGroupSCCL.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/csrc/distributed/c10d/ProcessGroupSCCLHost.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/csrc/distributed/c10d/SCCLHostDeviceFactory.cpp
-  )
-  get_filename_component(scclPath ${SCCL_LIBRARY} DIRECTORY)
+  list(APPEND concated_src ${DIST_SRCS})
 endif()
-
-find_package(TPU1686 REQUIRED)
 
 add_library(torch_tpu SHARED ${concated_src})
-target_link_libraries(torch_tpu TPU1686::tpuDNN c10 torch_cpu)
-
-get_filename_component(tpuDNNPath ${tpuDNN_LIBRARY} DIRECTORY)
-# print all include files path
-get_property(dirs DIRECTORY ${CMAKE_SOURCE_DIR} PROPERTY INCLUDE_DIRECTORIES)
-message(STATUS ">>>> Include directories: ${dirs}")
-
-if(SOC_CROSS_MODE STREQUAL "ON")
-  SET( BMRUNTIME ${CMAKE_SOURCE_DIR}/third_party/bmruntime/lib/bm1684x/arm)
-else()
-  SET( BMRUNTIME ${CMAKE_SOURCE_DIR}/third_party/bmruntime/lib/bm1684x)
-endif()
+target_link_libraries(torch_tpu c10 torch_cpu TPU1686::tpuDNN sgdnn)
 
 if(BACKEND_1684X)
-  include_directories(${RUNTIME_INCLUDE_PATH})
-  include_directories(${CMAKE_SOURCE_DIR}/third_party/bmruntime/include)
-  target_link_directories(torch_tpu PRIVATE ${RUNTIME_LIB_PATH} ${BMRUNTIME})
-  target_link_libraries(torch_tpu sgdnn bmlib bmrt)
-  if(SOC_CROSS_MODE STREQUAL "ON")
-    set_target_properties(torch_tpu PROPERTIES INSTALL_RPATH
-        "$ORIGIN;$ORIGIN/../../third_party/bmlib/lib/arm;$ORIGIN/../../third_party/bmruntime/lib/bm1684x/arm;${tpuDNNPath}")
-  else()
-    set_target_properties(torch_tpu PROPERTIES INSTALL_RPATH
-        "$ORIGIN;$ORIGIN/../../third_party/bmlib/lib;$ORIGIN/../../third_party/bmruntime/lib/bm1684x;${tpuDNNPath}")
-  endif()
+  target_link_directories(torch_tpu PRIVATE ${RUNTIME_LIB_PATH} ${MODELRUNTIME_LIB_PATH})
+  target_link_libraries(torch_tpu bmlib bmrt)
+  set_target_properties(torch_tpu PROPERTIES INSTALL_RPATH
+                        "$ORIGIN;${RUNTIME_LIB_PATH};${MODELRUNTIME_LIB_PATH};${tpuDNNPath}")
   install(TARGETS torch_tpu DESTINATION lib)
 elseif(BACKEND_SG2260)
-
-  if (EXISTS ${CMAKE_SOURCE_DIR}/../tpuv7-runtime)
-    include_directories(${CMAKE_SOURCE_DIR}/../tpuv7-runtime/cdmlib/host/cdm_runtime/include
-                        ${CMAKE_SOURCE_DIR}/../tpuv7-runtime/model-runtime/runtime/include)
+  if (EXISTS ${TPUv7_RUNTIME_REPO_PATH})
+    include_directories( ${TPUv7_REPO_RT_INCLUDE_PATH} ${TPUv7_REPO_MODEL_RT_INCLUDE_PATH} )
     set(tpuv7_rpath "/opt/tpuv7/tpuv7-current/lib:$ORIGIN/../../../tpuv7-runtime/build/cdmlib/host/cdm_runtime:$ORIGIN/../../../tpuv7-runtime/build/model-runtime/runtime:$ORIGIN/../../../tpuv7-runtime/build/model-runtime/bmodel")
-    target_link_directories(torch_tpu PRIVATE "${CMAKE_SOURCE_DIR}/../tpuv7-runtime/build/cdmlib/host/cdm_runtime"
-                                              "${CMAKE_SOURCE_DIR}/../tpuv7-runtime/build/cdmlib/fw/ap/daemon"
-                                              "${CMAKE_SOURCE_DIR}/../tpuv7-runtime/build/model-runtime/runtime"
-                                              "${CMAKE_SOURCE_DIR}/../tpuv7-runtime/build/model-runtime/bmodel" )
+    target_link_directories(torch_tpu PRIVATE ${TPUv7_REPO_RT_LIB_PATH}
+                                              ${TPUv7_REPO_RT_AP_LIB_PATH}
+                                              ${TPUv7_REPO_MODEL_RT_LIB_PATH}
+                                              ${TPUv7_REPO_MODEL_BMODEL_LIB_PATH})
   else()
-  # Use tpu-train current repo third-party library path
+    # Use tpu-train current repo third-party library path
     message("Use tpu-train current repo third-party library path")
-    include_directories(${RUNTIME_INCLUDE_PATH})
-    target_link_directories(torch_tpu PRIVATE ${RUNTIME_LIB_PATH})
-    set(tpuv7_rpath "/opt/tpuv7/tpuv7-current/lib:$ORIGIN/../../third_party/tpuv7_runtime/tpuv7-emulator_0.1.0/lib")
-    # set(tpuv7_rpath "${TPUV7_DRIVER_CURRENT}/lib:$ORIGIN/../../third_party/tpuv7_runtime/tpuv7-emulator_0.1.0/lib")
+    target_link_directories(torch_tpu PRIVATE ${RUNTIME_LIB_PATH} ${MODELRUNTIME_LIB_PATH})
+    set(tpuv7_rpath "/opt/tpuv7/tpuv7-current/lib")
   endif()
   set_target_properties(torch_tpu PROPERTIES INSTALL_RPATH
-      "$ORIGIN;${tpuv7_rpath};${tpuDNNPath};${scclPath}")
-  target_link_libraries(torch_tpu sgdnn tpuv7_rt tpuv7_modelrt sophon TPU1686::sccl)
+                      "$ORIGIN;${tpuv7_rpath};${RUNTIME_LIB_PATH};${MODELRUNTIME_LIB_PATH};
+                       ${tpuDNNPath};${scclPath}")
+  target_link_libraries(torch_tpu tpuv7_rt tpuv7_modelrt sophon TPU1686::sccl)
   if (USING_CMODEL)
     target_link_libraries(torch_tpu cdm_daemon_emulator pthread)
   endif()
@@ -164,3 +120,28 @@ add_custom_command(TARGET torch_tpu POST_BUILD
     COMMAND patchelf --set-soname libtorch_tpu.so $<TARGET_FILE:torch_tpu>
     COMMENT "Change SONAME of libtorch_tpu.so"
     DEPENDS torch_tpu VERBATIM)
+
+### torch-tpu python api interface 
+if(SOC_CROSS_MODE STREQUAL "ON")
+  include_directories($ENV{CROSS_TOOLCHAINS}/riscv64-linux-x86_64/python3.10)
+else()
+  include_directories(${PYTHON_INCLUDE_DIR})
+endif()
+message(STATUS "PYTHON API ENABLE")
+file(GLOB_RECURSE PYC_SRCS
+  csrc/tpu/*.cpp
+  csrc/utils/*.cpp
+)
+add_library(torch_tpu_python SHARED ${PYC_SRCS})
+target_link_directories(torch_tpu_python PRIVATE ${RUNTIME_LIB_PATH} ${MODELRUNTIME_LIB_PATH})
+target_link_libraries(torch_tpu_python torch_tpu)
+
+set_target_properties(torch_tpu_python PROPERTIES INSTALL_RPATH 
+      "$ORIGIN;${tpuv7_rpath};${tpuDNNPath};${scclPath};${RUNTIME_LIB_PATH};${MODELRUNTIME_LIB_PATH}")
+install(TARGETS torch_tpu_python DESTINATION lib)
+
+set_target_properties(torch_tpu_python PROPERTIES SUFFIX ".$ENV{CHIP_ARCH}.so")
+add_custom_command(TARGET torch_tpu_python POST_BUILD
+    COMMAND patchelf --set-soname libtorch_tpu_python.so $<TARGET_FILE:torch_tpu_python>
+    COMMENT "Change SONAME of torch_tpu_python.so"
+    DEPENDS torch_tpu_python VERBATIM)

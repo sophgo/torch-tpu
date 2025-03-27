@@ -218,17 +218,23 @@ class Build(build_ext, ExtBase, object):
     def run(self):
         self.run_command('build_clib')
         package_dir = self.get_package_dir()
-        sym_fn = os.path.join(package_dir, 'lib/libtorch_tpu.so')
-        if not os.path.exists(sym_fn):
+        sym_fnc = os.path.join(package_dir, 'lib/libtorch_tpu.so')
+        sym_fnpy = os.path.join(package_dir, 'lib/libtorch_tpu_python.so')
+
+        if not os.path.exists(sym_fnc):
             lib_fn = glob.glob(os.path.join(package_dir, 'lib/*libtorch_tpu*.so'))[0]
-            os.symlink(lib_fn, sym_fn)
+            os.symlink(lib_fn, sym_fnc)
+        if not os.path.exists(sym_fnpy):
+            lib_fn = glob.glob(os.path.join(package_dir, 'lib/*libtorch_tpu_python*.so'))[0]
+            os.symlink(lib_fn, sym_fnpy)
 
         self.build_lib = os.path.relpath(os.path.join(BASE_DIR, f"build/{get_build_type()}/packages"))
         self.library_dirs.append(
             os.path.relpath(os.path.join(BASE_DIR, f"build/{get_build_type()}/packages/torch_tpu/lib")))
         super(Build, self).run()
 
-        os.unlink(sym_fn)
+        os.unlink(sym_fnc)
+        os.unlink(sym_fnpy)
 
     def finalize_options(self):
         build_ext.finalize_options(self)
@@ -396,6 +402,7 @@ include_directories = [
     os.path.join(TPUV7_RUNTIME_PATH, "tpuv7-emulator_0.1.0", "include"),
     os.path.join(SGDNN_PATH, "include"),
     os.path.join(SGAPI_STRUCT_PATH, "include"),
+    os.path.join(BMLIB_PATH, "include"),
 ]
 if SOC_CROSS:
     include_directories.append(os.path.join(CROSS_TOOLCHAINS, "riscv64-linux-x86_64/python3.10"))
@@ -453,7 +460,7 @@ setup(
             CppExtension(
                 'torch_tpu._C',
                 sources=["torch_tpu/csrc/InitTpuBindings.cpp"],
-                libraries=["torch_tpu"],
+                libraries=["torch_tpu_python"],
                 include_dirs=include_directories,
                 extra_compile_args=extra_compile_args + ['-fstack-protector-all'],
                 library_dirs=lib_directories,

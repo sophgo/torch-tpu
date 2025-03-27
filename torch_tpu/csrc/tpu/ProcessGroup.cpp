@@ -1,4 +1,3 @@
-#pragma once
 #if defined BACKEND_SG2260
 
 #include <pybind11/chrono.h>

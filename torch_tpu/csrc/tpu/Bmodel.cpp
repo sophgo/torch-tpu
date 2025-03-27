@@ -6,27 +6,84 @@
 #include <ATen/ATen.h>
 #include <ATen/NativeFunctions.h>
 #include <torch/extension.h>
+#include <torch/csrc/python_headers.h>
+#include "torch_tpu/csrc/core/TPUStream.h"
 #include "torch_tpu/csrc/core/TPUCtypeApi.h"
 #include "torch_tpu/csrc/utils/LazyInit.h"
 #include "torch_tpu/csrc/aten/TPUFormatCastHelper.h"
-
-
-static void ReportAndDelete(void *ptr)
-{
-  // do nothing
-  #ifdef DEBUG
-  // std::cout << "ReportAndDelete for prt : " << ptr  << std::endl;
-  // std::cout << "PLEASE BE CAREFUL, THIS FUNCTION SHOULD NOT CALLED" << std::endl;
-  #endif
-}
-
-at::DataPtr make_tensor_ptr(void *ptr)
-{
-  return {ptr, ptr, &ReportAndDelete, tpu::TPUGetCurrentDevice()};
-}
+#include "torch_tpu/csrc/aten/TPUNativeFunctions.h"
 
 
 #if defined BACKEND_SG2260
+#include "tpuv7_modelrt.h"
+namespace py = pybind11;
+
+struct PythonTensor {
+  PythonTensor(tpuRtDataType_t dtype_, const char *name_, float scale_,
+               int zero_point_, tpuRtShape_t shape);
+  std::string name;
+  std::string dtype; // f32/f16/bf16/i8/i16/i32/u8/u16/u32
+  float qscale;
+  int qzero_point;
+
+private:
+  py::dtype pytype;
+  void fixDtype(tpuRtDataType_t fmt);
+};
+
+struct PythonNet {
+  PythonNet(tpuRtNet_t *net, const char *netname, int stage = 0);
+
+  uint64_t shapeCount(tpuRtShape_t shape);
+
+  int dataTypeSize(tpuRtDataType_t dtype);
+
+  void printNetworkInfo(tpuRtNetInfo_t *info);
+
+  void dump() { printNetworkInfo(&m_info); }
+
+  // input and output vector is torch tensors
+  void forward(std::vector<py::object>& inputs,
+               std::vector<py::object>& outputs);
+
+  void forward_sync(std::vector<py::object>& inputs,
+               std::vector<py::object>& outputs);
+
+  std::string name;
+  int num_input;
+  int num_output;
+  tpuRtNet_t m_net;
+  tpuRtNetInfo_t m_info;
+  void **input_mems;
+  void **output_mems;
+  std::vector<tpuRtShape_t> input_shapes;
+  std::vector<tpuRtShape_t> output_shapes;
+private:
+  PythonNet() {}
+  tpuRtStream_t m_stream;
+};
+
+struct PythonModel {
+  PythonModel(const std::string &model_file, int dev_id,
+	      const std::string &decrypt_lib);
+
+  ~PythonModel() {
+    tpuRtUnloadNet(m_net);
+    tpuRtDestroyNetContext(m_context);
+    //tpuRtFreeDevice(m_dev_id);
+  }
+
+  std::vector<const char *> networks;
+  int m_net_num;
+  tpuRtNet_t m_net;
+
+private:
+  PythonModel() {}
+  uint32_t chip_id;
+  tpuRtNetContext_t m_context;
+  int m_dev_id = 0;
+};
+
 PythonTensor::PythonTensor(tpuRtDataType_t dtype_, const char *name_, float scale_,
                                  int zero_point_, tpuRtShape_t shape) {
   name = std::string(name_);
@@ -78,16 +135,12 @@ void PythonTensor::fixDtype(tpuRtDataType_t fmt) {
     }
   }
 
-uint64_t shape_count(tpuRtShape_t shape) {
+uint64_t PythonNet::shapeCount(tpuRtShape_t shape) {
     uint64_t count = 1;
     for (int i = 0; i < shape.num_dims; i++) {
       count *= shape.dims[i];
     }
     return count;
-}
-
-uint64_t PythonNet::shapeCount(tpuRtShape_t shape) {
-  return shape_count(shape);
 }
 
 int data_type_size(tpuRtDataType_t dtype) {
@@ -115,9 +168,7 @@ int PythonNet::dataTypeSize(tpuRtDataType_t dtype) {
     return data_type_size(dtype);
 }
 
-// dtype convert into torch dtype
-
-auto convert_dtype_to_torch_dtype(tpuRtDataType_t dtype)
+at::ScalarType convert_dtype_to_torch_dtype(tpuRtDataType_t dtype)
 {
   switch (dtype) {
     case TPU_FLOAT32:
@@ -149,28 +200,10 @@ auto convert_dtype_to_torch_dtype(tpuRtDataType_t dtype)
 
 auto make_tensor_from_ptr(void *ptr, tpuRtShape_t shape, tpuRtDataType_t dtype)
 {
-  auto size = shape_count(shape) * data_type_size(dtype);
-  auto meta_dtype = convert_dtype_to_torch_dtype(dtype);
-  auto tensor_dtype = at::scalarTypeToTypeMeta(meta_dtype);
-  at::detail::check_size_nonnegative ( size );
-  #ifdef DEBUG
-  std::cout << "ptr : " << ptr << "  size : " << size << std::endl;
-  #endif
-  auto ptr_ = make_tensor_ptr(ptr);
-  auto allocator = c10::GetTPUAllocator();
-  c10::intrusive_ptr<c10::StorageImpl> storage_impl = c10::make_intrusive<torch_tpu::TPUStorageImpl> (
-                      c10::StorageImpl::use_byte_size_t(),
-                      size,
-                      std::move(ptr_),
-                      allocator,
-                      /*resizeable=*/false );
-  auto tensor = at::detail::make_tensor<torch_tpu::TPUTensorImpl> ( storage_impl, tensor_dtype );
-  std::vector <int64_t> sizes;
-  for (int i = 0; i < shape.num_dims; i++) {
-    sizes.push_back(shape.dims[i]);
-  }
-  tensor.unsafeGetTensorImpl()->set_sizes_contiguous ( sizes );
-  return tensor;
+  std::vector<int64_t> sizes;
+  for (int i = 0; i < shape.num_dims; i++) { sizes.push_back(shape.dims[i]); }
+  auto torch_dtype = convert_dtype_to_torch_dtype(dtype);
+  return at_tpu::TPUNativeFunctions::make_tensor_from_ptr(ptr, sizes, torch_dtype);
 }
 
 PythonNet::PythonNet(tpuRtNet_t *net, const char *netname, int stage){
@@ -356,8 +389,52 @@ PyObject* THPTPythonNet_getNetworkInfo(PyObject* self, PyObject* args) {
   END_HANDLE_TH_ERRORS
 }
 
-
 #elif defined BACKEND_1684X
+#include "bmruntime_interface.h"
+namespace py = pybind11;
+struct PythonTensor {
+  PythonTensor(bm_data_type_t dtype_, const char *name_, float scale_,
+               int zero_point_, bm_shape_t shape);
+
+  std::string name;
+  std::string dtype; // f32/f16/bf16/i8/i16/i32/u8/u16/u32
+  float qscale;
+  int qzero_point;
+  void fixDtype(bm_data_type_t fmt);
+};
+
+struct PythonNet{
+  PythonNet(void* bmrt_, const char* netname, bm_handle_t handle_, int stage = 0);
+  void dump() { bmrt_print_network_info(m_info); }
+  void forward(std::vector<py::object> &inputs, std::vector<py::object> &outputs);
+  // void forward_dynamic(std::vector<> &inputs, std::vector<> &outputs);
+  void forward_sync(std::vector<py::object> &inputs, std::vector<py::object> &outputs);
+  std::string name;
+  int num_input;
+  int num_output;
+  void* p_bmrt;
+  bm_handle_t bm_handle;
+  const bm_net_info_t* m_info;
+  std::vector<bm_shape_t> input_shapes;
+  std::vector<bm_shape_t> output_shapes;
+  bm_device_mem_t *input_mems;
+  bm_device_mem_t *output_mems;
+};
+
+struct PythonModel{
+  PythonModel(const std::string &model_file, int dev_id, const std::string &decrypt_lib);
+  ~PythonModel(){
+    bmrt_destroy(p_bmrt);
+  }
+
+  std::vector<const char *> networks;
+  int m_net_num;
+  void* p_bmrt;
+  bm_handle_t bm_handle;
+
+  int m_dev_id = 0;
+};
+
 
 PythonTensor::PythonTensor(bm_data_type_t dtype_, const char *name_, float scale_,
                                  int zero_point_, bm_shape_t shape) {
@@ -410,15 +487,7 @@ void PythonTensor::fixDtype(bm_data_type_t fmt){
     }
 }
 
-uint64_t shape_count(bm_shape_t &shape){
-    uint64_t count = 1;
-    for (int i = 0; i < shape.num_dims; i++) {
-      count *= shape.dims[i];
-    }
-    return count;
-}
-
-auto convert_dtype_to_torch_dtype(bm_data_type_t dtype){
+at::ScalarType convert_dtype_to_torch_dtype(bm_data_type_t dtype){
   switch (dtype) {
     case BM_FLOAT32:
       return at::kFloat;
@@ -447,30 +516,12 @@ auto convert_dtype_to_torch_dtype(bm_data_type_t dtype){
   }
 }
 
-static auto make_tensor_from_ptr(bm_device_mem_t dev_mem, bm_shape_t shape, bm_data_type_t dtype){
+at::Tensor make_tensor_from_ptr(bm_device_mem_t dev_mem, bm_shape_t shape, bm_data_type_t dtype){
   auto ptr          = (void*) dev_mem.u.device.device_addr;
-  auto size         = shape_count(shape) * bmrt_data_type_size(dtype);
-  auto meta_dtype   = convert_dtype_to_torch_dtype(dtype);
-  auto tensor_dtype = at::scalarTypeToTypeMeta(meta_dtype);
-  at::detail::check_size_nonnegative(size);
-  #ifdef DEBUG
-  std::cout << "ptr : " << ptr << "  size : " << size << std::endl;
-  #endif
-  auto ptr_      = make_tensor_ptr(ptr);
-  auto allocator = c10::GetTPUAllocator();
-  c10::intrusive_ptr<c10::StorageImpl> storage_impl = c10::make_intrusive<torch_tpu::TPUStorageImpl>(
-                      c10::StorageImpl::use_byte_size_t(),
-                      size,
-                      std::move(ptr_),
-                      allocator,
-                      /*resizeable=*/false);
-  auto tensor    = at::detail::make_tensor<torch_tpu::TPUTensorImpl>(storage_impl, tensor_dtype);
   std::vector<int64_t> sizes;
-  for (int i = 0; i < shape.num_dims; i++) {
-    sizes.push_back(shape.dims[i]);
-  }
-  tensor.unsafeGetTensorImpl()->set_sizes_contiguous(sizes);
-  return tensor;
+  for (int i = 0; i < shape.num_dims; i++) { sizes.push_back(shape.dims[i]); }
+  auto torch_dtype = convert_dtype_to_torch_dtype(dtype);
+  return at_tpu::TPUNativeFunctions::make_tensor_from_ptr(ptr, sizes, torch_dtype);
 }
 
 PythonNet::PythonNet(void* bmrt_, const char* netname, bm_handle_t handle_, int stage){
@@ -608,8 +659,6 @@ PyObject* THPTPythonNet_getNetworkInfo(PyObject* self, PyObject* args){
   END_HANDLE_TH_ERRORS
 }
 
-#else
-// 
 #endif
 
 void PythonModel_deleter(PyObject* capsule) {

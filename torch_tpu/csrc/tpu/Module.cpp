@@ -432,7 +432,7 @@ PyObject* THPTModule_setStream_wrap(
 
 PyObject* THPTModule_emptyCache(PyObject* _unused, PyObject* noargs) {
   HANDLE_TH_ERRORS
-  c10::EmptyCache();
+  tpu::TPUEmptyCache();
   END_HANDLE_TH_ERRORS
   Py_RETURN_NONE;
 }

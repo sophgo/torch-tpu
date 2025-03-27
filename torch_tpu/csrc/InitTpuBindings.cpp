@@ -5,13 +5,9 @@
 #include "torch_tpu/csrc/tpu/Module.h"
 #include "torch_tpu/csrc/tpu/UtilsFunc.h"
 #include "torch_tpu/csrc/utils/AutocastMode.h"
-
 #include "torch_tpu/csrc/tpu/Bmodel.h"
-
-#ifdef BACKEND_SG2260
 #include "torch_tpu/csrc/tpu/Stream.h"
 #include "torch_tpu/csrc/tpu/Event.h"
-#endif
 
 PyObject* module;
 static std::vector<PyMethodDef> methods;
@@ -48,19 +44,15 @@ PyObject* initModule() {
         methods.data()
     };
     module = PyModule_Create(&torchtpu_module);
-#ifdef BACKEND_SG2260
     THPTStream_init(module);
     THPTEvent_init(module);
-#endif
     RegisterTPUProperties(module);
     BindGetDeviceProperties(module);
     return module;
 }
 
 void deinit() {
-#ifdef BACKEND_SG2260
   tpu::TPUDeleteInstance();
-#endif
 }
 
 PyMODINIT_FUNC PyInit__C(void){

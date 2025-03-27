@@ -9,7 +9,6 @@
 #include "torch_tpu/csrc/tpu/Stream.h"
 #include "torch_tpu/csrc/tpu/Module.h"
 
-
 PyObject *THPTStreamClass = nullptr;
 
 static PyObject* THPTStream_pynew(
@@ -179,9 +178,11 @@ PyTypeObject THPTStreamType = {
   THPTStream_pynew,                      /* tp_new */
 };
 
+#endif
 
 void THPTStream_init(PyObject *module)
 {
+#if defined BACKEND_SG2260
   Py_INCREF(THPStreamClass);
   THPTStreamType.tp_base = THPStreamClass;
   THPTStreamClass = (PyObject*)&THPTStreamType;
@@ -192,5 +193,5 @@ void THPTStream_init(PyObject *module)
   if (PyModule_AddObject(module, "_TPUStreamBase", (PyObject *)&THPTStreamType) < 0) {
     throw python_error();
   }
-}
 #endif
+}

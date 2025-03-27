@@ -11,7 +11,7 @@ namespace TPUNativeFunctions {
 ***************************************************************************/
 at::Tensor empty_with_format(at::IntArrayRef size, c10::optional<at::ScalarType> dtype={}, c10::optional<at::Layout> layout={}, c10::optional<at::Device> device={}, c10::optional<bool> pin_memory={}, int64_t tpu_format=0);
 at::Tensor unsafe_empty_with_format(at::IntArrayRef size, c10::optional<at::ScalarType> dtype={}, c10::optional<at::Layout> layout={}, c10::optional<at::Device> device={}, c10::optional<bool> pin_memory={}, int64_t acl_format=2, bool keep_format=false);
-
+at::Tensor make_tensor_from_ptr(void *ptr, std::vector<int64_t>& sizes, at::ScalarType dtype);
 /***************************************************************************
  **********              format cast functions                     *********
 ***************************************************************************/

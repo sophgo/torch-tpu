@@ -155,8 +155,10 @@ PyTypeObject THPTEventType = {
   0,                                     /* tp_alloc */
   THPTEvent_pynew,                       /* tp_new */
 };
+#endif // BACKEND_SG2260
 
 void THPTEvent_init(PyObject *module) {
+#ifdef BACKEND_SG2260
   THPTEventClass = (PyObject*)&THPTEventType;
   if (PyType_Ready(&THPTEventType) < 0) {
     throw python_error();
@@ -165,5 +167,5 @@ void THPTEvent_init(PyObject *module) {
   if (PyModule_AddObject(module, "_TPUEventBase", (PyObject *)&THPTEventType) < 0) {
     throw python_error();
   }
+#endif
 }
-#endif // BACKEND_SG2260
