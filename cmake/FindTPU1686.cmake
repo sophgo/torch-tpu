@@ -41,19 +41,33 @@ if ($ENV{CHIP_ARCH} STREQUAL "bm1684x")
             $ENV{TPUTRAIN_TOP}/third_party/firmware/$ENV{CHIP_ARCH}/)
     endif()
 elseif ($ENV{CHIP_ARCH} STREQUAL "sg2260")
-    find_library(
-        cmodel_firmware_LIBRARY
-        NAMES cmodel_firmware tpuv7_emulator
-        HINTS
-        $ENV{TPUTRAIN_TOP}/../TPU1686/build_$ENV{CHIP_ARCH}/firmware_core/
-        $ENV{TPUTRAIN_TOP}/third_party/tpuv7_runtime/tpuv7-emulator_0.1.0/lib/)
+    if($ENV{SOC_CROSS_MODE} STREQUAL "ON")
+        find_library(
+            cmodel_firmware_LIBRARY
+            NAMES tpuv7_emulator-riscv
+            HINTS
+            $ENV{TPUTRAIN_TOP}/third_party/tpuv7_runtime/tpuv7-emulator_0.1.0/lib/)
 
-    find_library(
-        firmware_LIBRARY
-        NAMES libfirmware_core.a
-        HINTS
-        $ENV{TPUTRAIN_TOP}/../TPU1686/build_fw_$ENV{CHIP_ARCH}/firmware_core/
-        $ENV{TPUTRAIN_TOP}/third_party/firmware/$ENV{CHIP_ARCH}/)
+        find_library(
+            firmware_LIBRARY
+            NAMES libfirmware_core-riscv.a
+            HINTS
+            $ENV{TPUTRAIN_TOP}/third_party/firmware/$ENV{CHIP_ARCH}/)
+    else()
+        find_library(
+            cmodel_firmware_LIBRARY
+            NAMES cmodel_firmware tpuv7_emulator
+            HINTS
+            $ENV{TPUTRAIN_TOP}/../TPU1686/build_$ENV{CHIP_ARCH}/firmware_core/
+            $ENV{TPUTRAIN_TOP}/third_party/tpuv7_runtime/tpuv7-emulator_0.1.0/lib/)
+
+        find_library(
+            firmware_LIBRARY
+            NAMES libfirmware_core.a
+            HINTS
+            $ENV{TPUTRAIN_TOP}/../TPU1686/build_fw_$ENV{CHIP_ARCH}/firmware_core/
+            $ENV{TPUTRAIN_TOP}/third_party/firmware/$ENV{CHIP_ARCH}/)
+    endif()
 
     find_path(
         SCCL_INCLUDE_DIR
@@ -62,24 +76,41 @@ elseif ($ENV{CHIP_ARCH} STREQUAL "sg2260")
         $ENV{TPUTRAIN_TOP}/../TPU1686/sccl/include
         $ENV{TPUTRAIN_TOP}/third_party/sccl/include)
 
-    find_library(
-        SCCL_LIBRARY
-        NAMES sccl
-        HINTS
-        $ENV{TPUTRAIN_TOP}/../TPU1686/build_$ENV{CHIP_ARCH}/sccl/
-        $ENV{TPUTRAIN_TOP}/third_party/sccl/$ENV{CHIP_ARCH}_lib/)
+    if($ENV{SOC_CROSS_MODE} STREQUAL "ON")
+        find_library(
+            SCCL_LIBRARY
+            NAMES sccl-riscv
+            HINTS
+            $ENV{TPUTRAIN_TOP}/../TPU1686/build_$ENV{CHIP_ARCH}/sccl/
+            $ENV{TPUTRAIN_TOP}/third_party/sccl/$ENV{CHIP_ARCH}_lib/)
+    else()
+        find_library(
+            SCCL_LIBRARY
+            NAMES sccl
+            HINTS
+            $ENV{TPUTRAIN_TOP}/../TPU1686/build_$ENV{CHIP_ARCH}/sccl/
+            $ENV{TPUTRAIN_TOP}/third_party/sccl/$ENV{CHIP_ARCH}_lib/)
+    endif()
 
     list(APPEND additional_vars SCCL_INCLUDE_DIR SCCL_LIBRARY)
 
 endif()
 
 if($ENV{SOC_CROSS_MODE} STREQUAL "ON")
-    find_library(
-        tpuDNN_LIBRARY
-        NAMES tpudnn
-        HINTS
-        $ENV{TPUTRAIN_TOP}/../TPU1686/build_$ENV{CHIP_ARCH}/tpuDNN/src/
-        $ENV{TPUTRAIN_TOP}/third_party/tpuDNN/$ENV{CHIP_ARCH}_lib/arm)
+    if ($ENV{CHIP_ARCH} STREQUAL "bm1684x")
+        find_library(
+            tpuDNN_LIBRARY
+            NAMES tpudnn
+            HINTS
+            $ENV{TPUTRAIN_TOP}/../TPU1686/build_$ENV{CHIP_ARCH}/tpuDNN/src/
+            $ENV{TPUTRAIN_TOP}/third_party/tpuDNN/$ENV{CHIP_ARCH}_lib/arm)
+    else()
+        find_library(
+            tpuDNN_LIBRARY
+            NAMES tpudnn-riscv
+            HINTS
+            $ENV{TPUTRAIN_TOP}/third_party/tpuDNN/$ENV{CHIP_ARCH}_lib/)
+    endif()
 else()
     find_library(
         tpuDNN_LIBRARY

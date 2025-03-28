@@ -123,6 +123,8 @@ source scripts/envsetup.sh sg2260
 
 # 构建 TPU 基础内核
 rebuild_TPU1686
+# 构建 TPU RISCV 基础内核
+rebuild_TPU1686_riscv
 
 # 以可编辑模式安装 torch-tpu
 develop_torch_tpu

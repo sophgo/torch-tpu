@@ -243,6 +243,20 @@ function check_third_party() {
   fi
 }
 
+function build_riscv_whl() {
+  origin_cross_mode=${SOC_CROSS_MODE}
+  export SOC_MODE=ON
+  export SOC_CROSS_MODE=ON
+  export CROSS_TOOLCHAINS="$CURRENT_DIR/../../bm_prebuilt_toolchains/"
+  export SOC_CROSS_COMPILE=1
+  new_clean && bdist_wheel
+  ret=$?
+  unset SOC_MODE
+  export SOC_CROSS_MODE=${origin_cross_mode}
+  unset SOC_CROSS_COMPILE
+  return $ret
+}
+
 function run_online_regression_test() {
   echo "[INFO]Ubuntu version"
   version_cmd="cat /etc/os-release"
@@ -330,6 +344,15 @@ function run_online_regression_test() {
         return -1
       fi
     fi
+    if [ $test_CHIP_ARCH = 'sg2260' ]; then
+      build_riscv_whl; ret_regression_for_riscv=$?
+      if [ $ret_regression_for_riscv -eq 0 ];then
+        echo "[RESULT-$test_CHIP_ARCH] riscv torch-tpu.whl is build successfully!"
+      else
+        echo "[RESULT-$test_CHIP_ARCH] riscv torch-tpu.whl is build failed!"
+        return -1
+      fi
+    fi
   fi
 }
 
@@ -396,6 +419,15 @@ function run_daily_regression_test() {
           echo "[RESULT-$test_CHIP_ARCH] regression_for_sccl is computed successfully!"
         else
           echo "[RESULT-$test_CHIP_ARCH] regression_for_sccl is computed failed!"
+          return -1
+        fi
+      fi
+      if [ $test_CHIP_ARCH = 'sg2260' ]; then
+        build_riscv_whl; ret_regression_for_riscv=$?
+        if [ $ret_regression_for_riscv -eq 0 ];then
+          echo "[RESULT-$test_CHIP_ARCH] riscv torch-tpu.whl is build successfully!"
+        else
+          echo "[RESULT-$test_CHIP_ARCH] riscv torch-tpu.whl is build failed!"
           return -1
         fi
       fi

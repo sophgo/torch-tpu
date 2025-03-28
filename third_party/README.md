@@ -8,9 +8,13 @@ tpu-train的第三方库
     commit 1c4644118773ed8294afb37310c654805d12a3d2
     libbm1684x.a libbmlib_cmodel.so libcmodel_firmware.so
 ### sg2260
-    [TPU1686] commit 84831cbc9b45e4181589c68acc3a9f105bf9274f
+    rebuild_TPU1686 && rebuild_TPU1686_riscv
+    [TPU1686] commit 26ea40c5debf7ca02740780a9d2f7f5fdf790b5d
     [libsophon] commit b9622adb89a712c1d2cadec9dd83eabc8850f000
     libbmlib.so.0 libcmodel_firmware.so
+    data: 2025-04-01
+    [tpuv7-runtime] commit bdea5a01ce9ebe6e83d8fc102876e971b2858422
+    libtpuv7_rt.so libtpuv7_modelrt.so
 ### bmlib
 Cmodel版本的BMlib第三方库。参考bmlib下readme。
 

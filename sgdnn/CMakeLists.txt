@@ -41,5 +41,5 @@ elseif(BACKEND_SG2260)
   list(APPEND sgdnn_srcs ${CMAKE_CURRENT_SOURCE_DIR}/src/tpukernel_launcher.cpp)
   add_library(sgdnn ${sgdnn_srcs})
   target_link_libraries(sgdnn torch_tpu_kernel_data)
-  target_link_libraries(sgdnn PUBLIC tpuv7_rt)
+
 endif()

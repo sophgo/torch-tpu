@@ -380,18 +380,29 @@ class bdist_wheel(_bdist_wheel, ExtBase):
         for lib in tpuDNN_libs:
             target = re.match('.+tpuDNN/(\w+)_lib.+', lib).group(1)
             if 'tpudnn' in lib:
-                if 'bm1684x' in lib and SOC_CROSS:
-                    lib = os.path.join(BASE_DIR, 'third_party/tpuDNN/bm1684x_lib/arm/libtpudnn.so')
-                self.copy_file(lib, os.path.join(pkg_dir, f'lib/libtpudnn.{target}.so'))
-        sccl_libs = glob.glob(os.path.join(BASE_DIR, 'third_party/sccl/*_lib/libsccl.so'))
+                if 'bm1684x' in lib:
+                    if SOC_CROSS:
+                        lib = os.path.join(BASE_DIR, 'third_party/tpuDNN/bm1684x_lib/arm/libtpudnn.so')
+                    self.copy_file(lib, os.path.join(pkg_dir, f'lib/libtpudnn.{target}.so'))
+                else:
+                    if 'riscv' in lib and SOC_CROSS:
+                        self.copy_file(lib, os.path.join(pkg_dir, f'lib/libtpudnn.{target}.so'))
+                    elif 'riscv' not in lib and not SOC_CROSS:
+                        self.copy_file(lib, os.path.join(pkg_dir, f'lib/libtpudnn.{target}.so'))
+
+        sccl_libs = glob.glob(os.path.join(BASE_DIR, 'third_party/sccl/*_lib/libsccl*.so'))
         for lib in sccl_libs:
-            self.copy_file(lib, os.path.join(pkg_dir, f'lib/'))
+            if ('riscv' in lib and SOC_CROSS) or ('riscv' not in lib and not SOC_CROSS):
+                self.copy_file(lib, os.path.join(pkg_dir, f'lib/libsccl.so'))
 
         # include libraries just cmodel, for inst-cache use.
         # tpuv7-emulator_0.1.0 is the cmodel version of runtime, no device version contained.
-        base_fw_libs = glob.glob(os.path.join(TPUV7_RUNTIME_PATH, f'tpuv7-emulator_0.1.0/lib/libtpuv7_emulator.so'))
-        base_fw_libs.append(os.path.join(TPUV7_RUNTIME_PATH, 'tpuv7-emulator_0.1.0/lib/libdnnl.so.3'))
+        base_fw_libs = glob.glob(os.path.join(TPUV7_RUNTIME_PATH, f'tpuv7-emulator_0.1.0/lib/libtpuv7_emulator.so')) if not SOC_CROSS else \
+                       glob.glob(os.path.join(TPUV7_RUNTIME_PATH, f'tpuv7-emulator_0.1.0/lib/libtpuv7_emulator-riscv.so'))
         for lib in base_fw_libs:
+            self.copy_file(lib, os.path.join(pkg_dir, f'lib/libtpuv7_emulator.so'))
+        dnn_libs = glob.glob(os.path.join(TPUV7_RUNTIME_PATH, 'tpuv7-emulator_0.1.0/lib/libdnnl.so.3'))
+        for lib in dnn_libs:
             target = os.path.join(pkg_dir, f'lib/', os.path.basename(lib))
             self.copy_file(lib, target)
 
@@ -421,7 +432,7 @@ include_directories = [
     os.path.join(SGAPI_STRUCT_PATH, "include"),
     os.path.join(BMLIB_PATH, "include"),
 ]
-if SOC_CROSS:
+if SOC_CROSS and os.environ["CHIP_ARCH"] == "sg2260":
     include_directories.append(os.path.join(CROSS_TOOLCHAINS, "riscv64-linux-x86_64/python3.10"))
 lib_directories = [
     os.path.join(BASE_DIR, f"build/{get_build_type()}/packages", "torch_tpu/lib"),

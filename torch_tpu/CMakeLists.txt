@@ -108,7 +108,11 @@ elseif(BACKEND_SG2260)
   set_target_properties(torch_tpu PROPERTIES INSTALL_RPATH
                       "$ORIGIN;${tpuv7_rpath};${RUNTIME_LIB_PATH};${MODELRUNTIME_LIB_PATH};
                        ${tpuDNNPath};${scclPath}")
-  target_link_libraries(torch_tpu tpuv7_rt tpuv7_modelrt sophon TPU1686::sccl)
+  if((SOC_CROSS_MODE STREQUAL "ON") AND (NOT EXISTS ${TPUv7_RUNTIME_REPO_PATH}))
+    target_link_libraries(torch_tpu tpuv7_rt_riscv tpuv7_modelrt_riscv sophon TPU1686::sccl)
+  else()
+    target_link_libraries(torch_tpu tpuv7_rt tpuv7_modelrt sophon TPU1686::sccl)
+  endif()
   if (USING_CMODEL)
     target_link_libraries(torch_tpu cdm_daemon_emulator pthread)
   endif()

@@ -1,4 +1,4 @@
-option(DEBUG "option for debug" ON)
+option(DEBUG "option for debug" OFF)
 
 if(DEBUG OR "$ENV{TPUTRAIN_BUILD_TYPE}" STREQUAL "ON")
   set(CMAKE_BUILD_TYPE "Debug")

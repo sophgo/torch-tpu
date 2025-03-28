@@ -34,7 +34,11 @@ target_link_directories(torch_tpu_python PRIVATE
                           ${PYTORCH_INSTALL_DIR}/lib
                           $ENV{TORCH_TPU_PATH}/lib
                         )
-target_link_libraries(torch_tpu_python torch_tpu.$ENV{CHIP_ARCH} torch_python torch_cpu c10 tpuv7_rt tpuv7_modelrt)
+if(SOC_CROSS_MODE STREQUAL "ON")
+  target_link_libraries(torch_tpu_python torch_tpu.$ENV{CHIP_ARCH} torch_python torch_cpu c10 tpuv7_rt_riscv tpuv7_modelrt_riscv)
+else()
+  target_link_libraries(torch_tpu_python torch_tpu.$ENV{CHIP_ARCH} torch_python torch_cpu c10 tpuv7_rt tpuv7_modelrt)
+endif()
 
 set_target_properties(torch_tpu_python PROPERTIES INSTALL_RPATH 
       "$ORIGIN;${tpuv7_rpath}")

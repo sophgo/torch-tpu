@@ -166,6 +166,8 @@ export EXTRA_CONFIG='-DDEBUG=ON -DUSING_FW_PRINT=ON -DUSING_FW_DEBUG=ON'
 
 # Build TPU base kernels
 rebuild_TPU1686
+# Build TPU RISCV base kernels
+rebuild_TPU1686_riscv
 
 # Make sure we have a clean env
 pip uninstall --yes torch-tpu
