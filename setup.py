@@ -259,16 +259,6 @@ class Clean(distutils.command.clean.clean):
             input('\nsetup.py clean will run git clean -fdx, \033[1;31mTHIS IS DANGEROUS!\033[0m\nMake sure you known what you are doing.\n\nOtherwise Ctrl-C to exit NOW!\n')
         subprocess.check_call(['git', 'clean', '-fdx'], cwd=BASE_DIR, env=os.environ)
 
-def generate_backend_py():
-    backend_f = os.path.join(BASE_DIR, "torch_tpu", "tpu/backend.py")
-    with open(backend_f, 'w') as f:
-        if os.environ.get("CHIP_ARCH", None) == 'bm1684x':
-            f.write("BACKEND='1684X'")
-        elif os.environ.get("CHIP_ARCH", None) == 'sg2260':
-            f.write("BACKEND='SG2260'")
-        else:
-            raise RuntimeError("Failed to generate backend.py")
-
 def walk_dir(dir):
     res = []
     for root, _, files in os.walk(dir):
@@ -330,7 +320,6 @@ def get_src_py_and_dst():
 
 class PythonPackageBuild(build_py, object):
     def run(self) -> None:
-        generate_backend_py()
         ret = get_src_py_and_dst()
         for src, dst in ret:
             self.copy_file(src, dst)
@@ -345,7 +334,6 @@ class EggInfoBuild(egg_info, object):
         super(EggInfoBuild, self).finalize_options()
 
     def run(self):
-        generate_backend_py()
         super().run()
 
 class bdist_wheel(_bdist_wheel, ExtBase):
@@ -427,15 +415,15 @@ extra_compile_args = [
     '-D_GLIBCXX_USE_CXX11_ABI=0'
 ]
 
+if os.environ.get("CHIP_ARCH", None) == 'sg2260':
+    extra_compile_args += ["-DBACKEND_SG2260"]
+
 if DEBUG:
     extra_compile_args += ['-O0', '-g']
     extra_link_args += ['-O0', '-g', '-Wl,-z,now']
 else:
     extra_compile_args += ['-DNDEBUG']
     extra_link_args += ['-Wl,-z,now,-s']
-
-extra_compile_args_sg2260 = extra_compile_args.copy() + ["-DBACKEND_SG2260"]
-extra_compile_args_bm1684x = extra_compile_args
 
 from setuptools.command.develop import develop as _develop
 class CustomDevelop(_develop):
@@ -463,22 +451,13 @@ setup(
         package_dir={'': os.path.relpath(os.path.join(BASE_DIR, f"build/{get_build_type()}/packages"))},
         ext_modules=[
             CppExtension(
-                'torch_tpu.sg2260._C',
+                'torch_tpu._C',
                 sources=["torch_tpu/csrc/InitTpuBindings.cpp"],
                 libraries=["torch_tpu"],
                 include_dirs=include_directories,
-                extra_compile_args=extra_compile_args_sg2260 + ['-fstack-protector-all'],
+                extra_compile_args=extra_compile_args + ['-fstack-protector-all'],
                 library_dirs=lib_directories,
-                extra_link_args=extra_link_args + ['-Wl,-rpath,$ORIGIN/../lib'],
-            ),
-            CppExtension(
-                'torch_tpu.bm1684x._C',
-                sources=["torch_tpu/csrc/InitTpuBindings.cpp"],
-                libraries=["torch_tpu"],
-                include_dirs=include_directories,
-                extra_compile_args=extra_compile_args_bm1684x + ['-fstack-protector-all'],
-                library_dirs=lib_directories,
-                extra_link_args=extra_link_args + ['-Wl,-rpath,$ORIGIN/../lib'],
+                extra_link_args=extra_link_args + ['-Wl,-rpath,$ORIGIN/lib'],
             )
         ],
         entry_points={
@@ -494,13 +473,9 @@ setup(
         dependency_links = [
             "https://download.pytorch.org/whl/cpu",
         ],
-        include_package_data=True,
         package_data={
             'torch_tpu': [
-                '*.so', 
-                'lib/*.so*',
-                'sg2260/*.so',
-                'bm1684x/*.so',
+                '*.so', 'lib/*.so*',
             ],
         },
         cmdclass={

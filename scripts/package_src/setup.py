@@ -24,16 +24,6 @@ def get_pytorch_dir():
         frame_summary = traceback.extract_tb(exc_traceback)[-1]
         return os.path.dirname(frame_summary.filename)
 
-def generate_backend_py():
-    backend_f = os.path.join(BASE_DIR, "torch_tpu", "tpu/backend.py")
-    with open(backend_f, 'w') as f:
-        if os.environ.get("CHIP_ARCH", None) == 'bm1684x':
-            f.write("BACKEND='1684X'")
-        elif os.environ.get("CHIP_ARCH", None) == 'sg2260':
-            f.write("BACKEND='SG2260'")
-        else:
-            raise RuntimeError("Failed to generate backend.py")
-
 def find_package_data(directory):
     paths = []
     for root, dirs, files in os.walk(directory):

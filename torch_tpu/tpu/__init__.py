@@ -1,5 +1,3 @@
-from .backend import BACKEND
-
 __all__ = [
     "StreamContext",
     "can_device_access_peer",
@@ -112,7 +110,7 @@ __all__ = [
     # "matmul",
     # "conv",
 ]
-
+import os
 from typing import Tuple
 import torch
 import torch_tpu
@@ -133,7 +131,7 @@ from .utils import ( _lazy_call, _lazy_init, init,is_initialized, is_available,
                     memory_usage, set_sync_debug_mode, utilization, temperature,
                     power_draw, clock_rate
                     )
-if BACKEND == "SG2260":
+if os.environ.get('CHIP_ARCH') == "sg2260":
     from .streams import Stream, ExternalStream, Event
     from .bmodel_runtime import BmodelRunner, dtype_map
 
