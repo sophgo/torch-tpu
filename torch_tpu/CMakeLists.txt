@@ -133,7 +133,16 @@ file(GLOB_RECURSE PYC_SRCS
   csrc/utils/*.cpp
 )
 add_library(torch_tpu_python SHARED ${PYC_SRCS})
-target_link_directories(torch_tpu_python PRIVATE ${RUNTIME_LIB_PATH} ${MODELRUNTIME_LIB_PATH})
+
+if (BACKEND_SG2260 AND (EXISTS ${TPUv7_RUNTIME_REPO_PATH}))
+  target_link_directories(torch_tpu_python PRIVATE ${TPUv7_REPO_RT_LIB_PATH}
+                                                  ${TPUv7_REPO_RT_AP_LIB_PATH}
+                                                  ${TPUv7_REPO_MODEL_RT_LIB_PATH}
+                                                  ${TPUv7_REPO_MODEL_BMODEL_LIB_PATH})
+      else()
+  target_link_directories(torch_tpu_python PRIVATE ${RUNTIME_LIB_PATH} ${MODELRUNTIME_LIB_PATH})
+endif()
+
 target_link_libraries(torch_tpu_python torch_tpu)
 
 set_target_properties(torch_tpu_python PROPERTIES INSTALL_RPATH 
