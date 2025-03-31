@@ -2,9 +2,13 @@ pushd $TPUTRAIN_TOP/dist
 
 
 package_src=src
+package_csrc=src/torch_tpu/csrc
 setup_path=$TPUTRAIN_TOP/scripts/package_src/setup.py
 readme_path=$TPUTRAIN_TOP/scripts/package_src/README.md
 binding_src=$TPUTRAIN_TOP/torch_tpu/csrc/InitTpuBindings.cpp
+pyc_tpu_src=$TPUTRAIN_TOP/torch_tpu/csrc/tpu
+pyc_utils_src=$TPUTRAIN_TOP/torch_tpu/csrc/utils
+pyc_cmake=$TPUTRAIN_TOP/scripts/package_src/CMakeLists.txt
 
 # ==================================================================
 echo "[step-1] package torch-tpu"
@@ -19,7 +23,12 @@ unzip $keep_file
 mv torch_tpu        $package_src/
 cp $setup_path      $package_src/torch_tpu/
 cp $binding_src     $package_src/torch_tpu/
-rm $package_src/torch_tpu/*.so
+mkdir $package_csrc
+cp -r $pyc_tpu_src     $package_csrc
+cp -r $pyc_utils_src   $package_csrc
+cp $pyc_cmake       $package_csrc
+rm $package_src/torch_tpu/_C*.so # _C.so
+rm $package_src/torch_tpu/lib/libtorch_tpu_python.*.so # libtorch_tpu_python
 rm -rf *.egg-info
 rm -rf *.dist-info
 

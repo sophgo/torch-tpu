@@ -2,8 +2,8 @@
 
 #include <c10/util/hash.h>
 #include "tpuDNN.h"
-#include "TPUStream.h"
 #include "sccl.h"
+#include "torch_tpu/csrc/core/TPUStream.h"
 
 #include <condition_variable>
 #include <deque>

@@ -13,7 +13,7 @@
 #include "torch_tpu/csrc/core/TPUFunction.h"
 #if defined BACKEND_SG2260
 #include "torch_tpu/csrc/core/TPUStream.h"
-#include "ProcessGroupSCCL.hpp"
+#include "torch_tpu/csrc/distributed/c10d/ProcessGroupSCCL.hpp"
 #include "torch_tpu/csrc/core/Interface/sgrtInterface.h"
 #endif
 

@@ -1,20 +1,26 @@
 import os
 import sys
+import platform
 import traceback
+import subprocess
 from sysconfig import get_paths
 from setuptools import setup, Extension, distutils
+from setuptools.command.build_clib import build_clib
+from distutils.version import LooseVersion
+
+FORMTER = "===="*10 + "\n" + "=== {}\n" + "===="*10
 
 VERSION = '2.1.0.post1'
-
 CHIP_ARCH           = os.environ["CHIP_ARCH"]  = "sg2260"
-BASE_DIR            = os.path.dirname(os.path.realpath(__file__)) + "/.."
-SGDNN_PATH          = os.path.join(BASE_DIR,         "sgdnn")
-THIRD_PARTY_PATH    = os.path.join(BASE_DIR,         "third_party")
-TORCH_TPU_PATH      = os.path.join(BASE_DIR,         "torch_tpu") 
-TPUDNN_PATH         = os.path.join(THIRD_PARTY_PATH, "tpuDNN")
-SCCL_PATH           = os.path.join(THIRD_PARTY_PATH, "sccl")
-TPUV7_RUNTIME_PATH  = os.path.join(THIRD_PARTY_PATH, "tpuv7_runtime")
-BMLIB_PATH          = os.path.join(THIRD_PARTY_PATH, "bmlib")
+print(FORMTER.format(f"CHIP_ARCH={CHIP_ARCH}"))
+os.environ['BASE_DIR']            = BASE_DIR           = os.path.dirname(os.path.realpath(__file__)) + "/.."
+os.environ['SGDNN_PATH']          = SGDNN_PATH         = os.path.join(BASE_DIR,         "sgdnn")
+os.environ['THIRD_PARTY_PATH']    = THIRD_PARTY_PATH   = os.path.join(BASE_DIR,         "third_party")
+os.environ['TORCH_TPU_PATH']      = TORCH_TPU_PATH     = os.path.join(BASE_DIR,         "torch_tpu") 
+os.environ['TPUDNN_PATH']         = TPUDNN_PATH        = os.path.join(THIRD_PARTY_PATH, "tpuDNN")
+os.environ['SCCL_PATH']           = SCCL_PATH          = os.path.join(THIRD_PARTY_PATH, "sccl")
+os.environ['TPUV7_RUNTIME_PATH']  = TPUV7_RUNTIME_PATH = os.path.join(THIRD_PARTY_PATH, "tpuv7_runtime/tpuv7-emulator_0.1.0")
+os.environ['BMLIB_PATH']          = BMLIB_PATH         = os.path.join(THIRD_PARTY_PATH, "bmlib")
 def get_pytorch_dir():
     try:
         import torch
@@ -23,6 +29,40 @@ def get_pytorch_dir():
         _, _, exc_traceback = sys.exc_info()
         frame_summary = traceback.extract_tb(exc_traceback)[-1]
         return os.path.dirname(frame_summary.filename)
+
+def which(thefile):
+    path = os.environ.get("PATH", os.defpath).split(os.pathsep)
+    for d in path:
+        fname = os.path.join(d, thefile)
+        fnames = [fname]
+        if sys.platform == 'win32':
+            exts = os.environ.get('PATHEXT', '').split(os.pathsep)
+            fnames += [fname + ext for ext in exts]
+        for name in fnames:
+            if os.access(name, os.F_OK | os.X_OK) and not os.path.isdir(name):
+                return name
+    return None
+
+def get_cmake_command():
+    def _get_version(cmd):
+        for line in subprocess.check_output([cmd, '--version']).decode('utf-8').split('\n'):
+            if 'version' in line:
+                return LooseVersion(line.strip().split(' ')[2])
+        raise RuntimeError('no version found')
+    "Returns cmake command."
+    cmake_command = 'cmake'
+    if platform.system() == 'Windows':
+        return cmake_command
+    cmake3 = which('cmake3')
+    cmake = which('cmake')
+    if cmake3 is not None and _get_version(cmake3) >= LooseVersion("3.12.0"):
+        cmake_command = 'cmake3'
+        return cmake_command
+    elif cmake is not None and _get_version(cmake) >= LooseVersion("3.12.0"):
+        return cmake_command
+    else:
+        raise RuntimeError('no cmake or cmake3 with version >= 3.12.0 found')
+
 
 def find_package_data(directory):
     paths = []
@@ -42,6 +82,29 @@ def package_data():
     package_data_.extend(find_package_data(os.path.join(TORCH_TPU_PATH, "dynamo")))
     package_data_.extend(find_package_data(os.path.join(TORCH_TPU_PATH, "demo")))
     return package_data_
+
+# torch-tpu-python
+class PYClibBuild():
+    def run(self):
+        self.cmake = get_cmake_command()
+        cmake_args = [
+            '-DPYTHON_INCLUDE_DIR='   +  get_paths()['include'],
+            '-DPYTORCH_INSTALL_DIR='  +  get_pytorch_dir(),
+            '-Dtpuv7_rpath='          +  "/opt/tpuv7/tpuv7-current/lib",
+            ]
+        install_cmd = 'install/strip'
+        if CHIP_ARCH == 'sg2260':
+            cmake_args.append('-DBACKEND_SG2260=ON')
+        elif CHIP_ARCH == 'bm1684x':
+            cmake_args.append('-DBACKEND_1684X=ON')
+        build_dir = "./build"
+        os.makedirs(build_dir, exist_ok=True)
+        
+        build_args = ['-j', str(os.cpu_count())]
+        subprocess.check_call([self.cmake, '../csrc'] + cmake_args, cwd=build_dir, env=os.environ)
+        subprocess.check_call(['make'] + build_args, cwd=build_dir, env=os.environ)
+        subprocess.check_call(['make', install_cmd], cwd=build_dir, env=os.environ)
+        os.system('cp ' + os.path.join(build_dir,"*.so") + " lib/")
 
 ## pybinding compile related
 def CppExtension(name, sources, *args, **kwargs):
@@ -76,8 +139,9 @@ include_directories = [
     os.path.join(SGDNN_PATH,         "include"),
     os.path.join(TPUDNN_PATH,        "include"),
     os.path.join(SCCL_PATH,          "include"),
-    os.path.join(TPUV7_RUNTIME_PATH, "tpuv7-emulator_0.1.0/include"),
+    os.path.join(TPUV7_RUNTIME_PATH, "include"),
 ]
+
 lib_directories    = [ os.path.join(TORCH_TPU_PATH, "lib") ]
 extra_link_args    = [ '-Wl,-z,now,-s', '-Wl,-rpath,$ORIGIN/lib' ]
 extra_compile_args = [
@@ -92,41 +156,45 @@ extra_compile_args = [
     '-fstack-protector-all'
 ]
 
-setup(
-        name=os.environ.get('TORCH_TPU_PACKAGE_NAME', 'torch_tpu'),
-        version=VERSION,
-        author="sophgo",
-        author_email="dev@sophgo.com",
-        description='TPU bridge for PyTorch',
-        url='https://github.com/sophgo/torch-tpu',
-        packages=["torch_tpu"],
-        libraries=[(f'torch_tpu.{CHIP_ARCH}', {'sources': list()})],
-        package_dir={'torch_tpu': TORCH_TPU_PATH},
-        ext_modules=[
-            CppExtension(
-                'torch_tpu._C',
-                sources             = ["InitTpuBindings.cpp"],
-                libraries           = [],
-                include_dirs        = include_directories,
-                extra_compile_args  = extra_compile_args,
-                library_dirs        = lib_directories,
-                extra_link_args     = extra_link_args,
-            )
-        ],
-        entry_points={
-            'console_scripts': [
-                'tpu_apply_all_patch=torch_tpu.utils:apply_all_patches',
-                'tpu_revert_all_patch=torch_tpu.utils:revert_all_patches',
-                'tpu_gen_sccl_rank_table=torch_tpu.utils:gen_sccl_rank_table',
-                'tpu_show_topology=torch_tpu.utils:show_topology'
+if __name__ == "__main__":
+    pyc = PYClibBuild()
+    pyc.run()
+
+    setup(
+            name=os.environ.get('TORCH_TPU_PACKAGE_NAME', 'torch_tpu'),
+            version=VERSION,
+            author="sophgo",
+            author_email="dev@sophgo.com",
+            description='TPU bridge for PyTorch',
+            url='https://github.com/sophgo/torch-tpu',
+            packages=["torch_tpu"],
+            libraries=[(f'torch_tpu.{CHIP_ARCH}', {'sources': list()})],
+            package_dir={'torch_tpu': TORCH_TPU_PATH},
+            ext_modules=[
+                CppExtension(
+                    'torch_tpu._C',
+                    sources             = ["InitTpuBindings.cpp"],
+                    libraries           = [],
+                    include_dirs        = include_directories,
+                    extra_compile_args  = extra_compile_args,
+                    library_dirs        = lib_directories,
+                    extra_link_args     = extra_link_args,
+                )
             ],
-        },
-        python_requires=">=3.8",
-        install_requires = [],
-        dependency_links = [
-            "https://download.pytorch.org/whl/cpu",
-        ],
-        package_data={
-            'torch_tpu': package_data()
-        },
-    )
+            entry_points={
+                'console_scripts': [
+                    'tpu_apply_all_patch=torch_tpu.utils:apply_all_patches',
+                    'tpu_revert_all_patch=torch_tpu.utils:revert_all_patches',
+                    'tpu_gen_sccl_rank_table=torch_tpu.utils:gen_sccl_rank_table',
+                    'tpu_show_topology=torch_tpu.utils:show_topology'
+                ],
+            },
+            python_requires=">=3.8",
+            install_requires = [],
+            dependency_links = [
+                "https://download.pytorch.org/whl/cpu",
+            ],
+            package_data={
+                'torch_tpu': package_data()
+            },
+        )

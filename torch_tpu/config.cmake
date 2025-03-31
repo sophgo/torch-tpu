@@ -9,6 +9,7 @@ option(SHOW_CPU_OP      "option for cpu op using "                        OFF)
 option(SHOW_MALLOC_INFO "option for memory usage info"                    OFF)
 option(BUILD_LIBTORCH   "option for control use only build libtorch"      OFF)
 option(SHOW_EACH_OP_TIME     "option for show op time"                    OFF)
+option(HOSTCCL          "option for compile Hostsccl"                     OFF)
 
 if (DEBUG)
     set(CMAKE_BUILD_TYPE "Debug")
@@ -35,6 +36,10 @@ endif()
 
 if(SHOW_EACH_OP_TIME)
   add_definitions(-DSHOW_EACH_OP_TIME)
+endif()
+
+if(HOSTCCL)
+  add_definitions(-DHOSTCCL)
 endif()
 
 ######################################

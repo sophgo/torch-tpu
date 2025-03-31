@@ -195,6 +195,7 @@ class CPPLibBuild(build_clib, ExtBase, object):
             '-DPYTHON_INCLUDE_DIR=' + python_path_dir(),
             '-DPYTORCH_INSTALL_DIR=' + get_pytorch_dir(),
             '-DBUILD_LIBTORCH=0',
+            '-DHOSTCCL=ON',
             f'-DKERNEL_MODULE_PATH={fw_path}',
             f'-DCMAKE_INSTALL_PREFIX={package_dir}'
             ]
@@ -296,7 +297,7 @@ def get_src_py_and_dst():
         ret.append((src, dst))
 
     header_files = [
-        "torch_tpu/csrc/**/*.h",
+        "torch_tpu/csrc/**/*.h", "torch_tpu/csrc/**/**/*.hpp"
     ]
     glob_header_files = []
     for regex_pattern in header_files:

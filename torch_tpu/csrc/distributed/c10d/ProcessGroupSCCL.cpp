@@ -16,9 +16,9 @@
 #include <sys/types.h>
 #include <type_traits>
 
-#include "ProcessGroupSCCL.hpp"
-#include "TPUDeviceManager.h"
-#include "TPUAddrHelper.h"
+#include "torch_tpu/csrc/distributed/c10d/ProcessGroupSCCL.hpp"
+#include "torch_tpu/csrc/core/TPUDeviceManager.h"
+#include "torch_tpu/csrc/core/TPUAddrHelper.h"
 #include "sccl.h"
 
 namespace c10d {
