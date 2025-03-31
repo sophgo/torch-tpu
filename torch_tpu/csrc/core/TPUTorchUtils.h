@@ -216,6 +216,8 @@ static inline T TPUGenerateDnnTensor ( const at::Tensor & Tensor )
 }
 static inline SgdnnTensor_t TPUGenerateSgdnnTensor ( const at::Tensor & Tensor )
 {
+  CHECK_TENSOR_IN_DEVICE_NO_CONTIGUOUS(Tensor);
+
   SgdnnTensor_t t = { 0 };
   unsigned long long data_ptr;
   if (at_tpu::StorageDescHelper::IsBaseFormatType(Tensor)) {
@@ -240,6 +242,8 @@ using func_Sgdnn_t = SgdnnTensor_t (*)(const at::Tensor &);
 
 static inline tpudnnTensor_t TPUGenerateTpudnnTensor(tpudnnHandle_t handle, const at::Tensor & Tensor)
 {
+  CHECK_TENSOR_IN_DEVICE_NO_CONTIGUOUS(Tensor);
+
   tpudnnTensor_t t = { 0 };
   unsigned long long data_ptr;
   if (at_tpu::StorageDescHelper::IsBaseFormatType(Tensor)) {

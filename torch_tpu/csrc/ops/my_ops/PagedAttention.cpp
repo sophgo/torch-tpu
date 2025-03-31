@@ -90,7 +90,7 @@ namespace at
 			fetch_slots.has_value() ? tpu::TPUGenerateTpudnnTensor(stream, fetch_slots.value()) : tpudnnUndefinedTensor(),
 			mask.has_value() ? tpu::TPUGenerateTpudnnTensor(stream, mask.value()) : tpudnnUndefinedTensor(),
 			tpudnnUndefinedTensor(), tpudnnUndefinedTensor(), tpudnnUndefinedTensor(),
-			tpu::TPUGenerateTpudnnTensor(stream, input_lengths),
+			tpudnnUndefinedTensor(),
             rope_head_size,
 			(int*)input_lengths.data_ptr(),
       	    (int)(input_lengths.nbytes()/4),

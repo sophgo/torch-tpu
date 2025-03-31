@@ -31,6 +31,9 @@ Tensor & index_out_tpu( const Tensor & self, const c10::List<c10::optional<Tenso
       auto idx = indices[0].value();
       auto idx_value = idx.scalar_type() == torch::kInt64 || idx.scalar_type() == torch::kInt32 ? idx : idx.to(torch::kInt32);
 
+      if (!IS_TPU_TENSOR(idx_value))
+          idx_value = idx_value.to(self.device());
+
       auto stream = c10_tpu::getCurrentTPUStream();
       if (tpu::TPUConvertDtype<SgdnnDataType_t>(self.dtype()) == SGDNN_DTYPE_INT64){
         auto self_ = self.to(torch::kInt32);
