@@ -114,7 +114,12 @@ Tensor _to_copy_tpu(const Tensor &self, c10::optional<ScalarType> dtype_opt,
   auto option = self.options();
   auto dtype = dtype_opt.has_value() ? dtype_opt.value()
                                      : typeMetaToScalarType(option.dtype());
-  if ( IS_CPU_TENSOR(self) && dtype == ScalarType::Long ) dtype = ScalarType::Int;
+  auto self_ = self;
+  if ( IS_CPU_TENSOR(self) && dtype == ScalarType::Long )
+  {
+    dtype = ScalarType::Int;
+    self_ = self.to(dtype);
+  } 
 
   auto layout = layout_opt.has_value() ? layout_opt.value() : option.layout();
   auto device = device_opt.has_value() ? device_opt.value() : option.device();
@@ -129,12 +134,12 @@ Tensor _to_copy_tpu(const Tensor &self, c10::optional<ScalarType> dtype_opt,
 
   // copy formated tpu Tensor to cpu, recover tpu tensor's format firstly 
   if ( device.type() == c10::DeviceType::CPU  && 
-        !at_tpu::StorageDescHelper::IsBaseFormatType(self) )
+        !at_tpu::StorageDescHelper::IsBaseFormatType(self_) )
   {
-    auto self_ori = at_tpu::TPUNativeFunctions::tpu_format_cast_back_to_origin(self);
+    auto self_ori = at_tpu::TPUNativeFunctions::tpu_format_cast_back_to_origin(self_);
     return _copy_from_tpu(self_ori, dst, non_blocking);
   }
-  return _copy_from_tpu(self, dst, non_blocking);
+  return _copy_from_tpu(self_, dst, non_blocking);
 }
 
 Tensor clone_tpu(const Tensor &self,

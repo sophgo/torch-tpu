@@ -22,6 +22,7 @@ Tensor empty_strided_tpu ( IntArrayRef                size,
   TIMING_START;
   torch_tpu::utils::maybe_initialize_tpu(device_opt);
   auto scalar_type = dtype_or_default ( dtype_opt );
+  TORCH_CHECK( scalar_type != ScalarType::Long, "not support int64, please use int32");
   // auto pin_memory = pinned_memory_or_default ( pin_memory_opt );
   at::detail::check_size_nonnegative ( size );
   caffe2::TypeMeta dtype = scalarTypeToTypeMeta ( scalar_type );
@@ -52,6 +53,7 @@ c10::optional<c10::MemoryFormat>  memory_format_opt )
   TIMING_START;
   torch_tpu::utils::maybe_initialize_tpu(device_opt);
   auto scalar_type = dtype_or_default ( dtype_opt );
+  TORCH_CHECK( scalar_type != ScalarType::Long, "not support int64, please use int32");
   // auto pin_memory = pinned_memory_or_default ( pin_memory_opt );
   constexpr c10::DispatchKeySet ks ( c10::DispatchKey::TPU );
   auto allocator = c10::GetTPUAllocator();
