@@ -4,7 +4,7 @@
 
 ## Step1: prepare base torch-tpu environment
 
-You can refer to [README.md](../../README.md) to prepare base torch-tpu environment.
+You can refer to [README.md] or UserGuide to prepare base torch-tpu environment.
 
 
 ## Step2: Install `torch_tpu` in the docker container
