@@ -141,7 +141,7 @@ dataset_option=" \
 pr_options=" \
         --fp16 \
         --apply-query-key-layer-scaling \
-        --loss-scale 16384.0 \
+        --initial-loss-scale 16384.0 \
         --use-cpu-initialization"
 
 sft_option=" \
@@ -175,7 +175,7 @@ RANK=$rank \
 WORLD_SIZE=$((TP*PP)) \
 LOCAL_RANK=$rank \
 LOCAL_WORLD_SIZE=$((TP*PP)) \
-CMODEL_FAST_EXEC=1 CMODEL_GLOBAL_MEM_SIZE=120000000000 python examples/qwen2/pretrain_qwen.py \
+python examples/qwen2/pretrain_qwen.py \
     ${megatron_options} \
     ${fuse_options} \
     ${te_options} \

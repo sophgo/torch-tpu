@@ -5,7 +5,7 @@ from torch import distributed as dist
 from torch.distributed.constants import default_pg_timeout
 import os
 import time
-from nnmoduletools.module_debugger.utils import print_log
+# from nnmoduletools.module_debugger.utils import print_log
 from nnmoduletools.module_debugger.tensor_utils import get_tensor_info
 
 class Noop:
@@ -17,7 +17,7 @@ def send_recv_wrapper(func):
     def wrapper(tensor, src_dst, group=None, tag=0):
         if dist.get_world_size(group=group) == 1:
             return Noop()
-        print_log(f"- {dist.get_backend()}: {func.__name__} {get_tensor_info(tensor)}")
+        # print_log(f"- {dist.get_backend()}: {func.__name__} {get_tensor_info(tensor)}")
         return func(tensor, src_dst, group=group, tag=tag)
     return wrapper
     
@@ -26,7 +26,7 @@ def broadcast_wrapper(func):
     def wrapper(tensor, src, group=None, async_op=False):
         if dist.get_world_size(group=group) == 1:
             return Noop()
-        print_log(f"- {dist.get_backend()}: {func.__name__} {get_tensor_info(tensor)}")
+        # print_log(f"- {dist.get_backend()}: {func.__name__} {get_tensor_info(tensor)}")
         return func(tensor, src, group=group, async_op=async_op)
     return wrapper
 
@@ -35,7 +35,7 @@ def reduce_wrapper(func):
     def wrapper(tensor, dst, op=dist.ReduceOp.SUM, group=None, async_op=False):
         if dist.get_world_size(group=group) == 1:
             return Noop()
-        print_log(f"- {dist.get_backend()}: {func.__name__} {get_tensor_info(tensor)}")
+        # print_log(f"- {dist.get_backend()}: {func.__name__} {get_tensor_info(tensor)}")
         if tensor.dtype in [torch.bool, torch.int8, torch.uint8, torch.long]:
             _tensor = tensor.int()
             ret = func(tensor=_tensor, dst=dst, op=op, group=group, async_op=async_op)
@@ -54,7 +54,7 @@ def all_reduce_wrapper(func):
     def wrapper(tensor, op=dist.ReduceOp.SUM, group=None, async_op=False):
         if dist.get_world_size(group=group) == 1:
             return Noop()
-        print_log(f"- {dist.get_backend()}: {func.__name__} {get_tensor_info(tensor)}")
+        # print_log(f"- {dist.get_backend()}: {func.__name__} {get_tensor_info(tensor)}")
         if tensor.dtype in [torch.bool, torch.int8, torch.uint8, torch.long]:
             _tensor = tensor.int()
             ret = func(tensor=_tensor, op=op, group=group, async_op=async_op)
@@ -73,7 +73,7 @@ def all_gather_into_tensor_wrapper(func):
     def wrapper(output_tensor, input_tensor, group=None, async_op=False):
         if dist.get_world_size(group=group) == 1:
             return Noop()
-        print_log(f"- {dist.get_backend()}: {func.__name__} {get_tensor_info(input_tensor)}")
+        # print_log(f"- {dist.get_backend()}: {func.__name__} {get_tensor_info(input_tensor)}")
         return func(output_tensor, input_tensor, group=group, async_op=async_op)
     return wrapper
 

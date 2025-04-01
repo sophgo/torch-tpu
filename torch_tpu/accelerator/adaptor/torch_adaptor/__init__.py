@@ -5,3 +5,4 @@ if strtobool(os.environ.get('DS_USE_HOST_GLOO', "0")):
 else:
     from . import distributed
 from . import cuda
+from . import ops
