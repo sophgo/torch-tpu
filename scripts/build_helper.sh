@@ -52,8 +52,8 @@ function new_clean()
   rm -rf torch_tpu.egg-info
   echo " - Delete torch_tpu/lib ..."
   rm -rf torch_tpu/lib
-  echo " - Delete torch_tpu/_C.cpython-310-x86_64-linux-gnu.so ..."
-  rm -rf torch_tpu/_C.cpython-310-x86_64-linux-gnu.so
+  echo " - Delete torch_tpu/_C.cpython-*.so ..."
+  rm -rf torch_tpu/_C.cpython-*.so
   popd
 }
 

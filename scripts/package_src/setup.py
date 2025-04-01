@@ -168,13 +168,13 @@ if __name__ == "__main__":
             description='TPU bridge for PyTorch',
             url='https://github.com/sophgo/torch-tpu',
             packages=["torch_tpu"],
-            libraries=[(f'torch_tpu.{CHIP_ARCH}', {'sources': list()})],
+            libraries=[(f'torch_tpu.{CHIP_ARCH}',{'sources': list()})],
             package_dir={'torch_tpu': TORCH_TPU_PATH},
             ext_modules=[
                 CppExtension(
                     'torch_tpu._C',
                     sources             = ["InitTpuBindings.cpp"],
-                    libraries           = [],
+                    libraries           = [f'torch_tpu_python.{CHIP_ARCH}', f'torch_tpu.{CHIP_ARCH}'],
                     include_dirs        = include_directories,
                     extra_compile_args  = extra_compile_args,
                     library_dirs        = lib_directories,
