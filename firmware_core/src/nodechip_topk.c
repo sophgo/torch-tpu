@@ -133,15 +133,20 @@ static int greater(const void *a, const void *b, int size)
 
 #include <string.h>
 
-void partial_sort(
-    const char *input,
-    char *value_output,
-    int32_t *index_output,
+void partial_sort_cpu(
+    uint64_t input_addr,
+    uint64_t value_output_addr,
+    uint64_t index_output_addr,
     int k,
     uint64_t axis_size,
     uint64_t axis_stride,
-    int dt_size)
+    data_type_t dtype)
 {
+    const char *input = (char *)tpu_global_mem_addr(input_addr);
+    char *value_output = (char *)tpu_global_mem_addr(value_output_addr);
+    int32_t *index_output = (int32_t *)tpu_global_mem_addr(index_output_addr);
+    int dt_size = tpu_data_type_size(dtype);
+
     // Only supports signed comparision, i.e., INT, FP32, BF32
 
     char *input_buffer = (char *)malloc(axis_size * dt_size);
@@ -204,6 +209,167 @@ void partial_sort(
     }
 }
 
+void tpu_topk(
+    global_addr_t input_global,
+    int outer_size, int axis_size, int inner_size,
+    int k,
+    global_addr_t value_output,
+    global_addr_t index_output,
+    data_type_t dtype)
+{
+    TPUKERNEL_ASSERT_INFO(inner_size == 1, "tpu Top-K only support inner size 1, got %d", inner_size);
+
+    int input_size_in_lane = DIV_UP(outer_size, NPU_NUM) * axis_size * inner_size * sizeof(float);
+    int mask_size_in_lane = DIV_UP(outer_size, NPU_NUM) * axis_size * axis_size;
+    TPUKERNEL_ASSERT_INFO(
+        mask_size_in_lane < (LOCAL_BANK_SIZE * (LOCAL_MEM_BANKS - 4)),
+        "Too large for tpu Top-K, outer_size=%d, axis_size=%d", outer_size, axis_size);  // TODO tiling
+    TPUKERNEL_ASSERT_INFO(
+        input_size_in_lane < LOCAL_BANK_SIZE,
+        "Too large for tpu Top-K, outer_size=%d, axis_size=%d", outer_size, axis_size); // TODO tiling
+
+    local_addr_t input_local = 0;
+    local_addr_t seq_local = LOCAL_BANK_SIZE;
+    local_addr_t buf0 = seq_local + LOCAL_BANK_SIZE;
+    local_addr_t buf1 = buf0 + LOCAL_BANK_SIZE;
+    local_addr_t buf2 = buf1 + LOCAL_BANK_SIZE;
+
+    tpu_parallel_start();
+
+    dim4 input_shape = {.n = 1, .c = outer_size, .h = 1, .w = axis_size};
+    tpu_gdma_cpy_S2L(input_local, input_global, &input_shape, NULL, NULL, dtype);
+
+    tpu_bdc_arithmetic_sequence_bcast(seq_local, outer_size, 0, 1, axis_size);
+    dim4 seq_shape = {.n = 1, .c = NPU_NUM, .h = 1, .w = axis_size};
+    tpu_bdc_cast(buf1, seq_local, &seq_shape, NULL, NULL, DT_FP32, DT_UINT32, RM_HALF_TO_EVEN);
+    scalar_t C = {.f32 = 1e-6};
+    tpu_bdc_fp_mul_C(buf0, buf1, C, &seq_shape, NULL, NULL, DT_FP32);
+    local_addr_t bias_local = buf0;
+
+    tpu_parallel_end();
+
+    local_addr_t f32_input = buf2;
+    tpu_bdc_cast(f32_input, input_local, &input_shape, NULL, NULL, DT_FP32, dtype, RM_HALF_TO_EVEN);
+
+    dim4 seq_stride;
+    tpu_aligned_stride(&seq_stride, 0, &input_shape, dtype);
+    seq_stride.c = 0;
+    local_addr_t biased_input_local = buf1;
+    tpu_bdc_fp_add(biased_input_local, f32_input, bias_local, &input_shape, NULL, NULL, &seq_stride, DT_FP32);
+
+    dim4 bw_stride, bh_stride;
+    tpu_aligned_stride(&bw_stride, 0, &input_shape, dtype);
+    bh_stride = bw_stride;
+    bw_stride.h = 1;
+    bw_stride.w = 0;
+    bh_stride.w = 1;
+    bh_stride.h = 0;
+    scalar_t true_val = {.u8 = 1};
+    dim4 mask_shape = {.n = 1, .c = outer_size, .h = axis_size, .w = axis_size};
+    local_addr_t mask_local = buf2;
+    tpu_bdc_less(
+        mask_local,
+        biased_input_local, biased_input_local,
+        true_val,
+        &mask_shape, NULL,
+        &bw_stride, &bh_stride,
+        DT_UINT8, DT_FP32);
+
+    local_addr_t scatter_index = buf0;
+    dim2 kernel = {.h = 1, .w = axis_size};
+    padding_t padding = {0};
+    dim2 stride = {.h = 1, .w = 1};
+    dim2 dilation = {.h = 1, .w = 1};
+    const int pool_eu_num = 32; // Use 32 outta 64
+    if (axis_size % pool_eu_num == 0 && kernel.w / pool_eu_num < 15)
+    {
+        kernel.w /= pool_eu_num;
+        stride.w = kernel.w;
+        tpu_bdc_int8_avg_pool2d(
+            mask_local,
+            mask_local,
+            &mask_shape,
+            &kernel,
+            &padding,
+            &stride,
+            &dilation,
+            DT_UINT8,
+            DT_UINT8,
+            1, 0);
+        mask_shape.w = pool_eu_num;
+        kernel.w = pool_eu_num;
+        tpu_bdc_int8_avg_pool2d(
+            scatter_index,
+            mask_local,
+            &mask_shape,
+            &kernel,
+            &padding,
+            &stride,
+            &dilation,
+            DT_UINT16,
+            DT_UINT8,
+            1, 0);
+    } else {
+        tpu_bdc_int8_avg_pool2d(
+            scatter_index,
+            mask_local,
+            &mask_shape,
+            &kernel,
+            &padding,
+            &stride,
+            &dilation,
+            DT_UINT16,
+            DT_UINT8,
+            1, 0);
+    }
+
+    local_addr_t output_local = buf1;
+    tpu_bdc_batch_bcast_w_scatter(
+        output_local,
+        input_local,
+        scatter_index,
+        &input_shape,
+        axis_size,
+        dtype,
+        DT_UINT16,
+        false);
+
+    tpu_parallel_start();
+
+    dim4 output_shape = {.n = 1, .c = outer_size, .h = 1, .w = k};
+    dim4 output_local_stride;
+    tpu_aligned_stride(&output_local_stride, 0, &input_shape, dtype);
+    tpu_gdma_cpy_L2S(
+        value_output,
+        output_local,
+        &output_shape,
+        NULL,
+        &output_local_stride,
+        dtype);
+
+    local_addr_t index_local = mask_local;
+    tpu_bdc_batch_bcast_w_scatter(
+        index_local,
+        seq_local,
+        scatter_index,
+        &input_shape,
+        axis_size,
+        DT_UINT32,
+        DT_UINT16,
+        false);
+
+    tpu_parallel_end();
+
+    tpu_aligned_stride(&output_local_stride, 0, &input_shape, DT_UINT32);
+    tpu_gdma_cpy_L2S(
+        index_output,
+        index_local,
+        &output_shape,
+        NULL,
+        &output_local_stride,
+        DT_UINT32);
+}
+
 #ifdef BACKEND_SG2260
 int scalar_topk_multi_core(sg_api_topk_t *api)
 {
@@ -233,9 +399,9 @@ int scalar_topk_multi_core(sg_api_topk_t *api)
     if (tile_index * tiling_size > outer_num)
         return 0;
 
-    const char *input = (char *)tpu_global_mem_addr(api->input_global_addr);
-    char *value_output = (char *)tpu_global_mem_addr(api->value_global_addr);
-    char *index_output = (char *)tpu_global_mem_addr(api->index_global_addr);
+    uint64_t input = api->input_global_addr;
+    uint64_t value_output = api->value_global_addr;
+    uint64_t index_output = api->index_global_addr;
 
     int dt_size = tpu_data_type_size(api->dtype);
 
@@ -244,20 +410,30 @@ int scalar_topk_multi_core(sg_api_topk_t *api)
     index_output += tile_index * tiling_size * output_stride * sizeof(int32_t);
 
     unsigned real_tile_size = MIN(tiling_size, outer_num - tiling_size * tile_index);
+    if (real_tile_size <= 0)
+        return 0;
+#if 0
     for (int i = 0; i < (int)real_tile_size; ++i)
     {
         for (int j = 0; j < (int)inner_num; ++j)
         {
-            partial_sort(
+            partial_sort_cpu(
                 input + (i * outer_stride + j) * dt_size,
                 value_output + (i * output_stride + j) * dt_size,
-                ((int32_t *)index_output) + i * output_stride + j,
+                index_output + (i * output_stride + j) * sizeof(int32_t),
                 api->k,
                 api->shape[axis],
                 axis_stride,
-                dt_size);
+                api->dtype);
         }
     }
+#else
+    tpu_topk(
+        input,
+        real_tile_size, api->shape[axis], inner_num,
+        api->k,
+        value_output, index_output, api->dtype);
+#endif
 
     return 0;
 }
@@ -270,7 +446,7 @@ int tpu_kernel_api_topk_multi_core(const void *args) {
     length *= api->shape[i];
   }
 
-  if (length < 1024 * 8)
+  if (api->shape[api->axis] <= 256)
   {
       tpu_initialize();
       int ret = scalar_topk_multi_core(api);

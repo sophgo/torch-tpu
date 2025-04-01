@@ -37,7 +37,7 @@ std::tuple<Tensor &, Tensor &> topk_values_tpu(const Tensor &self, int64_t k,
   TORCH_CHECK(axis <= self.dim())
   TORCH_CHECK(k <= self.size(axis));
 
-  if (at::numel(self) < 1024*8) {
+  if (self.size(axis) <= 256) {
     auto stream = c10_tpu::getCurrentTPUStream();
     auto status = tpudnnTopkAsync(
         stream,
