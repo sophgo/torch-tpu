@@ -11,13 +11,18 @@ bdist_wheel || exit -1
 
 unset RELEASE_MODE
 
+## docs
 if [ -z $SKIP_DOC ]; then
     source scripts/release_doc.sh
 fi
 
+## package example
 pushd $CUR_DIR/../dist
 cp -rf $CUR_DIR/../examples .
 popd
+
+## src
+source scripts/package_src/package_release_src.sh
 
 # ------------------------------------------------------------------------------
 release_archive="./dist"
