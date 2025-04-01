@@ -60,6 +60,7 @@ if not arch:
         try:
             cdll.LoadLibrary(os.path.join(lib_pwd, tpudnn))
         except:
+            print(f"ERROR: unable to load {os.path.join(lib_pwd, tpudnn)}")
             continue
         arch = arch_iter
         make_symlinks(arch_iter)
