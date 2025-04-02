@@ -351,6 +351,22 @@ class bdist_wheel(_bdist_wheel, ExtBase):
                 self.plat_name = 'linux_riscv64'
             else:
                 self.plat_name = 'manylinux2014_aarch64'
+    def copy_file(self, src, dst):
+        #check file
+        def is_lfs_pointer(file_path):
+            with open(file_path, 'r', errors="ignore") as f:
+                header = [f.readline() for _ in range(5)]
+
+            # 判断是否包含 Git LFS 指针文件的特征字符串
+            if header and header[0].startswith("version https://git-lfs.github.com/spec"):
+                print(f"[ERROR] {file_path} is a ELF HEADER FILE. \
+                      \n[ERROR] Please pull with \"git lfs pull --include '*' --exclude ''\" ")
+                return True
+            return False
+        if is_lfs_pointer(src):
+            print("[ERROR] The third-party library was not pulled down !!!")
+            sys.exit(0)
+        super().copy_file(src, dst)
 
     def run(self):
         self.run_command('build')
