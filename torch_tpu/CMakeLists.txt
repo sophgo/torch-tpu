@@ -15,8 +15,11 @@ endif()
 
 include(${CMAKE_CURRENT_SOURCE_DIR}/config.cmake)
 add_compile_options(-std=c++17 -Wno-attributes -Wall -fPIC)
-add_definitions("-D_GLIBCXX_USE_CXX11_ABI=0")
-add_definitions("-DPYBIND11_BUILD_ABI=\"_cxxabi1011\"")
+if ( NOT $ENV{TORCH_CXX11_ABI} )
+  message(STATUS "TORCH_CXX11_ABI=0" )
+  add_definitions("-D_GLIBCXX_USE_CXX11_ABI=0")
+  add_definitions("-DPYBIND11_BUILD_ABI=\"_cxxabi1011\"")
+endif()
 
 #################### DEPENDS #######################
 ## pytorch

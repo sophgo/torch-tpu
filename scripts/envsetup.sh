@@ -25,6 +25,9 @@ function check_pytorch_version(){
           echo "[ERROR]错误：当前Torch版本是 $torch_version，而不是 $target_version"
           update_pytorch_to_2_1;
      fi
+     
+     torch_with_cxx11_abi=$(python -c "import torch; print(torch.compiled_with_cxx11_abi())")
+     export TORCH_CXX11_ABI=${torch_with_cxx11_abi}
 }
 
 function get_pytorch_install_dir(){
@@ -78,6 +81,7 @@ echo "[INFO]CHIP_ARCH=$CHIP_ARCH"
 echo "[INFO]TPUTRAIN_DEBUG=$TPUTRAIN_DEBUG"
 echo "[INFO]LIBSOPHON_TOP=$LIBSOPHON_TOP"
 echo "[INFO]PYTORCH_INSTALL_DIR=$PYTORCH_INSTALL_DIR"
+echo "[INFO]TORCH_CXX11_ABI=$TORCH_CXX11_ABI"
 echo "[INFO]EXTRA_CONFIG=$EXTRA_CONFIG"
 
 source ${TPUTRAIN_TOP}/scripts/build_helper.sh
