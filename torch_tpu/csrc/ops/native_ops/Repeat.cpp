@@ -14,7 +14,7 @@ Tensor &repeat_out_tpu(const Tensor &self, const IntArrayRef repeats,
                        Tensor &out) {
   Tensor contiguous_self = self.is_contiguous() ? self : self.contiguous();
   std::vector<int> repeat_times;
-  if (self.dim() == 0) {
+  if (0) {
     CPU_IMPL_WARNING();
     TIMING_START;
     Tensor out_cpu = out.cpu();

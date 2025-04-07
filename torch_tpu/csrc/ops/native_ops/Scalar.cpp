@@ -36,6 +36,10 @@ Tensor scalar_tensor_tpu (const Scalar& s,
                           c10::optional<bool> pin_memory)
 {
   TensorOptions options = TensorOptions().dtype(dtype).layout(layout).device(device).pinned_memory(pin_memory);
+  if ( options.dtype() == torch::kInt64 ) {
+    LOG( WARNING ) << "scalar_tensor_tpu detect int64 dtype," << "auto cast to int32 dtype.";
+    options = options.dtype( ScalarType::Int );
+  }
   return empty({}, options).fill_(s);
 }
 TORCH_LIBRARY_IMPL (aten, TPU, m)

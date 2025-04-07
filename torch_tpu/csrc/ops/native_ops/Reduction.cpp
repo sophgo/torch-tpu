@@ -1,7 +1,7 @@
-#include <ATen/EmptyTensor.h>
 #include <ATen/core/TensorBase.h>
 #include <torch/library.h>
 #include <torch/torch.h>
+#include <ATen/native/ReduceOpsUtils.h>
 
 #include "TPUTorchUtils.h"
 #include "common/config.h"
@@ -101,8 +101,18 @@ Tensor &sum_IntList_out_tpu(const Tensor &self, OptionalIntArrayRef dim_opt,
   SHOW_TENSOR_OP(self, out);
   return out;
 }
+Tensor sum_dim_IntList_tpu(const Tensor & self, OptionalIntArrayRef dim, bool keepdim, 
+                           c10::optional<ScalarType> dtype) {
+    TORCH_CHECK((dtype.has_value() && dtype.value() == self.scalar_type()) || !dtype.has_value(),
+                "sum_dim_IntList get error dtype setting");
+    Tensor out = native::create_reduction_result(self, dim, keepdim, self.scalar_type());
+    out = sum_IntList_out_tpu(self, dim, keepdim, dtype, out);
+    return out;
+}
+
 TORCH_LIBRARY_IMPL(aten, TPU, m) {
   m.impl("sum.IntList_out", sum_IntList_out_tpu);
+  m.impl("sum.dim_IntList", sum_dim_IntList_tpu);
 }
 
 Tensor &prod_int_out_tpu(const Tensor &self, long dim, bool keepdim,

@@ -2,7 +2,7 @@
 #include <torch/torch.h>
 #include <ATen/core/TensorBase.h>
 #include <ATen/EmptyTensor.h>
-#include <ATen/native/NonEmptyUtils.h>
+#include <ATen/native/ScatterGatherChecks.h>
 
 #include "TPUTorchUtils.h"
 
@@ -11,30 +11,6 @@
 
 namespace at
 {
-// Used for `gather`-like methods
-// Note: self means the input tensor here
-// Test:
-// 1. index.size(d) <= self.size(d) for all d != dim
-// 2. index.dim() == self.dim()
-static C10_UNUSED void gather_shape_check(const Tensor& self, int64_t dim, const Tensor& index) {
-    auto self_dims = native::ensure_nonempty_dim(self.dim());
-    TORCH_CHECK(self_dims == native::ensure_nonempty_dim(index.dim()),
-        "Index tensor must have the same number of dimensions as input tensor"
-    );
-
-    for (const auto i : c10::irange(self_dims)) {
-        if (i != dim) {
-        TORCH_CHECK(
-            native::ensure_nonempty_size(index, i) <= native::ensure_nonempty_size(self, i),
-            "Size does not match at dimension ", i,
-            " expected index ", index.sizes(),
-            " to be smaller than self ", self.sizes(),
-            " apart from dimension ", dim
-        );
-        }
-    }
-}
-
 Tensor &gather_out_tpu(const Tensor &self, int64_t axis, const Tensor &other, bool sparse_grad, Tensor &out )
 {
     if (self.dim() > 0)
@@ -73,7 +49,7 @@ Tensor &gather_out_tpu(const Tensor &self, int64_t axis, const Tensor &other, bo
 Tensor gather_tpu(const Tensor &self, int64_t dim, const Tensor &other, bool sparse_grad)
 {
     int64_t wrapped_dim = maybe_wrap_dim(dim, self.dim());
-    gather_shape_check(self, wrapped_dim, other);
+    native::gather_shape_check(self, wrapped_dim, other);
     TORCH_CHECK(other.dtype() == torch::kInt32, "gather's index must be int32 dtype.");
 
     TensorOptions options = TensorOptions(self.device()).dtype(self.dtype());
