@@ -136,6 +136,23 @@ typedef struct
   int groups;
 }tpudnnConv2dParam_t;
 
+typedef struct
+{
+  int kernel_t;
+  int kernel_h;
+  int kernel_w;
+  int pad_t;
+  int pad_h;
+  int pad_w;
+  int stride_t;
+  int stride_h;
+  int stride_w;
+  int dilation_t;
+  int dilation_h;
+  int dilation_w;
+  int groups;
+}tpudnnConv3dParam_t;
+
 typedef enum
 {
   TPUDNN_NO_FORMATED = 0,
@@ -769,6 +786,20 @@ tpudnnStatus_t tpudnnConv2dBackwardAsync (
     tpudnnTensor_t grad_input,
     tpudnnTensor_t grad_weight,
     tpudnnTensor_t grad_bias);
+
+tpudnnStatus_t tpudnnConv3dAsync (
+    tpudnnHandle_t handle,
+    tpudnnTensor_t input,
+    tpudnnTensor_t weight,
+    tpudnnTensor_t bias,
+    tpudnnConv3dParam_t param,
+    tpudnnTensor_t output);
+
+tpudnnStatus_t tpudnnReorderConv3dWeightAsync (
+    tpudnnHandle_t handle,
+    tpudnnTensor_t input,
+    int mode,
+    tpudnnTensor_t output);
 
 tpudnnStatus_t tpudnnUpsamplingAsync(
     tpudnnHandle_t handle,

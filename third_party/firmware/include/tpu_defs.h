@@ -65,6 +65,9 @@ typedef struct {
     int top, bottom, left, right;
 } padding_t;
 typedef struct {
+    int front, back, top, bottom, left, right;
+} padding3d_t;
+typedef struct {
     int start, end;
 } range_t;
 

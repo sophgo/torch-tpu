@@ -98,32 +98,62 @@ int64_t groups )
   }
   else
   {
-    TORCH_CHECK ( num_spatial_dims == 2, "TPU ", num_spatial_dims, "D convolution is not implemented" );
+    TORCH_CHECK ( num_spatial_dims == 2 || num_spatial_dims == 3, "TPU ", num_spatial_dims, "D convolution is not implemented" );
     auto output_shape = at::native::conv_output_size ( input.sizes(), weight.sizes(), padding, stride, dilation );
     output = torch::empty ( output_shape, input.options() );
-    tpudnnConv2dParam_t conv_param =
-    {
-      .kernel_h = ( int ) weight.size ( 2 ),
-      .kernel_w = ( int ) weight.size ( 3 ),
-      .pad_h = ( int ) padding[0],
-      .pad_w = ( int ) padding[1],
-      .stride_h = ( int ) stride[0],
-      .stride_w = ( int ) stride[1],
-      .dilation_h = ( int ) dilation[0],
-      .dilation_w = ( int ) dilation[1],
-      .groups = ( int ) groups,
-    };
+    if(num_spatial_dims == 2){
+      tpudnnConv2dParam_t conv_param =
+      {
+        .kernel_h = ( int ) weight.size ( 2 ),
+        .kernel_w = ( int ) weight.size ( 3 ),
+        .pad_h = ( int ) padding[0],
+        .pad_w = ( int ) padding[1],
+        .stride_h = ( int ) stride[0],
+        .stride_w = ( int ) stride[1],
+        .dilation_h = ( int ) dilation[0],
+        .dilation_w = ( int ) dilation[1],
+        .groups = ( int ) groups,
+      };
 
-    TIMING_START;
-    auto stream = c10_tpu::getCurrentTPUStream();
-    auto status = tpudnnConv2dAsync(
-      stream,
-      tpu::TPUGenerateTpudnnTensor(stream, input),
-      tpu::TPUGenerateTpudnnTensor(stream, weight),
-      bias.defined() ? tpu::TPUGenerateTpudnnTensor (stream, bias ) : tpudnnUndefinedTensor(),
-      conv_param,
-      tpu::TPUGenerateTpudnnTensor(stream, output));
-    TORCH_CHECK(status == TPUDNN_STATUS_SUCCESS);
+      TIMING_START;
+      auto stream = c10_tpu::getCurrentTPUStream();
+      auto status = tpudnnConv2dAsync(
+        stream,
+        tpu::TPUGenerateTpudnnTensor(stream, input),
+        tpu::TPUGenerateTpudnnTensor(stream, weight),
+        bias.defined() ? tpu::TPUGenerateTpudnnTensor (stream, bias ) : tpudnnUndefinedTensor(),
+        conv_param,
+        tpu::TPUGenerateTpudnnTensor(stream, output));
+      TORCH_CHECK(status == TPUDNN_STATUS_SUCCESS);
+    }else if(num_spatial_dims == 3){
+      tpudnnConv3dParam_t conv_param =
+      {
+        .kernel_t = ( int ) weight.size ( 2 ),
+        .kernel_h = ( int ) weight.size ( 3 ),
+        .kernel_w = ( int ) weight.size ( 4 ), 
+        .pad_t = ( int ) padding[0],
+        .pad_h = ( int ) padding[1],
+        .pad_w = ( int ) padding[2],
+        .stride_t = ( int ) stride[0],
+        .stride_h = ( int ) stride[1],
+        .stride_w = ( int ) stride[2],
+        .dilation_t = ( int ) dilation[0],
+        .dilation_h = ( int ) dilation[1],
+        .dilation_w = ( int ) dilation[2],
+        .groups = ( int ) groups,
+      };
+
+      TIMING_START;
+      auto stream = c10_tpu::getCurrentTPUStream();
+      auto status = tpudnnConv3dAsync(
+        stream,
+        tpu::TPUGenerateTpudnnTensor(stream, input),
+        tpu::TPUGenerateTpudnnTensor(stream, weight),
+        bias.defined()? tpu::TPUGenerateTpudnnTensor (stream, bias ) : tpudnnUndefinedTensor(),
+        conv_param,
+        tpu::TPUGenerateTpudnnTensor(stream, output));
+      TORCH_CHECK(status == TPUDNN_STATUS_SUCCESS);
+    }
     TIMING_END ( tpu::CONVOLUTION );
   }
   SHOW_TENSOR_OP(input_, weight, bias, output);
