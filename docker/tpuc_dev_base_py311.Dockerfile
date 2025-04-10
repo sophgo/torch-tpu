@@ -16,6 +16,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     # python3-dev \
     # python3-venv \
     # python3-pip \
+    patchelf \
     virtualenv \
     swig \
     tzdata \
@@ -54,6 +55,7 @@ RUN add-apt-repository ppa:deadsnakes/ppa && \
 
 # 更新 alternatives 使 /usr/bin/python 指向 python3.11
 RUN update-alternatives --install /usr/bin/python python /usr/bin/python3.11 10 && \
+    update-alternatives --install /usr/bin/python3 python3 /usr/bin/python3.11 10 && \
     python3.11 -m pip install --upgrade pip && \
     rm /usr/bin/pip && rm /usr/bin/pip3 && \
     update-alternatives --install /usr/bin/pip3 pip3 /usr/local/bin/pip3.11 10 && \
