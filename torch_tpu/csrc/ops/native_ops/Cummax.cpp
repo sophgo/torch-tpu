@@ -95,4 +95,22 @@ TORCH_LIBRARY_IMPL(aten, TPU, m)
     m.impl("cumsum.out", cumsum_out_tpu);
     m.impl("cumsum",     cumsum_tpu);
 }
+
+// called by https://pytorch.org/docs/2.1/generated/torch.logcumsumexp.html#torch.logcumsumexp
+Tensor & _logcumsumexp_out_tpu(const Tensor & self, int64_t dim, Tensor & out) {
+    CPU_IMPL_WARNING();
+    auto out_cpu = torch::logcumsumexp(self.cpu(), dim);
+    out = out_cpu.to(out.device());
+    return out;
+}
+Tensor _logcumsumexp_tpu(const Tensor & self, int64_t dim) {
+    auto out = empty(self.sizes(), self.options());
+    return _logcumsumexp_out_tpu(self, dim, out);
+}
+
+TORCH_LIBRARY_IMPL(aten, TPU, m)
+{
+    m.impl("_logcumsumexp.out", _logcumsumexp_out_tpu);
+    m.impl("_logcumsumexp",     _logcumsumexp_tpu);
+}
 }; // namespace at
