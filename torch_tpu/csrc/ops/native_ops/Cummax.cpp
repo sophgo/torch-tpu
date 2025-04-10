@@ -86,10 +86,13 @@ Tensor & cumsum_out_tpu(const Tensor & self, int64_t dim,
     out = out_cpu.to(out.device());
     return out;
 }
-// Tensor cumsum_tpu(const Tensor & self, int64_t dim, c10::optional<ScalarType> dtype=c10::nullopt) {}
+Tensor cumsum_tpu(const Tensor & self, int64_t dim, c10::optional<ScalarType> dtype=c10::nullopt) {
+    auto out  = empty(self.sizes(), self.options());
+    return cumsum_out_tpu(self, dim, dtype, out);
+}
 TORCH_LIBRARY_IMPL(aten, TPU, m)
 {
     m.impl("cumsum.out", cumsum_out_tpu);
-    //m.impl("cumsum",     cumsum_tpu);
+    m.impl("cumsum",     cumsum_tpu);
 }
 }; // namespace at
