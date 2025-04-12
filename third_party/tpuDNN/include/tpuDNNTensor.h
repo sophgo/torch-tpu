@@ -154,6 +154,11 @@ typedef struct
     TpudnnFormatedType_t format_casted;
 } tpudnnTensor_t;
 
+typedef enum {
+    PAGED_ATTENTION_PREFILL = 0,
+    PAGED_ATTENTION_DECODE = 1,
+} AttentionMode_t;
+
 /**
  * @brief tpudnnCreateDeviceTensor
  *
@@ -1018,7 +1023,7 @@ tpudnnStatus_t tpudnnPagedAttentionAsync (
     int attention_mode // 2: prefile, 3: decode
     );
 
-tpudnnStatus_t tpudnnMLAAsync ( 
+tpudnnStatus_t tpudnnMLAAsync (
     tpudnnHandle_t handle,
     tpudnnTensor_t OUT,
     tpudnnTensor_t Q,
@@ -1041,8 +1046,40 @@ tpudnnStatus_t tpudnnMLAAsync (
     int v_head_dim,
     int mask_size,
     float C,
-    int attention_mode
+    AttentionMode_t attention_mode
 );
+
+tpudnnStatus_t tpudnnPagedLatentAttentionFp8Async(
+    tpudnnHandle_t handle,
+    tpudnnTensor_t OUT,
+    tpudnnTensor_t Q,
+    tpudnnTensor_t KV,
+    tpudnnTensor_t PE,
+    tpudnnTensor_t WUQ,
+    tpudnnTensor_t WUKV,
+    tpudnnTensor_t KVcache,
+    tpudnnTensor_t PEcache,
+    tpudnnTensor_t cos,
+    tpudnnTensor_t sin,
+    tpudnnTensor_t mask,
+    tpudnnTensor_t WUQ_scale,
+    tpudnnTensor_t WUKV_scale,
+    tpudnnTensor_t fetch_slots,
+    const int*     seqlen,
+    int            batch,
+    int            num_heads,
+    int            qk_nope_head_dim,
+    int            qk_rope_head_dim,
+    int            v_head_dim,
+    int            q_lora_rank,
+    int            kv_lora_rank,
+    int            mask_size,
+    int            quant_block_size,
+    int            slots_size,
+    int            paged_cache_block_size,
+    float          softmax_scale,
+    int            with_w8a16,
+    AttentionMode_t attn_mode);
 
 tpudnnStatus_t tpudnnLlamaAttentionForwardAsync(
     tpudnnHandle_t handle,

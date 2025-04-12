@@ -38,6 +38,7 @@ namespace at
 		m.def("llava_mlp", llava_mlp);
 		m.def("llava_attention", llava_attention);
 		m.def("mla", mla);
+		m.def("paged_latent_attention_fp8", paged_latent_attention_fp8);
 		m.def("mlp_forward", mlp_forward);
 		m.def("mlp_backward", mlp_backward);
 		m.def("llama_mlp_forward", llama_mlp_forward);
