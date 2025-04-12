@@ -447,7 +447,7 @@ extra_compile_args = [
     '-Wno-deprecated-declarations',
     '-Wno-return-type',
     '-D__FILENAME__=\"$(notdir $(abspath $<))\"',
-    '-D_GLIBCXX_USE_CXX11_ABI=1' if os.getenv('TORCH_CXX11_ABI') else '-D_GLIBCXX_USE_CXX11_ABI=0'
+    '-D_GLIBCXX_USE_CXX11_ABI=1' if eval(os.getenv('TORCH_CXX11_ABI')) else '-D_GLIBCXX_USE_CXX11_ABI=0'
 ]
 
 if os.environ.get("CHIP_ARCH", None) == 'sg2260':
