@@ -184,6 +184,7 @@ int           shape_dims,
 int           index_num,
 int           axis, // axis to do index_select
 int           const_val, // fill_value if index not found in input
+int           if_neg_index,
 data_type_t   dtype );
 
 int tpu_kernel_api_index_select ( const void * args )
@@ -212,7 +213,7 @@ int tpu_kernel_api_index_select ( const void * args )
   api->dim,
   api->index_num,
   api->axis,
-  0,
+  0, 1,
   ( data_type_t ) api->dtype );
   tpu_poll();
   return 0;

@@ -15,9 +15,7 @@ int*          shape,
 int           dims,
 int           axis,
 int           affine,
-#ifdef BACKEND_SG2260
 int           requires_grad_input,
-#endif
 data_type_t   dtype );
 
 extern void nodechip_layernorm_backward_multi_core (
@@ -76,9 +74,7 @@ int tpu_kernel_api_layernorm_backward_multi_core ( const void *args )
     api->dim,
     api->axis,
     api->grad_weight_global_addr && api->grad_bias_global_addr,
-#ifdef BACKEND_SG2260
     api->requires_grad_input,
-#endif
     ( data_type_t ) api->dtype );
   tpu_poll();
   return 0;

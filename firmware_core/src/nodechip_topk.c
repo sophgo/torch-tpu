@@ -428,11 +428,23 @@ int scalar_topk_multi_core(sg_api_topk_t *api)
         }
     }
 #else
-    tpu_topk(
-        input,
-        real_tile_size, api->shape[axis], inner_num,
-        api->k,
-        value_output, index_output, api->dtype);
+    // TODO
+    // Adjust local tiling size by inner shape & pipeline
+    const unsigned local_tile = 128;
+    int local_tile_num = DIV_UP(real_tile_size, local_tile);
+    for (int i = 0; i < local_tile_num; ++i)
+    {
+        int real_local_tile = MIN(local_tile, real_tile_size - local_tile * i);
+        tpu_topk(
+            input + i * local_tile * outer_stride * dt_size,
+            real_local_tile,
+            api->shape[axis],
+            inner_num,
+            api->k,
+            value_output + i * local_tile * output_stride * dt_size,
+            index_output + i * local_tile *output_stride * sizeof(int32_t),
+            api->dtype);
+    }
 #endif
 
     return 0;
