@@ -39,7 +39,8 @@ class MLAConfig:
     softmax_scale: float
     dtype: torch.dtype
     weight_dtype: torch.dtype
-    context_len: int = 4096
+    context_len: int
+    attention_mode: int #0: Paged Prefill, 1: Paged Decode
 
     def random_tensors(self):
         seqlen = torch.tensor([self.context_len for _ in range(self.batch)], dtype = torch.int32)
@@ -143,18 +144,18 @@ class MLATpu(MLA):
             torch.ops.my_ops.paged_latent_attention_fp8(
                 tensors.output, tensors.Q, tensors.KV, tensors.PE, tensors.WUQ, tensors.WUKV,
                 tensors.kv_cache, tensors.pe_cache, tensors.cos, tensors.sin, tensors.WUQ_scale,
-                tensors.WUKV_scale, tensors.seqlen, None, tensors.seqlen, self.config.num_heads,
-                self.config.q_lora_rank, self.config.kv_lora_rank, self.config.qk_nope_head_dim,
-                self.config.qk_rope_head_dim, self.config.v_head_dim,
-                0, self.config.block_size, 1, 0, self.config.softmax_scale, 1)
+                tensors.WUKV_scale, tensors.seqlen, tensors.seqlen, None, tensors.seqlen,
+                self.config.num_heads, self.config.q_lora_rank, self.config.kv_lora_rank,
+                self.config.qk_nope_head_dim, self.config.qk_rope_head_dim, self.config.v_head_dim,
+                0, self.config.block_size, 16, 16, self.config.softmax_scale, self.config.attention_mode)
         else:
             torch.ops.my_ops.mla(
                 tensors.output, tensors.Q, tensors.KV, tensors.PE,
                 tensors.WUQ, tensors.WUKV, tensors.kv_cache, tensors.pe_cache,
-                tensors.cos, tensors.sin, None, tensors.seqlen, self.config.num_heads,
+                tensors.cos, tensors.sin, tensors.seqlen, None, tensors.seqlen, self.config.num_heads,
                 self.config.q_lora_rank, self.config.kv_lora_rank, self.config.qk_nope_head_dim,
                 self.config.qk_rope_head_dim, self.config.v_head_dim,
-                0, self.config.softmax_scale, 1)
+                0, 16, 16, self.config.softmax_scale, self.config.attention_mode)
         return tensors.output
 
 
@@ -209,7 +210,7 @@ class MLACpu(MLA):
 
 
 def mla_decode(act_dtype: torch.dtype, weight_dtype: torch.dtype):
-    config = MLAConfig(1, 16, 128, 64, 128, 1536, 512, 128, 128**-0.5, act_dtype, weight_dtype, 4096)
+    config = MLAConfig(1, 16, 128, 64, 128, 1536, 512, 128, 128**-0.5, act_dtype, weight_dtype, 4096, 1)
     net_cpu = MLACpu(config)
     net_tpu = MLATpu(config)
 
@@ -244,6 +245,52 @@ def mla_decode(act_dtype: torch.dtype, weight_dtype: torch.dtype):
     if flat_cosine_similarity.item() < 0.99:
         raise RuntimeError("mla decode failed")
 
+def mla_prefill(act_dtype: torch.dtype, weight_dtype: torch.dtype):
+    config = MLAConfig(1, 16, 128, 64, 128, 1536, 512, 128, 128**-0.5, act_dtype, weight_dtype, 4096, 0)
+    net_cpu = MLACpu(config)
+    net_tpu = MLATpu(config)
+
+    tensors = config.random_tensors()
+    tensors_tpu = MLATensors(
+        tensors.seqlen,
+        tensors.WUQ.to(device),
+        tensors.WUKV.to(device),
+        tensors.Q.to(device),
+        tensors.KV.to(device),
+        tensors.PE.to(device),
+        tensors.kv_cache.to(device),
+        tensors.pe_cache.to(device),
+        tensors.idx_theta.to(device),
+        tensors.cos.to(device),
+        tensors.sin.to(device),
+        tensors.output.to(device),
+        tensors.WUQ_scale.to(device) if tensors.WUQ_scale is not None else None,
+        tensors.WUKV_scale.to(device) if tensors.WUKV_scale is not None else None
+    )
+
+    output_tpu = net_tpu(tensors_tpu)
+    output = net_cpu(tensors)
+
+    diff = output_tpu.cpu() - output.cpu()
+    cosine_similarity = F.cosine_similarity(output_tpu.view(output_tpu.shape[0], -1).cpu(),
+                                            output.view(output_tpu.shape[0], -1).cpu(), dim=0)
+    print(f"diff: {torch.max(torch.abs(diff))}")
+    print(f"{cosine_similarity}")
+    flat_cosine_similarity = F.cosine_similarity(output_tpu.cpu().flatten(), output.cpu().flatten(), dim=0)
+    print(f"flat_cosine_similarity: {flat_cosine_similarity.item()}")
+    if flat_cosine_similarity.item() < 0.99:
+        raise RuntimeError("mla prefill failed")
+
 if __name__ == "__main__":
+    print(f"Test MLA Decode BF16:")
     mla_decode(torch.bfloat16, torch.bfloat16)
+    print(f"----------------------------------")
+    print(f"Test MLA Decode FP8_E4M3:")
     mla_decode(torch.bfloat16, torch.float8_e4m3fn)
+    print(f"----------------------------------")
+    #print(f"Test MLA Prefill BF16:")
+    #mla_prefill(torch.bfloat16, torch.bfloat16)
+    #print(f"----------------------------------")
+    #print(f"Test MLA Prefill FP8_E4M3:")
+    #mla_prefill(torch.bfloat16, torch.float8_e4m3fn)
+    #print(f"----------------------------------")
