@@ -1205,6 +1205,17 @@ tpudnnStatus_t tpudnnLLamaA16MlpAsync (
     int weight_bits,
     tpudnnTensor_t output);
 
+tpudnnStatus_t tpudnnMatmulFp8Async (
+    tpudnnHandle_t handle,
+    tpudnnTensor_t left,
+    tpudnnTensor_t right,
+    tpudnnTensor_t bias,
+    tpudnnTensor_t scale_left,
+    tpudnnTensor_t scale_right,
+    tpudnnTensor_t scale_result,
+    tpudnnTensor_t output,
+    tpudnnTensor_t output_max);
+
 tpudnnStatus_t tpudnnMlpW8A16DqAsync (
     tpudnnHandle_t handle,
     tpudnnTensor_t input,

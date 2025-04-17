@@ -375,7 +375,7 @@ def mla_decode(act_dtype: torch.dtype, weight_dtype: torch.dtype, mode: Attentio
         raise RuntimeError("mla pe-cache failed")
 
 def mla_prefill(act_dtype: torch.dtype, weight_dtype: torch.dtype):
-    config = MLAConfig(1, 16, 128, 64, 128, 1536, 512, 128, 128**-0.5, act_dtype, weight_dtype, 4096, 0)
+    config = MLAConfig(1, 16, 128, 64, 128, 1536, 512, 128, 192**-0.5, act_dtype, weight_dtype, 4096, 0)
     net_cpu = MLACpu(config)
     net_tpu = MLATpu(config)
 
@@ -409,7 +409,7 @@ def mla_prefill(act_dtype: torch.dtype, weight_dtype: torch.dtype):
     flat_cosine_similarity = F.cosine_similarity(output_tpu.flatten(), output_cpu.flatten(), dim=0)
     print(f"flat_cosine_similarity: {flat_cosine_similarity.item()}")
     if flat_cosine_similarity.item() < 0.99:
-        raise RuntimeError("mla decode failed")
+        raise RuntimeError("mla prefill failed")
 
 if __name__ == "__main__":
     print(f"Test MLA Decode BF16:")
@@ -418,9 +418,10 @@ if __name__ == "__main__":
     print(f"----------------------------------")
     print(f"\nTest MLA Decode FP8_E4M3 continuous_decode:")
     mla_decode(torch.bfloat16, torch.float8_e4m3fn, AttentionMode.CONTINUOUS_DECODE)
+    print(f"----------------------------------")
     print(f"\nTest MLA Decode FP8_E4M3 paged_decode:")
     mla_decode(torch.bfloat16, torch.float8_e4m3fn, AttentionMode.PAGED_DECODE)
-    # print(f"----------------------------------")
+    print(f"----------------------------------")
     #print(f"Test MLA Prefill BF16:")
     #mla_prefill(torch.bfloat16, torch.bfloat16)
     #print(f"----------------------------------")
