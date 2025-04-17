@@ -154,18 +154,6 @@ Tensor & baddbmm_out_tpu(const Tensor & self, const Tensor & batch1, const Tenso
   else
     out = alpha * bmm(batch1_, batch2_);
 
-  // TIMING_START;
-  //
-  // // TODO: imple this op, current has bugs
-  // auto status = sgdnnBaddbmm(
-  //               tpu::TPUGetDeviceResource(),
-  //               tpu::TPUGenerateSgdnnTensor ( self_ ),
-  //               tpu::TPUGenerateSgdnnTensor ( batch1_ ),
-  //               tpu::TPUGenerateSgdnnTensor ( batch2_ ),
-  //               tpu::TPUGenerateSgdnnTensor ( out ),
-  //               alpha.toDouble(),
-  //               beta.toDouble() );
-  //   // TIMING_END( tpu::BADDBMM );
 #endif
   SHOW_TENSOR_OP(self, batch1, batch2, out);
   return out;

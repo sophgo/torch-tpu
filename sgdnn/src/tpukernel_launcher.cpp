@@ -3,36 +3,11 @@
 #include <iostream>
 #include <cassert>
 #include <cstring>
-#include "message.h"
 #include "sg_api_struct.h"
 #include "tpukernel_launcher.hpp"
 
 #define MAX_MSG_QUEUE_LENGTH 2048
 #define MAX_CORE_NUM 8
-
-#ifdef DUMP_INS
-#include <dlfcn.h>
-struct CmdDump
-{
-    void *handle;
-    typedef void (*Func)();
-    Func inc_file_dump_group_num = nullptr;
-    CmdDump()
-    {
-        char *fw_path = getenv("TPUKERNEL_FIRMWARE_PATH");
-        if (!fw_path)
-            return;
-        handle = dlopen(fw_path, RTLD_LAZY);
-        inc_file_dump_group_num = (Func)(dlsym(handle, "inc_file_dump_group_num"));
-    }
-
-    void operator()()
-    {
-        if (inc_file_dump_group_num)
-            inc_file_dump_group_num();
-    }
-} cmd_dump;
-#endif
 
 TPUKernelLauncher::TPUKernelLauncher()
 {

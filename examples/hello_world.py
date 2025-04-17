@@ -9,5 +9,5 @@ def hello_world(device):
     print(c.cpu())
 
 
-hello_world("tpu:1")
+hello_world("tpu:0")
 print(torch.tpu.device_count())

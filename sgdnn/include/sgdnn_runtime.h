@@ -110,27 +110,4 @@ static inline tpu_status_t sgdnnMemcpyD2S(tpu_resource_t tpu_resource, void *dst
 #endif
 }
 
-static inline tpu_status_t sgdnnMemcpyS2D(tpu_resource_t tpu_resource, tpu_device_mem_t dst, void *src, unsigned long long size) {
-#if defined BACKEND_1684X
-  return bm_memcpy_s2d(tpu_resource, dst, src);
-#elif defined BACKEND_SG2260
-  return tpuRtMemcpyS2DAsync(dst, src, size, tpu_resource);
-#else
-  SGDNN_CHECK ( false );
-#endif
-}
-
-static inline tpu_status_t sgdnnMemcpyD2D(tpu_resource_t tpu_resource, tpu_device_mem_t dst,
-                                          unsigned long long dst_offset, tpu_device_mem_t src,
-                                          unsigned long long src_offset, unsigned long long size) {
-#if defined BACKEND_1684X
-  return bm_memcpy_d2d_byte(tpu_resource, dst, dst_offset, src, src_offset, size);
-#elif defined BACKEND_SG2260
-  SGDNN_CHECK(dst_offset == 0 && src_offset == 0);
-  return tpuRtMemcpyD2DAsync(dst, src, size, tpu_resource);
-#else
-  SGDNN_CHECK ( false );
-#endif
-}
-
 #endif //end def SGDNN_RUNTIME_H

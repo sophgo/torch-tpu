@@ -60,8 +60,6 @@ namespace at
 		m.def("ln_mm_backward", ln_mm_backward);
 		m.def("add_ln_mm_forward", add_ln_mm_forward);
 		m.def("add_ln_mm_backward", add_ln_mm_backward);
-		m.def("enable_pmu", enable_pmu);
-		m.def("disable_pmu", disable_pmu);
 		m.def("enable_profile", enable_profile);
 		m.def("disable_profile", disable_profile);
 		m.def("lora_matmul_forward",lora_matmul_forward);
