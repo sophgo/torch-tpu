@@ -1,7 +1,9 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from top_utest import set_requires_grad,move_to, set_bacis_info, Tester_Basic
+from top_utest import set_requires_grad,move_to, set_bacis_info, Tester_Basic, TensorComparator
+import torch_tpu
+import sys
 def case1():
     #step0:set seed
     seed=1000
@@ -51,10 +53,32 @@ def case1():
     My_Tester.customized_execute_function = customized_execute_function
     return My_Tester.Torch_Test_Execution_Function(Test_Module(), input_data)
 
+def case2():
+    #int8 matmul
+    seed=1000
+    set_bacis_info(seed)
+    a = torch.randn(1024, 1024, device="tpu", dtype=torch.int8)
+    b = torch.randn(1024, 1024, device="tpu", dtype=torch.int8)
+    c = torch.matmul(a, b)
+
+    a_c = a.cpu()
+    b_c = b.cpu()
+    c_c_high_precision = torch.matmul(a_c.to(torch.int32), b_c.to(torch.int32))
+    c_c_clamped = torch.clamp(c_c_high_precision, min=-128, max=127)
+    c_c = c_c_clamped.to(torch.int8)
+
+    comparator = TensorComparator()
+    status = comparator.cmp_result(c_c, c.cpu())
+    if not status:
+        print("int8 matmul is wrong!")
+        sys.exit(255)
+    else:
+        print("int8 matmul is correct!")
 
 if __name__ == "__main__":
     #This example shows all  [], [[]] is acceptable
     case1()
+    case2()
 
 #######################
 ##  case1():forward + backward [[T]]

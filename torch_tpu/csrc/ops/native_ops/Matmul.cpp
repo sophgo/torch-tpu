@@ -91,7 +91,7 @@ Tensor & mm_out_tpu ( const Tensor & self, const Tensor & mat2, Tensor & out )
     tpudnnUndefinedTensor(),
     tpu::TPUGenerateTpudnnTensor(stream, out));
   TORCH_CHECK ( status == TPUDNN_STATUS_SUCCESS );
-    TIMING_END( tpu::MM );
+  TIMING_END( tpu::MM );
 #endif
   SHOW_TENSOR_OP(self, mat2, out);
   return out;
