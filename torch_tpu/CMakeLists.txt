@@ -146,7 +146,7 @@ if (BACKEND_SG2260 AND (EXISTS ${TPUv7_RUNTIME_REPO_PATH}))
                                                   ${TPUv7_REPO_RT_AP_LIB_PATH}
                                                   ${TPUv7_REPO_MODEL_RT_LIB_PATH}
                                                   ${TPUv7_REPO_MODEL_BMODEL_LIB_PATH})
-      else()
+else()
   target_link_directories(torch_tpu_python PRIVATE ${RUNTIME_LIB_PATH} ${MODELRUNTIME_LIB_PATH})
 endif()
 
