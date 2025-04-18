@@ -30,21 +30,30 @@ namespace torch{
           ctx->save_for_backward( {mask} );
           auto out = mask * self * (1/(1-p));
     #else
+
+          if( p == 1.0 ) {
+            return torch::zeros_like(self);
+          }else if( p == 0.0 ) {
+            return self;
+          }
+
           at::Tensor out = torch::empty( self.sizes(), self.options() );
+          at::Tensor mask = torch::empty( self.sizes(), self.options() );
           TIMING_START;
           auto stream = c10_tpu::getCurrentTPUStream();
           auto status = tpudnnDropoutMultiCoreAsync(
             stream,
             tpu::TPUGenerateTpudnnTensor(stream, self),
             tpu::TPUGenerateTpudnnTensor(stream, out),
-            tpu::TPUGenerateTpudnnTensor(stream, out),
+            tpu::TPUGenerateTpudnnTensor(stream, mask),
             p
           );
           TORCH_CHECK(status == TPUDNN_STATUS_SUCCESS);
           TIMING_END(tpu::DROPOUT);
-          auto mask = (out - self * (1/(1-p))).abs().to(torch::kFloat);
-          mask = (mask == 0.0f);
-          ctx->save_for_backward( { mask.to(self.dtype()) } );
+          // auto mask = (out - self * (1/(1-p))).abs().to(torch::kFloat);
+          // mask = (mask == 0.0f);
+          // ctx->save_for_backward( { mask.to(self.dtype()) } );
+          ctx->save_for_backward( { mask } );
     #endif
           SHOW_TENSOR_OP(self, out);
           return out;
@@ -55,6 +64,11 @@ namespace torch{
       {
         auto p = ctx->saved_data["p"].toDouble();
         auto train = ctx->saved_data["train"].toBool();
+
+        if(p == 1){
+          return { torch::zeros_like(gradout[0]), at::Tensor(), at::Tensor(), at::Tensor(), at::Tensor(), at::Tensor() };
+        }
+
         if (p == 0 || !train) {
           return {gradout[0], at::Tensor(), at::Tensor(), at::Tensor(), at::Tensor(), at::Tensor() };
         }else{
