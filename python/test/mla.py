@@ -73,15 +73,19 @@ class MLAConfig:
                         dtype = self.dtype).to(self.weight_dtype)
         WUKV = torch.randn((self.num_heads * (self.qk_nope_head_dim + self.v_head_dim), self.kv_lora_rank),
                         dtype = self.dtype).to(self.weight_dtype)
-        Q = torch.randn((self.batch, 1, self.q_lora_rank), dtype = self.dtype)
-        KV = torch.randn((self.batch, 1, self.kv_lora_rank), dtype = self.dtype)
-        PE = torch.randn((self.batch, 1, self.qk_rope_head_dim), dtype = self.dtype)
+        seq = max(seqlen).item() if self.attention_mode in (
+            AttentionMode.CONTINUOUS_PREFILL,
+            AttentionMode.PAGED_PREFILL,
+        ) else 1
+        Q = torch.randn((self.batch, seq, self.q_lora_rank), dtype = self.dtype)
+        KV = torch.randn((self.batch, seq, self.kv_lora_rank), dtype = self.dtype)
+        PE = torch.randn((self.batch, seq, self.qk_rope_head_dim), dtype = self.dtype)
         kv_cache = torch.randn((self.batch, self.max_cache_size, self.kv_lora_rank), dtype = self.dtype)
         pe_cache = torch.randn((self.batch, self.max_cache_size, self.qk_rope_head_dim), dtype = self.dtype)
-        idx_theta = gen_rope(self.batch, self.qk_rope_head_dim).to(self.dtype)
+        idx_theta = gen_rope(self.batch * seq, self.qk_rope_head_dim).to(self.dtype)
         cos = torch.cos(idx_theta).contiguous().to(self.dtype)
         sin = torch.sin(idx_theta).contiguous().to(self.dtype)
-        output = torch.randn((self.batch, 1, self.num_heads, self.v_head_dim), dtype = self.dtype)
+        output = torch.randn((self.batch, seq, self.num_heads, self.v_head_dim), dtype = self.dtype)
 
         paged_kvcache = None
         paged_pecache = None
@@ -104,7 +108,7 @@ class MLAConfig:
             for b in range(self.batch):
                 paged_kvcache.view(-1, self.kv_lora_rank)[indices[b]] = kv_cache[b,:len(indices[b])]
                 paged_pecache.view(-1, self.qk_rope_head_dim)[indices[b]] = pe_cache[b,:len(indices[b])]
-            
+
 
         WUQ_scale = None
         WUKV_scale = None
@@ -243,6 +247,7 @@ class MLACpu(MLA):
         super(MLACpu, self).__init__(config)
 
     def forward(self, tensors: MLATensors):
+        bsz, seqlen, _ = tensors.Q.size()
         # step 1: Q upper
         if tensors.WUQ.dtype == torch.float8_e4m3fn or tensors.WUQ.dtype == torch.float8_e5m2:
             WUQ = fp8_dequant(tensors.WUQ, tensors.WUQ_scale, self.config.block_size)
@@ -251,23 +256,24 @@ class MLACpu(MLA):
             WUQ = tensors.WUQ
             WUKV = tensors.WUKV
 
-        Q = tensors.Q.view(tensors.Q.shape[0], -1)
+        Q = tensors.Q.view(-1, tensors.Q.shape[-1])
         Q = torch.matmul(Q, WUQ.t())
-        Q = Q.view(Q.shape[0], 1, self.config.num_heads, self.config.qk_nope_head_dim + self.config.qk_rope_head_dim)
+        Q = Q.view(bsz, seqlen, self.config.num_heads, self.config.qk_nope_head_dim + self.config.qk_rope_head_dim)
         q_nope, q_pe = torch.split(Q, [self.config.qk_nope_head_dim, self.config.qk_rope_head_dim], dim=-1)
 
         cos = torch.cos(tensors.idx_theta)
         sin = torch.sin(tensors.idx_theta)
         # step 2: Q RoPE
-        q_pe = q_pe.view(q_pe.shape[0], self.config.num_heads, self.config.qk_rope_head_dim).contiguous()
+        q_pe = q_pe.view(bsz * seqlen, self.config.num_heads, self.config.qk_rope_head_dim).contiguous()
         q_pe = apply_rope(q_pe, cos, sin)
-        q_pe = q_pe.view(q_pe.shape[0], 1, self.config.num_heads, self.config.qk_rope_head_dim)
+        q_pe = q_pe.view(bsz, seqlen, self.config.num_heads, self.config.qk_rope_head_dim)
 
         # step 3: Q_nope * WUKV[:, :qk_nope_head_dim]
         WUKV = WUKV.view(self.config.num_heads, -1, self.config.kv_lora_rank)
         q_nope = torch.einsum("bshd, hdc->bshc", q_nope, WUKV[:, :self.config.qk_nope_head_dim])
 
-        if self.config.attention_mode == AttentionMode.CONTINUOUS_DECODE:
+        if self.config.attention_mode == AttentionMode.CONTINUOUS_DECODE \
+            or self.config.attention_mode == AttentionMode.CONTINUOUS_PREFILL:
             kv_cache = tensors.kv_cache
             pe_cache = tensors.pe_cache
         else:
@@ -287,20 +293,22 @@ class MLACpu(MLA):
 
         # step 4: QK
         max_seqlen = max(tensors.seqlen).item()
-        start_pos = max_seqlen
-        end_pos = start_pos + 1
-        kv_cache[:Q.shape[0], start_pos:end_pos, :] = tensors.KV
-        PE = apply_rope(tensors.PE, cos, sin)
-        pe_cache[:Q.shape[0], start_pos:end_pos, :] = PE
-        scores = (torch.einsum("bshc, btc->bsht", q_nope, kv_cache[:Q.shape[0], :end_pos]) +
-                  torch.einsum("bshr, btr->bsht", q_pe, pe_cache[:Q.shape[0], :end_pos]))
+        start_pos = 0 if seqlen != 1 else max_seqlen
+        end_pos = start_pos + seqlen
+        kv_cache[:bsz, start_pos:end_pos, :] = tensors.KV
+        PE = tensors.PE.view(bsz * seqlen, 1, self.config.qk_rope_head_dim)
+        PE = apply_rope(PE, cos, sin)
+        PE = PE.view(bsz, seqlen, self.config.qk_rope_head_dim)
+        pe_cache[:bsz, start_pos:end_pos, :] = PE
+        scores = (torch.einsum("bshc, btc->bsht", q_nope, kv_cache[:bsz, :end_pos]) +
+                  torch.einsum("bshr, btr->bsht", q_pe, pe_cache[:bsz, :end_pos]))
         scores = scores * self.config.softmax_scale
 
         # step 5: softmax
         scores = scores.softmax(dim = -1, dtype = torch.float32).type_as(Q)
 
         # step 6: QK * KVcache
-        output = torch.einsum("bsht, btc->bshc", scores, kv_cache[:Q.shape[0], :end_pos])
+        output = torch.einsum("bsht, btc->bshc", scores, kv_cache[:bsz, :end_pos])
         # step 7: QK * WUKV[:, qk_nope_head_dim:]
         output = torch.einsum("bshc, hdc->bshd", output, WUKV[:, -self.config.v_head_dim:])
         return (output.contiguous(), kv_cache.contiguous(), pe_cache.contiguous())
@@ -374,8 +382,8 @@ def mla_decode(act_dtype: torch.dtype, weight_dtype: torch.dtype, mode: Attentio
         print(f"pe_diff: {torch.max(torch.abs(pe_diff))}")
         raise RuntimeError("mla pe-cache failed")
 
-def mla_prefill(act_dtype: torch.dtype, weight_dtype: torch.dtype):
-    config = MLAConfig(1, 16, 128, 64, 128, 1536, 512, 128, 192**-0.5, act_dtype, weight_dtype, 4096, 0)
+def mla_prefill(act_dtype: torch.dtype, weight_dtype: torch.dtype, mode: AttentionMode):
+    config = MLAConfig(3, 16, 128, 64, 128, 1536, 512, 128, 192**-0.5, act_dtype, weight_dtype, 512, mode)
     net_cpu = MLACpu(config)
     net_tpu = MLATpu(config)
 
@@ -394,11 +402,15 @@ def mla_prefill(act_dtype: torch.dtype, weight_dtype: torch.dtype):
         tensors.sin.to(device),
         tensors.output.to(device),
         tensors.WUQ_scale.to(device) if tensors.WUQ_scale is not None else None,
-        tensors.WUKV_scale.to(device) if tensors.WUKV_scale is not None else None
+        tensors.WUKV_scale.to(device) if tensors.WUKV_scale is not None else None,
+        tensors.block_tables.to(device) if tensors.block_tables is not None else None,
+        tensors.slots.to(device) if tensors.slots is not None else None,
+        tensors.paged_kvcache.to(device) if tensors.paged_kvcache is not None else None,
+        tensors.paged_pecache.to(device) if tensors.paged_pecache is not None else None
     )
 
     output_tpu = net_tpu(tensors_tpu)
-    output_cpu = net_cpu(tensors).contiguous()
+    output_cpu, kv_cache, pe_cache = net_cpu(tensors)
     output_tpu = output_tpu.cpu()
 
     diff = output_tpu - output_cpu
@@ -410,6 +422,22 @@ def mla_prefill(act_dtype: torch.dtype, weight_dtype: torch.dtype):
     print(f"flat_cosine_similarity: {flat_cosine_similarity.item()}")
     if flat_cosine_similarity.item() < 0.99:
         raise RuntimeError("mla prefill failed")
+
+    if mode == AttentionMode.CONTINUOUS_PREFILL:
+        kv_diff = (
+            tensors_tpu.kv_cache.cpu()[:, :config.context_len]
+            - kv_cache[:, :config.context_len]
+        )
+        pe_diff = (
+            tensors_tpu.pe_cache.cpu()[:, :config.context_len]
+            - pe_cache[:, :config.context_len]
+        )
+    if torch.max(torch.abs(kv_diff)) > 1e-5:
+        print(f"kv_diff: {torch.max(torch.abs(kv_diff))}")
+        raise RuntimeError("mla kv-cache failed")
+    if torch.max(torch.abs(pe_diff)) > 1e-5:
+        print(f"pe_diff: {torch.max(torch.abs(pe_diff))}")
+        raise RuntimeError("mla pe-cache failed")
 
 if __name__ == "__main__":
     # print(f"Test MLA Decode BF16 continuous_decode:")
@@ -424,9 +452,9 @@ if __name__ == "__main__":
     # print(f"\nTest MLA Decode FP8_E4M3 paged_decode:")
     # mla_decode(torch.bfloat16, torch.float8_e4m3fn, AttentionMode.PAGED_DECODE)
     # print(f"----------------------------------")
-    #print(f"Test MLA Prefill BF16:")
-    #mla_prefill(torch.bfloat16, torch.bfloat16)
-    #print(f"----------------------------------")
-    #print(f"Test MLA Prefill FP8_E4M3:")
-    #mla_prefill(torch.bfloat16, torch.float8_e4m3fn)
-    #print(f"----------------------------------")
+    # print(f"Test MLA Prefill BF16:")
+    # mla_prefill(torch.bfloat16, torch.bfloat16, AttentionMode.CONTINUOUS_PREFILL)
+    # print(f"----------------------------------")
+    print(f"Test MLA Prefill FP8_E4M3:")
+    mla_prefill(torch.bfloat16, torch.float8_e4m3fn, AttentionMode.CONTINUOUS_PREFILL)
+    print(f"----------------------------------")
