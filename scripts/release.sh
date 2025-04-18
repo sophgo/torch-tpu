@@ -8,6 +8,12 @@ export RELEASE_MODE=ON
 TORCH_TPU_NONINTERACTIVE=ON python setup.py clean
 # bash scripts/auto_generate_patch.sh || exit -1
 bdist_wheel || exit -1
+mkdir -p release
+cp dist/*.whl release/
+source scripts/envsetup.sh sg2260
+build_riscv_whl || exit -1
+cp dist/*.whl release/
+rm -rf dist/*.whl
 
 unset RELEASE_MODE
 
@@ -17,7 +23,7 @@ if [ -z $SKIP_DOC ]; then
 fi
 
 ## package example
-pushd $CUR_DIR/../dist
+pushd $CUR_DIR/../release
 cp -rf $CUR_DIR/../examples .
 popd
 
@@ -25,7 +31,7 @@ popd
 source scripts/package_src/package_release_src.sh
 
 # ------------------------------------------------------------------------------
-release_archive="./dist"
+release_archive="./release"
 BUILD_PATH=build/torch-tpu
 torch_tpu_version="$(grep TORCHTPU_VERSION ${BUILD_PATH}/CMakeCache.txt | cut -d "=" -f2)"
 commit=$(git log -1 --pretty=format:"%h")
