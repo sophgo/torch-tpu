@@ -203,31 +203,53 @@ namespace at
 	    const c10::optional<Tensor> &mask,
 	    double C);
 
-	Tensor mla(
-		Tensor &OUT, 
-		Tensor &Q, 
-		Tensor &KV, 
-		Tensor &PE, 
-		Tensor &WUQ,
-		Tensor &WUKV,
-		Tensor &KVcache,
-		Tensor &PEcache,
-		Tensor &cos,
-		Tensor &sin,
-                Tensor &save_slots,
-		const c10::optional<Tensor> &mask,
-		const Tensor &input_lengths,
-		int64_t head,
-		int64_t q_lora_rank,
-		int64_t kv_lora_rank,
-		int64_t qk_nope_head_dim,
-		int64_t qk_rope_head_dim,
-		int64_t v_head_dim,
-		int64_t mask_size,
-                int64_t slots_size,
-                int64_t paged_cache_block_size,	
-		double C,
-		int64_t attention_mode);
+	Tensor latent_attention(
+        Tensor &OUT,
+        Tensor &Q,
+        Tensor &KV,
+        Tensor &PE,
+        Tensor &WUQ,
+        Tensor &WUKV,
+        Tensor &KVcache,
+        Tensor &PEcache,
+        Tensor &cos,
+        Tensor &sin,
+        const c10::optional<Tensor> &mask, // decode: None
+        const Tensor &input_lengths, 
+        int64_t head,
+        int64_t q_lora_rank,
+        int64_t kv_lora_rank,
+        int64_t qk_nope_head_dim,
+        int64_t qk_rope_head_dim,
+        int64_t v_head_dim,
+        int64_t mask_size,
+        int64_t max_cache_size,
+        double C,
+        int64_t attention_mode);
+
+        Tensor paged_latent_attention(
+            Tensor &OUT, Tensor &Q, Tensor &KV, Tensor &PE, Tensor &WUQ,
+            Tensor &WUKV, Tensor &KVcache, Tensor &PEcache, Tensor &cos,
+            Tensor &sin, Tensor &save_slots,
+            const c10::optional<Tensor> &mask, // decode: None
+            const Tensor &input_lengths, int64_t head, int64_t q_lora_rank,
+            int64_t kv_lora_rank, int64_t qk_nope_head_dim,
+            int64_t qk_rope_head_dim, int64_t v_head_dim, int64_t mask_size,
+            int64_t slots_size, int64_t paged_cache_block_size, double C,
+            int64_t attention_mode);
+
+        Tensor latent_attention_fp8(
+            Tensor &OUT, Tensor &Q, Tensor &KV, Tensor &PE, Tensor &WUQ,
+            Tensor &WUKV, Tensor &KVcache, Tensor &PEcache, Tensor &cos,
+            Tensor &sin, Tensor &WUQ_scale, Tensor &WUKV_scale,
+            const c10::optional<Tensor> &mask, // decode: None
+            const Tensor &seqlen, int64_t num_heads, int64_t q_lora_rank,
+            int64_t kv_lora_rank, int64_t qk_nope_head_dim,
+            int64_t qk_rope_head_dim, int64_t v_head_dim, int64_t mask_size,
+            int64_t quant_block_size, int64_t max_cache_size,
+            double softmax_scale,
+            int64_t attention_mode // prefille 0, decode 1
+        );
 
         Tensor paged_latent_attention_fp8(
             Tensor &OUT, Tensor &Q, Tensor &KV, Tensor &PE, Tensor &WUQ,

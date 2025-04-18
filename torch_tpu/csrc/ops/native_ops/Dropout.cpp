@@ -37,6 +37,7 @@ namespace torch{
             stream,
             tpu::TPUGenerateTpudnnTensor(stream, self),
             tpu::TPUGenerateTpudnnTensor(stream, out),
+            tpu::TPUGenerateTpudnnTensor(stream, out),
             p
           );
           TORCH_CHECK(status == TPUDNN_STATUS_SUCCESS);

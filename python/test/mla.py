@@ -41,8 +41,10 @@ class MLAConfig:
     weight_dtype: torch.dtype
     context_len: int
     attention_mode: int #0: Paged Prefill, 1: Paged Decode
+    max_cache_size: int = 8192
 
     def random_tensors(self):
+        assert self.max_cache_size >= self.context_len + 1, "max_cache_size should be larger than context_len + 1"
         seqlen = torch.tensor([self.context_len for _ in range(self.batch)], dtype = torch.int32)
         max_seqlen = max(seqlen).item()
         WUQ = torch.randn((self.num_heads * (self.qk_nope_head_dim + self.qk_rope_head_dim), self.q_lora_rank),
@@ -52,11 +54,11 @@ class MLAConfig:
         Q = torch.randn((self.batch, 1, self.q_lora_rank), dtype = self.dtype)
         KV = torch.randn((self.batch, 1, self.kv_lora_rank), dtype = self.dtype)
         PE = torch.randn((self.batch, 1, self.qk_rope_head_dim), dtype = self.dtype)
-        kv_cache = torch.randn((self.batch, max_seqlen * 4, self.kv_lora_rank), dtype = self.dtype)
-        pe_cache = torch.randn((self.batch, max_seqlen * 4, self.qk_rope_head_dim), dtype = self.dtype)
-        idx_theta = gen_rope(self.batch * self.context_len, self.qk_rope_head_dim).to(self.dtype)
-        cos = torch.cos(idx_theta[:,0,:]).view(idx_theta.shape[0],1,-1).contiguous().to(self.dtype)
-        sin = torch.sin(idx_theta[:,0,:]).view(idx_theta.shape[0],1,-1).contiguous().to(self.dtype)
+        kv_cache = torch.randn((self.batch, self.max_cache_size, self.kv_lora_rank), dtype = self.dtype)
+        pe_cache = torch.randn((self.batch, self.max_cache_size, self.qk_rope_head_dim), dtype = self.dtype)
+        idx_theta = gen_rope(self.batch, self.qk_rope_head_dim).to(self.dtype)
+        cos = torch.cos(idx_theta).contiguous().to(self.dtype)
+        sin = torch.sin(idx_theta).contiguous().to(self.dtype)
         output = torch.randn((self.batch, 1, self.num_heads, self.v_head_dim), dtype = self.dtype)
 
         WUQ_scale = None
@@ -74,11 +76,12 @@ class MLAConfig:
 
 
 def gen_rope(Ntotal, head_size):
-    theta = torch.arange(5, head_size+5, 2).float() / head_size
+    theta = torch.arange(0, head_size, 2).float() / head_size
     theta = 1. / 10000 ** theta
     theta = theta.view(1, -1).squeeze()  # (1, d/2)
-    seq_idx = torch.arange(20, Ntotal+20, dtype=theta.dtype)
-    seq_idx = seq_idx.view(-1, 1).squeeze()  # (seq_len, 1)
+    seq_idx = torch.arange(Ntotal, dtype=theta.dtype)
+    if Ntotal > 1:
+        seq_idx = seq_idx.view(-1, 1).squeeze()  # (seq_len, 1)
     idx_theta = torch.einsum('i,j->ij', seq_idx, theta)  # (seq_len, d/2)
     idx_theta = idx_theta.view(idx_theta.shape[0],1,-1)
     idx_theta = idx_theta.repeat(1,1,2)
@@ -141,21 +144,44 @@ class MLATpu(MLA):
 
     def forward(self, tensors: MLATensors):
         if (tensors.WUQ.dtype == torch.float8_e4m3fn or tensors.WUQ.dtype == torch.float8_e5m2):
-            torch.ops.my_ops.paged_latent_attention_fp8(
-                tensors.output, tensors.Q, tensors.KV, tensors.PE, tensors.WUQ, tensors.WUKV,
-                tensors.kv_cache, tensors.pe_cache, tensors.cos, tensors.sin, tensors.WUQ_scale,
-                tensors.WUKV_scale, tensors.seqlen, tensors.seqlen, None, tensors.seqlen,
-                self.config.num_heads, self.config.q_lora_rank, self.config.kv_lora_rank,
-                self.config.qk_nope_head_dim, self.config.qk_rope_head_dim, self.config.v_head_dim,
-                0, self.config.block_size, 16, 16, self.config.softmax_scale, self.config.attention_mode)
+            # 0: normal attention
+            if self.config.attention_mode == 0 or self.config.attention_mode == 1:
+                torch.ops.my_ops.latent_attention_fp8(
+                    tensors.output, tensors.Q, tensors.KV, tensors.PE, tensors.WUQ, tensors.WUKV,
+                    tensors.kv_cache, tensors.pe_cache, tensors.cos, tensors.sin, tensors.WUQ_scale,
+                    tensors.WUKV_scale, None, tensors.seqlen, self.config.num_heads,
+                    self.config.q_lora_rank, self.config.kv_lora_rank, self.config.qk_nope_head_dim,
+                    self.config.qk_rope_head_dim, self.config.v_head_dim, 0,
+                    self.config.block_size, self.config.max_cache_size, self.config.softmax_scale,
+                    self.config.attention_mode)
+            elif self.config.attention_mode == 2 or self.config.attention_mode == 3:
+                # paged attention
+                torch.ops.my_ops.paged_latent_attention_fp8(
+                    tensors.output, tensors.Q, tensors.KV, tensors.PE, tensors.WUQ, tensors.WUKV,
+                    tensors.kv_cache, tensors.pe_cache, tensors.cos, tensors.sin, tensors.WUQ_scale,
+                    tensors.WUKV_scale, None, None, None, tensors.seqlen, self.config.num_heads,
+                    self.config.q_lora_rank, self.config.kv_lora_rank, self.config.qk_nope_head_dim,
+                    self.config.qk_rope_head_dim, self.config.v_head_dim, 0,
+                    self.config.block_size, 0, 0, self.config.softmax_scale,
+                    self.config.attention_mode)
         else:
-            torch.ops.my_ops.mla(
-                tensors.output, tensors.Q, tensors.KV, tensors.PE,
-                tensors.WUQ, tensors.WUKV, tensors.kv_cache, tensors.pe_cache,
-                tensors.cos, tensors.sin, tensors.seqlen, None, tensors.seqlen, self.config.num_heads,
-                self.config.q_lora_rank, self.config.kv_lora_rank, self.config.qk_nope_head_dim,
-                self.config.qk_rope_head_dim, self.config.v_head_dim,
-                0, 16, 16, self.config.softmax_scale, self.config.attention_mode)
+            if self.config.attention_mode == 0 or self.config.attention_mode == 1:
+                torch.ops.my_ops.latent_attention(
+                    tensors.output, tensors.Q, tensors.KV, tensors.PE,
+                    tensors.WUQ, tensors.WUKV, tensors.kv_cache, tensors.pe_cache,
+                    tensors.cos, tensors.sin, None, tensors.seqlen, self.config.num_heads,
+                    self.config.q_lora_rank, self.config.kv_lora_rank, self.config.qk_nope_head_dim,
+                    self.config.qk_rope_head_dim, self.config.v_head_dim,
+                    0, self.config.max_cache_size, self.config.softmax_scale, self.config.attention_mode)
+            elif self.config.attention_mode == 2 or self.config.attention_mode == 3:
+                torch.ops.my_ops.paged_latent_attention(
+                    tensors.output, tensors.Q, tensors.KV, tensors.PE,
+                    tensors.WUQ, tensors.WUKV, tensors.kv_cache, tensors.pe_cache,
+                    tensors.cos, tensors.sin, None, None, tensors.seqlen, self.config.num_heads,
+                    self.config.q_lora_rank, self.config.kv_lora_rank, self.config.qk_nope_head_dim,
+                    self.config.qk_rope_head_dim, self.config.v_head_dim,
+                    0, 0, self.config.softmax_scale, self.config.attention_mode
+                )
         return tensors.output
 
 
@@ -177,8 +203,8 @@ class MLACpu(MLA):
         Q = Q.view(Q.shape[0], 1, self.config.num_heads, self.config.qk_nope_head_dim + self.config.qk_rope_head_dim)
         q_nope, q_pe = torch.split(Q, [self.config.qk_nope_head_dim, self.config.qk_rope_head_dim], dim=-1)
 
-        cos = torch.cos(tensors.idx_theta[0])
-        sin = torch.sin(tensors.idx_theta[0])
+        cos = torch.cos(tensors.idx_theta)
+        sin = torch.sin(tensors.idx_theta)
         # step 2: Q RoPE
         q_pe = q_pe.view(q_pe.shape[0], self.config.num_heads, self.config.qk_rope_head_dim).contiguous()
         q_pe = apply_rope(q_pe, cos, sin)
@@ -210,7 +236,7 @@ class MLACpu(MLA):
 
 
 def mla_decode(act_dtype: torch.dtype, weight_dtype: torch.dtype):
-    config = MLAConfig(1, 16, 128, 64, 128, 1536, 512, 128, 128**-0.5, act_dtype, weight_dtype, 4096, 1)
+    config = MLAConfig(2, 16, 128, 64, 128, 1536, 512, 128, 192**-0.5 * 0.3, act_dtype, weight_dtype, 4096, 1)
     net_cpu = MLACpu(config)
     net_tpu = MLATpu(config)
 
@@ -233,14 +259,15 @@ def mla_decode(act_dtype: torch.dtype, weight_dtype: torch.dtype):
     )
 
     output_tpu = net_tpu(tensors_tpu)
-    output = net_cpu(tensors)
+    output_cpu = net_cpu(tensors).contiguous()
+    output_tpu = output_tpu.cpu()
 
-    diff = output_tpu.cpu() - output.cpu()
-    cosine_similarity = F.cosine_similarity(output_tpu.view(output_tpu.shape[0], -1).cpu(),
-                                            output.view(output_tpu.shape[0], -1).cpu(), dim=0)
-    print(f"diff: {torch.max(torch.abs(diff))}")
-    print(f"{cosine_similarity}")
-    flat_cosine_similarity = F.cosine_similarity(output_tpu.cpu().flatten(), output.cpu().flatten(), dim=0)
+    diff = output_tpu - output_cpu
+    cosine_similarity = F.cosine_similarity(output_tpu.view(config.batch, -1),
+                                            output_cpu.view(config.batch, -1), dim=-1)
+    print(f"diff: {torch.max(torch.abs(diff.view(config.batch, -1)), dim=-1)}")
+    print(f"cos sim: {cosine_similarity}")
+    flat_cosine_similarity = F.cosine_similarity(output_tpu.flatten(), output_cpu.flatten(), dim=0)
     print(f"flat_cosine_similarity: {flat_cosine_similarity.item()}")
     if flat_cosine_similarity.item() < 0.99:
         raise RuntimeError("mla decode failed")
@@ -269,17 +296,18 @@ def mla_prefill(act_dtype: torch.dtype, weight_dtype: torch.dtype):
     )
 
     output_tpu = net_tpu(tensors_tpu)
-    output = net_cpu(tensors)
+    output_cpu = net_cpu(tensors).contiguous()
+    output_tpu = output_tpu.cpu()
 
-    diff = output_tpu.cpu() - output.cpu()
-    cosine_similarity = F.cosine_similarity(output_tpu.view(output_tpu.shape[0], -1).cpu(),
-                                            output.view(output_tpu.shape[0], -1).cpu(), dim=0)
-    print(f"diff: {torch.max(torch.abs(diff))}")
-    print(f"{cosine_similarity}")
-    flat_cosine_similarity = F.cosine_similarity(output_tpu.cpu().flatten(), output.cpu().flatten(), dim=0)
+    diff = output_tpu - output_cpu
+    cosine_similarity = F.cosine_similarity(output_tpu.view(config.batch, -1),
+                                            output_cpu.view(config.batch, -1), dim=-1)
+    print(f"diff: {torch.max(torch.abs(diff.view(config.batch, -1)), dim=-1)}")
+    print(f"cos sim: {cosine_similarity}")
+    flat_cosine_similarity = F.cosine_similarity(output_tpu.flatten(), output_cpu.flatten(), dim=0)
     print(f"flat_cosine_similarity: {flat_cosine_similarity.item()}")
     if flat_cosine_similarity.item() < 0.99:
-        raise RuntimeError("mla prefill failed")
+        raise RuntimeError("mla decode failed")
 
 if __name__ == "__main__":
     print(f"Test MLA Decode BF16:")

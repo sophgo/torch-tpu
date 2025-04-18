@@ -37,7 +37,9 @@ namespace at
 		m.def("dummy_no_kernel_launch", dummy_no_kernel_launch);
 		m.def("llava_mlp", llava_mlp);
 		m.def("llava_attention", llava_attention);
-		m.def("mla", mla);
+		m.def("latent_attention", latent_attention);
+		m.def("latent_attention_fp8", latent_attention_fp8);
+		m.def("paged_latent_attention", paged_latent_attention);
 		m.def("paged_latent_attention_fp8", paged_latent_attention_fp8);
 		m.def("mlp_forward", mlp_forward);
 		m.def("mlp_backward", mlp_backward);
@@ -66,7 +68,6 @@ namespace at
 		m.def("tgi_input_ids_update_decode_phase",TGI_input_ids_update_decode_phase);
 		m.def("dynlib_execute",dynlib_execute);
 		m.def("format_cast", FormatCast);
-		
 		m.def("fused_moe_grouped_topk", fused_moe_grouped_topk);
 		m.def("fused_moe_fused_experts", fused_moe_fused_experts);
 	}
