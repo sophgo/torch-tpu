@@ -255,7 +255,7 @@ namespace at
             Tensor &OUT, Tensor &Q, Tensor &KV, Tensor &PE, Tensor &WUQ,
             Tensor &WUKV, Tensor &KVcache, Tensor &PEcache, Tensor &cos,
             Tensor &sin, Tensor &WUQ_scale, Tensor &WUKV_scale,
-            Tensor &fetch_slots, Tensor &save_slots,
+            const c10::optional<Tensor> &fetch_slots, Tensor &save_slots,
             const c10::optional<Tensor> &mask, // decode: None
             const Tensor &seqlen, int64_t num_heads, int64_t q_lora_rank,
             int64_t kv_lora_rank, int64_t qk_nope_head_dim,
