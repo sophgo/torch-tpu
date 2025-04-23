@@ -322,12 +322,7 @@ void PythonNet::printNetworkInfo(tpuRtNetInfo_t *info){
 
 PythonModel::PythonModel(const std::string &model_file, int dev_id,
                                 const std::string &decrypt_lib) {
-    // tpuRtStatus_t ret = tpuRtSuccess;
     m_dev_id = dev_id;
-    // if(tpu::IsTPUMgrInited() != tpu::INIT_SUCCESS){
-    //   printf(">>>>>>>  tpuMgr not inited, init it\n");
-    //   tpu::InitTPUMgr();
-    // }
     tpuRtSetDevice(dev_id);
     tpuRtCreateNetContext(&m_context);
     tpuRtLoadNet(model_file.c_str(), m_context, &m_net);

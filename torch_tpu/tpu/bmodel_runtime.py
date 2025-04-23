@@ -1,4 +1,3 @@
-import contextlib
 import torch_tpu
 import torch
 
@@ -66,7 +65,7 @@ class BmodelRunner:
         assert 0 <= idx and idx < self.model_net_info[self.cur_net_name]["num_input"] if is_input else self.model_net_info[self.cur_net_name]["num_output"], "The idx is out of range"
         return torch_tpu._C.getTensor(self.cur_net, idx, is_input)
 
-    def prepare_outputs(self, build_in=True):
+    def prepare_outputs(self, build_in=False):
         """Prepare the output tensor for the model.
         Parameters:
             build_in: bool, whether the output tensor is build in the model (use empty or torch.ops.help.build_tensor).
@@ -86,14 +85,14 @@ class BmodelRunner:
     def forward_sync(self, inputs):
         self._check_cur_net()
         outputs = self.prepare_outputs()
-        self.forward_with_outputs(inputs, outputs)
-        return outputs
+        self.forward_sync_with_outputs(inputs, outputs)
+        return outputs if len(outputs) > 1 else outputs[0]
 
     def forward(self, inputs):
         self._check_cur_net()
         outputs = self.prepare_outputs()
         self.forward_with_outputs(inputs, outputs)
-        return outputs
+        return outputs if len(outputs) > 1 else outputs[0]
 
     def check_input_outputs(self, inputs, outputs):
         """check the inputs and outputs tensor shape and dtype.
@@ -141,6 +140,14 @@ class BmodelRunner:
             inputs:  list, input tensor
             outputs: list, output tensor
         """
+        if isinstance(inputs, list):
+            pass
+        elif not isinstance(inputs, list) and isinstance(inputs, torch.Tensor):
+            inputs = [inputs]
+        else:
+            assert 0, "input should be instance of list or instance of Tensor"
+        assert isinstance(outputs, list), "outputs should be a instance of list"
+
         if with_check:
             self.check_input_outputs(inputs, outputs)
         torch_tpu._C.forward(self.cur_net, inputs, outputs)
@@ -151,6 +158,14 @@ class BmodelRunner:
             inputs:  list, input tensor
             outputs: list, output tensor
         """
+        if not isinstance(inputs, list) and isinstance(inputs, torch.Tensor):
+            inputs = [inputs]
+        elif isinstance(inputs, list):
+            pass
+        else:
+            assert 0, "input should be instance of list or instance of Tensor"
+        assert isinstance(outputs, list), "outputs should be a instance of list"
+
         if with_check:
             self.check_input_outputs(inputs, outputs)
         torch_tpu._C.forward_sync(self.cur_net, inputs, outputs)

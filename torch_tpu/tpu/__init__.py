@@ -88,6 +88,9 @@ __all__ = [
     "GlobalOpTimer_dump",
     "format_cast",          # tensor format cast
 
+    ## custom tpu bmodel runtime funcs
+    "BmodelRunner",
+
     # "BoolStorage",
     # "ByteStorage",
     # "ShortStorage",
