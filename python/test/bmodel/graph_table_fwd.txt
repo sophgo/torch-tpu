@@ -1,0 +1,6 @@
+opcode         name       target           args                    kwargs
+-------------  ---------  ---------------  ----------------------  --------
+placeholder    primals_1  primals_1        ()                      {}
+placeholder    primals_2  primals_2        ()                      {}
+call_function  mm         aten.mm.default  (primals_1, primals_2)  {}
+output         output     output           ([mm, primals_2],)      {}

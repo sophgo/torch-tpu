@@ -35,7 +35,7 @@ PyObject* initModule() {
     AddPyMethodDefs(methods, THPTModule_get_methods());
     AddPyMethodDefs(methods, THPTUtils_get_methods());
     AddPyMethodDefs(methods, torch_tpu::autocast::autocast_mode_functions());
-    AddPyMethodDefs(methods, THPTBmodel_get_methods());
+    AddPyMethodDefs(methods, THPTBmodel_get_methods()); // TODO: remove it, use THPTBMRT_init instead
     static struct PyModuleDef torchtpu_module = {
         PyModuleDef_HEAD_INIT,
         "torch_tpu._C",
@@ -46,6 +46,7 @@ PyObject* initModule() {
     module = PyModule_Create(&torchtpu_module);
     THPTStream_init(module);
     THPTEvent_init(module);
+    THPTBMRT_init(module);
     RegisterTPUProperties(module);
     BindGetDeviceProperties(module);
     return module;

@@ -1,0 +1,7 @@
+opcode         name        target           args             kwargs
+-------------  ----------  ---------------  ---------------  --------
+placeholder    primals_2   primals_2        ()               {}
+placeholder    tangents_1  tangents_1       ()               {}
+call_function  t           aten.t.default   (primals_2,)     {}
+call_function  mm_1        aten.mm.default  (tangents_1, t)  {}
+output         output      output           ([mm_1, None],)  {}

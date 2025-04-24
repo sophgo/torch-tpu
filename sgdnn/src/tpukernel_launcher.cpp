@@ -3,11 +3,38 @@
 #include <iostream>
 #include <cassert>
 #include <cstring>
+#include <stdio.h>
+#include <dlfcn.h>
+#include <libgen.h>  // dirname()
 #include "sg_api_struct.h"
 #include "tpukernel_launcher.hpp"
 
 #define MAX_MSG_QUEUE_LENGTH 2048
 #define MAX_CORE_NUM 8
+
+std::string get_save_dir() {
+  std::string save_path = std::string(getenv("HOME")) + "/.torch_tpu_kernel_module";
+  return save_path;
+}
+
+static void save_to_file(const char* filename, const tpuRtModule* module)
+{
+  FILE* file = fopen(filename, "wb"); 
+  if (!file) {
+    perror("Failed to open file for writing"); return;
+  }
+  size_t written = fwrite(module, 80, 1, file);
+  if (written != 1) { 
+    perror("Failed to write to file"); 
+  }
+  fclose(file);
+}
+static bool save_kernel_module()
+{
+  const char *r = getenv("TorchTpuSaveKernelModule");
+  if (!r) return 0;
+  return atoi(r);
+}
 
 TPUKernelLauncher::TPUKernelLauncher()
 {
@@ -47,6 +74,11 @@ tpuRtStatus_t TPUKernelLauncher::register_kernel_module(tpuRtStream_t stream){
       sg_module = tpuRtKernelLoadModule(torch_tpu_kernel_data, torch_tpu_kernel_data_length, stream);
     }
     _stream_kernel_modules[stream] = sg_module;
+    if (save_kernel_module()) {
+      std::string p = get_save_dir();
+      const char* kernel_path = p.c_str();
+      save_to_file(kernel_path, sg_module);
+    }
   }
   return tpuRtSuccess;
 }

@@ -77,6 +77,9 @@ if os.environ.get('TPU_CACHE_BACKEND') is None:
     if not os.environ.get('DISABLE_CACHE'):
         os.environ['TPU_CACHE_BACKEND'] = os.environ['TPU_EMULATOR_PATH']
 
+#open kernel-module save default
+os.environ['TorchTpuSaveKernelModule'] = '1'
+
 import torch_tpu._C
 import torch_tpu.tpu
 from .tpu.jit import (jit, CallCppDynLib)
@@ -125,6 +128,21 @@ def apply_class_patches():
 
 apply_class_patches()
 
-## init TPU's Extension
-# torch_tpu.torch_tpu._initExtension()
+## torch-tpu ENVS
+def print_all_torch_tpu_envs():
+    print(f"===================== CHIP-ARCH ===========================================")
+    print(f"CHIP_ARCH                   = {os.environ.get('CHIP_ARCH')}, choose backend. value: 2260 | bm1684x | None(default). default will chose 2260.")
+    print(f"CHIP                        = {os.environ.get('CHIP')}, same with`CHIP_ARCH`, to compatible with backend")
+    print(f"TPU_EMULATOR_PATH           = {os.environ.get('TPU_EMULATOR_PATH')}, used for emulator version. value: the path of emulator lib.")
+    print(f"===================== INST-CACHE ===========================================")
+    print(f"DISABLE_CACHE              = {os.environ.get('DISABLE_CACHE')}, wheater use inst-cache. value: None | ON. default is None(use inst cache)")
+    print(f"TPU_CACHE_BACKEND          = {os.environ.get('TPU_CACHE_BACKEND')}, the lib to generate tpu inst.")
+    print(f"===================== BMODEL-RUNTIME =======================================")
+    print(f"ModelRtRunWithTorchTpu     = {os.environ.get('ModelRtRunWithTorchTpu')}, model-rt will use torch-tpu's kernel-module(~/.torch_tpu_kernel_module)")
+    print(f"TorchTpuSaveKernelModule   = {os.environ.get('TorchTpuSaveKernelModule')}, save kernel-module with ~/.torch_tpu_kernel_module. value: 1 | None(default), no save default")
+    print(f"ModelRtWTorchDEBUG         = {os.environ.get('ModelRtWTorchDEBUG')}, save bmodel module's IO for debug. value: 1 | None(default), no save default")
+    print(f"===================== DISTRIBUTED  =========================================")
+    print(f"CHIP_MAP                   = {os.environ.get('CHIP_MAP')}, rank to physical-device.")
+    print(f"============================================================================")
 
+# torch_tpu.torch_tpu._initExtension()
