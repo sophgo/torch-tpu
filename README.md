@@ -108,6 +108,10 @@ sudo apt install git-lfs
 # MAKE SURE YOU ARE USING 2.x VERSION! Otherwise IT WILL NOT BE COMPATIBLE WITH GERRIT
 git-lfs --version
 
+# install 2.x lfs
+curl -s https://packagecloud.io/install/repositories/github/git-lfs/script.deb.sh | sudo bash
+sudo apt-get install git-lfs=2.13.1
+
 # To use Gerrit HTTP protocal, you nee extra configs like:
 export GIT_SSL_NO_VERIFY=1
 export GIT_LFS_SKIP_SMUDGE=1
