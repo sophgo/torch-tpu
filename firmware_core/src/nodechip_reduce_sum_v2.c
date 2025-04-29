@@ -262,7 +262,7 @@ static inline void nodechip_reduce_sum_2d_multi_core_single_stage(
     }
     reduce_tile_fp32_addrs[0] = next; next += tsize_fp32;
     reduce_tile_fp32_addrs[1] = next; next += tsize_fp32;
-    if ( ( int ) next <= LOCAL_MEM_SIZE )
+    if ( ( uint32_t ) next <= ( uint32_t )LOCAL_MEM_SIZE )
     {
       break;
     }
@@ -273,7 +273,7 @@ static inline void nodechip_reduce_sum_2d_multi_core_single_stage(
         cmax -= NPU_NUM;
         continue;
       }
-      else if ( wmax > 1 )
+      else if ( wmax > tile )
       {
         wmax -= tile;
         continue;
