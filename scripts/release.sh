@@ -10,12 +10,12 @@ TORCH_TPU_NONINTERACTIVE=ON python setup.py clean
 bdist_wheel || exit -1
 mkdir -p release
 cp dist/*.whl release/
+unset RELEASE_MODE
+
 source scripts/envsetup.sh sg2260
 build_riscv_whl || exit -1
-cp dist/*.whl release/
-rm -rf dist/*.whl
-
-unset RELEASE_MODE
+cp release/*.whl dist/
+rm -r release
 
 ## docs
 if [ -z $SKIP_DOC ]; then
@@ -23,7 +23,7 @@ if [ -z $SKIP_DOC ]; then
 fi
 
 ## package example
-pushd $CUR_DIR/../release
+pushd $CUR_DIR/../dist
 cp -rf $CUR_DIR/../examples .
 popd
 
@@ -31,7 +31,7 @@ popd
 source scripts/package_src/package_release_src.sh
 
 # ------------------------------------------------------------------------------
-release_archive="./release"
+release_archive="./dist"
 BUILD_PATH=build/torch-tpu
 torch_tpu_version="$(grep TORCHTPU_VERSION ${BUILD_PATH}/CMakeCache.txt | cut -d "=" -f2)"
 commit=$(git log -1 --pretty=format:"%h")
