@@ -1066,6 +1066,7 @@ tpudnnStatus_t tpudnnLatentAttentionAsync (
     tpudnnTensor_t cos,
     tpudnnTensor_t sin,
     tpudnnTensor_t mask,
+    tpudnnTensor_t fetch_slots,
     tpudnnTensor_t save_slots,
     int slots_size,
     int block_size,

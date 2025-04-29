@@ -77,6 +77,7 @@ namespace at
         Tensor &OUT, Tensor &Q, Tensor &KV, Tensor &PE,
         Tensor &WUQ, Tensor &WUKV, Tensor &KVcache,
         Tensor &PEcache, Tensor &cos, Tensor &sin,
+        const c10::optional<Tensor> &fetch_slots,
         Tensor &save_slots,
         const c10::optional<Tensor> &mask, // decode: None
         const Tensor &input_lengths, int64_t head,
@@ -111,7 +112,9 @@ namespace at
           tpu::TPUGenerateTpudnnTensor(stream, sin),
           mask.has_value() ? tpu::TPUGenerateTpudnnTensor(stream, mask.value())
                            : tpudnnUndefinedTensor(),
-          tpudnnUndefinedTensor(), // save slots
+          fetch_slots.has_value() ? tpu::TPUGenerateTpudnnTensor(stream, fetch_slots.value())
+                           : tpudnnUndefinedTensor(),//fetch slots
+          tpu::TPUGenerateTpudnnTensor(stream, save_slots),
           slots_size, paged_cache_block_size, (int *)input_lengths.data_ptr(),
           (int)(input_lengths.nbytes() / 4), head, q_lora_rank, kv_lora_rank,
           qk_nope_head_dim, qk_rope_head_dim, v_head_dim, mask_size,

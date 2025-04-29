@@ -229,11 +229,11 @@ class MLATpu(MLA):
                 or self.config.attention_mode == AttentionMode.PAGED_PREFILL:
                 torch.ops.my_ops.paged_latent_attention(
                     tensors.output, tensors.Q, tensors.KV, tensors.PE,
-                    tensors.WUQ, tensors.WUKV, tensors.kv_cache, tensors.pe_cache,
-                    tensors.cos, tensors.sin, None, None, tensors.seqlen, self.config.num_heads,
+                    tensors.WUQ, tensors.WUKV, tensors.paged_kvcache, tensors.paged_pecache,
+                    tensors.cos, tensors.sin, tensors.block_tables, tensors.slots, None, tensors.seqlen, self.config.num_heads,
                     self.config.q_lora_rank, self.config.kv_lora_rank, self.config.qk_nope_head_dim,
                     self.config.qk_rope_head_dim, self.config.v_head_dim,
-                    0, 0, self.config.softmax_scale,
+                    0, tensors.block_tables.shape[1], self.config.paged_block_size, self.config.softmax_scale,
                     self.config.attention_mode.value)
         return tensors.output
 
@@ -307,7 +307,7 @@ class MLACpu(MLA):
 
 
 def mla_decode(act_dtype: torch.dtype, weight_dtype: torch.dtype, mode: AttentionMode):
-    config = MLAConfig(1, 16, 128, 64, 128, 1536, 512, 128, 192**-0.5 * 0.3,\
+    config = MLAConfig(2, 16, 128, 64, 128, 1536, 512, 128, 192**-0.5 * 0.3,\
                        act_dtype, weight_dtype, 4096, mode)
     net_cpu = MLACpu(config)
     net_tpu = MLATpu(config)
@@ -412,9 +412,11 @@ def mla_prefill(act_dtype: torch.dtype, weight_dtype: torch.dtype):
         raise RuntimeError("mla prefill failed")
 
 if __name__ == "__main__":
-    print(f"Test MLA Decode BF16:")
-    # TODO: test the case of paged_decode
+    print(f"Test MLA Decode BF16 continuous_decode:")
     mla_decode(torch.bfloat16, torch.bfloat16, AttentionMode.CONTINUOUS_DECODE)
+    print(f"----------------------------------")
+    print(f"Test MLA Decode BF16 paged_decode:")
+    mla_decode(torch.bfloat16, torch.bfloat16, AttentionMode.PAGED_DECODE)
     print(f"----------------------------------")
     print(f"\nTest MLA Decode FP8_E4M3 continuous_decode:")
     mla_decode(torch.bfloat16, torch.float8_e4m3fn, AttentionMode.CONTINUOUS_DECODE)
