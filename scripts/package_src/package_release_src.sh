@@ -13,7 +13,7 @@ pyc_cmake=$TPUTRAIN_TOP/scripts/package_src/CMakeLists.txt
 # ==================================================================
 echo "[step-1] package torch-tpu"
 
-keep_file=*.whl
+keep_file=*x86_64.whl
 # find . -mindepth 1 ! -name "$keep_file" -exec rm -rf {} +;
 
 mkdir $package_src
