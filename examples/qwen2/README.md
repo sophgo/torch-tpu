@@ -2,7 +2,17 @@
 
 # Qwen2-7B Pretrain Using PAI-Megatron-Patch
 
-## Step1: prepare base torch-tpu environment
+## Step1: Set the environment
+
+### Option 1: Check the Linux system environment
+
+Ensure that the IOMMU (Input-Output Memory Management Unit) service on your system is set to translated mode.
+
+You can verify this by running the following command: `sudo dmesg | grep -i iommu`<br>
+If the output indicates that the IOMMU type is `Translated`, your environment is correctly configured.
+Otherwise, please update your system configuration to enable IOMMU in translated mode.<br>
+
+### Option 2: Prepare base torch-tpu environment
 
 You can refer to [README.md] or UserGuide to prepare base torch-tpu environment.
 

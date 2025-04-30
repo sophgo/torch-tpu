@@ -2,18 +2,19 @@
 
 # 使用 PAI-Megatron-Patch 预训练 Qwen2-7B
 
-## 步骤1: 准备 docker 容器
+## 步骤1: 设置基础环境
 
-- 使用 sophgo/torch_tpu:latest 镜像创建 docker 容器，并确保安装了最新版本的 torch_tpu 和 tpuv7-runtime 库。
-```
-docker run
-```
+### 可选方式1: 检查 Linux 系统环境
+确保系统中的 IOMMU（输入输出内存管理单元）服务已设置为 translated 模式。
 
-容器启动后，可以通过以下命令进入容器：
+你可以通过运行以下命令进行验证：`sudo dmesg | grep -i iommu`<br>
+如果输出显示 IOMMU 类型为 `Translated`，则说明你的环境配置正确。
+否则，请更新系统配置，将 IOMMU 设置为 translated 模式。
 
-```
-docker exec -it <container_id> /bin/bash
-```
+### 可选方式2: 准备 torch-tpu 环境
+
+你可以参考[README.md]或者用户手册去设置torch_tpu环境。
+
 
 ## 步骤2: 在 docker 容器中安装 `torch_tpu`
 

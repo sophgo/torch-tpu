@@ -25,6 +25,7 @@ import pkgutil
 pkg_path = os.path.dirname(pkgutil.get_loader('torch_tpu').get_filename())
 lib_pwd = os.path.join(pkg_path, 'lib/')
 
+arch_list = ['sg2260', 'bm1684x']
 arch = arch_env = os.environ.get('CHIP_ARCH')
 
 def make_symlinks(arch_sel):
@@ -48,13 +49,14 @@ if not arch:
         if not m:
             re.match(r'.+TPU1686.+build_(\w+).+', tpudnn)
         arch = m.group(1) if m else 'sg2260' # default to sg2260
+        if arch in arch_list:
+            os.environ['CHIP_ARCH'] = arch
     except FileNotFoundError:
         pass
 
 if not arch:
     # Select arch by checking if coresponding tpuDNN works
     from ctypes import cdll
-    arch_list = ['sg2260', 'bm1684x']
     for arch_iter in arch_list:
         tpudnn = f'libtpudnn.{arch_iter}.so'
         try:

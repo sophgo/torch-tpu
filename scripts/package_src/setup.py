@@ -81,6 +81,8 @@ def package_data():
     package_data_.extend(find_package_data(os.path.join(TORCH_TPU_PATH, "utils")))
     package_data_.extend(find_package_data(os.path.join(TORCH_TPU_PATH, "dynamo")))
     package_data_.extend(find_package_data(os.path.join(TORCH_TPU_PATH, "demo")))
+    package_data_.extend(find_package_data(os.path.join(TORCH_TPU_PATH, "accelerator")))
+    package_data_.extend(find_package_data(os.path.join(TORCH_TPU_PATH, "workarounds")))
     return package_data_
 
 # torch-tpu-python
