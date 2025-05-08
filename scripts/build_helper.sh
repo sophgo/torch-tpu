@@ -159,6 +159,5 @@ function update_tpuv7()
   make driver
   make install
   popd
-  rm -rf $TPUTRAIN_TOP/third_party/tpuv7_runtime/tpuv7-emulator_0.1.0/
-  cp -r $TPURT_TOP/build/install/tpuv7-runtime-emulator-onednn_0.1.0 $TPUTRAIN_TOP/third_party/tpuv7_runtime/tpuv7-emulator_0.1.0/
+  cp -r $TPURT_TOP/build/install/tpuv7-runtime-emulator-onednn_*/* $TPUTRAIN_TOP/third_party/tpuv7_runtime/tpuv7-emulator_0.1.0/
 }
