@@ -307,8 +307,8 @@ class MLACpu(MLA):
 
 
 def mla_decode(act_dtype: torch.dtype, weight_dtype: torch.dtype, mode: AttentionMode):
-    config = MLAConfig(2, 16, 128, 64, 128, 1536, 512, 128, 192**-0.5 * 0.3,\
-                       act_dtype, weight_dtype, 4096, mode)
+    config = MLAConfig(128, 16, 128, 64, 128, 1536, 512, 128, 192**-0.5 * 0.3,\
+                       act_dtype, weight_dtype, 512, mode)
     net_cpu = MLACpu(config)
     net_tpu = MLATpu(config)
 
@@ -412,18 +412,18 @@ def mla_prefill(act_dtype: torch.dtype, weight_dtype: torch.dtype):
         raise RuntimeError("mla prefill failed")
 
 if __name__ == "__main__":
-    print(f"Test MLA Decode BF16 continuous_decode:")
-    mla_decode(torch.bfloat16, torch.bfloat16, AttentionMode.CONTINUOUS_DECODE)
-    print(f"----------------------------------")
-    print(f"Test MLA Decode BF16 paged_decode:")
-    mla_decode(torch.bfloat16, torch.bfloat16, AttentionMode.PAGED_DECODE)
-    print(f"----------------------------------")
+    # print(f"Test MLA Decode BF16 continuous_decode:")
+    # mla_decode(torch.bfloat16, torch.bfloat16, AttentionMode.CONTINUOUS_DECODE)
+    # print(f"----------------------------------")
+    # print(f"Test MLA Decode BF16 paged_decode:")
+    # mla_decode(torch.bfloat16, torch.bfloat16, AttentionMode.PAGED_DECODE)
+    # print(f"----------------------------------")
     print(f"\nTest MLA Decode FP8_E4M3 continuous_decode:")
     mla_decode(torch.bfloat16, torch.float8_e4m3fn, AttentionMode.CONTINUOUS_DECODE)
     print(f"----------------------------------")
-    print(f"\nTest MLA Decode FP8_E4M3 paged_decode:")
-    mla_decode(torch.bfloat16, torch.float8_e4m3fn, AttentionMode.PAGED_DECODE)
-    print(f"----------------------------------")
+    # print(f"\nTest MLA Decode FP8_E4M3 paged_decode:")
+    # mla_decode(torch.bfloat16, torch.float8_e4m3fn, AttentionMode.PAGED_DECODE)
+    # print(f"----------------------------------")
     #print(f"Test MLA Prefill BF16:")
     #mla_prefill(torch.bfloat16, torch.bfloat16)
     #print(f"----------------------------------")

@@ -622,6 +622,12 @@ tpudnnStatus_t tpudnnGatherAsync(
     tpudnnTensor_t output,
     int axis);
 
+tpudnnStatus_t tpudnnCumsumAsync(
+    tpudnnHandle_t handle,
+    tpudnnTensor_t input,
+    tpudnnTensor_t output,
+    int axis);
+
 tpudnnStatus_t tpudnnArgAsync(
     tpudnnHandle_t resource,
     tpudnnTensor_t input,
