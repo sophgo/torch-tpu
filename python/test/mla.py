@@ -9,8 +9,8 @@ import numpy as np
 
 import torch_tpu
 import torch_tpu.tpu
-torch.manual_seed(200)
-random.seed(200)
+torch.manual_seed(300)
+random.seed(300)
 device = "tpu:0"
 
 class AttentionMode(Enum):
@@ -307,8 +307,8 @@ class MLACpu(MLA):
 
 
 def mla_decode(act_dtype: torch.dtype, weight_dtype: torch.dtype, mode: AttentionMode):
-    config = MLAConfig(128, 16, 128, 64, 128, 1536, 512, 128, 192**-0.5 * 0.3,\
-                       act_dtype, weight_dtype, 512, mode)
+    config = MLAConfig(16, 16, 128, 64, 128, 1536, 512, 128, 192**-0.5 * 0.3,\
+                       act_dtype, weight_dtype, 4096, mode)
     net_cpu = MLACpu(config)
     net_tpu = MLATpu(config)
 
