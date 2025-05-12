@@ -58,6 +58,7 @@ static PyObject* THPTStream_pynew(
   self->stream_id = static_cast<int64_t>(stream.id());
   self->device_index = static_cast<int64_t>(stream.device_index());
   self->device_type = static_cast<int64_t>(stream.device_type());
+  self->tpudnn_handle = (int64_t)((tpudnnHandle_t)stream);
   new (&self->tpu_stream) c10_tpu::TPUStream(stream);
 
   return (PyObject *)ptr.release();
@@ -119,6 +120,7 @@ static struct PyMemberDef THPTStream_members[] = {
     {(char*)"stream_id", T_ULONGLONG, offsetof(THPTStream, stream_id), READONLY, nullptr},
     {(char*)"device_type", T_ULONGLONG, offsetof(THPTStream, device_type), READONLY, nullptr},
     {(char*)"device_index", T_ULONGLONG, offsetof(THPTStream, device_index), READONLY, nullptr},
+    {(char*)"tpudnn_handle", T_ULONGLONG, offsetof(THPTStream, tpudnn_handle), READONLY, nullptr},
     {nullptr}
 };
 

@@ -6,6 +6,7 @@
 #include "torch_tpu/csrc/core/TPUStream.h"
 
 struct THPTStream : THPStream {
+    int64_t            tpudnn_handle;
     c10_tpu::TPUStream tpu_stream;
 };
 
