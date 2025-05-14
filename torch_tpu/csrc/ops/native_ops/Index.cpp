@@ -59,16 +59,16 @@ Tensor & index_out_tpu( const Tensor & self, const c10::List<c10::optional<Tenso
 
       TIMING_END ( tpu::INDEX_SELECT );
     } else {
-    CPU_IMPL_WARNING();
-    c10::List<c10::optional<Tensor>> indices_cpu;
-    for (size_t i = 0; i < indices.size(); i++)
-    {
-        c10::optional<Tensor> indice = c10::nullopt;
-        if ( indices[i].has_value() ) { indice = indices[i].value().cpu(); }
-        indices_cpu.push_back(indice);
-    }
-    auto out_cpu = index( self.cpu(), indices_cpu );
-    out = out_cpu.to(out.device());
+      CPU_IMPL_WARNING();
+      c10::List<c10::optional<Tensor>> indices_cpu;
+      for (size_t i = 0; i < indices.size(); i++)
+      {
+          c10::optional<Tensor> indice = c10::nullopt;
+          if ( indices[i].has_value() ) { indice = indices[i].value().cpu(); }
+          indices_cpu.push_back(indice);
+      }
+      auto out_cpu = index( self.cpu(), indices_cpu );
+      out = out_cpu.to(out.device());
 #if 0
       int64_t index_size = -1;
       std::vector<bool> broadcast;
@@ -171,20 +171,34 @@ Tensor index_tpu(const at::Tensor & self, const c10::List<c10::optional<at::Tens
   Tensor out;
   if ( indices.size() == 1 )
   {
-    auto idx = indices[0].value();
-    std::vector<int64_t> sizes_vec;
-    sizes_vec.push_back ( idx.size( 0 ) );
-    for ( int i = 1; i <  self.dim(); i++ ) {
-      sizes_vec.push_back ( self.size ( i ) );
+    if (indices[0].value().scalar_type() == at::ScalarType::Int)
+    { 
+      out = torch::index_select(self, 0, indices[0].value());
     }
-
-    IntArrayRef sizes ( sizes_vec.data(), sizes_vec.size() );
-    TensorOptions options = TensorOptions ( self.device() ).dtype ( self.dtype() );
-    out = torch::empty( sizes, options);
-    out = index_out_tpu(self, indices, out);
+    else if (indices[0].value().scalar_type() == at::ScalarType::Bool)
+    {
+      Tensor index;
+      if (IS_TPU_TENSOR(indices[0].value())) { index = indices[0].value().cpu(); }
+      else                                   { index = indices[0].value(); }
+      int64_t num_nonzeros = torch::sum(index).item().toInt();
+      std::vector<int64_t> out_sizes = {num_nonzeros}, self_view_sizes = {index.numel()};
+      for (int i = index.dim(); i < self.dim(); i++) { out_sizes.push_back( self.size(i) ); self_view_sizes.push_back(self.size(i)); }
+      out = torch::empty(out_sizes, self.options());
+      auto index_flatten = index.view( { index.numel() } );
+      auto self_flatten  = self.view( self_view_sizes );
+      int o_i = 0;
+      for (int i = 0; i < index.numel(); i++) {
+        if (index_flatten[i].item().toBool()) { out[o_i].copy_(self_flatten[i]); o_i++; }
+      }
+    }
+    else
+    {
+      TORCH_CHECK( false, "index_tpu should not be called here." )
+    }
   }
   else
   {
+    CPU_IMPL_WARNING();
     c10::List<c10::optional<Tensor>> indices_cpu;
     for (size_t i = 0; i < indices.size(); i++)
     {

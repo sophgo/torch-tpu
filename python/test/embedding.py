@@ -217,7 +217,7 @@ def case_embedding_backward_large_V():
 
 
 if __name__ == "__main__":
-    # case_embedding()
+    case_embedding()
     # case_embedding_backward()
     #case_embedding_backward_simulate()
-    case_embedding_backward_large_V()
+    #case_embedding_backward_large_V()

@@ -74,9 +74,47 @@ def case3():
     
     print(max_diff)
 
+def case4():
+    '''int32'''
+    t = torch.range(1, 2 * 3 * 4).view((2,3, 4))
+    t_tpu = t.to(device)
+    
+    j = torch.randint(0, 2, (3, 4),dtype=torch.int32)
+    j_tpu = j.to(device)
+
+    to = t[j]
+    to_tpu = t_tpu[j_tpu]
+    print(to_tpu.shape)
+    print(to.shape)
+
+    diff = torch.max(abs(to - to_tpu.cpu()))
+    print(diff)
+
+    import pdb; pdb.set_trace()
+
+def case5():
+    '''int32'''
+    t = torch.range(1, 2 * 3 * 4).view((2,3, 4))
+    t_tpu = t.to(device)
+    
+    j = torch.randint(0, 2, (2, 3),dtype=torch.bool)
+    j_tpu = j.to(device)
+
+    to = t[j]
+    to_tpu = t_tpu[j_tpu]
+    print(to_tpu.shape)
+    print(to.shape)
+
+    diff = torch.max(abs(to - to_tpu.cpu()))
+    print(diff)
+
+    import pdb; pdb.set_trace()
+
 
 
 if __name__ == "__main__":
-    case1()
-    case2()
-    case3()
+    # case1()
+    # case2()
+    # case3()
+    # case4()
+    case5()
