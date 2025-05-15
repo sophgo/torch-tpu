@@ -43,7 +43,8 @@ enum tpudnnReduceType_t {
 typedef enum {
     TPUDNN_INTRA_CARD = 0,
     TPUDNN_INTER_CARD = 1,
-    TPUDNN_INTER_CHIP = 2
+    TPUDNN_RING_INTER_CHIP = 2,
+    TPUDNN_INTER_CHIP = 3,
 } c2c_communication_type;
 
 typedef enum {
@@ -847,7 +848,9 @@ tpudnnStatus_t tpudnnC2CPerf(
     const char* uuid,
     int nranks,
     int cur_rank,
-    const int *chip_map);
+    const int *chip_map,
+    int left_chipid,
+    int right_chipid);
 
 tpudnnStatus_t tpudnnC2CSend(
     tpudnnHandle_t handle,
