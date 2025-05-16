@@ -24,7 +24,7 @@ max_pool2d_with_indices_tpu(const Tensor &self, IntArrayRef kernel_size,
   sizes_vec.push_back(output_w);
   IntArrayRef sizes ( sizes_vec.data(), sizes_vec.size() );
   auto output = torch::empty(sizes, self.options());
-  auto mask = torch::empty(sizes, self.options());
+  auto mask = torch::empty(sizes, self.options().dtype(torch::kInt32));
 #if 0
   std::tuple<Tensor, Tensor> outputs;
   CPU_IMPL_WARNING();
