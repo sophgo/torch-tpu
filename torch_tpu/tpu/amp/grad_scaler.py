@@ -117,6 +117,7 @@ class GradScaler:
                  enabled=True,
                  allow_fp16=False):
         self.allow_fp16 = allow_fp16
+        self._enabled = False
         if enabled:
             warnings.warn("torch_tpu.tpu.amp.GradScaler is enabled")
             self._enabled = enabled
