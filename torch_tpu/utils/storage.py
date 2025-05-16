@@ -22,4 +22,4 @@ def _deepcopy(self, memo):
 
 def add_storage_methods():
     torch.storage.UntypedStorage.cpu = _cpu
-    torch.storage.TypedStorage._deepcopy = _deepcopy
+    # torch.storage.TypedStorage._deepcopy = _deepcopy
