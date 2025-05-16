@@ -8,8 +8,36 @@ index 2e86fdf..53406fc 100644
  Bigcode-Evaluation-Harness*
 +*__pycache__*
 Submodule LM-Evaluation-Harness-240310 contains modified content
+diff --git a/LM-Evaluation-Harness-240310/lm_eval/__main__.py b/LM-Evaluation-Harness-240310/lm_eval/__main__.py
+index b9dd4157..8a7188d6 100644
+--- a/LM-Evaluation-Harness-240310/lm_eval/__main__.py
++++ b/LM-Evaluation-Harness-240310/lm_eval/__main__.py
+@@ -17,6 +17,23 @@ from lm_eval.tasks import TaskManager, include_path, initialize_tasks
+ from lm_eval.utils import make_table, simple_parse_args_string
+ 
+ 
++import torch
++from functools import wraps
++def fix_int64(func):
++    @wraps(func)
++    def wrapper(*args, **kwargs):
++        dtype = kwargs.get('dtype')
++        if dtype is not None:
++            if isinstance(dtype, str):
++                dtype = getattr(torch, dtype, dtype)
++            if dtype == torch.int64:
++                kwargs['dtype'] = torch.int32
++        return func(*args, **kwargs)
++    return wrapper
++
++torch.empty = fix_int64(torch.empty)
++torch.arange = fix_int64(torch.arange)
++
+ DEFAULT_RESULTS_FILE = "results.json"
+ 
+ 
 diff --git a/LM-Evaluation-Harness-240310/lm_eval/models/huggingface.py b/LM-Evaluation-Harness-240310/lm_eval/models/huggingface.py
-index fc78b55a..740fdb36 100644
+index fc78b55a..f80fd7e6 100644
 --- a/LM-Evaluation-Harness-240310/lm_eval/models/huggingface.py
 +++ b/LM-Evaluation-Harness-240310/lm_eval/models/huggingface.py
 @@ -34,6 +34,43 @@ from lm_eval.models.utils import (
@@ -50,7 +78,7 @@ index fc78b55a..740fdb36 100644
 +        condition = j < torch.minimum(i + diagonal + 1, torch.tensor(tgt_len, device=device))
 +        mask.masked_fill_(condition, torch.finfo(dtype).min)
 +
-+    return mask[None, None, :, :].expand(bsz, 1, tgt_len, tgt_len + past_key_values_length)
++    return mask[None, None, :, :].expand(bsz, 1, tgt_len, tgt_len + past_key_values_length).contiguous()
 +import transformers
 +transformers.modeling_attn_mask_utils.AttentionMaskConverter._make_causal_mask = staticmethod(make_causal_mask)
  

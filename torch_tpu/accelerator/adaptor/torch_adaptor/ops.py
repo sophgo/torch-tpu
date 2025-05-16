@@ -15,3 +15,4 @@ def fix_int64(func):
     return wrapper
 
 torch.empty = fix_int64(torch.empty)
+torch.arange = fix_int64(torch.arange)

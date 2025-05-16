@@ -4,19 +4,20 @@
 
 ## 步骤1: 设置基础环境
 
-### 可选方式1: 检查 Linux 系统环境
+### 1: 检查 Linux 系统环境
 确保系统中的 IOMMU（输入输出内存管理单元）服务已设置为 translated 模式。
 
 你可以通过运行以下命令进行验证：`sudo dmesg | grep -i iommu`<br>
 如果输出显示 IOMMU 类型为 `Translated`，则说明你的环境配置正确。
 否则，请更新系统配置，将 IOMMU 设置为 translated 模式。
 
-### 可选方式2: 准备 torch-tpu 环境
+### 2: 准备 torch-tpu 环境
 
 你可以参考[README.md]或者用户手册去设置torch_tpu环境。
 
 
 ## 步骤2: 在 docker 容器中安装 `torch_tpu`
+`我们强烈推荐使用“可选方式2”获取最新的torch_tpu安装包，以避免“可选方式1”可能带来的运行失败或者性能问题`
 
 ### 可选方式1: 通过 pip 安装 `torch_tpu`
 
@@ -94,13 +95,13 @@ pip install pybind11 transformers==4.41.2 accelerate==0.30.1 datasets netifaces 
 要使用 TP=2 预训练 7B 模型，运行：
 
 ```bash
-source run_qwen2_train.sh 7B 0 2 1
+QWEN2_WHOLE_NET_TRANS=1 DISABLE_CACHE=1 source run_qwen2_train.sh 7B 0 2 1
 ```
 
 要运行较小的测试，例如使用 TP=2 的单层 7B 模型，运行：
 
 ```bash
-source run_qwen2_train.sh 7B 1 2 1
+QWEN2_WHOLE_NET_TRANS=1 DISABLE_CACHE=1 source run_qwen2_train.sh 7B 1 2 1
 ```
 
 

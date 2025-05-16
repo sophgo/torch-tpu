@@ -4,7 +4,7 @@
 
 ## Step1: Set the environment
 
-### Option 1: Check the Linux system environment
+### 1: Check the Linux system environment
 
 Ensure that the IOMMU (Input-Output Memory Management Unit) service on your system is set to translated mode.
 
@@ -12,12 +12,13 @@ You can verify this by running the following command: `sudo dmesg | grep -i iomm
 If the output indicates that the IOMMU type is `Translated`, your environment is correctly configured.
 Otherwise, please update your system configuration to enable IOMMU in translated mode.<br>
 
-### Option 2: Prepare base torch-tpu environment
+### 2: Prepare base torch-tpu environment
 
 You can refer to [README.md] or UserGuide to prepare base torch-tpu environment.
 
 
 ## Step2: Install `torch_tpu` in the docker container
+`We strongly recommend using Option 2 to obtain the latest released wheel file, in order to avoid potential failures or performance issues that may occur with Option 1.`
 
 ### Option 1: Install `torch_tpu` by pip
 
@@ -96,13 +97,13 @@ The arguments are: full model size, layers (0 for full), TP and PP.
 To pretrain 7B model with TP=2, run
 
 ```bash
-source run_qwen2_train.sh 7B 0 2 1
+QWEN2_WHOLE_NET_TRANS=1 DISABLE_CACHE=1 source run_qwen2_train.sh 7B 0 2 1
 ```
 
 To run a smaller test, for example a 1-layer 7B model with TP=2, run
 
 ```bash
-source run_qwen2_train.sh 7B 1 2 1
+QWEN2_WHOLE_NET_TRANS=1 DISABLE_CACHE=1 source run_qwen2_train.sh 7B 1 2 1
 ```
 
 
