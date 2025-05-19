@@ -12,6 +12,7 @@ namespace at
 {
 Tensor& index_select_out_tpu ( const Tensor & self, int64_t dim, const Tensor & index, Tensor & out)
 {
+  if ( self.numel() == 0) {return out;}
   CHECK_TENSOR_IN_DEVICE ( self );
   CHECK_TENSOR_IN_DEVICE ( index );
   auto stream = c10_tpu::getCurrentTPUStream();
