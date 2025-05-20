@@ -403,4 +403,9 @@ namespace at
 		const Tensor &self,
 		const Tensor &dst,
 		int64_t tpu_format);
+
+	Tensor nms(
+		const Tensor& dets,
+		const Tensor& scores,
+		double iou_threshold);
 }
