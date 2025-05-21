@@ -61,9 +61,9 @@ namespace at
         Tensor &gate_weights,
         Tensor &up_weights,
         Tensor &down_weights,
-        Tensor &gate_scales,
-        Tensor &up_scales,
-        Tensor &down_scales,
+        const c10::optional<Tensor> &gate_scales,
+        const c10::optional<Tensor> &up_scales,
+        const c10::optional<Tensor> &down_scales,
         Tensor &select_experts,
         Tensor &routing_weights,
         const c10::optional<Tensor> &num_select_experts,
@@ -89,9 +89,12 @@ namespace at
         CHECK_TENSOR_IN_DEVICE(gate_weights);
         CHECK_TENSOR_IN_DEVICE(up_weights);
         CHECK_TENSOR_IN_DEVICE(down_weights);
-        CHECK_TENSOR_IN_DEVICE(gate_scales);
-        CHECK_TENSOR_IN_DEVICE(up_scales);
-        CHECK_TENSOR_IN_DEVICE(down_scales);
+        if (gate_scales.has_value())
+            CHECK_TENSOR_IN_DEVICE(gate_scales.value());
+        if (up_scales.has_value())
+            CHECK_TENSOR_IN_DEVICE(up_scales.value());
+        if (down_scales.has_value())
+            CHECK_TENSOR_IN_DEVICE(down_scales.value());
         CHECK_TENSOR_IN_DEVICE(select_experts);
         TORCH_CHECK(select_experts.dtype() == torch::kInt32, "select_experts must be int32 dtype");
         CHECK_TENSOR_IN_DEVICE(routing_weights);
@@ -122,9 +125,9 @@ namespace at
             tpu::TPUGenerateTpudnnTensor(stream, gate_weights),
             tpu::TPUGenerateTpudnnTensor(stream, up_weights),
             tpu::TPUGenerateTpudnnTensor(stream, down_weights),
-            tpu::TPUGenerateTpudnnTensor(stream, gate_scales),
-            tpu::TPUGenerateTpudnnTensor(stream, up_scales),
-            tpu::TPUGenerateTpudnnTensor(stream, down_scales),
+            gate_scales.has_value() ? tpu::TPUGenerateTpudnnTensor(stream, gate_scales.value()) : tpudnnUndefinedTensor(),
+            up_scales.has_value() ? tpu::TPUGenerateTpudnnTensor(stream, up_scales.value()) : tpudnnUndefinedTensor(),
+            down_scales.has_value() ? tpu::TPUGenerateTpudnnTensor(stream, down_scales.value()) : tpudnnUndefinedTensor(),
             tpu::TPUGenerateTpudnnTensor(stream, select_experts),
             tpu::TPUGenerateTpudnnTensor(stream, routing_weights),
             num_select_experts.has_value() ? tpu::TPUGenerateTpudnnTensor(stream, num_select_experts.value()) : tpudnnUndefinedTensor(),
