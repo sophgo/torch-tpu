@@ -12,29 +12,25 @@ namespace at {
 Tensor & clamp_out_tpu( const Tensor & self, const c10::optional<Scalar> & min,
                         const c10::optional<Scalar> & max, Tensor & out) {
   if ( self.dim() > 0 )  { CHECK_TENSOR_IN_DEVICE_NO_CONTIGUOUS ( self ); }
-  CHECK_TENSOR_IN_DEVICE ( out );
   auto self_ = self.contiguous();
+  auto out_  = out;
+  if ( !out.is_contiguous() ) { out_ = out.contiguous(); LOG( WARNING ) << "clamp out not contiguous"; }
+
 #if 0
     auto out_cpu = clamp ( self.to(torch::kFloat32).cpu(), min, max );
     out = out_cpu.to(out.device()).to(out.dtype());
 #else
-    if (IS_TPU_TENSOR(self_)){
-        TIMING_START;
-
-        auto stream = c10_tpu::getCurrentTPUStream();
-        auto status = tpudnnClampAsync(
-            stream,
-            tpu::TPUGenerateTpudnnTensor(stream, self_),
-            min.has_value() ? min.value().to<float>() : -std::numeric_limits<float>::infinity(),
-            max.has_value() ? max.value().to<float>() : std::numeric_limits<float>::infinity(),
-            tpu::TPUGenerateTpudnnTensor(stream, out));
-        TORCH_CHECK(status == TPUDNN_STATUS_SUCCESS);
-                TIMING_END(tpu::CLAMP);
-    }
-    else
-    {
-        TORCH_CHECK(false, "Input is required in TPU device");
-    }
+    TIMING_START;
+    auto stream = c10_tpu::getCurrentTPUStream();
+    auto status = tpudnnClampAsync(
+        stream,
+        tpu::TPUGenerateTpudnnTensor(stream, self_),
+        min.has_value() ? min.value().to<float>() : -std::numeric_limits<float>::infinity(),
+        max.has_value() ? max.value().to<float>() : std::numeric_limits<float>::infinity(),
+        tpu::TPUGenerateTpudnnTensor(stream, out_));
+    TORCH_CHECK(status == TPUDNN_STATUS_SUCCESS);
+    TIMING_END(tpu::CLAMP);
+    if ( !out.is_contiguous() ) { out.copy_(out_); }
 #endif
     SHOW_TENSOR_OP(self, out);
     return out;
