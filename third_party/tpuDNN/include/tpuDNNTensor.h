@@ -1232,7 +1232,21 @@ tpudnnStatus_t tpudnnLLamaMlpAsync (
     tpudnnTensor_t output,
     bool save_mid_res);
 
-tpudnnStatus_t tpudnnLLamaA16MlpAsync (
+tpudnnStatus_t tpudnnLLamaMlpbackward(tpudnnHandle_t handle,
+    tpudnnTensor_t input,
+    tpudnnTensor_t weight0,
+    tpudnnTensor_t weight1,
+    tpudnnTensor_t weight2,
+    tpudnnTensor_t w0x,
+    tpudnnTensor_t output,
+    tpudnnTensor_t silu,
+    tpudnnTensor_t sigmoid,
+    tpudnnTensor_t grad_input,
+    tpudnnTensor_t grad_weight0,
+    tpudnnTensor_t grad_weight1,
+    tpudnnTensor_t grad_weight2);
+
+  tpudnnStatus_t tpudnnLLamaA16MlpAsync(
     tpudnnHandle_t handle,
     tpudnnTensor_t input,
     tpudnnTensor_t weight0,
@@ -1397,6 +1411,14 @@ tpudnnStatus_t tpudnnDynLibExecuteAsync(
                     std::vector<int64_t> fp_scalars_index,
                     std::vector<int64_t> fixed_scalars,
                     std::vector<int64_t> fixed_scalars_index);
+
+tpudnnStatus_t tpudnnDynLibExecuteAsyncCompact(
+                    tpudnnHandle_t handle,
+                    const char *so_url,
+                    const char *func_name,
+                    std::vector<size_t> addrOffsets,
+                    char *args,
+                    size_t argBytes);
 
 tpudnnStatus_t tpudnnScatterAddAsync(
     tpudnnHandle_t handle,
