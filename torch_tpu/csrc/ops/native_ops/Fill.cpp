@@ -10,6 +10,7 @@
 namespace at {
 Tensor &fill__Scalar_tpu(Tensor &self, const Scalar &value) {
   CHECK_TENSOR_IN_DEVICE(self);
+  if ( self.numel() == 0) return self;
 #if 0
   auto self_cpu = TENSOR_TO_CPU ( self );
   self_cpu.fill_ ( value );
