@@ -40,7 +40,7 @@ TORCH-TPU可以在Docker中开发, 配置好Docker就可以编译和运行了。
 
 .. code-block:: shell
 
-   $ docker pull sophgo/torch_tpu:latest
+   $ docker pull sophgo/torch_tpu:v0.1-py311
 
 
 如果是首次使用Docker, 可执行下述命令进行安装和配置(仅首次执行):
@@ -71,7 +71,7 @@ TORCH-TPU可以在Docker中开发, 配置好Docker就可以编译和运行了。
       --device=/dev/bm-sophon0:/dev/bm-sophon0 \
       -v /opt:/opt   \
       -v $HOME:/workspace \
-      --name my sophgo/torch_tpu:v0.1 bash
+      --name my sophgo/torch_tpu:v0.1-py311 bash
   # myname只是举个名字的例子, 请指定成自己想要的容器的名字
   # -e LD_LIBRARY_PATH=... -e PATH=... 是引入libsophon的环境变量
   # --device=...  是将设备映射到容器内，可以按需添加

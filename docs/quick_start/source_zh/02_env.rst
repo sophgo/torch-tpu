@@ -54,7 +54,7 @@ Docker环境配置
 
 .. code-block:: shell
 
-   $ docker pull sophgo/torch_tpu:v0.1
+   $ docker pull sophgo/torch_tpu:v0.1-py311
 
 创建容器
 ------------------
@@ -79,7 +79,7 @@ Docker环境配置
       -v $HOME:/workspace \
       -v /opt:/opt   \
       -w /workspace \
-      --name torch_tpu_0 sophgo/torch_tpu:v0.1 bash
+      --name torch_tpu_0 sophgo/torch_tpu:v0.1-py311 bash
 
    docker attach torch_tpu_0
 
