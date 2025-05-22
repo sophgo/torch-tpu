@@ -6,6 +6,7 @@ from dataclasses import dataclass
 from enum import Enum
 import random
 import numpy as np
+import pdb
 
 import torch_tpu
 import torch_tpu.tpu
@@ -33,6 +34,7 @@ class MLATensors:
     cos: torch.Tensor
     sin: torch.Tensor
     output: torch.Tensor
+    mask: torch.Tensor = None
     WUQ_scale: torch.Tensor = None
     WUKV_scale: torch.Tensor = None
     block_tables: torch.Tensor = None
@@ -57,12 +59,13 @@ class MLAConfig:
     attention_mode: AttentionMode
     max_cache_size: int = 8192
     paged_block_size: int = 16
+    mask_size: int = 0
 
     def block_index_to_slots(self, block_idx, block_size, context_len):
         flat_slots_idx = []
         for b in range(block_idx.size(0)):
             for s in range(block_idx.size(1)):
-                block_end = min(block_size, (context_len % block_size) if s == block_idx.size(1) - 1 else block_size)
+                block_end = min(block_size, (context_len - block_size * s) if s == block_idx.size(1) - 1 else block_size)
                 flat_slots_idx.extend([block_idx[b, s] * block_size + j for j in range(block_end)])
         return flat_slots_idx
 
@@ -87,6 +90,14 @@ class MLAConfig:
         sin = torch.sin(idx_theta).contiguous().to(self.dtype)
         output = torch.randn((self.batch, seq, self.num_heads, self.v_head_dim), dtype = self.dtype)
 
+        mask = None
+        if self.attention_mode == AttentionMode.CONTINUOUS_PREFILL \
+            or self.attention_mode == AttentionMode.PAGED_PREFILL:
+            self.mask_size = seq
+            neg_inf = -1e4
+            mask = torch.full((self.mask_size, self.mask_size), neg_inf, dtype = self.dtype)
+            mask = torch.triu(mask, diagonal=1)
+
         paged_kvcache = None
         paged_pecache = None
         block_tables = None
@@ -108,6 +119,14 @@ class MLAConfig:
             for b in range(self.batch):
                 paged_kvcache.view(-1, self.kv_lora_rank)[indices[b]] = kv_cache[b,:len(indices[b])]
                 paged_pecache.view(-1, self.qk_rope_head_dim)[indices[b]] = pe_cache[b,:len(indices[b])]
+        elif self.attention_mode == AttentionMode.PAGED_PREFILL:
+            block_per_batch = int(math.ceil(self.context_len / self.paged_block_size))
+            total_block_num = max(block_per_batch * self.batch, 512)
+            paged_kvcache = torch.empty((total_block_num, self.paged_block_size, self.kv_lora_rank), dtype = self.dtype)
+            paged_pecache = torch.empty((total_block_num, self.paged_block_size, self.qk_rope_head_dim), dtype = self.dtype)
+            block_idx = random.sample(range(total_block_num), block_per_batch * self.batch)
+            block_tables = torch.tensor(block_idx, dtype = torch.int32).view(self.batch, -1)
+            slots = block_tables
 
 
         WUQ_scale = None
@@ -121,8 +140,8 @@ class MLAConfig:
                                     dtype = self.dtype)
 
         return MLATensors(
-            seqlen, WUQ, WUKV, Q, KV, PE, kv_cache, pe_cache, idx_theta, cos, sin,
-            output, WUQ_scale, WUKV_scale, block_tables, slots, paged_kvcache, paged_pecache)
+            seqlen, WUQ, WUKV, Q, KV, PE, kv_cache, pe_cache, idx_theta, cos, sin, output,
+            mask, WUQ_scale, WUKV_scale, block_tables, slots, paged_kvcache, paged_pecache)
 
 
 def gen_rope(Ntotal, head_size):
@@ -200,9 +219,9 @@ class MLATpu(MLA):
                 torch.ops.my_ops.latent_attention_fp8(
                     tensors.output, tensors.Q, tensors.KV, tensors.PE, tensors.WUQ, tensors.WUKV,
                     tensors.kv_cache, tensors.pe_cache, tensors.cos, tensors.sin, tensors.WUQ_scale,
-                    tensors.WUKV_scale, None, tensors.seqlen, self.config.num_heads,
+                    tensors.WUKV_scale, tensors.mask, tensors.seqlen, self.config.num_heads,
                     self.config.q_lora_rank, self.config.kv_lora_rank, self.config.qk_nope_head_dim,
-                    self.config.qk_rope_head_dim, self.config.v_head_dim, 0,
+                    self.config.qk_rope_head_dim, self.config.v_head_dim, self.config.mask_size,
                     self.config.block_size, self.config.max_cache_size, self.config.softmax_scale,
                     self.config.attention_mode.value)
             elif self.config.attention_mode == AttentionMode.PAGED_DECODE \
@@ -212,9 +231,9 @@ class MLATpu(MLA):
                     tensors.output, tensors.Q, tensors.KV, tensors.PE, tensors.WUQ, tensors.WUKV,
                     tensors.paged_kvcache, tensors.paged_pecache, tensors.cos, tensors.sin, tensors.WUQ_scale,
                     tensors.WUKV_scale, tensors.block_tables, tensors.slots,
-                    None, tensors.seqlen, self.config.num_heads,
+                    tensors.mask, tensors.seqlen, self.config.num_heads,
                     self.config.q_lora_rank, self.config.kv_lora_rank, self.config.qk_nope_head_dim,
-                    self.config.qk_rope_head_dim, self.config.v_head_dim, 0,
+                    self.config.qk_rope_head_dim, self.config.v_head_dim, self.config.mask_size,
                     self.config.block_size, tensors.block_tables.shape[1],
                     self.config.paged_block_size, self.config.softmax_scale,
                     self.config.attention_mode.value)
@@ -224,20 +243,20 @@ class MLATpu(MLA):
                 torch.ops.my_ops.latent_attention(
                     tensors.output, tensors.Q, tensors.KV, tensors.PE,
                     tensors.WUQ, tensors.WUKV, tensors.kv_cache, tensors.pe_cache,
-                    tensors.cos, tensors.sin, None, tensors.seqlen, self.config.num_heads,
+                    tensors.cos, tensors.sin, tensors.mask, tensors.seqlen, self.config.num_heads,
                     self.config.q_lora_rank, self.config.kv_lora_rank, self.config.qk_nope_head_dim,
                     self.config.qk_rope_head_dim, self.config.v_head_dim,
-                    0, self.config.max_cache_size, self.config.softmax_scale,
+                    self.config.mask_size, self.config.max_cache_size, self.config.softmax_scale,
                     self.config.attention_mode.value)
             elif self.config.attention_mode == AttentionMode.PAGED_DECODE \
                 or self.config.attention_mode == AttentionMode.PAGED_PREFILL:
                 torch.ops.my_ops.paged_latent_attention(
                     tensors.output, tensors.Q, tensors.KV, tensors.PE,
                     tensors.WUQ, tensors.WUKV, tensors.paged_kvcache, tensors.paged_pecache,
-                    tensors.cos, tensors.sin, tensors.block_tables, tensors.slots, None, tensors.seqlen, self.config.num_heads,
+                    tensors.cos, tensors.sin, tensors.block_tables, tensors.slots, tensors.mask, tensors.seqlen, self.config.num_heads,
                     self.config.q_lora_rank, self.config.kv_lora_rank, self.config.qk_nope_head_dim,
-                    self.config.qk_rope_head_dim, self.config.v_head_dim,
-                    0, tensors.block_tables.shape[1], self.config.paged_block_size, self.config.softmax_scale,
+                    self.config.qk_rope_head_dim, self.config.v_head_dim, self.config.mask_size,
+                    tensors.block_tables.shape[1], self.config.paged_block_size, self.config.softmax_scale,
                     self.config.attention_mode.value)
         return tensors.output
 
@@ -304,6 +323,8 @@ class MLACpu(MLA):
                   torch.einsum("bshr, btr->bsht", q_pe, pe_cache[:bsz, :end_pos]))
         scores = scores * self.config.softmax_scale
 
+        if tensors.mask is not None:
+            scores += tensors.mask.unsqueeze(1)
         # step 5: softmax
         scores = scores.softmax(dim = -1, dtype = torch.float32).type_as(Q)
 
@@ -334,6 +355,7 @@ def mla_decode(act_dtype: torch.dtype, weight_dtype: torch.dtype, mode: Attentio
         tensors.cos.to(device),
         tensors.sin.to(device),
         tensors.output.to(device),
+        tensors.mask.to(device) if tensors.mask is not None else None,
         tensors.WUQ_scale.to(device) if tensors.WUQ_scale is not None else None,
         tensors.WUKV_scale.to(device) if tensors.WUKV_scale is not None else None,
         tensors.block_tables.to(device) if tensors.block_tables is not None else None,
@@ -383,7 +405,7 @@ def mla_decode(act_dtype: torch.dtype, weight_dtype: torch.dtype, mode: Attentio
         raise RuntimeError("mla pe-cache failed")
 
 def mla_prefill(act_dtype: torch.dtype, weight_dtype: torch.dtype, mode: AttentionMode):
-    config = MLAConfig(3, 16, 128, 64, 128, 1536, 512, 128, 192**-0.5, act_dtype, weight_dtype, 512, mode)
+    config = MLAConfig(16, 16, 128, 64, 128, 1536, 512, 128, 192**-0.5, act_dtype, weight_dtype, 512, mode)
     net_cpu = MLACpu(config)
     net_tpu = MLATpu(config)
 
@@ -401,6 +423,7 @@ def mla_prefill(act_dtype: torch.dtype, weight_dtype: torch.dtype, mode: Attenti
         tensors.cos.to(device),
         tensors.sin.to(device),
         tensors.output.to(device),
+        tensors.mask.to(device) if tensors.mask is not None else None,
         tensors.WUQ_scale.to(device) if tensors.WUQ_scale is not None else None,
         tensors.WUKV_scale.to(device) if tensors.WUKV_scale is not None else None,
         tensors.block_tables.to(device) if tensors.block_tables is not None else None,
@@ -432,6 +455,17 @@ def mla_prefill(act_dtype: torch.dtype, weight_dtype: torch.dtype, mode: Attenti
             tensors_tpu.pe_cache.cpu()[:, :config.context_len]
             - pe_cache[:, :config.context_len]
         )
+    else:
+        slots = config.block_index_to_slots(tensors.block_tables, config.paged_block_size, config.context_len)
+        slots = torch.tensor(slots, dtype=torch.int64).reshape(config.batch, -1)
+        kv_diff = (
+            tensors_tpu.paged_kvcache.cpu().view(-1, config.kv_lora_rank)[slots]
+            - kv_cache[:, :config.context_len]
+        )
+        pe_diff = (
+            tensors_tpu.paged_pecache.cpu().view(-1, config.qk_rope_head_dim)[slots]
+            - pe_cache[:, :config.context_len]
+        )
     if torch.max(torch.abs(kv_diff)) > 1e-5:
         print(f"kv_diff: {torch.max(torch.abs(kv_diff))}")
         raise RuntimeError("mla kv-cache failed")
@@ -440,21 +474,27 @@ def mla_prefill(act_dtype: torch.dtype, weight_dtype: torch.dtype, mode: Attenti
         raise RuntimeError("mla pe-cache failed")
 
 if __name__ == "__main__":
-    # print(f"Test MLA Decode BF16 continuous_decode:")
-    # mla_decode(torch.bfloat16, torch.bfloat16, AttentionMode.CONTINUOUS_DECODE)
-    # print(f"----------------------------------")
-    # print(f"Test MLA Decode BF16 paged_decode:")
-    # mla_decode(torch.bfloat16, torch.bfloat16, AttentionMode.PAGED_DECODE)
-    # print(f"----------------------------------")
+    print(f"Test MLA Decode BF16 continuous_decode:")
+    mla_decode(torch.bfloat16, torch.bfloat16, AttentionMode.CONTINUOUS_DECODE)
+    print(f"----------------------------------")
+    print(f"Test MLA Decode BF16 paged_decode:")
+    mla_decode(torch.bfloat16, torch.bfloat16, AttentionMode.PAGED_DECODE)
+    print(f"----------------------------------")
     print(f"\nTest MLA Decode FP8_E4M3 continuous_decode:")
     mla_decode(torch.bfloat16, torch.float8_e4m3fn, AttentionMode.CONTINUOUS_DECODE)
     print(f"----------------------------------")
-    # print(f"\nTest MLA Decode FP8_E4M3 paged_decode:")
-    # mla_decode(torch.bfloat16, torch.float8_e4m3fn, AttentionMode.PAGED_DECODE)
-    # print(f"----------------------------------")
-    # print(f"Test MLA Prefill BF16:")
-    # mla_prefill(torch.bfloat16, torch.bfloat16, AttentionMode.CONTINUOUS_PREFILL)
-    # print(f"----------------------------------")
-    print(f"Test MLA Prefill FP8_E4M3:")
+    print(f"\nTest MLA Decode FP8_E4M3 paged_decode:")
+    mla_decode(torch.bfloat16, torch.float8_e4m3fn, AttentionMode.PAGED_DECODE)
+    print(f"----------------------------------")
+    print(f"Test MLA Prefill BF16 continuous_prefill:")
+    mla_prefill(torch.bfloat16, torch.bfloat16, AttentionMode.CONTINUOUS_PREFILL)
+    print(f"----------------------------------")
+    print(f"Test MLA Prefill BF16 paged_prefill:")
+    mla_prefill(torch.bfloat16, torch.bfloat16, AttentionMode.PAGED_PREFILL)
+    print(f"----------------------------------")
+    print(f"Test MLA Prefill FP8_E4M3 continuous_prefill:")
     mla_prefill(torch.bfloat16, torch.float8_e4m3fn, AttentionMode.CONTINUOUS_PREFILL)
+    print(f"----------------------------------")
+    print(f"Test MLA Prefill FP8_E4M3 paged_prefill:")
+    mla_prefill(torch.bfloat16, torch.float8_e4m3fn, AttentionMode.PAGED_PREFILL)
     print(f"----------------------------------")
