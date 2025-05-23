@@ -357,17 +357,6 @@ typedef struct
 {
   unsigned long long input_global_addr;
   unsigned long long output_global_addr;
-  int shape[FW_MAX_SHAPE_DIMS];
-  int dim;
-  int input_dtype;
-  int output_dtype;
-  int is_bool;
-} WITH_PLATFORM(sg_api_dtype_convert_t);
-
-typedef struct
-{
-  unsigned long long input_global_addr;
-  unsigned long long output_global_addr;
   int shape[4];
   int mode;
 } WITH_PLATFORM(sg_api_conv_weight_reorder_t);

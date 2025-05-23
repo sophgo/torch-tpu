@@ -846,52 +846,6 @@ tpu_status_t sgdnnRecoverConv2dWeight ( tpu_resource_t resource ,
   return SG_SUCCESS;
 }
 
-tpu_status_t sgdnnConvert ( tpu_resource_t resource ,
-                           SgdnnTensor_t input,
-                           SgdnnTensor_t output ,
-                           bool non_blocking )
-{
-  SGDNN_CHECK ( sgdnnIsSameShape ( &input, &output ) );
-  SGDNN_CHECK ( sgdnnIsTensorContiguous ( &input ) );
-  SGDNN_CHECK ( sgdnnIsTensorContiguous ( &output ) );
-#if defined BACKEND_1684X
-  sg_api_dtype_convert_t api;
-  api.input_global_addr = input.addr;
-  api.output_global_addr = output.addr;
-  api.dim = input.dim;
-  for ( int i = 0; i < input.dim; ++i )
-  {
-    api.shape[i] = input.shape[i];
-  }
-  api.input_dtype = sgdnnTPUKernelDType ( input.dtype );
-  api.output_dtype = sgdnnTPUKernelDType ( output.dtype );
-  SAFE_CALL ( sgdnnTPUKernelLaunch ( resource , "tpu_kernel_api_dtype_convert", &api, sizeof ( api ) ) );
-#elif defined BACKEND_SG2260
-  sg_api_dtype_convert_t api;
-  api.input_global_addr = input.addr;
-  api.output_global_addr = output.addr;
-  api.dim = input.dim;
-  for ( int i = 0; i < input.dim; ++i )
-  {
-    api.shape[i] = input.shape[i];
-  }
-  api.input_dtype = sgdnnTPUKernelDType ( input.dtype );
-  api.output_dtype = sgdnnTPUKernelDType ( output.dtype );
-#ifdef USING_PERF_MODE
-  std::cout << "input_num\n" << 1 <<std::endl;
-  std::cout << "output_num\n" << 1 <<std::endl;
-  std::cout << "input_addr0\n" << api.input_global_addr << std::endl;
-  std::cout << "input_size0\n" << sgdnnTensorBytes(&input) << std::endl;
-  std::cout << "output_addr0\n" << api.output_global_addr << std::endl;
-  std::cout << "output_size0\n" << sgdnnTensorBytes(&output) << std::endl;
-#endif
-  SAFE_CALL ( sgdnnTPUKernelLaunchMultiCore ( resource , "tpu_kernel_api_dtype_convert_multi_core", &api, sizeof ( api ) , non_blocking) );
-#else
-  SGDNN_CHECK ( false );
-#endif
-  return SG_SUCCESS;
-}
-
 tpu_status_t sgdnnIndexSelect ( tpu_resource_t resource ,
                                SgdnnTensor_t input,
                                SgdnnTensor_t indices,

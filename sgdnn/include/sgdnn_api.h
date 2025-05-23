@@ -446,16 +446,6 @@ tpu_status_t sgdnnStridedCopy ( tpu_resource_t resource,
                              SgdnnTensor_t input,
                              SgdnnTensor_t output,
                              bool non_blocking = true );
-/*
- * OUTPUT = CONVERT ( INPUT )
- * Note:
- * 1. The shapes of INPUT and OUTPUT must be the same
- * 2. INPUT and OUTPUT must be contiguous
- */
-tpu_status_t sgdnnConvert ( tpu_resource_t resource,
-                         SgdnnTensor_t input,
-                         SgdnnTensor_t output,
-                         bool non_blocking = true );
 
 /*
  * OUTPUT = INDEX SELECT ( INPUT, INDICES, DIM )
