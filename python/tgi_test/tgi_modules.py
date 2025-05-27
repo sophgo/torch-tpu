@@ -437,7 +437,7 @@ class SophLlamaMlp(nn.Module):
         w0, w1 = w0.transpose(-1, -2).contiguous(), w1.transpose(-1, -2).contiguous()
         if self.profile_mode !=None:
             torch.ops.my_ops.enable_profile(40960, False)
-        out=torch.ops.my_ops.llama_mlp_forward(hidden_states, w0, w1, w2, None, None, None, None, None, None,output, False)
+        out=torch.ops.my_ops.llama_mlp_forward(hidden_states, w0, w1, w2,  None, None, None, None, None,output, False)
         out.cpu()
         torch_tpu.tpu.synchronize()
         if self.profile_mode !=None:

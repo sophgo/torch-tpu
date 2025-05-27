@@ -31,25 +31,24 @@ namespace at
 		const c10::optional<Tensor> &bias0,
 		const c10::optional<Tensor> &bias1,
 		const c10::optional<Tensor> &bias2,
-		const c10::optional<Tensor> &silu,
-		const c10::optional<Tensor> &sigmoid,
+		const c10::optional<Tensor> &fc1,
 		const c10::optional<Tensor> &m0,
 		Tensor &output,
     bool save_mid_res);
 
   std::tuple<Tensor, Tensor, Tensor, Tensor> mlp_backward(
-    Tensor& input,
-    Tensor& weight0,
-    Tensor& weight1,
-    Tensor& weight2,
+    Tensor &input,
+    Tensor &weight0,
+    Tensor &weight1,
+    Tensor &weight2,
     Tensor& w0x,
+    Tensor& w1x,
     Tensor& output,
-    const c10::optional<Tensor>& silu,
-    const c10::optional<Tensor>& sigmoid,
-    Tensor& grad_input,
-    Tensor& grad_weight0,
-    Tensor& grad_weight1,
-    Tensor& grad_weight2);
+    Tensor &grad_tmp,
+    Tensor &grad_input,
+    Tensor &grad_weight0,
+    Tensor &grad_weight1,
+    Tensor &grad_weight2);
 
 
 	Tensor matmul_gptq_forward(

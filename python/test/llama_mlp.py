@@ -42,7 +42,6 @@ class LLamaMlpFunc(torch.autograd.Function):
                                     None,
                                     None,
                                     None,
-                                    None,
                                     output,
                                     False)
         return output

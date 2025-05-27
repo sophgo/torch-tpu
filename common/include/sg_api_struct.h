@@ -1217,8 +1217,7 @@ typedef struct {
   unsigned long long scale2_addr;
   unsigned long long bias2_addr;
   unsigned long long output_addr;
-  unsigned long long silu_addr;
-  unsigned long long sigmoid_addr;
+  unsigned long long fc1_addr;
   unsigned long long m0_addr;
   int has_bias;
   int save_mid_res;

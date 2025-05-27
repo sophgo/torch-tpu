@@ -17,8 +17,7 @@ namespace at
 		const c10::optional<Tensor> &bias0,
 		const c10::optional<Tensor> &bias1,
 		const c10::optional<Tensor> &bias2,
-		const c10::optional<Tensor> &silu,
-		const c10::optional<Tensor> &sigmoid,
+		const c10::optional<Tensor> &fc1,
 		const c10::optional<Tensor> &m0,
 		Tensor &output,
 		bool save_mid_res)
@@ -33,10 +32,8 @@ namespace at
 			CHECK_TENSOR_IN_DEVICE(bias1.value());
 		if (bias2.has_value())
 			CHECK_TENSOR_IN_DEVICE(bias2.value());
-		if (silu.has_value())
-			CHECK_TENSOR_IN_DEVICE(silu.value());
-		if (sigmoid.has_value())
-			CHECK_TENSOR_IN_DEVICE(sigmoid.value());
+		if (fc1.has_value())
+			CHECK_TENSOR_IN_DEVICE(fc1.value());
 		if (m0.has_value())
 			CHECK_TENSOR_IN_DEVICE(m0.value());
 		CHECK_TENSOR_IN_DEVICE(output);
@@ -53,8 +50,7 @@ namespace at
 			bias0.has_value()? tpu::TPUGenerateTpudnnTensor( stream, bias0.value()) : tpudnnUndefinedTensor(),
 			bias1.has_value()? tpu::TPUGenerateTpudnnTensor( stream, bias1.value()) : tpudnnUndefinedTensor(),
 			bias2.has_value()? tpu::TPUGenerateTpudnnTensor( stream, bias2.value()) : tpudnnUndefinedTensor(),
-			silu.has_value() ? tpu::TPUGenerateTpudnnTensor( stream, silu.value()) : tpudnnUndefinedTensor(),
-			sigmoid.has_value() ? tpu::TPUGenerateTpudnnTensor( stream, sigmoid.value()) : tpudnnUndefinedTensor(),
+			fc1.has_value() ? tpu::TPUGenerateTpudnnTensor( stream, fc1.value()) : tpudnnUndefinedTensor(),
 			m0.has_value() ? tpu::TPUGenerateTpudnnTensor( stream, m0.value()) : tpudnnUndefinedTensor(),
 			tpu::TPUGenerateTpudnnTensor( stream, output),
 			save_mid_res);
@@ -70,11 +66,11 @@ std::tuple<Tensor, Tensor, Tensor, Tensor> mlp_backward(
     Tensor &input,
     Tensor &weight0,
     Tensor &weight1,
-    Tensor& weight2,
+    Tensor &weight2,
     Tensor &w0x,
+    Tensor &w1x,
     Tensor &output,
-    const c10::optional<Tensor>& silu,
-    const c10::optional<Tensor> &sigmoid,
+    Tensor &grad_tmp,
     Tensor &grad_input,
     Tensor &grad_weight0,
     Tensor &grad_weight1,
@@ -85,11 +81,9 @@ std::tuple<Tensor, Tensor, Tensor, Tensor> mlp_backward(
     CHECK_TENSOR_IN_DEVICE(weight1);
     CHECK_TENSOR_IN_DEVICE(weight2);
     CHECK_TENSOR_IN_DEVICE(w0x);
+    CHECK_TENSOR_IN_DEVICE(w1x);
     CHECK_TENSOR_IN_DEVICE(output);
-    if (silu.has_value())
-      CHECK_TENSOR_IN_DEVICE(silu.value());
-    if (sigmoid.has_value())
-      CHECK_TENSOR_IN_DEVICE(sigmoid.value());
+    CHECK_TENSOR_IN_DEVICE(grad_tmp);
     CHECK_TENSOR_IN_DEVICE(grad_input);
     CHECK_TENSOR_IN_DEVICE(grad_weight0);
     CHECK_TENSOR_IN_DEVICE(grad_weight1);
@@ -97,28 +91,24 @@ std::tuple<Tensor, Tensor, Tensor, Tensor> mlp_backward(
 
 
     TIMING_START;
-#if defined BACKEND_SG2260
     auto stream = c10_tpu::getCurrentTPUStream();
-    auto status = tpudnnLLamaMlpbackward(
+    auto status = tpudnnMlpbackward(
       stream,
       tpu::TPUGenerateTpudnnTensor(stream, input),
       tpu::TPUGenerateTpudnnTensor(stream, weight0),
       tpu::TPUGenerateTpudnnTensor(stream, weight1),
       tpu::TPUGenerateTpudnnTensor(stream, weight2),
       tpu::TPUGenerateTpudnnTensor(stream, w0x),
+      tpu::TPUGenerateTpudnnTensor(stream, w1x),
       tpu::TPUGenerateTpudnnTensor(stream, output),
-      silu.has_value() ? tpu::TPUGenerateTpudnnTensor(stream, silu.value()) : tpudnnUndefinedTensor(),
-      sigmoid.has_value() ? tpu::TPUGenerateTpudnnTensor(stream, sigmoid.value()) : tpudnnUndefinedTensor(),
+      tpu::TPUGenerateTpudnnTensor(stream, grad_tmp),
       tpu::TPUGenerateTpudnnTensor(stream, grad_input),
       tpu::TPUGenerateTpudnnTensor(stream, grad_weight0),
       tpu::TPUGenerateTpudnnTensor(stream, grad_weight1),
       tpu::TPUGenerateTpudnnTensor(stream, grad_weight2));
 
     TORCH_CHECK(status == TPUDNN_STATUS_SUCCESS);
-#elif defined BACKEND_1684X
-    TORCH_CHECK(false);
-#endif
-    TIMING_END(tpu::LLAMA_MLP_BACKWARD);
+    TIMING_END(tpu::MLP_BACKWARD);
     return std::tuple<Tensor, Tensor, Tensor, Tensor>(grad_input, grad_weight0, grad_weight1, grad_weight2);
 }
 
