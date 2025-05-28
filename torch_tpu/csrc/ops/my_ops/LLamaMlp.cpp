@@ -14,6 +14,9 @@ namespace at
 		Tensor &weight0,
 		Tensor &weight1,
 		Tensor &weight2,
+		const c10::optional<Tensor> &bias0,
+		const c10::optional<Tensor> &bias1,
+		const c10::optional<Tensor> &bias2,
 		const c10::optional<Tensor> &silu,
 		const c10::optional<Tensor> &sigmoid,
 		const c10::optional<Tensor> &m0,
@@ -24,12 +27,18 @@ namespace at
 		CHECK_TENSOR_IN_DEVICE(weight0);
 		CHECK_TENSOR_IN_DEVICE(weight1);
 		CHECK_TENSOR_IN_DEVICE(weight2);
-			if (silu.has_value())
-		CHECK_TENSOR_IN_DEVICE(silu.value());
-			if (sigmoid.has_value())
-		CHECK_TENSOR_IN_DEVICE(sigmoid.value());
-			if (m0.has_value())
-		CHECK_TENSOR_IN_DEVICE(m0.value());
+		if (bias0.has_value())
+			CHECK_TENSOR_IN_DEVICE(bias0.value());
+		if (bias1.has_value())
+			CHECK_TENSOR_IN_DEVICE(bias1.value());
+		if (bias2.has_value())
+			CHECK_TENSOR_IN_DEVICE(bias2.value());
+		if (silu.has_value())
+			CHECK_TENSOR_IN_DEVICE(silu.value());
+		if (sigmoid.has_value())
+			CHECK_TENSOR_IN_DEVICE(sigmoid.value());
+		if (m0.has_value())
+			CHECK_TENSOR_IN_DEVICE(m0.value());
 		CHECK_TENSOR_IN_DEVICE(output);
 
 		TIMING_START;
@@ -41,6 +50,9 @@ namespace at
 			tpu::TPUGenerateTpudnnTensor( stream, weight0),
 			tpu::TPUGenerateTpudnnTensor( stream, weight1),
 			tpu::TPUGenerateTpudnnTensor( stream, weight2),
+			bias0.has_value()? tpu::TPUGenerateTpudnnTensor( stream, bias0.value()) : tpudnnUndefinedTensor(),
+			bias1.has_value()? tpu::TPUGenerateTpudnnTensor( stream, bias1.value()) : tpudnnUndefinedTensor(),
+			bias2.has_value()? tpu::TPUGenerateTpudnnTensor( stream, bias2.value()) : tpudnnUndefinedTensor(),
 			silu.has_value() ? tpu::TPUGenerateTpudnnTensor( stream, silu.value()) : tpudnnUndefinedTensor(),
 			sigmoid.has_value() ? tpu::TPUGenerateTpudnnTensor( stream, sigmoid.value()) : tpudnnUndefinedTensor(),
 			m0.has_value() ? tpu::TPUGenerateTpudnnTensor( stream, m0.value()) : tpudnnUndefinedTensor(),
