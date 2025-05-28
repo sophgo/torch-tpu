@@ -60,6 +60,7 @@ class MLAConfig:
     max_cache_size: int = 8192
     paged_block_size: int = 16
     mask_size: int = 0
+    generate_token: int = 1
 
     def block_index_to_slots(self, block_idx, block_size, context_len):
         flat_slots_idx = []
@@ -70,22 +71,22 @@ class MLAConfig:
         return flat_slots_idx
 
     def random_tensors(self):
-        assert self.max_cache_size >= self.context_len + 1, "max_cache_size should be larger than context_len + 1"
+        assert self.max_cache_size >= self.context_len + self.generate_token, "max_cache_size should be larger than context_len + generate_token"
         seqlen = torch.tensor([self.context_len for _ in range(self.batch)], dtype = torch.int32)
         WUQ = torch.randn((self.num_heads * (self.qk_nope_head_dim + self.qk_rope_head_dim), self.q_lora_rank),
-                        dtype = self.dtype).to(self.weight_dtype)
+                        dtype = self.dtype).to(self.weight_dtype) / math.sqrt(self.q_lora_rank)
         WUKV = torch.randn((self.num_heads * (self.qk_nope_head_dim + self.v_head_dim), self.kv_lora_rank),
-                        dtype = self.dtype).to(self.weight_dtype)
+                        dtype = self.dtype).to(self.weight_dtype) / math.sqrt(self.kv_lora_rank)
         seq = max(seqlen).item() if self.attention_mode in (
             AttentionMode.CONTINUOUS_PREFILL,
             AttentionMode.PAGED_PREFILL,
-        ) else 1
+        ) else self.generate_token
         Q = torch.randn((self.batch, seq, self.q_lora_rank), dtype = self.dtype)
         KV = torch.randn((self.batch, seq, self.kv_lora_rank), dtype = self.dtype)
         PE = torch.randn((self.batch, seq, self.qk_rope_head_dim), dtype = self.dtype)
         kv_cache = torch.randn((self.batch, self.max_cache_size, self.kv_lora_rank), dtype = self.dtype)
         pe_cache = torch.randn((self.batch, self.max_cache_size, self.qk_rope_head_dim), dtype = self.dtype)
-        idx_theta = gen_rope(self.batch * seq, self.qk_rope_head_dim).to(self.dtype)
+        idx_theta = gen_rope(self.batch, self.qk_rope_head_dim).to(self.dtype)
         cos = torch.cos(idx_theta).contiguous().to(self.dtype)
         sin = torch.sin(idx_theta).contiguous().to(self.dtype)
         output = torch.randn((self.batch, seq, self.num_heads, self.v_head_dim), dtype = self.dtype)
@@ -103,7 +104,7 @@ class MLAConfig:
         block_tables = None
         slots = None
         if self.attention_mode == AttentionMode.PAGED_DECODE:
-            block_per_batch = int(math.ceil((self.context_len + 1) / self.paged_block_size))
+            block_per_batch = int(math.ceil((self.context_len + self.generate_token) / self.paged_block_size))
             total_block_num = max(block_per_batch * self.batch, 512)
             paged_kvcache = torch.empty((total_block_num, self.paged_block_size, self.kv_lora_rank), dtype = self.dtype)
             paged_pecache = torch.empty((total_block_num, self.paged_block_size, self.qk_rope_head_dim), dtype = self.dtype)
@@ -222,7 +223,7 @@ class MLATpu(MLA):
                 torch.ops.my_ops.latent_attention_fp8(
                     tensors.output, tensors.Q, tensors.KV, tensors.PE, tensors.WUQ, tensors.WUKV,
                     tensors.kv_cache, tensors.pe_cache, tensors.cos, tensors.sin, tensors.WUQ_scale,
-                    tensors.WUKV_scale, tensors.mask, tensors.seqlen, self.config.num_heads,
+                    tensors.WUKV_scale, tensors.mask, tensors.seqlen, self.config.num_heads, self.config.generate_token,
                     self.config.q_lora_rank, self.config.kv_lora_rank, self.config.qk_nope_head_dim,
                     self.config.qk_rope_head_dim, self.config.v_head_dim, self.config.mask_size,
                     self.config.block_size, self.config.max_cache_size, self.config.softmax_scale,
@@ -234,7 +235,7 @@ class MLATpu(MLA):
                     tensors.output, tensors.Q, tensors.KV, tensors.PE, tensors.WUQ, tensors.WUKV,
                     tensors.paged_kvcache, tensors.paged_pecache, tensors.cos, tensors.sin, tensors.WUQ_scale,
                     tensors.WUKV_scale, tensors.block_tables, tensors.slots,
-                    tensors.mask, tensors.seqlen, self.config.num_heads,
+                    tensors.mask, tensors.seqlen, self.config.num_heads, self.config.generate_token,
                     self.config.q_lora_rank, self.config.kv_lora_rank, self.config.qk_nope_head_dim,
                     self.config.qk_rope_head_dim, self.config.v_head_dim, self.config.mask_size,
                     self.config.block_size, tensors.block_tables.shape[1],
@@ -246,7 +247,7 @@ class MLATpu(MLA):
                 torch.ops.my_ops.latent_attention(
                     tensors.output, tensors.Q, tensors.KV, tensors.PE,
                     tensors.WUQ, tensors.WUKV, tensors.kv_cache, tensors.pe_cache,
-                    tensors.cos, tensors.sin, tensors.mask, tensors.seqlen, self.config.num_heads,
+                    tensors.cos, tensors.sin, tensors.mask, tensors.seqlen, self.config.num_heads, self.config.generate_token,
                     self.config.q_lora_rank, self.config.kv_lora_rank, self.config.qk_nope_head_dim,
                     self.config.qk_rope_head_dim, self.config.v_head_dim,
                     self.config.mask_size, self.config.max_cache_size, self.config.softmax_scale,
@@ -256,7 +257,8 @@ class MLATpu(MLA):
                 torch.ops.my_ops.paged_latent_attention(
                     tensors.output, tensors.Q, tensors.KV, tensors.PE,
                     tensors.WUQ, tensors.WUKV, tensors.paged_kvcache, tensors.paged_pecache,
-                    tensors.cos, tensors.sin, tensors.block_tables, tensors.slots, tensors.mask, tensors.seqlen, self.config.num_heads,
+                    tensors.cos, tensors.sin, tensors.block_tables, tensors.slots, tensors.mask,
+                    tensors.seqlen, self.config.num_heads, self.config.generate_token,
                     self.config.q_lora_rank, self.config.kv_lora_rank, self.config.qk_nope_head_dim,
                     self.config.qk_rope_head_dim, self.config.v_head_dim, self.config.mask_size,
                     tensors.block_tables.shape[1], self.config.paged_block_size, self.config.softmax_scale,
@@ -278,6 +280,7 @@ class MLACpu(MLA):
             WUQ = tensors.WUQ
             WUKV = tensors.WUKV
 
+        # breakpoint()
         Q = tensors.Q.view(-1, tensors.Q.shape[-1])
         Q = torch.matmul(Q, WUQ.t())
         Q = Q.view(bsz, seqlen, self.config.num_heads, self.config.qk_nope_head_dim + self.config.qk_rope_head_dim)
@@ -286,7 +289,7 @@ class MLACpu(MLA):
         cos = torch.cos(tensors.idx_theta)
         sin = torch.sin(tensors.idx_theta)
         # step 2: Q RoPE
-        q_pe = q_pe.view(bsz * seqlen, self.config.num_heads, self.config.qk_rope_head_dim).contiguous()
+        q_pe = q_pe.view(bsz, seqlen * self.config.num_heads, self.config.qk_rope_head_dim).contiguous()
         q_pe = apply_rope(q_pe, cos, sin)
         q_pe = q_pe.view(bsz, seqlen, self.config.num_heads, self.config.qk_rope_head_dim)
 
@@ -315,19 +318,24 @@ class MLACpu(MLA):
 
         # step 4: QK
         max_seqlen = max(tensors.seqlen).item()
-        start_pos = 0 if seqlen != 1 else max_seqlen
+        start_pos = 0 if seqlen != self.config.generate_token else max_seqlen
         end_pos = start_pos + seqlen
         kv_cache[:bsz, start_pos:end_pos, :] = tensors.KV
-        PE = tensors.PE.view(bsz * seqlen, 1, self.config.qk_rope_head_dim)
+        PE = tensors.PE.view(bsz, seqlen, self.config.qk_rope_head_dim)
         PE = apply_rope(PE, cos, sin)
         PE = PE.view(bsz, seqlen, self.config.qk_rope_head_dim)
         pe_cache[:bsz, start_pos:end_pos, :] = PE
-        scores = (torch.einsum("bshc, btc->bsht", q_nope, kv_cache[:bsz, :end_pos]) +
-                  torch.einsum("bshr, btr->bsht", q_pe, pe_cache[:bsz, :end_pos]))
+        score0 = torch.einsum("bshc, btc->bsht", q_nope, kv_cache[:bsz, :end_pos]) 
+        score1 = torch.einsum("bshr, btr->bsht", q_pe, pe_cache[:bsz, :end_pos])
+        scores = score0 + score1
         scores = scores * self.config.softmax_scale
 
         if tensors.mask is not None:
             scores += tensors.mask.unsqueeze(1)
+        mask = torch.triu(torch.full((seqlen, seqlen), float('-inf'), dtype=scores.dtype), diagonal=1)
+        mask = mask.reshape(1, seqlen, 1, seqlen)
+        scores[:,:,:,-seqlen:] = scores[:,:,:,-seqlen:] + mask
+
         # step 5: softmax
         scores = scores.softmax(dim = -1, dtype = torch.float32).type_as(Q)
 
@@ -371,6 +379,7 @@ def mla_decode(act_dtype: torch.dtype, weight_dtype: torch.dtype, mode: Attentio
     output_cpu, kv_cache, pe_cache = net_cpu(tensors)
     output_tpu = output_tpu.cpu()
 
+    # breakpoint()
     diff = output_tpu - output_cpu
     cosine_similarity = F.cosine_similarity(output_tpu.view(config.batch, -1),
                                             output_cpu.view(config.batch, -1), dim=-1)
@@ -384,21 +393,21 @@ def mla_decode(act_dtype: torch.dtype, weight_dtype: torch.dtype, mode: Attentio
     # compare the kv-cache and pe-cache
     if mode == AttentionMode.CONTINUOUS_DECODE:
         kv_diff = (
-            tensors_tpu.kv_cache.cpu()[:, config.context_len : config.context_len + 1]
-            - kv_cache[:, config.context_len : config.context_len + 1]
+            tensors_tpu.kv_cache.cpu()[:, config.context_len : config.context_len + config.generate_token]
+            - kv_cache[:, config.context_len : config.context_len + config.generate_token]
         )
         pe_diff = (
-            tensors_tpu.pe_cache.cpu()[:, config.context_len : config.context_len + 1]
-            - pe_cache[:, config.context_len : config.context_len + 1]
+            tensors_tpu.pe_cache.cpu()[:, config.context_len : config.context_len + config.generate_token]
+            - pe_cache[:, config.context_len : config.context_len + config.generate_token]
         )
     else:
         kv_diff = (
             tensors_tpu.paged_kvcache.cpu().view(-1, config.kv_lora_rank)[tensors.slots]
-            - kv_cache[:, config.context_len : config.context_len + 1].view(-1, config.kv_lora_rank)
+            - kv_cache[:, config.context_len : config.context_len + config.generate_token].view(-1, config.kv_lora_rank)
         )
         pe_diff = (
             tensors_tpu.paged_pecache.cpu().view(-1, config.qk_rope_head_dim)[tensors.slots]
-            - pe_cache[:, config.context_len : config.context_len + 1].view(-1, config.qk_rope_head_dim)
+            - pe_cache[:, config.context_len : config.context_len + config.generate_token].view(-1, config.qk_rope_head_dim)
         )
     if torch.max(torch.abs(kv_diff)) > 1e-5:
         print(f"kv_diff: {torch.max(torch.abs(kv_diff))}")

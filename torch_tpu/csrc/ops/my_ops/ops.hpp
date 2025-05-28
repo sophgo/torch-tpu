@@ -257,6 +257,7 @@ namespace at
         const c10::optional<Tensor> &mask, // decode: None
         const Tensor &input_lengths,
         int64_t head,
+        int64_t generate_token,
         int64_t q_lora_rank,
         int64_t kv_lora_rank,
         int64_t qk_nope_head_dim,
@@ -272,7 +273,7 @@ namespace at
             Tensor &WUKV, Tensor &KVcache, Tensor &PEcache, Tensor &cos,
             Tensor &sin, const c10::optional<Tensor> &block_table,
             Tensor &save_slots, const c10::optional<Tensor> &mask, // decode: None
-            const Tensor &input_lengths, int64_t head, int64_t q_lora_rank,
+            const Tensor &input_lengths, int64_t head, int64_t generate_token, int64_t q_lora_rank,
             int64_t kv_lora_rank, int64_t qk_nope_head_dim,
             int64_t qk_rope_head_dim, int64_t v_head_dim, int64_t mask_size,
             int64_t max_paged_block_num, int64_t paged_cache_block_size, double C,
@@ -283,7 +284,7 @@ namespace at
             Tensor &WUKV, Tensor &KVcache, Tensor &PEcache, Tensor &cos,
             Tensor &sin, Tensor &WUQ_scale, Tensor &WUKV_scale,
             const c10::optional<Tensor> &mask, // decode: None
-            const Tensor &seqlen, int64_t num_heads, int64_t q_lora_rank,
+            const Tensor &seqlen, int64_t num_heads, int64_t generate_token, int64_t q_lora_rank,
             int64_t kv_lora_rank, int64_t qk_nope_head_dim,
             int64_t qk_rope_head_dim, int64_t v_head_dim, int64_t mask_size,
             int64_t quant_block_size, int64_t max_cache_size,
@@ -297,7 +298,7 @@ namespace at
             Tensor &sin, Tensor &WUQ_scale, Tensor &WUKV_scale,
             const c10::optional<Tensor> &block_table, Tensor &save_slots,
             const c10::optional<Tensor> &mask, // decode: None
-            const Tensor &seqlen, int64_t num_heads, int64_t q_lora_rank,
+            const Tensor &seqlen, int64_t num_heads, int64_t generate_token, int64_t q_lora_rank,
             int64_t kv_lora_rank, int64_t qk_nope_head_dim,
             int64_t qk_rope_head_dim, int64_t v_head_dim, int64_t mask_size,
             int64_t quant_block_size, int64_t max_paged_block_num,
