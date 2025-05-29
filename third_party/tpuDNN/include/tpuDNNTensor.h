@@ -1366,6 +1366,8 @@ tpudnnStatus_t tpudnnMultiHeadAttentionAsync(
     tpudnnTensor_t Q, // {batch, seq, head, head_dim}
     tpudnnTensor_t K, // {batch, seq, head, head_dim}
     tpudnnTensor_t V, // {batch, seq, head, head_dim}
+    tpudnnTensor_t cos, // {batch, 1, head, head_dim}
+    tpudnnTensor_t sin, // {batch, 1, head, head_dim}
     tpudnnTensor_t mask, // {batch, 1, head, head_dim}
     float scale);
 

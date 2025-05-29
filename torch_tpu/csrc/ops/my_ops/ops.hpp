@@ -218,6 +218,8 @@ namespace at
 	    Tensor &Q,
 	    Tensor &K,
 	    Tensor &V,
+	    const c10::optional<Tensor> &cos,
+	    const c10::optional<Tensor> &sin,
 	    const c10::optional<Tensor> &mask,
 	    double C);
 

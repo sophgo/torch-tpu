@@ -14,6 +14,8 @@ namespace at
 	    Tensor &Q, // (tokens, heads, heads_size)
 	    Tensor &K, // (tokens, heads, heads_size)
 	    Tensor &V, // (tokens, heads, heads_size)
+		const c10::optional<Tensor> &cos,
+		const c10::optional<Tensor> &sin,
 	    const c10::optional<Tensor> &mask,
 	    double C)
 	{
@@ -23,6 +25,10 @@ namespace at
 		CHECK_TENSOR_IN_DEVICE_NO_CONTIGUOUS(V);
 		if (mask.has_value())
 			CHECK_TENSOR_IN_DEVICE(mask.value());
+		if (cos.has_value())
+			CHECK_TENSOR_IN_DEVICE_NO_CONTIGUOUS(cos.value());
+		if (sin.has_value())
+			CHECK_TENSOR_IN_DEVICE_NO_CONTIGUOUS(sin.value());
 
 		TIMING_START;
 		auto stream = c10_tpu::getCurrentTPUStream();
@@ -32,6 +38,8 @@ namespace at
 			tpu::TPUGenerateTpudnnTensor(stream, Q),
 			tpu::TPUGenerateTpudnnTensor(stream, K),
 			tpu::TPUGenerateTpudnnTensor(stream, V),
+			cos.has_value() ? tpu::TPUGenerateTpudnnTensor(stream, cos.value()) : tpudnnUndefinedTensor(),
+			sin.has_value() ? tpu::TPUGenerateTpudnnTensor(stream, sin.value()) : tpudnnUndefinedTensor(),
 			mask.has_value() ? tpu::TPUGenerateTpudnnTensor(stream, mask.value()) : tpudnnUndefinedTensor(),
 			C);
 		TORCH_CHECK ( status == TPUDNN_STATUS_SUCCESS);
