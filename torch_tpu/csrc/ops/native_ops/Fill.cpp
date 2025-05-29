@@ -17,16 +17,20 @@ Tensor &fill__Scalar_tpu(Tensor &self, const Scalar &value) {
   tpu::TPUCopyHostToDevice ( self.data_ptr(), self_cpu.contiguous().data_ptr(), self.nbytes() );
 #else
   int64_t value_;
-  if (self.dtype() == caffe2::TypeMeta::Make<float>()) {
+  if (self.scalar_type() == at::ScalarType::Float) {
     *(float *)(&value_) = value.toFloat();
-  } else if (self.dtype() == caffe2::TypeMeta::Make<at::Half>()) {
+  } else if (self.scalar_type() == at::ScalarType::Float) {
     *(at::Half *)(&value_) = value.toHalf();
-  } else if (self.dtype() == caffe2::TypeMeta::Make<int>()) {
+  } else if (self.scalar_type() == at::ScalarType::BFloat16) {
+    *(at::BFloat16 *)(&value_) = value.toBFloat16();
+  } else if (self.scalar_type() == at::ScalarType::Int) {
     value_ = value.toInt();
-  } else if (self.dtype() == caffe2::TypeMeta::Make<bool>()) {
+  } else if (self.scalar_type() == at::ScalarType::Bool) {
     value_ = value.toBool();
+  } else if (self.scalar_type() == at::ScalarType::Byte) {
+    value_ = value.toByte();
   } else {
-    TORCH_CHECK(false);
+    TORCH_CHECK(false, "unsupport scalar type");
   }
   TIMING_START;
 
