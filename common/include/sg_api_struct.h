@@ -62,6 +62,7 @@ typedef enum {
   ACTIVE_RECIPROCAL = 39,
   ACTIVE_EXP2 = 40,
   ACTIVE_TRUNC = 41,
+  ACTIVE_ARCTAN=42,
 } sg_active_type_t;
 
 typedef enum {

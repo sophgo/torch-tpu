@@ -8,22 +8,21 @@ torch.set_printoptions(precision=6)
 device = "tpu:0"
 
 def case1():
-    input_origin=torch.tensor([4.5,5.4])
-    
+    len = 100
+    input_origin=torch.randn(len)*1
+    o  = torch.atan(input_origin)
+
+
     input_tpu=input_origin.to(device)
+    o_t=torch.atan(input_tpu)
+    diff = abs(o - o_t.cpu())
+    # print(f'input          : {input_origin}')
+    # print(f'o              : {o}')    
+    # print("output_tpu_aten : ", o_t.cpu())
+    # print("delta_aten      : ", abs(o - o_t.cpu()))
     
-    output_cpu_aten=torch.ops.aten.atan(input_origin)
-    output_tpu_aten=torch.ops.aten.atan(input_tpu).cpu()
-    output_cpu_prims=torch.ops.prims.atan(input_origin)
-    output_tpu_prims=torch.ops.prims.atan(input_tpu).cpu()
-    
-    # print("input_origin : ",input_origin)
-    print("output_cpu_aten : ", output_cpu_aten)
-    print("output_tpu_aten : ", output_tpu_aten)
-    print("delta_aten : ",(output_cpu_aten-output_tpu_aten)/output_cpu_aten)
-    print("output_cpu_prims : ", output_cpu_prims)
-    print("output_tpu_prims : ", output_tpu_prims)
-    print("delta_prims : ",(output_cpu_prims-output_tpu_prims)/output_cpu_prims)
-    
+    for i in range(len):
+        print(f'{input_origin[i]}, {o[i]}, {o_t[i]}, {diff[i]}')
+    print(torch.max(diff))
 if __name__ == "__main__":
     case1()
