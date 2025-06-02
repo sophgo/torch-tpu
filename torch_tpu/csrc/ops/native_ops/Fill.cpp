@@ -19,7 +19,7 @@ Tensor &fill__Scalar_tpu(Tensor &self, const Scalar &value) {
   int64_t value_;
   if (self.scalar_type() == at::ScalarType::Float) {
     *(float *)(&value_) = value.toFloat();
-  } else if (self.scalar_type() == at::ScalarType::Float) {
+  } else if (self.scalar_type() == at::ScalarType::Half) {
     *(at::Half *)(&value_) = value.toHalf();
   } else if (self.scalar_type() == at::ScalarType::BFloat16) {
     *(at::BFloat16 *)(&value_) = value.toBFloat16();
