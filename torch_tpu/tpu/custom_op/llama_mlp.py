@@ -69,10 +69,10 @@ class LLamaMlpFunc(torch.autograd.Function):
 
           grad_silu_t = (sigmoid + silu * (1-sigmoid))
           grad_tmp = torch.matmul(grad_output, w2_t)
-          grad_w1x = (w0x / silu) * grad_tmp * grad_silu_t
+          grad_w1x = w0x * grad_tmp * grad_silu_t
 
           grad_w0x = grad_tmp * silu
-          grad_w2 = torch.matmul(w0x.transpose(-1,-2).contiguous(), grad_output)
+          grad_w2 = torch.matmul((w0x * silu).transpose(-1,-2).contiguous(), grad_output)
           grad_w1 = torch.matmul(x_t, grad_w1x)
           grad_w0 = torch.matmul(x_t, grad_w0x)
           grad_input = torch.matmul(grad_w0x, w0) + torch.matmul(grad_w1x, w1)
@@ -163,7 +163,7 @@ class MegatronQwen2MlpFunc(torch.autograd.Function):
 
         grad_silu_t = (sigmoid + silu * (1 - sigmoid)) # [s * b, i]
         grad_tmp = torch.matmul(y, down_proj) # [s * b, h] @ [h, i] = [s * b, i]
-        grad_w1x = w0x/silu * grad_tmp * grad_silu_t # [s * b, i]
+        grad_w1x =  w0x * grad_tmp * grad_silu_t  # [s * b, i]
         grad_w0x = grad_tmp * silu # [s * b, i]
 
         # x_t = x.t() # [s * b, h] -> [h, s * b]
@@ -174,7 +174,7 @@ class MegatronQwen2MlpFunc(torch.autograd.Function):
         ## a @ b = c <=> b.T @ a.T = c.T
         ## Use this property to avoid .t().contiguous() operation
         ## .t() in matmul is supported so we do not need to .contiguous() after .t()
-        grad_w2 = torch.matmul(y.t(), w0x) # [h, s * b] @ [s * b, i] = [h, i]
+        grad_w2 = torch.matmul(y.t(), w0x * silu) # [h, s * b] @ [s * b, i] = [h, i]
         grad_w1 = torch.matmul(grad_w1x.t(), x) # [i, s * b] @ [s * b, h] = [i, h]
         grad_w0 = torch.matmul(grad_w0x.t(), x) # [i, s * b] @ [s * b, h] = [i, h]
 
