@@ -17,7 +17,7 @@
 
 
 ## 步骤2: 在 docker 容器中安装 `torch_tpu`
-`我们强烈推荐使用“可选方式2”获取最新的torch_tpu安装包，以避免“可选方式1”可能带来的运行失败或者性能问题`
+`我们强烈推荐使用"可选方式2"获取最新的torch_tpu安装包，以避免"可选方式1"可能带来的运行失败或者性能问题`
 
 ### 可选方式1: 通过 pip 安装 `torch_tpu`
 
@@ -26,10 +26,11 @@ pip install torch_tpu
 ```
 
 ### 可选方式2: 直接基于 Release 链接安装 `torch_tpu`
+安装之前建议检查github仓库中文件更新时间，若时间较久，烦请联系相关人员获取最新包进行安装
 
 ```
 <!-- TODO -->
-pip install https://github.com/sophgo/torch-tpu/releases/download/v0.1.0/torch_tpu-0.1.0-cp310-cp310-linux_x86_64.whl
+pip install https://github.com/sophgo/torch-tpu/releases/download/v0.1.0/torch_tpu-0.1.0-cp310-cp310-linux_x86_64.whl --force-reinstall
 ```
 
 ## 步骤3: 获取 PAI-Megatron-Patch

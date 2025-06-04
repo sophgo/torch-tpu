@@ -27,10 +27,11 @@ pip install torch_tpu
 ```
 
 ### Option 2: Install `torch_tpu` from released wheel file
+Before installation, please verify the last update time of the GitHub repository. If the package is outdated, please contact the development team for the latest version.
 
 ```
 <!-- TODO -->
-pip install https://github.com/sophgo/torch-tpu/releases/download/v0.1.0/torch_tpu-0.1.0-cp310-cp310-linux_x86_64.whl
+pip install https://github.com/sophgo/torch-tpu/releases/download/v0.1.0/torch_tpu-0.1.0-cp310-cp310-linux_x86_64.whl --force-reinstall
 ```
 
 ## Step3: Get PAI-Megatron-Patch

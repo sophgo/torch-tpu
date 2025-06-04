@@ -42,7 +42,7 @@ docker run -it  \
         -v $HOME:$HOME \
         -v /workspace:/workspace \
         -v /opt:/opt \
-        sophgo/torch_tpu:v0.1  /bin/bash
+        sophgo/torch_tpu:v0.1-py311  /bin/bash
 ```
 
 2. 安装 torch-tpu

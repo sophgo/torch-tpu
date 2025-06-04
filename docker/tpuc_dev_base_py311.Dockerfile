@@ -50,7 +50,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 # 添加 deadsnakes PPA，并安装 python3.11 及相关开发包
 RUN add-apt-repository ppa:deadsnakes/ppa && \
     apt-get update && \
-    apt-get install -y python3.11 python3.11-dev python3.11-venv python3.11-distutils && \
+    apt-get install -y python3.11 python3.11-dev python3.11-venv python3.11-distutils python3-dev && \
     apt-get clean && rm -rf /var/lib/apt/lists/*
 
 # 更新 alternatives 使 /usr/bin/python 指向 python3.11
@@ -59,7 +59,8 @@ RUN update-alternatives --install /usr/bin/python python /usr/bin/python3.11 10 
     python3.11 -m pip install --upgrade pip && \
     rm /usr/bin/pip && rm /usr/bin/pip3 && \
     update-alternatives --install /usr/bin/pip3 pip3 /usr/local/bin/pip3.11 10 && \
-    update-alternatives --install /usr/bin/pip pip /usr/local/bin/pip3.11 10 
+    update-alternatives --install /usr/bin/pip pip /usr/local/bin/pip3.11 10 && \
+    update-alternatives --install /usr/bin/python3-config python3-config /usr/bin/python3.11-config 10
 
 ENV CMAKE_VERSION 3.25.3
 
