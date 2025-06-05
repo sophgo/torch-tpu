@@ -212,6 +212,9 @@ class MLATpu(MLA):
         super(MLATpu, self).__init__(config)
 
     def forward(self, tensors: MLATensors):
+        if self.config.attention_mode == AttentionMode.PAGED_DECODE or self.config.attention_mode == AttentionMode.CONTINUOUS_DECODE:
+            # keep consistant with TGI, the seqlen is cache-len + decode-len
+            tensors.seqlen += 1
         if (tensors.WUQ.dtype == torch.float8_e4m3fn or tensors.WUQ.dtype == torch.float8_e5m2):
             # 0: normal attention
             if self.config.attention_mode == AttentionMode.CONTINUOUS_DECODE \
@@ -343,7 +346,7 @@ def mla_decode(act_dtype: torch.dtype, weight_dtype: torch.dtype, mode: Attentio
 
     tensors = config.random_tensors()
     tensors_tpu = MLATensors(
-        tensors.seqlen,
+        tensors.seqlen.clone(),
         tensors.WUQ.to(device),
         tensors.WUKV.to(device),
         tensors.Q.to(device),
