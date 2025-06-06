@@ -38,8 +38,8 @@ Tensor _copy_from_tpu(const Tensor &self, const Tensor &dst,
         auto stream = c10_tpu::getCurrentTPUStream();
         auto status = tpudnnGDMAD2DAsync(
           stream,
-          tpu::TPUGenerateTpudnnTensor(stream, self.view(-1).view(torch::kInt8)),
-          tpu::TPUGenerateTpudnnTensor(stream, dst.view(-1).view(torch::kInt8)),
+          tpu::TPUGenerateTpudnnTensor(stream, self),
+          tpu::TPUGenerateTpudnnTensor(stream, dst),
           dst.nbytes());
         TORCH_CHECK(status == TPUDNN_STATUS_SUCCESS);
         TIMING_END(tpu::COPY);
