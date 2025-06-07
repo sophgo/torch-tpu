@@ -221,7 +221,7 @@ def print_tensor_info(tensor, name):
         print(f"  Dtype: {tensor.dtype}\n")
         print(f"  Stride: {tensor.stride()}\n")
         # Convert tensor to numpy array for safe printing
-        if name in ["save_slots","input_lengths","fetch_slots"]:
+        if name in ["save_slots","input_lengths","block_tables"]:
             tensor_np = tensor.cpu()
             print(f"  Values:\n{tensor_np}\n\n")
 
@@ -537,7 +537,7 @@ class SophLlamaAttention(nn.Module):
         sin,
         input_lengths,
         save_slots,
-        fetch_slots,
+        block_tables,
         mask,
         slot_size,
         max_s,
@@ -555,7 +555,7 @@ class SophLlamaAttention(nn.Module):
         print_tensor_info(sin, "sin")
         print_tensor_info(input_lengths, "input_lengths")
         print_tensor_info(save_slots, "save_slots")
-        print_tensor_info(fetch_slots, "fetch_slots")
+        print_tensor_info(block_tables, "block_tables")
         print_tensor_info(mask, "mask")
         print(f"block_tables_size_1: {slot_size}\n")
         print(f"max_s: {max_s}\n")
@@ -573,7 +573,7 @@ class SophLlamaAttention(nn.Module):
             sin,
             input_lengths,
             save_slots,
-            fetch_slots,
+            block_tables,
             mask,
             slot_size,
             max_s,
@@ -628,7 +628,7 @@ class LlamaAttention(nn.Module):
         input_length,
         mask,
         save_slots,
-        fetch_slots,
+        block_tables,
         max_s,
     ):
         Ylist = []
@@ -652,7 +652,7 @@ class LlamaAttention(nn.Module):
                 cur_V = V[batch_id, :, :].unsqueeze(0)
 
                 for slot_id in range(cur_slot_num):
-                    cur_slot = fetch_slots[batch_id][slot_id]
+                    cur_slot = block_tables[batch_id][slot_id] * self.block_size
                     tokens_cur_block = min(fetch_tokens, self.block_size)
                     Kfetch_list.append(
                         Kcache.view(-1, Kcache.shape[-2], Kcache.shape[-1])[

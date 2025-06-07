@@ -20,11 +20,11 @@ namespace at
 		const c10::optional<Tensor> &sin, // (tokens, 1, 128)
 		const Tensor &input_lengths, // [10, 11, 8]
 		const c10::optional<Tensor> &cache_lengths, // [5, 7, 5]
-		const Tensor &save_slots, //  prefill : [[0, 16], [32, 0], [48, 0]]  decode : [[17], [35], [50]]
-		const c10::optional<Tensor> &fetch_slots, // prefill : null, decode: [[0, 16], [32, 0], [48, 0]]
+		const Tensor &save_slots, //  prefill : [[0, 1], [2, 0], [3, 0]]  decode : [[17], [35], [50]]
+		const c10::optional<Tensor> &block_tables, // prefill : null, decode: [[0, 1], [2, 0], [3, 0]]
 		const c10::optional<Tensor> &mask, // prefill: (max_length, max_length), decode: None
         int64_t rope_head_size,
-		int64_t	slots_size, // prefill: save_slots.size(1) decode: fetch_slots.size(1)
+		int64_t	slots_size, // prefill: save_slots.size(1) decode: block_tables.size(1)
 		int64_t	fetch_size,
 		int64_t mask_size, // mask_size
 		int64_t block_size, // tokens num of one block
@@ -53,10 +53,10 @@ namespace at
 			CHECK_TENSOR_IN_DEVICE(cos.value());
 		if (sin.has_value())
 			CHECK_TENSOR_IN_DEVICE(sin.value());
-		if (fetch_slots.has_value()) {
-			CHECK_TENSOR_IN_DEVICE(fetch_slots.value());
-			TORCH_CHECK (fetch_slots.value().dtype() == torch::kInt32,
-						"LLammaAttention fetch_slots must be int32 dtype");
+		if (block_tables.has_value()) {
+			CHECK_TENSOR_IN_DEVICE(block_tables.value());
+			TORCH_CHECK (block_tables.value().dtype() == torch::kInt32,
+						"LLammaAttention block_tables must be int32 dtype");
 		}
 		if (mask.has_value())
 			CHECK_TENSOR_IN_DEVICE(mask.value());
@@ -89,7 +89,7 @@ namespace at
 			cos.has_value() ? tpu::TPUGenerateTpudnnTensor(stream, cos.value()) : tpudnnUndefinedTensor(),
 			sin.has_value() ? tpu::TPUGenerateTpudnnTensor(stream, sin.value()) : tpudnnUndefinedTensor(),
 			tpu::TPUGenerateTpudnnTensor(stream, save_slots),
-			fetch_slots.has_value() ? tpu::TPUGenerateTpudnnTensor(stream, fetch_slots.value()) : tpudnnUndefinedTensor(),
+			block_tables.has_value() ? tpu::TPUGenerateTpudnnTensor(stream, block_tables.value()) : tpudnnUndefinedTensor(),
 			mask.has_value() ? tpu::TPUGenerateTpudnnTensor(stream, mask.value()) : tpudnnUndefinedTensor(),
 			tpudnnUndefinedTensor(), tpudnnUndefinedTensor(), tpudnnUndefinedTensor(),
 			tpudnnUndefinedTensor(),
@@ -119,9 +119,9 @@ namespace at
 		const c10::optional<Tensor> &sin, // (tokens, 1, 128)
 		const Tensor &input_lengths, // [10, 11, 8]
 		const Tensor &save_slots, //  prefill : [[0, 16], [32, 0], [48, 0]]  decode : [[17], [35], [50]]
-		const c10::optional<Tensor> &fetch_slots, // prefill : null, decode: [[0, 16], [32, 0], [48, 0]]
+		const c10::optional<Tensor> &block_tables, // prefill : null, decode: [[0, 16], [32, 0], [48, 0]]
 		const c10::optional<Tensor> &mask, // prefill: (max_length, max_length), decode: None
-		int64_t	slots_size, // prefill: save_slots.size(1) decode: fetch_slots.size(1)
+		int64_t	slots_size, // prefill: save_slots.size(1) decode: block_tables.size(1)
 		int64_t mask_size, // mask_size
 		int64_t block_size, // tokens num of one block
 		double C, // softmax_scale
@@ -130,7 +130,7 @@ namespace at
 	{
         return paged_attention(
             OUT, Q, K, V, Kcache, Vcache, cos, sin,
-            input_lengths, c10::nullopt, save_slots, fetch_slots, mask,
+            input_lengths, c10::nullopt, save_slots, block_tables, mask,
             V.size(-1), slots_size, slots_size, mask_size, block_size, C, attention_mode);
 	}
 

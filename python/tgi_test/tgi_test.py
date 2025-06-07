@@ -186,7 +186,8 @@ def test_attn(CFG: MODEL_CFG, batch, seqlen, profile_mode):
     input_lengths_tpu = torch.tensor(
         [cfg.DECODE_START + seqlen -1] * batch, dtype=torch.int32, device=CFG.DEVICE
     )
-    cfg.MAX_SEQLEN= ((cfg.DECODE_START + seqlen -1) // cfg.BLOCK_SIZE + 1)*cfg.BLOCK_SIZE
+    cfg.MAX_BLOCKS= (cfg.DECODE_START + seqlen -1) // cfg.BLOCK_SIZE + 1
+    cfg.MAX_SEQLEN= cfg.MAX_BLOCKS * cfg.BLOCK_SIZE
     save_slots_tpu = torch.tensor(
         [[CFG.DECODE_START + seqlen - 2 + b * CFG.MAX_SEQLEN] for b in range(batch)],
         dtype=torch.int32,
@@ -207,7 +208,22 @@ def test_attn(CFG: MODEL_CFG, batch, seqlen, profile_mode):
         dtype=torch.int32,
         device=CFG.DEVICE,
     )
-    slot_size_tpu = fetch_slots_tpu.shape[1]
+    block_tables_tpu = torch.tensor(
+        [
+            [
+                i
+                for i in range(
+                    b * cfg.MAX_BLOCKS,
+                    b * cfg.MAX_BLOCKS + (cfg.DECODE_START + seqlen - 1) // cfg.BLOCK_SIZE + 1,
+                    1,
+                )
+            ]
+            for b in range(batch)
+        ],
+        dtype=torch.int32,
+        device=CFG.DEVICE,
+    )
+    slot_size_tpu = block_tables_tpu.shape[1]
     output_tpu = torch.empty_like(query_tpu)
 
     query_cpu = query_tpu.cpu()
@@ -218,13 +234,13 @@ def test_attn(CFG: MODEL_CFG, batch, seqlen, profile_mode):
     cos_cpu = cos_tpu.cpu()
     sin_cpu = sin_tpu.cpu()
     save_slots_cpu = save_slots_tpu.cpu()
-    fetch_slots_cpu = fetch_slots_tpu.cpu()
+    block_tables_cpu = block_tables_tpu.cpu()
     mask_cpu = mask.cpu() if mask is not None else None
 
     logger.info(
         f"test_parameters:\n{output_tpu.shape}\n{query_tpu.shape=}\n{key_tpu.shape=}\n{value_tpu.shape=}\n\
 {kv_cache_tpu[0].shape=}\n{kv_cache_tpu[1].shape=}\n{cos_tpu.shape=}\n{sin_tpu.shape=}\n{mask=}\
-{input_lengths_tpu.cpu()=}\n{save_slots_tpu.cpu()=}\n{slot_size_tpu=}\n{fetch_slots_tpu.cpu()=}"
+{input_lengths_tpu.cpu()=}\n{save_slots_tpu.cpu()=}\n{slot_size_tpu=}\n{block_tables_tpu.cpu()=}"
     )
     net_tpu(
         output_tpu,
@@ -236,7 +252,7 @@ def test_attn(CFG: MODEL_CFG, batch, seqlen, profile_mode):
         sin_tpu,
         input_lengths_tpu.cpu(),
         save_slots_tpu,
-        fetch_slots_tpu,
+        block_tables_tpu,
         mask,
         slot_size_tpu,
         CFG.DECODE_START + seqlen -1,
@@ -253,7 +269,7 @@ def test_attn(CFG: MODEL_CFG, batch, seqlen, profile_mode):
         input_lengths_tpu.cpu(),
         mask_cpu,
         save_slots_cpu,
-        fetch_slots_cpu,
+        block_tables_cpu,
         CFG.DECODE_START + seqlen -1,
     )
     return output_tpu, output_cpu
@@ -300,13 +316,14 @@ def test_attn_prefill(CFG: MODEL_CFG, batch, seqlen, profile_mode):
     input_lengths_tpu = torch.tensor(
         [seqlen] * batch, dtype=torch.int32, device=CFG.DEVICE
     )
-    cfg.MAX_SEQLEN= ((cfg.DECODE_START + seqlen -1) // cfg.BLOCK_SIZE + 1)*cfg.BLOCK_SIZE
-    save_slots_tpu = torch.tensor(
+    cfg.MAX_BLOCKS = (cfg.DECODE_START + seqlen -1) // cfg.BLOCK_SIZE + 1
+    cfg.MAX_SEQLEN= cfg.MAX_BLOCKS * cfg.BLOCK_SIZE
+    block_tables_tpu = torch.tensor(
         [
             [
                 i
                 for i in range(
-                    b * CFG.MAX_SEQLEN, (b+1) * CFG.MAX_SEQLEN, CFG.BLOCK_SIZE
+                    b * CFG.MAX_BLOCKS, (b+1) * CFG.MAX_BLOCKS, 1
                 )
             ]
             for b in range(batch)
@@ -314,7 +331,6 @@ def test_attn_prefill(CFG: MODEL_CFG, batch, seqlen, profile_mode):
         dtype=torch.int32,
         device=CFG.DEVICE,
     )
-    fetch_slots_tpu = None
     slot_size_tpu = CFG.MAX_SEQLEN // CFG.BLOCK_SIZE
     output_tpu = torch.empty_like(query_tpu)
 
@@ -325,14 +341,13 @@ def test_attn_prefill(CFG: MODEL_CFG, batch, seqlen, profile_mode):
     vcache_cpu = kv_cache_tpu[1].cpu()
     cos_cpu = cos_tpu.cpu()
     sin_cpu = sin_tpu.cpu()
-    save_slots_cpu = save_slots_tpu.cpu()
-    fetch_slots_cpu = None
+    block_tables_cpu = block_tables_tpu.cpu()
     mask_cpu = None
 
     logger.info(
         f"test_parameters:\n{output_tpu.shape}\n{query_tpu.shape=}\n{key_tpu.shape=}\n{value_tpu.shape=}\n\
 {kv_cache_tpu[0].shape=}\n{kv_cache_tpu[1].shape=}\n{cos_tpu.shape=}\n{sin_tpu.shape=}\n{mask.shape=}\
-{input_lengths_tpu.cpu()=}\n{save_slots_tpu.cpu()=}\n{slot_size_tpu=}\n{fetch_slots_tpu=}"
+{input_lengths_tpu.cpu()=}\n{block_tables_tpu.cpu()=}\n{slot_size_tpu=}"
     )
     net_tpu(
         output_tpu,
@@ -343,8 +358,8 @@ def test_attn_prefill(CFG: MODEL_CFG, batch, seqlen, profile_mode):
         cos_tpu,
         sin_tpu,
         input_lengths_tpu.cpu(),
-        save_slots_tpu,
-        fetch_slots_tpu,
+        block_tables_tpu,
+        block_tables_tpu,
         mask,
         slot_size_tpu,
         seqlen,
@@ -360,8 +375,8 @@ def test_attn_prefill(CFG: MODEL_CFG, batch, seqlen, profile_mode):
         sin_cpu,
         input_lengths_tpu.cpu(),
         mask_cpu,
-        save_slots_cpu,
-        fetch_slots_cpu,
+        block_tables_cpu,
+        block_tables_cpu,
         seqlen,
     )
     return output_tpu, output_cpu
@@ -1571,14 +1586,14 @@ def check_attn_prefill(
             dtype=torch.int32,
             device=cfg.DEVICE,
         )
-        fetch_slots_tpu = None
+        block_tables_tpu = None
         slot_size_tpu = cfg.MAX_SEQLEN // cfg.BLOCK_SIZE
         output_tpu = torch.empty_like(query_tpu)
 
         logger.info(
             f"test_parameters:\n{output_tpu.shape}\n{query_tpu.shape=}\n{key_tpu.shape=}\n{value_tpu.shape=}\n\
     {kv_cache_tpu[0].shape=}\n{kv_cache_tpu[1].shape=}\n{cos_tpu.shape=}\n{sin_tpu.shape=}\n{mask.shape=}\
-    {input_lengths_tpu.cpu()=}\n{save_slots_tpu.cpu()=}\n{slot_size_tpu=}\n{fetch_slots_tpu=}"
+    {input_lengths_tpu.cpu()=}\n{save_slots_tpu.cpu()=}\n{slot_size_tpu=}\n{block_tables_tpu=}"
         )
         net_tpu(
             output_tpu,
@@ -1590,7 +1605,7 @@ def check_attn_prefill(
             sin_tpu,
             input_lengths_tpu.cpu(),
             save_slots_tpu,
-            fetch_slots_tpu,
+            block_tables_tpu,
             mask,
             slot_size_tpu,
             seqlen,
@@ -1663,7 +1678,8 @@ def check_attn(cfg: MODEL_CFG, batch, seqlen, is_test, is_PerfAI, profile_mode):
         input_lengths_tpu = torch.tensor(
             [cfg.DECODE_START + seqlen -1] * batch, dtype=torch.int32, device=cfg.DEVICE
         )
-        cfg.MAX_SEQLEN= ((cfg.DECODE_START + seqlen -1) // cfg.BLOCK_SIZE + 1)*cfg.BLOCK_SIZE
+        cfg.MAX_BLOCKS = (cfg.DECODE_START + seqlen -1) // cfg.BLOCK_SIZE + 1
+        cfg.MAX_SEQLEN= cfg.MAX_BLOCKS * cfg.BLOCK_SIZE
         save_slots_tpu = torch.tensor(
             [[cfg.DECODE_START + seqlen -2 + b * cfg.MAX_SEQLEN] for b in range(batch)],
             dtype=torch.int32,
@@ -1684,13 +1700,28 @@ def check_attn(cfg: MODEL_CFG, batch, seqlen, is_test, is_PerfAI, profile_mode):
             dtype=torch.int32,
             device=cfg.DEVICE,
         )
-        slot_size_tpu = fetch_slots_tpu.shape[1]
+        block_tables_tpu = torch.tensor(
+            [
+                [
+                    i
+                    for i in range(
+                        b * cfg.MAX_BLOCKS,
+                        b * cfg.MAX_BLOCKS + (cfg.DECODE_START + seqlen - 1) // cfg.BLOCK_SIZE + 1,
+                        1,
+                    )
+                ]
+                for b in range(batch)
+            ],
+            dtype=torch.int32,
+            device=CFG.DEVICE,
+        )
+        slot_size_tpu = block_tables_tpu.shape[1]
         output_tpu = torch.empty_like(query_tpu)
 
         logger.info(
             f"test_parameters:\n{output_tpu.shape}\n{query_tpu.shape=}\n{key_tpu.shape=}\n{value_tpu.shape=}\n\
     {kv_cache_tpu[0].shape=}\n{kv_cache_tpu[1].shape=}\n{cos_tpu.shape=}\n{sin_tpu.shape=}\n{mask=}\
-    {input_lengths_tpu.cpu()=}\n{save_slots_tpu.cpu()=}\n{slot_size_tpu=}\n{fetch_slots_tpu.cpu()=}"
+    {input_lengths_tpu.cpu()=}\n{save_slots_tpu.cpu()=}\n{slot_size_tpu=}\n{block_tables_tpu.cpu()=}"
         )
         net_tpu(
             output_tpu,
@@ -1702,7 +1733,7 @@ def check_attn(cfg: MODEL_CFG, batch, seqlen, is_test, is_PerfAI, profile_mode):
             sin_tpu,
             input_lengths_tpu.cpu(),
             save_slots_tpu,
-            fetch_slots_tpu,
+            block_tables_tpu,
             mask,
             slot_size_tpu,
             cfg.DECODE_START + seqlen -1,
