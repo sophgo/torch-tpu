@@ -339,8 +339,8 @@ class MLACpu(MLA):
 
 
 def mla_decode(act_dtype: torch.dtype, weight_dtype: torch.dtype, mode: AttentionMode):
-    config = MLAConfig(7, 16, 128, 64, 128, 1536, 512, 128, 192**-0.5 * 0.3,\
-                       act_dtype, weight_dtype, 4096, mode)
+    config = MLAConfig(16, 16, 128, 64, 128, 1536, 512, 128, 192**-0.5 * 0.3,\
+                       act_dtype, weight_dtype, 512, mode)
     net_cpu = MLACpu(config)
     net_tpu = MLATpu(config)
 
