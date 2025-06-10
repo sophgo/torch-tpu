@@ -61,6 +61,7 @@ Torch_tpu 对Accelerate仓库添加了补丁，以支持TPU的训练。补丁位
 ------------------
 
 对 LLaMA-Factory 仓库，也需要进行类似的操作，还需要额外安装依赖包。
+修改仓库下requirements.txt中: peft==0.11.1, trl==0.8.6
 
 .. code-block :: bash
 
@@ -72,9 +73,10 @@ Torch_tpu 对Accelerate仓库添加了补丁，以支持TPU的训练。补丁位
     python -m pip install -e .
     popd
 
+执行命令" pip list "检查 Accelerate和transformers包安装路径是否指向以上步骤中git下载至本地的路径，若不是重新进入Accelerate和transformers本地目录下执行" python -m pip install -e . " 命令。
 
 开始训练
 ==================
 
 进入 "${TORCH_TPU_HOME}/demo/LLaMA-2_LoRA_Finetune" 目录，根据实际情况修改 "llama_2_lora.yaml" 文件中的模型位置。
-随后进入"LLaMA-Factory"安装目录，执行 "llamafactory-cli train ${TORCH_TPU_HOME}/demo/LLaMA-2_LoRA_Finetune/llama_2_lora.yaml" 即可开始训练。训练更多配置信息请参考官网其他示例。
+随后进入"LLaMA-Factory"安装目录，执行 "DISABLE_CACHE=1 llamafactory-cli train ${TORCH_TPU_HOME}/demo/LLaMA-2_LoRA_Finetune/llama_2_lora.yaml" 即可开始训练。训练更多配置信息请参考官网其他示例。

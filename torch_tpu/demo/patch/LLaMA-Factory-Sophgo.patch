@@ -1,21 +1,40 @@
+diff --git a/all_my_changes.patch b/all_my_changes.patch
+new file mode 100644
+index 00000000..e69de29b
+diff --git a/src/llamafactory/__init__.py b/src/llamafactory/__init__.py
+old mode 100644
+new mode 100755
 diff --git a/src/llamafactory/cli.py b/src/llamafactory/cli.py
-index 48eb289..00d987c 100644
+old mode 100644
+new mode 100755
+index 48eb2898..4dde2f56
 --- a/src/llamafactory/cli.py
 +++ b/src/llamafactory/cli.py
-@@ -12,6 +12,11 @@
+@@ -12,6 +12,13 @@
  # See the License for the specific language governing permissions and
  # limitations under the License.
  
 +try:
++    use_tpu = 1
 +    import torch_tpu
 +    from . import tpu_workarounds
 +except ImportError:
++    use_tpu = None
 +    pass
  import os
  import random
  import subprocess
+@@ -87,7 +94,7 @@ def main():
+         export_model()
+     elif command == Command.TRAIN:
+         force_torchrun = os.environ.get("FORCE_TORCHRUN", "0").lower() in ["true", "1"]
+-        if force_torchrun or get_device_count() > 1:
++        if (force_torchrun or get_device_count() > 1) and use_tpu == None:
+             master_addr = os.environ.get("MASTER_ADDR", "127.0.0.1")
+             master_port = os.environ.get("MASTER_PORT", str(random.randint(20001, 29999)))
+             logger.info("Initializing distributed tasks at: {}:{}".format(master_addr, master_port))
 diff --git a/src/llamafactory/extras/misc.py b/src/llamafactory/extras/misc.py
-index d7329b0..c0b43f9 100644
+index d7329b06..c0b43f90 100644
 --- a/src/llamafactory/extras/misc.py
 +++ b/src/llamafactory/extras/misc.py
 @@ -29,6 +29,7 @@ from transformers.utils import (
@@ -53,9 +72,12 @@ index d7329b0..c0b43f9 100644
  
  
  def numpify(inputs: Union["NDArray", "torch.Tensor"]) -> "NDArray":
+diff --git a/src/llamafactory/launcher.py b/src/llamafactory/launcher.py
+old mode 100644
+new mode 100755
 diff --git a/src/llamafactory/sophgo.py b/src/llamafactory/sophgo.py
-new file mode 100644
-index 0000000..a0b7b63
+new file mode 100755
+index 00000000..a0b7b63d
 --- /dev/null
 +++ b/src/llamafactory/sophgo.py
 @@ -0,0 +1,7 @@
@@ -67,11 +89,11 @@ index 0000000..a0b7b63
 +#
 +# ==============================================================================
 diff --git a/src/llamafactory/tpu_workarounds.py b/src/llamafactory/tpu_workarounds.py
-new file mode 100644
-index 0000000..7293cc7
+new file mode 100755
+index 00000000..0179ae5c
 --- /dev/null
 +++ b/src/llamafactory/tpu_workarounds.py
-@@ -0,0 +1,24 @@
+@@ -0,0 +1,28 @@
 +import torch
 +
 +def arange_wrapper(func):
@@ -79,6 +101,8 @@ index 0000000..7293cc7
 +        ret = func(*args, **kwargs)
 +        if ret.dtype == torch.int64:
 +            return ret.to(torch.int32)
++        else:
++            return ret
 +    return wrapper
 +
 +torch.arange = arange_wrapper(torch.arange)
@@ -87,6 +111,9 @@ index 0000000..7293cc7
 +    def wrapper(input, tensor, weight=None, *args, **kwargs):
 +        input_cpu = input.cpu()
 +        tensor_cpu = tensor.cpu()
++        # 切换为int64
++        if tensor_cpu.dtype != torch.int64:
++            tensor_cpu = tensor_cpu.to(torch.int64)
 +        if weight is not None:
 +            weight_cpu = weight.cpu()
 +        else:
@@ -95,4 +122,3 @@ index 0000000..7293cc7
 +    return wrapper
 +
 +torch.nn.functional.cross_entropy = ce_wrapper(torch.nn.functional.cross_entropy)
-+
