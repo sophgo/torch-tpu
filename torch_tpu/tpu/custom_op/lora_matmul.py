@@ -15,31 +15,35 @@ class LoraMatmulFunc(torch.autograd.Function):
         loraA = loraA.unsqueeze(0)#backend op only accept dim==3 of loraA/loraB
         loraB = loraB.unsqueeze(0)
         output = torch.empty(output_shape, dtype = x.dtype, device=x.device)
+        # output = x @ w.t + scale * (x @ loraA.t()) @ loraB.t()
         torch.ops.my_ops.lora_matmul_forward(x,
                                         loraA,
                                         loraB,
                                         weight,
                                         output,
                                         scale)
-        return output.float()
+        return output
 
     @staticmethod
     def backward(ctx, grad_output):
         x, loraA, loraB, weight = ctx.saved_tensors
-        grad_output_half = grad_output.half()
         grad_loraA = None
         grad_loraB = None
-        weight_t = weight.contiguous()
-        loraA_t = loraA.contiguous()
-        loraB_t = loraB.contiguous()
-        x_t = x.transpose(-1, -2).contiguous()
-        if ctx.scale == 0:
-            grad_input = torch.matmul(grad_output_half, weight_t)
+        scale = ctx.scale
+        if scale == 0:
+            grad_input = torch.matmul(grad_output, weight)
         else:
-            grad_input = torch.matmul(grad_output_half, (weight_t + 1 / ctx.scale * torch.matmul(loraB_t, loraA_t)))
-            grad_loraA = 1 / ctx.scale * torch.matmul(torch.matmul(x_t, grad_output_half), loraB_t)
-            grad_loraB = 1 / ctx.scale * torch.matmul(torch.matmul(loraA_t, x_t), grad_output_half)
-        return grad_input.float(), grad_loraA, grad_loraB, None, None, None
+            # lora A: (r, i), lora B: (o,r), weight: (o,i)
+            # x: (b*s, i), output: (b*s, o), grad_output: (b*s, o)
+            x_2d = x.view(-1, x.shape[-1]).contiguous()
+            grad_out_half_2d = grad_output.view(-1, grad_output.shape[-1]).contiguous()
+            grad_input = torch.matmul(grad_out_half_2d, weight) + \
+                scale * grad_out_half_2d.matmul(loraB).matmul(loraA)
+            grad_input = grad_input.view(x.shape)
+            grad_loraA = scale * torch.matmul((torch.matmul(grad_out_half_2d, loraB)).t(), x_2d)
+            grad_loraB = scale * torch.matmul(grad_out_half_2d.t(), x_2d.matmul(loraA.t()))
+
+        return grad_input, grad_loraA, grad_loraB, None, None
 
 class LoraMatmulBlock(nn.Module):
     def __init__(self, in_feature, out_feature, weight,lora_A,lora_B, rank, alpha, dropout_rate) -> None:
@@ -88,13 +92,21 @@ def create_and_replace(lora_model, lora_config:LoraConfig, adapter_name:str = "d
         lora_A = peft_lora_module.lora_A[adapter_name]
         lora_B = peft_lora_module.lora_B[adapter_name]
 
-        weight = peft_lora_module.base_layer.weight.data.contiguous().half().to(device)
-        loraA_data = lora_A.weight.data.contiguous().half().to(device)
-        loraB_data = lora_B.weight.data.contiguous().half().to(device)
+        weight = peft_lora_module.base_layer.weight.data
+        loraA_data = lora_A.weight.data
+        loraB_data = lora_B.weight.data
+        if weight.dtype != torch.float16 or loraA_data.dtype != torch.float16 or loraB_data.dtype != torch.float16:
+            raise ValueError(f"lora_model must be float16. please check the dtype")
+        if weight.device != device or loraA_data.device != device or loraB_data.device != device:
+            raise ValueError(f"lora_model must be on device {device}. please check the device")
         newlora_block = LoraMatmulBlock(lora_A.in_features, lora_B.out_features, weight,
                                         lora_A=loraA_data,lora_B=loraB_data,
                                         rank=lora_config.r, alpha=lora_config.lora_alpha,
                                         dropout_rate=lora_config.lora_dropout).to(device)
+        newlora_block.loraA.requires_grad = True
+        newlora_block.loraB.requires_grad = True
+        newlora_block.weight.requires_grad = False #force to false
+
         setattr(parent, target_name, newlora_block)
     if not exist_target_modules:
         raise ValueError(f"lora_model can not match lora_config.target_modules({lora_config.target_modules})")
