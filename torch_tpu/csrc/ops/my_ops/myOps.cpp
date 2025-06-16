@@ -66,5 +66,6 @@ namespace at
 		m.def("fused_moe_grouped_topk", fused_moe_grouped_topk);
 		m.def("fused_moe_fused_experts", fused_moe_fused_experts);
 		m.def("nms", nms);
+		m.def("noaux_tc_topk", noaux_tc_topk);
 	}
 }

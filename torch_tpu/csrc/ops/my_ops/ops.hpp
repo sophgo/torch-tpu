@@ -449,4 +449,12 @@ namespace at
 		const Tensor& dets,
 		const Tensor& scores,
 		double iou_threshold);
+
+	Tensor noaux_tc_topk(
+		Tensor &values,
+		Tensor &indices, 
+		const Tensor &scores,
+		int64_t n_groups,
+		int64_t topk_groups,
+		int64_t top_k);
 }
