@@ -62,7 +62,8 @@ void nodechip_inf_check_and_unscale(
     int                 length,
     float               inv_scale,
     data_type_t         idtype,
-    data_type_t         found_inf_dtype)
+    data_type_t         found_inf_dtype,
+    int                 skip_check_flag)
 {
     const int dsize = tpu_data_type_size ( idtype );
     int wmax = DIV_UP ( length, NPU_NUM );
@@ -101,8 +102,10 @@ void nodechip_inf_check_and_unscale(
 
     // 1. cpy found_inf s -> l
     dim4 found_inf_shape = {.n = 1, .c = 1, .h = 1, .w = 1};
-    tpu_gdma_cpy_S2L(found_inf_dst_addr, found_inf_global_addr, &found_inf_shape, NULL, NULL, found_inf_dtype);
-    tpu_bdc_cast(found_inf_dst_addr, found_inf_dst_addr, &found_inf_shape, NULL, NULL, DT_UINT8, found_inf_dtype, RM_HALF_TO_EVEN);
+    if (skip_check_flag == 0){
+        tpu_gdma_cpy_S2L(found_inf_dst_addr, found_inf_global_addr, &found_inf_shape, NULL, NULL, found_inf_dtype);
+        tpu_bdc_cast(found_inf_dst_addr, found_inf_dst_addr, &found_inf_shape, NULL, NULL, DT_UINT8, found_inf_dtype, RM_HALF_TO_EVEN);
+    }
 
     // 2. start check and unscale
     int todo = length;
@@ -122,7 +125,10 @@ void nodechip_inf_check_and_unscale(
         tpu_parallel_start();
         if ( l2s ) { tpu_gdma_cpy_L2S ( l2s_global_addr, l2s_local_addr, &l2s_shape, NULL, NULL, idtype ); }
         // start//
-        tpu_bdc_check_inf_nan(dst_addr, found_inf_dst_addr, input_local_addrs[index], work0_local_addr, work1_local_addr, work2_local_addr, work3_local_addr, &shape, idtype);
+        if (skip_check_flag == 0){
+            tpu_bdc_check_inf_nan(dst_addr, found_inf_dst_addr, input_local_addrs[index], work0_local_addr, work1_local_addr, work2_local_addr, work3_local_addr, &shape, idtype);
+        }
+
         scalar_t scalar;
         if (idtype == DT_FP32){
             scalar.f32 = inv_scale;
@@ -150,25 +156,29 @@ void nodechip_inf_check_and_unscale(
     }
 
     // 3. save check inf result
-    tpu_gdma_cpy_L2S(found_inf_global_addr, found_inf_dst_addr, &found_inf_shape, NULL, NULL, DT_UINT8);
-    tpu_poll();
+    if (skip_check_flag == 0){
+        tpu_gdma_cpy_L2S(found_inf_global_addr, found_inf_dst_addr, &found_inf_shape, NULL, NULL, DT_UINT8);
+        tpu_poll();
+    }
 
-    tpu_invalidate_cache ( found_inf_global_addr, 64 );
-    void * tmp = (void *)tpu_global_mem_addr ( found_inf_global_addr );
-    float tmp_found_inf = (float)(*( uint8_t* ) tmp);
-    if (found_inf_dtype == DT_FP32)
-    { 
-        *(float*)tmp = tmp_found_inf;
+    if (skip_check_flag == 0){
+        tpu_invalidate_cache ( found_inf_global_addr, 64 );
+        void * tmp = (void *)tpu_global_mem_addr ( found_inf_global_addr );
+        float tmp_found_inf = (float)(*( uint8_t* ) tmp);
+        if (found_inf_dtype == DT_FP32)
+        { 
+            *(float*)tmp = tmp_found_inf;
+        }
+        else if (found_inf_dtype == DT_BFP16 || found_inf_dtype == DT_FP16)
+        {
+            scalar_t s = {.f32 = tmp_found_inf};
+            scalar_t s_fp16 = tpu_fp_cast(s, found_inf_dtype, DT_FP32, RM_HALF_TO_EVEN);
+            *(unsigned short *)tmp = *(unsigned short*)(&s_fp16.f16);
+        }else{
+            TPUKERNEL_ASSERT ( false );
+        }
+        tpu_flush_cache ( found_inf_global_addr, 64 );
     }
-    else if (found_inf_dtype == DT_BFP16 || found_inf_dtype == DT_FP16)
-    {
-        scalar_t s = {.f32 = tmp_found_inf};
-        scalar_t s_fp16 = tpu_fp_cast(s, found_inf_dtype, DT_FP32, RM_HALF_TO_EVEN);
-        *(unsigned short *)tmp = *(unsigned short*)(&s_fp16.f16);
-    }else{
-        TPUKERNEL_ASSERT ( false );
-    }
-    tpu_flush_cache ( found_inf_global_addr, 64 );
 }
 
 static inline void nodechip_find_inf(
@@ -217,13 +227,35 @@ int tpu_kernel_api_inf_check_and_unscale(const void *args){
     for (int i = 0; i < api->dim; i++ ){ length *= api->shape[i]; }
 
     tpu_initialize();
+    int skip_check_flag = 0;
+    tpu_invalidate_cache ( api->found_inf_global_addr, 32);
+    void * tmp = (void *)tpu_global_mem_addr ( api->found_inf_global_addr );
+    if (api->found_inf_dtype == DT_FP32)
+    { 
+        float tmp_found_inf = (*( float* ) tmp);
+        if (tmp_found_inf > 0){
+            skip_check_flag = 1;
+        }
+    }
+    else if (api->found_inf_dtype == DT_BFP16 || api->found_inf_dtype == DT_FP16)
+    {
+        short tmp_found_inf = (*( short* ) tmp);
+        if (tmp_found_inf > 0){
+            skip_check_flag = 1;
+        }
+    }
+    else{
+        TPUKERNEL_ASSERT ( false );
+    }
+    
     nodechip_inf_check_and_unscale(
         api->input_global_addr,
         api->found_inf_global_addr,
         length,
         api->inv_scale,
         (data_type_t)api->idtype,
-        (data_type_t)api->found_inf_dtype);
+        (data_type_t)api->found_inf_dtype,
+        skip_check_flag);
     tpu_poll();
     return 0;
 }
@@ -244,6 +276,28 @@ int tpu_kernel_api_inf_check_and_unscale_multi_core(const void *args){
     int cur_length_slice = length_slice;
     if (core_idx == length_secs - 1)
         cur_length_slice = length - length_slice * (length_secs - 1);
+    int skip_check_flag = 0;
+    if (api->need_clear_found_inf){  //default is 0
+        tpu_invalidate_cache ( api->found_inf_global_addr, 32);
+        void * tmp = (void *)tpu_global_mem_addr ( api->found_inf_global_addr );
+        if (api->found_inf_dtype == DT_FP32)
+        { 
+            float tmp_found_inf = (*( float* ) tmp);
+            if (tmp_found_inf > 0){
+                skip_check_flag = 1;
+            }
+        }
+        else if (api->found_inf_dtype == DT_BFP16 || api->found_inf_dtype == DT_FP16)
+        {
+            short tmp_found_inf = (*( short* ) tmp);
+            if (tmp_found_inf > 0){
+                skip_check_flag = 1;
+            }
+        }
+        else{
+            TPUKERNEL_ASSERT ( false );
+        }
+    }
     // sometimes buffer memory is not empty. clear the buffer
     if (core_idx == 0) {
         nodechip_clear_buffer(api->found_inf_buffer_global_addr, api->found_inf_dtype);
@@ -262,12 +316,15 @@ int tpu_kernel_api_inf_check_and_unscale_multi_core(const void *args){
             cur_length_slice,
             api->inv_scale,
             (data_type_t)api->idtype,
-            (data_type_t)api->found_inf_dtype
+            (data_type_t)api->found_inf_dtype,
+            skip_check_flag
             );
     }
-    tpu_sync_all();
-    if (core_idx == 0) {
-        nodechip_find_inf(api->found_inf_buffer_global_addr, api->found_inf_global_addr, (data_type_t)api->found_inf_dtype);
+    if (skip_check_flag == 0){
+        tpu_sync_all();
+        if (core_idx == 0) {
+            nodechip_find_inf(api->found_inf_buffer_global_addr, api->found_inf_global_addr, (data_type_t)api->found_inf_dtype);
+        }
     }
     tpu_poll();
     return 0;

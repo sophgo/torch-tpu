@@ -5,31 +5,32 @@
 void isNan(local_addr_t output_local_addr, local_addr_t input_local_addr,
                   local_addr_t work0_local_addr, local_addr_t work1_local_addr,
                   const dim4 *shape, const dim4 *stride, data_type_t dtype) {
-  scalar_t inf_C;
-  scalar_t neg_C;
+  scalar_t exp_mask;
+  scalar_t frac_mask;
   if (dtype == DT_FP32) {
-    inf_C.u32 = 0x7f800000;
-    neg_C.u32 = 0x7fffffff;
+    exp_mask.u32 = 0x7f800000;
+    frac_mask.u32 = 0x007fffff;
   } else if (dtype == DT_FP16) {
-    inf_C.u16 = 0x7c00;
-    neg_C.u16 = 0x7fff;
+    exp_mask.u16 = 0x7c00;
+    frac_mask.u16 = 0x03ff;
   } else {
-    inf_C.u16 = 0x7f80;
-    neg_C.u16 = 0x7fff;
+    exp_mask.u16 = 0x7f80;
+    frac_mask.u16 = 0x007f;
   }
-  scalar_t C = {.u8 = 1};
-  tpu_bdc_and_C(work1_local_addr, input_local_addr, inf_C, shape, stride,
+  scalar_t s_one = {.u8 = 1};
+  scalar_t s_zero = {.u8 = 0};
+
+  tpu_bdc_and_C(output_local_addr, input_local_addr, exp_mask, shape, stride, stride, dtype);
+  tpu_bdc_equal_C(work0_local_addr, output_local_addr, exp_mask, s_one, shape, stride, stride, DT_UINT8,
+                  dtype);
+
+  tpu_bdc_and_C(output_local_addr, input_local_addr, frac_mask, shape, stride,
                 stride, dtype);
-  tpu_bdc_equal_C(output_local_addr, work1_local_addr, inf_C, C, shape, stride,
-                  stride, DT_UINT8, dtype);
-  tpu_bdc_and_C(work1_local_addr, input_local_addr, neg_C, shape, stride,
-                stride, dtype);
-  tpu_bdc_not_equal_C(work0_local_addr, work1_local_addr, inf_C, C, shape,
+  tpu_bdc_not_equal_C(work1_local_addr, output_local_addr, s_zero, s_one, shape,
                       stride, stride, DT_UINT8, dtype);
-  tpu_bdc_and(work1_local_addr, output_local_addr, work0_local_addr, shape,
+
+  tpu_bdc_and(output_local_addr, work1_local_addr, work0_local_addr, shape,
               stride, stride, stride, DT_UINT8);
-  tpu_bdc_equal_C(output_local_addr, work1_local_addr, C, C, shape, stride,
-                  stride, DT_UINT8, DT_UINT8);
 }
 
 void replaceWithNan(local_addr_t output_local_addr,
@@ -77,24 +78,23 @@ void tpu_bdc_fp_isnan(local_addr_t dst_addr, local_addr_t src_addr,
                       local_addr_t work0_addr, local_addr_t work1_addr,
                       local_addr_t work2_addr, const dim4 *shape,
                       data_type_t dtype) {
-  scalar_t inf_C = {.u32 = (dtype == DT_FP32
+  scalar_t exp_mask = {.u32 = (dtype == DT_FP32
                                 ? 0x7f800000
                                 : (dtype == DT_FP16 ? 0x7c00 : 0x7f80))};
-  scalar_t neg_C = {.u32 = (dtype == DT_FP32
-                                ? 0x7fffffff
-                                : (dtype == DT_FP16 ? 0x7fff : 0x7fff))};
-  scalar_t C = {.u8 = 1};
+  scalar_t frac_mask = {.u32 = (dtype == DT_FP32
+                                ? 0x007fffff
+                                : (dtype == DT_FP16 ? 0x03ff : 0x007f))};
+  scalar_t s_one = {.u8 = 1};
+  scalar_t s_zero = {.u8 = 0};
 
-  tpu_bdc_and_C(work2_addr, src_addr, inf_C, shape, NULL, NULL, dtype);
-  tpu_bdc_equal_C(work0_addr, work2_addr, inf_C, C, shape, NULL, NULL, DT_UINT8,
+  tpu_bdc_and_C(work2_addr, src_addr, exp_mask, shape, NULL, NULL, dtype);
+  tpu_bdc_equal_C(work0_addr, work2_addr, exp_mask, s_one, shape, NULL, NULL, DT_UINT8,
                   dtype);
 
-  tpu_bdc_and_C(work2_addr, src_addr, neg_C, shape, NULL, NULL, dtype);
-  tpu_bdc_not_equal_C(work1_addr, work2_addr, inf_C, C, shape, NULL, NULL,
+  tpu_bdc_and_C(work2_addr, src_addr, frac_mask, shape, NULL, NULL, dtype);
+  tpu_bdc_not_equal_C(work1_addr, work2_addr, s_zero, s_one, shape, NULL, NULL,
                       DT_UINT8, dtype);
 
-  tpu_bdc_and(work2_addr, work0_addr, work1_addr, shape, NULL, NULL, NULL,
+  tpu_bdc_and(dst_addr, work0_addr, work1_addr, shape, NULL, NULL, NULL,
               DT_UINT8);
-  tpu_bdc_equal_C(dst_addr, work2_addr, C, C, shape, NULL, NULL, DT_UINT8,
-                  DT_UINT8);
 }
