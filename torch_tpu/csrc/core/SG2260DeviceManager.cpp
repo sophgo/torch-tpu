@@ -1,3 +1,4 @@
+#include <unistd.h>
 #include <vector>
 #include <unordered_set>
 #include <mutex>
@@ -123,6 +124,20 @@ public:
       devices_init_[0] = 1; // tpuRtDeviceInit will default set idx = 0 device. that not a good idea.
     }
     SOPHON_LOG("TPU Device Manager init successfully\n");
+#if 0
+    // for multi-chip debug
+    const char *rankStr = getenv("LOCAL_RANK");
+    int rank = 0;
+    if (rankStr)
+        rank = atoi(rankStr);
+    if (rank == 0)
+    {
+        volatile int i = 0;
+        printf("PID %d ready for attach\n", getpid());
+        fflush(stdout);
+        while (0 == i);
+    }
+#endif
     forced_ttl_ = getTPUAllocatorForcedTTL();
     free_delay_ = getTPUAllocatorFreeDelay();
     init_flag_ = true;
@@ -547,7 +562,7 @@ void TPUGetTopology(std::vector<std::vector<int>> *topo) {
 
   for (int i = 0; i < dev_cnt; ++i) {
       for (int j = 0; j < dev_cnt; ++j) {
-          (*topo)[i][j] = -1; 
+          (*topo)[i][j] = -1;
       }
   }
 
