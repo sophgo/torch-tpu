@@ -11,6 +11,7 @@ namespace at {
 
 Tensor _copy_from_tpu(const Tensor &self, const Tensor &dst,
                       bool non_blocking) {
+  if (self.numel() == 0) {return dst;}
   if (self.dtype() == dst.dtype()) {
     TORCH_CHECK(self.nbytes() == dst.nbytes(),
                 "SELF and dst number bytes must be the same");
