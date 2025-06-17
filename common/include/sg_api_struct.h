@@ -6,10 +6,6 @@
 #ifndef FW_MAX_SHAPE_DIMS
 #define FW_MAX_SHAPE_DIMS      8
 #endif
-#ifndef FW_MAX_CONCAT_NUM
-#define FW_MAX_CONCAT_NUM     10
-#endif
-
 
 #ifndef WIN32
 #define WITH_PLATFORM(x) __attribute__ ((packed)) x

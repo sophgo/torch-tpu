@@ -50,7 +50,7 @@ Tensor & cat_out_tpu ( const ITensorListRef & tensors, int64_t dim, Tensor & out
       contiguous_tensors.push_back ( tensor.contiguous() );
       inputs.push_back ( tpu:: TPUGenerateTpudnnTensor (stream, contiguous_tensors.back() ) );
     }
-    
+
     if (inputs.size()!= 0)
     {
       TIMING_START;
