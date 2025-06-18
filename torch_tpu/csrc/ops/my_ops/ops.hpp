@@ -167,6 +167,27 @@ namespace at
 		double C,
 		int64_t attention_mode);
 
+	Tensor hybrid_attention(
+		Tensor &OUT,
+		Tensor &mode_tensor,
+		Tensor &Q,
+		Tensor &K,
+		Tensor &V,
+		Tensor &Kcache,
+		Tensor &Vcache,
+		const c10::optional<Tensor> &cos,
+		const c10::optional<Tensor> &sin,
+		const Tensor &input_lengths,
+		const Tensor &cache_lengths,
+		const Tensor &prompt_lengths,
+		const Tensor &slots,
+		const Tensor &block_tables,
+		const c10::optional<Tensor> &mask,
+		int64_t	slots_size,
+		int64_t mask_size,
+		int64_t block_size,
+		double C);
+
 	Tensor llama_attention_forward(
 		Tensor &OUT,
 		Tensor &Q,

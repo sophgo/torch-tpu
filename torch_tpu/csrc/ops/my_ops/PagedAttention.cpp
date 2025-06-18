@@ -6,6 +6,8 @@
 #include "TPUTorchUtils.h"
 
 #include "common/config.h"
+#include <ATen/TensorIndexing.h>
+using namespace torch::indexing;
 
 namespace at
 {
@@ -132,6 +134,83 @@ namespace at
             OUT, Q, K, V, Kcache, Vcache, cos, sin,
             input_lengths, c10::nullopt, save_slots, block_tables, mask,
             V.size(-1), slots_size, slots_size, mask_size, block_size, C, attention_mode);
+	}
+
+	Tensor hybrid_attention(
+		Tensor &OUT, // (tokens, heads, heads_size)
+		Tensor &mode_tensor, // index of itmes when its input_lengths > 1; [0, 1, 2](all prefill) or [2, 3](prefill + decode) or [](decode)
+		Tensor &Q, // (tokens, heads, heads_size)
+		Tensor &K, // (tokens, heads, heads_size)
+		Tensor &V, // (tokens, heads, heads_size)
+		Tensor &Kcache, // (blocks, block_size, heads, heads_size)
+		Tensor &Vcache, // (blocks, block_size, heads, heads_size)
+		const c10::optional<Tensor> &cos, // (tokens, 1, 128)
+		const c10::optional<Tensor> &sin, // (tokens, 1, 128)
+		const Tensor &input_lengths, // [1, 16, 32]
+		const Tensor &cache_lengths, // [16, 7, 5]
+		const Tensor &prompt_lengths, // [17, 23, 37]
+		const Tensor &slots,
+		const Tensor &block_tables,
+		const c10::optional<Tensor> &mask, // prefill: (max_length, max_length), decode: None
+		int64_t	slots_size, // block_tables.size(1)
+		int64_t mask_size, // mask_size
+		int64_t block_size, // tokens num of one block(16)
+		double C // softmax_scale
+		)
+	{
+		TORCH_CHECK (tpu::TPUConvertDtype<SgdnnDataType_t>(prompt_lengths.dtype()) == SGDNN_DTYPE_INT32,
+					"HybridAttention prompt lenghts must be int32 dtype");
+		TORCH_CHECK ( prompt_lengths.device().type() == DeviceType::CPU,
+					"HybridAttention prompt lenghts must on CPU device" );
+		// 3 conditions according to mode_tensor:1.all prefill;2.prefill + decode;3.all decode
+		if (mode_tensor.size(0) != 0) {
+			int64_t first_large_index = mode_tensor[0].item<int64_t>();
+            if (first_large_index == 0){
+			//  all prefill
+				return paged_attention(
+							OUT, Q, K, V, Kcache, Vcache, cos, sin,
+							input_lengths, cache_lengths, block_tables, c10::nullopt, mask,
+							V.size(-1), slots_size, slots_size, mask_size, block_size, C, 2);
+			}else{
+			// prefill + decode
+				// decode
+				paged_attention(
+						OUT, Q, K, V, Kcache, Vcache, cos, sin,
+						prompt_lengths, c10::nullopt, slots, block_tables, mask,
+						V.size(-1), slots_size, slots_size, mask_size, block_size, C, 3);
+				// prefill
+				// calculate decode_length to split prefill and decode
+				int64_t decode_length = input_lengths.index({Slice(0, first_large_index)}).sum().item<int64_t>();
+
+				// slice tensor for prefill
+				auto OUT_slice = OUT.index({Slice(decode_length, None), Slice()});
+				auto Q_slice = Q.index({Slice(decode_length, None), Slice()});
+				auto K_slice = K.index({Slice(decode_length, None), Slice()});
+				auto V_slice = V.index({Slice(decode_length, None), Slice()});
+				auto cos_slice = cos.has_value()
+					? c10::make_optional(cos.value().index({Slice(decode_length, None), Slice()}))
+					: c10::nullopt;
+				auto sin_slice = sin.has_value()
+					? c10::make_optional(sin.value().index({Slice(decode_length, None), Slice()}))
+					: c10::nullopt;
+				auto input_lengths_slice = input_lengths.index({Slice(first_large_index, None)});
+				auto cache_lengths_slice = cache_lengths.index({Slice(first_large_index, None)});
+				auto block_tables_slice = block_tables.index({Slice(first_large_index, None), Slice()});
+
+				return paged_attention(
+					OUT_slice, Q_slice, K_slice, V_slice, Kcache, Vcache, cos_slice, sin_slice,
+					input_lengths_slice, cache_lengths_slice, block_tables_slice, c10::nullopt, mask,
+					V.size(-1), slots_size, slots_size, mask_size, block_size, C, 2
+				);
+				return OUT;
+			}
+		}else{
+			// all decode
+			return paged_attention(
+				OUT, Q, K, V, Kcache, Vcache, cos, sin,
+				prompt_lengths, c10::nullopt, slots, block_tables, mask,
+				V.size(-1), slots_size, slots_size, mask_size, block_size, C, 3);
+		}
 	}
 
 	Tensor llama_attention_forward(
