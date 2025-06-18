@@ -87,15 +87,75 @@ Tensor &sum_IntList_out_tpu(const Tensor &self, OptionalIntArrayRef dim_opt,
       TORCH_CHECK(reduction_dim_vec[i] + 1 == reduction_dim_vec[i + 1],
                   "Reduction only supports contiguous reduction dimension now");
     }
+    const int start_dim = reduction_dim_vec.front();
+    const int end_dim = reduction_dim_vec.back();
+    if(start_dim == 0 || end_dim + 1 == self_.dim()){
+      TIMING_START;
+      auto stream = c10_tpu::getCurrentTPUStream();
+      auto status = tpudnnReduceAsync(
+          stream, tpu::TPUGenerateTpudnnTensor(stream, self_),
+          start_dim, end_dim + 1, keepdim, 1,
+          tpu::TPUGenerateTpudnnTensor(stream, out));
+      TORCH_CHECK(status == TPUDNN_STATUS_SUCCESS);
+      TIMING_END(tpu::REDUCE_SUM);
+    }
+    else{//workaround: matmul to sum
+      TIMING_START;
+      int64_t M = 1, N = 1, Bsz = 1;
+      for(int i = 0; i < start_dim; i++){
+        Bsz *= self_.size(i);
+      }
+      for(int i = start_dim; i <= end_dim; i++){
+        M *= self_.size(i);
+      }
+      for(int i = end_dim + 1; i < self_.dim(); i++){
+        N *= self_.size(i);
+      }
+      Tensor right = self_.reshape({Bsz, M, N});
 
-    TIMING_START;
-    auto stream = c10_tpu::getCurrentTPUStream();
-    auto status = tpudnnReduceAsync(
-        stream, tpu::TPUGenerateTpudnnTensor(stream, self_),
-        reduction_dim_vec[0], reduction_dim_vec.back() + 1, keepdim, 1,
-        tpu::TPUGenerateTpudnnTensor(stream, out));
-    TORCH_CHECK(status == TPUDNN_STATUS_SUCCESS);
-    TIMING_END(tpu::REDUCE_SUM);
+      TensorOptions opts = self_.options();
+      if(dtype_opt.has_value()){
+        opts = opts.dtype(dtype_opt.value());
+      }
+      Tensor left = torch::ones({Bsz, 1, M}, opts);
+
+      Tensor out_mm;
+      if(out.numel() != Bsz * N){
+        out_mm = at::empty({Bsz, 1, N}, opts);
+      } else{
+        std::vector<int64_t> new_strides = {N, N, 1};
+        out.unsafeGetTensorImpl()->set_sizes_and_strides({Bsz, 1, N}, new_strides);
+        out_mm = out;
+      }
+
+      auto stream = c10_tpu::getCurrentTPUStream();
+      auto status = tpudnnMatmulAsync(
+      stream,
+      tpu::TPUGenerateTpudnnTensor(stream, left),
+      tpu::TPUGenerateTpudnnTensor(stream, right),
+      tpudnnUndefinedTensor(),
+      tpu::TPUGenerateTpudnnTensor(stream, out_mm));
+      TORCH_CHECK(status == TPUDNN_STATUS_SUCCESS);
+
+      std::vector<int64_t> size_out;
+      for(int d = 0; d < self_.dim(); d++){
+        if(d < start_dim || d > end_dim){
+          size_out.push_back(self_.size(d));
+        } else if(keepdim){
+          size_out.push_back(1);
+        }
+      }
+      if(!keepdim && size_out.empty()){
+        size_out = {1};
+      }
+      if(out_mm.data_ptr() == out.data_ptr()){
+        out = out.reshape(size_out);
+      } else{
+        out.resize_(size_out);
+        out.copy_(out_mm);
+      }
+      TIMING_END(tpu::REDUCE_SUM_MATMUL);
+    }
   }
 #endif
   SHOW_TENSOR_OP(self, out);
