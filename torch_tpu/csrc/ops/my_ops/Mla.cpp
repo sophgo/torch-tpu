@@ -82,7 +82,7 @@ namespace at
         const c10::optional<Tensor> &block_table,
         Tensor &save_slots,
         const c10::optional<Tensor> &mask, // decode: None
-        const Tensor &input_lengths, int64_t head, int64_t generate_token,
+        const Tensor &input_lengths, const Tensor &cache_lengths, int64_t head, int64_t generate_token,
         int64_t q_lora_rank, int64_t kv_lora_rank,
         int64_t qk_nope_head_dim, int64_t qk_rope_head_dim,
         int64_t v_head_dim, int64_t mask_size,
@@ -117,7 +117,8 @@ namespace at
           block_table.has_value() ? tpu::TPUGenerateTpudnnTensor(stream, block_table.value())
                            : tpudnnUndefinedTensor(),//fetch slots
           tpu::TPUGenerateTpudnnTensor(stream, save_slots),
-          max_paged_block_num, paged_cache_block_size, (int *)input_lengths.data_ptr(),
+          max_paged_block_num, paged_cache_block_size,
+          (int *)input_lengths.data_ptr(), (int *)cache_lengths.data_ptr(),
           (int)(input_lengths.nbytes() / 4), head, generate_token, q_lora_rank, kv_lora_rank,
           qk_nope_head_dim, qk_rope_head_dim, v_head_dim, mask_size,
           C, (AttentionMode_t)attention_mode);
@@ -133,7 +134,8 @@ namespace at
             const c10::optional<Tensor> &block_table,
             Tensor &save_slots,
             const c10::optional<Tensor> &mask, // decode: None
-            const Tensor &seqlen, int64_t num_heads, int64_t generate_token, int64_t q_lora_rank,
+            const Tensor &seqlen, const Tensor &cache_seqlen,
+            int64_t num_heads, int64_t generate_token, int64_t q_lora_rank,
             int64_t kv_lora_rank, int64_t qk_nope_head_dim,
             int64_t qk_rope_head_dim, int64_t v_head_dim, int64_t mask_size,
             int64_t quant_block_size, int64_t max_paged_block_num,
@@ -171,7 +173,7 @@ namespace at
                     ? tpu::TPUGenerateTpudnnTensor(stream, block_table.value())
                     : tpudnnUndefinedTensor(),//block_table
               tpu::TPUGenerateTpudnnTensor(stream, save_slots), //save slots
-              (const int *)seqlen.data_ptr(),
+              (const int *)seqlen.data_ptr(), (const int *)cache_seqlen.data_ptr(),
               (int)(seqlen.nbytes() / 4), num_heads, generate_token, qk_nope_head_dim,
               qk_rope_head_dim, v_head_dim, q_lora_rank, kv_lora_rank,
               mask_size, quant_block_size, max_paged_block_num, paged_cache_block_size,

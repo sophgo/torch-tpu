@@ -665,6 +665,17 @@ tpudnnStatus_t tpudnnTopkAsync(
     tpudnnTensor_t value,
     tpudnnTensor_t index);
 
+tpudnnStatus_t tpudnnNoauxTcTopkAsync(
+    tpudnnHandle_t handle,
+    tpudnnTensor_t values,
+    tpudnnTensor_t indices,
+    tpudnnTensor_t scores,
+    int batch_size,
+    int total_size,
+    int n_groups,
+    int topk_groups,
+    int top_k);
+
 tpudnnStatus_t tpudnnConjAsync(
     tpudnnHandle_t handle,
     tpudnnTensor_t input,
@@ -1113,6 +1124,7 @@ tpudnnStatus_t tpudnnLatentAttentionAsync (
     int max_paged_block_num,
     int block_size,
     int*           input_lengths,
+    int*           cache_lengths,
     int            num_input_lengths,
     int n_heads,
     int decode_num,
@@ -1143,6 +1155,7 @@ tpudnnStatus_t tpudnnPagedLatentAttentionFp8Async(
     tpudnnTensor_t block_table,
     tpudnnTensor_t save_slots,
     const int*     seqlen,
+    const int*     cache_seqlen,
     int            batch,
     int            num_heads,
     int            generate_token,
