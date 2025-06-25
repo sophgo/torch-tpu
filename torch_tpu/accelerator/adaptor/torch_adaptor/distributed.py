@@ -39,12 +39,12 @@ def reduce_wrapper(func):
         if tensor.dtype in [torch.bool, torch.int8, torch.uint8, torch.long]:
             _tensor = tensor.int()
             ret = func(tensor=_tensor, dst=dst, op=op, group=group, async_op=async_op)
-            tensor.copy_(_tensor.to(tensor.dtype))
+            tensor.copy_(_tensor)
             return ret
         if tensor.dtype == torch.double:
-            _tensor = tensor.float()
+            _tensor = tensor.float() # including D2H/H2D
             ret = func(tensor=_tensor, dst=dst, op=op, group=group, async_op=async_op)
-            tensor.copy_(_tensor.to(tensor.dtype))
+            tensor.copy_(_tensor) # including D2H/H2D
             return ret
         return func(tensor, dst, op=op, group=group, async_op=async_op)
     return wrapper
@@ -58,12 +58,12 @@ def all_reduce_wrapper(func):
         if tensor.dtype in [torch.bool, torch.int8, torch.uint8, torch.long]:
             _tensor = tensor.int()
             ret = func(tensor=_tensor, op=op, group=group, async_op=async_op)
-            tensor.copy_(_tensor.to(tensor.dtype))
+            tensor.copy_( _tensor)
             return ret
         if tensor.dtype == torch.double:
-            _tensor = tensor.float()
+            _tensor = tensor.float() # including D2H/H2D
             ret = func(tensor=_tensor, op=op, group=group, async_op=async_op)
-            tensor.copy_(_tensor.to(tensor.dtype))
+            tensor.copy_(_tensor) # including D2H/H2D
             return ret
         return func(tensor, op=op, group=group, async_op=async_op)
     return wrapper
