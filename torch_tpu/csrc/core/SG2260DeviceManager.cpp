@@ -283,8 +283,19 @@ public:
       return nullptr;
     }
     Devptr dev_ptr;
-    tpuRtStatus_t Status = tpuRtMalloc((void **)(&dev_ptr), Size, NO_USE);
-    TORCH_CHECK ( Status == tpuRtSuccess, "Failed to allocate memory on TPU device #", Index, " size = ", Size, "bytes" );
+
+    // Try to allocate memory, if failed, free all reserved memory and retry once
+    auto tryAllocate = [&]() -> tpuRtStatus_t {
+      return tpuRtMalloc((void **)(&dev_ptr), Size, NO_USE);
+    };
+
+    tpuRtStatus_t Status = tryAllocate();
+    if (Status != tpuRtSuccess) {
+      std::cout << "First allocation failed, trying to free cache and retry. Device: #" << Index << " Size: " << Size << "bytes" << std::endl;
+      EmptyCache(Index);
+      Status = tryAllocate();
+    }
+    TORCH_CHECK(Status == tpuRtSuccess, "Failed to allocate memory on TPU device #", Index, " size = ", Size, "bytes");
 
     MemInfo info;
     info.size = Size;
@@ -293,7 +304,6 @@ public:
     getMemInfo(Index)[dev_ptr] = info;
 
     // std::cout << "Alloc " << ptr << " of size " << Size << std::endl;
-
     return ptr;
   }
 
