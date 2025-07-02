@@ -73,10 +73,10 @@ class MLAConfig:
     def random_tensors(self):
         assert self.max_cache_size >= self.context_len + self.generate_token, "max_cache_size should be larger than context_len + generate_token"
         seqlen = torch.tensor([self.context_len for _ in range(self.batch)], dtype = torch.int32)
-        WUQ = torch.randn((self.num_heads * (self.qk_nope_head_dim + self.qk_rope_head_dim), self.q_lora_rank),
-                        dtype = self.dtype).to(self.weight_dtype) / math.sqrt(self.q_lora_rank)
-        WUKV = torch.randn((self.num_heads * (self.qk_nope_head_dim + self.v_head_dim), self.kv_lora_rank),
-                        dtype = self.dtype).to(self.weight_dtype) / math.sqrt(self.kv_lora_rank)
+        WUQ = (torch.randn((self.num_heads * (self.qk_nope_head_dim + self.qk_rope_head_dim), self.q_lora_rank),
+                        dtype = self.dtype) / math.sqrt(self.q_lora_rank)).to(self.weight_dtype)
+        WUKV = (torch.randn((self.num_heads * (self.qk_nope_head_dim + self.v_head_dim), self.kv_lora_rank),
+                        dtype = self.dtype) / math.sqrt(self.kv_lora_rank)).to(self.weight_dtype)
         seq = max(seqlen).item() if self.attention_mode in (
             AttentionMode.CONTINUOUS_PREFILL,
             AttentionMode.PAGED_PREFILL,
