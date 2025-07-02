@@ -81,7 +81,7 @@ class LLamaMlpFunc(torch.autograd.Function):
             x = x.view(-1, x.size(2)).contiguous()
           if grad_output.shape != x.shape:
             grad_output = grad_output.view(x.shape).contiguous()
-          grad_input = torch.empty_like(x).half()
+          grad_input = torch.empty_like(x)
           grad_w0 = torch.empty(w0.size(), device=x.device, dtype=x.dtype)
           grad_w1 = torch.empty(w1.size(), device=x.device, dtype=x.dtype)
           grad_w2 = torch.empty(w2_t.size(), device=x.device, dtype=x.dtype)
@@ -205,13 +205,13 @@ class MegatronQwen2MlpFunc(torch.autograd.Function):
         else:
             if x.dim() == 3:
               x = x.view(-1, x.size(2)).contiguous()
-            grad_input = torch.full(x.size(),0, device=x.device, dtype=x.dtype)
-            grad_w0 = torch.full(up_proj.size(),0,device=x.device, dtype=x.dtype)
-            grad_w1 = torch.full(gate_proj.size(),0,device=x.device, dtype=x.dtype)
-            grad_w2 = torch.full(down_proj.size(),0,device=x.device, dtype=x.dtype)
+            grad_input = torch.empty(x.size(), device=x.device, dtype=x.dtype)
+            grad_w0 = torch.empty(up_proj.size(),device=x.device, dtype=x.dtype)
+            grad_w1 = torch.empty(gate_proj.size(),device=x.device, dtype=x.dtype)
+            grad_w2 = torch.empty(down_proj.size(),device=x.device, dtype=x.dtype)
 
             w0x_shape = (w0x.shape[-2], w0x.shape[-1])
-            grad_tmp = torch.full(w0x_shape,0, device=x.device, dtype=x.dtype)
+            grad_tmp = torch.empty(w0x_shape, device=x.device, dtype=x.dtype)
 
             torch.ops.my_ops.mlp_backward(x,
                                             up_proj,

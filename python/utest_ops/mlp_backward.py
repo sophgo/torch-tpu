@@ -28,7 +28,7 @@ class LLamaMlpBlock(nn.Module):
     def forward(self, x):
         return LLamaMlpFunc.apply(x, self.w0_tpu_cpu, self.w1_tpu_cpu, self.w2_tpu_cpu, self.use_cpu_fw, self.return_mid_tensor, self.use_cpu_bw)
 
-def check_mlp():
+def check_mlp(dtype: torch.dtype):
 
     batch_size = 1  #1
     seq_len = 4096  #128000
@@ -39,17 +39,17 @@ def check_mlp():
 
     net_cpu = LLamaMlp(embed_dim, intermediate_size)
 
-    w0_tpu_cpu = copy.deepcopy(net_cpu.mm0.weight.detach()).detach().requires_grad_(True).to(device).half()
-    w1_tpu_cpu = copy.deepcopy(net_cpu.mm1.weight.detach()).detach().requires_grad_(True).to(device).half()
-    w2_tpu_cpu = copy.deepcopy(net_cpu.mm2.weight.detach()).detach().transpose(0,1).contiguous().requires_grad_(True).to(device).half()
+    w0_tpu_cpu = copy.deepcopy(net_cpu.mm0.weight.detach()).detach().requires_grad_(True).to(device).to(dtype)
+    w1_tpu_cpu = copy.deepcopy(net_cpu.mm1.weight.detach()).detach().requires_grad_(True).to(device).to(dtype)
+    w2_tpu_cpu = copy.deepcopy(net_cpu.mm2.weight.detach()).detach().transpose(0,1).contiguous().requires_grad_(True).to(device).to(dtype)
     w0_tpu_cpu.retain_grad()
     w1_tpu_cpu.retain_grad()
     w2_tpu_cpu.retain_grad()
 
 
-    w0_tpu_tpu = copy.deepcopy(net_cpu.mm0.weight.detach()).detach().requires_grad_(True).to(device).half()
-    w1_tpu_tpu = copy.deepcopy(net_cpu.mm1.weight.detach()).detach().requires_grad_(True).to(device).half()
-    w2_tpu_tpu = copy.deepcopy(net_cpu.mm2.weight.detach()).detach().transpose(0,1).contiguous().requires_grad_(True).to(device).half()
+    w0_tpu_tpu = copy.deepcopy(net_cpu.mm0.weight.detach()).detach().requires_grad_(True).to(device).to(dtype)
+    w1_tpu_tpu = copy.deepcopy(net_cpu.mm1.weight.detach()).detach().requires_grad_(True).to(device).to(dtype)
+    w2_tpu_tpu = copy.deepcopy(net_cpu.mm2.weight.detach()).detach().transpose(0,1).contiguous().requires_grad_(True).to(device).to(dtype)
     w0_tpu_tpu.retain_grad()
     w1_tpu_tpu.retain_grad()
     w2_tpu_tpu.retain_grad()
@@ -58,8 +58,8 @@ def check_mlp():
     net_tpu_tpu = LLamaMlpBlock(w0_tpu_tpu, w1_tpu_tpu, w2_tpu_tpu, False, return_mid_tensor, False)
     x = torch.randn(batch_size, seq_len, embed_dim, requires_grad=True)*0.1
 
-    x_tpu_cpu = copy.deepcopy(x.detach()).requires_grad_(True).to(device).half()
-    x_tpu_tpu = copy.deepcopy(x.detach()).requires_grad_(True).to(device).half()
+    x_tpu_cpu = copy.deepcopy(x.detach()).requires_grad_(True).to(device).to(dtype)
+    x_tpu_tpu = copy.deepcopy(x.detach()).requires_grad_(True).to(device).to(dtype)
     x_tpu_cpu.retain_grad()
     x_tpu_tpu.retain_grad()
 
@@ -102,9 +102,18 @@ def check_mlp():
     print(f"x={com_x},w0={com_w0},w1={com_w1},w2={com_w2}")
     print(f"/********************************************************/")
 
+    com_bwd = com_w0 and com_w1 and com_w2
+    if com_bwd and com_x:
+        print(f"[Success] llama_mlp_backward compare succeed!")
+    else:
+        print(f"[Failed] llama_mlp_backward compare failed!")
+        sys.exit(255)
 
-    return
+    return com_bwd, com_x
 
 
 if __name__ == "__main__":
-    check_mlp()
+    print("==========float16==========")
+    check_mlp(torch.float16)
+    print("==========bfloat16==========")
+    check_mlp(torch.bfloat16)

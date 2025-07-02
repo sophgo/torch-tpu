@@ -622,12 +622,12 @@ class TensorComparator:
             if compare_status[0] == -1:
                 print("Error: Too many warnings detected.")
 
-            cos_my = F.cosine_similarity(tensor_target.view(-1).to(torch.float64), tensor2_result.view(-1).to(torch.float64),dim=0)
-            euclidean_dist = self.euclidean_similarity(tensor_target.view(-1).to(torch.float64), tensor2_result.view(-1).to(torch.float64))
-            print(f"{prefix} Result : cosine similarity: {cos_my}")
-            print(f"{prefix} Result : euclidean similarity: {euclidean_dist}")
+            self.cos_my = F.cosine_similarity(tensor_target.view(-1).to(torch.float64), tensor2_result.view(-1).to(torch.float64),dim=0)
+            self.euclidean_dist = self.euclidean_similarity(tensor_target.view(-1).to(torch.float64), tensor2_result.view(-1).to(torch.float64))
+            print(f"{prefix} Result : cosine similarity: {self.cos_my}")
+            print(f"{prefix} Result : euclidean similarity: {self.euclidean_dist}")
             if num_removed > 0:
-               print(f"{prefix} {num_removed} values removed due to nan or inf")
-            if(cos_my < 0.99 or euclidean_dist < 0.98 or compare_status[0] == -1):
+               print(f"{prefix} {num_removed} values removed due to nan or inf, remaining {tensor_target.numel()} values")
+            if(self.cos_my < 0.99 or self.euclidean_dist < 0.98 or compare_status[0] == -1):
                 return False
             return True
