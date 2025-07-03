@@ -33,22 +33,19 @@ namespace at
 		CHECK_TENSOR_IN_DEVICE(out);
 
 		TIMING_START;
-		#if defined BACKEND_SG2260
-		tpuRtStatus_t status = sgdnnLnMm(
-			tpu::TPUGetDeviceResource(),
-			tpu::TPUGenerateSgdnnTensor(input),
-			tpu::TPUGenerateSgdnnTensor(w),
-			b.has_value() ? tpu::TPUGenerateSgdnnTensor(b.value()) : sgdnnUndefinedTensor(),
-			tpu::TPUGenerateSgdnnTensor(gamma),
-			tpu::TPUGenerateSgdnnTensor(beta),
-			eps,
-			tpu::TPUGenerateSgdnnTensor(mean),
-			tpu::TPUGenerateSgdnnTensor(rstd),
-			tpu::TPUGenerateSgdnnTensor(out));
-		TORCH_CHECK(status == tpuRtSuccess);
-		#elif defined BACKEND_1684X
-		TORCH_CHECK(false);
-		#endif
+        auto handle = c10_tpu::getCurrentTPUStream();
+        auto status = tpudnnFusedNormMMAsync(
+            handle,
+            tpu::TPUGenerateTpudnnTensor(handle, input),
+            tpu::TPUGenerateTpudnnTensor(handle, w),
+            b.has_value()? tpu::TPUGenerateTpudnnTensor(handle, b.value()) : tpudnnUndefinedTensor(),
+            tpu::TPUGenerateTpudnnTensor(handle, gamma),
+            tpu::TPUGenerateTpudnnTensor(handle, beta),
+            eps,
+            tpu::TPUGenerateTpudnnTensor(handle, mean),
+            tpu::TPUGenerateTpudnnTensor(handle, rstd),
+            tpu::TPUGenerateTpudnnTensor(handle, out));
+		TORCH_CHECK(status == TPUDNN_STATUS_SUCCESS);
 		TIMING_END(tpu::LN_MM_FORWARD);
 		return std::tuple<Tensor, Tensor, Tensor>(mean, rstd, out);
     }
@@ -75,23 +72,20 @@ namespace at
 		CHECK_TENSOR_IN_DEVICE(grad_beta);
 
 		TIMING_START;
-		#if defined BACKEND_SG2260
-		tpuRtStatus_t status = sgdnnLayernormBackward (
-			tpu::TPUGetDeviceResource(),
-			tpu::TPUGenerateSgdnnTensor ( grad_out_ln ),
-			tpu::TPUGenerateSgdnnTensor ( input ),
-			tpu::TPUGenerateSgdnnTensor ( gamma ),
-			tpu::TPUGenerateSgdnnTensor ( mean ),
-			tpu::TPUGenerateSgdnnTensor ( rstd ),
-			-1,
-			tpu::TPUGenerateSgdnnTensor( grad_input ),
-			tpu::TPUGenerateSgdnnTensor( grad_gamma ),
-			tpu::TPUGenerateSgdnnTensor( grad_beta ),
-			1);
-		TORCH_CHECK(status == tpuRtSuccess);
-		#elif defined BACKEND_1684X
-		TORCH_CHECK(false);
-		#endif
+        auto handle = c10_tpu::getCurrentTPUStream();
+        auto status = tpudnnLayernormBackwardAsync(
+            handle,
+            tpu::TPUGenerateTpudnnTensor(handle, grad_out_ln),
+            tpu::TPUGenerateTpudnnTensor(handle, input),
+            tpu::TPUGenerateTpudnnTensor(handle, gamma),
+            tpu::TPUGenerateTpudnnTensor(handle, mean),
+            tpu::TPUGenerateTpudnnTensor(handle, rstd),
+            -1,
+            tpu::TPUGenerateTpudnnTensor(handle, grad_input),
+            tpu::TPUGenerateTpudnnTensor(handle, grad_gamma),
+            tpu::TPUGenerateTpudnnTensor(handle, grad_beta),
+            true);
+        TORCH_CHECK(status == TPUDNN_STATUS_SUCCESS);
 		TIMING_END(tpu::LN_MM_BACKWARD);
 		return std::tuple<Tensor, Tensor, Tensor>(grad_input, grad_gamma, grad_beta);
     }

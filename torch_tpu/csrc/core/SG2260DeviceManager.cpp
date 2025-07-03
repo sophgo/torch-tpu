@@ -408,18 +408,13 @@ public:
 
   void CopyDeviceToDevice ( void * Dst, const void * Src, size_t Size, int Index, bool non_blocking )
   {
-    // if (!non_blocking) {
-    //   // tpuRtStatus_t Status = sgMemcpyD2D( Dst, Src, Size);
-    // } else {
-    //   //tpuRtStatus_t Status = sgMemcpyD2DAsync( Dst, Src, Size, stream );
-    // }
     auto stream = c10_tpu::getDefaultTPUStream();
-    SgdnnTensor_t input = {.addr = (unsigned long long)Src, .dim = 1, .dtype = SGDNN_DTYPE_INT8};
-    SgdnnTensor_t output = {.addr = (unsigned long long)Dst, .dim = 1, .dtype = SGDNN_DTYPE_INT8};
+    tpudnnTensor_t input = {.addr = tpudnnPhysToVirt(stream, (uint64_t)Src), .dim = 1, .dtype = TPUDNN_DTYPE_INT8};
+    tpudnnTensor_t output = {.addr = tpudnnPhysToVirt(stream, (uint64_t)Dst), .dim = 1, .dtype = TPUDNN_DTYPE_INT8};
     input.shape[0] = output.shape[0] = Size;
     input.stride[0] = output.stride[0] = 1;
-    tpuRtStatus_t Status = sgdnnStridedCopy(stream, input, output, non_blocking);
-    TORCH_CHECK (Status == tpuRtSuccess, "TPU device #", Index, "D2D failed! Error Code : #", Status);
+    auto Status = tpudnnStridedCopyAsync(stream, input, output);
+    TORCH_CHECK (Status == TPUDNN_STATUS_SUCCESS, "TPU device #", Index, "D2D failed! Error Code : #", Status);
   }
 
 private:

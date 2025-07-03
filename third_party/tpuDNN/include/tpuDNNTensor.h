@@ -179,6 +179,20 @@ typedef enum {
     PAGED_ATTENTION_PREFILL = 2,
     PAGED_ATTENTION_DECODE = 3,
 } AttentionMode_t;
+typedef enum {
+  XOR = 0,
+  AND,
+  OR,
+} BitwiseMode_t;
+
+typedef enum {
+  TPUDNN_EQ = 0,
+  TPUDNN_NE,
+  TPUDNN_GT,
+  TPUDNN_GE,
+  TPUDNN_LT,
+  TPUDNN_LE,
+} CompareMode_t;
 
 /**
  * @brief tpudnnCreateDeviceTensor
@@ -1490,4 +1504,92 @@ tpudnnStatus_t tpudnnFusedMoEFusedExpertsMultiCoreAsync(
     tpudnnTensor_t m0,
     bool save_mid_res);
 
+tpudnnStatus_t tpudnnFusedAddNormMMAsync(
+    const tpudnnHandle_t handle,
+    tpudnnTensor_t input0,
+    tpudnnTensor_t input1,
+    tpudnnTensor_t w,
+    tpudnnTensor_t b,
+    tpudnnTensor_t gamma,
+    tpudnnTensor_t beta,
+    float eps,
+    tpudnnTensor_t out_add,
+    tpudnnTensor_t mean,
+    tpudnnTensor_t rstd,
+    tpudnnTensor_t output);
+
+tpudnnStatus_t tpudnnFusedNormMMAsync(
+    const tpudnnHandle_t handle,
+    tpudnnTensor_t input,
+    tpudnnTensor_t w,
+    tpudnnTensor_t b,
+    tpudnnTensor_t gamma,
+    tpudnnTensor_t beta,
+    float eps,
+    tpudnnTensor_t mean,
+    tpudnnTensor_t rstd,
+    tpudnnTensor_t output);
+
+tpudnnStatus_t tpudnnReorderConv2dGradAsync(
+    const tpudnnHandle_t handle,
+    tpudnnTensor_t input,
+    tpudnnTensor_t output);
+
+tpudnnStatus_t tpudnnDummyAsync(const tpudnnHandle_t handle);
+
+tpudnnStatus_t tpudnnBitwiseConstAsync(const tpudnnHandle_t handle,
+                                       tpudnnTensor_t input,
+                                       tpudnnTensor_t output, int scalar,
+                                       BitwiseMode_t mode);
+tpudnnStatus_t tpudnnBitwiseAsync(const tpudnnHandle_t handle,
+                                  tpudnnTensor_t input, tpudnnTensor_t other,
+                                  tpudnnTensor_t output, BitwiseMode_t mode);
+
+tpudnnStatus_t tpudnnCompareAsync(const tpudnnHandle_t handle,
+                                  tpudnnTensor_t input, tpudnnTensor_t other,
+                                  tpudnnTensor_t output, CompareMode_t mode);
+tpudnnStatus_t
+tpudnnCompareConstAsync(const tpudnnHandle_t handle, tpudnnTensor_t input,
+                        tpudnnTensor_t output, float scalar, CompareMode_t mode,
+                        bool inversed); // True tensor compare with scalar,
+                                        // False scalar compare with tensor
+
+tpudnnStatus_t tpudnnShiftConstAsync(const tpudnnHandle_t handle,
+                                     tpudnnTensor_t input,
+                                     tpudnnTensor_t output, char value,
+                                     bool left);
+tpudnnStatus_t tpudnnShiftAsync(const tpudnnHandle_t handle,
+                                tpudnnTensor_t input, tpudnnTensor_t other,
+                                tpudnnTensor_t output, bool left);
+
+tpudnnStatus_t tpudnnMinimumConstAsync(tpudnnHandle_t handle,
+                                       tpudnnTensor_t input,
+                                       tpudnnTensor_t output, float scalar);
+tpudnnStatus_t tpudnnMaximumConstAsync(tpudnnHandle_t handle,
+                                       tpudnnTensor_t input,
+                                       tpudnnTensor_t output, float scalar);
+tpudnnStatus_t tpudnnMinimumAsync(tpudnnHandle_t handle, tpudnnTensor_t input,
+                                  tpudnnTensor_t other, tpudnnTensor_t output);
+tpudnnStatus_t tpudnnMaximumAsync(tpudnnHandle_t handle, tpudnnTensor_t input,
+                                  tpudnnTensor_t other, tpudnnTensor_t output);
+
+tpudnnStatus_t tpudnnPowerAsync(const tpudnnHandle_t handle,
+                                tpudnnTensor_t input, tpudnnTensor_t other,
+                                tpudnnTensor_t output);
+tpudnnStatus_t tpudnnPowerScalarAsync(const tpudnnHandle_t handle,
+                                      tpudnnTensor_t input,
+                                      tpudnnTensor_t output, float scalar);
+tpudnnStatus_t tpudnnScalarPowerAsync(const tpudnnHandle_t handle,
+                                      tpudnnTensor_t input,
+                                      tpudnnTensor_t output, float scalar);
+
+tpudnnStatus_t tpudnnAtan2ScalarAsync(const tpudnnHandle_t handle,
+                                      tpudnnTensor_t input,
+                                      tpudnnTensor_t output, float scalar);
+tpudnnStatus_t tpudnnScalarAtan2Async(const tpudnnHandle_t handle,
+                                      tpudnnTensor_t input,
+                                      tpudnnTensor_t output, float scalar);
+tpudnnStatus_t tpudnnAtan2Async(const tpudnnHandle_t handle,
+                                tpudnnTensor_t input, tpudnnTensor_t other,
+                                tpudnnTensor_t output);
 } // extern "C"

@@ -624,7 +624,7 @@ typedef struct
   int src_dtype;
   int dst_dtype;
   int other_dtype;
-  char const_value;
+  int const_value;
 }WITH_PLATFORM(sg_api_shift_left_c_t);
 
 typedef struct
@@ -662,7 +662,7 @@ typedef struct
   int src_dtype;
   int dst_dtype;
   int other_dtype;
-  char const_value;
+  int const_value;
 }WITH_PLATFORM(sg_api_shift_right_arithmetic_c_t);
 
 typedef struct

@@ -10,12 +10,29 @@ namespace at_tpu
 *****************   TPU Storage Desc Helper   *****************
 ***************************************************************/
 namespace {
+static inline int div_up(int a, int b) {
+  return (a + b - 1) / b;
+}
+static void tpu32ICShape(const int *shape, int *_32ic_shape) {
+  _32ic_shape[0] = shape[0];
+  _32ic_shape[1] = shape[2] * shape[3];
+  _32ic_shape[2] = div_up(shape[1], 32);
+  _32ic_shape[3] = 32;
+}
+
+static void tpu32OCShape(const int *shape, int *_32oc_shape) {
+  _32oc_shape[0] = shape[1];
+  _32oc_shape[1] = shape[2] * shape[3];
+  _32oc_shape[2] = div_up(shape[0], 32);
+  _32oc_shape[3] = 32;
+}
+
   constexpr int BLOCKSIZE = 16;
   // base format is ND
   FormatShape InferShapeConv_W_32IC(c10::IntArrayRef dims){ //  CONV2D 32IC
     AT_ASSERT(dims.size() == 4, "32IC FormatCast must with dims == 4, but got ", dims.size());
     std::vector<int> dims_vec(dims.begin(), dims.end()), res_vec(4,0);
-    sgdnn32ICShape( dims_vec.data(), res_vec.data());
+    tpu32ICShape( dims_vec.data(), res_vec.data());
     FormatShape res(res_vec.begin(), res_vec.end());
     return res;
   }
@@ -23,8 +40,8 @@ namespace {
   {
     AT_ASSERT(dims.size() == 4, "32IC FormatCast must with dims == 4, but got ", dims.size());
     std::vector<int> dims_vec(dims.begin(), dims.end()), res_vec(8,0);
-    sgdnn32ICShape( dims_vec.data(), res_vec.data());
-    sgdnn32OCShape( dims_vec.data(), res_vec.data() + 4);
+    tpu32ICShape( dims_vec.data(), res_vec.data());
+    tpu32OCShape( dims_vec.data(), res_vec.data() + 4);
     FormatShape res(res_vec.begin(), res_vec.end());
     return res;
   }
@@ -32,7 +49,7 @@ namespace {
   {
     AT_ASSERT(dims.size() == 4, "32IC FormatCast must with dims == 4, but got ", dims.size());
     std::vector<int> dims_vec(dims.begin(), dims.end()), res_vec(4,0);
-    sgdnn32OCShape( dims_vec.data(), res_vec.data());
+    tpu32OCShape( dims_vec.data(), res_vec.data());
     FormatShape res(res_vec.begin(), res_vec.end());
     return res;
   }
@@ -178,39 +195,6 @@ void StorageDescHelper::SetDesc(at::Tensor &dst, const c10::IntArrayRef& size, c
 void StorageDescHelper::SetDesc(at::Tensor &dst, const c10::IntArrayRef& size, const c10::IntArrayRef& strides, tpuFormat format)
 {
   torch_tpu::GetTpuStorageImpl(dst)->tpu_desc_ = SetDesc(dst.dtype(), size, strides, format);
-}
-
-void StorageDescHelper::SetSgTensorAttributeWithFormat(const at::Tensor& self, SgdnnTensor_t& t)
-{
-    if (GetFormat(self) == TPU_DFORMAT_CONV_W_Infer){
-        t.dim = self.dim();
-        FormatShape f_shape = InferShapeConv_W_32IC(self.sizes());
-        for (int i = 0; i < t.dim; i++) { t.shape[i] = f_shape[i]; }
-        sgdnnContiguousStride(t.shape, 4, t.stride);
-        t.dtype = tpu::TPUConvertDtype<decltype(t.dtype)> ( self.dtype() );
-        t.format_casted = SGDNN_CONV_W_INFER_FORMAT;
-    }
-    else if (GetFormat(self) == TPU_DFORMAT_CONV_W_Train){
-        FormatShape f_shape = InferShapeConv_W_32IC32OC(self.sizes());
-        t.dim = self.dim() * 2; // double dim half for 32IC, half for 32OC
-        for (int i = 0; i < t.dim; i++ ) { t.shape[i] = f_shape[i]; } // save 32ic shape and 32oc shape
-        sgdnnContiguousStride(t.shape, 4, t.stride); // 32ic 's stride
-        sgdnnContiguousStride(t.shape + 4, 4, t.stride + 4); // 32oc 's stride
-        t.dtype = tpu::TPUConvertDtype<decltype(t.dtype)>( self.dtype() );
-        t.format_casted = SGDNN_CONV_W_TRAIN_FORMAT;
-    }
-    else if (GetFormat(self) == TPU_DFORMAT_CONV_DW){
-      t.dim = self.dim();
-      FormatShape f_shape = InferShapeConv_DW_32OC(self.sizes());
-      for (int i = 0; i < t.dim; i++) {t.shape[i] = f_shape[i];}
-      sgdnnContiguousStride(t.shape, 4, t.stride);
-      t.dtype = tpu::TPUConvertDtype<decltype(t.dtype)> ( self.dtype() );
-      t.format_casted = SGDNN_CONV_DW_TRAIN_FORMAT;
-    }
-    else {
-        AT_ERROR("unsupport InferShape with format ", GetFormatName(self));
-        AT_ASSERT(false);
-    }
 }
 
 void tpudnnContiguousStride ( const int * shape, int dim,  int * stride )

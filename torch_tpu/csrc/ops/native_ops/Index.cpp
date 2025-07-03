@@ -35,7 +35,7 @@ Tensor & index_out_tpu( const Tensor & self, const c10::List<c10::optional<Tenso
           idx_value = idx_value.to(self.device());
 
       auto stream = c10_tpu::getCurrentTPUStream();
-      if (tpu::TPUConvertDtype<SgdnnDataType_t>(self.dtype()) == SGDNN_DTYPE_INT64){
+      if (self.scalar_type() == torch::kInt64){
         auto self_ = self.to(torch::kInt32);
         auto out_  = out.to(torch::kInt32);
         auto status = tpudnnIndexSelectAsync(

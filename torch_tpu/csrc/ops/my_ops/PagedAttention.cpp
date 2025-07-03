@@ -63,7 +63,7 @@ namespace at
 		if (mask.has_value())
 			CHECK_TENSOR_IN_DEVICE(mask.value());
 		if (attention_mode == 3 || attention_mode == 2){
-			TORCH_CHECK (tpu::TPUConvertDtype<SgdnnDataType_t>(input_lengths.dtype()) == SGDNN_DTYPE_INT32,
+			TORCH_CHECK (input_lengths.dtype() == torch::kInt32,
 						"LLammaAttention input lenghts must be int32 dtype");
 			TORCH_CHECK ( input_lengths.device().type() == DeviceType::CPU, 
 						"LLammaAttention input lenghts must on CPU device" );
@@ -158,7 +158,7 @@ namespace at
 		double C // softmax_scale
 		)
 	{
-		TORCH_CHECK (tpu::TPUConvertDtype<SgdnnDataType_t>(prompt_lengths.dtype()) == SGDNN_DTYPE_INT32,
+		TORCH_CHECK (prompt_lengths.dtype() == torch::kInt32,
 					"HybridAttention prompt lenghts must be int32 dtype");
 		TORCH_CHECK ( prompt_lengths.device().type() == DeviceType::CPU,
 					"HybridAttention prompt lenghts must on CPU device" );

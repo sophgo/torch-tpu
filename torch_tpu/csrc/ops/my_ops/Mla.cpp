@@ -36,7 +36,7 @@ namespace at
     ) {
 
 		if (attention_mode == NORMAL_ATTENTION_DECODE || attention_mode == NORMAL_ATTENTION_PREFILL){
-			TORCH_CHECK (tpu::TPUConvertDtype<SgdnnDataType_t>(input_lengths.dtype()) == SGDNN_DTYPE_INT32,
+			TORCH_CHECK (input_lengths.dtype() == torch::kInt32,
 						"MLA input lenghts must be int32 dtype");
 			TORCH_CHECK ( input_lengths.device().type() == DeviceType::CPU, 
 						"MLA input lenghts must on CPU device" );
@@ -92,8 +92,7 @@ namespace at
 
       if (attention_mode == PAGED_ATTENTION_DECODE ||
           attention_mode == PAGED_ATTENTION_PREFILL) {
-        TORCH_CHECK(tpu::TPUConvertDtype<SgdnnDataType_t>(
-                        input_lengths.dtype()) == SGDNN_DTYPE_INT32,
+        TORCH_CHECK(input_lengths.dtype() == torch::kInt32,
                     "MLA input lenghts must be int32 dtype");
         TORCH_CHECK(input_lengths.device().type() == DeviceType::CPU,
                     "MLA input lenghts must on CPU device");

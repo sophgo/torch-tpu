@@ -5,6 +5,7 @@
 #include "torch_tpu/csrc/core/TPUDeviceUtils.h"
 #include "torch_tpu/csrc/core/TPUTorchUtils.h"
 #include "common/config.h"
+#include <functional>
 
 using tensor_list = std::vector<at::Tensor>;
 
@@ -86,15 +87,24 @@ namespace {
 }
 
 at::Tensor& format_cast_impl_out_tpu(at::Tensor& dst, const at::Tensor& src, FORMATCAST_TYPE cast_type) {
-  auto status = sgdnnFormatCast(
-      tpu::TPUGetDeviceResource(),
-      tpu::TPUGenerateSgdnnTensor(src),
-      tpu::TPUGenerateSgdnnTensor(dst),
-      cast_type);
-  LOG( INFO ) << "Format Cast with " << _FormatCast_Str[cast_type].c_str();
-  TORCH_CHECK(status == SG_SUCCESS);
-  return dst;
+  auto handle = c10_tpu::getCurrentTPUStream();
+  auto src_tensor = tpu::TPUGenerateTpudnnTensor(handle, src);
+  auto dst_tensor = tpu::TPUGenerateTpudnnTensor(handle, dst);
+  auto status = TPUDNN_STATUS_SUCCESS;
+  if (cast_type == Conv_W_ND_TO_32IC || cast_type == Conv_W_32IC_TO_ND) {
+    status = tpudnnReorderConv2dWeightAsync(handle, src_tensor, 0, dst_tensor);
+  } else if (cast_type == Conv_W_ND_TO_32IC32OC ||
+             cast_type == Conv_W_32IC32OC_TO_ND) {
+    status = tpudnnReorderConv2dWeightAsync(handle, src_tensor, 2, dst_tensor);
+  } else if (cast_type == Conv_DW_32OC_TO_ND ||
+             cast_type == Conv_DW_ND_TO_32OC) {
+    status = tpudnnReorderConv2dGradAsync(handle, src_tensor, dst_tensor);
+  } else {
+    TORCH_CHECK(0, "NO SUPPORT SUCH Format Cast.");
   }
+  TORCH_CHECK(status == TPUDNN_STATUS_SUCCESS, "FormatCast Failed.");
+  return dst;
+}
 
 // conver self to tpu_format, write the result into new result tensor
 at::Tensor tpu_format_cast_impl(
@@ -158,18 +168,10 @@ at::Tensor tpu_format_cast_back_to_origin(
 } // namespace at_tpu
 namespace at
 {
-void FormatCast(
-    const at::Tensor& self,
-    const at::Tensor& dst,
-    int64_t tpu_format) {
-      // TODO check something later
-      // auto format_type = at_tpu::TPUNativeFunctions::FORMATCAST_TYPE (tpu_format);
-      // at_tpu::TPUNativeFunctions::format_cast_impl_out_tpu(dst, self, format_type);
-      auto status = sgdnnFormatCast(
-          tpu::TPUGetDeviceResource(),
-          tpu::TPUGenerateSgdnnTensor(self),
-          tpu::TPUGenerateSgdnnTensor(dst),
-          tpu_format);
-      TORCH_CHECK(status == SG_SUCCESS);
-  }
+void FormatCast(const at::Tensor &self, const at::Tensor &dst,
+                int64_t tpu_format) {
+  // TODO check something later
+  auto format_type = at_tpu::TPUNativeFunctions::FORMATCAST_TYPE(tpu_format);
+  at_tpu::TPUNativeFunctions::format_cast_impl_out_tpu(const_cast<at::Tensor&>(dst), self, format_type);
 }
+} // namespace at

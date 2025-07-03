@@ -30,22 +30,19 @@ namespace at
 		CHECK_TENSOR_IN_DEVICE(p);
 		CHECK_TENSOR_IN_DEVICE(out2);
 		TIMING_START;
-#if defined BACKEND_SG2260
-		tpuRtStatus_t status = sgdnnMlp(
-			tpu::TPUGetDeviceResource(),
-			tpu::TPUGenerateSgdnnTensor(input),
-			tpu::TPUGenerateSgdnnTensor(w1),
-			tpu::TPUGenerateSgdnnTensor(w2),
-			b1.has_value() ? tpu::TPUGenerateSgdnnTensor(b1.value()) : sgdnnUndefinedTensor(),
-			b2.has_value() ? tpu::TPUGenerateSgdnnTensor(b2.value()) : sgdnnUndefinedTensor(),
-			tpu::TPUGenerateSgdnnTensor(out1),
-			tpu::TPUGenerateSgdnnTensor(p),
-			tpu::TPUGenerateSgdnnTensor(out2));
-		TORCH_CHECK(status == tpuRtSuccess);
-#elif defined BACKEND_1684X
-		TORCH_CHECK(false);
-#endif
-		TIMING_END(tpu::MLP_FORWARD);
+        // It seems that is tensors p and out1 are not used in the kernel
+        // The function of llavaMlpAsync is the same as the API of sgdnnMlp
+        auto handle = c10_tpu::getCurrentTPUStream();
+        auto status = tpudnnLLaVaMlpAsync(
+            handle,
+            tpu::TPUGenerateTpudnnTensor(handle, input),
+            tpu::TPUGenerateTpudnnTensor(handle, w1),
+            tpu::TPUGenerateTpudnnTensor(handle, w2),
+            b1.has_value() ? tpu::TPUGenerateTpudnnTensor(handle, b1.value()) : tpudnnUndefinedTensor(),
+            b2.has_value()? tpu::TPUGenerateTpudnnTensor(handle, b2.value()) : tpudnnUndefinedTensor(),
+            tpu::TPUGenerateTpudnnTensor(handle, out2));
+        TORCH_CHECK(status == TPUDNN_STATUS_SUCCESS);
+        TIMING_END(tpu::MLP_FORWARD);
 		return out2;
 	}
 }
