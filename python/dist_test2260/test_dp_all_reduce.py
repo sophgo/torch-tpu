@@ -34,7 +34,7 @@ options = torch_tpu.ProcessGroupSCCLOptions()
 chip_map = [6,7,4,5]
 chip_map = chip_map[GROUP_IDX * LOCAL_WORLD_SIZE: (GROUP_IDX+1)* LOCAL_WORLD_SIZE]
 options.chip_map = chip_map
-torch_tpu.tpu.set_device(chip_map[LOCAL_RANK])
+torch_tpu.tpu.set_device(LOCAL_RANK)
 os.environ["USE_CHIP"] =  ",".join(str(chip) for chip in chip_map)
 
 logger.info(f'distribute initilizing........{RANK}/{WORLD_SIZE}')
@@ -49,7 +49,7 @@ torch.distributed.init_process_group(
 def case1():
     logger.info(f"LOCAL_RANK: {LOCAL_RANK}, LOCAL_WORLD_SIZE:{LOCAL_WORLD_SIZE}, RANK: {RANK}, WORLD_SIZE:{WORLD_SIZE},")
     
-    device = torch.device(f"{TPU}:{chip_map[int(RANK)]}")
+    device = torch.device(f"{TPU}:{int(RANK)}")
     tensor = torch.ones(4).to(device)
     torch.distributed.all_reduce(tensor, op=dist.ReduceOp.SUM)
 

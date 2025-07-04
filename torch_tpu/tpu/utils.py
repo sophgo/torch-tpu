@@ -139,8 +139,24 @@ class device_of(device):
         idx = obj.get_device() if obj.is_tpu else -1
         super(device_of, self).__init__(idx)
 
-def set_device(device):
-    device_id = _get_device_index(device, optional=True)
+def map_local_rank_to_device_idx(index):
+    try:
+        rank_id = int(index)
+    except (TypeError, ValueError):
+        return index
+
+    if rank_id < 0:
+        raise ValueError(f"Invalid local_rank_idx: {rank_id}")
+
+    chip_map = os.getenv('CHIP_MAP')
+    if not chip_map:
+        return rank_id
+
+    device_mapping = list(map(int, chip_map.split(',')))
+    return device_mapping[rank_id]
+
+def set_device(rank_id):
+    device_id = map_local_rank_to_device_idx(rank_id)
     if device_id >= 0:
         torch_tpu._C._tpu_setDevice(device_id)
 
@@ -189,6 +205,7 @@ def set_chip_map(options, use_rank_table=False, chip_map=None):
         elif size in (1,2):
             chip_map = [0,1]
             options.chip_map = chip_map
+            os.environ["CHIP_MAP"] = ",".join(map(str, chip_map))
             return
 
     if size == 1:

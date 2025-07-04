@@ -112,8 +112,8 @@ Torch.distributed 支持 SCCL 内置后端，SCCL 通信后端能够充分利用
     torch_tpu.tpu.set_chip_map(options, use_rank_table=False)
 
     # init device
-    torch_tpu.tpu.set_device(options.chip_map[rank])
-    device = torch.device(f"{TPU}:{options.chip_map[rank]}")
+    torch_tpu.tpu.set_device(rank)
+    device = torch.device(f"{TPU}:{rank}")
 
     # init backend
     dist.init_process_group(

@@ -19,13 +19,13 @@ tensor_len = 16
 # init dist and logger
 options = torch_tpu.ProcessGroupSCCLOptions()
 torch_tpu.tpu.set_chip_map(options, use_rank_table=False)
-torch_tpu.tpu.set_device(options.chip_map[rank])
+torch_tpu.tpu.set_device(rank)
 dist.init_process_group(backend="sccl", rank=rank, world_size=world_size, pg_options=options)
 init_logger()
 logger = logging.getLogger('sccl_logger')
 
 def case1():
-    device = torch.device(f"{TPU}:{options.chip_map[rank]}")
+    device = torch.device(f"{TPU}:{rank}")
 
     if is_master():
         input_list = [torch.rand(tensor_len) for _ in range(int(world_size))]

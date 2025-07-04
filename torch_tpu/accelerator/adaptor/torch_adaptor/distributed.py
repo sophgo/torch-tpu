@@ -87,7 +87,7 @@ def init_wrapper(func):
         pg_options.chip_map = list(range(world_size))
         if rank == -1:
             rank = int(os.environ.get('RANK', '0'))
-        torch_tpu.tpu.set_device(pg_options.chip_map[rank])
+        torch_tpu.tpu.set_device(rank)
         return func(backend=backend, init_method=init_method, timeout=timeout, world_size=world_size, rank=rank, store=store, group_name=group_name, pg_options=pg_options)
     return wrapper
 
@@ -101,7 +101,7 @@ def new_group_wrapper(func):
         world_size = int(os.environ.get("WORLD_SIZE", "1"))
         pg_options.chip_map = list(range(world_size))
         rank = os.environ.get('RANK', '0')
-        torch_tpu.tpu.set_device(pg_options.chip_map[int(rank)])
+        torch_tpu.tpu.set_device(int(rank))
         return func(ranks=ranks, timeout=timeout, backend=backend, pg_options=pg_options, use_local_synchronization=use_local_synchronization)
     return wrapper
 

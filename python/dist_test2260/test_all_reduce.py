@@ -20,8 +20,8 @@ tensor_len = 4
 # init dist and logger
 options = torch_tpu.ProcessGroupSCCLOptions()
 torch_tpu.tpu.set_chip_map(options, use_rank_table=False)
-torch_tpu.tpu.set_device(options.chip_map[rank])
-device = torch.device(f"{TPU}:{options.chip_map[rank]}")
+torch_tpu.tpu.set_device(rank)
+device = torch.device(f"{TPU}:{rank}")
 
 dist.init_process_group(
     backend="sccl",
