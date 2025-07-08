@@ -169,7 +169,7 @@ namespace at
 			//  all prefill
 				return paged_attention(
 							OUT, Q, K, V, Kcache, Vcache, cos, sin,
-							input_lengths, cache_lengths, block_tables, c10::nullopt, mask,
+							input_lengths, cache_lengths, slots, block_tables, mask,
 							V.size(-1), slots_size, slots_size, mask_size, block_size, C, 2);
 			}else{
 			// prefill + decode
@@ -195,11 +195,12 @@ namespace at
 					: c10::nullopt;
 				auto input_lengths_slice = input_lengths.index({Slice(first_large_index, None)});
 				auto cache_lengths_slice = cache_lengths.index({Slice(first_large_index, None)});
+				auto slots_slice = slots.index({Slice(decode_length, None)});
 				auto block_tables_slice = block_tables.index({Slice(first_large_index, None), Slice()});
 
 				return paged_attention(
 					OUT_slice, Q_slice, K_slice, V_slice, Kcache, Vcache, cos_slice, sin_slice,
-					input_lengths_slice, cache_lengths_slice, block_tables_slice, c10::nullopt, mask,
+					input_lengths_slice, cache_lengths_slice, slots_slice, block_tables_slice, mask,
 					V.size(-1), slots_size, slots_size, mask_size, block_size, C, 2
 				);
 				return OUT;

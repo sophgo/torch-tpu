@@ -33,7 +33,7 @@ class PagedAttentionFunc(torch.autograd.Function):
             if first_large_index == 0:
                 # logger.info(f"all prefill")
                 torch.ops.my_ops.paged_attention(output, Q, K, V, Kcache, Vcache,
-                                                cos, sin, input_length, cache_length, block_tables, block_tables, mask,
+                                                cos, sin, input_length, cache_length, slots, block_tables, mask,
                                                 V.size(-1), block_tables.size(1), block_tables.size(1), max_s, block_size, softmax_scale, 2)
             # prefill + decode
             # input_length.shape[0] > 1 and 0 < first_large_index < input_length.shape[0]
@@ -46,7 +46,7 @@ class PagedAttentionFunc(torch.autograd.Function):
                                                 Kcache, Vcache,
                                                 cos[decode_length:, :], sin[decode_length:, :],
                                                 input_length[first_large_index:], cache_length[first_large_index:],
-                                                block_tables[first_large_index:, :], block_tables[first_large_index:, :], mask,V.size(-1),
+                                                slots[decode_length:], block_tables[first_large_index:, :], mask,V.size(-1),
                                                 block_tables.size(1), block_tables.size(1),
                                                 max_s, block_size, softmax_scale, 2)
                 # decode(save+fetch)
