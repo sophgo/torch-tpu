@@ -34,6 +34,7 @@ double eps )
   if( !training ) {
     auto dtype = input.scalar_type();
     // implement inference mode
+    CPU_IMPL_WARNING("infer mode");
     auto running_mean_cpu = running_mean.defined() ? running_mean.cpu().to(torch::kFloat) : Tensor();
     auto running_var_cpu  = running_var.defined() ? running_var.cpu().to(torch::kFloat) : Tensor();
     auto outputs_cpu = native_batch_norm (

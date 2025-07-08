@@ -107,12 +107,6 @@ typedef enum {
 } sg_resize_mode_t;
 
 typedef enum {
-  BITWISE_XOR,
-  BITWISE_AND,
-  BITWISE_OR,
-} sg_element_bitwise_mode_t;
-
-typedef enum {
   EQUAL,
   NOT_EQUAL,
   GREATER,
@@ -801,20 +795,6 @@ typedef struct
 
 typedef struct
 {
-  unsigned long long input_global_addr;
-  unsigned long long target_global_addr;
-  unsigned long long grad_output_global_addr;
-  unsigned long long grad_input_global_addr;
-  int batch;
-  int class_;
-  int reduction;
-  float label_smoothing;
-  int dtype;
-  int is_target_int64;
-} WITH_PLATFORM(sg_api_cross_entropy_loss_backward_t);
-
-typedef struct
-{
   unsigned long long grad_output_global_addr;
   unsigned long long index_global_addr;
   unsigned long long grad_input_global_addr;
@@ -832,15 +812,6 @@ typedef struct
   int grad_output_dtype;
   int is_index_int64;
 } WITH_PLATFORM(sg_api_embedding_backward_t);
-
-typedef struct
-{
-  unsigned long long input_global_addr;
-  unsigned long long output_global_addr;
-  int shape[FW_MAX_SHAPE_DIMS];
-  int dim;
-  int dtype;
-} WITH_PLATFORM(sg_api_abs_t);
 
 typedef struct
 {
@@ -886,18 +857,6 @@ typedef struct {
   int affine;
   int dtype;
 } WITH_PLATFORM(sg_api_native_group_norm_t);
-
-typedef struct
-{
-  unsigned long long input_global_addr;
-  unsigned long long other_global_addr;
-  unsigned long long output_global_addr;
-  int shape[FW_MAX_SHAPE_DIMS];
-  int dim;
-  float value;
-  int dtype;
-  int binary_type;
-} WITH_PLATFORM(sg_api_binary_t);
 
 typedef struct
 {
@@ -961,19 +920,6 @@ typedef struct
   int other_dtype;
   int output_dtype;
 } WITH_PLATFORM(sg_api_pow_bcast_t);
-
-typedef struct
-{
-  unsigned long long input_global_addr;
-  unsigned long long other_global_addr;
-  unsigned long long output_global_addr;
-  int input_shape[FW_MAX_SHAPE_DIMS];
-  int other_shape[FW_MAX_SHAPE_DIMS];
-  int dim;
-  float value;
-  int dtype;
-  int binary_type;
-} WITH_PLATFORM(sg_api_binary_bcast_t);
 
 typedef struct
 {

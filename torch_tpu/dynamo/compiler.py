@@ -90,6 +90,7 @@ def dummy_graph_compiler(fx_g : torch.fx.GraphModule, example_inputs : List[torc
 
 ######################## tpu compiler
 def _clean_intermidate_file():
+    return
     print("clean compiler intermidate files ...")
     os.system("rm compiler*")
     os.system("rm *.mlir")
@@ -99,7 +100,7 @@ def _clean_intermidate_file():
 
 def tpu_mlir_fwd_compiler(fx_g : torch.fx.GraphModule, example_inputs : List[torch.Tensor] ):
     save_path = f"tmp_fwd"
-    use_f16 = True
+    use_f16 = False if os.environ.get('COMPILER_DTYPE', 0) == 0 else True
     dtype = 'f16' if use_f16 else 'f32'
     bmodel_path = f"tmp/{save_path}_{os.environ['CHIP']}_{dtype}_tpu.bmodel"
 
@@ -140,7 +141,7 @@ def _process_None_output(gx_g : torch.fx.GraphModule):
 
 def tpu_mlir_bwd_compiler(fx_g : torch.fx.GraphModule, example_inputs : List[torch.Tensor] ):
     save_path = f"tmp_bwd"
-    use_f16 = False
+    use_f16 = False if os.environ.get('COMPILER_DTYPE', 0) == 0 else True
     dtype = 'f16' if use_f16 else 'f32'
     bmodel_path = f"tmp/{save_path}_{os.environ['CHIP']}_{dtype}_tpu.bmodel"
 

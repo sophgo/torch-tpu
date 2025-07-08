@@ -351,6 +351,13 @@ static inline tpudnnTensor_t tpudnnUndefinedTensor()
     return tensor;
 }
 
+static inline void tpudnnProcessZeroDim( tpudnnTensor_t * tensor )
+{
+    if ( tensor->dim != 0) return;
+    tensor->dim = 1; tensor->shape[0] = 1; tensor->stride[0] = 1;
+    return;
+}
+
 tpudnnStatus_t tpudnnBinaryAsync(
     tpudnnHandle_t handle,
     tpudnnTensor_t input,

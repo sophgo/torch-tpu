@@ -6,13 +6,31 @@
 #include "TPUTorchUtils.h"
 #include "common/config.h"
 
-//called by https://pytorch.org/docs/2.1/generated/torch.roll.html#torch.roll
+//called by https://docs.pytorch.org/docs/2.1/generated/torch.remainder.html#torch-remainder
 namespace at {
 
 Tensor & remainder_tensor_out_tpu(const Tensor & self, const Tensor & other, Tensor & out) {
-    CPU_IMPL_WARNING();
-    auto out_cpu = torch::remainder(self.cpu(), other.cpu());
-    out = TENSOR_TO_TPU ( out_cpu );
+
+    if ( other.dim() == 0 && IS_CPU_TENSOR(other) && 0)
+    {
+        auto self_ = self.contiguous(); if ( !self.is_contiguous() ) { CONTIGUOUS_WARNING(); }
+        // TIMING_START;
+        auto stream = c10_tpu::getCurrentTPUStream();
+        auto status = tpudnnRemainderAsync(
+            stream,
+            tpu::TPUGenerateTpudnnTensor(stream, self_),
+            other.item().toFloat(),
+            tpu::TPUGenerateTpudnnTensor(stream, out));
+        TORCH_CHECK(status == TPUDNN_STATUS_SUCCESS);
+        // TIMING_END(Remainder)
+    }
+    else
+    {
+        CPU_IMPL_WARNING();
+        auto out_cpu = torch::remainder(self.cpu(), other.cpu());
+        out = TENSOR_TO_TPU ( out_cpu );
+    }
+
     return out;
 }
 // Tensor remainder_tensor_tpu(const Tensor & self, const Tensor & other) {
