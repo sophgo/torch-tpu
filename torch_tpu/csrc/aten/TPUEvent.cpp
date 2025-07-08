@@ -18,7 +18,7 @@ void TPUEvent::createEvent(c10::DeviceIndex device_index) {
   device_index_ = device_index;
   TPUGuard guard(device_index_);
   C10_TPU_CHECK(sgrt::SgrtCreateEventWithFlag(&(event_->event), flags_));
-  SOPHON_LOGI("Event: SgrtCreateEvent is successfully executed.");
+  LOG( INFO ) << "Event: SgrtCreateEvent is successfully executed.";
   is_created_ = true;
 #endif
 }
@@ -96,7 +96,7 @@ void TPUEvent::synchronize() const {
 #ifdef BACKEND_SG2260
   if (is_created_) {
     C10_TPU_CHECK(sgrt::SgrtSynchronizeEvent((event_->event)));
-    SOPHON_LOGI("Event: sgrtSynchronizeEvent is successfully executed.");
+    LOG( INFO ) << "Event: sgrtSynchronizeEvent is successfully executed.";
   }
 #endif
 }

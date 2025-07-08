@@ -13,7 +13,7 @@ bool is_tpu_device(const at::Device& device) {
 void init_tpu(const c10::DeviceIndex device_index) {
   auto status = tpu::InitTPUMgr();
   if (status != tpu::INIT_SUCCESS) {
-    SOPHON_LOGE("init device failed");
+    LOG( ERROR ) << "init device failed";
     return;
   }
 }

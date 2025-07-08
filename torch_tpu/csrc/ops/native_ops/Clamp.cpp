@@ -13,6 +13,7 @@ Tensor & clamp_out_tpu( const Tensor & self, const c10::optional<Scalar> & min,
                         const c10::optional<Scalar> & max, Tensor & out) {
   if ( self.dim() > 0 )  { CHECK_TENSOR_IN_DEVICE_NO_CONTIGUOUS ( self ); }
   auto self_ = self.contiguous();
+  if (self.data_ptr() != self_.data_ptr()) { LOG( WARNING ) << "clamp inp not contiguous"; }
   auto out_  = out;
   if ( !out.is_contiguous() ) { out_ = out.contiguous(); LOG( WARNING ) << "clamp out not contiguous"; }
 

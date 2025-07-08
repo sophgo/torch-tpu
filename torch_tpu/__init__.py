@@ -1,10 +1,5 @@
-import sys
-import types
-from functools import wraps
-
-import torch
-
 import os
+import pkgutil
 
 def symlink(src, dst):
     try:
@@ -21,7 +16,6 @@ def symlink(src, dst):
     except FileExistsError:
         pass
 
-import pkgutil
 pkg_path = os.path.dirname(pkgutil.get_loader('torch_tpu').get_filename())
 lib_pwd = os.path.join(pkg_path, 'lib/')
 
@@ -80,6 +74,11 @@ if os.environ.get('TPU_CACHE_BACKEND') is None:
 #open kernel-module save default
 os.environ['TorchTpuSaveKernelModule'] = '1'
 
+### TORCH-CPP LOG LEVEL
+if not os.environ.get('TORCH_TPU_CPP_LOG_LEVEL'):
+    os.environ['TORCH_TPU_CPP_LOG_LEVEL'] = '2' # 0: INFO| 1: WARNING| 2: ERROR| 3:FATAL
+
+import torch
 import torch_tpu._C
 import torch_tpu.tpu
 from .tpu.jit import (jit, CallCppDynLib)
@@ -92,27 +91,6 @@ elif arch == 'bm1684x':
     os.environ['CHIP'] = "bm1684x"
 
 __all__ = []
-
-def wrap_torch_error_func(func):
-    @wraps(func)
-    def wrapper(*args, **kwargs):
-        raise RuntimeError(f"torch.{func.__name__} is deprecated and will be removed in future version. "
-                           f"Use torch_tpu.{func.__name__} instead.")
-    return wrapper
-
-
-###### CUSTOM OPs. no use now
-###### TODO: change namespace. torch_tpu:tpu/my_ops -> torch
-# tpu_functions = {
-#     "tpu_format_cast",
-# }
-# for name in dir(torch.ops.tpu):
-#     if name.startswith('__')  or name in ['_dir', 'name']:
-#         continue
-#     globals()[name] = getattr(torch.ops.tpu, name)
-#     if (name in tpu_functions):
-#         __all__.append(name)
-#     setattr(torch, name, wrap_torch_error_func(getattr(torch.ops.tpu, name)))
 
 ##### register device 
 torch._register_device_module('tpu', torch_tpu.tpu)
@@ -143,6 +121,5 @@ def print_all_torch_tpu_envs():
     print(f"ModelRtWTorchDEBUG         = {os.environ.get('ModelRtWTorchDEBUG')}, save bmodel module's IO for debug. value: 1 | None(default), no save default")
     print(f"===================== DISTRIBUTED  =========================================")
     print(f"CHIP_MAP                   = {os.environ.get('CHIP_MAP')}, rank to physical-device.")
-    print(f"============================================================================")
-
-# torch_tpu.torch_tpu._initExtension()
+    print(f"===================== LOG-LEVEL ===========================================")
+    print(f"TORCH_TPU_CPP_LOG_LEVEL    = {os.environ.get('TORCH_TPU_CPP_LOG_LEVEL')}, value: 0|1|2|3. default is 2(ERROR), only in debug version")

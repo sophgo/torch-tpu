@@ -54,7 +54,7 @@ TPUDeviceProp* GetDeviceProperties(int64_t deviceid) {
 #endif
   if (device_name == nullptr) {
     prop.name = " ";
-    SOPHON_LOGE("TPU get device name fail.");
+    LOG( ERROR ) << "TPU get device name fail.";
   } else {
     prop.name = std::string(device_name);
   }
@@ -75,7 +75,8 @@ static PyObject* THPTModule_initExtension(PyObject* self, PyObject* noargs) {
   {
     pybind11::gil_scoped_release no_gil;
     auto status = tpu::InitTPUMgr();
-    if (status != tpu::INIT_SUCCESS) {SOPHON_LOGE("init device failed");}
+    if (status != tpu::INIT_SUCCESS) {LOG( ERROR ) << "init device failed";}
+    resetLogLevel();
   }
   auto m = THPObjectPtr(PyImport_ImportModule("torch_tpu.tpu"));
   if (!m) {
@@ -122,7 +123,7 @@ PyObject* THPTModule_setDevice_wrap(PyObject* self, PyObject* arg) {
     pybind11::gil_scoped_release no_gil;
     // init device
     auto status = tpu::InitTPUMgr();
-    if (status != tpu::INIT_SUCCESS){  SOPHON_LOGE( "INIT Device Failed"); }
+    if (status != tpu::INIT_SUCCESS){  LOG( ERROR ) << "INIT Device Failed"; }
   }
   tpu::TPUSetDeviceIndex(device);
 

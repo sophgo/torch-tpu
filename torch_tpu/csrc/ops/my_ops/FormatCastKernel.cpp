@@ -80,7 +80,6 @@ namespace {
       return Conv_DW_32OC_TO_ND;
     }
     else {
-      //SOPHON_LOGW("NO SUPPORT SUCH Format Cast. src.dtype = %d; src.form = %ld,dst.format = %ld \n",  src_format, dst_format);
       return FORMATCAST_UNSUPPORT;
     }
   }
@@ -92,7 +91,7 @@ at::Tensor& format_cast_impl_out_tpu(at::Tensor& dst, const at::Tensor& src, FOR
       tpu::TPUGenerateSgdnnTensor(src),
       tpu::TPUGenerateSgdnnTensor(dst),
       cast_type);
-  SOPHON_LOGD("Format Cast with %s \n", (_FormatCast_Str[cast_type]).c_str());
+  LOG( INFO ) << "Format Cast with " << _FormatCast_Str[cast_type].c_str();
   TORCH_CHECK(status == SG_SUCCESS);
   return dst;
   }
@@ -103,12 +102,12 @@ at::Tensor tpu_format_cast_impl(
     int64_t tpu_format) {
   auto src_desc = torch_tpu::GetTpuStorageImpl(src)->tpu_desc_;
   if (src_desc.tpu_format_ == tpu_format) {
-    SOPHON_LOGD("no need to do format cast, because of Same FormatCast\n");
+    LOG( INFO ) << "no need to do format cast, because of Same FormatCast\n";
     return src;
   }
   FORMATCAST_TYPE cast_type = formatcast_type(src, tpu_format);
   if (cast_type == FORMATCAST_UNSUPPORT) {
-    SOPHON_LOGD("no need to do format cast, because of UnSupport FormatCast\n");
+    LOG( INFO ) << "no need to do format cast, because of UnSupport FormatCast\n";
     return src;
   }
 
@@ -128,7 +127,7 @@ at::Tensor tpu_format_cast(const at::Tensor& self,
     int64_t tpu_format) {
   torch_tpu::utils::is_tpu(self);
   if (get_tpu_format(self) == tpu_format) {
-    SOPHON_LOGW("no need to do format cast");
+    LOG( WARNING) << "no need to do format cast";
     return self;
   }
   return tpu_format_cast_impl(self, tpu_format);
@@ -149,7 +148,7 @@ at::Tensor tpu_format_cast_back_to_origin(
   int64_t tpu_format = get_tpu_format(self);
   int64_t ori_format = get_origin_format(self);
   if ( tpu_format == ori_format ) {
-    SOPHON_LOGW("no need to do format cast");
+    LOG( WARNING) << "no need to do format cast";
     return self;
   }
   return tpu_format_cast_impl(self, ori_format);

@@ -51,19 +51,9 @@ do{                                                     \
 #define SHOW_EMPTY_INFO(Tensor)
 #endif
 
-#ifdef SHOW_CPU_OP
-#define CPU_IMPL_WARNING(...)  LOG( WARNING ) << __func__ << " use cpu impl." << #__VA_ARGS__;
-#else
-#define CPU_IMPL_WARNING(...)
-#endif
-
-//#define PERF_MODE
-#ifdef PERF_MODE
-
-#define CHECK_TENSOR_IN_DEVICE(t)
-#define CHECK_TENSOR_IN_DEVICE_NO_CONTIGUOUS(t)
-
-#else
+#ifdef DEBUG
+#define CPU_IMPL_WARNING(...)   LOG( WARNING ) << __func__ << " use cpu impl." << #__VA_ARGS__;
+#define CONTIGUOUS_WARNING(...) LOG( WARNING ) << __func__ << " will contiguous." << #__VA_ARGS__;
 
 #define CHECK_TENSOR_IN_DEVICE(t) \
 do \
@@ -80,6 +70,12 @@ do \
 TORCH_CHECK ( t.device().type() == DeviceType::TPU, #t, " is not in TPU device" ); \
 } \
 while ( 0 )
+#else
+
+#define CPU_IMPL_WARNING(...)
+#define CONTIGUOUS_WARNING(...) 
+#define CHECK_TENSOR_IN_DEVICE(t)
+#define CHECK_TENSOR_IN_DEVICE_NO_CONTIGUOUS(t)
 
 #endif
 

@@ -123,7 +123,7 @@ public:
       device_count_ = DeviceCount;
       devices_init_[0] = 1; // tpuRtDeviceInit will default set idx = 0 device. that not a good idea.
     }
-    SOPHON_LOG("TPU Device Manager init successfully\n");
+    LOG( INFO ) << "TPU Device Manager init successfully\n";
 #if 0
     // for multi-chip debug
     const char *rankStr = getenv("LOCAL_RANK");

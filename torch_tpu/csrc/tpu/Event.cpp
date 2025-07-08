@@ -61,7 +61,7 @@ static PyObject* THPTEvent_get_device(THPTEvent *self, void *unused) {
 static PyObject* THPTEvent_record(THPTEvent *self, THPTStream *stream) {
   HANDLE_TH_ERRORS
   self->tpu_event.record(stream->tpu_stream);
-  SOPHON_LOGI("Event: record api is successfully executed.");
+  LOG( INFO ) << "Event: record api is successfully executed.";
   Py_RETURN_NONE;
   END_HANDLE_TH_ERRORS
 }
@@ -71,7 +71,7 @@ static PyObject* THPTEvent_wait(THPTEvent *self, THPTStream *stream) {
   {
     pybind11::gil_scoped_release no_gil;
     self->tpu_event.block(stream->tpu_stream);
-    SOPHON_LOGI("Event: wait api is successfully executed.");
+    LOG( INFO ) << "Event: wait api is successfully executed.";
   }
   Py_RETURN_NONE;
   END_HANDLE_TH_ERRORS
@@ -94,7 +94,7 @@ static PyObject* THPTEvent_synchronize(THPTEvent *self, PyObject *noargs) {
   {
     pybind11::gil_scoped_release no_gil;
     self->tpu_event.synchronize();
-    SOPHON_LOGI("Event: synchronize api is successfully executed.");
+    LOG( INFO ) << "Event: synchronize api is successfully executed.";
   }
   Py_RETURN_NONE;
   END_HANDLE_TH_ERRORS
