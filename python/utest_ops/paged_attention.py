@@ -33,14 +33,14 @@ class PagedAttention(nn.Module):
         x = x * cos.unsqueeze(1) + x_temp * mask_coeff * sin.unsqueeze(1)
         return x
 
-    def forward(self, Q, K, V, Kcache, Vcache, input_length, cache_length, save_slots, fetch_slots, attention_mode):
+    def forward(self, Q, K, V, Kcache, Vcache, input_length, cache_length, save_slots, block_tables, attention_mode):
         #Cache : [block_nums*block_size, kv_heads, d]
         #Q : [batch, attention_heads, d]
         #K : [batch, kv_heads, d]
         #V : [batch, kv_heads, d]
         #cos/sin : prefill-[] decode-[batch, d]
         #mask : prefill-[max_s, max_s] decode-None
-        #fetch_slots : [batch, slot_size]
+        #block_tables : [batch, slot_size]
         #save_slots : [batch, 1]
 
         Ylist = []
@@ -67,7 +67,7 @@ class PagedAttention(nn.Module):
                 cur_K = K[batch_id, :, :].view(1,self.kv_heads, self.d).permute(1,0,2) # kv_headx1xd
                 cur_V = V[batch_id, :, :].view(1,self.kv_heads, self.d).permute(1,0,2) # kv_headx1xd
                 for slot_id in range(cur_slot_num):
-                    cur_slot = fetch_slots[batch_id][slot_id]
+                    cur_slot = block_tables[batch_id][slot_id]
                     tokens_cur_block = min(fetch_tokens, block_size)
                     Kfetch_list.append(Kcache[cur_slot:cur_slot+1*block_size, :, :].view(self.kv_heads, -1, self.d)[:,0:tokens_cur_block,:])
                     Vfetch_list.append(Vcache[cur_slot:cur_slot+1*block_size, :, :].view(self.kv_heads, -1, self.d)[:,0:tokens_cur_block,:])
@@ -103,7 +103,7 @@ class PagedAttention(nn.Module):
             batch_offset = 0
             attn_mask = self.mask if self.mask is not None else None
             if attn_mask is not None and attn_mask.dim() == 2:
-                attn_mask = attn_mask.repeat((len(input_length), attn_mask.shape[0], attn_mask.shape[1]))
+                attn_mask = attn_mask.repeat((len(input_length), 1, 1))
 
             for bidx in range(len(input_length)):
                 N = input_length[bidx]
@@ -111,8 +111,8 @@ class PagedAttention(nn.Module):
                 Kfetch_list =[]
                 Vfetch_list =[]
 
-                fetch_tokens = cache_length[bidx]
-                cur_slot_num = fetch_tokens // block_size
+                fetch_tokens = copy.deepcopy(cache_length[bidx])
+                cur_slot_num = (fetch_tokens - 1) // block_size + 1
                 # qkv of input_length
                 cur_Q = Q[batch_offset:batch_offset+N, :, :].view(N, self.num_attention_heads, self.d) # seq_lenxQheadxd
                 cur_K = K[batch_offset:batch_offset+N, :, :].view(N, self.kv_heads, self.d) # seq_lenxkv_headxd
@@ -121,9 +121,9 @@ class PagedAttention(nn.Module):
                 cur_Q = cur_Q.permute(1, 0, 2) # Qhead   x seq_len x d
                 cur_K = cur_K.permute(1, 0, 2) # kv_head x seq_len x d
                 cur_V = cur_V.permute(1, 0, 2) # kv_head x seq_len x d
-                # get kv-cache of cache_length using fetch_slots in prefill
+                # get kv-cache of cache_length using block_tables in prefill
                 for slot_id in range(cur_slot_num):
-                    cur_slot = fetch_slots[bidx][slot_id]
+                    cur_slot = block_tables[bidx][slot_id]
                     tokens_cur_block = min(fetch_tokens, block_size)
                     # Kfetch_list.append(Kcache[cur_slot:cur_slot+1*block_size, :, :].view(self.kv_heads, -1, self.d)[:,0:tokens_cur_block,:])
                     # Vfetch_list.append(Vcache[cur_slot:cur_slot+1*block_size, :, :].view(self.kv_heads, -1, self.d)[:,0:tokens_cur_block,:])
@@ -149,18 +149,27 @@ class PagedAttention(nn.Module):
                 Ylist.append(cur_Y)
 
                 if Kcache is not None and Vcache is not None:
+                    fetch_tail = N_cache % block_size
+                    save_offset = N_cache // block_size
                     cur_K = K[batch_offset:batch_offset+N, :, :].view(N, self.kv_heads, self.d) # seq_lenxkv_headxd
                     cur_V = V[batch_offset:batch_offset+N, :, :].view(N, self.kv_heads, self.d) # seq_lenxkv_headxd
                     cur_Kcache = Kcache.view(Kcache.shape[0]//block_size, block_size, Kcache.shape[1], Kcache.shape[2])
                     cur_Vcache = Vcache.view(Vcache.shape[0]//block_size, block_size, Vcache.shape[1], Vcache.shape[2])
                     seq_len = cur_K.shape[0]
-                    num_blocks = (seq_len + block_size - 1) // block_size
+                    num_blocks = (seq_len + fetch_tail + block_size - 1) // block_size
+                    kv_offset = 0
                     for i in range(num_blocks):
                         save_seq_len = min(seq_len, block_size)
-                        cur_save_slot = save_slots[bidx][i]
-                        cur_Kcache[cur_save_slot//block_size, :save_seq_len, :, :] = cur_K[i*block_size:i*block_size+save_seq_len, :, :]
-                        cur_Vcache[cur_save_slot//block_size, :save_seq_len, :, :] = cur_V[i*block_size:i*block_size+save_seq_len, :, :]
-                        seq_len -= block_size
+                        cur_save_slot = block_tables[bidx][i + save_offset]
+                        if (i == 0):
+                            save_seq_len = min(save_seq_len, save_seq_len - fetch_tail)
+                            cur_Kcache[cur_save_slot//block_size, fetch_tail:fetch_tail+save_seq_len, :, :] = cur_K[kv_offset:kv_offset+save_seq_len, :, :]
+                            cur_Vcache[cur_save_slot//block_size, fetch_tail:fetch_tail+save_seq_len, :, :] = cur_V[kv_offset:kv_offset+save_seq_len, :, :]
+                        else:
+                            cur_Kcache[cur_save_slot//block_size, :save_seq_len, :, :] = cur_K[kv_offset:kv_offset+save_seq_len, :, :]
+                            cur_Vcache[cur_save_slot//block_size, :save_seq_len, :, :] = cur_V[kv_offset:kv_offset+save_seq_len, :, :]
+                        seq_len -= save_seq_len
+                        kv_offset += save_seq_len
 
                 batch_offset += N
 
@@ -171,7 +180,7 @@ class PagedAttention(nn.Module):
 
 class PagedAttentionFunc(torch.autograd.Function):
     @staticmethod
-    def forward(ctx, Q, K, V, Kcache, Vcache, cos, sin, mask, input_length, cache_length, save_slots, fetch_slots, embeddings, attention_mode,
+    def forward(ctx, Q, K, V, Kcache, Vcache, cos, sin, mask, input_length, cache_length, save_slots, block_tables, embeddings, attention_mode,
                 softmax_scale, max_s, block_size = 16, dropout_rate = 0.0):
         block_size = 16
         if Kcache is not None and Kcache.dim() == 3:
@@ -199,9 +208,9 @@ class PagedAttentionFunc(torch.autograd.Function):
                                                     sin,
                                                     input_length + cache_length,
                                                     save_slots,
-                                                    fetch_slots,
+                                                    block_tables,
                                                     mask,
-                                                    fetch_slots.size(1) if attention_mode == 'decode' else save_slots.size(1),
+                                                    block_tables.size(1) if attention_mode == 'decode' else save_slots.size(1),
                                                     max_s,
                                                     block_size,
                                                     softmax_scale,
@@ -218,11 +227,11 @@ class PagedAttentionFunc(torch.autograd.Function):
                                                         input_length,
                                                         cache_length,
                                                         save_slots,
-                                                        fetch_slots,
+                                                        block_tables,
                                                         mask,
                                                         V.size(-1),
                                                         save_slots.size(1),
-                                                        fetch_slots.size(1),
+                                                        block_tables.size(1),
                                                         max_s,
                                                         block_size,
                                                         softmax_scale,
@@ -266,11 +275,11 @@ class PagedAttentionBlock(nn.Module):
         self.softmax_scale = softmax_scale
         self.dropout_rate = dropout_rate
 
-    def forward(self, Q, K, V, Kcache, Vcache, input_length, cache_length, save_slots, fetch_slots, embeddings, max_s, attention_mode):
+    def forward(self, Q, K, V, Kcache, Vcache, input_length, cache_length, save_slots, block_tables, embeddings, max_s, attention_mode):
         print(f"shape: {Q.shape, K.shape, V.shape}")
         if Kcache is not None and Vcache is not None:
             print(f"{Kcache.shape, Vcache.shape}")
-        return PagedAttentionFunc.apply(Q, K, V, Kcache, Vcache, self.w0, self.w1, self.w2,  input_length, cache_length, save_slots, fetch_slots, embeddings, attention_mode, self.softmax_scale, max_s)
+        return PagedAttentionFunc.apply(Q, K, V, Kcache, Vcache, self.w0, self.w1, self.w2,  input_length, cache_length, save_slots, block_tables, embeddings, attention_mode, self.softmax_scale, max_s)
 
 
 def check_paged_attention_decode():
@@ -308,7 +317,7 @@ def check_paged_attention_decode():
     slots_size = (max_s + block_size - 1) // block_size
     save_slots = torch.tensor([[26], [2], [44], [79], [94], [109], [124], [139],
                                [171], [179], [197], [215], [258], [244], [278], [296]], dtype=torch.int32)
-    fetch_slots = torch.tensor([[16, 0],[0, 0],[48, 32],[64, 0], [80, 0], [96, 0], [112, 0], [128, 0],
+    block_tables = torch.tensor([[16, 0],[0, 0],[48, 32],[64, 0], [80, 0], [96, 0], [112, 0], [128, 0],
                                 [144, 160], [176, 0], [192, 0], [208, 0], [256, 0], [240, 0], [272, 0], [288, 0]], dtype=torch.int32)
 
     softmax_scale = 1.0 / 11.313708498
@@ -344,7 +353,7 @@ def check_paged_attention_decode():
     input_length_tpu = copy.deepcopy(input_length)
     cache_length_tpu = copy.deepcopy(cache_length)
     save_slots_tpu = copy.deepcopy(save_slots).to(device)
-    fetch_slots_tpu = copy.deepcopy(fetch_slots).to(device)
+    block_tables_tpu = copy.deepcopy(block_tables).to(device)
 
     # init model
     net_cpu = PagedAttention(cos, sin, None, hidden_size, attention_heads, kv_heads, embeddings, softmax_scale)
@@ -353,8 +362,8 @@ def check_paged_attention_decode():
 
     # # inference
     print("=====decode======")
-    out_cpu = net_cpu(Q, K, V, Kcache, Vcache, input_length, cache_length, save_slots, fetch_slots, attention_mode)
-    out_tpu = net_tpu(Q_tpu, K_tpu, V_tpu, Kcache_tpu, Vcache_tpu, input_length_tpu, cache_length_tpu, save_slots_tpu, fetch_slots_tpu, embeddings, max_s, attention_mode)
+    out_cpu = net_cpu(Q, K, V, Kcache, Vcache, input_length, cache_length, save_slots, block_tables, attention_mode)
+    out_tpu = net_tpu(Q_tpu, K_tpu, V_tpu, Kcache_tpu, Vcache_tpu, input_length_tpu, cache_length_tpu, save_slots_tpu, block_tables_tpu, embeddings, max_s, attention_mode)
 
     # compare
     comparator = TensorComparator()
@@ -378,22 +387,27 @@ def check_paged_attention_prefill():
     max_blocks = 80
     embeddings = 4096 # no use
     softmax_scale = 1. / np.sqrt(d)  # sqrt(128)
-    input_length_list = [10, 1,  24, 15, 14, 13, 12, 11, 18, 3,  5,  7,  2,  4,  10, 8]
-    cache_length_list = [16, 16, 16, 32, 32, 32, 48, 48, 48, 64, 64, 64, 80, 80, 80, 96]
+    input_length_list = [10, 1,  24, 15, 14, 13, 12, 11, 18, 3,  5,  7,  2,  4,  10]
+    cache_length_list = [16, 16, 16, 32, 32, 32, 48, 48, 48, 64, 64, 64, 80, 80, 80]
 
     input_length = torch.tensor(input_length_list, dtype=torch.int32)
     cache_length = torch.tensor(cache_length_list, dtype=torch.int32)
     max_s = (input_length + cache_length).max()
     Ntotal = torch.sum(input_length).item()
     slots_size = (max_s + block_size - 1) // block_size
-    save_slots = torch.tensor([[16, 0],[0, 0],[48, 32],[64, 0], [80, 0], [96, 0], [112, 0], [128, 0],
-                               [144, 160], [176, 0], [192, 0], [208, 0], [256, 0], [240, 0], [272, 0], [304, 0]], dtype=torch.int32)
-    fetch_slots = torch.tensor([[320, 0, 0, 0, 0, 0],[336, 0, 0, 0, 0, 0],[352, 0, 0, 0, 0, 0],
-                                [384, 400, 0, 0, 0, 0], [416, 432, 0, 0, 0, 0], [448, 464, 0, 0, 0, 0],
-                                [480, 496, 512, 0, 0, 0], [528, 544, 576, 0, 0, 0],[592, 608, 624, 0, 0, 0],
-                                [640, 656, 672, 688, 0, 0], [704, 720, 736, 752, 0, 0], [768,  784, 800, 816, 0, 0],
-                                [832, 848, 864, 880, 896, 0], [912, 928, 944, 960, 976, 0], [992, 1008, 1024, 1040, 1056, 0],
-                                [1072,  1088, 1104,  1120, 1136, 1152]], dtype=torch.int32)
+    # save_slots = torch.tensor([[16, 0],[0, 0],[48, 32],[64, 0], [80, 0], [96, 0], [112, 0], [128, 0],
+    #                            [144, 160], [176, 0], [192, 0], [208, 0], [256, 0], [240, 0], [272, 0], [304, 0]], dtype=torch.int32)
+    # block_tables = torch.tensor([[320, 0, 0, 0, 0, 0],[336, 0, 0, 0, 0, 0],[352, 0, 0, 0, 0, 0],
+    #                             [384, 400, 0, 0, 0, 0], [416, 432, 0, 0, 0, 0], [448, 464, 0, 0, 0, 0],
+    #                             [480, 496, 512, 0, 0, 0], [528, 544, 576, 0, 0, 0],[592, 608, 624, 0, 0, 0],
+    #                             [640, 656, 672, 688, 0, 0], [704, 720, 736, 752, 0, 0], [768,  784, 800, 816, 0, 0],
+    #                             [832, 848, 864, 880, 896, 0], [912, 928, 944, 960, 976, 0], [992, 1008, 1024, 1040, 1056, 0],
+    #                             [1072,  1088, 1104,  1120, 1136, 1152]], dtype=torch.int32)
+    save_slots = torch.tensor([[320, 16, 0, 0, 0, 0],[336, 0, 0, 0, 0, 0],[352, 48, 32, 0, 0, 0],
+                                [384, 400, 64, 0, 0, 0], [416, 432, 80, 0, 0, 0], [448, 464, 96, 0, 0, 0],
+                                [480, 496, 512, 112, 0, 0], [528, 544, 576, 128, 0, 0],[592, 608, 624, 144, 160, 0],
+                                [640, 656, 672, 688, 176, 0], [704, 720, 736, 752, 192, 0], [768,  784, 800, 816, 208, 0],
+                                [832, 848, 864, 880, 896, 256], [912, 928, 944, 960, 976, 240], [992, 1008, 1024, 1040, 1056, 272]], dtype=torch.int32)
 
     # Assuming N and param.d are predefined
     print("====param====")
@@ -416,6 +430,7 @@ def check_paged_attention_prefill():
     V = torch.rand((Ntotal, kv_heads, d), requires_grad=False, dtype=torch.float32)
     Kcache = torch.zeros((max_blocks*block_size, kv_heads, d), requires_grad=False, dtype=torch.float32)
     Vcache = torch.zeros((max_blocks*block_size, kv_heads, d), requires_grad=False, dtype=torch.float32)
+    # generate_random_kv_cache(Kcache, Vcache, save_slots[0], cache_length, block_size)
     attn_mask = torch.triu(torch.full((max_s, max_s), float('-inf'), dtype=torch.float32), diagonal=1)
 
     cos_tpu = copy.deepcopy(cos).to(device).half()
@@ -428,7 +443,7 @@ def check_paged_attention_prefill():
     input_length_tpu = copy.deepcopy(input_length)
     cache_length_tpu = copy.deepcopy(cache_length)
     save_slots_tpu = copy.deepcopy(save_slots).to(device)
-    fetch_slots_tpu = copy.deepcopy(fetch_slots).to(device)
+    block_tables_tpu = copy.deepcopy(save_slots // block_size).to(device)
     attn_mask_tpu = copy.deepcopy(attn_mask).to(device).half()
 
     # init model
@@ -437,8 +452,8 @@ def check_paged_attention_prefill():
 
     # inference
     print("=====prefill======")
-    out_cpu = net_cpu(Q, K, V, Kcache, Vcache, input_length, cache_length, save_slots, fetch_slots, attention_mode)
-    out_tpu = net_tpu(Q_tpu, K_tpu, V_tpu, Kcache_tpu, Vcache_tpu,  input_length_tpu, cache_length_tpu, save_slots_tpu, fetch_slots_tpu, embeddings, max_s, attention_mode)
+    out_cpu = net_cpu(Q, K, V, Kcache, Vcache, input_length, cache_length, save_slots, save_slots, attention_mode)
+    out_tpu = net_tpu(Q_tpu, K_tpu, V_tpu, Kcache_tpu, Vcache_tpu,  input_length_tpu, cache_length_tpu, save_slots_tpu, block_tables_tpu, embeddings, max_s, attention_mode)
 
     # compare
     comparator = TensorComparator()
@@ -447,8 +462,27 @@ def check_paged_attention_prefill():
     status3 = comparator.cmp_result(Vcache.detach(), Vcache_tpu.cpu().detach().float(), "Vcache")
     return status1 and status2 and status3
 
+
+def generate_random_kv_cache(Kcache, Vcache, block_tables, seq_len, block_size):
+    seq_len = copy.deepcopy(seq_len)
+    cur_K = torch.rand((seq_len, Kcache.shape[1], Kcache.shape[2]), dtype=torch.float16).to(torch.float32)
+    cur_V = torch.rand((seq_len, Vcache.shape[1], Vcache.shape[2]), dtype=torch.float16).to(torch.float32)
+    Kcache = Kcache.view(Kcache.shape[0]//block_size, block_size, Kcache.shape[1], Kcache.shape[2])
+    Vcache = Vcache.view(Vcache.shape[0]//block_size, block_size, Vcache.shape[1], Vcache.shape[2])
+    num_blocks = (seq_len + block_size - 1) // block_size
+    kv_offset = 0
+    for i in range(num_blocks):
+        save_seq_len = min(seq_len, block_size)
+        cur_save_slot = block_tables[i]
+        Kcache[cur_save_slot//block_size, :save_seq_len, :, :] = cur_K[kv_offset:kv_offset+save_seq_len, :, :]
+        Vcache[cur_save_slot//block_size, :save_seq_len, :, :] = cur_V[kv_offset:kv_offset+save_seq_len, :, :]
+        seq_len -= save_seq_len
+        kv_offset += save_seq_len
+    return
+
 def check_paged_attention_prefill_single_batch():
     import copy
+    import random
     attention_mode = "prefill"
     batch = 1
     # # TP8
@@ -459,20 +493,23 @@ def check_paged_attention_prefill_single_batch():
     d = int(hidden_size/ attention_heads)  # 128
     assert d == 128
     block_size = 16
-    max_blocks = 5
+    max_blocks = 10
     embeddings = 4096 # no use
     softmax_scale = 1. / np.sqrt(d)  # sqrt(128)
 
-    input_length_list = [20]
-    cache_length_list = [16]
+    input_length_list = [68]
+    cache_length_list = [32]
 
     input_length = torch.tensor(input_length_list, dtype=torch.int32)
     cache_length = torch.tensor(cache_length_list, dtype=torch.int32)
     max_s = (input_length + cache_length).max()
     Ntotal = torch.sum(input_length).item()
     slots_size = (max_s + block_size - 1) // block_size
-    save_slots = torch.tensor([[16, 32]], dtype=torch.int32)
-    fetch_slots = torch.tensor([[64, 0]], dtype=torch.int32)
+    tables = list(range(0, slots_size * block_size, block_size))
+    random.shuffle(tables)
+    save_slots = torch.tensor([[34]], dtype=torch.int32)
+    # block_tables = torch.tensor([[48, 32, 16, 0]], dtype=torch.int32)
+    block_tables = torch.tensor([tables], dtype=torch.int32)
 
     # Assuming N and param.d are predefined
     print("====param====")
@@ -496,6 +533,7 @@ def check_paged_attention_prefill_single_batch():
     Kcache = torch.zeros((max_blocks*block_size, kv_heads, d), requires_grad=False, dtype=torch.float32)
     Vcache = torch.zeros((max_blocks*block_size, kv_heads, d), requires_grad=False, dtype=torch.float32)
     attn_mask = torch.triu(torch.full((max_s, max_s), float('-inf'), dtype=torch.float32), diagonal=1)
+    generate_random_kv_cache(Kcache, Vcache, block_tables[0], cache_length, block_size)
 
     cos_tpu = copy.deepcopy(cos).to(device).half()
     sin_tpu =  copy.deepcopy(sin).to(device).half()
@@ -507,7 +545,7 @@ def check_paged_attention_prefill_single_batch():
     input_length_tpu = copy.deepcopy(input_length)
     cache_length_tpu = copy.deepcopy(cache_length)
     save_slots_tpu = copy.deepcopy(save_slots).to(device)
-    fetch_slots_tpu = copy.deepcopy(fetch_slots).to(device)
+    block_tables_tpu = copy.deepcopy(block_tables // block_size).to(device)
     attn_mask_tpu = copy.deepcopy(attn_mask).to(device).half()
 
     # init model
@@ -516,8 +554,8 @@ def check_paged_attention_prefill_single_batch():
 
     # inference
     print("=====prefill single batch======")
-    out_cpu = net_cpu(Q, K, V, Kcache, Vcache, input_length, cache_length, save_slots, fetch_slots, attention_mode)
-    out_tpu = net_tpu(Q_tpu, K_tpu, V_tpu, Kcache_tpu, Vcache_tpu,  input_length_tpu, cache_length_tpu, save_slots_tpu, fetch_slots_tpu, embeddings, max_s, attention_mode)
+    out_cpu = net_cpu(Q, K, V, Kcache, Vcache, input_length, cache_length, save_slots, block_tables, attention_mode)
+    out_tpu = net_tpu(Q_tpu, K_tpu, V_tpu, Kcache_tpu, Vcache_tpu,  input_length_tpu, cache_length_tpu, block_tables_tpu, block_tables_tpu, embeddings, max_s, attention_mode)
 
     # compare
     comparator = TensorComparator()
