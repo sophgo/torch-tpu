@@ -20,6 +20,7 @@ namespace at
         Tensor &PEcache,
         Tensor &cos,
         Tensor &sin,
+        const c10::optional<Tensor> &KVU,
         const c10::optional<Tensor> &mask, // decode: None
         const Tensor &input_lengths, 
         int64_t head,
@@ -56,6 +57,7 @@ namespace at
             tpu::TPUGenerateTpudnnTensor(stream, PEcache),
             tpu::TPUGenerateTpudnnTensor(stream, cos),
             tpu::TPUGenerateTpudnnTensor(stream, sin),
+            KVU.has_value() ? tpu::TPUGenerateTpudnnTensor(stream, KVU.value()) : tpudnnUndefinedTensor(),
             mask.has_value() ? tpu::TPUGenerateTpudnnTensor(stream, mask.value()) : tpudnnUndefinedTensor(),
             (int*)input_lengths.data_ptr(),
             (int)(input_lengths.nbytes()/4),
@@ -81,6 +83,7 @@ namespace at
         Tensor &PEcache, Tensor &cos, Tensor &sin,
         const c10::optional<Tensor> &block_table,
         Tensor &save_slots,
+        const c10::optional<Tensor> &KVU,
         const c10::optional<Tensor> &mask, // decode: None
         const Tensor &input_lengths, const Tensor &cache_lengths, int64_t head, int64_t generate_token,
         int64_t q_lora_rank, int64_t kv_lora_rank,
@@ -111,6 +114,7 @@ namespace at
           tpu::TPUGenerateTpudnnTensor(stream, PEcache),
           tpu::TPUGenerateTpudnnTensor(stream, cos),
           tpu::TPUGenerateTpudnnTensor(stream, sin),
+          KVU.has_value() ? tpu::TPUGenerateTpudnnTensor(stream, KVU.value()) : tpudnnUndefinedTensor(),
           mask.has_value() ? tpu::TPUGenerateTpudnnTensor(stream, mask.value())
                            : tpudnnUndefinedTensor(),
           block_table.has_value() ? tpu::TPUGenerateTpudnnTensor(stream, block_table.value())
@@ -132,6 +136,7 @@ namespace at
             Tensor &sin, Tensor &WUQ_scale, Tensor &WUKV_scale,
             const c10::optional<Tensor> &block_table,
             Tensor &save_slots,
+            const c10::optional<Tensor> &KVU,
             const c10::optional<Tensor> &mask, // decode: None
             const Tensor &seqlen, const Tensor &cache_seqlen,
             int64_t num_heads, int64_t generate_token, int64_t q_lora_rank,
@@ -163,6 +168,7 @@ namespace at
               tpu::TPUGenerateTpudnnTensor(stream, PEcache),
               tpu::TPUGenerateTpudnnTensor(stream, cos),
               tpu::TPUGenerateTpudnnTensor(stream, sin),
+              KVU.has_value() ? tpu::TPUGenerateTpudnnTensor(stream, KVU.value()) : tpudnnUndefinedTensor(),
               mask.has_value()
                   ? tpu::TPUGenerateTpudnnTensor(stream, mask.value())
                   : tpudnnUndefinedTensor(),
@@ -186,6 +192,7 @@ namespace at
             Tensor &OUT, Tensor &Q, Tensor &KV, Tensor &PE, Tensor &WUQ,
             Tensor &WUKV, Tensor &KVcache, Tensor &PEcache, Tensor &cos,
             Tensor &sin, Tensor &WUQ_scale, Tensor &WUKV_scale,
+            const c10::optional<Tensor> &KVU,
             const c10::optional<Tensor> &mask, // decode: None
             const Tensor &seqlen, int64_t num_heads, int64_t generate_token, int64_t q_lora_rank,
             int64_t kv_lora_rank, int64_t qk_nope_head_dim,
@@ -216,6 +223,7 @@ namespace at
               tpu::TPUGenerateTpudnnTensor(stream, PEcache),
               tpu::TPUGenerateTpudnnTensor(stream, cos),
               tpu::TPUGenerateTpudnnTensor(stream, sin),
+              KVU.has_value() ? tpu::TPUGenerateTpudnnTensor(stream, KVU.value()) : tpudnnUndefinedTensor(),
               mask.has_value()
                   ? tpu::TPUGenerateTpudnnTensor(stream, mask.value())
                   : tpudnnUndefinedTensor(),
