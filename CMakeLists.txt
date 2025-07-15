@@ -29,12 +29,11 @@ message(STATUS "torch-tpu version: ${TORCHTPU_VERSION}")
 add_definitions(-DTORCHTPU_VERSION="${TORCHTPU_VERSION}")
 
 include(${PROJECT_SOURCE_DIR}/config_common.cmake)
-
-if (BACKEND_SG2260)
-    add_subdirectory(third_party/gloo_sophon)
-endif()
+set(SAFETY_FLAGS "-Wall -Wno-error=deprecated-declarations -ffunction-sections -fdata-sections -fPIC -Wno-unused-function -funwind-tables -fno-short-enums -Werror")
+set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} ${SAFETY_FLAGS}")
+set(CMAKE_CXX_FLAGS "${CMAKE_C_FLAGS} ${SAFETY_FLAGS} -Wno-invalid-offsetof")
 
 set(PROJECT_ROOT ${PROJECT_SOURCE_DIR})
 
-add_subdirectory(sgdnn)
+add_subdirectory(third_party/gloo_sophon)
 add_subdirectory(torch_tpu)

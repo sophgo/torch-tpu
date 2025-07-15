@@ -21,7 +21,6 @@ lib_pwd = os.path.join(pkg_path, 'lib/')
 
 arch_list = ['sg2260', 'bm1684x']
 arch = arch_env = os.environ.get('CHIP_ARCH')
-
 def make_symlinks(arch_sel):
     tpudnn = f'libtpudnn.{arch_sel}.so'
     sofn   = f'libtorch_tpu.{arch_sel}.so'

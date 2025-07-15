@@ -10,6 +10,7 @@ endif()
 list(APPEND CMAKE_MODULE_PATH ${CMAKE_SOURCE_DIR}/../cmake)
 
 include(config.cmake)
+include(${CMAKE_CURRENT_SOURCE_DIR}/../config_common.cmake)
 
 if (USING_LLM_PROFILE)
     add_definitions(-DUSING_LLM_TICK_TOCK_PROFILE)

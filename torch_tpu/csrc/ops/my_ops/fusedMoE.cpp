@@ -4,7 +4,6 @@
 #include <ATen/EmptyTensor.h>
 #include <TPUDeviceManager.h>
 #include <TPUTorchUtils.h>
-#include <sgdnn_api.h>
 
 #include "common/config.h"
 

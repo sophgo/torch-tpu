@@ -68,54 +68,60 @@ function soc_build()
   popd
 }
 
-function update_sg2260_third_party()
-{
+function update_head_files() {
   echo "updating tpuDNN.h ..."
   cp ${TPU1686_PATH}/tpuDNN/include/tpuDNN.h ${TPUTRAIN_TOP}/third_party/tpuDNN/include/
   echo "updating tpuDNNTensor.h ..."
   cp ${TPU1686_PATH}/tpuDNN/include/tpuDNNTensor.h ${TPUTRAIN_TOP}/third_party/tpuDNN/include/
   echo "updating sccl.h ..."
   cp ${TPU1686_PATH}/sccl/include/sccl.h ${TPUTRAIN_TOP}/third_party/sccl/include/
+  echo "updating tpu_runtime_api.h ..."
+  cp ${TPU1686_PATH}/runtime/tpu_runtime_api.h ${TPUTRAIN_TOP}/third_party/runtime_api/include/
+}
+
+function update_sg2260_third_party()
+{
+  update_head_files
   echo "updating libtpudnn.so ..."
   cp ${TPU1686_PATH}/build_sg2260/tpuDNN/src/libtpudnn.so ${TPUTRAIN_TOP}/third_party/tpuDNN/sg2260_lib/
   echo "updating libsccl.so ..."
-  cp ${TPU1686_PATH}/build_sg2260/sccl/libsccl.so ${TPUTRAIN_TOP}/third_party/sccl/sg2260_lib/
+  cp ${TPU1686_PATH}/build_sg2260/sccl/libsccl.so ${TPUTRAIN_TOP}/third_party/sccl/lib/
   echo "updating libtpuv7_emulator.so ..."
   cp ${TPU1686_PATH}/build_sg2260/firmware_core/libtpuv7_emulator.so ${TPUTRAIN_TOP}/third_party/tpuv7_runtime/tpuv7-emulator_0.1.0/lib/
   echo "updating libfirmware_core.a ..."
   cp ${TPU1686_PATH}/build_fw_sg2260/firmware_core/libfirmware_core.a ${TPUTRAIN_TOP}/third_party/firmware/sg2260/
+  echo "updating libtpurt.so ..."
+  cp ${TPU1686_PATH}/build_sg2260/runtime/libtpurt.so ${TPUTRAIN_TOP}/third_party/runtime_api/lib_sg2260/
 }
 
 function update_sg2260_riscv_third_party()
 {
-  echo "updating tpuDNN.h ..."
-  cp ${TPU1686_PATH}/tpuDNN/include/tpuDNN.h ${TPUTRAIN_TOP}/third_party/tpuDNN/include/
-  echo "updating tpuDNNTensor.h ..."
-  cp ${TPU1686_PATH}/tpuDNN/include/tpuDNNTensor.h ${TPUTRAIN_TOP}/third_party/tpuDNN/include/
-  echo "updating sccl.h ..."
-  cp ${TPU1686_PATH}/sccl/include/sccl.h ${TPUTRAIN_TOP}/third_party/sccl/include/
+  update_head_files
   echo "updating libtpudnn.so ..."
   cp ${TPU1686_PATH}/build_sg2260_riscv/tpuDNN/src/libtpudnn.so ${TPUTRAIN_TOP}/third_party/tpuDNN/sg2260_lib/libtpudnn-riscv.so
   echo "updating libsccl.so ..."
-  cp ${TPU1686_PATH}/build_sg2260_riscv/sccl/libsccl.so ${TPUTRAIN_TOP}/third_party/sccl/sg2260_lib/libsccl-riscv.so
+  cp ${TPU1686_PATH}/build_sg2260_riscv/sccl/libsccl.so ${TPUTRAIN_TOP}/third_party/sccl/lib/libsccl-riscv64.so
   echo "updating libtpuv7_emulator.so ..."
   cp ${TPU1686_PATH}/build_sg2260_riscv/firmware_core/libtpuv7_emulator.so ${TPUTRAIN_TOP}/third_party/tpuv7_runtime/tpuv7-emulator_0.1.0/lib/libtpuv7_emulator-riscv.so
   echo "updating libfirmware_core.a ..."
   cp ${TPU1686_PATH}/build_fw_sg2260/firmware_core/libfirmware_core.a ${TPUTRAIN_TOP}/third_party/firmware/sg2260/libfirmware_core-riscv.a
+  echo "updating libtpurt.so ..."
+  cp ${TPU1686_PATH}/build_sg2260_riscv/runtime/libtpurt.so ${TPUTRAIN_TOP}/third_party/runtime_api/lib_sg2260/libtpurt-riscv64.so
 }
 
 function update_bm1684x_third_party()
 {
-  echo "updating tpuDNN.h ..."
-  cp ${TPU1686_PATH}/tpuDNN/include/tpuDNN.h ${TPUTRAIN_TOP}/third_party/tpuDNN/include/
-  echo "updating tpuDNNTensor.h ..."
-  cp ${TPU1686_PATH}/tpuDNN/include/tpuDNNTensor.h ${TPUTRAIN_TOP}/third_party/tpuDNN/include/
+  update_head_files
   echo "updating libtpudnn.so ..."
   cp ${TPU1686_PATH}/build_bm1684x/tpuDNN/src/libtpudnn.so ${TPUTRAIN_TOP}/third_party/tpuDNN/bm1684x_lib/
   echo "updating libcmodel_firmware.so ..."
   cp ${TPU1686_PATH}/build_bm1684x/firmware_core/libcmodel_firmware.so ${TPUTRAIN_TOP}/third_party/firmware/bm1684x/
   echo "updating libfirmware_core.a ..."
   cp ${TPU1686_PATH}/build_fw_bm1684x/firmware_core/libfirmware_core.a ${TPUTRAIN_TOP}/third_party/firmware/bm1684x/
+  echo "updating libsccl.so ..."
+  cp ${TPU1686_PATH}/build_bm1684x/sccl/libsccl.so ${TPUTRAIN_TOP}/third_party/sccl/lib/
+  echo "updating libtpurt.so ..."
+  cp ${TPU1686_PATH}/build_bm1684x/runtime/libtpurt.so ${TPUTRAIN_TOP}/third_party/runtime_api/lib_bm1684x/libtpurt.so
 }
 
 function rebuild_TPU1686_riscv()

@@ -17,12 +17,6 @@
 #include "torch_tpu/csrc/aten/TPUFormatCastHelper.h"
 #include "TPUStream.h"
 
-#ifdef BACKEND_SG2260
-#include <sgdnn_api.h>
-#elif defined BACKEND_1684X
-#include <sgdnn_api.h>
-#endif
-
 #define DEBUG_SHOW(dtype, func, ...)                    \
 do{                                                     \
   std::cout << __func__ << "|" << #__VA_ARGS__ << "";   \
@@ -74,8 +68,8 @@ while ( 0 )
 
 #define CPU_IMPL_WARNING(...)
 #define CONTIGUOUS_WARNING(...) 
-#define CHECK_TENSOR_IN_DEVICE(t)
-#define CHECK_TENSOR_IN_DEVICE_NO_CONTIGUOUS(t)
+#define CHECK_TENSOR_IN_DEVICE(t) (void)(t)
+#define CHECK_TENSOR_IN_DEVICE_NO_CONTIGUOUS(t) (void)(t)
 
 #endif
 

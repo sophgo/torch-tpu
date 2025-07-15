@@ -21,7 +21,6 @@ from setuptools.command.egg_info import egg_info
 from wheel.bdist_wheel import bdist_wheel as _bdist_wheel
 
 BASE_DIR = os.path.dirname(os.path.realpath(__file__))
-SGDNN_PATH = os.path.join(BASE_DIR, "sgdnn")
 SGAPI_STRUCT_PATH = os.path.join(BASE_DIR, "common")
 THIRD_PARTY_PATH = os.path.join(BASE_DIR, "third_party")
 SCCL_PATH = os.path.join(THIRD_PARTY_PATH, "sccl")
@@ -32,13 +31,16 @@ VERSION = '2.1.0.post1'
 SOC_CROSS = os.environ.get("SOC_CROSS_MODE", None)
 SOC_CROSS = True if SOC_CROSS == "ON" else False
 CROSS_TOOLCHAINS= os.environ.get("CROSS_TOOLCHAINS", None)
+PLATFORM=''
 if SOC_CROSS:
     if os.environ["CHIP_ARCH"] == "sg2260":
         os.environ["CC"] = f"{CROSS_TOOLCHAINS}/riscv64-linux-x86_64/bin/riscv64-unknown-linux-gnu-gcc"
         os.environ["CXX"] = f"{CROSS_TOOLCHAINS}/riscv64-linux-x86_64/bin/riscv64-unknown-linux-gnu-g++"
+        PLATFORM='-riscv64'
     else:
         os.environ["CC"] = f"{CROSS_TOOLCHAINS}/gcc-arm-10.3-2021.07-x86_64-aarch64-none-linux-gnu/bin/aarch64-none-linux-gnu-gcc"
         os.environ["CXX"] = f"{CROSS_TOOLCHAINS}/gcc-arm-10.3-2021.07-x86_64-aarch64-none-linux-gnu/bin/aarch64-none-linux-gnu-g++"
+        PLATFORM='-aarch64'
 
 def which(thefile):
     path = os.environ.get("PATH", os.defpath).split(os.pathsep)
@@ -82,7 +84,7 @@ def get_build_type():
 
 def python_path_dir():
     if SOC_CROSS:
-        return os.path.join(CROSS_TOOLCHAINS, "Python-3.8.2/python_3.8.2/include/python3.8")
+        return os.path.join(CROSS_TOOLCHAINS, "pythons/Python-3.8.2/python_3.8.2/include/python3.8/")
     return get_paths()['include']
 
 def get_pytorch_dir():
@@ -106,7 +108,7 @@ def CppExtension(name, sources, *args, **kwargs):
     temp_include_dirs.append(os.path.join(pytorch_dir, 'include'))
     temp_include_dirs.append(os.path.join(pytorch_dir, 'include/torch/csrc/api/include'))
     if SOC_CROSS:
-        temp_include_dirs.append(os.path.join(CROSS_TOOLCHAINS, "Python-3.8.2/python_3.8.2/include/python3.8"))
+        temp_include_dirs.append(os.path.join(CROSS_TOOLCHAINS, "Python-3.8.2/python_3.8.2/include/python3.8/"))
     kwargs['include_dirs'] = temp_include_dirs
 
     temp_library_dirs = kwargs.get('library_dirs', [])
@@ -311,7 +313,6 @@ def get_src_py_and_dst():
         ret.append((src, dst))
 
     other_header_files = [
-        "sgdnn/include/*.h",
         "third_party/bmlib/include/*.h",
         "third_party/bmruntime/include/*.h",
     ]
@@ -405,10 +406,15 @@ class bdist_wheel(_bdist_wheel, ExtBase):
                     elif 'riscv' not in lib and not SOC_CROSS:
                         self.copy_file(lib, os.path.join(pkg_dir, f'lib/libtpudnn.{target}.so'))
 
-        sccl_libs = glob.glob(os.path.join(BASE_DIR, 'third_party/sccl/*_lib/libsccl*.so'))
+        chip_arch = os.environ.get('CHIP_ARCH')
+        sccl_libs = glob.glob(os.path.join(BASE_DIR, f'third_party/sccl/lib/libsccl{PLATFORM}.so'))
         for lib in sccl_libs:
-            if ('riscv' in lib and SOC_CROSS) or ('riscv' not in lib and not SOC_CROSS):
-                self.copy_file(lib, os.path.join(pkg_dir, f'lib/libsccl.so'))
+            self.copy_file(lib, os.path.join(pkg_dir, f'lib/libsccl.so'))
+
+        # runtime libs
+        runtime_libs = glob.glob(os.path.join(BASE_DIR, f'third_party/runtime_api/lib_{chip_arch}/libtpurt{PLATFORM}.so'))
+        for lib in runtime_libs:
+            self.copy_file(lib, os.path.join(pkg_dir, 'lib/libtpurt.so'))
 
         # include libraries just cmodel, for inst-cache use.
         # tpuv7-emulator_0.1.0 is the cmodel version of runtime, no device version contained.
@@ -441,9 +447,9 @@ class bdist_wheel(_bdist_wheel, ExtBase):
 include_directories = [
     BASE_DIR,
     os.path.join(BASE_DIR, 'third_party/tpuDNN/include'),
+    os.path.join(BASE_DIR, 'third_party/runtime_api/include'),
     os.path.join(SCCL_PATH, 'include'),
     os.path.join(TPUV7_RUNTIME_PATH, "tpuv7-emulator_0.1.0", "include"),
-    os.path.join(SGDNN_PATH, "include"),
     os.path.join(SGAPI_STRUCT_PATH, "include"),
     os.path.join(BMLIB_PATH, "include"),
 ]
@@ -472,8 +478,8 @@ if DEBUG:
     extra_compile_args += ['-O0', '-g']
     extra_link_args += ['-O0', '-g', '-Wl,-z,now']
 else:
-    extra_compile_args += ['-DNDEBUG']
-    extra_link_args += ['-Wl,-z,now,-s']
+    extra_compile_args += ['-DNDEBUG', '-O3', '-g0']
+    extra_link_args += ['-Wl,-z,now,-s,-O3']
 
 from setuptools.command.develop import develop as _develop
 class CustomDevelop(_develop):

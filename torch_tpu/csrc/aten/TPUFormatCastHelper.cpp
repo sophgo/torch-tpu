@@ -1,7 +1,6 @@
 #include "torch_tpu/csrc/core/TPUTorchUtils.h"
 #include "torch_tpu/csrc/aten/TPUFormatCastHelper.h"
 #include "torch_tpu/csrc/aten/TPUNativeFunctions.h"
-#include <sgdnn_api.h>
 
 namespace at_tpu
 {

@@ -18,11 +18,14 @@ Tensor &fill__Scalar_tpu(Tensor &self, const Scalar &value) {
 #else
   int64_t value_;
   if (self.scalar_type() == at::ScalarType::Float) {
-    *(float *)(&value_) = value.toFloat();
+    float value_f = value.toFloat();
+    memcpy(&value_, &value_f, sizeof(float));
   } else if (self.scalar_type() == at::ScalarType::Half) {
-    *(at::Half *)(&value_) = value.toHalf();
+    at::Half fp16 = value.toHalf();
+    memcpy(&value_, &fp16, sizeof(at::Half));
   } else if (self.scalar_type() == at::ScalarType::BFloat16) {
-    *(at::BFloat16 *)(&value_) = value.toBFloat16();
+    at::BFloat16 bf16 = value.toBFloat16();
+    memcpy(&value_, &bf16, sizeof(at::BFloat16));
   } else if (self.scalar_type() == at::ScalarType::Int) {
     value_ = value.toInt();
   } else if (self.scalar_type() == at::ScalarType::Bool) {

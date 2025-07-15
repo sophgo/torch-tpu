@@ -268,7 +268,7 @@ void PythonNet::forward(std::vector<py::object>& inputs,
       output_tensor.data = (void*) data_ptr;
       output_tensors.push_back(output_tensor);
     }
-    auto stream = c10_tpu::getCurrentTPUStream();
+    auto stream = (tpuRtStream_t)c10_tpu::getCurrentTPUStream().stream();
     m_stream = stream;
     auto status = tpuRtLaunchNetAsync(m_net, input_tensors.data(), output_tensors.data(), name.c_str(), stream);
     if (status != tpuRtSuccess) {
@@ -552,9 +552,8 @@ PythonModel::PythonModel(const std::string &model_file, int dev_id, const std::s
   m_dev_id    = dev_id;
   bm_dev_request(&bm_handle, dev_id);
   p_bmrt      = bmrt_create(bm_handle);
-  bool flag   = true;
   if(decrypt_lib.empty()){
-    flag = bmrt_load_bmodel(p_bmrt, model_file.c_str());
+    assert(bmrt_load_bmodel(p_bmrt, model_file.c_str()) == true);
   }else{
     assert(0);
   }
@@ -562,7 +561,6 @@ PythonModel::PythonModel(const std::string &model_file, int dev_id, const std::s
   at::Device device(at::DeviceType::TPU, dev_id);
   torch_tpu::utils::maybe_initialize_tpu(device);
 
-  assert(flag == true);
   const char **net_names = NULL;
   bmrt_get_network_names(p_bmrt, &net_names);
   m_net_num     = bmrt_get_network_number(p_bmrt);
@@ -605,11 +603,9 @@ void PythonNet::forward(std::vector<py::object>& inputs, std::vector<py::object>
     output_tensors[idx].device_mem.u.device.device_addr = (unsigned long long) data_ptr;
   }
 
-  auto ret = bmrt_launch_tensor_ex(p_bmrt, name.c_str(), input_tensors.data(), num_input, output_tensors.data(), num_output, true, false);
+ assert(bmrt_launch_tensor_ex(p_bmrt, name.c_str(), input_tensors.data(), num_input, output_tensors.data(), num_output, true, false) == true);
 
-  assert(true == ret);
-  auto status = bm_thread_sync(bm_handle);
-  assert(BM_SUCCESS == status);
+  assert(bm_thread_sync(bm_handle) == BM_SUCCESS);
 }
 
 void PythonNet::forward_sync(std::vector<py::object>& inputs, std::vector<py::object>& outputs){

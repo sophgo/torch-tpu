@@ -6,9 +6,7 @@
 #include <c10/core/impl/InlineStreamGuard.h>
 
 #include "torch_tpu/csrc/core/TPUGuardImpl.h"
-#if defined BACKEND_SG2260
 #include "torch_tpu/csrc/core/TPUStream.h"
-#endif
 #include <cstddef>
 
 using namespace c10;
@@ -144,7 +142,6 @@ struct OptionalTPUGuard {
   c10::impl::InlineOptionalDeviceGuard<c10_tpu::impl::TPUGuardImpl> guard_;
 };
 
-#if defined BACKEND_SG2260
 /// A variant of StreamGuard that is specialized for TPU.  See TPUGuard
 /// for when you can use this.
 struct TPUStreamGuard {
@@ -306,6 +303,5 @@ struct TPUMultiStreamGuard {
   }
 };
 
-#endif
 
 } // namespace c10_tpu

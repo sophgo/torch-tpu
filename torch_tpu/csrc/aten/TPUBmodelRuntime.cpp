@@ -123,7 +123,7 @@ struct BModelRunnerImpl
             rt_outputs.push_back(t);
         }
 
-        auto stream = c10_tpu::getCurrentTPUStream();
+        auto stream = (tpuRtStream_t)c10_tpu::getCurrentTPUStream().stream();
         if ( non_blocking ) {
             auto status = tpuRtLaunchNetAsync(m_net, rt_inputs.data(), rt_outputs.data(), m_running_net_info.name, stream);
             TORCH_CHECK(tpuRtSuccess == status, "tpuRtLaunchNetAsync ERROR!!!");

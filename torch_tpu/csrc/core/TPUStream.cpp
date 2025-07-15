@@ -1,26 +1,9 @@
-#include <array>
-#include <climits>
-#include <atomic>
-#include <cstdint>
-#include <cstring>
-#include <vector>
-#include <sys/time.h>
-#include <unistd.h>
-#include <iostream>
-
 #include <c10/core/Stream.h>
 #include <c10/util/CallOnce.h>
-
-#include "torch_tpu/csrc/core/TPUStream.h"
-#include "torch_tpu/csrc/core/TPUFunction.h"
-#include "torch_tpu/csrc/core/TPUGuard.h"
-#include "torch_tpu/csrc/core/TPUException.h"
 #include "TPUMacros.h"
+#include "KernelManager.hpp"
 
 #define tpuStreamNonBlocking 0x01 /**< Stream does not synchronize with stream 0 (the NULL stream) */
-
-extern tpu_module_t get_kernel_module(tpu_resource_t stream);
-
 namespace c10_tpu {
 namespace {
 
@@ -36,12 +19,8 @@ static std::once_flag device_flags[C10_COMPILE_TIME_MAX_TPUS];
 static std::atomic<uint32_t> 
         priority_counters[c10_tpu::max_compile_time_stream_priorities][C10_COMPILE_TIME_MAX_TPUS];
 
-#ifdef BACKEND_SG2260
-static sgrt::sgrtStream_t 
-        streams[c10_tpu::max_compile_time_stream_priorities][C10_COMPILE_TIME_MAX_TPUS][kStreamsPerPool];
-static sgrt::sgrtStream_t
-        default_streams[C10_COMPILE_TIME_MAX_TPUS] = {nullptr};
-#endif
+static tpuStream_t streams[c10_tpu::max_compile_time_stream_priorities][C10_COMPILE_TIME_MAX_TPUS][kStreamsPerPool];
+static tpuStream_t default_streams[C10_COMPILE_TIME_MAX_TPUS] = {nullptr};
 
 static tpudnnHandle_t tpudnn_handles[C10_COMPILE_TIME_MAX_TPUS] = {0};
 
@@ -157,23 +136,11 @@ static void initDeviceStreamState(c10::DeviceIndex device_index) {
   }
 #endif
 
-#ifdef BACKEND_SG2260
-  C10_TPU_CHECK(sgrt::SgrtCreateStream(&default_streams[device_index]));
-  std::cout << "Stream created for device " << int(device_index) << std::endl;
-#endif
-
-  // The goal is to remove all runtime dependencies in torch-tpu,
-  // then we can use tpudnnCreate to create tpuDNN handle. Util then
-  // we have to keep all the resource management logic around.
-  //
-  // And don't bother freeing tpuDNN handles.
-#ifdef BACKEND_SG2260
+  // create stream and load kernel module
+  tpuStreamCreate(&default_streams[device_index]);
+  auto module = tpu::KernelManager::Instance()->RegisterKernelModule(default_streams[device_index]);
   auto stream = default_streams[device_index];
-#else
-  auto stream = tpu::TPUGetDeviceResource();
-#endif
-  auto kmodule = get_kernel_module(stream);
-  tpudnn_handles[device_index] = tpudnnHandleFromStream(device_index, stream, kmodule);
+  tpudnn_handles[device_index] = tpudnnHandleFromStream(device_index, stream, module);
 }
 
 static void initTPUStreamsOnce() {
@@ -229,8 +196,7 @@ TPUStream TPUStreamForId(DeviceIndex device_index, StreamId stream_id) {
     return tpudnn_handles[device_index];
   }
 
-#ifdef BACKEND_SG2260
- sgrt::sgrtStream_t TPUStream::stream() const {
+ tpuStream_t TPUStream::stream() const {
   c10::DeviceIndex device_index = stream_.device_index();
   StreamId stream_id = stream_.id();
   StreamIdType st = streamIdType(stream_id);
@@ -247,7 +213,7 @@ TPUStream TPUStreamForId(DeviceIndex device_index, StreamId stream_id) {
         " official API like c10::cuda::getStreamFromPool() to get a new stream.");
     return default_streams[device_index];
   } else if (st.isExt()) {
-    return reinterpret_cast<sgrt::sgrtStream_t>(stream_id);
+    return reinterpret_cast<tpuStream_t>(stream_id);
   } else {
     auto streamType = st.getStreamType();
     TORCH_INTERNAL_ASSERT(
@@ -271,16 +237,15 @@ void tpuSynchronizeDevice() {
   //
   // We have only one stream now, so it is safe to
   // replace device sync with stream sync.
-  SgrtSynchronizeStream(getCurrentTPUStream());
+  getCurrentTPUStream().synchronize();
 }
 
 TPUStream getStreamFromExternal(
-    tpuRtStream_t ext_stream,
+    tpuStream_t ext_stream,
     DeviceIndex device_index) {
   // The stream pointer will be the actual id
   return TPUStreamForId(device_index, reinterpret_cast<int64_t>(ext_stream));
 }
-#endif // BACKEND_SG2260
 
 // Returns a stream from the requested pool
 // Note: when called the first time on a device, this will create the

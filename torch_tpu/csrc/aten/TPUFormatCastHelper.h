@@ -5,7 +5,6 @@
 #include <unordered_map>
 
 #include "torch_tpu/csrc/core/TPUStorageImpl.h"
-#include <sgdnn_api.h>
 using namespace torch_tpu;
 
 namespace at_tpu

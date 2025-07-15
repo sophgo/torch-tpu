@@ -35,19 +35,23 @@ namespace at
             int64_t value_;
             if (self.dtype() == caffe2::TypeMeta::Make<float>())
             {
-                *(float *)(&value_) = fill_value.toFloat();
+                auto value = fill_value.toFloat();
+                memcpy(&value_, &value, sizeof(float));
             }
             else if (self.dtype() == caffe2::TypeMeta::Make<at::Half>())
             {
-                *(at::Half *)(&value_) = fill_value.toHalf();
+                auto fp16 = fill_value.toHalf();
+                memcpy(&value_, &fp16, sizeof(at::Half));
             }
             else if (self.dtype() == caffe2::TypeMeta::Make<at::BFloat16>())
             {
-                *(at::BFloat16 *)(&value_) = fill_value.toBFloat16();
+                auto bf16 = fill_value.toBFloat16();
+                memcpy(&value_, &bf16, sizeof(at::BFloat16));
             }
              else if (self.dtype() == caffe2::TypeMeta::Make<int>())
             {
-                *(int *)(&value_) = fill_value.toInt();
+                auto value = fill_value.toInt();
+                memcpy(&value_, &value, sizeof(int));
             }
             else
             {

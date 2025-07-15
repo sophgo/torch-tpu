@@ -1,5 +1,3 @@
-#if defined BACKEND_SG2260
-
 #include <pybind11/chrono.h>
 #include <torch/python.h>
 
@@ -25,5 +23,3 @@ __attribute__((constructor)) void ProcessGroupSCCLConstructor() {
       module.attr("Backend").attr("register_backend");
   register_backend("SCCL", py::cpp_function(c10d::ProcessGroupSCCL::createProcessGroupSCCL), true, "tpu");
 }
-
-#endif // BACKEND_SG2260

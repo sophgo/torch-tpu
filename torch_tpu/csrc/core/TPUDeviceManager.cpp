@@ -1,225 +1,437 @@
-
+#include <unistd.h>
 #include <vector>
-#include <unordered_map>
+#include <unordered_set>
 #include <mutex>
 #include <iostream>
-#include <thread>
-#include <atomic>
-
 #include <c10/util/Logging.h>
 #include <c10/core/DeviceType.h>
+#include <sys/time.h>
 #include "TPUDeviceManager.h"
-
-#ifdef BACKEND_1684X
-#include <sgdnn_api.h>
-#include "TPUTorchUtils.h"
-
+#include "TPUStream.h"
+#include <tpu_runtime_api.h>
+#include "KernelManager.hpp"
 namespace tpu
 {
-#ifdef SHOW_MALLOC_INFO
-static unsigned long long mem_in_use = 0;
-#endif
+using Devptr = unsigned char *;
+
+static inline size_t alignTo(size_t s, size_t n)
+{
+  return (s + n - 1) / n * n;
+}
+
+size_t getTPUAllocatorFreeDelay()
+{
+  const char *delay = getenv("TPU_ALLOCATOR_FREE_DELAY_IN_MS");
+  if (!delay) return 0;
+  return atoi(delay);
+}
+
+size_t getTPUAllocatorForcedTTL()
+{
+  const char *delay = getenv("TPU_ALLOCATOR_FORCED_TTL_IN_MS");
+  if (!delay) return 0;
+  return atoi(delay);
+}
+
+size_t getTPUAllocatorAlignSize(size_t defaultVal)
+{
+  const char *size = getenv("TPU_ALLOCATOR_ALIGN_SIZE");
+  if (!size) return defaultVal;
+  return atoi(size);
+}
+
+bool getEnableAllocatorReuse()
+{
+  const char *reuseEnabled = getenv("TPU_ALLOCATOR_REUSE");
+  if (!reuseEnabled) return true;
+  return atoi(reuseEnabled);
+}
+
+int getVisibleDeviceCount()
+{
+  int DeviceCount = 0;
+  const char *visibe_tpu_num = getenv("TPU_VISIBLE_NUM");
+  if (visibe_tpu_num) DeviceCount = atoi(visibe_tpu_num);
+  return DeviceCount;
+}
+
+static std::shared_ptr<TPUDeviceManager> devMgrPtr;
+static int VISIBLE_DEVICE_NUM = getVisibleDeviceCount();
+
 
 class TPUDeviceManager
 {
 private:
-  TPUDeviceManager()
-  {
-    int DeviceCount = 0;
-    bm_status_t Status = bm_dev_getcount ( &DeviceCount );
-    char * MaxDeviceCountStr = nullptr;
-    if ( ( MaxDeviceCountStr = getenv ( "SG_MAX_DEVICE_COUNT" ) ) )
-    {
-      int MaxDeviceCount = atoi ( MaxDeviceCountStr );
-      TORCH_CHECK ( MaxDeviceCount > 0 );
-      if ( DeviceCount > MaxDeviceCount )
-      {
-        DeviceCount = MaxDeviceCount;
+  struct MemToFree {
+    void *ptr;
+    tpuEvent_t event;
+    tpuStream_t stream;
+    uint64_t marked_timestamp = 0, freed_timestamp = 0;
+  };
+
+  struct MemInfo {
+    size_t size;
+  };
+  bool disable_ins_cache = false;
+public:
+  TPUDeviceManager() : init_flag_(false) {
+    this->initialize();
+    disable_ins_cache = std::getenv("DISABLE_CACHE") != nullptr;
+  }
+
+  ~TPUDeviceManager() {
+    int device = -1;
+    auto ret = tpuGetDevice(&device);
+    if (device >= 0 && ret == tpuSuccess) {
+      std::lock_guard<std::mutex> lock(mutexes_[device]);
+      for (const auto& [key, value] : mem_info_[device]) {
+        tpuFree(key);
       }
     }
-    TORCH_CHECK ( Status == BM_SUCCESS, "Failed to get TPU device count" );
+  }
+
+  TPUMgrStatus Initialized() { return init_flag_ ? INIT_ALREADY : NOT_INIT;}
+
+  TPUMgrStatus initialize()
+  {
+    if (init_flag_) return INIT_SUCCESS;
+
+    tpuInit();
+
+    int DeviceCount = 0;
+    tpuError_t Status = tpuGetDeviceCount ( &DeviceCount );
+    TORCH_CHECK ( Status == tpuSuccess, "Failed to get TPU device count" );
+    if (DeviceCount == 0) {
+      std::cout << "Device Count:" << DeviceCount << "\n";
+      DeviceCount = 1;
+
+      char* size = getenv("OMPI_COMM_WORLD_SIZE");
+      if (size == nullptr) {
+          size = getenv("LOCAL_WORLD_SIZE");
+      }
+      if(size != nullptr) {
+        DeviceCount = atoi(size);
+      }
+    }
+
+
     if ( DeviceCount > 0 )
     {
-      Handles_.resize ( DeviceCount, nullptr );
-      Mutexes_ = std::vector<std::mutex> ( DeviceCount );
-      AddrMemMaps_ = std::vector<std::unordered_map<unsigned long long, sg_device_mem_t>> ( DeviceCount );
-    }
-  }
+      mutexes_ = std::vector<std::mutex>(DeviceCount);;
+      free_tbds_.resize(DeviceCount);
+      mem_info_.resize(DeviceCount);
 
-  ~TPUDeviceManager()
-  {
-    for ( auto it : Handles_ )
+      devices_init_ = std::vector<std::atomic<bool>> ( DeviceCount );
+      device_count_ = DeviceCount;
+      devices_init_[0] = 1; // tpuRtDeviceInit will default set idx = 0 device. that not a good idea.
+    }
+    LOG( INFO ) << "TPU Device Manager init successfully\n";
+#if 0
+    // for multi-chip debug
+    const char *rankStr = getenv("LOCAL_RANK");
+    int rank = 0;
+    if (rankStr)
+        rank = atoi(rankStr);
+    if (rank == 0)
     {
-      if (it != nullptr){
-        sgdnnDeinitialize ( it );
-        bm_dev_free ( it );
-      }
+        volatile int i = 0;
+        printf("PID %d ready for attach\n", getpid());
+        fflush(stdout);
+        while (0 == i);
     }
+#endif
+    forced_ttl_ = getTPUAllocatorForcedTTL();
+    free_delay_ = getTPUAllocatorFreeDelay();
+    init_flag_ = true;
+    return INIT_SUCCESS;
   }
 
-  TPUDeviceManager(const TPUDeviceManager&) = delete;
-  TPUDeviceManager& operator=(const TPUDeviceManager&) = delete;
-
-public:
+  TPUMgrStatus InitDevice(int Index ){
+    auto Status = tpuSetDevice( Index );
+    TORCH_CHECK (Status == tpuSuccess, " sgSetDevice failed! Error Code : #", Status);
+    return INIT_SUCCESS;
+  }
 
   static TPUDeviceManager& GetInstance()
   {
-    static TPUDeviceManager instance;
-    return instance;
+    static std::once_flag flag;
+    std::call_once(
+      flag,
+      [&](){
+        devMgrPtr = std::make_shared<TPUDeviceManager>();
+      });
+    return *devMgrPtr;
+  }
+
+  static void DeleteInstance()
+  {
+    devMgrPtr.reset();
   }
 
   int GetDeviceCount() const
   {
-    return ( int ) Handles_.size();
+    return device_count_;
   }
 
-  bm_handle_t GetDeviceHandle ( int Index ) const
+  size_t getSize(void *ptr, int i)
   {
-    if ( Index < 0 || Index > ( int ) Handles_.size() - 1 )
+    auto &mem_info = getMemInfo(i);
+    if (mem_info.find(ptr) == mem_info.end())
     {
-      return nullptr;
+      return 0;
     }
-    else
+    return mem_info[ptr].size;
+  }
+
+  inline static uint64_t gettime()
+  {
+    struct timeval t;
+    gettimeofday ( &t, NULL );
+    uint64_t now = (t.tv_sec * 1000000UL + t.tv_usec) / 1000UL;
+    return now;
+  }
+
+  void *processFreeTBDs(size_t size, int index)
+  {
+    auto now = gettime();
+
+    std::lock_guard<std::mutex> lock(getMutex(index));
+
+    void *reusedPtr = nullptr;
+    std::vector<void *> toRm;
+    auto &freeTBDs = getFreeTBDs(index);
+    static bool reuseEnabled = getEnableAllocatorReuse();
+    for (auto &pair : freeTBDs)
     {
-      return Handles_[Index];
+      auto &event = pair.second.event;
+      auto &tbd = pair.second;
+      if (tbd.freed_timestamp == 0)
+      {
+        if (forced_ttl_)
+        {
+            if (tbd.marked_timestamp + forced_ttl_ < now)
+              tbd.freed_timestamp = now;
+            else continue;
+        } else {
+            if (tpuEventQuery(event) == tpuSuccess)
+            {
+              tbd.freed_timestamp = now;
+            } else {
+                continue;
+            }
+        }
+      }
+      if (reuseEnabled && !reusedPtr && getSize(tbd.ptr, index) == size)
+      {
+        // Reuse it
+        toRm.push_back(tbd.ptr);
+        reusedPtr = tbd.ptr;
+        //std::cout << "Re-use " << reusedPtr << std::endl;
+        break;
+      }
+      if (tbd.freed_timestamp + free_delay_ > now)
+      {
+        continue;
+      }
+      if (!disable_ins_cache){
+        c10_tpu::getCurrentTPUStream().synchronize();
+      }
+      tpuFree(tbd.ptr);
+      // std::cout << "Free " << tbd.ptr << " of size " << getSize(tbd.ptr, index) << std::endl;
+      getMemInfo(index).erase(tbd.ptr);
+      toRm.push_back(tbd.ptr);
     }
+
+    for (auto ptr : toRm)
+    {
+      auto &tbd = freeTBDs[ptr];
+      if (!forced_ttl_)
+        tpuEventDestroy(tbd.event, tbd.stream);
+      freeTBDs.erase(ptr);
+    }
+
+#ifdef PROFILE_MEMORY_REUSE
+    size_t sizeDefered = 0;
+    size_t sizeDelayed = 0;
+    for (auto &pair : freeTBDs)
+    {
+      auto &tbd = pair.second;
+      if (tbd.freed_timestamp == 0)
+        sizeDefered += getSize(tbd.ptr, index);
+      else
+        sizeDelayed += getSize(tbd.ptr, index);
+    }
+    std::cout << "===== Memory defered by TPU tasks " << sizeDefered
+              << ". Memory delayed by reuse strategy " << sizeDelayed
+              << std::endl;
+#endif
+
+    return reusedPtr;
   }
 
   void * Alloc ( size_t Size, int Index )
   {
-    Mutexes_[Index].lock();
+    static size_t alignSize = getTPUAllocatorAlignSize(0x100000);
+    Size = alignTo(Size, alignSize);
+
+    auto reused = processFreeTBDs(Size, Index);
+    if (reused)
+      return (void*)UnifiedAddr((unsigned long long) reused, Index);
+
     if ( Size == 0 )
     {
-      Mutexes_[Index].unlock();
       return nullptr;
     }
+    Devptr dev_ptr;
 
-#ifdef SHOW_MALLOC_INFO
-    static int malloc_num = 0;
-    malloc_num++;
-    mem_in_use += ( unsigned int ) Size;
-    std::cout << "[Malloc] id = " << malloc_num << ", size = " << Size  << " bytes"
-              << ", Current Mem = " << ( mem_in_use >> 20 ) << "MB" << std::endl;
-#endif
+    // Try to allocate memory, if failed, free all reserved memory and retry once
+    auto tryAllocate = [&]() -> tpuError_t{
+      return tpuMalloc((void **)(&dev_ptr), Size);
+    };
 
-    // TORCH_CHECK ( Size < ( 1UL << 32 ), "TPU only allows to allocate memory with size smaller than (2^32) bytes" );
-    bm_handle_t Handle = GetDeviceHandle ( Index );
-    TORCH_CHECK ( Handle != nullptr, "TPU handle of device #", Index, " is null" );
-    sg_device_mem_t Mem;
-    bm_status_t Status = sg_malloc_device_byte ( Handle, &Mem, Size );
-    TORCH_CHECK ( Status == BM_SUCCESS, "Failed to allocate memory on TPU device #", Index, " size = ", Size, "bytes" );
-    unsigned long long Addr = sg_mem_get_device_addr ( Mem );
-    AddrMemMaps_[Index].emplace ( Addr, Mem );
-
-#ifdef SHOW_INFO
-    std::cout << "Alloc addr = " << ( void * ) Addr << " size = " << Size << std::endl;
-    std::cout << "====================================" << std::endl;
-    for ( auto iter : AddrMemMaps_[Index] )
-    {
-      std::cout << ( void * ) iter.first << " ";
+    tpuError_t Status = tryAllocate();
+    if (Status != tpuSuccess) {
+      std::cout << "First allocation failed, trying to free cache and retry. Device: #" << Index << " Size: " << Size << "bytes" << std::endl;
+      EmptyCache(Index);
+      Status = tryAllocate();
     }
-    std::cout << std::endl;
-    std::cout << "====================================" << std::endl;
-#endif
-    Mutexes_[Index].unlock();
-    return ( void * ) UnifiedAddr(Addr, Index);
+    TORCH_CHECK(Status == tpuSuccess, "Failed to allocate memory on TPU device #", Index, " size = ", Size, "bytes");
+
+    MemInfo info;
+    info.size = Size;
+    auto ptr = ( void * ) UnifiedAddr((unsigned long long) dev_ptr, Index);
+    std::lock_guard<std::mutex> lock(getMutex(Index));
+    getMemInfo(Index)[dev_ptr] = info;
+
+    // std::cout << "Alloc " << ptr << " of size " << Size << std::endl;
+    return ptr;
   }
 
   void Free ( void * Ptr, int Index )
   {
-    Mutexes_[Index].lock();
     if ( Ptr == nullptr )
     {
-      Mutexes_[Index].unlock();
       return;
     }
-    bm_handle_t Handle = GetDeviceHandle ( Index );
-    TORCH_CHECK ( Handle != nullptr, "TPU handle of device #", Index, " is null" );
-    auto Iter = AddrMemMaps_[Index].find ( ( unsigned long long ) Ptr );
-    TORCH_CHECK ( Iter != AddrMemMaps_[Index].end(), "Memory of address = ", Ptr, " is not found" );
-    sg_free_device ( Handle, Iter->second );
 
-#ifdef SHOW_MALLOC_INFO
-    static int free_num = 0;
-    free_num++;
-    mem_in_use -= Iter->second.size;
-    std::cout << "[Free] id = " << free_num << ", size = " << Iter->second.size << " bytes"
-              << ", Current Mem = " << ( mem_in_use >> 20 ) << "MB" << std::endl;
-#endif
-    AddrMemMaps_[Index].erase ( Iter );
-#ifdef SHOW_INFO
-    std::cout << "Free addr = " << Ptr << std::endl;
-    std::cout << "====================================" << std::endl;
-    for ( auto iter : AddrMemMaps_[Index] )
+    MemToFree tbd;
+    tbd.stream = c10_tpu::getCurrentTPUStream().stream();
+    std::lock_guard<std::mutex> lock(getMutex(Index));
+
+    auto &memInfo = getMemInfo(Index);
+    if (memInfo.find(Ptr) == memInfo.end())
+      return;
+
+    auto &freeTBDs = getFreeTBDs(Index);
+    if (freeTBDs.find(Ptr) != freeTBDs.end())
+      return;
+
+    tbd.ptr = Ptr;
+    if (forced_ttl_)
+      tbd.marked_timestamp = gettime();
+
+    auto status = tpuEventCreate(&tbd.event);
+    TORCH_CHECK (status == tpuSuccess, "Failed to create event");
+    status = tpuEventRecord(tbd.event, tbd.stream);
+    TORCH_CHECK (status == tpuSuccess, "Failed to record stream");
+    freeTBDs[Ptr] = tbd;
+  }
+
+  void EmptyCache( int Index )
+  {
+    std::lock_guard<std::mutex> lock(getMutex(Index));
+    auto &freeTBDs = getFreeTBDs(Index);
+    std::vector<void *> toRm;
+    for (auto &pair : freeTBDs)
     {
-      std::cout << ( void * ) iter.first << " ";
+      auto &event = pair.second.event;
+      auto &tbd = pair.second;
+      if (tpuEventQuery(event) == tpuSuccess)
+      {
+        // std::cout << "Free " << tbd.ptr << " of size " << getSize(tbd.ptr, index) << std::endl;
+        tpuFree(tbd.ptr);
+        getMemInfo(Index).erase(tbd.ptr);
+        toRm.push_back(tbd.ptr);
+      } else {
+          continue;
+      }
     }
-    std::cout << std::endl;
-    std::cout << "====================================" << std::endl;
-#endif
-    Mutexes_[Index].unlock();
+    for (auto ptr : toRm)
+    {
+      auto &tbd = freeTBDs[ptr];
+      tpuEventDestroy(tbd.event, tbd.stream);
+      freeTBDs.erase(ptr);
+    }
   }
 
-  void CopyHostToDevice ( void * Dst, const void * Src, size_t Size, int Index )
+  void CopyHostToDevice ( void * Dst, const void * Src, size_t Size, int Index, bool non_blocking )
   {
-#ifdef SHOW_INFO
-    std::cout << "Copy Host = " << Src << " to Device = " << Dst << " Size = " << Size << std::endl;
-#endif
-    bm_handle_t Handle = GetDeviceHandle ( Index );
-    TORCH_CHECK ( Handle != nullptr, "TPU handle of device #", Index, " is null" );
-    sg_device_mem_t DstMem = sg_mem_from_device ( ( unsigned long long ) Dst, Size );
-    bm_status_t Status = sg_memcpy_s2d ( Handle, DstMem, ( void * ) Src );
-    TORCH_CHECK ( Status == BM_SUCCESS, "Failed to copy memory from host to TPU device #", Index, " size = ", Size, "bytes" );
+    tpuError_t Status;
+    auto stream = c10_tpu::getDefaultTPUStream();
+    tpudnnFlush(stream);
+    tpuStreamSynchronize(stream.stream());
+    if (!non_blocking) {
+      Status = tpuMemcpyH2D(Dst, Src, Size);
+    } else {
+      // struct timeval timer, end, timer1;
+      // gettimeofday ( &timer1, NULL );
+      // gettimeofday ( &timer, NULL );
+      Status = tpuMemcpyH2DAsync(Dst, Src, Size, stream);
+      // gettimeofday ( &end, NULL );
+      // std::cout << " tpuRtMemcpyS2DAsync getstream time : " << ( timer.tv_sec - timer1.tv_sec ) * 1000000UL + ( timer.tv_usec - timer1.tv_usec ) << "us\n";
+      // std::cout << " sgMemcpyS2SAsync  time : " << ( end.tv_sec - timer.tv_sec ) * 1000000UL + ( end.tv_usec - timer.tv_usec ) << "us\n";
+    }
+    TORCH_CHECK ( Status == tpuSuccess, "Failed to copy memory from host to TPU device #", Index, " size = ", Size, "bytes" );
   }
 
-  void CopyDeviceToHost ( void * Dst, const void * Src, size_t Size, int Index )
+  void CopyDeviceToHost ( void * Dst, const void * Src, size_t Size, int Index, bool non_blocking )
   {
-#ifdef SHOW_INFO
-    std::cout << "Copy Device = " << Src << " to Host = " << Dst << " Size = " << Size << std::endl;
-#endif
-    bm_handle_t Handle = GetDeviceHandle ( Index );
-    TORCH_CHECK ( Handle != nullptr, "TPU handle of device #", Index, " is null" );
-    sg_device_mem_t SrcMem = sg_mem_from_device ( ( unsigned long long ) Src, Size );
-    bm_status_t Status = sg_memcpy_d2s ( Handle, Dst, SrcMem );
-    TORCH_CHECK ( Status == BM_SUCCESS, "Failed to copy memory from TPU device #", Index, " to host size = ", Size, "bytes" );
+    tpuError_t Status;
+    auto stream = c10_tpu::getDefaultTPUStream();
+    tpudnnFlush(stream);
+    tpuStreamSynchronize(stream.stream());
+    if(!non_blocking) {
+      Status = tpuMemcpyD2H(Dst, Src, Size);
+    } else {
+      // struct timeval timer1, timer, end;
+      // gettimeofday ( &timer1, NULL );
+      // gettimeofday ( &timer, NULL );
+      Status = tpuMemcpyD2HAsync(Dst, Src, Size, stream);
+      // gettimeofday ( &end, NULL );
+      // std::cout << " tpuRtMemcpyD2SAsync getstream time : " << ( timer.tv_sec - timer1.tv_sec ) * 1000000UL + ( timer.tv_usec - timer1.tv_usec ) << "us\n";
+      // std::cout << " tpuRtMemcpyD2SAsync  time : " << ( end.tv_sec - timer.tv_sec ) * 1000000UL + ( end.tv_usec - timer.tv_usec ) << "us\n";
+    }
+    TORCH_CHECK ( Status == tpuSuccess, "Failed to copy memory from TPU device #", Index, " to host size = ", Size, "bytes" );
   }
 
-void CopyDeviceToDevice(void* Dst, const void* Src, size_t Size, int Index)
-{
-#ifdef SHOW_INFO
-  std::cout << "Copy Device = " << Src << " to Device = " << Dst << " Size = " << Size << std::endl;
-#endif
-  bm_handle_t Handle = GetDeviceHandle(Index);
-  TORCH_CHECK(Handle != nullptr, "TPU handle of device #", Index, " is null");
-  // no sg_memcpy_d2d, use multiple bm_memcpy_d2d
-  const size_t chunkSize = __INT32_MAX__ - 65535; // avoid tpu_gdma_cpy_S2S overflow
-  const size_t numChunks = (Size + chunkSize - 1) / chunkSize;
-
-  for (size_t i = 0; i < numChunks; ++i)
+  void CopyDeviceToDevice ( void * Dst, const void * Src, size_t Size, int Index, bool non_blocking )
   {
-    size_t chunkOffset = i * chunkSize;
-    size_t chunkCopySize = std::min(chunkSize, Size - chunkOffset);
-
-    auto DstMem = bm_mem_from_device((unsigned long long)Dst + chunkOffset, chunkCopySize);
-    auto SrcMem = bm_mem_from_device((unsigned long long)Src + chunkOffset, chunkCopySize);
-
-    bm_status_t Status = BM_SUCCESS;
-    Status = bm_memcpy_d2d_byte ( Handle, DstMem, 0, SrcMem, 0, chunkCopySize );
-    TORCH_CHECK (Status == BM_SUCCESS, "D2D failed! Error Code : #", Status );
+    auto stream = c10_tpu::getDefaultTPUStream();
+    tpudnnTensor_t input = {.addr = tpudnnPhysToVirt(stream, (uint64_t)Src), .dim = 1, .dtype = TPUDNN_DTYPE_INT8};
+    tpudnnTensor_t output = {.addr = tpudnnPhysToVirt(stream, (uint64_t)Dst), .dim = 1, .dtype = TPUDNN_DTYPE_INT8};
+    input.shape[0] = output.shape[0] = Size;
+    input.stride[0] = output.stride[0] = 1;
+    auto Status = tpudnnStridedCopyAsync(stream, input, output);
+    TORCH_CHECK (Status == TPUDNN_STATUS_SUCCESS, "TPU device #", Index, "D2D failed! Error Code : #", Status);
   }
-}
-
-  bm_handle_t& get_device_handle(int i){ return Handles_[i];}
-  std::mutex& get_handle_mutex(int i) { return Mutexes_[i]; }
-  std::unordered_map<unsigned long long, sg_device_mem_t>& getAddrMems(int i) { return AddrMemMaps_[i]; }
 
 private:
-  std::vector<bm_handle_t> Handles_;
-  std::vector<std::mutex> Mutexes_;
-  std::vector<std::unordered_map<unsigned long long, sg_device_mem_t>> AddrMemMaps_;
-};
+  std::mutex& getMutex(int i) { return mutexes_[i]; }
+  std::unordered_map<void *, MemInfo>& getMemInfo(int i) { return mem_info_[i]; }
+  std::unordered_map<void *, MemToFree> &getFreeTBDs(int i) { return free_tbds_[i]; }
 
-static thread_local int kIndex = 0;
+  std::vector<std::mutex> mutexes_;
+  std::vector<std::unordered_map<void *, MemToFree>> free_tbds_;
+  std::vector<std::unordered_map<void *, MemInfo>> mem_info_;
+
+  int device_count_;
+  size_t free_delay_, forced_ttl_;
+  std::atomic<bool> init_flag_;
+  std::vector<std::atomic<bool>> devices_init_;
+
+  TPUDeviceManager(const TPUDeviceManager&) = delete;
+  TPUDeviceManager& operator=(const TPUDeviceManager&) = delete;
+};
 
 TPUDeviceManager* TPUGetInstance(){
   return &TPUDeviceManager::GetInstance();
@@ -227,13 +439,34 @@ TPUDeviceManager* TPUGetInstance(){
 
 void TPUDeleteInstance()
 {
-  // Do nothing currently
+  if (auto stream = c10_tpu::getDefaultTPUStream()) {
+    stream.synchronize();
+    KernelManager::Instance()->UnloadKernelModule(stream.stream());
+    tpuStreamDestroy(stream.stream());
+  }
+  TPUDeviceManager::DeleteInstance();
 }
 
-TPUMgrStatus InitTPUMgr() { TPUSetDeviceIndex(0); return INIT_SUCCESS; }
-TPUMgrStatus DestoryTpuMgr() { return DESTORY_SUCCESS;}
-TPUMgrStatus IsTPUMgrInited() { return INIT_ALREADY; }
-TPUMgrStatus TPUDeviceInitialize( int Index) { TPUSetDeviceIndex(Index); return INIT_SUCCESS;}
+TPUMgrStatus InitTPUMgr()
+{
+  return TPUGetInstance()->initialize();
+}
+
+TPUMgrStatus DestoryTpuMgr()
+{
+   delete TPUGetInstance();
+   return DESTORY_SUCCESS;
+}
+
+TPUMgrStatus IsTPUMgrInited()
+{
+  return TPUGetInstance()->Initialized();
+}
+
+TPUMgrStatus TPUDeviceInitialize( int Index ) {
+  InitTPUMgr();
+  return TPUDeviceManager::GetInstance().InitDevice(Index);
+}
 
 int TPUGetDeviceCount ( void )
 {
@@ -242,37 +475,30 @@ int TPUGetDeviceCount ( void )
 
 int TPUGetDeviceIndex ( void )
 {
-  return kIndex;
+  int DevIndex;
+  auto Status = tpuGetDevice( &DevIndex );
+  if (Status == tpuErrorNoDevice) {
+    DevIndex = 0;
+    TPUDeviceInitialize(DevIndex);
+  } else
+  {
+    TORCH_CHECK (Status == tpuSuccess, " sgGetDevice failed! Error Code : #", Status);
+  }
+  if (!VISIBLE_DEVICE_NUM)
+    return DevIndex;
+  else
+    return DevIndex % VISIBLE_DEVICE_NUM;
 }
-
 
 void TPUSetDeviceIndex ( int Index )
 {
-  kIndex = Index;
-  if (kIndex == -1) kIndex = 0;
-
-  TPUDeviceManager::GetInstance().get_handle_mutex(kIndex).lock();
-  if ( kIndex >= TPUGetDeviceCount() || kIndex < 0){
-    TORCH_CHECK ( false, "Failed to request tpu device #", kIndex );
-  }
-  bm_handle_t& handle = TPUDeviceManager::GetInstance().get_device_handle(kIndex);
-  if (handle == nullptr){
-    auto Status = bm_dev_request ( &handle, kIndex );
-    TORCH_CHECK ( Status == BM_SUCCESS, "Failed to request tpu device #", kIndex );
-    Status = sgdnnInitialize ( handle );
-    TORCH_CHECK ( Status == BM_SUCCESS, "Failed to initialize SGDNN on tpu device #", kIndex );
-  }
-  TPUDeviceManager::GetInstance().get_handle_mutex(kIndex).unlock();
-}
-
-bm_handle_t TPUGetDeviceResource()
-{
-  return TPUDeviceManager::GetInstance().GetDeviceHandle ( kIndex );
+  auto Status = tpuSetDevice( Index );
+  TORCH_CHECK (Status == tpuSuccess, " sgSetDevice failed! Error Code : #", Status);
 }
 
 void * TPUAlloc ( size_t Size )
 {
-  return TPUDeviceManager::GetInstance().Alloc ( Size, kIndex );
+  return TPUDeviceManager::GetInstance().Alloc ( Size, TPUGetDeviceIndex() );
 }
 
 void * TPUAlloc ( size_t Size, int Index )
@@ -287,40 +513,92 @@ void TPUFree ( void * Ptr )
   TPUDeviceManager::GetInstance().Free ( (void *)data_ptr, dev_index );
 }
 
-void TPUEmptyCache () {};
-
-void TPUCopyHostToDevice ( void * Dst, const void * Src, size_t Size, bool non_blocking /*= false */ )
+void TPUEmptyCache ()
 {
+  TPUDeviceManager::GetInstance().EmptyCache( TPUGetDeviceIndex() );
+}
+
+
+void TPUCopyHostToDevice ( void * Dst, const void * Src, size_t Size,  bool non_blocking)
+{
+  if ( Size == 0 ) return;
   unsigned long long dev_index = GetDeviceIndexByUnifiedAddr((unsigned long long)Dst);
   unsigned long long dst_ptr = GetAddrByUnifiedAddr((unsigned long long)Dst);
-  TPUDeviceManager::GetInstance().CopyHostToDevice ( (void*)dst_ptr, Src, Size, dev_index );
+  TPUDeviceManager::GetInstance().CopyHostToDevice ( (void*)dst_ptr, Src, Size, dev_index, non_blocking );
 }
 
-void TPUCopyDeviceToHost ( void * Dst, const void * Src, size_t Size, bool non_blocking /*= false */ )
+void TPUCopyDeviceToHost ( void * Dst, const void * Src, size_t Size, bool non_blocking )
 {
+  if ( Size == 0 ) return;
   unsigned long long dev_index = GetDeviceIndexByUnifiedAddr((unsigned long long)Src);
   unsigned long long src_ptr = GetAddrByUnifiedAddr((unsigned long long)Src);
-  TPUDeviceManager::GetInstance().CopyDeviceToHost ( Dst, (void*)src_ptr, Size, dev_index );
+  TPUDeviceManager::GetInstance().CopyDeviceToHost ( Dst, (void*)src_ptr, Size, dev_index, non_blocking );
 }
 
-void TPUCopyDeviceToDevice ( void * Dst, const void * Src, size_t Size, bool non_blocking /*= false */ )
+void TPUCopyDeviceToDevice ( void * Dst, const void * Src, size_t Size, bool non_blocking )
 {
   unsigned long long src_index = GetDeviceIndexByUnifiedAddr((unsigned long long)Src);
   unsigned long long src_ptr = GetAddrByUnifiedAddr((unsigned long long)Src);
   unsigned long long dst_index = GetDeviceIndexByUnifiedAddr((unsigned long long)Dst);
   unsigned long long dst_ptr = GetAddrByUnifiedAddr((unsigned long long)Dst);
   TORCH_CHECK ( dst_index == src_index, "D2D copy must in same device");
-  TPUDeviceManager::GetInstance().CopyDeviceToDevice ( (void*)dst_ptr, (void*)src_ptr, Size, dst_index );
+  TPUDeviceManager::GetInstance().CopyDeviceToDevice ( (void*)dst_ptr, (void*)src_ptr, Size, dst_index, non_blocking );
 }
 
-/**
- * multi-chip Topology utils 
- */
-void TPUSetupC2CTopology() {}
-void TPUGetTopology(std::vector<std::vector<int>> *topo) {}
-void TPUGetC2CRing(int world_size, int *chipMap) {}
-int TPUCheckChipMap(int world_size, int *chipMap) { return 1; }
+tpuStream_t TPUGetDeviceResource ( void ) {
+  auto stream = c10_tpu::getCurrentTPUStream();
+  tpudnnFlush(stream);
+  return stream.stream();
+}
+
+void TPUGetC2CRing(int world_size, int *chipMap)
+{
+  tpudnnStatus_t status = tpudnnGetC2CRing(world_size, chipMap);
+  TORCH_CHECK (status == TPUDNN_STATUS_SUCCESS, " TPUGetC2CRing failed! Error Code : #", status);
+}
+
+void TPUSetupC2CTopology()
+{
+  auto status = tpuSetupTopology();
+  TORCH_CHECK (status == tpuSuccess, " TPUSetupC2CTopology failed! Error Code : #", status);
+}
+
+void TPUGetTopology(std::vector<std::vector<int>> *topo) {
+  int dev_cnt = 0;
+  auto Status = tpuGetDeviceCount( &dev_cnt );
+  TORCH_CHECK ( Status == tpuSuccess, "Failed to get TPU device count" );
+
+  for (int i = 0; i < dev_cnt; ++i) {
+      for (int j = 0; j < dev_cnt; ++j) {
+          (*topo)[i][j] = -1;
+      }
+  }
+
+  tpuTopology_t topology[dev_cnt][dev_cnt];
+  Status = tpuGetTopology((tpuTopology_t **)topology);
+  TORCH_CHECK (Status == tpuSuccess, " sgGetTopology failed! Error Code : #", Status);
+
+  for (int i = 0; i < dev_cnt; i++) {
+      for (int j = 0; j < dev_cnt; j++) {
+          auto info = topology[i][j];
+          if (info.paraent_port != -1) {
+              (*topo)[info.paraent_dev][info.child_dev]=info.paraent_port;
+          }
+      }
+  }
+}
+
+int TPUCheckChipMap(int world_size, int *chipMap)
+{
+  tpudnnStatus_t status = tpudnnCheckChipMap(world_size, chipMap);
+  return (int) status;
+}
+
+bool can_device_access_peer(c10::DeviceIndex device_id, c10::DeviceIndex peer_device_id) {
+  int dev_cnt =  TPUGetDeviceCount();
+  std::vector<std::vector<int>> topology(dev_cnt, std::vector<int>(dev_cnt, -1));
+  TPUGetTopology(&topology);
+  return topology[device_id][peer_device_id] != -1;
+}
 
 } // namespace tpu
-
-#endif // BACKEND_1684X

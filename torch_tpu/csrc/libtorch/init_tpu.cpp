@@ -33,13 +33,11 @@ void init_tpu(const at::Device& device) {
 
 void finalize_tpu() {
   if (tpu::IsTPUMgrInited() == tpu::INIT_ALREADY) {
-#ifdef BACKEND_SG2260
     try {
       c10_tpu::tpuSynchronizeDevice();
     } catch (std::exception& e) {
       TORCH_CHECK(false, "tpu SynchronizeDevice failed err=:%s", e.what());
     }
-#endif
     auto status = tpu::DestoryTpuMgr();
     if (status != tpu::DESTORY_SUCCESS) {
       TORCH_CHECK(false, "tpu finalize failed.\n");
@@ -56,9 +54,7 @@ namespace torch_tpu {
 
 void synchronize(int64_t device_index) {
   c10_tpu::TPUGuard device_guard(at::Device(at::DeviceType::PrivateUse1, device_index));
-#ifdef BACKEND_SG2260
   c10_tpu::tpuSynchronizeDevice();
-#endif
 }
 
 } // namespace torch_tpu

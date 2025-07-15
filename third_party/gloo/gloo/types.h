@@ -5,6 +5,7 @@
 #pragma once
 
 #include <iostream>
+#include <memory>
 
 #ifdef __CUDA_ARCH__
 #include <cuda.h>
@@ -333,9 +334,9 @@ inline float cpu_half2float(float16 h) {
   }
 
   unsigned temp = ((sign << 31) | (exponent << 23) | mantissa);
-
-  void* rp = &temp;
-  return *(float*)rp;
+  float result = 0;
+  memcpy(&result, &temp, sizeof(float));
+  return result;
 }
 
 } // namespace gloo

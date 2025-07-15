@@ -1,17 +1,7 @@
 cmake_minimum_required(VERSION 3.18 FATAL_ERROR)
 
 project(TORCH_TPU CXX)
-
-set(SOC_CROSS_MODE $ENV{SOC_CROSS_MODE})
-message(STATUS "SOC_CROSS_MODE: ${SOC_CROSS_MODE}")
-if(SOC_CROSS_MODE STREQUAL "ON")
-    message(STATUS "SOC_CROSS_MODE is ON")
-    if (BACKEND_SG2260)
-        set(CMAKE_TOOLCHAIN_FILE ${CMAKE_SOURCE_DIR}/firmware_core/sg2260-toolchain.cmake)
-    else()
-        set(CMAKE_C_COMPILER $ENV{CROSS_TOOLCHAINS}/gcc-arm-10.3-2021.07-x86_64-aarch64-none-linux-gnu/bin/aarch64-none-linux-gnu-gcc)
-    endif()
-endif()
+include(${CMAKE_SOURCE_DIR}/cross-toolchain.cmake)
 
 include(${CMAKE_CURRENT_SOURCE_DIR}/config.cmake)
 add_compile_options(-std=c++17 -Wno-attributes -Wall -fPIC)
@@ -37,19 +27,14 @@ endif()
 ## sg_api_struct
 include_directories($ENV{TPUTRAIN_TOP}/common/include)
 
-## sgdnn
-include_directories($ENV{TPUTRAIN_TOP}/sgdnn/include)
-link_directories($ENV{TPUTRAIN_TOP}/build/sgdnn)
-
 ## runtime & model-runtime
 include_directories( ${RUNTIME_INCLUDE_PATH} ${MODELRUNTIME_INCLUDE_PATH} )
 
 ### tpudnn && sccl
 find_package(TPU1686 REQUIRED)
 get_filename_component(tpuDNNPath ${tpuDNN_LIBRARY} DIRECTORY)
-if($ENV{CHIP_ARCH} STREQUAL "sg2260")
+get_filename_component(tpurtPath ${tpurt_LIBRARY} DIRECTORY)
 get_filename_component(scclPath   ${SCCL_LIBRARY}   DIRECTORY)
-endif()
 #################### END DEPENDS ####################
 
 ######## torch-tpu inc/src
@@ -81,18 +66,23 @@ add_custom_command(
     DEPENDS ${SRCS}
     VERBATIM)
 
-if(BACKEND_SG2260)
-  list(APPEND concated_src ${DIST_SRCS})
-endif()
+list(APPEND concated_src ${DIST_SRCS})
 
-add_library(torch_tpu SHARED ${concated_src})
-target_link_libraries(torch_tpu c10 torch_cpu TPU1686::tpuDNN sgdnn)
+if (NOT DEFINED KERNEL_MODULE_PATH)
+    message(FATAL_ERROR "${KERNEL_MODULE_PATH} Please specify -DKERNEL_MODULE_PATH=")
+endif()
+include(ResourceTools)
+compile_binary_file(${KERNEL_MODULE_PATH} torch_tpu_kernel_data)
+set(kernel_srcs $<TARGET_PROPERTY:torch_tpu_kernel_data,SOURCES>)
+
+add_library(torch_tpu SHARED ${concated_src} ${kernel_srcs})
+target_link_libraries(torch_tpu c10 torch_cpu TPU1686::tpuDNN torch_tpu_kernel_data TPU1686::sccl TPU1686::tpurt sophon)
 
 if(BACKEND_1684X)
   target_link_directories(torch_tpu PRIVATE ${RUNTIME_LIB_PATH} ${MODELRUNTIME_LIB_PATH})
   target_link_libraries(torch_tpu bmlib bmrt)
   set_target_properties(torch_tpu PROPERTIES INSTALL_RPATH
-                        "$ORIGIN;${RUNTIME_LIB_PATH};${MODELRUNTIME_LIB_PATH};${tpuDNNPath}")
+                        "$ORIGIN;${RUNTIME_LIB_PATH};${MODELRUNTIME_LIB_PATH};${tpuDNNPath}:${scclPath}")
   install(TARGETS torch_tpu DESTINATION lib)
 elseif(BACKEND_SG2260)
   if (EXISTS ${TPUv7_RUNTIME_REPO_PATH})
@@ -110,11 +100,11 @@ elseif(BACKEND_SG2260)
   endif()
   set_target_properties(torch_tpu PROPERTIES INSTALL_RPATH
                       "$ORIGIN;${tpuv7_rpath};${RUNTIME_LIB_PATH};${MODELRUNTIME_LIB_PATH};
-                       ${tpuDNNPath};${scclPath}")
-  if((SOC_CROSS_MODE STREQUAL "ON") AND (NOT EXISTS ${TPUv7_RUNTIME_REPO_PATH}))
-    target_link_libraries(torch_tpu tpuv7_rt_riscv tpuv7_modelrt_riscv sophon TPU1686::sccl)
+                       ${tpuDNNPath};${scclPath};${tpurtPath}")
+  if(($ENV{SOC_CROSS_MODE} STREQUAL "ON") AND (NOT EXISTS ${TPUv7_RUNTIME_REPO_PATH}))
+    target_link_libraries(torch_tpu tpuv7_rt_riscv tpuv7_modelrt_riscv)
   else()
-    target_link_libraries(torch_tpu tpuv7_rt tpuv7_modelrt sophon TPU1686::sccl)
+    target_link_libraries(torch_tpu tpuv7_rt tpuv7_modelrt)
   endif()
   if (USING_CMODEL)
     target_link_libraries(torch_tpu cdm_daemon_emulator pthread)
@@ -129,7 +119,7 @@ add_custom_command(TARGET torch_tpu POST_BUILD
     DEPENDS torch_tpu VERBATIM)
 
 ### torch-tpu python api interface 
-if(SOC_CROSS_MODE STREQUAL "ON")
+if($ENV{SOC_CROSS_MODE} STREQUAL "ON")
   include_directories($ENV{CROSS_TOOLCHAINS}/riscv64-linux-x86_64/python3.10)
 else()
   include_directories(${PYTHON_INCLUDE_DIR})
@@ -153,7 +143,7 @@ endif()
 target_link_libraries(torch_tpu_python torch_tpu)
 
 set_target_properties(torch_tpu_python PROPERTIES INSTALL_RPATH 
-      "$ORIGIN;${tpuv7_rpath};${tpuDNNPath};${scclPath};${RUNTIME_LIB_PATH};${MODELRUNTIME_LIB_PATH}")
+      "$ORIGIN;${tpuv7_rpath};${tpuDNNPath};${tpurtPath};${scclPath};${RUNTIME_LIB_PATH};${MODELRUNTIME_LIB_PATH}")
 install(TARGETS torch_tpu_python DESTINATION lib)
 
 set_target_properties(torch_tpu_python PROPERTIES SUFFIX ".$ENV{CHIP_ARCH}.so")

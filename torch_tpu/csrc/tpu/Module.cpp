@@ -11,11 +11,8 @@
 #include "torch_tpu/csrc/aten/TPUGeneratorImpl.h"
 #include "torch_tpu/csrc/utils/LazyInit.h"
 #include "torch_tpu/csrc/core/TPUFunction.h"
-#if defined BACKEND_SG2260
 #include "torch_tpu/csrc/core/TPUStream.h"
 #include "torch_tpu/csrc/distributed/c10d/ProcessGroupSCCL.hpp"
-#include "torch_tpu/csrc/core/Interface/sgrtInterface.h"
-#endif
 
 #define CHANGE_UNIT_SIZE 1024.0
 
@@ -36,12 +33,10 @@ void RegisterTPUProperties(PyObject* module) {
                 << prop.totalGlobalMem / (CHANGE_UNIT_SIZE * CHANGE_UNIT_SIZE) << "MB)";
               return stream.str();
             });
-#if defined BACKEND_SG2260
   m.def("createProcessGroupSCCL", &c10d::ProcessGroupSCCL::createProcessGroupSCCL);
   py::class_<c10d::ProcessGroupSCCL::Options>(m, "ProcessGroupSCCLOptions")
     .def(py::init<>())
     .def_readwrite("chip_map", &c10d::ProcessGroupSCCL::Options::chip_map);
-#endif
 }
 
 TPUDeviceProp* GetDeviceProperties(int64_t deviceid) {
@@ -145,7 +140,6 @@ PyObject* THPTModule_getDeviceCount_wrap(PyObject* self, PyObject* noargs) {
   END_HANDLE_TH_ERRORS
 }
 
-#if defined BACKEND_SG2260
 PyObject* THPTModule_tpuSynchronize(PyObject* _unused, PyObject* noargs) {
   HANDLE_TH_ERRORS
   pybind11::gil_scoped_release no_gil;
@@ -341,7 +335,7 @@ PyObject* THPTModule_tpuCanDeviceAccessPeer_wrap(PyObject* self, PyObject* args)
   }
   int32_t device_id = THPUtils_unpackInt(value_1);
   int32_t peer_device_id = THPUtils_unpackInt(value_2);
-  auto can_access_peer = c10_tpu::sgrt::can_device_access_peer(device_id, peer_device_id);
+  auto can_access_peer = tpu::can_device_access_peer(device_id, peer_device_id);
   return PyBool_FromLong(can_access_peer);
   END_HANDLE_TH_ERRORS
 }
@@ -438,7 +432,6 @@ PyObject* THPTModule_emptyCache(PyObject* _unused, PyObject* noargs) {
   Py_RETURN_NONE;
 }
 
-#endif
 
 PyObject* THPTModule_tensor_construct_from_storage(PyObject* self, PyObject* args) {
   HANDLE_TH_ERRORS
@@ -466,7 +459,6 @@ static struct PyMethodDef THPTModule_methods[] = {
     {"_tpu_setDevice", (PyCFunction)THPTModule_setDevice_wrap, METH_O, nullptr},
     {"_tpu_getDevice", (PyCFunction)THPTModule_getDevice_wrap, METH_NOARGS, nullptr},
     {"_tpu_getDeviceCount", (PyCFunction)THPTModule_getDeviceCount_wrap, METH_NOARGS, nullptr},
-#if defined BACKEND_SG2260
     {"_tpu_synchronize", (PyCFunction)THPTModule_tpuSynchronize, METH_NOARGS, nullptr},
     {"_tpu_flush", (PyCFunction)THPTModule_tpuFlush, METH_NOARGS, nullptr},
     {"_tpu_getTopology", (PyCFunction)THPTModule_tpuGetTopology, METH_VARARGS, nullptr},
@@ -481,7 +473,6 @@ static struct PyMethodDef THPTModule_methods[] = {
     // allocator related
     {"_tpu_emptyCache", THPTModule_emptyCache, METH_NOARGS, nullptr},
 
-#endif
     {"_tensor_construct_from_storage", (PyCFunction)THPTModule_tensor_construct_from_storage, METH_VARARGS, nullptr},
     {nullptr}
 };
