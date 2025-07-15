@@ -27,6 +27,7 @@ static void tpu32OCShape(const int *shape, int *_32oc_shape) {
 }
 
   constexpr int BLOCKSIZE = 16;
+
   // base format is ND
   FormatShape InferShapeConv_W_32IC(c10::IntArrayRef dims){ //  CONV2D 32IC
     AT_ASSERT(dims.size() == 4, "32IC FormatCast must with dims == 4, but got ", dims.size());
@@ -107,7 +108,7 @@ int64_t StorageDescHelper::GetMemorySize(const c10::IntArrayRef& size, tpuFormat
 int64_t StorageDescHelper::GetMemorySize(const TPUStorageDesc &desc)
 {
   auto ori_sizes = desc.base_sizes_;
-  auto format    = desc.tpu_format_; 
+  auto format    = desc.tpu_format_;
   return GetMemorySize(ori_sizes, format);
 }
 int64_t StorageDescHelper::GetMemorySize(const at::Tensor &dst)
@@ -264,10 +265,10 @@ at::Tensor& StorageDescHelper::unsafe_format_cast(at::Tensor& self, int64_t self
     if (self_format == TPU_DFORMAT_ND && result_format == TPU_DFORMAT_CONV_W_Infer) {   // normal -> 32ic w, infer mode
     self_desc.storage_sizes_ = InferShapeConv_W_32IC(self.sizes());
     self_desc.tpu_format_ = TPU_DFORMAT_CONV_W_Infer;
-    } else if (self_format == TPU_DFORMAT_CONV_W_Infer && result_format == TPU_DFORMAT_ND) { 
+    } else if (self_format == TPU_DFORMAT_CONV_W_Infer && result_format == TPU_DFORMAT_ND) {
     self_desc.storage_sizes_ = self_desc.base_sizes_;
     self_desc.tpu_format_ = TPU_DFORMAT_ND;
-    } 
+    }
     else if (self_format == TPU_DFORMAT_ND && result_format == TPU_DFORMAT_CONV_W_Train) { // normal -> 32ic32oc
     self_desc.storage_sizes_ = InferShapeConv_W_32IC32OC(self.sizes());
     self_desc.tpu_format_ = TPU_DFORMAT_CONV_W_Train;

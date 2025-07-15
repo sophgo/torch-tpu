@@ -16,13 +16,17 @@ static constexpr unsigned int kDefaultFlags = tpuStreamNonBlocking;
 static constexpr int kStreamTypeBits = 4;
 
 static std::once_flag device_flags[C10_COMPILE_TIME_MAX_TPUS];
-static std::atomic<uint32_t> 
+static std::atomic<uint32_t>
         priority_counters[c10_tpu::max_compile_time_stream_priorities][C10_COMPILE_TIME_MAX_TPUS];
 
 static tpuStream_t streams[c10_tpu::max_compile_time_stream_priorities][C10_COMPILE_TIME_MAX_TPUS][kStreamsPerPool];
 static tpuStream_t default_streams[C10_COMPILE_TIME_MAX_TPUS] = {nullptr};
 
 static tpudnnHandle_t tpudnn_handles[C10_COMPILE_TIME_MAX_TPUS] = {0};
+
+#ifdef USING_PPL
+static tpuKernelModule_t ppl_module;
+#endif
 
 // Note [StreamId assignment]
 // ~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -141,6 +145,15 @@ static void initDeviceStreamState(c10::DeviceIndex device_index) {
   auto module = tpu::KernelManager::Instance()->RegisterKernelModule(default_streams[device_index]);
   auto stream = default_streams[device_index];
   tpudnn_handles[device_index] = tpudnnHandleFromStream(device_index, stream, module);
+
+#ifdef USING_PPL
+  const char* ppl_lib = getenv("PPL_BACKEND_LIB");
+  if (ppl_lib) {
+    ppl_module = tpuKernelModuleLoadFromFile(ppl_lib, stream);
+  } else {
+    TORCH_CHECK(false, "Please set PPL backend libaray to env: PPL_BACKEND_LIB");
+  }
+#endif
 }
 
 static void initTPUStreamsOnce() {
@@ -251,7 +264,7 @@ TPUStream getStreamFromExternal(
 // Note: when called the first time on a device, this will create the
 // stream pools for that device.
 TPUStream getStreamFromPool(
-    const int priority, 
+    const int priority,
     c10::DeviceIndex device_index) {
   initTPUStreamsOnce();
   if (device_index == -1)
@@ -305,5 +318,11 @@ void setCurrentTPUStream(TPUStream stream) {
 std::ostream& operator<<(std::ostream& stream, const TPUStream& s) {
   return stream << s.unwrap();
 }
+
+#ifdef USING_PPL
+tpuKernelModule_t getPplModule() {
+  return ppl_module;
+}
+#endif
 
 } // namespace c10_tpu

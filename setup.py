@@ -67,14 +67,14 @@ SOC_CROSS = True if SOC_CROSS == "ON" else False
 CROSS_TOOLCHAINS= os.environ.get("CROSS_TOOLCHAINS", None)
 PLATFORM=''
 if SOC_CROSS:
-    if os.environ["CHIP_ARCH"] == "sg2260":
-        os.environ["CC"] = f"{CROSS_TOOLCHAINS}/riscv64-linux-x86_64/bin/riscv64-unknown-linux-gnu-gcc"
-        os.environ["CXX"] = f"{CROSS_TOOLCHAINS}/riscv64-linux-x86_64/bin/riscv64-unknown-linux-gnu-g++"
-        PLATFORM='-riscv64'
-    else:
+    if os.environ["CHIP_ARCH"] == "bm1684x":
         os.environ["CC"] = f"{CROSS_TOOLCHAINS}/gcc-arm-10.3-2021.07-x86_64-aarch64-none-linux-gnu/bin/aarch64-none-linux-gnu-gcc"
         os.environ["CXX"] = f"{CROSS_TOOLCHAINS}/gcc-arm-10.3-2021.07-x86_64-aarch64-none-linux-gnu/bin/aarch64-none-linux-gnu-g++"
         PLATFORM='-aarch64'
+    else:
+        os.environ["CC"] = f"{CROSS_TOOLCHAINS}/riscv64-linux-x86_64/bin/riscv64-unknown-linux-gnu-gcc"
+        os.environ["CXX"] = f"{CROSS_TOOLCHAINS}/riscv64-linux-x86_64/bin/riscv64-unknown-linux-gnu-g++"
+        PLATFORM='-riscv64'
 
 def which(thefile):
     path = os.environ.get("PATH", os.defpath).split(os.pathsep)
@@ -184,6 +184,8 @@ class CPPLibBuild(build_clib, ExtBase, object):
             # build tpuv7_runtime
             os.environ['CHIP_ARCH'] = 'sg2260'
             self.build()
+            os.environ['CHIP_ARCH'] = 'sg2260e'
+            self.build()
 
     def build(self):
         cmake = get_cmake_command()
@@ -196,8 +198,8 @@ class CPPLibBuild(build_clib, ExtBase, object):
 
         arch = os.environ.get('CHIP_ARCH')
         build_dir = os.path.join(BASE_DIR, 'build', f'firmware_{arch}')
-        src_dir = os.path.join(BASE_DIR, 'firmware_core')
-        args = [self.cmake, src_dir]
+        src_dir = os.path.join(BASE_DIR, 'torch_tpu/csrc/ops') if arch == 'sg2260e' else os.path.join(BASE_DIR, 'firmware_core')
+        args = [self.cmake, f'-DCHIP_ARCH={arch}', src_dir]
         extra_cmake_opts = os.environ.get('EXTRA_CONFIG')
         if extra_cmake_opts:
             args += extra_cmake_opts.split()
@@ -207,10 +209,10 @@ class CPPLibBuild(build_clib, ExtBase, object):
             subprocess.check_call(['make', '-j'], cwd=build_dir, env=os.environ)
 
         build_fw = True
-        if arch == 'sg2260':
-            tc_path = os.environ.get('RISCV_TOOLCHAIN')
-        elif arch == 'bm1684x':
+        if arch == 'bm1684x':
             tc_path = os.environ.get('ARM_TOOLCHAIN')
+        else:
+            tc_path = os.environ.get('RISCV_TOOLCHAIN')
         if not tc_path or not os.path.exists(tc_path):
             build_fw = False
 
@@ -239,7 +241,7 @@ class CPPLibBuild(build_clib, ExtBase, object):
         if os.getenv('TPUTRAIN_DEBUG'):
             install_cmd = 'install'
             cmake_args.append('-DDEBUG=ON')
-        if arch == 'sg2260':
+        if arch == 'sg2260' or arch == 'sg2260e':
             cmake_args.append('-DBACKEND_SG2260=ON')
         elif arch == 'bm1684x':
             cmake_args.append('-DBACKEND_1684X=ON')
@@ -276,18 +278,18 @@ class Build(build_ext, ExtBase, object):
     def finalize_options(self):
         build_ext.finalize_options(self)
         if SOC_CROSS:
-            if os.environ["CHIP_ARCH"] == "sg2260":
-                self.plat_name = "riscv64"
+            if os.environ["CHIP_ARCH"] == "bm1684x":
+                self.plat_name = "aarch64"
             else:
-                self.plat_name = "aarch64"  # Example for ARM64
+                self.plat_name = "riscv64"
 
     def get_ext_filename(self, ext_name):
         filename = super().get_ext_filename(ext_name)
         if 'x86_64-linux-gnu' in filename and SOC_CROSS:
-            if os.environ["CHIP_ARCH"] == "sg2260":
-                return filename.replace('x86_64-linux-gnu', 'riscv64-linux-gnu')
-            else:
+            if os.environ["CHIP_ARCH"] == "bm1684x":
                 return filename.replace('x86_64-linux-gnu', 'aarch64-linux-gnu')
+            else:
+                return filename.replace('x86_64-linux-gnu', 'riscv64-linux-gnu')
         return filename
 
 class InstallCmd(install):
@@ -475,10 +477,10 @@ class bdist_wheel(_bdist_wheel, ExtBase):
     def finalize_options(self):
         _bdist_wheel.finalize_options(self)
         if SOC_CROSS:
-            if os.environ["CHIP_ARCH"] == "sg2260":
-                self.plat_name = 'linux_riscv64'
-            else:
+            if os.environ["CHIP_ARCH"] == "bm1684x":
                 self.plat_name = 'manylinux2014_aarch64'
+            else:
+                self.plat_name = 'linux_riscv64'
     def copy_file(self, src, dst):
         #check file
         def is_lfs_pointer(file_path):
@@ -583,7 +585,7 @@ extra_compile_args = [
     '-D_GLIBCXX_USE_CXX11_ABI=1' if eval(os.getenv('TORCH_CXX11_ABI')) else '-D_GLIBCXX_USE_CXX11_ABI=0'
 ]
 
-if os.environ.get("CHIP_ARCH", None) == 'sg2260':
+if os.environ.get("CHIP_ARCH", None) == 'sg2260' or os.environ.get("CHIP_ARCH", None) == 'sg2260e':
     extra_compile_args += ["-DBACKEND_SG2260"]
 
 if DEBUG:

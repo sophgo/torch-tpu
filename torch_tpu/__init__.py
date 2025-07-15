@@ -65,6 +65,8 @@ if not arch:
 if not os.environ.get('TPU_EMULATOR_PATH'):
     os.environ['TPU_EMULATOR_PATH'] = os.path.join(lib_pwd, f'{arch}_cmodel_firmware.so')
 
+if arch == 'sg2260e':
+    os.environ['DISABLE_CACHE'] = '1'
 # OPEN INS-CACHE default
 if os.environ.get('TPU_CACHE_BACKEND') is None:
     if not os.environ.get('DISABLE_CACHE'):
@@ -86,12 +88,14 @@ from torch_tpu.utils import ( apply_module_patch, \
 if arch == 'sg2260':
     from torch_tpu._C import ProcessGroupSCCLOptions
     os.environ['CHIP'] = "bm1690"
+elif arch == 'sg2260e':
+    from torch_tpu._C import ProcessGroupSCCLOptions
 elif arch == 'bm1684x':
     os.environ['CHIP'] = "bm1684x"
 
 __all__ = []
 
-##### register device 
+##### register device
 torch._register_device_module('tpu', torch_tpu.tpu)
 unsupported_dtype = [torch.quint8, torch.quint4x2, torch.quint2x4, torch.qint32, torch.qint8, torch.int64]
 torch.utils.generate_methods_for_privateuse1_backend(for_tensor=True, for_module=True, for_storage=True,

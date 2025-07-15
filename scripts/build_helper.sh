@@ -83,30 +83,30 @@ function update_sg2260_third_party()
 {
   update_head_files
   echo "updating libtpudnn.so ..."
-  cp ${TPU1686_PATH}/build_sg2260/tpuDNN/src/libtpudnn.so ${TPUTRAIN_TOP}/third_party/tpuDNN/sg2260_lib/
+  cp ${TPU1686_PATH}/build_${CHIP_ARCH}/tpuDNN/src/libtpudnn.so ${TPUTRAIN_TOP}/third_party/tpuDNN/${CHIP_ARCH}_lib/
   echo "updating libsccl.so ..."
-  cp ${TPU1686_PATH}/build_sg2260/sccl/libsccl.so ${TPUTRAIN_TOP}/third_party/sccl/lib/
+  cp ${TPU1686_PATH}/build_${CHIP_ARCH}/sccl/libsccl.so ${TPUTRAIN_TOP}/third_party/sccl/lib/
   echo "updating libtpuv7_emulator.so ..."
-  cp ${TPU1686_PATH}/build_sg2260/firmware_core/libtpuv7_emulator.so ${TPUTRAIN_TOP}/third_party/tpuv7_runtime/tpuv7-emulator_0.1.0/lib/
+  cp ${TPU1686_PATH}/build_${CHIP_ARCH}/firmware_core/libtpuv7_emulator.so ${TPUTRAIN_TOP}/third_party/tpuv7_runtime/tpuv7-emulator_0.1.0/lib/
   echo "updating libfirmware_core.a ..."
-  cp ${TPU1686_PATH}/build_fw_sg2260/firmware_core/libfirmware_core.a ${TPUTRAIN_TOP}/third_party/firmware/sg2260/
+  cp ${TPU1686_PATH}/build_fw_${CHIP_ARCH}/firmware_core/libfirmware_core.a ${TPUTRAIN_TOP}/third_party/firmware/${CHIP_ARCH}/
   echo "updating libtpurt.so ..."
-  cp ${TPU1686_PATH}/build_sg2260/runtime/libtpurt.so ${TPUTRAIN_TOP}/third_party/runtime_api/lib_sg2260/
+  cp ${TPU1686_PATH}/build_${CHIP_ARCH}/runtime/libtpurt.so ${TPUTRAIN_TOP}/third_party/runtime_api/lib_${CHIP_ARCH}/
 }
 
 function update_sg2260_riscv_third_party()
 {
   update_head_files
   echo "updating libtpudnn.so ..."
-  cp ${TPU1686_PATH}/build_sg2260_riscv/tpuDNN/src/libtpudnn.so ${TPUTRAIN_TOP}/third_party/tpuDNN/sg2260_lib/libtpudnn-riscv.so
+  cp ${TPU1686_PATH}/build_${CHIP_ARCH}_riscv/tpuDNN/src/libtpudnn.so ${TPUTRAIN_TOP}/third_party/tpuDNN/${CHIP_ARCH}_lib/libtpudnn-riscv.so
   echo "updating libsccl.so ..."
-  cp ${TPU1686_PATH}/build_sg2260_riscv/sccl/libsccl.so ${TPUTRAIN_TOP}/third_party/sccl/lib/libsccl-riscv64.so
+  cp ${TPU1686_PATH}/build_${CHIP_ARCH}_riscv/sccl/libsccl.so ${TPUTRAIN_TOP}/third_party/sccl/lib/libsccl-riscv64.so
   echo "updating libtpuv7_emulator.so ..."
-  cp ${TPU1686_PATH}/build_sg2260_riscv/firmware_core/libtpuv7_emulator.so ${TPUTRAIN_TOP}/third_party/tpuv7_runtime/tpuv7-emulator_0.1.0/lib/libtpuv7_emulator-riscv.so
+  cp ${TPU1686_PATH}/build_${CHIP_ARCH}_riscv/firmware_core/libtpuv7_emulator.so ${TPUTRAIN_TOP}/third_party/tpuv7_runtime/tpuv7-emulator_0.1.0/lib/libtpuv7_emulator-riscv.so
   echo "updating libfirmware_core.a ..."
-  cp ${TPU1686_PATH}/build_fw_sg2260/firmware_core/libfirmware_core.a ${TPUTRAIN_TOP}/third_party/firmware/sg2260/libfirmware_core-riscv.a
+  cp ${TPU1686_PATH}/build_fw_${CHIP_ARCH}/firmware_core/libfirmware_core.a ${TPUTRAIN_TOP}/third_party/firmware/${CHIP_ARCH}/libfirmware_core-riscv.a
   echo "updating libtpurt.so ..."
-  cp ${TPU1686_PATH}/build_sg2260_riscv/runtime/libtpurt.so ${TPUTRAIN_TOP}/third_party/runtime_api/lib_sg2260/libtpurt-riscv64.so
+  cp ${TPU1686_PATH}/build_${CHIP_ARCH}_riscv/runtime/libtpurt.so ${TPUTRAIN_TOP}/third_party/runtime_api/lib_${CHIP_ARCH}/libtpurt-riscv64.so
 }
 
 function update_bm1684x_third_party()
@@ -144,9 +144,14 @@ function rebuild_TPU1686()
     if [[ "$EXTRA_CONFIG" != *USING_TPUDNN_TESTS* ]]; then
         export EXTRA_CONFIG="-DUSING_TPUDNN_TESTS=OFF $EXTRA_CONFIG"
     fi
-    CMODEL_FW_BINARY_DIR=build_${CHIP_ARCH} rebuild_firmware_cmodel_and_tpudnn || return -1
-    FW_BINARY_DIR=build_fw_${CHIP_ARCH} rebuild_firmware || return -1
-    if [ "${CHIP_ARCH}" == "sg2260" ]; then
+    if [ "${CHIP_ARCH}" == "sg2260e" ]; then
+        CMODEL_FW_BINARY_DIR=build_${CHIP_ARCH} EXTRA_CONFIG="-DUSING_RVTI=ON $EXTRA_CONFIG" rebuild_firmware_cmodel_and_tpudnn || return -1
+        FW_BINARY_DIR=build_fw_${CHIP_ARCH} EXTRA_CONFIG="-DUSING_RVTI=ON $EXTRA_CONFIG" rebuild_firmware || return -1
+    else
+        CMODEL_FW_BINARY_DIR=build_${CHIP_ARCH} rebuild_firmware_cmodel_and_tpudnn || return -1
+        FW_BINARY_DIR=build_fw_${CHIP_ARCH} rebuild_firmware || return -1
+    fi
+    if [ "${CHIP_ARCH}" == "sg2260" ] || [ "${CHIP_ARCH}" == "sg2260e" ]; then
         update_sg2260_third_party
     elif [ "${CHIP_ARCH}" == "bm1684x" ]; then
         update_bm1684x_third_party

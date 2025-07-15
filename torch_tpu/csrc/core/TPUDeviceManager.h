@@ -5,7 +5,6 @@
 #include "torch_tpu/csrc/core/TPULog.h"
 #include "torch_tpu/csrc/core/TPUAddrHelper.h"
 #include <tpu_runtime_api.h>
-
 namespace tpu
 {
 
@@ -73,7 +72,7 @@ void TPUCopyDeviceToDevice ( void * Dst, const void * Src, size_t Size, bool non
 tpuStream_t TPUGetDeviceResource ( void );
 
 /**
- * multi-chip Topology utils 
+ * multi-chip Topology utils
  */
 void TPUSetupC2CTopology();
 void TPUGetTopology(std::vector<std::vector<int>> *topo);

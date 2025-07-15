@@ -25,7 +25,7 @@ function check_pytorch_version(){
           echo "[ERROR]错误：当前Torch版本是 $torch_version，而不是 $target_version"
           update_pytorch_to_2_1;
      fi
-     
+
      torch_with_cxx11_abi=$(python -c "import torch; print(torch.compiled_with_cxx11_abi())")
      export TORCH_CXX11_ABI=${torch_with_cxx11_abi}
 }
@@ -49,8 +49,8 @@ function set_v7runtime_env() {
     if [ "$TPUTRAIN_DEBUG" = "ON" ]; then
          build_type=Debug
     fi
-    export TPU_KERNEL_PATH=${root_path}/build/firmware_sg2260_cmodel/
-    export TPU_EMULATOR_PATH=${root_path}/build/firmware_sg2260_cmodel/libfirmware.so
+    export TPU_KERNEL_PATH=${root_path}/build/firmware_${CHIP_ARCH}_cmodel/
+    export TPU_EMULATOR_PATH=${root_path}/build/firmware_${CHIP_ARCH}_cmodel/libfirmware.so
     #export TPUKERNEL_FIRMWARE_PATH=${root_path}/build/firmware_sg2260_cmodel/libfirmware.so
 }
 
@@ -91,7 +91,7 @@ if [[ "$LD_LIBRARY_PATH" != *oneDNN* ]]; then
     export LD_LIBRARY_PATH=$TPUTRAIN_TOP/third_party/oneDNN/lib:$LD_LIBRARY_PATH
 fi
 
-if [ "${CHIP_ARCH}" == "sg2260" ]; then
+if [ "${CHIP_ARCH}" != "bm1684x" ]; then
      set_v7runtime_env ${TPUTRAIN_TOP}
 fi
 
@@ -107,3 +107,4 @@ fi
 export TPU_SCALAER_EMULATOR_WORKDIR=${TPUTRAIN_TOP}/build
 
 export PS1="\[\e[1;35m\]("train-"${CHIP_ARCH}):\[\e[1;33m\]\w\[\e[1;34m\]\$ \[\e[0m\]"
+export PPL_BACKEND_LIB=${TPUTRAIN_TOP}/build/firmware_${CHIP_ARCH}_cmodel/libfirmware.so

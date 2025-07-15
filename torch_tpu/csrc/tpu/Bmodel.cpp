@@ -15,7 +15,7 @@
 #include "TPUDeviceUtils.h"
 
 
-#if defined BACKEND_SG2260
+#ifndef BACKEND_1684X
 #include "tpuv7_modelrt.h"
 namespace py = pybind11;
 
@@ -696,16 +696,16 @@ PyObject* BmodelTensor_wrap(PyObject* self, PyObject* args) {
   at::Tensor tensor;
   if(is_input == 0)
   {
-    #if defined BACKEND_SG2260
-    tensor = make_tensor_from_ptr(net->output_mems[input_idx], net->output_shapes[input_idx], net->m_info.output.dtypes[input_idx]);
-    #else
+    #ifdef BACKEND_1684X
     tensor = make_tensor_from_ptr(net->output_mems[input_idx], net->output_shapes[input_idx], net->m_info->output_dtypes[input_idx]);
+    #else
+    tensor = make_tensor_from_ptr(net->output_mems[input_idx], net->output_shapes[input_idx], net->m_info.output.dtypes[input_idx]);
     #endif
   }else{
-    #if defined BACKEND_SG2260
-    tensor = make_tensor_from_ptr(net->input_mems[input_idx], net->input_shapes[input_idx], net->m_info.input.dtypes[input_idx]);
-    #else
+    #ifdef BACKEND_1684X
     tensor = make_tensor_from_ptr(net->input_mems[input_idx], net->input_shapes[input_idx], net->m_info->input_dtypes[input_idx]);
+    #else
+    tensor = make_tensor_from_ptr(net->input_mems[input_idx], net->input_shapes[input_idx], net->m_info.input.dtypes[input_idx]);
     #endif
   }
   PyObject* tensor_py = THPVariable_Wrap(tensor);
@@ -757,10 +757,10 @@ PyObject* THPTPythonModel_Net(PyObject* self, PyObject* args) {
     return NULL;
   }
   auto model = (PythonModel*) PyCapsule_GetPointer(model_capsule, "PythonModel");
-  #if defined BACKEND_SG2260
-  auto net = new PythonNet(&model->m_net, net_name);
-  #else
+  #ifdef BACKEND_1684X
   auto net = new PythonNet(model->p_bmrt, net_name, model->bm_handle, 0);
+  #else
+  auto net = new PythonNet(&model->m_net, net_name);
   #endif
   return PyCapsule_New(net, "PythonNet", PythonNet_deleter);
   END_HANDLE_TH_ERRORS

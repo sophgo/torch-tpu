@@ -17,6 +17,7 @@ Torch-TPU 是一个 PyTorch 扩展，使得 PyTorch 模型能够在算能 TPU �
     - [高级特性](#高级特性)
       - [JIT 模式 (仅支持 SG2260)](#jit-模式-仅支持-sg2260)
       - [存储格式](#存储格式)
+      - [支持PPL](#支持ppl)
   - [其他训练框架示例](#其他训练框架示例)
   - [许可证](#许可证)
 
@@ -154,6 +155,17 @@ Torch-TPU 默认使用 JIT 模式。要使用 Eager 模式：
 要对卷积权重使用 32IC 格式：
 ```bash
 export TORCHTPU_STORAGE_CAST=ON
+```
+
+#### 支持PPL
+
+可以使用PPL来开发后端算子，可以选择使用ppl工程或者release包，以SG2260E为例进行说明：
+
+```bash
+source scripts/envsetup.sh sg2260e
+export PPL_PROJECT_ROOT=/the/path/to/ppl/install/
+rebuild_TPU1686
+develop_torch_tpu
 ```
 
 ## 其他训练框架示例

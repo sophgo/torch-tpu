@@ -67,7 +67,7 @@ while ( 0 )
 #else
 
 #define CPU_IMPL_WARNING(...)
-#define CONTIGUOUS_WARNING(...) 
+#define CONTIGUOUS_WARNING(...)
 #define CHECK_TENSOR_IN_DEVICE(t) (void)(t)
 #define CHECK_TENSOR_IN_DEVICE_NO_CONTIGUOUS(t) (void)(t)
 
@@ -170,19 +170,6 @@ static inline T TPUConvertDtype ( caffe2::TypeMeta dtype )
   return dtypes<T>::DTYPE_UNKNOWN;
 }
 
-static inline bool IsSupportDtype( caffe2::TypeMeta&& dtype )
-{
-  bool support = false;
-  if ( dtype == caffe2::TypeMeta::Make<float>() || dtype == caffe2::TypeMeta::Make<at::Half>() ||
-       dtype == caffe2::TypeMeta::Make<at::BFloat16>() || dtype == caffe2::TypeMeta::Make<int>() ||
-       dtype == caffe2::TypeMeta::Make<bool>() || dtype == caffe2::TypeMeta::Make<unsigned char>() ||
-       dtype == caffe2::TypeMeta::Make<int8_t>())
-  {
-    support = true;
-  }
-  return support;
-}
-
 static inline tpudnnTensor_t TPUGenerateTpudnnTensor(tpudnnHandle_t handle, const at::Tensor & Tensor)
 {
   CHECK_TENSOR_IN_DEVICE_NO_CONTIGUOUS(Tensor);
@@ -209,6 +196,42 @@ static inline tpudnnTensor_t TPUGenerateTpudnnTensor(tpudnnHandle_t handle, cons
     t.addr = tpudnnPhysToVirt(handle, (unsigned long long)t.addr);
   }
   return t;
+}
+
+template <typename T>
+static inline T TPUGenerateTensorforComplex64 ( const at::Tensor & Tensor )
+{
+  T t = { 0 };
+  t.addr = reinterpret_cast<decltype(t.addr)>(
+    GetAddrByUnifiedAddr(( unsigned long long ) Tensor.data_ptr()));
+  t.dtype = TPUConvertDtype<decltype(t.dtype)>( Tensor.dtype() );
+  t.dim = Tensor.dim();
+  for ( auto i = 0; i < Tensor.dim(); ++i )
+  {
+    t.shape[i] = Tensor.size ( i );
+    t.stride[i] = Tensor.stride ( i ) * 2;
+  }
+  return t;
+}
+
+static inline tpudnnTensor_t TPUGenerateTpudnnTensorforComplex64(tpudnnHandle_t handle, const at::Tensor & tensor)
+{
+  auto ret = TPUGenerateTensorforComplex64<tpudnnTensor_t>(tensor);
+  ret.addr = tpudnnPhysToVirt(handle, (unsigned long long)ret.addr);
+  return ret;
+}
+
+static inline bool IsSupportDtype( caffe2::TypeMeta&& dtype )
+{
+  bool support = false;
+  if ( dtype == caffe2::TypeMeta::Make<float>() || dtype == caffe2::TypeMeta::Make<at::Half>() ||
+       dtype == caffe2::TypeMeta::Make<at::BFloat16>() || dtype == caffe2::TypeMeta::Make<int>() ||
+       dtype == caffe2::TypeMeta::Make<bool>() || dtype == caffe2::TypeMeta::Make<unsigned char>() ||
+       dtype == caffe2::TypeMeta::Make<int8_t>())
+  {
+    support = true;
+  }
+  return support;
 }
 
 static inline std::string GetTensorInfo( const at::Tensor & Tensor )
@@ -239,29 +262,6 @@ static inline std::string GetTensorInfo( const at::Tensor & Tensor )
     Tensor_info << "];";
   }
   return Tensor_info.str();
-}
-
-template <typename T>
-static inline T TPUGenerateTensorforComplex64 ( const at::Tensor & Tensor )
-{
-  T t = { 0 };
-  t.addr = reinterpret_cast<decltype(t.addr)>(
-    GetAddrByUnifiedAddr(( unsigned long long ) Tensor.data_ptr()));
-  t.dtype = TPUConvertDtype<decltype(t.dtype)>( Tensor.dtype() );
-  t.dim = Tensor.dim();
-  for ( auto i = 0; i < Tensor.dim(); ++i )
-  {
-    t.shape[i] = Tensor.size ( i );
-    t.stride[i] = Tensor.stride ( i ) * 2;
-  }
-  return t;
-}
-
-static inline tpudnnTensor_t TPUGenerateTpudnnTensorforComplex64(tpudnnHandle_t handle, const at::Tensor & tensor)
-{
-  auto ret = TPUGenerateTensorforComplex64<tpudnnTensor_t>(tensor);
-  ret.addr = tpudnnPhysToVirt(handle, (unsigned long long)ret.addr);
-  return ret;
 }
 
 static inline bool TPUIsSameShape ( const at::Tensor & Tensor1, const at::Tensor & Tensor2 )

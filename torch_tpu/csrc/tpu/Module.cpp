@@ -46,6 +46,8 @@ TPUDeviceProp* GetDeviceProperties(int64_t deviceid) {
   device_name = "BM1684X";
 #elif defined BACKEND_SG2260
   device_name = "SG2260";
+#elif defined BACKEND_SG2260E
+  device_name = "SG2260E";
 #endif
   if (device_name == nullptr) {
     prop.name = " ";
@@ -191,7 +193,7 @@ PyObject* THPTModule_tpuGetTopology(PyObject* self, PyObject* args) {
       return nullptr;
     }
     for (int j = 0; j < dev_cnt; ++j) {
-      PyObject* value = PyLong_FromLong(topology[i][j]); 
+      PyObject* value = PyLong_FromLong(topology[i][j]);
       // Replace the existing item in the row with the new value
       if (PyList_SetItem(row, j, value) != 0) {
         PyErr_SetString(PyExc_RuntimeError, "Failed to set item in input_list.");

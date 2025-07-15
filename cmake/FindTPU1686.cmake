@@ -84,7 +84,7 @@ if ($ENV{CHIP_ARCH} STREQUAL "bm1684x")
             #$ENV{TPUTRAIN_TOP}/../TPU1686/build_fw_$ENV{CHIP_ARCH}/firmware_core/
             $ENV{TPUTRAIN_TOP}/third_party/firmware/$ENV{CHIP_ARCH}/)
     endif()
-elseif ($ENV{CHIP_ARCH} STREQUAL "sg2260")
+elseif ($ENV{CHIP_ARCH} STREQUAL "sg2260" OR $ENV{CHIP_ARCH} STREQUAL "sg2260e")
     if($ENV{SOC_CROSS_MODE} STREQUAL "ON")
         find_library(
             cmodel_firmware_LIBRARY

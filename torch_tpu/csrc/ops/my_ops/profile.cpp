@@ -38,7 +38,7 @@ namespace at
 		auto timer = tpu::Timer().Start();
 #endif
 #if defined BACKEND_SG2260
-        auto stream = c10_tpu::getCurrentTPUStream();   
+        auto stream = c10_tpu::getCurrentTPUStream();
         tpudnnDisableProfile(stream);
 #else
     TORCH_CHECK(false);

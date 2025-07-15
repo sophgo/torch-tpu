@@ -44,7 +44,7 @@ include_directories(${CMAKE_CURRENT_SOURCE_DIR}/csrc)
 include_directories(${CMAKE_CURRENT_SOURCE_DIR}/csrc/core)
 include_directories(${CMAKE_CURRENT_SOURCE_DIR}/csrc/distributed/c10d)
 
-file(GLOB_RECURSE SRCS
+file(GLOB SRCS
   csrc/core/*.cpp
   csrc/core/Interface/*.cpp
   csrc/ops/native_ops/*.cpp
@@ -53,6 +53,26 @@ file(GLOB_RECURSE SRCS
   csrc/aten/*.cpp
   csrc/aten/*/*.cpp
 )
+
+if(BACKEND_SG2260E)
+
+macro(collect_ppl_host relative_path)
+    set(abs_path "${CMAKE_CURRENT_SOURCE_DIR}/${relative_path}")
+    file(GLOB pl_files LIST_DIRECTORIES false "${abs_path}/*.pl")
+
+    foreach(pl_file IN LISTS pl_files)
+        get_filename_component(base_name ${pl_file} NAME_WE)
+        get_filename_component(dir_path ${pl_file} DIRECTORY)
+        list(APPEND SRCS "${dir_path}/${base_name}/host/${base_name}.cpp")
+        include_directories("${dir_path}/${base_name}/include")
+    endforeach()
+endmacro()
+
+collect_ppl_host(csrc/ops/my_ops)
+collect_ppl_host(csrc/ops/native_ops)
+
+include_directories($ENV{PPL_PROJECT_ROOT}/runtime/customize/include/)
+endif()
 
 file(GLOB_RECURSE DIST_SRCS
   csrc/distributed/c10d/*.cpp
@@ -84,7 +104,7 @@ if(BACKEND_1684X)
   set_target_properties(torch_tpu PROPERTIES INSTALL_RPATH
                         "$ORIGIN;${RUNTIME_LIB_PATH};${MODELRUNTIME_LIB_PATH};${tpuDNNPath}:${scclPath}")
   install(TARGETS torch_tpu DESTINATION lib)
-elseif(BACKEND_SG2260)
+elseif(BACKEND_SG2260 OR BACKEND_SG2260E)
   if (EXISTS ${TPUv7_RUNTIME_REPO_PATH})
     include_directories( ${TPUv7_REPO_RT_INCLUDE_PATH} ${TPUv7_REPO_MODEL_RT_INCLUDE_PATH} )
     set(tpuv7_rpath "/opt/tpuv7/tpuv7-current/lib:$ORIGIN/../../../tpuv7-runtime/build/cdmlib/host/cdm_runtime:$ORIGIN/../../../tpuv7-runtime/build/model-runtime/runtime:$ORIGIN/../../../tpuv7-runtime/build/model-runtime/bmodel")
@@ -118,7 +138,7 @@ add_custom_command(TARGET torch_tpu POST_BUILD
     COMMENT "Change SONAME of libtorch_tpu.so"
     DEPENDS torch_tpu VERBATIM)
 
-### torch-tpu python api interface 
+### torch-tpu python api interface
 if($ENV{SOC_CROSS_MODE} STREQUAL "ON")
   include_directories($ENV{CROSS_TOOLCHAINS}/riscv64-linux-x86_64/python3.10)
 else()
@@ -131,7 +151,7 @@ file(GLOB_RECURSE PYC_SRCS
 )
 add_library(torch_tpu_python SHARED ${PYC_SRCS})
 
-if (BACKEND_SG2260 AND (EXISTS ${TPUv7_RUNTIME_REPO_PATH}))
+if ((BACKEND_SG2260 OR BACKEND_SG2260E) AND (EXISTS ${TPUv7_RUNTIME_REPO_PATH}))
   target_link_directories(torch_tpu_python PRIVATE ${TPUv7_REPO_RT_LIB_PATH}
                                                   ${TPUv7_REPO_RT_AP_LIB_PATH}
                                                   ${TPUv7_REPO_MODEL_RT_LIB_PATH}
@@ -142,7 +162,7 @@ endif()
 
 target_link_libraries(torch_tpu_python torch_tpu)
 
-set_target_properties(torch_tpu_python PROPERTIES INSTALL_RPATH 
+set_target_properties(torch_tpu_python PROPERTIES INSTALL_RPATH
       "$ORIGIN;${tpuv7_rpath};${tpuDNNPath};${tpurtPath};${scclPath};${RUNTIME_LIB_PATH};${MODELRUNTIME_LIB_PATH}")
 install(TARGETS torch_tpu_python DESTINATION lib)
 

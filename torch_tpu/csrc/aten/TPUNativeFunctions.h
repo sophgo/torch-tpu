@@ -19,7 +19,7 @@ int64_t get_tpu_format(const at::Tensor & self);
 // inplace is necessary?
 //at::Tensor& tpu_format_cast(at::Tensor& self, int64_t tpu_format); // format cast inplace
 at::Tensor tpu_format_cast(const at::Tensor& self, int64_t tpu_format);  // format cast generate new tensor
-at::Tensor tpu_format_cast(const at::Tensor& self, const at::Tensor& dst);  // format cast self to a new tensor, with dst's format 
+at::Tensor tpu_format_cast(const at::Tensor& self, const at::Tensor& dst);  // format cast self to a new tensor, with dst's format
 at::Tensor tpu_format_cast_back_to_origin(const at::Tensor& self); // cast tpu_format to base_format, generate new tensor
 } // namespace TPUNativeFunctions
 }// namespace at_tpu

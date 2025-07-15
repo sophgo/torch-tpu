@@ -20,11 +20,11 @@ if (NOT USING_CMODEL AND REMOVE_POLLS_IN_LLM)
 endif()
 
 add_definitions(-Wno-address-of-packed-member
-                -fno-builtin-memcpy 
-                -fno-builtin-memset 
+                -fno-builtin-memcpy
+                -fno-builtin-memset
                 -fno-builtin-memmove
-                -fsigned-char 
-                -Wsign-compare 
+                -fsigned-char
+                -Wsign-compare
                 -Wunused-variable
                 -Werror
                 -Wno-dev)

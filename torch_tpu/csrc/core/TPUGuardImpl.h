@@ -85,13 +85,13 @@ struct TPUGuardImpl final : public c10::impl::DeviceGuardImplInterface
   }
 
   // Event-related functions
-  void createEvent(void* sg_event, const c10::EventFlag flag) const 
+  void createEvent(void* sg_event, const c10::EventFlag flag) const
   {
     LOG(WARNING) << "flag is no use : ";
     tpuEventCreate(reinterpret_cast<tpuEvent_t*>(sg_event));
   }
 
-  void destroyEvent ( void * event, const DeviceIndex device_index )  const noexcept override 
+  void destroyEvent ( void * event, const DeviceIndex device_index )  const noexcept override
   {
     // TODO: Implement destroyEvent for NPU events.
     // int current_device = -1;

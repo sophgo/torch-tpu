@@ -8,43 +8,43 @@
 namespace at_tpu{
 namespace modelrt{
 
-#ifdef BACKEND_SG2260
+#if defined(BACKEND_SG2260) || defined(BACKEND_SG2260E)
 #include <tpuv7_modelrt.h>
 void CHECKDTYPE(tpuRtDataType_t model_iodtype, at::ScalarType tensor_dtype )
 {
-    if (model_iodtype == TPU_FLOAT32) { 
+    if (model_iodtype == TPU_FLOAT32) {
         TORCH_CHECK(tensor_dtype ==  c10::ScalarType::Float,
             "[ERROR] detect model-io is f32, tensor is ", tensor_dtype );
     } else if (model_iodtype == TPU_FLOAT16) {
         TORCH_CHECK(tensor_dtype ==  c10::ScalarType::Half,
-            "[ERROR] detect model-io is f16, tensor is ", tensor_dtype );     
+            "[ERROR] detect model-io is f16, tensor is ", tensor_dtype );
     } else if (model_iodtype == TPU_INT8) {
         TORCH_CHECK(tensor_dtype ==  c10::ScalarType::Char,
-            "[ERROR] detect model-io is char, tensor is ", tensor_dtype );  
+            "[ERROR] detect model-io is char, tensor is ", tensor_dtype );
     } else if (model_iodtype == TPU_UINT8) {
         TORCH_CHECK(tensor_dtype ==  c10::ScalarType::Byte,
-            "[ERROR] detect model-io is u8, tensor is ", tensor_dtype );  
+            "[ERROR] detect model-io is u8, tensor is ", tensor_dtype );
     } else if (model_iodtype == TPU_INT16) {
         TORCH_CHECK(tensor_dtype ==  c10::ScalarType::Short,
-            "[ERROR] detect model-io is f32, tensor is ", tensor_dtype );  
+            "[ERROR] detect model-io is f32, tensor is ", tensor_dtype );
     } else if (model_iodtype == TPU_UINT16) {
         TORCH_CHECK(tensor_dtype ==  c10::ScalarType::Bits16,
-            "[ERROR] detect model-io is f16, tensor is ", tensor_dtype );  
+            "[ERROR] detect model-io is f16, tensor is ", tensor_dtype );
     } else if (model_iodtype == TPU_INT32) {
         TORCH_CHECK(tensor_dtype ==  c10::ScalarType::Int,
-            "[ERROR] detect model-io is i32, tensor is ", tensor_dtype );  
+            "[ERROR] detect model-io is i32, tensor is ", tensor_dtype );
     } else if (model_iodtype == TPU_UINT32) {
         TORCH_CHECK(tensor_dtype ==  c10::ScalarType::Int,
-            "[ERROR] detect model-io is u32, tensor is ", tensor_dtype );  
+            "[ERROR] detect model-io is u32, tensor is ", tensor_dtype );
     } else if (model_iodtype == TPU_BFLOAT16) {
         TORCH_CHECK(tensor_dtype ==  c10::ScalarType::BFloat16,
-            "[ERROR] detect model-io is bf16, tensor is ", tensor_dtype );  
+            "[ERROR] detect model-io is bf16, tensor is ", tensor_dtype );
     } else if (model_iodtype == TPU_INT4) {
         TORCH_CHECK(tensor_dtype ==  c10::ScalarType::Bits4x2,
-            "[ERROR] detect model-io is i4, tensor is ", tensor_dtype );  
+            "[ERROR] detect model-io is i4, tensor is ", tensor_dtype );
     } else if (model_iodtype == TPU_UINT4) {
         TORCH_CHECK(tensor_dtype ==  c10::ScalarType::Bits4x2,
-            "[ERROR] detect model-io is u4, tensor is ", tensor_dtype );  
+            "[ERROR] detect model-io is u4, tensor is ", tensor_dtype );
     } else {
         TORCH_CHECK(false, "should not arrive here, seems like a error bmodel.")
     }
@@ -94,7 +94,7 @@ struct BModelRunnerImpl
         }
         m_running_net_info = tpuRtGetNetInfo(m_net, net_name);
         TORCH_CHECK(m_running_net_info.stage_num == 1, "current only support stage_num == 1");
-        TORCH_CHECK(m_running_net_info.is_dynamic == false, "current not support dynamic model");        
+        TORCH_CHECK(m_running_net_info.is_dynamic == false, "current not support dynamic model");
     }
 
     void forward(at::TensorList input, at::TensorList output,  bool non_blocking)
@@ -136,7 +136,7 @@ struct BModelRunnerImpl
     std::tuple<BModelRunner::tensor_vec, BModelRunner::tensor_vec> get_inplace_io() {
         int num_input  = m_running_net_info.input.num;
         int num_output = m_running_net_info.output.num;
-        
+
         BModelRunner::tensor_vec inputs, outputs;
         for (int i = 0; i < num_input; i++){
             std::vector<int64_t> sizes;
@@ -199,7 +199,7 @@ struct BModelRunnerImpl
 
     void set_running_net(const char* net_name)
     {
-        TORCH_CHECK( false);    
+        TORCH_CHECK( false);
     }
 
     void forward(at::TensorList input, at::TensorList output,  bool non_blocking)

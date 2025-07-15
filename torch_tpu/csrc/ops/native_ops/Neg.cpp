@@ -23,7 +23,7 @@ Tensor & neg_out_tpu ( const Tensor & self, Tensor & out )
       out = neg(self.contiguous());
     } else {
       auto out_ = neg(self.contiguous());
-      TIMING_START; 
+      TIMING_START;
       auto stream = c10_tpu::getCurrentTPUStream();
       auto status = tpudnnStridedCopyAsync(
             stream,
