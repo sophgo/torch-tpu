@@ -73,9 +73,7 @@ Docker环境配置
 
    docker run --cap-add SYS_ADMIN -itd --restart always --privileged \
       -e LD_LIBRARY_PATH=/opt/sophon/libsophon-current/lib:$LD_LIBRARY_PATH \
-      -e PATH=/opt/sophon/libsophon-current/bin:$PATH \
-      --device=/dev/bmdev-ctl:/dev/bmdev-ctl \
-      --device=/dev/bm-sophon0:/dev/bm-sophon0 \
+      -v /dev:/dev \
       -v $HOME:/workspace \
       -v /opt:/opt   \
       -w /workspace \
@@ -85,10 +83,6 @@ Docker环境配置
 
   # <torch_tpu_0>为自己想要的容器的名字
 
-  # 当前为单机器创建容器示例，如果有多台机器，设备要全部被映射，可按如下格式添加参数：
-
-  #  --device=/dev/bm-sophon0:/dev/bm-sophon0 --device=/dev/bm-sophon7:/dev/bm-sophon1 \
-  #      --device=/dev/bm-sophon3:/dev/bm-sophon2 --device=/dev/bm-sophon8:/dev/bm-sophon3
 
 上面命令，将主机的Host路径映射到容器中的/workspace，用户可以按需映射。
 

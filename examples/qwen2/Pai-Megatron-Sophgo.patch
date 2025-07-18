@@ -611,6 +611,18 @@ index 5965d785..685f77c7 100644
         }
  
         if args.pipeline_model_parallel_size == 1:
+diff --git a/examples/qwen2/README.md b/examples/qwen2/README.md
+index f3fcfc6..c1d0d31 100644
+--- a/examples/qwen2/README.md
++++ b/examples/qwen2/README.md
+@@ -40,6 +40,7 @@ wget https://atp-modelzoo-wlcb-pai.oss-cn-wulanchabu.aliyuncs.com/release/models
+ tar -zxf Qwen2-0.5B.tgz
+ 
+ mkdir qwen-datasets
++cd qwen-datasets
+ wget https://atp-modelzoo-wlcb-pai.oss-cn-wulanchabu.aliyuncs.com/release/models/pai-megatron-patch/qwen-datasets/wudao_qwenbpe_text_document.bin
+ wget https://atp-modelzoo-wlcb-pai.oss-cn-wulanchabu.aliyuncs.com/release/models/pai-megatron-patch/qwen-datasets/wudao_qwenbpe_text_document.idx
+ 
 diff --git a/examples/qwen2/pretrain_qwen.py b/examples/qwen2/pretrain_qwen.py
 index 8ab6be0..105638f 100644
 --- a/examples/qwen2/pretrain_qwen.py

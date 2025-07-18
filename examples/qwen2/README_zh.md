@@ -13,7 +13,7 @@
 
 ### 2: 准备 torch-tpu 环境
 
-你可以参考[README.md]或者用户手册去设置torch_tpu环境。
+你可以参考[README.md]或者用户手册[dist/docs/TORCH_TPU快速入门指南.pdf]去设置torch_tpu环境。
 
 
 ## 步骤2: 在 docker 容器中安装 `torch_tpu`
@@ -30,7 +30,7 @@ pip install torch_tpu
 
 ```
 <!-- TODO -->
-pip install https://github.com/sophgo/torch-tpu/releases/download/v0.1.0/torch_tpu-0.1.0-cp310-cp310-linux_x86_64.whl --force-reinstall
+pip install https://github.com/sophgo/torch-tpu/releases/download/v0.1.0/torch_tpu-*-linux_x86_64.whl --force-reinstall
 ```
 
 ## 步骤3: 获取 PAI-Megatron-Patch
@@ -106,7 +106,7 @@ QWEN2_WHOLE_NET_TRANS=1 DISABLE_CACHE=1 source run_qwen2_train.sh 7B 1 2 1
 ```
 
 
-## Step7: 将MegatronCore格式的checkpoints转为HuggingFace格式，并评估该模型
+## 步骤7: 将MegatronCore格式的checkpoints转为HuggingFace格式，并评估该模型
 
 - 启动评估脚本环境
 

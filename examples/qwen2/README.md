@@ -14,7 +14,7 @@ Otherwise, please update your system configuration to enable IOMMU in translated
 
 ### 2: Prepare base torch-tpu environment
 
-You can refer to [README.md] or UserGuide to prepare base torch-tpu environment.
+You can refer to [README.md] or UserGuide[dist/docs/TORCH_TPU快速入门指南.pdf] to prepare base torch-tpu environment.
 
 
 ## Step2: Install `torch_tpu` in the docker container
@@ -31,7 +31,7 @@ Before installation, please verify the last update time of the GitHub repository
 
 ```
 <!-- TODO -->
-pip install https://github.com/sophgo/torch-tpu/releases/download/v0.1.0/torch_tpu-0.1.0-cp310-cp310-linux_x86_64.whl --force-reinstall
+pip install https://github.com/sophgo/torch-tpu/releases/download/v0.1.0/torch_tpu-*-linux_x86_64.whl --force-reinstall
 ```
 
 ## Step3: Get PAI-Megatron-Patch
