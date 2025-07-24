@@ -1592,4 +1592,10 @@ tpudnnStatus_t tpudnnScalarAtan2Async(const tpudnnHandle_t handle,
 tpudnnStatus_t tpudnnAtan2Async(const tpudnnHandle_t handle,
                                 tpudnnTensor_t input, tpudnnTensor_t other,
                                 tpudnnTensor_t output);
+tpudnnStatus_t tpudnnRemainderAsync(
+    tpudnnHandle_t handle,
+    tpudnnTensor_t input,
+    float other,
+    tpudnnTensor_t output);
+
 } // extern "C"
