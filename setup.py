@@ -87,8 +87,8 @@ def python_path_dir():
 
 def get_pytorch_dir():
     if SOC_CROSS:
-        print(os.path.join(CROSS_TOOLCHAINS, "torchwhl/torch"))
-        return os.path.join(CROSS_TOOLCHAINS, "torchwhl/torch")
+        print(os.path.join(CROSS_TOOLCHAINS, "torchwhl-2.1.0-cp311/torch"))
+        return os.path.join(CROSS_TOOLCHAINS, "torchwhl-2.1.0-cp311/torch")
     try:
         import torch
         return os.path.dirname(os.path.realpath(torch.__file__))
