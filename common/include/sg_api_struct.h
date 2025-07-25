@@ -1753,19 +1753,6 @@ typedef struct
   int dtype;
 } WITH_PLATFORM(sg_api_permute_t);
 
-typedef struct
-{
-  unsigned long long input_global_addr;
-  unsigned long long value_global_addr;
-  unsigned long long index_global_addr;
-  int shape[FW_MAX_SHAPE_DIMS];
-  int dim;
-  int k;
-  int axis;
-  int largest;
-  int sorted;
-  int dtype;
-} WITH_PLATFORM(sg_api_topk_t);
 
 typedef struct
 {

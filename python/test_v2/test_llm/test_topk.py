@@ -112,8 +112,11 @@ def test_mid_topk(rand_batch, repeat_batch, n, groups, k, device="tpu"):
     )
 
     # 第二步：分别用 cpu/tpu 实现跑
-    # breakpoint()
     values_cpu, indices_cpu = topk_cpu(x, k)
     values_tpu, indices_tpu = topk_tpu(x, k, device)
     # 第三步：用 cmp_topk 对比
     cmp_topk(values_cpu, indices_cpu, values_tpu, indices_tpu)
+
+
+if __name__ == "__main__":
+    test_mid_topk(17, 1, 256, 32, 2, device="tpu")

@@ -3,6 +3,7 @@ import builtins
 import torch
 from contextlib import contextmanager
 
+
 # 导入必要的torch_tpu模块
 try:
     import torch_tpu
@@ -70,7 +71,9 @@ def pytest_collection_modifyitems(config, items):
 class ProfilerManager:
     """性能分析管理器，提供精确的性能分析控制"""
 
-    def __init__(self, enable_global_profile=False, test_case=None, parametrized_items=None):
+    def __init__(
+        self, enable_global_profile=False, test_case=None, parametrized_items=None
+    ):
         self.enable_global_profile = enable_global_profile
         self.test_case = test_case or "unknown_test"
         self.parametrized_items = parametrized_items or {}
@@ -87,7 +90,7 @@ class ProfilerManager:
                     param_info = ""
                     if self.parametrized_items:
                         param_info = f" | params: {self.parametrized_items}"
-                    
+
                     # 第二步：输出启用性能分析的详细信息
                     print(
                         f"[PROFILER] Enabled profiling for test: {self.test_case}{param_info} "
@@ -95,7 +98,9 @@ class ProfilerManager:
                     )
             except Exception as e:
                 if self.enable_global_profile:
-                    print(f"[PROFILER] Warning: Failed to enable profiling for {self.test_case}: {e}")
+                    print(
+                        f"[PROFILER] Warning: Failed to enable profiling for {self.test_case}: {e}"
+                    )
 
     def disable(self):
         """手动禁用性能分析"""
@@ -108,7 +113,9 @@ class ProfilerManager:
                     print(f"[PROFILER] Disabled profiling for test: {self.test_case}")
             except Exception as e:
                 if self.enable_global_profile:
-                    print(f"[PROFILER] Warning: Failed to disable profiling for {self.test_case}: {e}")
+                    print(
+                        f"[PROFILER] Warning: Failed to disable profiling for {self.test_case}: {e}"
+                    )
 
     @contextmanager
     def profile(self, buffer_size=1024, trace_level=2):
@@ -138,16 +145,16 @@ def profiler(request):
        profiler.disable()
     """
     enable_global_profile = request.config.getoption("--enable_profile")
-    
+
     # 第一步：获取当前测试的基本信息
     test_case = request.node.name
-    
+
     # 第二步：提取参数化项信息
     parametrized_items = {}
-    if hasattr(request.node, 'callspec'):
+    if hasattr(request.node, "callspec"):
         # 从 callspec 中提取参数化的参数和值
         parametrized_items = dict(request.node.callspec.params)
-    
+
     # 第三步：创建包含测试信息的 ProfilerManager
     manager = ProfilerManager(enable_global_profile, test_case, parametrized_items)
 
@@ -195,7 +202,7 @@ def device_parametrized(request):
     return device_name
 
 
-@pytest.fixture(scope="function")
+@pytest.fixture(scope="function", autouse=True)
 def setup_random_seed():
     """
     为每个测试函数设置随机种子，确保结果可重现
