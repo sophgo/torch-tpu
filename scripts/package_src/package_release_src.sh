@@ -40,16 +40,7 @@ mkdir $dest_dir
 find "$src_dir" -type f -name "*.h" -exec cp --parents {} "$dest_dir" \;
 
 # ==================================================================
-echo "[step-3] package sgdnn include"
-src_dir=../sgdnn
-dest_dir=$package_src/sgdnn
-mkdir $dest_dir
-find "$src_dir" -type f -name "*.h" -exec cp --parents {} "$dest_dir" \;
-find "$src_dir" -type f -name "*.hpp" -exec cp --parents {} "$dest_dir" \;
-cp ../common/include/* $dest_dir/include
-
-# ==================================================================
-echo "[step-4] tar src to torch_tpu_src.tar.gz"
+echo "[step-3] tar src to torch_tpu_src.tar.gz"
 tar -cvzf "torch-tpu_src.tar.gz" ${package_src}
 rm -rf ${package_src}
 
