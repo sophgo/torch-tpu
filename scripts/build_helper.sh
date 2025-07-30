@@ -21,7 +21,7 @@ function bdist_wheel()
   python setup.py bdist_wheel
 
   if [ $# -ne 1 ]; then
-    echo -e "\033[31m [warn] wheel not installed, use reinstall_torch_tpu to install wheel package \033[0m"
+    echo -e "[message] wheel not installed, use reinstall_torch_tpu to install wheel package"
   fi
   popd
 }
