@@ -10,49 +10,49 @@ find_path(
     tpuDNN_INCLUDE_DIR
     NAMES tpuDNN.h
     HINTS
-    ${TPU1686_PATH}/tpuDNN/include
-    $ENV{TPUTRAIN_TOP}/third_party/tpuDNN/include)
+    $ENV{TPUTRAIN_TOP}/third_party/tpuDNN/include
+    ${TPU1686_PATH}/tpuDNN/include)
 find_path(
     tpurt_INCLUDE_DIR
     NAMES tpu_runtime_api.h
     HINTS
-    ${TPU1686_ROOT}/runtime/
-    $ENV{TPUTRAIN_TOP}/third_party/runtime_api/include)
+    $ENV{TPUTRAIN_TOP}/third_party/runtime_api/include
+    ${TPU1686_ROOT}/runtime/)
 find_path(
     SCCL_INCLUDE_DIR
     NAMES sccl.h
     HINTS
-    ${TPU1686_PATH}/sccl/include
-    $ENV{TPUTRAIN_TOP}/third_party/sccl/include)
+    $ENV{TPUTRAIN_TOP}/third_party/sccl/include
+    ${TPU1686_PATH}/sccl/include)
 
 if($ENV{SOC_CROSS_MODE} STREQUAL "ON")
     find_library(
         tpurt_LIBRARY
         NAMES tpurt-${PLATFORM} tpurt
         HINTS
-        ${TPU1686_PATH}/build_$ENV{CHIP_ARCH}_riscv/runtime/
-        $ENV{TPUTRAIN_TOP}/third_party/runtime_api/lib_$ENV{CHIP_ARCH}/)
+        $ENV{TPUTRAIN_TOP}/third_party/runtime_api/lib_$ENV{CHIP_ARCH}/
+        ${TPU1686_PATH}/build_$ENV{CHIP_ARCH}_riscv/runtime/)
 
     find_library(
         SCCL_LIBRARY
         NAMES sccl-${PLATFORM} sccl
         HINTS
-        ${TPU1686_PATH}/build_$ENV{CHIP_ARCH}_riscv/sccl/
-        $ENV{TPUTRAIN_TOP}/third_party/sccl/lib/)
+        $ENV{TPUTRAIN_TOP}/third_party/sccl/lib/
+        ${TPU1686_PATH}/build_$ENV{CHIP_ARCH}_riscv/sccl/)
 else()
     find_library(
         tpurt_LIBRARY
         NAMES tpurt
         HINTS
-        ${TPU1686_PATH}/build_$ENV{CHIP_ARCH}/runtime/
-        $ENV{TPUTRAIN_TOP}/third_party/runtime_api/lib_$ENV{CHIP_ARCH}/)
+        $ENV{TPUTRAIN_TOP}/third_party/runtime_api/lib_$ENV{CHIP_ARCH}/
+        ${TPU1686_PATH}/build_$ENV{CHIP_ARCH}/runtime/)
 
     find_library(
         SCCL_LIBRARY
         NAMES sccl
         HINTS
-        ${TPU1686_PATH}/build_$ENV{CHIP_ARCH}/sccl/
-        $ENV{TPUTRAIN_TOP}/third_party/sccl/lib/)
+        $ENV{TPUTRAIN_TOP}/third_party/sccl/lib/
+        ${TPU1686_PATH}/build_$ENV{CHIP_ARCH}/sccl/)
 endif()
 
 set(additional_vars)
@@ -102,15 +102,15 @@ elseif ($ENV{CHIP_ARCH} STREQUAL "sg2260")
             cmodel_firmware_LIBRARY
             NAMES cmodel_firmware tpuv7_emulator
             HINTS
-            $ENV{TPUTRAIN_TOP}/../TPU1686/build_$ENV{CHIP_ARCH}/firmware_core/
-            $ENV{TPUTRAIN_TOP}/third_party/tpuv7_runtime/tpuv7-emulator_0.1.0/lib/)
+            $ENV{TPUTRAIN_TOP}/third_party/tpuv7_runtime/tpuv7-emulator_0.1.0/lib/
+            ${TPU1686_PATH}/build_$ENV{CHIP_ARCH}/firmware_core/)
 
         find_library(
             firmware_LIBRARY
             NAMES libfirmware_core.a
             HINTS
-            $ENV{TPUTRAIN_TOP}/../TPU1686/build_fw_$ENV{CHIP_ARCH}/firmware_core/
-            $ENV{TPUTRAIN_TOP}/third_party/firmware/$ENV{CHIP_ARCH}/)
+            $ENV{TPUTRAIN_TOP}/third_party/firmware/$ENV{CHIP_ARCH}/
+            ${TPU1686_PATH}/build_fw_$ENV{CHIP_ARCH}/firmware_core/)
     endif()
 
 endif()
@@ -121,8 +121,8 @@ if($ENV{SOC_CROSS_MODE} STREQUAL "ON")
             tpuDNN_LIBRARY
             NAMES tpudnn
             HINTS
-            $ENV{TPUTRAIN_TOP}/../TPU1686/build_$ENV{CHIP_ARCH}/tpuDNN/src/
-            $ENV{TPUTRAIN_TOP}/third_party/tpuDNN/$ENV{CHIP_ARCH}_lib/arm)
+            $ENV{TPUTRAIN_TOP}/third_party/tpuDNN/$ENV{CHIP_ARCH}_lib/arm
+            ${TPU1686_PATH}/build_$ENV{CHIP_ARCH}/tpuDNN/src/)
     else()
         find_library(
             tpuDNN_LIBRARY
@@ -135,8 +135,8 @@ else()
         tpuDNN_LIBRARY
         NAMES tpudnn
         HINTS
-        $ENV{TPUTRAIN_TOP}/../TPU1686/build_$ENV{CHIP_ARCH}/tpuDNN/src/
-        $ENV{TPUTRAIN_TOP}/third_party/tpuDNN/$ENV{CHIP_ARCH}_lib/)
+        $ENV{TPUTRAIN_TOP}/third_party/tpuDNN/$ENV{CHIP_ARCH}_lib/
+        ${TPU1686_PATH}/build_$ENV{CHIP_ARCH}/tpuDNN/src/)
 endif()
 
 find_package_handle_standard_args(
