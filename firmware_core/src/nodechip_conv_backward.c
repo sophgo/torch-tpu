@@ -1,6 +1,7 @@
 #include "sg_api_struct.h"
 #include "tpu_kernel.h"
 #include "debug.h"
+#include "kernel_utils_func.h"
 
 static inline bool is_local_mem_enough(
         int *size,
@@ -3347,6 +3348,15 @@ void nodechip_conv_backward(
  ) {
 
     TPUKERNEL_ASSERT(groups == 1);
+    if (grad_bias_enable)
+    {
+        int row = grad_out_shape->n * grad_out_shape->c;
+        int col = grad_out_shape->h * grad_out_shape->w;
+        nodechip_reduce_sum_2d(grad_out_global_addr, grad_input_global_addr,row, col, 1, dtype, 1);
+        row = grad_out_shape->n;
+        col = grad_out_shape->c;
+        nodechip_reduce_sum_2d(grad_input_global_addr, grad_bias_global_addr, row, col, 0, dtype, 1);
+    }
     if (grad_input_enable) {
         nodechip_conv_backward_input(
             grad_out_global_addr,
@@ -3364,7 +3374,7 @@ void nodechip_conv_backward(
             weight_reordered);
     }
     if (grad_weight_enable) {
-        if ((input_shape->h * input_shape->w > 10000) || grad_bias_enable) {
+        if ((input_shape->h * input_shape->w > 10000)) {
             nodechip_conv_backward_weight(
                 input_global_addr,
                 grad_out_global_addr,

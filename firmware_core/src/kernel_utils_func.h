@@ -28,4 +28,13 @@ void tpu_bdc_fp_isnan(local_addr_t dst_addr, local_addr_t src_addr,
                       local_addr_t work2_addr, const dim4 *shape,
                       data_type_t dtype);
 
+void nodechip_reduce_sum_2d (
+global_addr_t input_global_addr,
+global_addr_t output_global_addr,
+int row,
+int column,
+int axis,
+data_type_t dtype,
+int reduction );
+
 #endif

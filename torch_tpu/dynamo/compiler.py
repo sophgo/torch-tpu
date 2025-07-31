@@ -6,11 +6,6 @@ from torch._functorch import compilers
 from functorch.compile import min_cut_rematerialization_partition
 from torch.fx.passes.fake_tensor_prop import FakeTensorProp
 from typing import List
-try:
-    from tpu_mlir.python.tools.train.FxGraphConverter import fx2mlir
-    from tpu_mlir.python.tools.train.fx_pass import fx_pass_for_bmm_expand
-except ImportError:
-    raise RuntimeError("Error: This feature requires tpu_mlir package")
 
 import os
 from torch_tpu.tpu.bmrt import BmodelModule
@@ -106,6 +101,10 @@ def tpu_mlir_fwd_compiler(fx_g : torch.fx.GraphModule, example_inputs : List[tor
 
     compiled = os.path.isfile(bmodel_path)
     if not compiled:
+        try:
+            from tpu_mlir.python.tools.train.FxGraphConverter import fx2mlir
+        except ImportError:
+            raise RuntimeError("Error: This feature requires tpu_mlir package")
         tpu_compiler = fx2mlir(submodule_name = save_path, chip = os.environ['CHIP'], bwd_graph= False, cmp=False, f16 = use_f16, mlir_test=False)
         print("compiling ...... ......")
         FakeTensorProp(fx_g).propagate(*example_inputs)
@@ -147,6 +146,11 @@ def tpu_mlir_bwd_compiler(fx_g : torch.fx.GraphModule, example_inputs : List[tor
 
     compiled = os.path.isfile(bmodel_path)
     if not compiled:
+        try:
+            from tpu_mlir.python.tools.train.FxGraphConverter import fx2mlir
+        except ImportError:
+            raise RuntimeError("Error: This feature requires tpu_mlir package")
+
         tpu_compiler = fx2mlir(submodule_name = save_path, chip = os.environ['CHIP'], bwd_graph=True, cmp=False, f16 = use_f16, mlir_test=False)
         print("compiling ...... ......")
         FakeTensorProp(fx_g).propagate(*example_inputs)
