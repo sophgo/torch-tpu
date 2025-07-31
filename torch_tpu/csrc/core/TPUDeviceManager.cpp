@@ -376,7 +376,7 @@ public:
       // struct timeval timer, end, timer1;
       // gettimeofday ( &timer1, NULL );
       // gettimeofday ( &timer, NULL );
-      Status = tpuMemcpyH2DAsync(Dst, Src, Size, stream);
+      Status = tpuMemcpyH2DAsync(Dst, Src, Size, stream.stream());
       // gettimeofday ( &end, NULL );
       // std::cout << " tpuRtMemcpyS2DAsync getstream time : " << ( timer.tv_sec - timer1.tv_sec ) * 1000000UL + ( timer.tv_usec - timer1.tv_usec ) << "us\n";
       // std::cout << " sgMemcpyS2SAsync  time : " << ( end.tv_sec - timer.tv_sec ) * 1000000UL + ( end.tv_usec - timer.tv_usec ) << "us\n";
@@ -396,7 +396,7 @@ public:
       // struct timeval timer1, timer, end;
       // gettimeofday ( &timer1, NULL );
       // gettimeofday ( &timer, NULL );
-      Status = tpuMemcpyD2HAsync(Dst, Src, Size, stream);
+      Status = tpuMemcpyD2HAsync(Dst, Src, Size, stream.stream());
       // gettimeofday ( &end, NULL );
       // std::cout << " tpuRtMemcpyD2SAsync getstream time : " << ( timer.tv_sec - timer1.tv_sec ) * 1000000UL + ( timer.tv_usec - timer1.tv_usec ) << "us\n";
       // std::cout << " tpuRtMemcpyD2SAsync  time : " << ( end.tv_sec - timer.tv_sec ) * 1000000UL + ( end.tv_usec - timer.tv_usec ) << "us\n";
