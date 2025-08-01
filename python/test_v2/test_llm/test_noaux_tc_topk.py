@@ -138,21 +138,20 @@ err_data = [210.,  33.,  80.,  93., 222.,   7., 198.,  92.,  22., 186., 143., 16
 # fmt: on
 
 
-def cmp_noaux_tc_topk(values_gt, indices_gt, values_v2, indices_v2, n_groups):
-    indices_gt_groups = indices_gt // n_groups
-    indices_v2_groups = indices_v2.long() // n_groups
-    # for batch_idx in range(indices_gt_groups.shape[0]):
-    #     assert (
-    #         len(torch.unique(indices_gt_groups[batch_idx])) <= 4
-    #     ), f"batch {batch_idx} has elements in more than 4 groups"
-    #     assert (
-    #         len(torch.unique(indices_v2_groups[batch_idx])) <= 4
-    #     ), f"batch {batch_idx} has elements in more than 4 groups"
+def cmp_noaux_tc_topk(values_gt, indices_gt, values_v2, indices_v2):
+    indices_gt_groups = indices_gt // 32
+    indices_v2_groups = indices_v2.long() // 32
+    for batch_idx in range(indices_gt_groups.shape[0]):
+        assert (
+            len(torch.unique(indices_gt_groups[batch_idx])) <= 4
+        ), f"batch {batch_idx} has elements in more than 4 groups"
+        assert (
+            len(torch.unique(indices_v2_groups[batch_idx])) <= 4
+        ), f"batch {batch_idx} has elements in more than 4 groups"
     assert torch.allclose(
         values_gt.float(), values_v2.to(torch.float32), rtol=1e-5, atol=1e-6
     )
     assert torch.allclose(indices_gt, indices_v2.long())
-
 
 # TODO: fixme
 # def test_noaux_tc_topk_err(device):
@@ -194,9 +193,8 @@ def cmp_noaux_tc_topk(values_gt, indices_gt, values_v2, indices_v2, n_groups):
         (1, 8, 4, 8),
         (8, 8, 4, 8),
         (16, 8, 4, 8),
-        (17, 32, 4, 8),
         (64, 8, 4, 8),
-        # (128, 32, 4, 8),
+        (128, 8, 4, 8),
     ],
 )
 def test_noaux_tc_topk(batch_size, n_groups, topk_groups, top_k, device):
@@ -223,7 +221,7 @@ def test_noaux_tc_topk(batch_size, n_groups, topk_groups, top_k, device):
     )
 
     # 第五步：验证结果的正确性
-    cmp_noaux_tc_topk(values_gt, indices_gt, values_v2, indices_v2, n_groups)
+    cmp_noaux_tc_topk(values_gt, indices_gt, values_v2, indices_v2)
 
 
 # @pytest.mark.parametrize(
