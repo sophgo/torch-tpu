@@ -216,6 +216,8 @@ class MegatronQwen2AttentionQKVFunc(torch.autograd.Function):
                 sin,
                 attention_mask,
                 softmax_scale,
+                atten_fwd_atten_output,
+                atten_fwd_softmax_lse,
                 attention_dropout):
         # cos, sin: (seq, 1, 1, head_dim), fp32
         # attention_mask: (batch, 1, seq, seq), bool
@@ -224,16 +226,16 @@ class MegatronQwen2AttentionQKVFunc(torch.autograd.Function):
             # q, k, v: (seq, batch, num_heads, head_dim)
             batch, seq_len, num_attn_head, head_dim = query_states.size()
             output_shape = (batch, seq_len, num_attn_head, head_dim)
-            cos = cos.to(query_states.dtype).view(seq_len, 1, head_dim)
-            sin = sin.to(query_states.dtype).view(seq_len, 1, head_dim)
-            input_length = torch.tensor([seq_len] * batch, dtype=torch.int32)#TODO:construct data in device 
+            cos = cos.view(seq_len, 1, head_dim)
+            sin = sin.view(seq_len, 1, head_dim)
+            input_length = torch.tensor([seq_len] * batch, dtype=torch.int32)#TODO:construct data in device
         else:
             # q, k, v: (batch, seq, num_heads, head_dim)
             seq_len, batch, num_attn_head, head_dim = query_states.size()
             output_shape = (seq_len, batch, num_attn_head, head_dim)
             cos = cos.to(query_states.dtype).repeat(1, batch, 1, 1).view(batch * seq_len, 1, head_dim)
             sin = sin.to(query_states.dtype).repeat(1, batch, 1, 1).view(batch * seq_len, 1, head_dim)
-            input_length = torch.tensor([seq_len * batch], dtype=torch.int32)#TODO:construct data in device 
+            input_length = torch.tensor([seq_len * batch], dtype=torch.int32)#TODO:construct data in device
         num_kv_head = key_states.size(-2)
 
         query_states = query_states.view(batch * seq_len, num_attn_head, head_dim)
@@ -250,11 +252,10 @@ class MegatronQwen2AttentionQKVFunc(torch.autograd.Function):
         else:
             attention_mask_2d = None
 
-        attn_output = torch.empty(query_states.shape, dtype = query_states.dtype, device = query_states.device)
-        softmax_lse = torch.empty([batch * seq_len, num_attn_head, 1], dtype=torch.float32, device=query_states.device)
-        # input_length = torch.tensor([seq_len * batch], dtype=torch.int32)#TODO:construct data in device 
+        attn_output = atten_fwd_atten_output.view_as(query_states)
+        softmax_lse = atten_fwd_softmax_lse.view([batch * seq_len, num_attn_head, 1])
+        # input_length = torch.tensor([seq_len * batch], dtype=torch.int32)#TODO:construct data in device
         max_s = input_length.max().item()
-
         torch.ops.my_ops.llama_attention_forward(attn_output,
                                     query_states,
                                     key_states,
@@ -279,6 +280,7 @@ class MegatronQwen2AttentionQKVFunc(torch.autograd.Function):
             batch, seq_len, num_heads, head_dim = attn_output.size()
             num_key_value_heads = key_states.shape[-2]
 
+
             query_states = query_states.view(batch * seq_len, num_heads, head_dim)
             key_states = key_states.view(batch * seq_len, num_key_value_heads, head_dim)
             value_states = value_states.view(batch * seq_len, num_key_value_heads, head_dim)
@@ -297,7 +299,7 @@ class MegatronQwen2AttentionQKVFunc(torch.autograd.Function):
             else:
                 attention_mask = None
 
-            input_lengths = torch.tensor([seq_len] * batch, dtype=torch.int32, device=query_states.device)  
+            input_lengths = torch.tensor([seq_len] * batch, dtype=torch.int32, device=query_states.device)
 
             torch.ops.my_ops.llama_attention_backward(
                 query_states,
@@ -315,12 +317,12 @@ class MegatronQwen2AttentionQKVFunc(torch.autograd.Function):
                 input_lengths,
                 seq_len,
                 ctx.softmax_scale)
-            
+
             grad_query_states = grad_query_states.view(batch, seq_len, num_heads, head_dim)
             grad_key_states = grad_key_states.view(batch, seq_len, num_key_value_heads, head_dim)
             grad_value_states = grad_value_states.view(batch, seq_len, num_key_value_heads, head_dim)
 
-            return grad_query_states, grad_key_states, grad_value_states, None, None, None, None, None
+            return grad_query_states, grad_key_states, grad_value_states, None, None, None, None, None, None, None
         else:
             seq_len, batch, num_heads, head_dim = attn_output.size()
             assert seq_len * batch <= 4096, "batch size too large"
@@ -334,6 +336,7 @@ class MegatronQwen2AttentionQKVFunc(torch.autograd.Function):
             key_states = key_states.view(batch * seq_len, num_key_value_heads, head_dim)
             value_states = value_states.view(batch * seq_len, num_key_value_heads, head_dim)
 
+
             attn_output = attn_output.view(batch * seq_len, num_heads, head_dim)
             grad_output = grad_output.view(batch * seq_len, num_heads, head_dim)
             lse = lse.view(batch * seq_len, num_heads, 1)
@@ -343,7 +346,7 @@ class MegatronQwen2AttentionQKVFunc(torch.autograd.Function):
             grad_query_states = grad_query_states.view(batch * seq_len, num_heads, head_dim)
             grad_key_states = grad_key_states.view(batch * seq_len, num_key_value_heads, head_dim)
             grad_value_states = grad_value_states.view(batch * seq_len, num_key_value_heads, head_dim)
-            
+
             input_lengths = torch.tensor([seq_len]* batch, dtype=torch.int32, device=query_states.device)
 
             torch.ops.my_ops.llama_attention_backward(
@@ -362,12 +365,12 @@ class MegatronQwen2AttentionQKVFunc(torch.autograd.Function):
                 input_lengths,
                 batch * seq_len,
                 ctx.softmax_scale)
-            
+
             grad_query_states = grad_query_states.view(seq_len, batch, num_heads, head_dim)
             grad_key_states = grad_key_states.view(seq_len, batch, num_key_value_heads, head_dim)
             grad_value_states = grad_value_states.view(seq_len, batch, num_key_value_heads, head_dim)
 
-            return grad_query_states, grad_key_states, grad_value_states, None, None, None, None, None
+            return grad_query_states, grad_key_states, grad_value_states, None, None, None, None, None, None, None
 
 class MegatronQwen2AttentionQKV(torch.nn.Module):
     def __init__(self):
@@ -381,6 +384,8 @@ class MegatronQwen2AttentionQKV(torch.nn.Module):
                 sin,
                 attention_mask,
                 softmax_scale,
+                atten_fwd_atten_output,
+                atten_fwd_softmax_lse,
                 attention_dropout = 0.0):
         return MegatronQwen2AttentionQKVFunc.apply(
             query_states,
@@ -390,6 +395,8 @@ class MegatronQwen2AttentionQKV(torch.nn.Module):
             sin,
             attention_mask,
             softmax_scale,
+            atten_fwd_atten_output,
+            atten_fwd_softmax_lse,
             attention_dropout)
 
 def qwen2_attn_qkv_forward(
@@ -412,22 +419,40 @@ def qwen2_attn_qkv_forward(
         inference_params, key, value, rotary_pos_emb
     )
 
+    query_states = query.contiguous()
     if rotary_pos_emb is not None:
-        cos, sin = torch.cos(rotary_pos_emb), torch.sin(rotary_pos_emb) #　(seq, 1, 1, head_dim), fp32
+      seq_len = rotary_pos_emb.shape[0]
+      if seq_len != self._rope_cached_seq_len:
+        self._rope_cos_cached, self._rope_sin_cached = torch.cos(rotary_pos_emb), torch.sin(rotary_pos_emb) #　(seq, 1, 1, head_dim), fp32
+        self._rope_cos_cached = self._rope_cos_cached.to(query_states.dtype)
+        self._rope_sin_cached = self._rope_sin_cached.to(query_states.dtype)
+        self._rope_cached_seq_len = seq_len
 
     attention_mask = torch.zeros_like(attention_mask, dtype=query.dtype, device=query.device).masked_fill_(attention_mask, -10000.0)
 
-    seq_len, batch, num_heads, head_dim = query.size()
+
+    seq_len, batch, num_heads, head_dim = query.size()  #8 512 14 128
     softmax_scale = 1.0 / head_dim ** 0.5
+    #assign buffers for attn_output, softmax_lse
+    max_atten_fwd = seq_len * batch * num_heads * head_dim
+    max_atten_softmax = seq_len * batch * num_heads
+    if self.atten_fwd_atten_output.numel() < max_atten_fwd:
+      self.atten_fwd_atten_output = torch.empty(
+                    max_atten_fwd, dtype=query_states.dtype, device=query_states.device)
+    if self.atten_fwd_softmax_lse.numel() < max_atten_softmax:
+      self.atten_fwd_softmax_lse = torch.empty(
+                    max_atten_softmax, dtype=torch.float32, device=query_states.device)
 
     core_attn_out = self.attn_qkv(
-        query.contiguous(),
+        query_states,
         key.contiguous(),
         value.contiguous(),
-        cos,
-        sin,
+        self._rope_cos_cached,
+        self._rope_sin_cached,
         attention_mask,
         softmax_scale,
+        self.atten_fwd_atten_output,
+        self.atten_fwd_softmax_lse,
         self.config.hidden_dropout)
 
     core_attn_out = core_attn_out.view(seq_len, batch, -1)
@@ -439,4 +464,15 @@ def qwen2_attn_qkv_forward(
 def fuse_megatron_qwen2_attn_qkv():
     import megatron_patch
     from megatron_patch.model.qwen2.transformer.attention import Attention
-    megatron_patch.model.qwen2.transformer.attention.Attention.forward = qwen2_attn_qkv_forward        
+    ori_init = Attention.__init__
+    #assign buffers for cos, sin and atten_fwd_output and softmax
+    def patched_init(self, *args, **kwargs):
+        ori_init(self, *args, **kwargs)
+        self.register_buffer("_rope_cos_cached", None, persistent=False)
+        self.register_buffer("_rope_sin_cached", None, persistent=False)
+        self.register_buffer("atten_fwd_atten_output", torch.empty(1), persistent=False)
+        self.register_buffer("atten_fwd_softmax_lse", torch.empty(1), persistent=False)
+        self._rope_cached_seq_len = 0
+
+    Attention.__init__ = patched_init
+    megatron_patch.model.qwen2.transformer.attention.Attention.forward = qwen2_attn_qkv_forward
