@@ -1,7 +1,7 @@
 #pragma once
 
-#include <unistd.h>
 #include <stdint.h>
+#include <unistd.h>
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -12,45 +12,45 @@ extern "C" {
  * @brief TPU runtime error codes enumeration
  */
 typedef enum {
-  tpuSuccess = 0,                 ///< Operation completed successfully
-  tpuErrorInvalidDevice,          ///< Invalid device identifier
-  tpuErrorNoDevice,               ///< No device found
-  tpuErrorFailure,                ///< General operation failure
-  tpuErrorTimeout,                ///< Operation timed out
-  tpuErrorInvalidParam,           ///< Invalid parameter provided
-  tpuErrorOutOfMemory,            ///< Insufficient memory available
-  tpuErrorNotSupported,           ///< Operation not supported
-  tpuErrorInvalidValue,           ///< Invalid value provided
-  tpuErrorMemoryAllocation,       ///< Memory allocation error
-  tpuErrorKernelModuleLoad        ///< Kernel module loading error
+  tpuSuccess = 0,           ///< Operation completed successfully
+  tpuErrorInvalidDevice,    ///< Invalid device identifier
+  tpuErrorNoDevice,         ///< No device found
+  tpuErrorFailure,          ///< General operation failure
+  tpuErrorTimeout,          ///< Operation timed out
+  tpuErrorInvalidParam,     ///< Invalid parameter provided
+  tpuErrorOutOfMemory,      ///< Insufficient memory available
+  tpuErrorNotSupported,     ///< Operation not supported
+  tpuErrorInvalidValue,     ///< Invalid value provided
+  tpuErrorMemoryAllocation, ///< Memory allocation error
+  tpuErrorKernelModuleLoad  ///< Kernel module loading error
 } tpuError_t;
 
 /**
  * @brief TPU stream handle type
  */
-typedef void* tpuStream_t;
+typedef void *tpuStream_t;
 
 /**
  * @brief TPU event handle type
  */
-typedef void* tpuEvent_t;
+typedef void *tpuEvent_t;
 
 /**
  * @brief TPU kernel module handle type
  */
-typedef void* tpuKernelModule_t;
+typedef void *tpuKernelModule_t;
 
 /**
  * @brief TPU topology structure information
  */
 typedef struct {
-  uint32_t device_num;    ///< Number of devices
-  uint16_t paraent_dev;   ///< Parent device ID
-  uint16_t child_dev;     ///< Child device ID
-  uint8_t paraent_pcie;   ///< Parent device PCIe information
-  uint8_t child_pcie;     ///< Child device PCIe information
-  int8_t paraent_port;    ///< Parent device port
-  int8_t child_port;      ///< Child device port
+  uint32_t device_num;  ///< Number of devices
+  uint16_t paraent_dev; ///< Parent device ID
+  uint16_t child_dev;   ///< Child device ID
+  uint8_t paraent_pcie; ///< Parent device PCIe information
+  uint8_t child_pcie;   ///< Child device PCIe information
+  int8_t paraent_port;  ///< Parent device port
+  int8_t child_port;    ///< Child device port
 } tpuTopology_t;
 
 /**
@@ -64,14 +64,14 @@ tpuError_t tpuInit();
  * @param count[out] Pointer to store device count
  * @return tpuError_t Error code
  */
-tpuError_t tpuGetDeviceCount(int* count);
+tpuError_t tpuGetDeviceCount(int *count);
 
 /**
  * @brief Get current device ID
  * @param device[out] Pointer to store device ID
  * @return tpuError_t Error code
  */
-tpuError_t tpuGetDevice(int* device);
+tpuError_t tpuGetDevice(int *device);
 
 /**
  * @brief Set the current TPU device to use
@@ -85,7 +85,7 @@ tpuError_t tpuSetDevice(int device);
  * @param stream[out] Pointer to store stream handle
  * @return tpuError_t Error code
  */
-tpuError_t tpuStreamCreate(tpuStream_t* stream);
+tpuError_t tpuStreamCreate(tpuStream_t *stream);
 
 /**
  * @brief Destroy a TPU stream
@@ -114,7 +114,7 @@ tpuError_t tpuStreamWaitEvent(tpuStream_t stream, tpuEvent_t event);
  * @param event[out] Pointer to store event handle
  * @return tpuError_t Error code
  */
-tpuError_t tpuEventCreate(tpuEvent_t* event);
+tpuError_t tpuEventCreate(tpuEvent_t *event);
 
 /**
  * @brief Free a TPU event
@@ -146,7 +146,7 @@ tpuError_t tpuEventQuery(tpuEvent_t event);
  * @param end End event
  * @return tpuError_t Error code
  */
-tpuError_t tpuEventElapsedTime(float* ms, tpuEvent_t start, tpuEvent_t end);
+tpuError_t tpuEventElapsedTime(float *ms, tpuEvent_t start, tpuEvent_t end);
 
 /**
  * @brief Synchronize and wait for event to complete
@@ -162,7 +162,8 @@ tpuError_t tpuEventSynchronize(tpuEvent_t event);
  * @param stream Stream handle
  * @return tpuKernelModule_t Kernel module handle
  */
-tpuKernelModule_t tpuKernelModuleLoad(const char* data, size_t size, tpuStream_t stream);
+tpuKernelModule_t tpuKernelModuleLoad(const char *data, size_t size,
+                                      tpuStream_t stream);
 
 /**
  * @brief Load TPU kernel module from file
@@ -170,7 +171,8 @@ tpuKernelModule_t tpuKernelModuleLoad(const char* data, size_t size, tpuStream_t
  * @param stream Stream handle
  * @return tpuKernelModule_t Kernel module handle
  */
-tpuKernelModule_t tpuKernelModuleLoadFromFile(const char* file, tpuStream_t stream);
+tpuKernelModule_t tpuKernelModuleLoadFromFile(const char *file,
+                                              tpuStream_t stream);
 
 /**
  * @brief Unload TPU kernel module
@@ -181,19 +183,51 @@ tpuKernelModule_t tpuKernelModuleLoadFromFile(const char* file, tpuStream_t stre
 tpuError_t tpuKernelUnloadModule(tpuKernelModule_t module, tpuStream_t stream);
 
 /**
+ * @brief Launch TPU kernel synchronously
+ * @param module Kernel module handle
+ * @param kernel_name Kernel name
+ * @param args Kernel arguments
+ * @param arg_size Arguments size
+ * @param group_num Group number
+ * @param block_num Block number, like thread-num of cuda with each group
+ * @param stream Stream handle
+ * @return tpuError_t Error code
+ */
+tpuError_t tpuKernelLaunch(tpuKernelModule_t module, const char *kernel_name,
+                           const void *args, uint32_t arg_size,
+                           uint64_t group_num, uint64_t block_num,
+                           tpuStream_t stream);
+
+/**
+ * @brief Launch TPU kernel asynchronously
+ * @param module Kernel module handle
+ * @param kernel_name Kernel name
+ * @param args Kernel arguments
+ * @param arg_size Arguments size
+ * @param group_num Group number
+ * @param block_num Block number, like thread-num of cuda with each group
+ * @param stream Stream handle
+ * @return tpuError_t Error code
+ */
+tpuError_t tpuKernelLaunchAsync(tpuKernelModule_t module,
+                                const char *kernel_name, const void *args,
+                                uint32_t arg_size, uint64_t group_num,
+                                uint64_t block_num, tpuStream_t stream);
+
+/**
  * @brief Allocate memory on device
  * @param devPtr[out] Pointer to store device memory address
  * @param size Memory size in bytes
  * @return tpuError_t Error code
  */
-tpuError_t tpuMalloc(void** devPtr, size_t size);
+tpuError_t tpuMalloc(void **devPtr, size_t size);
 
 /**
  * @brief Free memory on device
  * @param devPtr Device memory pointer
  * @return tpuError_t Error code
  */
-tpuError_t tpuFree(void* devPtr);
+tpuError_t tpuFree(void *devPtr);
 
 /**
  * @brief Asynchronous device to device memory copy
@@ -203,7 +237,8 @@ tpuError_t tpuFree(void* devPtr);
  * @param stream Stream handle
  * @return tpuError_t Error code
  */
-tpuError_t tpuMemcpyD2DAsync(void* dstPtr, const void* srcPtr, size_t size, tpuStream_t stream);
+tpuError_t tpuMemcpyD2DAsync(void *dstPtr, const void *srcPtr, size_t size,
+                             tpuStream_t stream);
 
 /**
  * @brief Asynchronous host to device memory copy
@@ -213,7 +248,8 @@ tpuError_t tpuMemcpyD2DAsync(void* dstPtr, const void* srcPtr, size_t size, tpuS
  * @param stream Stream handle
  * @return tpuError_t Error code
  */
-tpuError_t tpuMemcpyH2DAsync(void* devPtr, const void* hostPtr, size_t size, tpuStream_t stream);
+tpuError_t tpuMemcpyH2DAsync(void *devPtr, const void *hostPtr, size_t size,
+                             tpuStream_t stream);
 
 /**
  * @brief Asynchronous device to host memory copy
@@ -223,7 +259,8 @@ tpuError_t tpuMemcpyH2DAsync(void* devPtr, const void* hostPtr, size_t size, tpu
  * @param stream Stream handle
  * @return tpuError_t Error code
  */
-tpuError_t tpuMemcpyD2HAsync(void* hostPtr, const void* devPtr, size_t size, tpuStream_t stream);
+tpuError_t tpuMemcpyD2HAsync(void *hostPtr, const void *devPtr, size_t size,
+                             tpuStream_t stream);
 
 /**
  * @brief Synchronous device to device memory copy
@@ -232,7 +269,7 @@ tpuError_t tpuMemcpyD2HAsync(void* hostPtr, const void* devPtr, size_t size, tpu
  * @param size Copy size in bytes
  * @return tpuError_t Error code
  */
-tpuError_t tpuMemcpyD2D(void* dstPtr, const void* srcPtr, size_t size);
+tpuError_t tpuMemcpyD2D(void *dstPtr, const void *srcPtr, size_t size);
 
 /**
  * @brief Synchronous host to device memory copy
@@ -241,7 +278,7 @@ tpuError_t tpuMemcpyD2D(void* dstPtr, const void* srcPtr, size_t size);
  * @param size Copy size in bytes
  * @return tpuError_t Error code
  */
-tpuError_t tpuMemcpyH2D(void* devPtr, const void* hostPtr, size_t size);
+tpuError_t tpuMemcpyH2D(void *devPtr, const void *hostPtr, size_t size);
 
 /**
  * @brief Synchronous device to host memory copy
@@ -250,7 +287,7 @@ tpuError_t tpuMemcpyH2D(void* devPtr, const void* hostPtr, size_t size);
  * @param size Copy size in bytes
  * @return tpuError_t Error code
  */
-tpuError_t tpuMemcpyD2H(void* hostPtr, const void* devPtr, size_t size);
+tpuError_t tpuMemcpyD2H(void *hostPtr, const void *devPtr, size_t size);
 
 /**
  * @brief Setup TPU topology configuration
@@ -263,7 +300,7 @@ tpuError_t tpuSetupTopology();
  * @param topology[out] Pointer to store topology information
  * @return tpuError_t Error code
  */
-tpuError_t tpuGetTopology(tpuTopology_t** topology);
+tpuError_t tpuGetTopology(tpuTopology_t **topology);
 
 #ifdef __cplusplus
 }
