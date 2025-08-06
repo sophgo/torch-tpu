@@ -8,6 +8,7 @@ def test_bn_fwd():
     device = 'tpu'
     #              inp_shape,     ic,  k, pad,  inp_grad, bias_grad 
     test_cases = [((8,256,20,20), 256, 5,   2,      True,     True),
+
                   ]
 
     cs = test_cases[0]
@@ -19,6 +20,8 @@ def test_bn_fwd():
     bias_req_grad= cs[5]
 
     inp = torch.randn(inp_shape)
+    # # torch.save(inp, 't.t')
+    # inp = torch.load('t.t')
     inp_tpu = copy.deepcopy(inp).to(device)
     inp.requires_grad     = inp_req_grad
     inp_tpu.requires_grad = inp_req_grad
@@ -29,12 +32,14 @@ def test_bn_fwd():
 
     out, o_i = net(inp)
     out_tpu, o_i_tpu = net_tpu(inp_tpu) # eager mode
-    # out_tpu, o_i_tpu = net_opt(inp_tpu)  # compile mode
+    #out_tpu, o_i_tpu = net_opt(inp_tpu)  # compile mode
 
     diff_o   = abs(out - out_tpu.cpu())
     diff_o_i = abs(o_i - o_i_tpu.cpu())
     print(f"val : {torch.max(diff_o)}")
     print(f"ind : {torch.max(diff_o_i)}")
+    print(f"{diff_o[diff_o!=0]}")
+
     import pdb; pdb.set_trace()
 
 if __name__ == "__main__":

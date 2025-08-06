@@ -8,12 +8,12 @@ def test_conv():
     device = 'tpu'
     #              inp_shape,     ic,   oc,   k,   pad, stride, inp_grad, bias_grad 
     test_cases = [((8,3,640,640), 3,    32,   6,   2,   2,      True,     False),
-                  ((8,256,40,40), 256,  256,  1,   0,   1,      True,     True), # Error: w, bias
+                  ((8,256,40,40), 256,  255,  1,   0,   1,      True,     True), # Error: w, bias
                   ((8,128,80,80), 128,  255,  1,   0,   1,      True,     True), # ERROR: bias
                   ((8,512,20,20), 512,  255,  1,   0,   1,      True,     True),
                   ]
     for i in range(len(test_cases)):
-        cs = test_cases[2]
+        cs = test_cases[1]
         inp_shape    = cs[0]
         ic           = cs[1]
         oc           = cs[2]
@@ -41,7 +41,7 @@ def test_conv():
         #out_tpu = net_tpu(inp_tpu)
         out_tpu = net_opt(inp_tpu)
 
-        grad_o = torch.ones_like(out)
+        grad_o = torch.randn_like(out)
         grad_o_cpu = grad_o.to(device)
 
         out.backward(grad_o)
