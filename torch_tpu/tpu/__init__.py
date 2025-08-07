@@ -80,6 +80,11 @@ __all__ = [
     "ExternalStream",
     "Event",
 
+    ## graph
+    "TPUGraph",
+    "graph",
+    "graph_pool_handle",
+
     ## tpu custom funcs
     "OpTimer_reset",
     "is_OpTimer_enabled",
@@ -124,6 +129,11 @@ from .memory import *  # noqa: F403
 
 from .random import * # noqa: F403
 
+from .graphs import (
+    TPUGraph,
+    graph,
+    graph_pool_handle,
+)
 
 from .utils import ( _lazy_call, _lazy_init, init,is_initialized, is_available,
                     device, device_of, device_count, current_device, set_device, read_rank_table, get_topology,
@@ -134,7 +144,7 @@ from .utils import ( _lazy_call, _lazy_init, init,is_initialized, is_available,
                     memory_usage, set_sync_debug_mode, utilization, temperature,
                     power_draw, clock_rate
                     )
-if os.environ.get('CHIP_ARCH') == "sg2260":
+if os.environ.get('CHIP_ARCH') == "sg2260" or os.environ.get('CHIP_ARCH') == "sg2260e":
     from .streams import Stream, ExternalStream, Event
     from .bmodel_runtime import BmodelRunner, dtype_map
 

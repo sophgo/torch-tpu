@@ -26,7 +26,7 @@ Tensor empty_strided_tpu ( IntArrayRef                size,
   at::detail::check_size_nonnegative ( size );
   caffe2::TypeMeta dtype = scalarTypeToTypeMeta ( scalar_type );
   auto size_bytes = at::detail::computeStorageNbytes ( size, stride, dtype.itemsize() );
-  auto allocator = c10::GetTPUAllocator();
+  auto allocator = c10_tpu::GetTPUAllocator();
   c10::intrusive_ptr<c10::StorageImpl> storage_impl = c10::make_intrusive<torch_tpu::TPUStorageImpl> (
                       c10::StorageImpl::use_byte_size_t(),
                       size_bytes,
@@ -53,7 +53,7 @@ c10::optional<c10::MemoryFormat>  memory_format_opt )
   TORCH_CHECK( scalar_type != ScalarType::Long, "not support int64, please use int32");
   // auto pin_memory = pinned_memory_or_default ( pin_memory_opt );
   constexpr c10::DispatchKeySet ks ( c10::DispatchKey::TPU );
-  auto allocator = c10::GetTPUAllocator();
+  auto allocator = c10_tpu::GetTPUAllocator();
   at::detail::check_size_nonnegative ( size );
   caffe2::TypeMeta dtype = scalarTypeToTypeMeta ( scalar_type );
   size_t size_bytes = at::detail::computeStorageNbytesContiguous ( size, dtype.itemsize() );

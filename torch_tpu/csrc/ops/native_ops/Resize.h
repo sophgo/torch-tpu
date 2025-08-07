@@ -28,7 +28,7 @@ static inline void maybe_resize_storage_tpu(TensorImpl* self, size_t new_size_by
     auto new_storage = c10::make_intrusive<StorageImpl>(
         StorageImpl::use_byte_size_t(),
         new_size_bytes,
-        c10::GetTPUAllocator(),
+        c10_tpu::GetTPUAllocator(),
         true);
     self->set_storage_keep_dtype(std::move(new_storage));
   } else if (new_size_bytes > storage.nbytes()) {

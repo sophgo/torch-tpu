@@ -4,14 +4,91 @@
 
 #include <c10/core/Allocator.h>
 #include <c10/util/Logging.h>
+#include "TPUStream.h"
+#include "tpu_runtime_api.h"
 
-namespace c10
+namespace c10_tpu
 {
 using MemoryDeleter = void ( * ) ( void * );
 
+using CaptureId_t = unsigned long long;
+
+// first is set if the instance is created by TPUGraph::capture_begin.
+// second is set if the instance is created by graph_pool_handle.
+using MempoolId_t = std::pair<CaptureId_t, CaptureId_t>;
+
+class TPUAllocator : public c10::Allocator {
+ public:
+  virtual void* raw_alloc(size_t nbytes) = 0;
+  virtual void emptyCache(MempoolId_t mempool_id = {0, 0}) = 0;
+  virtual void init() {
+    printf("NOT need initlization\n");
+    return;
+  };
+  virtual void free(void* ptr) {
+    TORCH_CHECK(
+      false,
+      " does not yet support free. ");
+  };
+  virtual void cacheInfo(c10::DeviceIndex device, size_t* largestBlock) {
+    TORCH_CHECK(
+      false,
+      " does not yet support cacheInfo. ");
+  };
+  virtual void recordStream(const c10::DataPtr&, TPUStream stream) {
+    TORCH_CHECK(
+      false,
+      " does not yet support recordStream. ");
+  };
+  virtual void beginAllocateToPool(
+      c10::DeviceIndex device,
+      MempoolId_t mempool_id,
+      std::function<bool(tpuStream_t)> filter) {
+    TORCH_CHECK(
+      false,
+      " does not yet support beginAllocateToPool. ");
+  };
+  virtual void endAllocateToPool(
+      c10::DeviceIndex device,
+      MempoolId_t mempool_id) {
+    TORCH_CHECK(
+      false,
+      " does not yet support endAllocateToPool. ");
+  };
+  virtual void releasePool(c10::DeviceIndex device, MempoolId_t mempool_id) {
+    TORCH_CHECK(
+      false,
+      " does not yet support releasePool. ");
+  };
+  virtual int getPoolUseCount(
+      c10::DeviceIndex /*device*/,
+      MempoolId_t /*mempool_id*/) {
+    TORCH_CHECK(
+        false,
+        " does not yet support getPoolUseCount. "
+        "If you need it, please file an issue describing your use case.");
+  }
+  virtual void createOrIncrefPool(
+      c10::DeviceIndex /*device*/,
+      MempoolId_t /*mempool_id*/,
+      TPUAllocator* allocator = nullptr) {
+    TORCH_CHECK(
+        false,
+        " does not yet support createOrIncrefPool. "
+        "If you need it, please file an issue describing your use case.");
+  }
+  virtual void setUseOnOOM(c10::DeviceIndex device, MempoolId_t mempool_id) {
+    TORCH_CHECK(
+        false,
+        " does not yet support setUseOnOOM. "
+        "If you need it, please file an issue describing your use case.");
+  }
+
+};
+
 // A simple struct that is used to report C10's memory allocation,
 // deallocation status and out-of-memory events to the profiler
-class C10_API ProfiledTPUMemoryReporter
+class ProfiledTPUMemoryReporter
 {
 public:
   ProfiledTPUMemoryReporter() {}
@@ -26,13 +103,13 @@ private:
   size_t log_cnt_ = 0;
 };
 
-C10_API ProfiledTPUMemoryReporter & profiledTPUMemoryReporter();
+ProfiledTPUMemoryReporter & profiledTPUMemoryReporter();
 
 // Get the TPU Allocator.
-C10_API at::Allocator * GetTPUAllocator();
+at::Allocator * GetTPUAllocator();
 
 // Get the Default TPU Allocator
-C10_API at::Allocator * GetDefaultTPUAllocator();
+TPUAllocator* GetDefaultTPUAllocator();
 
 void EmptyCache();
-} // namepsace c10
+} // namepsace c10_tpu

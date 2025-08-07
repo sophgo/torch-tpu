@@ -13,6 +13,7 @@
 #include "torch_tpu/csrc/core/TPUFunction.h"
 #include "torch_tpu/csrc/core/TPUStream.h"
 #include "torch_tpu/csrc/distributed/c10d/ProcessGroupSCCL.hpp"
+#include "torch_tpu/csrc/core/TPUAllocator.h"
 
 #define CHANGE_UNIT_SIZE 1024.0
 
@@ -431,7 +432,7 @@ PyObject* THPTModule_setStream_wrap(
 
 PyObject* THPTModule_emptyCache(PyObject* _unused, PyObject* noargs) {
   HANDLE_TH_ERRORS
-  tpu::TPUEmptyCache();
+  c10_tpu::EmptyCache();
   END_HANDLE_TH_ERRORS
   Py_RETURN_NONE;
 }

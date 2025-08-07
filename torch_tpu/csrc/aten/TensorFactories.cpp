@@ -18,7 +18,7 @@ namespace TPUNativeFunctions{
         torch_tpu::utils::maybe_initialize_tpu(device_);
         TORCH_CHECK(!pinned_memory_or_default(pin_memory_opt), "Only dense CPU tensors can be pinned");
 
-        auto allocator = c10::GetTPUAllocator();
+        auto allocator = c10_tpu::GetTPUAllocator();
         int64_t nelements = at_tpu::StorageDescHelper::GetMemorySize(size, (torch_tpu::tpuFormat)dst_format);
         auto dtype = c10::scalarTypeToTypeMeta(dtype_or_default(dtype_opt));
         int64_t size_bytes = nelements * dtype.itemsize();
@@ -61,7 +61,7 @@ namespace TPUNativeFunctions{
     {
         auto tensor_dtype = at::scalarTypeToTypeMeta(dtype);
         at::DataPtr ptr_ = {ptr, ptr, &DummyReportAndDelete, tpu::TPUGetCurrentDevice()};
-        auto allocator = c10::GetTPUAllocator();
+        auto allocator = c10_tpu::GetTPUAllocator();
         c10::intrusive_ptr<c10::StorageImpl> storage_impl = c10::make_intrusive<torch_tpu::TPUStorageImpl> (
                             c10::StorageImpl::use_byte_size_t(),
                             0,

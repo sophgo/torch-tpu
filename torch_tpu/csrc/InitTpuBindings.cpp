@@ -27,6 +27,8 @@ void AddPyMethodDefs(std::vector<PyMethodDef>& vector, PyMethodDef* methods)
   }
 }
 
+void THPTGraph_init(PyObject* module);
+
 extern "C" {
 
 PyObject* initModule() {
@@ -47,6 +49,7 @@ PyObject* initModule() {
     THPTStream_init(module);
     THPTEvent_init(module);
     THPTBMRT_init(module);
+    THPTGraph_init(module);
     RegisterTPUProperties(module);
     BindGetDeviceProperties(module);
     return module;

@@ -1,9 +1,10 @@
 #include "TPUAllocator.h"
+#include "TPUCachingAllocator.h"
 #include "TPUTorchUtils.h"
 
-namespace c10
+namespace c10_tpu
 {
-struct C10_API DefaultTPUAllocator final : at::Allocator
+struct DefaultTPUAllocator final : TPUAllocator
 {
   DefaultTPUAllocator() = default;
 
@@ -37,7 +38,11 @@ struct C10_API DefaultTPUAllocator final : at::Allocator
     return &ReportAndDelete;
   }
 
-  void emptyCache() {
+  void* raw_alloc(size_t nbytes) {
+    return tpu::TPUAlloc(nbytes);
+  }
+
+  void emptyCache(MempoolId_t mempool_id = {0, 0}) {
     tpu::TPUEmptyCache( );
   }
 };
@@ -57,17 +62,10 @@ at::Allocator * GetTPUAllocator()
 // Global default TPU Allocator
 static DefaultTPUAllocator g_tpu_alloc;
 
-at::Allocator * GetDefaultTPUAllocator()
+TPUAllocator * GetDefaultTPUAllocator()
 {
   return &g_tpu_alloc;
 }
-void EmptyCache()
-{
-  auto allocator = static_cast<DefaultTPUAllocator*>(GetTPUAllocator());
-  allocator->emptyCache();
-}
-
-REGISTER_ALLOCATOR ( DeviceType::TPU, &g_tpu_alloc );
 
 void ProfiledTPUMemoryReporter::New ( void * ptr, size_t nbytes )
 {
@@ -156,4 +154,54 @@ void ProfiledTPUMemoryReporter::OutOfMemory ( size_t nbytes )
     Device );
   }
 }
-} // namespace c10
+
+class DynamicAllocatorProxy : public TPUAllocator {
+ public:
+  DynamicAllocatorProxy() {
+    const char* env_val = std::getenv("PYTORCH_TPU_ALLOCATOR");
+    use_caching_ = (env_val && std::string(env_val) == "caching");
+  }
+
+  at::DataPtr allocate(size_t size) const override {
+    ensureInit();
+    return target()->allocate(size);
+  }
+
+  at::DeleterFnPtr raw_deleter() const override {
+    ensureInit();
+    return target()->raw_deleter();
+  }
+
+  void* raw_alloc(size_t nbytes) {
+    ensureInit();
+    return target()->raw_alloc(nbytes);
+  }
+
+  void emptyCache(MempoolId_t mempool_id = {0, 0}) {
+    ensureInit();
+    target()->emptyCache();
+  }
+
+ private:
+
+  void ensureInit() const {
+    if (use_caching_) {
+      std::call_once(init_flag_, [this]{ target()->init(); });
+    }
+  }
+  TPUAllocator* target() const {
+    return use_caching_ ? c10_tpu::TPUCachingAllocator::GetCachingTPUAllocator() : GetDefaultTPUAllocator();
+  }
+  mutable std::once_flag init_flag_;
+  bool use_caching_ = false;
+};
+
+static DynamicAllocatorProxy g_dynamic_tpu_alloc;
+REGISTER_ALLOCATOR(DeviceType::TPU, &g_dynamic_tpu_alloc);
+
+void EmptyCache() {
+  auto allocator = static_cast<DynamicAllocatorProxy*>(GetTPUAllocator());
+  allocator->emptyCache();
+}
+
+} // namespace c10_tpu

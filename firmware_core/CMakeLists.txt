@@ -53,6 +53,6 @@ if (USING_CMODEL)
 else()
     set_target_properties(firmware PROPERTIES LINK_FLAGS -s)
     target_link_options(firmware PRIVATE -Wl,-allow-multiple-definition) # FIXME
-    target_link_libraries(firmware PRIVATE -Wl,--whole-archive TPU1686::firmware -Wl,--no-whole-archive m dl)
+    target_link_libraries(firmware PRIVATE -Wl,--whole-archive TPU1686::firmware -Wl,--no-whole-archive dl m)
     target_link_options(firmware PRIVATE -Wl,--no-undefined)
 endif()

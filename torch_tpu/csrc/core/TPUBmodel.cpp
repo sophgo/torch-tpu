@@ -139,7 +139,7 @@ static auto make_tensor_from_ptr(u64 ptr, std::vector<int> shape, tpu_dtype_t dt
     // std::cout << "ptr : " << ptr << "  size : " << size << std::endl;
     #endif
     auto ptr_ = make_tensor_ptr((void*) ptr);
-    auto allocator = c10::GetTPUAllocator();
+    auto allocator = c10_tpu::GetTPUAllocator();
     c10::intrusive_ptr<c10::StorageImpl> storage_impl = c10::make_intrusive<torch_tpu::TPUStorageImpl>(
                         c10::StorageImpl::use_byte_size_t(),
                         size,
