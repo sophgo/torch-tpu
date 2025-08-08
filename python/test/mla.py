@@ -101,9 +101,6 @@ class MLAConfig:
         if self.attention_mode == AttentionMode.CONTINUOUS_PREFILL \
             or self.attention_mode == AttentionMode.PAGED_PREFILL:
             self.mask_size = seq + self.cache_len
-            neg_inf = -1e4
-            mask = torch.full((self.mask_size, self.mask_size), neg_inf, dtype = self.dtype)
-            mask = torch.triu(mask, diagonal=1)
             KVU = torch.empty((seq + max_cache_seqlen, self.num_heads, self.qk_nope_head_dim + self.v_head_dim), dtype = self.dtype)
 
         paged_kvcache = None
