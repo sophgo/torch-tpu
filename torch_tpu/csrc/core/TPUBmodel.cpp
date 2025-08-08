@@ -44,7 +44,7 @@ static int data_type_size(tpu_dtype_t dtype){
         default:
             return 4;
         }
-    #elif defined BACKEND_1684X
+    #elif defined BACKEND_1684X or defined BACKEND_1686
         switch (dtype) {
         case BM_FLOAT32:
         case BM_INT32:
@@ -95,7 +95,7 @@ static auto convert_dtype_to_torch_dtype(tpu_dtype_t dtype)
             default:
             return at::kFloat;
         }
-    #elif defined BACKEND_1684X
+    #elif defined BACKEND_1684X or defined BACKEND_1686
         switch (dtype) {
             case BM_FLOAT32:
             return at::kFloat;
@@ -167,7 +167,7 @@ TPUBmodel::TPUBmodel(const std::string cur_model_file, int dev_id, const std::st
         tpuRtSetDevice(dev_id);
         tpuRtCreateNetContext(&m_context);
         tpuRtLoadNet(model_file.c_str(), m_context, &m_net);
-    #elif defined BACKEND_1684X
+    #elif defined BACKEND_1684X or defined BACKEND_1686
         bm_handle_t bm_handle;
         bm_dev_request(&bm_handle, dev_id);
         m_stream = bm_handle;
@@ -185,7 +185,7 @@ TPUBmodel::TPUBmodel(const std::string cur_model_file, int dev_id, const std::st
     #if defined BACKEND_SG2260
         char** net_names = NULL;
         m_net_num = tpuRtGetNetNames(m_net, &net_names);
-    #elif defined BACKEND_1684X
+    #elif defined BACKEND_1684X or defined BACKEND_1686
         const char **net_names = NULL;
         bmrt_get_network_names(m_net, &net_names);
         m_net_num = bmrt_get_network_number(m_net);
@@ -221,7 +221,7 @@ TPUBmodel::~TPUBmodel(){
     #if defined BACKEND_SG2260
         tpuRtUnloadNet(m_net);
         tpuRtDestroyNetContext(m_context);
-    #elif defined BACKEND_1684X
+    #elif defined BACKEND_1684X or defined BACKEND_1686
         void* p_bmrt = m_net;
         bmrt_destroy(p_bmrt);
     #endif
@@ -270,7 +270,7 @@ void TPUBmodel::handle_each_net(){
             getTensor(i, false);
         }
 
-    #elif defined BACKEND_1684X
+    #elif defined BACKEND_1684X or defined BACKEND_1686
         void* p_bmrt           = m_net;
         tpu_net_info_t info    = bmrt_get_network_info(p_bmrt, net_name);
         input_num[cur_net_id]  = info->input_num;
@@ -336,7 +336,7 @@ void TPUBmodel::forward_sync(){
     #if defined BACKEND_SG2260
         auto stream = c10_tpu::getCurrentTPUStream();
         tpuRtStreamSynchronize(stream);
-    #elif defined BACKEND_1684X
+    #elif defined BACKEND_1684X or defined BACKEND_1686
         auto status = bm_thread_sync(m_stream);
         if(status != BM_SUCCESS){
             std::cout << "bm_thread_sync failed" << std::endl;
@@ -374,7 +374,7 @@ void TPUBmodel::forward(std::vector<at::Tensor> input_tensors, std::vector<at::T
         size *= data_type_size((tpu_dtype_t) input_dtypes[cur_net_id][i]);
         #if defined BACKEND_SG2260
             tensor.data    = (void*) input_tensors[i].data_ptr();
-        #elif defined BACKEND_1684X
+        #elif defined BACKEND_1684X or defined BACKEND_1686
             tensor.device_mem.size = size;
             tensor.st_mode = BM_STORE_1N;
             tensor.device_mem.u.device.device_addr = (u64) input_tensors[i].data_ptr();
@@ -396,7 +396,7 @@ void TPUBmodel::forward(std::vector<at::Tensor> input_tensors, std::vector<at::T
         size *= data_type_size((tpu_dtype_t) output_dtypes[cur_net_id][i]);
         #if defined BACKEND_SG2260
             tensor.data    = (void*) output_tensors[i].data_ptr();
-        #elif defined BACKEND_1684X
+        #elif defined BACKEND_1684X or defined BACKEND_1686
             tensor.st_mode = BM_STORE_1N;
             tensor.device_mem.size = size;
             tensor.device_mem.u.device.device_addr = (u64) output_tensors[i].data_ptr();
@@ -413,7 +413,7 @@ void TPUBmodel::forward(std::vector<at::Tensor> input_tensors, std::vector<at::T
             std::cout << "tpuRtLaunchNet failed" << std::endl;
             exit(1);
         }
-    #elif defined BACKEND_1684X
+    #elif defined BACKEND_1684X or defined BACKEND_1686
         void* p_bmrt = m_net;
         auto status = bmrt_launch_tensor_ex(p_bmrt, net_name, inputs.data(), num_input, outputs.data(), num_output, true, false);
         if(status != true){
@@ -428,7 +428,7 @@ void TPUBmodel::forward_sync(std::vector<at::Tensor> input_tensors, std::vector<
     #if defined BACKEND_SG2260
         auto stream = c10_tpu::getCurrentTPUStream();
         tpuRtStreamSynchronize(stream);
-    #elif defined BACKEND_1684X
+    #elif defined BACKEND_1684X or defined BACKEND_1686
         auto status = bm_thread_sync(m_stream);
         if(status != BM_SUCCESS){
             std::cout << "bm_thread_sync failed" << std::endl;

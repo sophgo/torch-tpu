@@ -12,7 +12,7 @@ typedef tpuRtNetInfo_t         tpu_net_info_t;
 typedef tpuRtStream_t          tpu_stream_t;
 typedef tpuRtTensor_t          tpu_tensor_t;
 typedef tpuRtShape_t           tpu_shape_t;
-#elif defined BACKEND_1684X
+#elif defined BACKEND_1684X or defined BACKEND_1686
 #include "bmruntime_interface.h"
 typedef bm_data_type_t         tpu_dtype_t;
 typedef const bm_net_info_t*   tpu_net_info_t;

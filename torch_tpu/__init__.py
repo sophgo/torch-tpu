@@ -92,6 +92,8 @@ elif arch == 'sg2260e':
     from torch_tpu._C import ProcessGroupSCCLOptions
 elif arch == 'bm1684x':
     os.environ['CHIP'] = "bm1684x"
+elif arch == 'bm1686':
+    os.environ['CHIP'] = "bm1686"
 
 __all__ = []
 
@@ -112,7 +114,7 @@ apply_class_patches()
 ## torch-tpu ENVS
 def print_all_torch_tpu_envs():
     print(f"===================== CHIP-ARCH ===========================================")
-    print(f"CHIP_ARCH                   = {os.environ.get('CHIP_ARCH')}, choose backend. value: 2260 | bm1684x | None(default). default will chose 2260.")
+    print(f"CHIP_ARCH                   = {os.environ.get('CHIP_ARCH')}, choose backend. value: 2260 | bm1684x | bm1686 | None(default). default will chose 2260.")
     print(f"CHIP                        = {os.environ.get('CHIP')}, same with`CHIP_ARCH`, to compatible with backend")
     print(f"TPU_EMULATOR_PATH           = {os.environ.get('TPU_EMULATOR_PATH')}, used for emulator version. value: the path of emulator lib.")
 

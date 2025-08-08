@@ -99,6 +99,8 @@ class PYClibBuild():
             cmake_args.append('-DBACKEND_SG2260=ON')
         elif CHIP_ARCH == 'bm1684x':
             cmake_args.append('-DBACKEND_1684X=ON')
+        elif CHIP_ARCH == 'bm1686':
+            cmake_args.append('-DBACKEND_1686=ON')
         build_dir = "./build"
         os.makedirs(build_dir, exist_ok=True)
         

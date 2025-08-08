@@ -48,6 +48,8 @@ TPUDeviceProp* GetDeviceProperties(int64_t deviceid) {
   device_name = "SG2260";
 #elif defined BACKEND_SG2260E
   device_name = "SG2260E";
+#elif defined BACKEND_1686
+  device_name = "BM1686";
 #endif
   if (device_name == nullptr) {
     prop.name = " ";

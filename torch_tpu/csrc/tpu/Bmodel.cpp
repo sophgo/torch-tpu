@@ -15,7 +15,7 @@
 #include "TPUDeviceUtils.h"
 
 
-#ifndef BACKEND_1684X
+#if defined BACKEND_SG2260 or defined BACKEND_SG2260E
 #include "tpuv7_modelrt.h"
 namespace py = pybind11;
 
@@ -385,7 +385,7 @@ PyObject* THPTPythonNet_getNetworkInfo(PyObject* self, PyObject* args) {
   END_HANDLE_TH_ERRORS
 }
 
-#elif defined BACKEND_1684X
+#elif defined BACKEND_1684X or defined BACKEND_1686
 #include "bmruntime_interface.h"
 namespace py = pybind11;
 struct PythonTensor {
@@ -539,10 +539,18 @@ PythonNet::PythonNet(void* bmrt_, const char* netname, bm_handle_t handle_, int 
   for(int i = 0; i < num_input; i++){
     auto &shape = info->stages[stage].input_shapes[i];
     input_shapes.push_back(shape);
+    #if defined BACKEND_1686 
+    auto tmp_addr = info->stages[stage].input_mems[i].u.device.device_addr;
+    info->stages[stage].input_mems[i].u.device.device_addr = (0x0FFFFFFFFF & tmp_addr) + 0x100000000ULL;
+    #endif
   }
   for(int i = 0; i < num_output; i++){
     auto &shape = info->stages[stage].output_shapes[i];
     output_shapes.push_back(shape);
+    #if defined BACKEND_1686 
+    auto tmp_addr = info->stages[stage].output_mems[i].u.device.device_addr;
+    info->stages[stage].output_mems[i].u.device.device_addr = (0x0FFFFFFFFF & tmp_addr) + 0x100000000ULL;
+    #endif
   }
   input_mems  = info->stages[stage].input_mems;
   output_mems = info->stages[stage].output_mems;
@@ -696,13 +704,13 @@ PyObject* BmodelTensor_wrap(PyObject* self, PyObject* args) {
   at::Tensor tensor;
   if(is_input == 0)
   {
-    #ifdef BACKEND_1684X
+    #if defined BACKEND_1684X or defined BACKEND_1686
     tensor = make_tensor_from_ptr(net->output_mems[input_idx], net->output_shapes[input_idx], net->m_info->output_dtypes[input_idx]);
     #else
     tensor = make_tensor_from_ptr(net->output_mems[input_idx], net->output_shapes[input_idx], net->m_info.output.dtypes[input_idx]);
     #endif
   }else{
-    #ifdef BACKEND_1684X
+    #if defined BACKEND_1684X or defined BACKEND_1686
     tensor = make_tensor_from_ptr(net->input_mems[input_idx], net->input_shapes[input_idx], net->m_info->input_dtypes[input_idx]);
     #else
     tensor = make_tensor_from_ptr(net->input_mems[input_idx], net->input_shapes[input_idx], net->m_info.input.dtypes[input_idx]);
@@ -757,7 +765,7 @@ PyObject* THPTPythonModel_Net(PyObject* self, PyObject* args) {
     return NULL;
   }
   auto model = (PythonModel*) PyCapsule_GetPointer(model_capsule, "PythonModel");
-  #ifdef BACKEND_1684X
+  #if defined BACKEND_1684X or defined BACKEND_1686
   auto net = new PythonNet(model->p_bmrt, net_name, model->bm_handle, 0);
   #else
   auto net = new PythonNet(&model->m_net, net_name);

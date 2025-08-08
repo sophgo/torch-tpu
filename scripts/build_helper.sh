@@ -124,6 +124,21 @@ function update_bm1684x_third_party()
   cp ${TPU1686_PATH}/build_bm1684x/runtime/libtpurt.so ${TPUTRAIN_TOP}/third_party/runtime_api/lib_bm1684x/libtpurt.so
 }
 
+function update_bm1686_third_party()
+{
+  update_head_files
+  echo "updating libtpudnn.so ..."
+  cp ${TPU1686_PATH}/build_bm1686/tpuDNN/src/libtpudnn.so ${TPUTRAIN_TOP}/third_party/tpuDNN/bm1686_lib/
+  echo "updating libcmodel_firmware.so ..."
+  cp ${TPU1686_PATH}/build_bm1686/firmware_core/libcmodel_firmware.so ${TPUTRAIN_TOP}/third_party/firmware/bm1686/
+  echo "updating libfirmware_core.a ..."
+  cp ${TPU1686_PATH}/build_fw_bm1686/firmware_core/libfirmware_core.a ${TPUTRAIN_TOP}/third_party/firmware/bm1686/
+  echo "updating libsccl.so ..."
+  cp ${TPU1686_PATH}/build_bm1686/sccl/libsccl.so ${TPUTRAIN_TOP}/third_party/sccl/lib/
+  echo "updating libtpurt.so ..."
+  cp ${TPU1686_PATH}/build_bm1686/runtime/libtpurt.so ${TPUTRAIN_TOP}/third_party/runtime_api/lib_bm1686/libtpurt.so
+}
+
 function rebuild_TPU1686_riscv()
 {
   unset skip_runtime
@@ -135,6 +150,8 @@ function rebuild_TPU1686_riscv()
       FW_BINARY_DIR=build_fw_${CHIP_ARCH} rebuild_firmware || return -1
       update_sg2260_riscv_third_party
   elif [ "${CHIP_ARCH}" == "bm1684x" ]; then
+      echo "not impl!!!"
+  elif [ "${CHIP_ARCH}" == "bm1686" ]; then
       echo "not impl!!!"
   fi
 }
@@ -155,6 +172,8 @@ function rebuild_TPU1686()
         update_sg2260_third_party
     elif [ "${CHIP_ARCH}" == "bm1684x" ]; then
         update_bm1684x_third_party
+    elif [ "${CHIP_ARCH}" == "bm1686" ]; then
+        update_bm1686_third_party
     fi
 }
 

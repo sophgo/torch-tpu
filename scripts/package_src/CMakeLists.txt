@@ -7,6 +7,8 @@ if (${BACKEND_SG2260} STREQUAL "ON")
 add_definitions(-DBACKEND_SG2260)
 elseif (${BACKEND_1684X} STREQUAL "ON")
 add_definitions(-DBACKEND_1684X)
+elseif (${BACKEND_1686} STREQUAL "ON")
+add_definitions(-DBACKEND_1686)
 endif()
 
 message(STATUS "PYTHON API ENABLE")

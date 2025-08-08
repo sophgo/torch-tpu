@@ -181,6 +181,8 @@ class CPPLibBuild(build_clib, ExtBase, object):
             # build bmlib
             os.environ['CHIP_ARCH'] = 'bm1684x'
             self.build()
+            os.environ['CHIP_ARCH'] = 'bm1686'
+            self.build()
             # build tpuv7_runtime
             os.environ['CHIP_ARCH'] = 'sg2260'
             self.build()
@@ -223,8 +225,8 @@ class CPPLibBuild(build_clib, ExtBase, object):
         build_dir += '_cmodel'
         if not build_fw:
             fw_path = os.path.join(build_dir, 'libfirmware.so')
-        # if not SOC_CROSS:
-        args.append('-DUSING_CMODEL=ON')
+        if not SOC_CROSS:
+            args.append('-DUSING_CMODEL=ON')
         build_firmware()
 
         package_dir = self.get_package_dir()
@@ -245,6 +247,8 @@ class CPPLibBuild(build_clib, ExtBase, object):
             cmake_args.append('-DBACKEND_SG2260=ON')
         elif arch == 'bm1684x':
             cmake_args.append('-DBACKEND_1684X=ON')
+        elif arch == 'bm1686':
+            cmake_args.append('-DBACKEND_1686=ON')
         build_dir = os.path.join(BASE_DIR, 'build/torch-tpu')
         os.makedirs(build_dir, exist_ok=True)
         build_args = ['-j', str(os.cpu_count())]
@@ -514,6 +518,10 @@ class bdist_wheel(_bdist_wheel, ExtBase):
                     if SOC_CROSS:
                         lib = os.path.join(BASE_DIR, 'third_party/tpuDNN/bm1684x_lib/arm/libtpudnn.so')
                     self.copy_file(lib, os.path.join(pkg_dir, f'lib/libtpudnn.{target}.so'))
+                elif 'bm1686' in lib:
+                    if SOC_CROSS:
+                        lib = os.path.join(BASE_DIR, 'third_party/tpuDNN/bm1686_lib/arm/libtpudnn.so')
+                    self.copy_file(lib, os.path.join(pkg_dir, f'lib/libtpudnn.{target}.so'))
                 else:
                     if 'riscv' in lib and SOC_CROSS:
                         self.copy_file(lib, os.path.join(pkg_dir, f'lib/libtpudnn.{target}.so'))
@@ -567,8 +575,11 @@ include_directories = [
     os.path.join(SGAPI_STRUCT_PATH, "include"),
     os.path.join(BMLIB_PATH, "include"),
 ]
-if SOC_CROSS and os.environ["CHIP_ARCH"] == "sg2260":
-    include_directories.append(os.path.join(CROSS_TOOLCHAINS, "riscv64-linux-x86_64/python3.10"))
+if SOC_CROSS:
+    if os.environ["CHIP_ARCH"] == "sg2260":
+        include_directories.append(os.path.join(CROSS_TOOLCHAINS, "riscv64-linux-x86_64/python3.10"))
+    elif os.environ["CHIP_ARCH"] in ["bm1684x", "bm1686"]:
+        include_directories.append(os.path.join(CROSS_TOOLCHAINS, "Python-3.8.2/python_3.8.2/include/python3.8"))    
 lib_directories = [
     os.path.join(BASE_DIR, f"build/{get_build_type()}/packages", "torch_tpu/lib"),
 ]

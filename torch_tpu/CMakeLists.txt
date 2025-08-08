@@ -98,7 +98,7 @@ set(kernel_srcs $<TARGET_PROPERTY:torch_tpu_kernel_data,SOURCES>)
 add_library(torch_tpu SHARED ${concated_src} ${kernel_srcs})
 target_link_libraries(torch_tpu c10 torch_cpu TPU1686::tpuDNN torch_tpu_kernel_data TPU1686::sccl TPU1686::tpurt sophon)
 
-if(BACKEND_1684X)
+if(BACKEND_1684X OR BACKEND_1686)
   target_link_directories(torch_tpu PRIVATE ${RUNTIME_LIB_PATH} ${MODELRUNTIME_LIB_PATH})
   target_link_libraries(torch_tpu bmlib bmrt)
   set_target_properties(torch_tpu PROPERTIES INSTALL_RPATH
@@ -140,7 +140,13 @@ add_custom_command(TARGET torch_tpu POST_BUILD
 
 ### torch-tpu python api interface
 if($ENV{SOC_CROSS_MODE} STREQUAL "ON")
-  include_directories($ENV{CROSS_TOOLCHAINS}/riscv64-linux-x86_64/python3.10)
+  if($ENV{CHIP_ARCH} STREQUAL "sg2260" OR $ENV{CHIP_ARCH} STREQUAL "sg2260e")
+    include_directories($ENV{CROSS_TOOLCHAINS}/riscv64-linux-x86_64/python3.10)
+  elseif($ENV{CHIP_ARCH} STREQUAL "bm1684x" OR $ENV{CHIP_ARCH} STREQUAL "bm1686")
+    include_directories($ENV{CROSS_TOOLCHAINS}/Python-3.8.2/python_3.8.2/include/python3.8)
+  else()
+    message(FATAL_ERROR "chip not support: $ENV{CHIP_ARCH}")
+  endif()
 else()
   include_directories(${PYTHON_INCLUDE_DIR})
 endif()

@@ -186,7 +186,7 @@ struct BModelRunnerImpl
     int                         m_net_num;
     const char*                 m_running_net_name;
 };
-#elif defined BACKEND_1684X
+#elif defined BACKEND_1684X or defined BACKEND_1686
 struct BModelRunnerImpl
 {
     BModelRunnerImpl(const std::string &model_file)
