@@ -11,10 +11,10 @@ namespace at {
 
 Tensor & remainder_tensor_out_tpu(const Tensor & self, const Tensor & other, Tensor & out) {
 
-    if ( other.dim() == 0 && IS_CPU_TENSOR(other) && 0)
+    if ( other.dim() == 0 && IS_CPU_TENSOR(other))
     {
         auto self_ = self.contiguous(); if ( !self.is_contiguous() ) { CONTIGUOUS_WARNING(); }
-        // TIMING_START;
+        TIMING_START;
         auto stream = c10_tpu::getCurrentTPUStream();
         auto status = tpudnnRemainderAsync(
             stream,
@@ -22,7 +22,7 @@ Tensor & remainder_tensor_out_tpu(const Tensor & self, const Tensor & other, Ten
             other.item().toFloat(),
             tpu::TPUGenerateTpudnnTensor(stream, out));
         TORCH_CHECK(status == TPUDNN_STATUS_SUCCESS);
-        // TIMING_END(Remainder)
+        TIMING_END(Remainder)
     }
     else
     {

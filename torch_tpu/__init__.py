@@ -79,6 +79,10 @@ os.environ['TorchTpuSaveKernelModule'] = '1'
 if not os.environ.get('TORCH_TPU_CPP_LOG_LEVEL'):
     os.environ['TORCH_TPU_CPP_LOG_LEVEL'] = '2' # 0: INFO| 1: WARNING| 2: ERROR| 3:FATAL
 
+### no free mem default
+if not os.environ.get('TPU_ALLOCATOR_FREE_DELAY_IN_MS'):
+    os.environ['TPU_ALLOCATOR_FREE_DELAY_IN_MS'] = '99999'
+
 import torch
 import torch_tpu._C
 import torch_tpu.tpu
@@ -138,3 +142,5 @@ def print_all_torch_tpu_envs():
 
     print(f"===================== LOG-LEVEL ===========================================")
     print(f"TORCH_TPU_CPP_LOG_LEVEL    = {os.environ.get('TORCH_TPU_CPP_LOG_LEVEL')}, value: 0|1|2|3. default is 2(ERROR), only in debug version")
+
+# print_all_torch_tpu_envs()
