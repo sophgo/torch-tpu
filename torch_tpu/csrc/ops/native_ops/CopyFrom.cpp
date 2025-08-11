@@ -7,6 +7,72 @@
 #include "common/config.h"
 #include "TPUTorchUtils.h"
 #include "torch_tpu/csrc/aten/TPUNativeFunctions.h"
+
+#ifdef USING_PPL
+#include "CopyFrom.h"
+static void copy_impl(
+    uint64_t output_addr,
+    uint64_t input_addr,
+    int is_bool,
+    uint32_t outer_size,
+    uint32_t inner_size,
+    at::ScalarType dst_type,
+    at::ScalarType src_type
+)
+{
+  auto kernel = [&](tpuStream_t stream, tpuKernelModule_t ppl_module,
+    int tile_size, uint32_t inner_size, uint32_t outer_size) -> int {
+
+    if (src_type == at::kHalf) {
+      if (dst_type == at::kFloat){
+        return convert_impl_half_to_float(stream, ppl_module, output_addr, input_addr, tile_size, inner_size, outer_size);
+      } else if (dst_type == at::kHalf){
+        return convert_impl_half_to_half(stream, ppl_module, output_addr, input_addr, tile_size, inner_size, outer_size);
+      }
+    } else if (src_type == at::kBFloat16) {
+      if (dst_type == at::kFloat){
+        return convert_impl_bf16_to_float(stream, ppl_module, output_addr, input_addr, tile_size, inner_size, outer_size);
+      } else if (dst_type == at::kBFloat16){
+        return convert_impl_bf16_to_bf16(stream, ppl_module, output_addr, input_addr, tile_size, inner_size, outer_size);
+      }
+    } else if (src_type == at::kFloat) {
+      if (dst_type == at::kFloat) {
+        return convert_impl_float_to_float(stream, ppl_module, output_addr, input_addr, tile_size, inner_size, outer_size);
+      } else if (dst_type == at::kHalf) {
+        return convert_impl_float_to_half(stream, ppl_module, output_addr, input_addr, tile_size, inner_size, outer_size);
+      } else if (dst_type == at::kBFloat16) {
+        return convert_impl_float_to_bf16(stream, ppl_module, output_addr, input_addr, tile_size, inner_size, outer_size);
+      }
+    } else if (src_type == at::kInt) {
+      if (dst_type == at::kInt){
+        return convert_impl_int32_to_int32(stream, ppl_module, output_addr, input_addr, tile_size, inner_size, outer_size);
+      } else if(dst_type == at::kFloat){
+        return convert_impl_int32_to_float(stream, ppl_module, output_addr, input_addr, tile_size, inner_size, outer_size);
+      } else if(dst_type == at::kHalf){
+        return convert_impl_int32_to_half(stream, ppl_module, output_addr, input_addr, tile_size, inner_size, outer_size);
+      } else if(dst_type == at::kBFloat16){
+        return convert_impl_int32_to_bf16(stream, ppl_module, output_addr, input_addr, tile_size, inner_size, outer_size);
+      }
+    }
+    return -1;
+  };
+
+  tpuStream_t stream = c10_tpu::getCurrentTPUStream().stream();
+  tpuKernelModule_t ppl_module = getPplModule();
+  uint32_t tile_size = inner_size;
+  while (tile_size >= 1) {
+    int ret = kernel(stream, ppl_module, tile_size, inner_size, outer_size);
+    if (ret == 0) {
+      return;
+    } else {
+      tile_size = tile_size / 2;
+      continue;
+    }
+  }
+
+}
+#endif
+
 namespace at {
 
 Tensor _copy_from_tpu(const Tensor &self, const Tensor &dst,
@@ -81,6 +147,36 @@ Tensor _copy_from_tpu(const Tensor &self, const Tensor &dst,
         auto self_ = self.contiguous();
         if (dst.is_contiguous()) {
           TIMING_START;
+#ifdef USING_PPL
+
+          int is_bool = (dst.dtype() == caffe2::TypeMeta::Make<bool>());
+          uint32_t outer_size = 1;
+          uint32_t inner_size = 1;
+          int axis = 0;
+          if (self_.dim() > 2){
+            axis = 2;
+          } else if (self_.dim() > 0){
+            axis = 1;
+          }
+          for (const auto i : c10::irange(axis)) {
+              outer_size *= self_.size(i);
+          }
+          for (const auto i : c10::irange(axis, self_.dim())) {
+              inner_size *= self_.size(i);
+          }
+          at::ScalarType self_type = self_.scalar_type();
+          at::ScalarType dst_type = dst.scalar_type();
+
+          copy_impl(
+            reinterpret_cast<uint64_t>(dst.data_ptr()),
+            reinterpret_cast<uint64_t>(self_.data_ptr()),
+            is_bool,
+            outer_size,
+            inner_size,
+            dst_type,
+            self_type);
+
+#else
           auto stream = c10_tpu::getCurrentTPUStream();
           int is_bool = (dst.dtype() == caffe2::TypeMeta::Make<bool>());
           auto status = tpudnnConvertAsync(
@@ -89,6 +185,7 @@ Tensor _copy_from_tpu(const Tensor &self, const Tensor &dst,
             tpu::TPUGenerateTpudnnTensor(stream, dst),
             is_bool);
           TORCH_CHECK(status == TPUDNN_STATUS_SUCCESS);
+#endif
           TIMING_END(tpu::DTYPE_CONVERT);
           SHOW_TENSOR_OP(self_, dst);
         } else {
@@ -120,7 +217,7 @@ Tensor _to_copy_tpu(const Tensor &self, c10::optional<ScalarType> dtype_opt,
   {
     dtype = ScalarType::Int;
     self_ = self.to(dtype);
-  } 
+  }
 
   auto layout = layout_opt.has_value() ? layout_opt.value() : option.layout();
   auto device = device_opt.has_value() ? device_opt.value() : option.device();
@@ -133,8 +230,8 @@ Tensor _to_copy_tpu(const Tensor &self, c10::optional<ScalarType> dtype_opt,
   auto dst =
       empty(self.sizes(), dtype, layout, device, pin_memory, memory_format);
 
-  // copy formated tpu Tensor to cpu, recover tpu tensor's format firstly 
-  if ( device.type() == c10::DeviceType::CPU  && 
+  // copy formated tpu Tensor to cpu, recover tpu tensor's format firstly
+  if ( device.type() == c10::DeviceType::CPU  &&
         !at_tpu::StorageDescHelper::IsBaseFormatType(self_) )
   {
     auto self_ori = at_tpu::TPUNativeFunctions::tpu_format_cast_back_to_origin(self_);

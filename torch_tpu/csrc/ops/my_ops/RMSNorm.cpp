@@ -23,22 +23,22 @@ static void rmsnorm_forward_impl(
 			uint32_t tile_size) -> int {
 		if constexpr (std::is_same_v<scalar_t, float>) {
 			return rmsnorm_fp32(
-				stream, ppl_module, output_addr, input_addr, scale_addr,
-				eps, (scale_addr != 0),
+				stream, ppl_module, output_addr, input_addr, scale_addr, bias_addr,
+				eps, (scale_addr != 0), (bias_addr != 0),
 				static_cast<uint32_t>(outer_size),
 				static_cast<uint32_t>(inner_size),
 				tile_size);
 		} else if constexpr (std::is_same_v<scalar_t, at::Half>) {
 			return rmsnorm_fp16(
-				stream, ppl_module, output_addr, input_addr, scale_addr,
-				eps, (scale_addr != 0),
+				stream, ppl_module, output_addr, input_addr, scale_addr, bias_addr,
+				eps, (scale_addr != 0), (bias_addr != 0),
 				static_cast<uint32_t>(outer_size),
 				static_cast<uint32_t>(inner_size),
 				tile_size);
 		} else if constexpr (std::is_same_v<scalar_t, at::BFloat16>) {
 			return rmsnorm_bf16(
-				stream, ppl_module, output_addr, input_addr, scale_addr,
-				eps, (scale_addr != 0),
+				stream, ppl_module, output_addr, input_addr, scale_addr, bias_addr,
+				eps, (scale_addr != 0), (bias_addr != 0),
 				static_cast<uint32_t>(outer_size),
 				static_cast<uint32_t>(inner_size),
 				tile_size);
