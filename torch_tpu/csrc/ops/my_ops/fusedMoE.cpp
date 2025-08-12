@@ -21,6 +21,7 @@ namespace at
         Tensor &matmul_res,
         Tensor &softmax_res)
     {
+        TIMING_START;
         CHECK_TENSOR_IN_DEVICE(topk_experts_res);
         CHECK_TENSOR_IN_DEVICE(topk_weights_res_bf16);
         CHECK_TENSOR_IN_DEVICE(left_bf16);
@@ -32,7 +33,6 @@ namespace at
         CHECK_TENSOR_IN_DEVICE(matmul_res);
         CHECK_TENSOR_IN_DEVICE(softmax_res);
 
-        TIMING_START;
         auto stream = c10_tpu::getCurrentTPUStream();
         tpudnnStatus_t status = tpudnnFusedMoEGroupedTopkMultiCoreAsync(
             stream,
@@ -48,7 +48,7 @@ namespace at
             tpu::TPUGenerateTpudnnTensor(stream, softmax_res));
 
         TORCH_CHECK(status == TPUDNN_STATUS_SUCCESS);
-        TIMING_END(tpu::FUSED_MOE_GROUPED_TOPK);
+        TIMING_END;
         return topk_experts_res;
     }
 
@@ -79,6 +79,7 @@ namespace at
         const c10::optional<Tensor> &m0,
         bool save_mid_res)
     {
+        TIMING_START;
         CHECK_TENSOR_IN_DEVICE(output);
         CHECK_TENSOR_IN_DEVICE(input);
         if (output_sample.has_value())
@@ -113,7 +114,6 @@ namespace at
         if (m0.has_value())
             CHECK_TENSOR_IN_DEVICE(m0.value());
 
-        TIMING_START;
         auto stream = c10_tpu::getCurrentTPUStream();
         tpudnnStatus_t status = tpudnnFusedMoEFusedExpertsMultiCoreAsync(
             stream,
@@ -144,7 +144,7 @@ namespace at
             save_mid_res);
 
         TORCH_CHECK(status == TPUDNN_STATUS_SUCCESS);
-        TIMING_END(tpu::FUSED_MOE_FUSED_EXPERTS);
+        TIMING_END;
         return output;
     }
 }

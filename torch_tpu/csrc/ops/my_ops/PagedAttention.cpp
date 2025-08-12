@@ -78,7 +78,6 @@ namespace at
 		}
 		TORCH_CHECK ( block_num >= block_need_num, "LLamatAttention KVCache block_num must be larger than ", block_need_num);
 
-		TIMING_START;
   		auto stream = c10_tpu::getCurrentTPUStream();
 		auto status = tpudnnPagedAttentionAsync(
 			stream,
@@ -106,7 +105,7 @@ namespace at
 			C,
 			attention_mode);
 		TORCH_CHECK ( status == TPUDNN_STATUS_SUCCESS );
-		TIMING_END( tpu::LLAMA_ATTENTION );
+		TIMING_END;
 		return OUT;
 	}
 
@@ -229,6 +228,7 @@ namespace at
 		double dropout_rate,
 		int64_t batch)
 	{
+		TIMING_START;
 		//if (!Q.is_contiguous() || !K.is_contiguous() || !V.is_contiguous()){
 			// LOG(WARNING) << "llama_attention not contiguous, use QKV packed.";
 		//}
@@ -245,7 +245,6 @@ namespace at
 		if (mask.has_value())
 			CHECK_TENSOR_IN_DEVICE(mask.value());
 
-		TIMING_START;
 		auto stream =  c10_tpu::getCurrentTPUStream();
 		tpudnnStatus_t status = tpudnnLlamaAttentionForwardAsync(
 			stream,
@@ -264,7 +263,7 @@ namespace at
 			dropout_rate,
 			batch);
 		TORCH_CHECK(status == TPUDNN_STATUS_SUCCESS);
-		TIMING_END(tpu::LLAMA_ATTENTION_FORWARD);
+		TIMING_END;
 		return OUT;
 
 	}
@@ -324,7 +323,7 @@ namespace at
 			mask_max,
 			C);
 		TORCH_CHECK(status == TPUDNN_STATUS_SUCCESS);
-		TIMING_END(tpu::LLAMA_ATTENTION_BACKWARD); 
+		TIMING_END; 
 		return std::tuple<Tensor, Tensor, Tensor>(dQ, dK, dV);
 	}
 

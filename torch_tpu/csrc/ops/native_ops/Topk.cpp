@@ -22,6 +22,7 @@ std::tuple<Tensor &, Tensor &> topk_values_tpu(const Tensor &self, int64_t k,
                                                int64_t axis, bool largest,
                                                bool sorted, Tensor &values,
                                                Tensor &indices) {
+  TIMING_START;
   if (self.dim() > 0) {
     CHECK_TENSOR_IN_DEVICE(self);
   }
@@ -35,7 +36,6 @@ std::tuple<Tensor &, Tensor &> topk_values_tpu(const Tensor &self, int64_t k,
 
   TORCH_CHECK(axis <= self.dim())
   TORCH_CHECK(k <= self.size(axis));
-
   if (self.size(axis) <= 256) {
     auto stream = c10_tpu::getCurrentTPUStream();
     auto status = tpudnnTopkAsync(
@@ -57,8 +57,6 @@ std::tuple<Tensor &, Tensor &> topk_values_tpu(const Tensor &self, int64_t k,
       self_temp = self_temp.to(torch::kFloat);
       values_temp = values_temp.to(torch::kFloat);
     }
-
-    TIMING_START;
     auto stream = c10_tpu::getCurrentTPUStream();
     auto status = tpudnnTopkAsync(
         stream,
@@ -77,8 +75,7 @@ std::tuple<Tensor &, Tensor &> topk_values_tpu(const Tensor &self, int64_t k,
       values = values_temp.to(values.dtype());
     }
   }
-  TIMING_END(tpu::TOPK);
-
+  TIMING_END;
   SHOW_TENSOR_OP(self, values, indices);
   return {values, indices};
 }
@@ -109,6 +106,7 @@ std::tuple<Tensor &, Tensor &>
 sort_values_stable_tpu(const Tensor &self, c10::optional<bool> stable,
                        int64_t axis, bool descending, Tensor &values,
                        Tensor &indices) {
+  TIMING_START;
   if (self.dim() > 0) {
     CHECK_TENSOR_IN_DEVICE(self);
   }
@@ -127,7 +125,6 @@ sort_values_stable_tpu(const Tensor &self, c10::optional<bool> stable,
     values_temp = values_temp.to(torch::kFloat);
   }
 
-  TIMING_START;
   auto stream = c10_tpu::getCurrentTPUStream();
   auto status = tpudnnTopkAsync(
       stream,
@@ -145,7 +142,7 @@ sort_values_stable_tpu(const Tensor &self, c10::optional<bool> stable,
       self.dtype() == caffe2::TypeMeta::Make<BFloat16>()) {
     values = values_temp.to(values.dtype());
   }
-  TIMING_END(tpu::TOPK);
+  TIMING_END;
 
   return {values, indices};
 }

@@ -12,6 +12,7 @@ namespace at
 {
 Tensor & index_out_tpu( const Tensor & self, const c10::List<c10::optional<Tensor>> & indices, Tensor & out)
 {
+    TIMING_START;
     CHECK_TENSOR_IN_DEVICE ( out );
     CHECK_TENSOR_IN_DEVICE ( self );
 #if 0
@@ -27,7 +28,6 @@ Tensor & index_out_tpu( const Tensor & self, const c10::List<c10::optional<Tenso
     out = out_cpu.to(out.device());
 #else
     if (indices.size() == 1) {
-      TIMING_START;
       auto idx = indices[0].value();
       auto idx_value = idx.scalar_type() == torch::kInt64 || idx.scalar_type() == torch::kInt32 ? idx : idx.to(torch::kInt32);
 
@@ -57,7 +57,6 @@ Tensor & index_out_tpu( const Tensor & self, const c10::List<c10::optional<Tenso
         TORCH_CHECK ( status == TPUDNN_STATUS_SUCCESS );
       }
 
-      TIMING_END ( tpu::INDEX_SELECT );
     } else {
       CPU_IMPL_WARNING();
       c10::List<c10::optional<Tensor>> indices_cpu;
@@ -136,7 +135,6 @@ Tensor & index_out_tpu( const Tensor & self, const c10::List<c10::optional<Tenso
                                               tpu::TPUGenerateSgdnnTensor(out_two_dim));
 
         TORCH_CHECK ( status == SG_SUCCESS );
-                TIMING_END ( tpu::INDEX_SELECT );
       } else {
         // no support; use cpu impl
         CPU_IMPL_WARNING();
@@ -150,11 +148,11 @@ Tensor & index_out_tpu( const Tensor & self, const c10::List<c10::optional<Tenso
         }
         auto out_cpu = index( self.cpu(), indices_cpu );
         out = out_cpu.to(out.device());
-        TIMING_END(tpu::CPU_LAYER);
       }
 #endif
     }
 #endif
+    TIMING_END;
     SHOW_TENSOR_OP(self, out);
     SHOW_TENSOR_OP(indices[0].value());
     return out;
@@ -167,6 +165,7 @@ TORCH_LIBRARY_IMPL ( aten, TPU, m )
 
 Tensor index_tpu(const at::Tensor & self, const c10::List<c10::optional<at::Tensor>> & indices)
 {
+  TIMING_START;
   CHECK_TENSOR_IN_DEVICE ( self );
   Tensor out;
   if ( indices.size() == 1 )
@@ -209,7 +208,7 @@ Tensor index_tpu(const at::Tensor & self, const c10::List<c10::optional<at::Tens
     auto out_cpu = index( self.cpu(), indices_cpu );
     out = out_cpu.to( self.device());
   }
-
+  TIMING_END;
   return out;
 }
 
@@ -287,7 +286,6 @@ Tensor & index_put_tpu(Tensor & self, const torch::List<c10::optional<Tensor>>& 
   #if 1
     // have no idea how to impl in tpu. use cpu first.
     CPU_IMPL_WARNING();
-    TIMING_START;
     c10::List<c10::optional<Tensor>> indices_cpu;
     for (int i = 0; i < (int)indices.size(); i++)
     {
@@ -298,7 +296,6 @@ Tensor & index_put_tpu(Tensor & self, const torch::List<c10::optional<Tensor>>& 
     auto self_cpu = self.cpu();
     auto out_cpu = index_put(self_cpu, indices_cpu, value.cpu(), accumulate);
     tpu::TPUCopyHostToDevice(self.data_ptr(), out_cpu.contiguous().data_ptr(), out_cpu.nbytes());
-    TIMING_END(tpu::CPU_LAYER);
   #else
     TORCH_CHECK(false, "Not implemented");
   #endif
@@ -339,6 +336,7 @@ TORCH_LIBRARY_IMPL ( aten, TPU, m )
 
 Tensor & index_add_tpu( Tensor & self, int64_t dim, const Tensor & index, const Tensor & source, const Scalar &alpha)
 {
+    TIMING_START;
     TORCH_CHECK( alpha.toFloat() == 1,  "index_add_ 's alpha now only support 1.");
     Tensor index_ = index;
     if(index.dtype()== torch::kInt64) {
@@ -348,7 +346,6 @@ Tensor & index_add_tpu( Tensor & self, int64_t dim, const Tensor & index, const 
     CHECK_TENSOR_IN_DEVICE ( self );
     CHECK_TENSOR_IN_DEVICE( index_ );
     CHECK_TENSOR_IN_DEVICE( source );
-    TIMING_START;
 #if defined BACKEND_SG2260
     auto stream = c10_tpu::getCurrentTPUStream();
 
@@ -364,7 +361,7 @@ Tensor & index_add_tpu( Tensor & self, int64_t dim, const Tensor & index, const 
 		TORCH_CHECK(false);
 #endif
     SHOW_TENSOR_OP(self, index, source);
-    TIMING_END ( tpu::INDEX_ADD_ );
+    TIMING_END;
     return self;
 }
 

@@ -12,6 +12,7 @@ namespace at
 {
 Tensor & neg_out_tpu ( const Tensor & self, Tensor & out )
 {
+  TIMING_START;
   CHECK_TENSOR_IN_DEVICE_NO_CONTIGUOUS ( self );
   CHECK_TENSOR_IN_DEVICE_NO_CONTIGUOUS ( out );
 #if 0
@@ -23,19 +24,16 @@ Tensor & neg_out_tpu ( const Tensor & self, Tensor & out )
       out = neg(self.contiguous());
     } else {
       auto out_ = neg(self.contiguous());
-      TIMING_START;
       auto stream = c10_tpu::getCurrentTPUStream();
       auto status = tpudnnStridedCopyAsync(
             stream,
             tpu::TPUGenerateTpudnnTensor(stream, out_),
             tpu::TPUGenerateTpudnnTensor(stream, out));
       TORCH_CHECK(status == TPUDNN_STATUS_SUCCESS);
-      TIMING_END(tpu::STRIDED_COPY);
     }
     SHOW_TENSOR_OP(self, out);
     return out;
   }
-  TIMING_START;
 
   auto stream = c10_tpu::getCurrentTPUStream();
   auto status = tpudnnNegAsync(
@@ -43,8 +41,8 @@ Tensor & neg_out_tpu ( const Tensor & self, Tensor & out )
               tpu::TPUGenerateTpudnnTensor(stream, self),
               tpu::TPUGenerateTpudnnTensor(stream, out));
   TORCH_CHECK(status == TPUDNN_STATUS_SUCCESS);
-    TIMING_END ( tpu::NEG );
 #endif
+  TIMING_END;
   SHOW_TENSOR_OP(self, out);
   return out;
 }

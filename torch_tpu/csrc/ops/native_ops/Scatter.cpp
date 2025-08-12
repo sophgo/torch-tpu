@@ -41,6 +41,7 @@ Tensor &slice_scatter_out_tpu(const Tensor &self, const Tensor &src,
                               int64_t dim, c10::optional<int64_t> start,
                               c10::optional<int64_t> end, int64_t step,
                               Tensor &out) {
+  TIMING_START;
   if (self.dim() > 0) {
     CHECK_TENSOR_IN_DEVICE(self);
   }
@@ -60,7 +61,6 @@ Tensor &slice_scatter_out_tpu(const Tensor &self, const Tensor &src,
                        .unsqueeze(-1)
                        .expand({1, num_c, -1, 1})
                        .to(self.device());
-  TIMING_START;
 
   auto stream = c10_tpu::getCurrentTPUStream();
   auto status = tpudnnSliceScatterAsync(
@@ -71,8 +71,8 @@ Tensor &slice_scatter_out_tpu(const Tensor &self, const Tensor &src,
       dim,
       tpu::TPUGenerateTpudnnTensor(stream, out));
   TORCH_CHECK(status == TPUDNN_STATUS_SUCCESS);
-    TIMING_END(tpu::SLICE_SCATTER);
 #endif
+  TIMING_END;
   SHOW_TENSOR_OP(self, out);
   return out;
 }
@@ -92,7 +92,7 @@ TORCH_LIBRARY_IMPL(aten, TPU, m) {
 
 Tensor &scatter_add_tpu(Tensor &self, int64_t dim, const Tensor &index,
                        const Tensor &src) {
-#if defined BACKEND_SG2260
+  TIMING_START;
   auto stream = c10_tpu::getCurrentTPUStream();
   auto status = tpudnnScatterAddAsync(
       stream,
@@ -101,11 +101,9 @@ Tensor &scatter_add_tpu(Tensor &self, int64_t dim, const Tensor &index,
       tpu::TPUGenerateTpudnnTensor(stream, index),
       dim);
   TORCH_CHECK(status == TPUDNN_STATUS_SUCCESS);
+  TIMING_END;
   SHOW_TENSOR_OP(self, self);
   return self;
-#else
-  TORCH_CHECK(false, "Not implemented");
-#endif
 }
 
 TORCH_LIBRARY_IMPL(aten, TPU, m) {

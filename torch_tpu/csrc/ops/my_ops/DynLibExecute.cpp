@@ -20,13 +20,13 @@ namespace at
         const std::vector<int64_t> &fixed_scalars_index
 		)
 	{
+		TIMING_START;
 		TORCH_CHECK(tensors.size() == tensors_index.size());
 		TORCH_CHECK(fp_scalars.size() == fp_scalars_index.size());
 		TORCH_CHECK(fixed_scalars.size() == fixed_scalars_index.size());
 		for (size_t i = 0; i < tensors.size(); i++) {
 			CHECK_TENSOR_IN_DEVICE_NO_CONTIGUOUS(tensors[i]);
 		}
-		TIMING_START;
 #if defined BACKEND_SG2260
 		auto stream = c10_tpu::getCurrentTPUStream();
 		std::vector<tpudnnTensor_t> dnnTensors;
@@ -47,7 +47,7 @@ namespace at
 #elif defined BACKEND_1684X
 		TORCH_CHECK(false);
 #endif
-		TIMING_END(tpu::PPL_EXECUTE);
+		TIMING_END;
 		return;
 	}
 }

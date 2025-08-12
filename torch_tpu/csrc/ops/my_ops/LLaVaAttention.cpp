@@ -19,6 +19,7 @@ namespace at
 	    const c10::optional<Tensor> &mask,
 	    double C)
 	{
+		TIMING_START;
 		CHECK_TENSOR_IN_DEVICE(OUT);
 		CHECK_TENSOR_IN_DEVICE_NO_CONTIGUOUS(Q);
 		CHECK_TENSOR_IN_DEVICE_NO_CONTIGUOUS(K);
@@ -30,7 +31,6 @@ namespace at
 		if (sin.has_value())
 			CHECK_TENSOR_IN_DEVICE_NO_CONTIGUOUS(sin.value());
 
-		TIMING_START;
 		auto stream = c10_tpu::getCurrentTPUStream();
 		auto status = tpudnnMultiHeadAttentionAsync(
 			stream,
@@ -43,7 +43,7 @@ namespace at
 			mask.has_value() ? tpu::TPUGenerateTpudnnTensor(stream, mask.value()) : tpudnnUndefinedTensor(),
 			C);
 		TORCH_CHECK ( status == TPUDNN_STATUS_SUCCESS);
-		TIMING_END(tpu::LLAVA_ATTENTION);
+		TIMING_END;
 		return OUT;
 	}
 }

@@ -19,16 +19,6 @@ std::tuple<Tensor &,Tensor &> _scaled_mm_out_tpu(
         const c10::optional<Tensor> & scale_result,
         Tensor & out,
         Tensor & out_amax){
-    CPU_IMPL_WARNING();
-    // ERROR ===== cpu has no _scaled_mm.
-    // auto outputs_cpu = torch::_scaled_mm(self.cpu(), mat2.cpu(),
-    //                         bias.has_value() ? c10::optional<Tensor>(bias.value().cpu()) : c10::optional<Tensor>(),
-    //                         out_dtype,
-    //                         scale_a.has_value() ? c10::optional<Tensor>(scale_a.value().cpu()) : c10::optional<Tensor>(),
-    //                         scale_b.has_value() ? c10::optional<Tensor>(scale_b.value().cpu()) : c10::optional<Tensor>(),
-    //                         scale_result.has_value() ? c10::optional<Tensor>(scale_result.value().cpu()) : c10::optional<Tensor>());
-    // out      = std::get<0> ( outputs_cpu ).to(out.device());
-    // out_amax = std::get<1> ( outputs_cpu ).to(out.device());
     CHECK_TENSOR_IN_DEVICE( self );
     CHECK_TENSOR_IN_DEVICE( mat2 );
     if (bias.has_value())

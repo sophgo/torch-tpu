@@ -10,6 +10,7 @@
 namespace at
 {
 void _amp_foreach_non_finite_check_and_unscale_tpu(at::TensorList self, at::Tensor & found_inf, const at::Tensor & inv_scale) {
+    TIMING_START;
     CHECK_TENSOR_IN_DEVICE ( found_inf );
     CHECK_TENSOR_IN_DEVICE ( inv_scale );
     TORCH_CHECK(inv_scale.numel() == 1, "inv_scale must be a 1-element tensor.");
@@ -21,14 +22,13 @@ void _amp_foreach_non_finite_check_and_unscale_tpu(at::TensorList self, at::Tens
     for (const auto & s : self){
         CHECK_TENSOR_IN_DEVICE ( s );
         inputs.push_back( tpu::TPUGenerateTpudnnTensor (stream,s) ); }
-    TIMING_START;
     auto status = tpudnnInfCheckAndUnscaleAsync(
     stream,
     inputs,
     tpu::TPUGenerateTpudnnTensor (stream,found_inf),
     *inv_scale_cpu.data_ptr<float>());
     TORCH_CHECK(status == TPUDNN_STATUS_SUCCESS, "_amp_foreach_non_finite_check_and_unscale_ failed.");\
-    TIMING_END(tpu::InfCheckAndUnscale);
+    TIMING_END;
     SHOW_TENSOR_OP( found_inf, inv_scale);
 }
 

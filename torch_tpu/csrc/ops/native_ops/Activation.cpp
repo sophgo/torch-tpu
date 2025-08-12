@@ -14,17 +14,15 @@ Tensor &threshold_backward_grad_input_tpu(const Tensor &grad_output,
                                           const Tensor &input,
                                           const Scalar &threshold,
                                           Tensor &grad_input) {
+  TIMING_START;
   CHECK_TENSOR_IN_DEVICE(grad_output);
   CHECK_TENSOR_IN_DEVICE(input);
   CHECK_TENSOR_IN_DEVICE(grad_input);
 #if 0
   CPU_IMPL_WARNING();
-  TIMING_START;
   auto grad_input_cpu = threshold_backward ( grad_output.cpu(), input.cpu(), threshold );
   tpu::TPUCopyHostToDevice ( grad_input.data_ptr(), grad_input_cpu.contiguous().data_ptr(), grad_input.nbytes() );
-  TIMING_END(tpu::CPU_LAYER);
 #else
-  TIMING_START;
   auto stream = c10_tpu::getCurrentTPUStream();
   auto status = tpudnnReLUBackwardAsync(
     stream,
@@ -32,8 +30,8 @@ Tensor &threshold_backward_grad_input_tpu(const Tensor &grad_output,
     tpu::TPUGenerateTpudnnTensor(stream, input),
     tpu::TPUGenerateTpudnnTensor(stream, grad_input));
   TORCH_CHECK(status == TPUDNN_STATUS_SUCCESS);
-  TIMING_END(tpu::RELU_BACKWARD);
 #endif
+  TIMING_END;
   SHOW_TENSOR_OP(grad_output, input, grad_input);
   return grad_input;
 }
@@ -43,6 +41,7 @@ TORCH_LIBRARY_IMPL(aten, TPU, m) {
 
 Tensor &gelu_out_tpu(const Tensor &self, c10::string_view approximate,
                      Tensor &out) {
+  TIMING_START;
   CHECK_TENSOR_IN_DEVICE_NO_CONTIGUOUS(self);
   CHECK_TENSOR_IN_DEVICE_NO_CONTIGUOUS(out);
 #if 0
@@ -51,15 +50,14 @@ Tensor &gelu_out_tpu(const Tensor &self, c10::string_view approximate,
 #else
   auto self_ = self.contiguous();
   out = out.contiguous();
-  TIMING_START;
   auto stream = c10_tpu::getCurrentTPUStream();
   auto status = tpudnnGELUAsync(
     stream,
     tpu::TPUGenerateTpudnnTensor(stream, self_),
     tpu::TPUGenerateTpudnnTensor(stream, out));
   TORCH_CHECK(status == TPUDNN_STATUS_SUCCESS);
-  TIMING_END(tpu::GELU);
 #endif
+  TIMING_END;
   SHOW_TENSOR_OP(self, out);
   return out;
 }
@@ -69,6 +67,7 @@ Tensor &gelu_backward_grad_input_tpu(const Tensor &grad_output,
                                      const Tensor &self,
                                      c10::string_view approximate,
                                      Tensor &grad_input) {
+  TIMING_START;
   CHECK_TENSOR_IN_DEVICE(grad_output);
   CHECK_TENSOR_IN_DEVICE_NO_CONTIGUOUS(self);
   CHECK_TENSOR_IN_DEVICE(grad_input);
@@ -77,7 +76,6 @@ Tensor &gelu_backward_grad_input_tpu(const Tensor &grad_output,
   tpu::TPUCopyHostToDevice ( grad_input.data_ptr(), grad_input_cpu.contiguous().data_ptr(), grad_input.nbytes() );
 #else
   auto self_ = self.contiguous();
-  TIMING_START;
   auto stream = c10_tpu::getCurrentTPUStream();
   auto status = tpudnnGELUBackwardAsync(
     stream,
@@ -85,8 +83,8 @@ Tensor &gelu_backward_grad_input_tpu(const Tensor &grad_output,
     tpu::TPUGenerateTpudnnTensor(stream, self_),
     tpu::TPUGenerateTpudnnTensor(stream, grad_input));
   TORCH_CHECK(status == TPUDNN_STATUS_SUCCESS);
-  TIMING_END(tpu::GELU_BACKWARD);
 #endif
+  TIMING_END;
   SHOW_TENSOR_OP(grad_output, self, grad_input);
   return grad_input;
 }
@@ -95,6 +93,7 @@ TORCH_LIBRARY_IMPL(aten, TPU, m) {
 }
 
 Tensor &silu_out_tpu(const Tensor &self, Tensor &out) {
+  TIMING_START;
   CHECK_TENSOR_IN_DEVICE_NO_CONTIGUOUS(self);
   CHECK_TENSOR_IN_DEVICE(out);
 #if 0
@@ -103,7 +102,6 @@ Tensor &silu_out_tpu(const Tensor &self, Tensor &out) {
   out = out_cpu.to(out.device()).to(out.dtype());
 #else
   auto self_ = self.contiguous();
-  TIMING_START;
   auto stream = c10_tpu::getCurrentTPUStream();
   auto status = tpudnnActiveAsync(
     stream,
@@ -111,14 +109,15 @@ Tensor &silu_out_tpu(const Tensor &self, Tensor &out) {
     tpu::TPUGenerateTpudnnTensor(stream, out),
     TPUDNN_ACTIVE_SILU);
   TORCH_CHECK(status == TPUDNN_STATUS_SUCCESS);
-  TIMING_END(tpu::SILU);
 #endif
+  TIMING_END;
   SHOW_TENSOR_OP(self, out);
   return out;
 }
 TORCH_LIBRARY_IMPL(aten, TPU, m) { m.impl("silu.out", silu_out_tpu); }
 
 Tensor &leakyrelu__tpu(Tensor &self, Scalar negative_slope) {
+  TIMING_START;
   CHECK_TENSOR_IN_DEVICE_NO_CONTIGUOUS(self);
 #if 0
   auto self_cpu = self.cpu();
@@ -127,7 +126,6 @@ Tensor &leakyrelu__tpu(Tensor &self, Scalar negative_slope) {
   return self;
 #else
   auto self_ = self.contiguous();
-  TIMING_START;
   auto stream = c10_tpu::getCurrentTPUStream();
   auto status = tpudnnLeakyReLUAsync(
     stream,
@@ -135,7 +133,7 @@ Tensor &leakyrelu__tpu(Tensor &self, Scalar negative_slope) {
     tpu::TPUGenerateTpudnnTensor(stream, self_),
     negative_slope.to<double>());
   TORCH_CHECK(status == TPUDNN_STATUS_SUCCESS);
-  TIMING_END(tpu::LEAKY_RELU);
+  TIMING_END;
   SHOW_TENSOR_OP(self);
   return self;
 #endif
@@ -144,6 +142,7 @@ TORCH_LIBRARY_IMPL(aten, TPU, m) { m.impl("leakyRelu_", leakyrelu__tpu); }
 
 Tensor &leakyrelu_tpu(const Tensor &self, const Scalar &negative_slope,
                       Tensor &out) {
+  TIMING_START;
   CHECK_TENSOR_IN_DEVICE_NO_CONTIGUOUS(self);
 #if 0
   auto self_cpu = self.cpu();
@@ -152,7 +151,6 @@ Tensor &leakyrelu_tpu(const Tensor &self, const Scalar &negative_slope,
   return self;
 #else
   auto self_ = self.contiguous();
-  TIMING_START;
   auto stream = c10_tpu::getCurrentTPUStream();
   auto status = tpudnnLeakyReLUAsync(
     stream,
@@ -160,7 +158,7 @@ Tensor &leakyrelu_tpu(const Tensor &self, const Scalar &negative_slope,
     tpu::TPUGenerateTpudnnTensor(stream, out),
     negative_slope.to<double>());
   TORCH_CHECK(status == TPUDNN_STATUS_SUCCESS);
-  TIMING_END(tpu::LEAKY_RELU);
+  TIMING_END;
   SHOW_TENSOR_OP(self, out);
   return out;
 #endif
@@ -169,6 +167,7 @@ TORCH_LIBRARY_IMPL(aten, TPU, m) { m.impl("leaky_relu.out", leakyrelu_tpu); }
 
 Tensor & hardtanh_out_tpu(const Tensor &self, const Scalar &min_value,
                           const Scalar &max_value, Tensor &out) {
+  TIMING_START;
   if(self.dim() > 0) {
     CHECK_TENSOR_IN_DEVICE(self);
   }
@@ -181,7 +180,6 @@ Tensor & hardtanh_out_tpu(const Tensor &self, const Scalar &min_value,
   }
   else {
     auto self_ = self.contiguous();
-    TIMING_START;
     auto stream = c10_tpu::getCurrentTPUStream();
     auto status = tpudnnHardtanhAsync(
       stream,
@@ -190,8 +188,8 @@ Tensor & hardtanh_out_tpu(const Tensor &self, const Scalar &min_value,
       max_value.toFloat(),
       tpu::TPUGenerateTpudnnTensor(stream, out));
     TORCH_CHECK(status == TPUDNN_STATUS_SUCCESS);
-    TIMING_END(tpu::HARDTANH);
   }
+  TIMING_END;
   SHOW_TENSOR_OP(self, out);
   return out;
 }
@@ -206,17 +204,15 @@ TORCH_LIBRARY_IMPL(aten, TPU, m) {
 }
 
 Tensor & tanh_backward_grad_input_tpu(const Tensor& grad_output, const Tensor& output, Tensor& grad_input) {
+  TIMING_START;
   CHECK_TENSOR_IN_DEVICE(grad_output);
   CHECK_TENSOR_IN_DEVICE(output);
   CHECK_TENSOR_IN_DEVICE(grad_input);
 #if 0
   CPU_IMPL_WARNING();
-  TIMING_START;
   auto grad_input_cpu = tanh_backward ( grad_output.cpu(), output.cpu() );
   tpu::TPUCopyHostToDevice ( grad_input.data_ptr(), grad_input_cpu.contiguous().data_ptr(), grad_input.nbytes() );
-  TIMING_END(tpu::CPU_LAYER);
 #else
-  TIMING_START;
   auto stream = c10_tpu::getCurrentTPUStream();
   auto status = tpudnnTanhBackwardAsync(
     stream,
@@ -224,8 +220,8 @@ Tensor & tanh_backward_grad_input_tpu(const Tensor& grad_output, const Tensor& o
     tpu::TPUGenerateTpudnnTensor(stream, output),
     tpu::TPUGenerateTpudnnTensor(stream, grad_input));
   TORCH_CHECK(status == TPUDNN_STATUS_SUCCESS);
-  TIMING_END(tpu::TANH_BACKWARD);
 #endif
+  TIMING_END;
   SHOW_TENSOR_OP(grad_output, output, grad_input);
   return grad_input;
 }
@@ -235,17 +231,15 @@ TORCH_LIBRARY_IMPL(aten, TPU, m) {
 }
 
 Tensor & sigmoid_backward_grad_input_tpu(const Tensor& grad_output, const Tensor& output, Tensor& grad_input) {
+  TIMING_START;
   CHECK_TENSOR_IN_DEVICE(grad_output);
   CHECK_TENSOR_IN_DEVICE(output);
   CHECK_TENSOR_IN_DEVICE(grad_input);
 #if 0
   CPU_IMPL_WARNING();
-  TIMING_START;
   auto grad_input_cpu = sigmoid_backward ( grad_output.cpu(), output.cpu() );
   tpu::TPUCopyHostToDevice ( grad_input.data_ptr(), grad_input_cpu.contiguous().data_ptr(), grad_input.nbytes() );
-  TIMING_END(tpu::CPU_LAYER);
 #else
-  TIMING_START;
   auto stream = c10_tpu::getCurrentTPUStream();
   auto status = tpudnnSigmoidBackwardAsync(
     stream,
@@ -253,8 +247,8 @@ Tensor & sigmoid_backward_grad_input_tpu(const Tensor& grad_output, const Tensor
     tpu::TPUGenerateTpudnnTensor(stream, output),
     tpu::TPUGenerateTpudnnTensor(stream, grad_input));
   TORCH_CHECK(status == TPUDNN_STATUS_SUCCESS);
-  TIMING_END(tpu::SIGMOID_BACKWARD);
 #endif
+  TIMING_END;
   SHOW_TENSOR_OP(grad_output, output, grad_input);
   return grad_input;
 }
@@ -263,22 +257,19 @@ TORCH_LIBRARY_IMPL(aten, TPU, m) {
   m.impl("sigmoid_backward.grad_input", sigmoid_backward_grad_input_tpu);
 }
 
-
 /*
 * FIXME: The actual silu backward does not pass this route, as it is implemented by several sub-ops.
 */
 Tensor & silu_backward_grad_input_tpu(const Tensor& grad_output, const Tensor& input, Tensor& grad_input) {
+  TIMING_START;
   CHECK_TENSOR_IN_DEVICE(grad_output);
   CHECK_TENSOR_IN_DEVICE(input);
   CHECK_TENSOR_IN_DEVICE(grad_input);
 #if 0
   CPU_IMPL_WARNING();
-  TIMING_START;
   auto grad_input_cpu = silu_backward ( grad_output.cpu(), input.cpu() );
   tpu::TPUCopyHostToDevice ( grad_input.data_ptr(), grad_input_cpu.contiguous().data_ptr(), grad_input.nbytes() );
-  TIMING_END(tpu::CPU_LAYER);
 #else
-  TIMING_START;
   auto stream = c10_tpu::getCurrentTPUStream();
   auto status = tpudnnSiluBackwardAsync(
     stream,
@@ -286,9 +277,9 @@ Tensor & silu_backward_grad_input_tpu(const Tensor& grad_output, const Tensor& i
     tpu::TPUGenerateTpudnnTensor(stream, input),
     tpu::TPUGenerateTpudnnTensor(stream, grad_input));
   TORCH_CHECK(status == TPUDNN_STATUS_SUCCESS);
-  TIMING_END(tpu::SILU_BACKWARD);
 #endif
   SHOW_TENSOR_OP(grad_output, input, grad_input);
+  TIMING_END;
   return grad_input;
 }
 

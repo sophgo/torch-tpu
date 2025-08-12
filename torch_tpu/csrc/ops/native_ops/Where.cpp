@@ -48,7 +48,7 @@ Tensor where_self_tpu(const Tensor &condition, const Tensor &self,
       tpu::TPUGenerateTpudnnTensor(stream, other),
       tpu::TPUGenerateTpudnnTensor(stream, out));
   TORCH_CHECK(status == TPUDNN_STATUS_SUCCESS);
-  TIMING_END(tpu::WHERE);
+  TIMING_END;
   SHOW_TENSOR_OP(condition, self, other, out);
   return out;
 }

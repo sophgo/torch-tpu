@@ -13,6 +13,7 @@ namespace at {
         int64_t n_groups,
         int64_t topk_groups,
         int64_t top_k) {
+        TIMING_START;
         
         // 第一步：输入验证
         CHECK_TENSOR_IN_DEVICE(values);
@@ -47,7 +48,6 @@ namespace at {
         TORCH_CHECK(top_k > 0, "top_k must be positive");
         
         // 第三步：调用底层 DNN 接口
-        TIMING_START;
         auto stream = c10_tpu::getCurrentTPUStream();
         auto status = tpudnnNoauxTcTopkAsync(
             stream,
@@ -61,7 +61,7 @@ namespace at {
             top_k);
         TORCH_CHECK(status == TPUDNN_STATUS_SUCCESS, 
                    "tpudnnNoauxTcTopkAsync failed");
-        TIMING_END(tpu::NOAUX_TC_TOPK);
+        TIMING_END;
         
         return values;
     }

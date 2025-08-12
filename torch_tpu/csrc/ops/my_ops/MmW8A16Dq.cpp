@@ -16,12 +16,12 @@ namespace at
 		Tensor &output,
 		int64_t blocksize)
 	{
+		TIMING_START;
 		CHECK_TENSOR_IN_DEVICE(input);
 		CHECK_TENSOR_IN_DEVICE(weight);
         CHECK_TENSOR_IN_DEVICE(scale);
 		CHECK_TENSOR_IN_DEVICE(output);
 
-		TIMING_START;
 #if defined BACKEND_SG2260
 		auto stream = c10_tpu::getCurrentTPUStream();
 		auto status = tpudnnMmW8A16DqAsync(
@@ -35,7 +35,7 @@ namespace at
 #elif defined BACKEND_1684X
 		TORCH_CHECK(false);
 #endif
-		TIMING_END(tpu::MM_W8A16_DQ_FORWARD);
+		TIMING_END;
 		return output;
 	}
 

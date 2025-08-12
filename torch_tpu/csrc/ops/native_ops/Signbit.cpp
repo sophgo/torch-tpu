@@ -10,21 +10,21 @@ namespace at
 {
 Tensor & signbit_out_tpu ( const Tensor & self, Tensor & out )
 {
+  TIMING_START;
   CHECK_TENSOR_IN_DEVICE ( self );
   CHECK_TENSOR_IN_DEVICE ( out );
 #if 0
   auto out_cpu = signbit( self.cpu());
   tpu::TPUCopyHostToDevice ( out.data_ptr(), out_cpu.contiguous().data_ptr(), out.nbytes() );
 #else
-  TIMING_START;
   auto stream = c10_tpu::getCurrentTPUStream();
   auto status = tpudnnSignbitAsync(
       stream,
       tpu::TPUGenerateTpudnnTensor(stream, self),
       tpu::TPUGenerateTpudnnTensor(stream, out));
   TORCH_CHECK(status == TPUDNN_STATUS_SUCCESS);
-      TIMING_END ( tpu::SIGNBIT );
 #endif
+  TIMING_END;
   SHOW_TENSOR_OP(self, out);
   return out;
 }

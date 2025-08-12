@@ -26,6 +26,7 @@ void _fused_adam_out_tpu(
     const c10::optional<at::Tensor>& found_inf
 )
 { 
+    TIMING_START;
     // Check that all tensors are on the same device
     for (const auto& s : self) {
         CHECK_TENSOR_IN_DEVICE(s);
@@ -78,7 +79,6 @@ void _fused_adam_out_tpu(
     // }
 
     // Adam need inplace operation
-    TIMING_START;
     for (size_t i = 0; i < self.size(); ++i) {
         auto status = tpudnnAdamBackwardMultiCoreAsync(
             stream,
@@ -109,7 +109,7 @@ void _fused_adam_out_tpu(
     //     if (amsgrad)
     //         max_exp_avg_sqs[i].copy_(output_vmax[i]);
     // }
-    TIMING_END(tpu::ADAM_BACKWARD);
+    TIMING_END;
     //SHOW_TENSOR_OP(self);
 }
 TORCH_LIBRARY_IMPL(aten, TPU, m) {

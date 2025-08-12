@@ -9,6 +9,7 @@
 
 namespace at {
 Tensor &fill__Scalar_tpu(Tensor &self, const Scalar &value) {
+  TIMING_START;
   CHECK_TENSOR_IN_DEVICE(self);
   if ( self.numel() == 0) return self;
 #if 0
@@ -35,7 +36,6 @@ Tensor &fill__Scalar_tpu(Tensor &self, const Scalar &value) {
   } else {
     TORCH_CHECK(false, "unsupport scalar type");
   }
-  TIMING_START;
 
   auto stream = c10_tpu::getCurrentTPUStream();
   auto status = tpudnnFillAsync(
@@ -43,8 +43,8 @@ Tensor &fill__Scalar_tpu(Tensor &self, const Scalar &value) {
       &value_,
       tpu::TPUGenerateTpudnnTensor(stream, self));
   TORCH_CHECK(status == TPUDNN_STATUS_SUCCESS);
-    TIMING_END(tpu::CONST_FILL);
 #endif
+  TIMING_END;
   SHOW_TENSOR_OP(self);
   return self;
 }
@@ -93,9 +93,9 @@ Tensor &masked_fill_Scalar_tpu(Tensor &self, const Tensor &mask,
       value.toDouble(),
       tpu::TPUGenerateTpudnnTensor(stream, out));
   TORCH_CHECK(status == TPUDNN_STATUS_SUCCESS);
-    TIMING_END(tpu::MASKED_FILL);
   self = out.clone();
 #endif
+  TIMING_END;
   SHOW_TENSOR_OP(self, mask);
   return self;
 }

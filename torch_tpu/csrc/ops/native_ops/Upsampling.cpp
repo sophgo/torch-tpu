@@ -15,9 +15,9 @@ Tensor upsample_bilinear2d_tpu(const at::Tensor &self,
                                bool align_corners,
                                c10::optional<double> scales_h,
                                c10::optional<double> scales_w) {
+  TIMING_START;
   CHECK_TENSOR_IN_DEVICE(self);
   TORCH_CHECK(self.dim() > 0, "input dim should larger than 0.");
-
 #if 0
   auto self_cpu = upsample_bilinear2d(self.cpu(), output_size, align_corners,
                                       scale_factors);
@@ -39,7 +39,6 @@ Tensor upsample_bilinear2d_tpu(const at::Tensor &self,
   at::IntArrayRef output_shape_ref(output_shape);
   auto out = empty(output_shape_ref, self.options());
 
-  TIMING_START;
 
   auto stream = c10_tpu::getCurrentTPUStream();
   auto status = tpudnnUpsamplingAsync(
@@ -54,8 +53,8 @@ Tensor upsample_bilinear2d_tpu(const at::Tensor &self,
               .slice(3, c10::nullopt, size_ref[1]);
   }
   TORCH_CHECK(status ==  TPUDNN_STATUS_SUCCESS);
-  TIMING_END(tpu::UPSAMPLING_BILINEAR)
 #endif
+  TIMING_END;
   SHOW_TENSOR_OP(self, out);
   return out;
 }
@@ -68,6 +67,7 @@ Tensor upsample_nearest2d_tpu(const at::Tensor &self,
                               at::ArrayRef<long> output_size,
                               c10::optional<double> scales_h,
                               c10::optional<double> scales_w) {
+  TIMING_START;
   CHECK_TENSOR_IN_DEVICE_NO_CONTIGUOUS(self);
   TORCH_CHECK(self.dim() > 0, "input dim should larger than 0.");
 #if 0
@@ -91,7 +91,6 @@ Tensor upsample_nearest2d_tpu(const at::Tensor &self,
     output_shape[3] = (int64_t)(scales_w.value() * self.size(3));
   }
   auto self_ = self.is_contiguous() ? self : self.contiguous();
-  TIMING_START;
 
   auto stream = c10_tpu::getCurrentTPUStream();
   auto status = tpudnnUpsamplingAsync(
@@ -106,7 +105,7 @@ Tensor upsample_nearest2d_tpu(const at::Tensor &self,
               .slice(3, c10::nullopt, size_ref[1]);
   }
   TORCH_CHECK(status == TPUDNN_STATUS_SUCCESS);
-  TIMING_END(tpu::UPSAMPLING_NEAREST)
+  TIMING_END;
 #endif
   SHOW_TENSOR_OP(self, out);
   return out;
@@ -155,7 +154,7 @@ Tensor &upsample_nearest2d_backward_out_tpu(
     scales_h.value() * scales_w.value(),
     pooling_desc);
   TORCH_CHECK(status == TPUDNN_STATUS_SUCCESS);
-  TIMING_END(tpu::UPSAMPLING_NEAREST_BACKWARD)
+  TIMING_END;
 #endif
   SHOW_TENSOR_OP(grad_output_, grad_input);
   return grad_input;

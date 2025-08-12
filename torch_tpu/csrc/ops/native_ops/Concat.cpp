@@ -12,6 +12,7 @@ namespace at
 {
 Tensor & cat_out_tpu ( const ITensorListRef & tensors, int64_t dim, Tensor & out )
 {
+  TIMING_START;
   CHECK_TENSOR_IN_DEVICE ( out );
   // if input.dtype != output.dtype , use cpu to convert.
   int flag = 0;
@@ -24,7 +25,6 @@ Tensor & cat_out_tpu ( const ITensorListRef & tensors, int64_t dim, Tensor & out
   if ( tensors.size() > TPU_MAX_CONCAT_NUM || flag )
   {
     CPU_IMPL_WARNING();
-    TIMING_START;
     std::vector<Tensor> tensors_cpu;
     for ( auto tensor : tensors )
     {
@@ -34,7 +34,6 @@ Tensor & cat_out_tpu ( const ITensorListRef & tensors, int64_t dim, Tensor & out
       auto out_cpu = cat ( tensors_lis_cpu, dim );
       tpu::TPUCopyHostToDevice ( out.data_ptr(), out_cpu.contiguous().data_ptr(), out.nbytes() );
     }
-    TIMING_END(tpu::CPU_LAYER);
   }
   else
   {
@@ -53,7 +52,6 @@ Tensor & cat_out_tpu ( const ITensorListRef & tensors, int64_t dim, Tensor & out
 
     if (inputs.size()!= 0)
     {
-      TIMING_START;
       auto status = tpudnnConcatAsync(
       stream,
       inputs.data(),
@@ -61,10 +59,10 @@ Tensor & cat_out_tpu ( const ITensorListRef & tensors, int64_t dim, Tensor & out
       dim,
       tpu::TPUGenerateTpudnnTensor(stream, out));
       TORCH_CHECK(status == TPUDNN_STATUS_SUCCESS);
-      TIMING_END ( tpu::CONCAT );
     }
 
   }
+  TIMING_END;
   SHOW_TENSOR_OP(out);
   return out;
 }

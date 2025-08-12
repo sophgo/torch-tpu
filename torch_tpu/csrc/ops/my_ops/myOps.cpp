@@ -10,16 +10,16 @@
 #include "torch_tpu/csrc/aten/TPUNativeFunctions.h"
 namespace at {
 Tensor &dummy(Tensor &in) {
-  CHECK_TENSOR_IN_DEVICE(in);
   TIMING_START;
+  CHECK_TENSOR_IN_DEVICE(in);
   tpudnnDummyAsync(c10_tpu::getCurrentTPUStream());
-  TIMING_END(tpu::DUMMY);
+  TIMING_END;
   return in;
 }
 Tensor &dummy_no_kernel_launch(Tensor &in) {
-  CHECK_TENSOR_IN_DEVICE(in);
   TIMING_START;
-  TIMING_END(tpu::DUMMY);
+  CHECK_TENSOR_IN_DEVICE(in);
+  TIMING_END;
   return in;
 }
 } // namespace at

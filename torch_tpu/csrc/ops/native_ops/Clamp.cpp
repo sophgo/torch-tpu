@@ -11,17 +11,17 @@ namespace at {
 // ========== clamp
 Tensor & clamp_out_tpu( const Tensor & self, const c10::optional<Scalar> & min,
                         const c10::optional<Scalar> & max, Tensor & out) {
-  if ( self.dim() > 0 )  { CHECK_TENSOR_IN_DEVICE_NO_CONTIGUOUS ( self ); }
-  auto self_ = self.contiguous();
-  if (self.data_ptr() != self_.data_ptr()) { LOG( WARNING ) << "clamp inp not contiguous"; }
-  auto out_  = out;
-  if ( !out.is_contiguous() ) { out_ = out.contiguous(); LOG( WARNING ) << "clamp out not contiguous"; }
+    TIMING_START;
+    if ( self.dim() > 0 )  { CHECK_TENSOR_IN_DEVICE_NO_CONTIGUOUS ( self ); }
+    auto self_ = self.contiguous();
+    if (self.data_ptr() != self_.data_ptr()) { LOG( WARNING ) << "clamp inp not contiguous"; }
+    auto out_  = out;
+    if ( !out.is_contiguous() ) { out_ = out.contiguous(); LOG( WARNING ) << "clamp out not contiguous"; }
 
 #if 0
     auto out_cpu = clamp ( self.to(torch::kFloat32).cpu(), min, max );
     out = out_cpu.to(out.device()).to(out.dtype());
 #else
-    TIMING_START;
     auto stream = c10_tpu::getCurrentTPUStream();
     auto status = tpudnnClampAsync(
         stream,
@@ -30,9 +30,9 @@ Tensor & clamp_out_tpu( const Tensor & self, const c10::optional<Scalar> & min,
         max.has_value() ? max.value().to<float>() : std::numeric_limits<float>::infinity(),
         tpu::TPUGenerateTpudnnTensor(stream, out_));
     TORCH_CHECK(status == TPUDNN_STATUS_SUCCESS);
-    TIMING_END(tpu::CLAMP);
     if ( !out.is_contiguous() ) { out.copy_(out_); }
 #endif
+    TIMING_END;
     SHOW_TENSOR_OP(self, out);
     return out;
 }
@@ -40,11 +40,13 @@ Tensor & clamp_out_tpu( const Tensor & self, const c10::optional<Scalar> & min,
 Tensor& clamp_Tensor_out_tpu ( const Tensor & self, const c10::optional<Tensor> & min,
                                const c10::optional<Tensor> & max, Tensor & out )
 {
+    TIMING_START;
     CPU_IMPL_WARNING();
     auto min_cpu = min.has_value() ? c10::optional<Tensor>(min.value().cpu()) : c10::nullopt;
     auto max_cpu = max.has_value() ? c10::optional<Tensor>(max.value().cpu()) : c10::nullopt;
     auto out_cpu = clamp ( self.to(torch::kFloat32).cpu(), min_cpu, max_cpu );
     out = out_cpu.to(out.device()).to(out.dtype());
+    TIMING_END;
     return out;
 }
 

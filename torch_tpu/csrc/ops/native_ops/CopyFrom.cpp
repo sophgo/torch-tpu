@@ -83,25 +83,20 @@ Tensor _copy_from_tpu(const Tensor &self, const Tensor &dst,
                 "SELF and dst number bytes must be the same");
     if (IS_CPU_TENSOR(self) && IS_TPU_TENSOR(dst)) {
       if (dst.is_contiguous()) {
-        TIMING_START;
         tpu::TPUCopyHostToDevice(dst.data_ptr(), self.contiguous().data_ptr(),
                                  dst.nbytes(), non_blocking);
-        TIMING_END(tpu::CDMA_S2D);
       } else {
         dst.copy_(self.contiguous().to(dst.device()), non_blocking);
       }
     } else if (IS_TPU_TENSOR(self) && IS_CPU_TENSOR(dst)) {
       if (dst.is_contiguous()) {
-        TIMING_START;
         tpu::TPUCopyDeviceToHost(dst.data_ptr(), self.contiguous().data_ptr(),
                                  dst.nbytes(), non_blocking);
-        TIMING_END(tpu::CDMA_D2S);
       } else {
         dst.copy_(self.contiguous().to(dst.device()), non_blocking);
       }
     } else if (IS_TPU_TENSOR(self) && IS_TPU_TENSOR(dst)) {
       if (self.is_contiguous() && dst.is_contiguous()) {
-        TIMING_START;
         auto stream = c10_tpu::getCurrentTPUStream();
         auto status = tpudnnGDMAD2DAsync(
           stream,
@@ -109,16 +104,13 @@ Tensor _copy_from_tpu(const Tensor &self, const Tensor &dst,
           tpu::TPUGenerateTpudnnTensor(stream, dst),
           dst.nbytes());
         TORCH_CHECK(status == TPUDNN_STATUS_SUCCESS);
-        TIMING_END(tpu::COPY);
       } else {
-        TIMING_START;
         auto stream = c10_tpu::getCurrentTPUStream();
         auto status = tpudnnStridedCopyAsync(
           stream,
           tpu::TPUGenerateTpudnnTensor(stream, self),
           tpu::TPUGenerateTpudnnTensor(stream, dst));
         TORCH_CHECK(status == TPUDNN_STATUS_SUCCESS);
-        TIMING_END(tpu::STRIDED_COPY);
       }
     } else {
       TORCH_CHECK(false, "Unsupported copy from device ", self.device(),
@@ -137,18 +129,14 @@ Tensor _copy_from_tpu(const Tensor &self, const Tensor &dst,
       if ( !tpu::IsSupportDtype(self.dtype()) || !tpu::IsSupportDtype( dst.dtype() ))
       {
         CPU_IMPL_WARNING("unsupport dtype.");
-        TIMING_START;
         auto dst_cpu = self.cpu().to ( dst.dtype() );
         tpu::TPUCopyHostToDevice ( dst.data_ptr(), dst_cpu.contiguous().data_ptr(), dst.nbytes(), non_blocking );
-        TIMING_END(tpu::CPU_LAYER);
       }
       else
       {
         auto self_ = self.contiguous();
         if (dst.is_contiguous()) {
-          TIMING_START;
 #ifdef USING_PPL
-
           int is_bool = (dst.dtype() == caffe2::TypeMeta::Make<bool>());
           uint32_t outer_size = 1;
           uint32_t inner_size = 1;
@@ -175,7 +163,6 @@ Tensor _copy_from_tpu(const Tensor &self, const Tensor &dst,
             inner_size,
             dst_type,
             self_type);
-
 #else
           auto stream = c10_tpu::getCurrentTPUStream();
           int is_bool = (dst.dtype() == caffe2::TypeMeta::Make<bool>());
@@ -186,7 +173,6 @@ Tensor _copy_from_tpu(const Tensor &self, const Tensor &dst,
             is_bool);
           TORCH_CHECK(status == TPUDNN_STATUS_SUCCESS);
 #endif
-          TIMING_END(tpu::DTYPE_CONVERT);
           SHOW_TENSOR_OP(self_, dst);
         } else {
           dst.copy_(self_.to(dst.dtype()), non_blocking);

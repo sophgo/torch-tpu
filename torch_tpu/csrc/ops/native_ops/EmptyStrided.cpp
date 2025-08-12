@@ -19,7 +19,6 @@ Tensor empty_strided_tpu ( IntArrayRef                size,
                            c10::optional<Device>      device_opt,
                            c10::optional<bool>        pin_memory_opt )
 {
-  TIMING_START;
   torch_tpu::utils::maybe_initialize_tpu(device_opt);
   auto scalar_type = dtype_or_default ( dtype_opt );
   TORCH_CHECK( scalar_type != ScalarType::Long, "not support int64, please use int32");
@@ -37,7 +36,6 @@ Tensor empty_strided_tpu ( IntArrayRef                size,
   auto tensor = detail::make_tensor<torch_tpu::TPUTensorImpl> ( storage_impl, dtype );
   tensor.unsafeGetTensorImpl()->set_sizes_and_strides ( size, stride );
   at_tpu::StorageDescHelper::SetDesc(tensor, size, tensor.strides());
-  TIMING_END(tpu::MALLOC);
   SHOW_EMPTY_INFO(tensor);
   return tensor;
 }
@@ -50,7 +48,6 @@ c10::optional<Device>             device_opt,
 c10::optional<bool>               pin_memory_opt,
 c10::optional<c10::MemoryFormat>  memory_format_opt )
 {
-  TIMING_START;
   torch_tpu::utils::maybe_initialize_tpu(device_opt);
   auto scalar_type = dtype_or_default ( dtype_opt );
   TORCH_CHECK( scalar_type != ScalarType::Long, "not support int64, please use int32");
@@ -81,7 +78,6 @@ c10::optional<c10::MemoryFormat>  memory_format_opt )
     }
   }
   at_tpu::StorageDescHelper::SetDesc(tensor, size, tensor.strides());
-  TIMING_END(tpu::MALLOC);
   SHOW_EMPTY_INFO(tensor);
   return tensor;
 }

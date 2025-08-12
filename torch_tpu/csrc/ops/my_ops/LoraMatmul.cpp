@@ -14,13 +14,13 @@ namespace at{
         Tensor &output,
         double_t scale)
     {
+        TIMING_START;
         CHECK_TENSOR_IN_DEVICE(input);
         CHECK_TENSOR_IN_DEVICE(loraA);
         CHECK_TENSOR_IN_DEVICE(loraB);
         CHECK_TENSOR_IN_DEVICE(weight);
         CHECK_TENSOR_IN_DEVICE(output);
         
-        TIMING_START;
         auto stream = c10_tpu::getCurrentTPUStream();
         tpudnnStatus_t status = tpudnnLoraMatmulForwardAsync(
             stream,
@@ -32,7 +32,7 @@ namespace at{
             scale
         );
         TORCH_CHECK(status ==  TPUDNN_STATUS_SUCCESS);
-        TIMING_END(tpu::LORA_MATMUL_FORWARD);
+        TIMING_END;
         return output;
     }
 }

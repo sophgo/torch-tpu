@@ -9,9 +9,11 @@
 //called by https://pytorch.org/docs/2.1/generated/torch.cross.html#torch.cross
 namespace at {
 Tensor & linalg_cross_out_tpu(const Tensor & self, const Tensor & other, int64_t dim, Tensor & out) {
+    TIMING_START;
     CPU_IMPL_WARNING();
     auto out_cpu = torch::linalg_cross(self.cpu(), other.cpu(), dim);
     tpu::TPUCopyHostToDevice ( out.data_ptr(), out_cpu.contiguous().data_ptr(), out.nbytes() );
+    TIMING_END;
     return out;
 }
 TORCH_LIBRARY_IMPL(aten, TPU, m)

@@ -74,6 +74,7 @@ namespace at
 		int64_t axis,
 		double_t eps)
 	{
+		TIMING_START;
 		CHECK_TENSOR_IN_DEVICE(input);
 		CHECK_TENSOR_IN_DEVICE(output);
 		if(scale.has_value()){
@@ -82,7 +83,6 @@ namespace at
 		if(bias.has_value()){
 			CHECK_TENSOR_IN_DEVICE(bias.value());
 		}
-		TIMING_START;
 #ifdef USING_PPL
 		uint32_t outer_size = 1;
         uint32_t inner_size = 1;
@@ -114,7 +114,7 @@ namespace at
 			eps);
 		TORCH_CHECK(status == TPUDNN_STATUS_SUCCESS);
 #endif
-        TIMING_END(tpu::RMSNORM_FORWARD);
+        TIMING_END;
 		return output;
 	}
 
@@ -130,6 +130,7 @@ namespace at
 		int64_t axis,
 		double_t eps)
 	{
+		TIMING_START;
 		CHECK_TENSOR_IN_DEVICE(grad_output);
 		CHECK_TENSOR_IN_DEVICE(input);
 		if (scale.has_value())
@@ -153,7 +154,6 @@ namespace at
 		{
 			CHECK_TENSOR_IN_DEVICE(grad_bias.value());
 		}
-		TIMING_START;
 
   		auto stream = c10_tpu::getCurrentTPUStream();
 		tpudnnStatus_t status = tpudnnRmsNormBackwardAsync(
@@ -169,7 +169,7 @@ namespace at
 			eps);
 		TORCH_CHECK(status == TPUDNN_STATUS_SUCCESS);
 
-		TIMING_END(tpu::RMSNORM_BACKWARD);
+		TIMING_END;
 		return rms;
 	}
 

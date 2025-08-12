@@ -12,6 +12,7 @@ namespace at
 {
 Tensor & norm_out_tpu ( const at::Tensor & self, const c10::optional<at::Scalar> & p, at::IntArrayRef dim, bool keepdim, Tensor & out )
 {
+  TIMING_START;
   CHECK_TENSOR_IN_DEVICE ( self );
   CHECK_TENSOR_IN_DEVICE ( out );
 #if 0
@@ -33,7 +34,6 @@ Tensor & norm_out_tpu ( const at::Tensor & self, const c10::optional<at::Scalar>
   {
     TORCH_CHECK ( (int)dim.size() == self.dim() || dim.size() == 0 ); // TODO: Support partial dims
     for (int i = 0; i < (int)dim.size(); i++) { TORCH_CHECK ( dim[i] == i ); }
-    TIMING_START;
     auto stream = c10_tpu::getCurrentTPUStream();
     auto status = tpudnnNorm2Async(
         stream,
@@ -41,9 +41,9 @@ Tensor & norm_out_tpu ( const at::Tensor & self, const c10::optional<at::Scalar>
         keepdim,
         tpu::TPUGenerateTpudnnTensor(stream, out));
     TORCH_CHECK(status == TPUDNN_STATUS_SUCCESS);
-        TIMING_END(tpu::NORM2);
   }
 #endif
+  TIMING_END;
   SHOW_TENSOR_OP(self, out);
   return out;
 }

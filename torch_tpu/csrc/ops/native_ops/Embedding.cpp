@@ -12,6 +12,7 @@ namespace at
 {
 Tensor& index_select_out_tpu ( const Tensor & self, int64_t dim, const Tensor & index, Tensor & out)
 {
+  TIMING_START;
   if ( self.numel() == 0) {return out;}
   CHECK_TENSOR_IN_DEVICE ( self );
   CHECK_TENSOR_IN_DEVICE ( index );
@@ -23,7 +24,7 @@ Tensor& index_select_out_tpu ( const Tensor & self, int64_t dim, const Tensor & 
                 dim,
                 tpu::TPUGenerateTpudnnTensor(stream, out));
   TORCH_CHECK(status == TPUDNN_STATUS_SUCCESS);
-  TIMING_END ( tpu::INDEX_SELECT );
+  TIMING_END;
   SHOW_TENSOR_OP(self, index, out);
   return out;
 }
@@ -62,6 +63,7 @@ TORCH_LIBRARY_IMPL ( aten, TPU, m )
 
 Tensor embedding_dense_backward_tpu ( const Tensor & grad_output, const Tensor & indices, int64_t num_weights, int64_t padding_idx, bool scale_grad_by_freq )
 {
+  TIMING_START;
   CHECK_TENSOR_IN_DEVICE ( grad_output );
   CHECK_TENSOR_IN_DEVICE ( indices );
 #if 0
@@ -72,7 +74,6 @@ Tensor embedding_dense_backward_tpu ( const Tensor & grad_output, const Tensor &
   torch::Tensor out = torch::empty ( {num_weights, grad_output.size ( grad_output.dim() - 1 ) }, out_option );
   // indices should not be int64_t
   auto indices_int32 = indices.to ( torch::kInt32 );
-  TIMING_START;
   auto stream = c10_tpu::getCurrentTPUStream();
   auto status = tpudnnEmbeddingBackwardAsync(
     stream,
@@ -80,8 +81,8 @@ Tensor embedding_dense_backward_tpu ( const Tensor & grad_output, const Tensor &
     tpu::TPUGenerateTpudnnTensor(stream, indices_int32),
     tpu::TPUGenerateTpudnnTensor(stream, out));
   TORCH_CHECK(status == TPUDNN_STATUS_SUCCESS);
-  TIMING_END ( tpu::EMBEDDING_BACKWARD );
 #endif
+  TIMING_END;
   SHOW_TENSOR_OP(grad_output, indices, out);
   return out;
 }

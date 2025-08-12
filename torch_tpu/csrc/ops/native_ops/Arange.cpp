@@ -11,6 +11,7 @@ namespace at
 {
 Tensor & arange_start_out_tpu( const Scalar & start, const Scalar & end, const Scalar & step, Tensor & out)
 {
+    TIMING_START;
     // LOG( WARNING ) << __func__ ;
     CHECK_TENSOR_IN_DEVICE ( out );
 #if 0
@@ -19,7 +20,6 @@ Tensor & arange_start_out_tpu( const Scalar & start, const Scalar & end, const S
     out = out_cpu.to(out.device()).to(out.dtype());
 #else
     if ((start.toInt() >= 0 && end.toInt() >= 0)){
-        TIMING_START;
         auto stream = c10_tpu::getCurrentTPUStream();
         auto status = tpudnnArangeAsync(
             stream,
@@ -29,15 +29,13 @@ Tensor & arange_start_out_tpu( const Scalar & start, const Scalar & end, const S
             tpu::TPUGenerateTpudnnTensor(stream, out)
             );
         TORCH_CHECK(status == TPUDNN_STATUS_SUCCESS);
-        TIMING_END(tpu::ARANGE)
     }else{
         CPU_IMPL_WARNING();
-        TIMING_START;
         auto out_cpu = arange(start,end,step);
         out = out_cpu.to(out.device()).to(out.dtype());
-        TIMING_END(tpu::CPU_LAYER);
     }
 #endif
+    TIMING_END;
     SHOW_TENSOR_OP(out);
     return out;
 }

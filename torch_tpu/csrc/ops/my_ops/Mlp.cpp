@@ -19,6 +19,7 @@ namespace at
 		Tensor &p,
 		Tensor &out2)
 	{
+		TIMING_START;
 		CHECK_TENSOR_IN_DEVICE(input);
 		CHECK_TENSOR_IN_DEVICE(w1);
 		CHECK_TENSOR_IN_DEVICE(w2);
@@ -29,7 +30,6 @@ namespace at
 		CHECK_TENSOR_IN_DEVICE(out1);
 		CHECK_TENSOR_IN_DEVICE(p);
 		CHECK_TENSOR_IN_DEVICE(out2);
-		TIMING_START;
         // It seems that is tensors p and out1 are not used in the kernel
         // The function of llavaMlpAsync is the same as the API of sgdnnMlp
         auto handle = c10_tpu::getCurrentTPUStream();
@@ -42,7 +42,7 @@ namespace at
             b2.has_value()? tpu::TPUGenerateTpudnnTensor(handle, b2.value()) : tpudnnUndefinedTensor(),
             tpu::TPUGenerateTpudnnTensor(handle, out2));
         TORCH_CHECK(status == TPUDNN_STATUS_SUCCESS);
-        TIMING_END(tpu::MLP_FORWARD);
+        TIMING_END;
 		return out2;
 	}
 }

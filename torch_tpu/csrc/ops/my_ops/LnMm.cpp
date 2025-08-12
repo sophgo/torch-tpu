@@ -22,6 +22,7 @@ namespace at
 		Tensor &out
     )
     {
+		TIMING_START;
         CHECK_TENSOR_IN_DEVICE(input);
 		CHECK_TENSOR_IN_DEVICE(w);
 		if (b.has_value())
@@ -32,7 +33,6 @@ namespace at
 		CHECK_TENSOR_IN_DEVICE(rstd);
 		CHECK_TENSOR_IN_DEVICE(out);
 
-		TIMING_START;
         auto handle = c10_tpu::getCurrentTPUStream();
         auto status = tpudnnFusedNormMMAsync(
             handle,
@@ -46,7 +46,7 @@ namespace at
             tpu::TPUGenerateTpudnnTensor(handle, rstd),
             tpu::TPUGenerateTpudnnTensor(handle, out));
 		TORCH_CHECK(status == TPUDNN_STATUS_SUCCESS);
-		TIMING_END(tpu::LN_MM_FORWARD);
+		TIMING_END;
 		return std::tuple<Tensor, Tensor, Tensor>(mean, rstd, out);
     }
 
@@ -62,6 +62,7 @@ namespace at
         Tensor &grad_beta
     )
     {
+		TIMING_START;
         CHECK_TENSOR_IN_DEVICE(grad_out_ln);
 		CHECK_TENSOR_IN_DEVICE(input);
 		CHECK_TENSOR_IN_DEVICE(mean);
@@ -71,7 +72,6 @@ namespace at
 		CHECK_TENSOR_IN_DEVICE(grad_gamma);
 		CHECK_TENSOR_IN_DEVICE(grad_beta);
 
-		TIMING_START;
         auto handle = c10_tpu::getCurrentTPUStream();
         auto status = tpudnnLayernormBackwardAsync(
             handle,
@@ -86,7 +86,7 @@ namespace at
             tpu::TPUGenerateTpudnnTensor(handle, grad_beta),
             true);
         TORCH_CHECK(status == TPUDNN_STATUS_SUCCESS);
-		TIMING_END(tpu::LN_MM_BACKWARD);
+		TIMING_END;
 		return std::tuple<Tensor, Tensor, Tensor>(grad_input, grad_gamma, grad_beta);
     }
 }

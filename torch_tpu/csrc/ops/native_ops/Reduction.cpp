@@ -10,17 +10,13 @@ namespace at {
 Tensor &mean_out_tpu(const Tensor &self, OptionalIntArrayRef dim_opt,
                      bool keepdim, c10::optional<ScalarType> dtype_opt,
                      Tensor &out) {
+  TIMING_START;
   CHECK_TENSOR_IN_DEVICE(self);
   CHECK_TENSOR_IN_DEVICE(out);
 #if 0
   auto out_cpu = mean ( self.cpu(), dim_opt, keepdim, dtype_opt );
   tpu::TPUCopyHostToDevice ( out.data_ptr(), out_cpu.contiguous().data_ptr(), out.nbytes() );
 #else
-  if (self.dim() == 0) {
-    CPU_IMPL_WARNING();
-    tpu::TPUCopyDeviceToDevice(out.data_ptr(), self.data_ptr(), out.nbytes());
-    return out;
-  }
 
   auto reduce_dim = dim_opt.value_or(IntArrayRef{});
   std::vector<int> reduction_dim_vec;
@@ -38,15 +34,14 @@ Tensor &mean_out_tpu(const Tensor &self, OptionalIntArrayRef dim_opt,
     TORCH_CHECK(reduction_dim_vec[i] + 1 == reduction_dim_vec[i + 1],
                 "Reduction only supports contiguous reduction dimension now");
   }
-  TIMING_START;
   auto stream = c10_tpu::getCurrentTPUStream();
   auto status =
       tpudnnReduceAsync(stream, tpu::TPUGenerateTpudnnTensor(stream, self),
                         reduction_dim_vec[0], reduction_dim_vec.back() + 1,
                         keepdim, 0, tpu::TPUGenerateTpudnnTensor(stream, out));
   TORCH_CHECK(status == TPUDNN_STATUS_SUCCESS);
-  TIMING_END(tpu::REDUCE_MEAN);
 #endif
+  TIMING_END;
   SHOW_TENSOR_OP(self, out);
   return out;
 }
@@ -55,6 +50,7 @@ TORCH_LIBRARY_IMPL(aten, TPU, m) { m.impl("mean.out", mean_out_tpu); }
 Tensor &sum_IntList_out_tpu(const Tensor &self, OptionalIntArrayRef dim_opt,
                             bool keepdim, c10::optional<ScalarType> dtype_opt,
                             Tensor &out) {
+  TIMING_START;
   CHECK_TENSOR_IN_DEVICE_NO_CONTIGUOUS(self);
   CHECK_TENSOR_IN_DEVICE(out);
   auto self_ = self.contiguous();
@@ -62,102 +58,89 @@ Tensor &sum_IntList_out_tpu(const Tensor &self, OptionalIntArrayRef dim_opt,
   auto out_cpu = sum ( self.cpu(), dim_opt, keepdim, dtype_opt );
   tpu::TPUCopyHostToDevice ( out.data_ptr(), out_cpu.contiguous().data_ptr(), out.nbytes() );
 #else
-  if (self_.dim() == 0) // corner case; use cpu impl.
-  {
-    CPU_IMPL_WARNING();
-    TIMING_START;
-    auto out_cpu = sum(self_.cpu(), dim_opt, keepdim, dtype_opt);
-    tpu::TPUCopyHostToDevice(out.data_ptr(), out_cpu.contiguous().data_ptr(),
-                             out.nbytes());
-    TIMING_END(tpu::CPU_LAYER);
+  auto reduce_dim = dim_opt.value_or(IntArrayRef{});
+  std::vector<int> reduction_dim_vec;
+  if (reduce_dim.size() > 0) {
+    for (auto it : reduce_dim) {
+      reduction_dim_vec.push_back(it < 0 ? it + self_.dim() : it);
+    }
+    std::sort(reduction_dim_vec.begin(), reduction_dim_vec.end());
   } else {
-    auto reduce_dim = dim_opt.value_or(IntArrayRef{});
-    std::vector<int> reduction_dim_vec;
-    if (reduce_dim.size() > 0) {
-      for (auto it : reduce_dim) {
-        reduction_dim_vec.push_back(it < 0 ? it + self_.dim() : it);
-      }
-      std::sort(reduction_dim_vec.begin(), reduction_dim_vec.end());
-    } else {
-      for (auto i = 0; i < self_.dim(); ++i) {
-        reduction_dim_vec.push_back(i);
+    for (auto i = 0; i < self_.dim(); ++i) {
+      reduction_dim_vec.push_back(i);
+    }
+  }
+  for (size_t i = 0; i < reduction_dim_vec.size() - 1; ++i) {
+    TORCH_CHECK(reduction_dim_vec[i] + 1 == reduction_dim_vec[i + 1],
+                "Reduction only supports contiguous reduction dimension now");
+  }
+  const int start_dim = reduction_dim_vec.front();
+  const int end_dim = reduction_dim_vec.back();
+  if(start_dim == 0 || end_dim + 1 == self_.dim()){
+    auto stream = c10_tpu::getCurrentTPUStream();
+    auto status = tpudnnReduceAsync(
+        stream, tpu::TPUGenerateTpudnnTensor(stream, self_),
+        start_dim, end_dim + 1, keepdim, 1,
+        tpu::TPUGenerateTpudnnTensor(stream, out));
+    TORCH_CHECK(status == TPUDNN_STATUS_SUCCESS);
+  }
+  else{//workaround: matmul to sum
+    int64_t M = 1, N = 1, Bsz = 1;
+    for(int i = 0; i < start_dim; i++){
+      Bsz *= self_.size(i);
+    }
+    for(int i = start_dim; i <= end_dim; i++){
+      M *= self_.size(i);
+    }
+    for(int i = end_dim + 1; i < self_.dim(); i++){
+      N *= self_.size(i);
+    }
+    Tensor right = self_.reshape({Bsz, M, N});
+
+    TensorOptions opts = self_.options();
+    if(dtype_opt.has_value()){
+      opts = opts.dtype(dtype_opt.value());
+    }
+    Tensor left = torch::ones({Bsz, 1, M}, opts);
+
+    Tensor out_mm;
+    if(out.numel() != Bsz * N){
+      out_mm = at::empty({Bsz, 1, N}, opts);
+    } else{
+      std::vector<int64_t> new_strides = {N, N, 1};
+      out.unsafeGetTensorImpl()->set_sizes_and_strides({Bsz, 1, N}, new_strides);
+      out_mm = out;
+    }
+
+    auto stream = c10_tpu::getCurrentTPUStream();
+    auto status = tpudnnMatmulAsync(
+    stream,
+    tpu::TPUGenerateTpudnnTensor(stream, left),
+    tpu::TPUGenerateTpudnnTensor(stream, right),
+    tpudnnUndefinedTensor(),
+    tpu::TPUGenerateTpudnnTensor(stream, out_mm));
+    TORCH_CHECK(status == TPUDNN_STATUS_SUCCESS);
+
+    std::vector<int64_t> size_out;
+    for(int d = 0; d < self_.dim(); d++){
+      if(d < start_dim || d > end_dim){
+        size_out.push_back(self_.size(d));
+      } else if(keepdim){
+        size_out.push_back(1);
       }
     }
-    for (size_t i = 0; i < reduction_dim_vec.size() - 1; ++i) {
-      TORCH_CHECK(reduction_dim_vec[i] + 1 == reduction_dim_vec[i + 1],
-                  "Reduction only supports contiguous reduction dimension now");
+    if(!keepdim && size_out.empty()){
+      size_out = {1};
     }
-    const int start_dim = reduction_dim_vec.front();
-    const int end_dim = reduction_dim_vec.back();
-    if(start_dim == 0 || end_dim + 1 == self_.dim()){
-      TIMING_START;
-      auto stream = c10_tpu::getCurrentTPUStream();
-      auto status = tpudnnReduceAsync(
-          stream, tpu::TPUGenerateTpudnnTensor(stream, self_),
-          start_dim, end_dim + 1, keepdim, 1,
-          tpu::TPUGenerateTpudnnTensor(stream, out));
-      TORCH_CHECK(status == TPUDNN_STATUS_SUCCESS);
-      TIMING_END(tpu::REDUCE_SUM);
-    }
-    else{//workaround: matmul to sum
-      TIMING_START;
-      int64_t M = 1, N = 1, Bsz = 1;
-      for(int i = 0; i < start_dim; i++){
-        Bsz *= self_.size(i);
-      }
-      for(int i = start_dim; i <= end_dim; i++){
-        M *= self_.size(i);
-      }
-      for(int i = end_dim + 1; i < self_.dim(); i++){
-        N *= self_.size(i);
-      }
-      Tensor right = self_.reshape({Bsz, M, N});
-
-      TensorOptions opts = self_.options();
-      if(dtype_opt.has_value()){
-        opts = opts.dtype(dtype_opt.value());
-      }
-      Tensor left = torch::ones({Bsz, 1, M}, opts);
-
-      Tensor out_mm;
-      if(out.numel() != Bsz * N){
-        out_mm = at::empty({Bsz, 1, N}, opts);
-      } else{
-        std::vector<int64_t> new_strides = {N, N, 1};
-        out.unsafeGetTensorImpl()->set_sizes_and_strides({Bsz, 1, N}, new_strides);
-        out_mm = out;
-      }
-
-      auto stream = c10_tpu::getCurrentTPUStream();
-      auto status = tpudnnMatmulAsync(
-      stream,
-      tpu::TPUGenerateTpudnnTensor(stream, left),
-      tpu::TPUGenerateTpudnnTensor(stream, right),
-      tpudnnUndefinedTensor(),
-      tpu::TPUGenerateTpudnnTensor(stream, out_mm));
-      TORCH_CHECK(status == TPUDNN_STATUS_SUCCESS);
-
-      std::vector<int64_t> size_out;
-      for(int d = 0; d < self_.dim(); d++){
-        if(d < start_dim || d > end_dim){
-          size_out.push_back(self_.size(d));
-        } else if(keepdim){
-          size_out.push_back(1);
-        }
-      }
-      if(!keepdim && size_out.empty()){
-        size_out = {1};
-      }
-      if(out_mm.data_ptr() == out.data_ptr()){
-        out = out.reshape(size_out);
-      } else{
-        out.resize_(size_out);
-        out.copy_(out_mm);
-      }
-      TIMING_END(tpu::REDUCE_SUM_MATMUL);
+    if(out_mm.data_ptr() == out.data_ptr()){
+      out = out.reshape(size_out);
+    } else{
+      out.resize_(size_out);
+      out.copy_(out_mm);
     }
   }
 #endif
+  TIMING_END;
   SHOW_TENSOR_OP(self, out);
   return out;
 }
@@ -177,16 +160,16 @@ TORCH_LIBRARY_IMPL(aten, TPU, m) {
 
 Tensor &prod_int_out_tpu(const Tensor &self, long dim, bool keepdim,
                          c10::optional<ScalarType> dtype_opt, Tensor &out) {
+  TIMING_START;
   CHECK_TENSOR_IN_DEVICE(self);
   CHECK_TENSOR_IN_DEVICE(out);
 
-  TIMING_START;
   auto stream = c10_tpu::getCurrentTPUStream();
   auto status = tpudnnReduceProdAsync(
       stream, tpu::TPUGenerateTpudnnTensor(stream, self), dim, keepdim,
       tpu::TPUGenerateTpudnnTensor(stream, out));
   TORCH_CHECK(status == TPUDNN_STATUS_SUCCESS);
-  TIMING_END(tpu::REDUCE_PROD);
+  TIMING_END;
   SHOW_TENSOR_OP(self, out);
   return out;
 }
@@ -194,17 +177,11 @@ TORCH_LIBRARY_IMPL(aten, TPU, m) { m.impl("prod.int_out", prod_int_out_tpu); }
 
 Tensor &amax_out_tpu(const Tensor &self, IntArrayRef dim_opt, bool keepdim,
                      Tensor &out) {
+  TIMING_START;
   CHECK_TENSOR_IN_DEVICE(self);
   CHECK_TENSOR_IN_DEVICE(out);
 #if 0
 #else
-  if (self.dim() == 0) {
-    TIMING_START;
-    tpu::TPUCopyDeviceToDevice(out.data_ptr(), self.data_ptr(), out.nbytes(),
-                               true);
-    TIMING_END(tpu::COPY);
-    return out;
-  }
   std::vector<int> reduce_dim(dim_opt.begin(), dim_opt.end());
   std::vector<int> reduction_dim_vec;
   if (reduce_dim.size() > 0) {
@@ -217,15 +194,14 @@ Tensor &amax_out_tpu(const Tensor &self, IntArrayRef dim_opt, bool keepdim,
       reduction_dim_vec.push_back(i);
     }
   }
-  TIMING_START;
   auto stream = c10_tpu::getCurrentTPUStream();
   auto status = tpudnnReduceMaxOrMinAsync(
       stream, tpu::TPUGenerateTpudnnTensor(stream, self),
       reduction_dim_vec.data(), reduction_dim_vec.size(), keepdim, 0,
       tpu::TPUGenerateTpudnnTensor(stream, out));
   TORCH_CHECK(status == TPUDNN_STATUS_SUCCESS);
-  TIMING_END(tpu::REDUCE_MAX);
 #endif
+  TIMING_END;
   SHOW_TENSOR_OP(self, out);
   return out;
 }
@@ -233,18 +209,11 @@ TORCH_LIBRARY_IMPL(aten, TPU, m) { m.impl("amax.out", amax_out_tpu); }
 
 Tensor &amin_out_tpu(const Tensor &self, IntArrayRef dim_opt, bool keepdim,
                      Tensor &out) {
+  TIMING_START;
   CHECK_TENSOR_IN_DEVICE(self);
   CHECK_TENSOR_IN_DEVICE(out);
 #if 0
-
 #else
-  if (self.dim() == 0) {
-    TIMING_START;
-    tpu::TPUCopyDeviceToDevice(out.data_ptr(), self.data_ptr(), out.nbytes(),
-                               true);
-    TIMING_END(tpu::COPY);
-    return out;
-  }
   std::vector<int> reduce_dim(dim_opt.begin(), dim_opt.end());
   std::vector<int> reduction_dim_vec;
   if (reduce_dim.size() > 0) {
@@ -257,15 +226,14 @@ Tensor &amin_out_tpu(const Tensor &self, IntArrayRef dim_opt, bool keepdim,
       reduction_dim_vec.push_back(i);
     }
   }
-  TIMING_START;
   auto stream = c10_tpu::getCurrentTPUStream();
   auto status = tpudnnReduceMaxOrMinAsync(
       stream, tpu::TPUGenerateTpudnnTensor(stream, self),
       reduction_dim_vec.data(), reduction_dim_vec.size(), keepdim, 1,
       tpu::TPUGenerateTpudnnTensor(stream, out));
   TORCH_CHECK(status == TPUDNN_STATUS_SUCCESS);
-  TIMING_END(tpu::REDUCE_MIN);
 #endif
+  TIMING_END;
   SHOW_TENSOR_OP(self, out);
   return out;
 }
@@ -273,6 +241,7 @@ TORCH_LIBRARY_IMPL(aten, TPU, m) { m.impl("amin.out", amin_out_tpu); }
 
 Tensor var_correction_tpu(const Tensor &self, OptionalIntArrayRef dims,
                           optional<long> conrrection, bool keepdim) {
+  TIMING_START;
   if (self.dim() > 0) {
     CHECK_TENSOR_IN_DEVICE(self);
   }
@@ -284,13 +253,11 @@ Tensor var_correction_tpu(const Tensor &self, OptionalIntArrayRef dims,
   std::vector<int> reduce_vec;
   if (reduce_list.empty()) {
     out = torch::tensor(0.).to(device);
-    TIMING_START;
     auto stream = c10_tpu::getCurrentTPUStream();
     auto status = tpudnnReduceVarAllAsync(
         stream, tpu::TPUGenerateTpudnnTensor(stream, self), conrrection.value(),
         keepdim, tpu::TPUGenerateTpudnnTensor(stream, out));
     TORCH_CHECK(status == TPUDNN_STATUS_SUCCESS);
-    TIMING_END(tpu::REDUCE_VAR);
   } else {
     std::map<int, int> reduce_map;
     std::vector<int64_t> size_vec;
@@ -306,16 +273,14 @@ Tensor var_correction_tpu(const Tensor &self, OptionalIntArrayRef dims,
     IntArrayRef size(size_vec);
     out = torch::empty(size, self.dtype()).to(device);
 
-    TIMING_START;
     auto stream = c10_tpu::getCurrentTPUStream();
     auto status = tpudnnReduceVarAsync(
         stream, tpu::TPUGenerateTpudnnTensor(stream, self), reduce_vec.data(),
         reduce_vec.size(), conrrection.value(), keepdim,
         tpu::TPUGenerateTpudnnTensor(stream, out));
     TORCH_CHECK(status == TPUDNN_STATUS_SUCCESS);
-    TIMING_END(tpu::REDUCE_VAR);
   }
-
+  TIMING_END;
   SHOW_TENSOR_OP(self, out);
   return out;
 }
@@ -324,30 +289,22 @@ Tensor var_correction_tpu(const Tensor &self, OptionalIntArrayRef dims,
 // }
 
 Tensor max_tpu(const Tensor &self) {
-
+  TIMING_START;
   CHECK_TENSOR_IN_DEVICE(self);
   std::vector<int> reduction_dim_vec;
   TensorOptions options = TensorOptions ( self.device() ).dtype ( self.dtype() );
   Tensor out = torch::scalar_tensor(0, options);
-  if (self.dim() == 0) {
-    TIMING_START;
-    tpu::TPUCopyDeviceToDevice(out.data_ptr(), self.data_ptr(), out.nbytes(),
-                               true);
-    TIMING_END(tpu::COPY);
-    return out;
-  }
 
   for (auto i = 0; i < self.dim(); ++i) {
       reduction_dim_vec.push_back(i);
   }
-  TIMING_START;
   auto stream = c10_tpu::getCurrentTPUStream();
   auto status = tpudnnReduceMaxOrMinAsync(
       stream, tpu::TPUGenerateTpudnnTensor(stream, self),
       reduction_dim_vec.data(), reduction_dim_vec.size(), false, 0,
       tpu::TPUGenerateTpudnnTensor(stream, out));
   TORCH_CHECK(status == TPUDNN_STATUS_SUCCESS);
-  TIMING_END(tpu::REDUCE_MAX);
+  TIMING_END;
   SHOW_TENSOR_OP(self, out);
   return out;
 }
@@ -355,23 +312,14 @@ Tensor max_tpu(const Tensor &self) {
 TORCH_LIBRARY_IMPL(aten, TPU, m) { m.impl("max", max_tpu); }
 
 Tensor min_tpu(const Tensor &self) {
-
+  TIMING_START;
   CHECK_TENSOR_IN_DEVICE(self);
   std::vector<int> reduction_dim_vec;
   TensorOptions options = TensorOptions ( self.device() ).dtype ( self.dtype() );
   Tensor out = torch::scalar_tensor(0, options);
-  if (self.dim() == 0) {
-    TIMING_START;
-    tpu::TPUCopyDeviceToDevice(out.data_ptr(), self.data_ptr(), out.nbytes(),
-                               true);
-    TIMING_END(tpu::COPY);
-    return out;
-  }
-
   for (auto i = 0; i < self.dim(); ++i) {
       reduction_dim_vec.push_back(i);
   }
-  TIMING_START;
   torch::Device device(torch::kPrivateUse1);
   auto stream = c10_tpu::getCurrentTPUStream();
   auto status = tpudnnReduceMaxOrMinAsync(
@@ -379,7 +327,7 @@ Tensor min_tpu(const Tensor &self) {
       reduction_dim_vec.data(), reduction_dim_vec.size(), false, 1,
       tpu::TPUGenerateTpudnnTensor(stream, out));
   TORCH_CHECK(status == TPUDNN_STATUS_SUCCESS);
-  TIMING_END(tpu::REDUCE_MIN);
+  TIMING_END;
   SHOW_TENSOR_OP(self, out);
   return out;
 }

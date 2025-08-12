@@ -9,6 +9,7 @@
 
 namespace at {
 Tensor &triu_out_tpu(const Tensor &self, int64_t diagonal, Tensor &out) {
+  TIMING_START;
   CHECK_TENSOR_IN_DEVICE(out);
   CHECK_TENSOR_IN_DEVICE(self);
 #if 0
@@ -16,8 +17,6 @@ Tensor &triu_out_tpu(const Tensor &self, int64_t diagonal, Tensor &out) {
     auto out_cpu = triu( self.cpu(), diagonal );
     out = out_cpu.to(out.device());
 #else
-  TIMING_START;
-
   auto stream = c10_tpu::getCurrentTPUStream();
   auto status = tpudnnTriangularizeAsync(
       stream,
@@ -26,8 +25,8 @@ Tensor &triu_out_tpu(const Tensor &self, int64_t diagonal, Tensor &out) {
       diagonal,
       tpu::TPUGenerateTpudnnTensor(stream, out));
   TORCH_CHECK(status == TPUDNN_STATUS_SUCCESS);
-  TIMING_END(tpu::TRIU);
 #endif
+  TIMING_END;
   SHOW_TENSOR_OP(self, out);
   return out;
 }

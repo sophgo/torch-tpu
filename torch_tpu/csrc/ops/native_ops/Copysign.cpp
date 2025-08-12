@@ -11,17 +11,21 @@ namespace at
 {
 inline at::Tensor & copysign_out_tpu(const at::Tensor & self, const at::Tensor & other, at::Tensor & out)
 {
+    TIMING_START;
     CPU_IMPL_WARNING();
     auto out_cpu = copysign( self.cpu(), other.cpu() );
     out = out_cpu.to(out.device()).to(out.dtype());
+    TIMING_END;
     return out;
 }
 
 inline at::Tensor & copysign_Scalar_out_tpu(const at::Tensor & self, const at::Scalar & other, at::Tensor & out)
 {
+    TIMING_START;
     CPU_IMPL_WARNING();
     auto out_cpu = copysign( self.cpu(), other );
     out = out_cpu.to(out.device()).to(out.dtype());
+    TIMING_END;
     return out;
 }
 

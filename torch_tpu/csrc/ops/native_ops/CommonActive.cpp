@@ -74,6 +74,7 @@ namespace at {
 
 #define IMP_ACTIVE_OUT(OP, ACTIVE_TYPE, TIMING_NAME)                           \
   Tensor &OP##_out_tpu(const Tensor &self, Tensor &out) {                      \
+    TIMING_START;                                                              \
     if (self.dim() > 0) {                                                      \
       CHECK_TENSOR_IN_DEVICE_NO_CONTIGUOUS(self);                              \
     }                                                                          \
@@ -85,7 +86,6 @@ namespace at {
                                  out.nbytes());                                \
     } else if (IS_TPU_TENSOR(self)) {                                          \
       auto self_ = self.contiguous();                                          \
-      TIMING_START;                                                            \
       auto stream = c10_tpu::getCurrentTPUStream();                            \
       auto status = tpudnnActiveAsync(                                         \
           stream,                                                              \
@@ -93,15 +93,15 @@ namespace at {
           tpu::TPUGenerateTpudnnTensor(stream, out),                           \
           ACTIVE_TYPE);                                                        \
       TORCH_CHECK(status == TPUDNN_STATUS_SUCCESS);                            \
-      TIMING_END(TIMING_NAME)                                                  \
     } else {                                                                   \
       TORCH_CHECK(false, "At least one input is required in TPU device");      \
     }                                                                          \
+    TIMING_END;                                                                \
     SHOW_TENSOR_OP(self, out);                                                 \
     return out;                                                                \
   }
 
-IMP_ACTIVE_OUT(abs, TPUDNN_ACTIVE_ABSVAL, tpu::ABS_FORWARD)
+IMP_ACTIVE_OUT(abs, TPUDNN_ACTIVE_ABSVAL, tpu::ACTIVE)
 IMP_ACTIVE(abs)
 
 TORCH_LIBRARY_IMPL(aten, TPU, m) {
@@ -109,11 +109,11 @@ TORCH_LIBRARY_IMPL(aten, TPU, m) {
   m.impl("abs", abs_tpu);
 }
 
-IMP_ACTIVE_OUT(exp, TPUDNN_ACTIVE_EXP, tpu::EXP_FORWARD)
+IMP_ACTIVE_OUT(exp, TPUDNN_ACTIVE_EXP, tpu::ACTIVE)
 IMP_ACTIVE(exp)
-IMP_ACTIVE_OUT(exp2, TPUDNN_ACTIVE_EXP2, tpu::EXP2)
+IMP_ACTIVE_OUT(exp2, TPUDNN_ACTIVE_EXP2, tpu::ACTIVE)
 IMP_ACTIVE(exp2)
-IMP_ACTIVE_OUT(expm1, TPUDNN_ACTIVE_EXPM1, tpu::EXPM1)
+IMP_ACTIVE_OUT(expm1, TPUDNN_ACTIVE_EXPM1, tpu::ACTIVE)
 IMP_ACTIVE(expm1)
 
 TORCH_LIBRARY_IMPL(aten, TPU, m) {
@@ -125,9 +125,9 @@ TORCH_LIBRARY_IMPL(aten, TPU, m) {
   m.impl("expm1", expm1_tpu);
 }
 
-IMP_ACTIVE_OUT(erf, TPUDNN_ACTIVE_ERF, tpu::ERF)
+IMP_ACTIVE_OUT(erf, TPUDNN_ACTIVE_ERF, tpu::ACTIVE)
 IMP_ACTIVE(erf)
-IMP_ACTIVE_OUT(erfc, TPUDNN_ACTIVE_ERFC, tpu::ERFC)
+IMP_ACTIVE_OUT(erfc, TPUDNN_ACTIVE_ERFC, tpu::ACTIVE)
 IMP_ACTIVE(erfc)
 
 TORCH_LIBRARY_IMPL(aten, TPU, m) {
@@ -137,13 +137,13 @@ TORCH_LIBRARY_IMPL(aten, TPU, m) {
   m.impl("erfc", erfc_tpu);
 }
 
-IMP_ACTIVE_OUT(ceil, TPUDNN_ACTIVE_CEIL, tpu::CEIL)
+IMP_ACTIVE_OUT(ceil, TPUDNN_ACTIVE_CEIL, tpu::ACTIVE)
 IMP_ACTIVE(ceil)
-IMP_ACTIVE_OUT(floor, TPUDNN_ACTIVE_FLOOR, tpu::FLOOR)
+IMP_ACTIVE_OUT(floor, TPUDNN_ACTIVE_FLOOR, tpu::ACTIVE)
 IMP_ACTIVE(floor)
-IMP_ACTIVE_OUT(round, TPUDNN_ACTIVE_ROUND, tpu::ROUND)
+IMP_ACTIVE_OUT(round, TPUDNN_ACTIVE_ROUND, tpu::ACTIVE)
 IMP_ACTIVE(round)
-IMP_ACTIVE_OUT(trunc, TPUDNN_ACTIVE_TRUNC, tpu::TRUNC)
+IMP_ACTIVE_OUT(trunc, TPUDNN_ACTIVE_TRUNC, tpu::ACTIVE)
 IMP_ACTIVE(trunc)
 
 TORCH_LIBRARY_IMPL(aten, TPU, m) {
@@ -157,9 +157,9 @@ TORCH_LIBRARY_IMPL(aten, TPU, m) {
   m.impl("trunc.out", trunc_out_tpu);
 }
 
-IMP_ACTIVE_OUT(sqrt, TPUDNN_ACTIVE_SQRT, tpu::SQRT)
+IMP_ACTIVE_OUT(sqrt, TPUDNN_ACTIVE_SQRT, tpu::ACTIVE)
 IMP_ACTIVE(sqrt)
-IMP_ACTIVE_OUT(rsqrt, TPUDNN_ACTIVE_RSQRT, tpu::RSQRT)
+IMP_ACTIVE_OUT(rsqrt, TPUDNN_ACTIVE_RSQRT, tpu::ACTIVE)
 IMP_ACTIVE(rsqrt)
 
 TORCH_LIBRARY_IMPL(aten, TPU, m) {
@@ -169,11 +169,11 @@ TORCH_LIBRARY_IMPL(aten, TPU, m) {
   m.impl("rsqrt", rsqrt_tpu);
 }
 
-IMP_ACTIVE_OUT(isfinite, TPUDNN_ACTIVE_IS_FINITE, tpu::ISFINITE)
+IMP_ACTIVE_OUT(isfinite, TPUDNN_ACTIVE_IS_FINITE, tpu::ACTIVE)
 IMP_ACTIVE_BOOL(isfinite)
-IMP_ACTIVE_OUT(isnan, TPUDNN_ACTIVE_ISNAN, tpu::ISNAN)
+IMP_ACTIVE_OUT(isnan, TPUDNN_ACTIVE_ISNAN, tpu::ACTIVE)
 IMP_ACTIVE_BOOL(isnan)
-IMP_ACTIVE_OUT(isinf, TPUDNN_ACTIVE_ISINF, tpu::ISINF)
+IMP_ACTIVE_OUT(isinf, TPUDNN_ACTIVE_ISINF, tpu::ACTIVE)
 IMP_ACTIVE_BOOL(isinf)
 
 TORCH_LIBRARY_IMPL(aten, TPU, m) {
@@ -189,12 +189,12 @@ TORCH_LIBRARY_IMPL(aten, AutogradPrivateUse1, m) {
   m.impl("isfinite", isfinite_tpu);
 }
 
-IMP_ACTIVE_OUT(sign, TPUDNN_ACTIVE_SIGN, tpu::SIGN)
+IMP_ACTIVE_OUT(sign, TPUDNN_ACTIVE_SIGN, tpu::ACTIVE)
 IMP_ACTIVE(sign)
-IMP_ACTIVE_OUT(relu, TPUDNN_ACTIVE_RELU, tpu::RELU)
+IMP_ACTIVE_OUT(relu, TPUDNN_ACTIVE_RELU, tpu::ACTIVE)
 IMP_ACTIVE_(relu)
 IMP_ACTIVE(relu)
-IMP_ACTIVE_OUT(sigmoid, TPUDNN_ACTIVE_SIGMOID, tpu::SIGMOID)
+IMP_ACTIVE_OUT(sigmoid, TPUDNN_ACTIVE_SIGMOID, tpu::ACTIVE)
 IMP_ACTIVE(sigmoid)
 
 // TODO: should take f16 and backward support  into count
@@ -217,11 +217,11 @@ TORCH_LIBRARY_IMPL(aten, TPU, m) {
   // m.impl("gleu", gleu_tpu);
 }
 
-IMP_ACTIVE_OUT(sin, TPUDNN_ACTIVE_SIN, tpu::SIN_FORWARD)
+IMP_ACTIVE_OUT(sin, TPUDNN_ACTIVE_SIN, tpu::ACTIVE)
 IMP_ACTIVE(sin)
-IMP_ACTIVE_OUT(cos, TPUDNN_ACTIVE_COS, tpu::COS_FORWARD)
+IMP_ACTIVE_OUT(cos, TPUDNN_ACTIVE_COS, tpu::ACTIVE)
 IMP_ACTIVE(cos)
-IMP_ACTIVE_OUT(tan, TPUDNN_ACTIVE_TAN, tpu::TAN_FORWARD)
+IMP_ACTIVE_OUT(tan, TPUDNN_ACTIVE_TAN, tpu::ACTIVE)
 IMP_ACTIVE(tan)
 
 TORCH_LIBRARY_IMPL(aten, TPU, m) {
@@ -233,11 +233,11 @@ TORCH_LIBRARY_IMPL(aten, TPU, m) {
   m.impl("tan", tan_tpu);
 }
 
-IMP_ACTIVE_OUT(asin, TPUDNN_ACTIVE_ARCSIN, tpu::ASIN)
+IMP_ACTIVE_OUT(asin, TPUDNN_ACTIVE_ARCSIN, tpu::ACTIVE)
 IMP_ACTIVE(asin)
-IMP_ACTIVE_OUT(acos, TPUDNN_ACTIVE_ARCCOS, tpu::ACOS)
+IMP_ACTIVE_OUT(acos, TPUDNN_ACTIVE_ARCCOS, tpu::ACTIVE)
 IMP_ACTIVE(acos)
-IMP_ACTIVE_OUT(atan, TPUDNN_ACTIVE_ARCTAN, tpu::ATAN)
+IMP_ACTIVE_OUT(atan, TPUDNN_ACTIVE_ARCTAN, tpu::ACTIVE)
 IMP_ACTIVE(atan)
 
 TORCH_LIBRARY_IMPL(aten, TPU, m) {
@@ -249,11 +249,11 @@ TORCH_LIBRARY_IMPL(aten, TPU, m) {
   m.impl("atan", atan_tpu);
 }
 
-IMP_ACTIVE_OUT(asinh, TPUDNN_ACTIVE_ARCSINH, tpu::ASINH_FORWARD)
+IMP_ACTIVE_OUT(asinh, TPUDNN_ACTIVE_ARCSINH, tpu::ACTIVE)
 IMP_ACTIVE(asinh)
-IMP_ACTIVE_OUT(acosh, TPUDNN_ACTIVE_ARCCOSH, tpu::ACOSH_FORWARD)
+IMP_ACTIVE_OUT(acosh, TPUDNN_ACTIVE_ARCCOSH, tpu::ACTIVE)
 IMP_ACTIVE(acosh)
-IMP_ACTIVE_OUT(atanh, TPUDNN_ACTIVE_ARCTANH, tpu::ATANH_FORWARD)
+IMP_ACTIVE_OUT(atanh, TPUDNN_ACTIVE_ARCTANH, tpu::ACTIVE)
 IMP_ACTIVE(atanh)
 
 TORCH_LIBRARY_IMPL(aten, TPU, m) {
@@ -265,11 +265,11 @@ TORCH_LIBRARY_IMPL(aten, TPU, m) {
   m.impl("atanh", atanh_tpu);
 }
 
-IMP_ACTIVE_OUT(sinh, TPUDNN_ACTIVE_SINH, tpu::SINH_FORWARD)
+IMP_ACTIVE_OUT(sinh, TPUDNN_ACTIVE_SINH, tpu::ACTIVE)
 IMP_ACTIVE(sinh)
-IMP_ACTIVE_OUT(cosh, TPUDNN_ACTIVE_COSH, tpu::COSH_FORWARD)
+IMP_ACTIVE_OUT(cosh, TPUDNN_ACTIVE_COSH, tpu::ACTIVE)
 IMP_ACTIVE(cosh)
-IMP_ACTIVE_OUT(tanh, TPUDNN_ACTIVE_TANH, tpu::TANH_FORWARD)
+IMP_ACTIVE_OUT(tanh, TPUDNN_ACTIVE_TANH, tpu::ACTIVE)
 IMP_ACTIVE(tanh)
 
 TORCH_LIBRARY_IMPL(aten, TPU, m) {

@@ -14,6 +14,7 @@ namespace at
 		IntArrayRef input_lengths,
 		int64_t n_accept_ids)
     {
+        TIMING_START;
         CHECK_TENSOR_IN_DEVICE(all_input_ids);
         CHECK_TENSOR_IN_DEVICE(all_input_ids);
         TORCH_CHECK((int)input_lengths.size() == (int)all_input_ids.size(0));
@@ -33,6 +34,7 @@ namespace at
             input_lengths_vec.size(),
             n_accept_ids);
         TORCH_CHECK ( status == TPUDNN_STATUS_SUCCESS );
+    	TIMING_END;
         return;
     }
 

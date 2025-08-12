@@ -191,3 +191,12 @@ function update_tpuv7()
   popd
   cp -r $TPURT_TOP/install/tpuv7-runtime-emulator-onednn_*/* $TPUTRAIN_TOP/third_party/tpuv7_runtime/tpuv7-emulator_0.1.0/
 }
+
+function TorchTpuDebugMode()
+{
+  export TPUTRAIN_DEBUG=ON
+}
+function TorchTpuReleaseMode()
+{
+  unset TPUTRAIN_DEBUG
+}

@@ -9,6 +9,7 @@
 
 namespace at {
 Tensor &reciprocal_out_tpu(const at::Tensor &self, at::Tensor &out) {
+  TIMING_START;
   CHECK_TENSOR_IN_DEVICE(self);
   CHECK_TENSOR_IN_DEVICE(out);
 #if 0
@@ -16,30 +17,14 @@ Tensor &reciprocal_out_tpu(const at::Tensor &self, at::Tensor &out) {
   tpu::TPUCopyHostToDevice ( out.data_ptr(), out_cpu.contiguous().data_ptr(), out.nbytes() );
   return out;
 #endif
-  if (self.dim() == 0 || self.numel() == 1) {
-    CPU_IMPL_WARNING();
-    TIMING_START;
-    auto out_cpu = reciprocal(self.cpu());
-    tpu::TPUCopyHostToDevice(out.data_ptr(), out_cpu.contiguous().data_ptr(),
-                             out.nbytes());
-    TIMING_END(tpu::CPU_LAYER);
-  } else {
-    /**
-     * common implemented active (CommonActive.cpp) call cpu function when
-     * self.dim() == 0, but when the op is reciprocal, 1 / tensor meet the
-     * self.dim() == 0 condition, which should be handled separately.
-     */
-    TIMING_START;
-    SHOW_TENSOR_OP(self, out);
-    auto stream = c10_tpu::getCurrentTPUStream();
-    auto status = tpudnnActiveAsync(
-        stream,
-        tpu::TPUGenerateTpudnnTensor(stream, self),
-        tpu::TPUGenerateTpudnnTensor(stream, out),
-        TPUDNN_ACTIVE_RECIPROCAL);
-    TORCH_CHECK(status == TPUDNN_STATUS_SUCCESS);
-        TIMING_END(tpu::RECIPROCAL)
-  }
+  auto stream = c10_tpu::getCurrentTPUStream();
+  auto status = tpudnnActiveAsync(
+      stream,
+      tpu::TPUGenerateTpudnnTensor(stream, self),
+      tpu::TPUGenerateTpudnnTensor(stream, out),
+      TPUDNN_ACTIVE_RECIPROCAL);
+  TORCH_CHECK(status == TPUDNN_STATUS_SUCCESS);
+  TIMING_END;
   SHOW_TENSOR_OP(self, out);
   return out;
 }

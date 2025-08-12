@@ -13,6 +13,7 @@ namespace at
 
     Tensor &logical_or_out_tpu(const Tensor &self, const Tensor &other, Tensor &out)
     {
+        TIMING_START;
         if (self.dim() > 0)
         {
             CHECK_TENSOR_IN_DEVICE(self);
@@ -23,18 +24,9 @@ namespace at
   tpu::TPUCopyHostToDevice ( self.data_ptr(),self.contiguous().data_ptr(), self.nbytes() );
   tpu::TPUCopyHostToDevice ( other.data_ptr(),other.contiguous().data_ptr(), other.nbytes() );
 #else
-        if (self.dim() == 0 && other.dim() == 0)
-        {
-            CPU_IMPL_WARNING();
-            TIMING_START;
-            auto out_cpu = logical_or(self.cpu(),other.cpu());
-            tpu::TPUCopyHostToDevice(out.data_ptr(), out_cpu.contiguous().data_ptr(), out.nbytes());
-            TIMING_END(tpu::CPU_LAYER);
-        }
-        else if (IS_TPU_TENSOR(self) && IS_TPU_TENSOR ( other ))
+        if (IS_TPU_TENSOR(self) && IS_TPU_TENSOR ( other ))
         {
         //need to consider broadcast later
-            TIMING_START;
             auto stream = c10_tpu::getCurrentTPUStream();
             auto status = tpudnnLogicalOrAsync(
             stream,
@@ -42,13 +34,13 @@ namespace at
             tpu::TPUGenerateTpudnnTensor(stream, other),
             tpu::TPUGenerateTpudnnTensor(stream, out));
             TORCH_CHECK(status == TPUDNN_STATUS_SUCCESS);
-                        TIMING_END(tpu::LOGICAL_OR);
         }
         else
         {
             TORCH_CHECK(false, "At least one input is required in TPU device");
         }
 #endif
+        TIMING_END;
         SHOW_TENSOR_OP(self, other, out);
         return out;
     }

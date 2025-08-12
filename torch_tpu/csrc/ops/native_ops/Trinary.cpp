@@ -12,6 +12,7 @@ namespace at {
 Tensor &addcmul_out_tpu(const Tensor &self, const Tensor &tensor1,
                         const Tensor &tensor2, const Scalar &value,
                         Tensor &out) {
+  TIMING_START;
   CHECK_TENSOR_IN_DEVICE(self);
   CHECK_TENSOR_IN_DEVICE(tensor1);
   CHECK_TENSOR_IN_DEVICE(tensor2);
@@ -22,7 +23,6 @@ Tensor &addcmul_out_tpu(const Tensor &self, const Tensor &tensor1,
 #else
   if (tpu::TPUIsSameShape(self, tensor1) &&
       tpu::TPUIsSameShape(self, tensor2)) {
-    TIMING_START;
     auto stream = c10_tpu::getCurrentTPUStream();
     auto status = tpudnnAddCMulAsync(
       stream,
@@ -32,7 +32,6 @@ Tensor &addcmul_out_tpu(const Tensor &self, const Tensor &tensor1,
       value.toDouble(),
       tpu::TPUGenerateTpudnnTensor(stream, out));
     TORCH_CHECK(status == TPUDNN_STATUS_SUCCESS);
-    TIMING_END(tpu::ADDCMUL);
   } else {
     auto stream = c10_tpu::getCurrentTPUStream();
     auto self_t = tpu::TPUGenerateTpudnnTensor(stream, self);
@@ -88,7 +87,6 @@ Tensor &addcmul_out_tpu(const Tensor &self, const Tensor &tensor1,
       }
       tensor2_t.dim = maxdim;
     }
-    TIMING_START;
     auto status = tpudnnAddCMulBcastAsync(
       stream,
       self_t,
@@ -97,9 +95,9 @@ Tensor &addcmul_out_tpu(const Tensor &self, const Tensor &tensor1,
       value.toDouble(),
       tpu::TPUGenerateTpudnnTensor(stream, out));
     TORCH_CHECK(status == TPUDNN_STATUS_SUCCESS);
-    TIMING_END(tpu::ADDCMUL);
   }
 #endif
+  TIMING_END;
   SHOW_TENSOR_OP(self, tensor1, tensor2, out);
   return out;
 }
@@ -108,11 +106,11 @@ TORCH_LIBRARY_IMPL(aten, TPU, m) { m.impl("addcmul.out", addcmul_out_tpu); }
 Tensor &addcdiv_out_tpu(const Tensor &self, const Tensor &tensor1,
                         const Tensor &tensor2, const Scalar &value,
                         Tensor &out) {
+  TIMING_START;
   CHECK_TENSOR_IN_DEVICE(self);
   CHECK_TENSOR_IN_DEVICE(tensor1);
   CHECK_TENSOR_IN_DEVICE(tensor2);
   CHECK_TENSOR_IN_DEVICE(out);
-  TIMING_START;
   auto stream = c10_tpu::getCurrentTPUStream();
   auto status = tpudnnAddCDivAsync(
     stream,
@@ -122,7 +120,7 @@ Tensor &addcdiv_out_tpu(const Tensor &self, const Tensor &tensor1,
     value.toDouble(),
     tpu::TPUGenerateTpudnnTensor(stream, out));
   TORCH_CHECK(status == TPUDNN_STATUS_SUCCESS);
-  TIMING_END(tpu::ADDCDIV);
+  TIMING_END;
   SHOW_TENSOR_OP(self, tensor1, tensor2, out);
   return out;
 }

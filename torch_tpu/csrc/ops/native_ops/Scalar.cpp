@@ -12,16 +12,16 @@ namespace at
 {
 Scalar _local_scalar_dense_tpu ( const Tensor & self )
 {
+  TIMING_START;
   SHOW_TENSOR_OP(self);
   CHECK_TENSOR_IN_DEVICE ( self );
   Scalar out;
 #if 1
   CPU_IMPL_WARNING();
-  TIMING_START;
   out = _local_scalar_dense ( TENSOR_TO_CPU ( self ) );
-  TIMING_END(tpu::CPU_LAYER);
 #else
 #endif
+  TIMING_END;
   return out;
 }
 TORCH_LIBRARY_IMPL ( aten, TPU, m )

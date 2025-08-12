@@ -43,7 +43,7 @@ namespace at
 			);
 		TORCH_CHECK(status == TPUDNN_STATUS_SUCCESS);
 
-		TIMING_END(tpu::LLama2A16MATMUL);
+		TIMING_END;
 		return output;
 	}
 

@@ -11,11 +11,13 @@ namespace at {
 
 Tensor & bincount_out_tpu(const Tensor & self, const c10::optional<Tensor> & weights, int64_t minlength, Tensor & out)
 {
+    TIMING_START;
     CPU_IMPL_WARNING();
     Tensor weights_cpu;
     if ( weights.has_value() ) { weights_cpu = weights.value().cpu(); }
     auto out_cpu = bincount(self.cpu(), c10::optional<Tensor>(weights_cpu), minlength);
     out = out_cpu.to(out.device()).to(out.dtype());
+    TIMING_END;
     return out;
 }
 

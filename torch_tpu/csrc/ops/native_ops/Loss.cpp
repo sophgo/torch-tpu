@@ -9,19 +9,6 @@
 #include <algorithm>
 #include "common/config.h"
 
-// template<typename T>
-// int countValidElements(const at::Tensor& target, int ignore_index) {
-//   SHOW_TENSOR_OP(target);
-//   int valid_batch = 0;
-//   const int64_t numel = target.numel();
-//   for (int64_t i = 0; i < numel; ++i) {
-//     if (target[i].item<T>() != ignore_index) {
-//       ++valid_batch;
-//     }
-//   }
-//   return valid_batch;
-// }
-
 namespace torch {
 namespace autograd {
 class CrossEntropyLossFunction : public torch::autograd::Function<CrossEntropyLossFunction>
@@ -32,6 +19,7 @@ public:
   const c10::optional<at::Tensor> &weight_opt, int64_t reduction,
   int64_t ignore_index, double label_smoothing )
   {
+    TIMING_START;
     ctx->saved_data["reduction"] = reduction;
     ctx->saved_data["ignore_index"] = ignore_index;
     ctx->saved_data["label_smoothing"] = label_smoothing;
@@ -63,7 +51,6 @@ public:
     TORCH_CHECK ( !weight.defined() );
     TORCH_CHECK ( ignore_index < 0 );
 
-    TIMING_START;
     auto stream = c10_tpu::getCurrentTPUStream();
     auto status = tpudnnCrossEntropyLossAsync(
         stream,
@@ -74,14 +61,15 @@ public:
         label_smoothing,
         tpu::TPUGenerateTpudnnTensor(stream, out));
     TORCH_CHECK(status == TPUDNN_STATUS_SUCCESS);
-        TIMING_END ( tpu::CROSS_ENTROPY_LOSS );
 #endif
+    TIMING_END;
     SHOW_TENSOR_OP(self, target, out);
     return out;
   }
 
   static tensor_list backward ( AutogradContext *ctx, tensor_list grad_outputs )
   {
+    TIMING_START;
     auto reduction = ctx->saved_data["reduction"].toInt();
     auto ignore_index = ctx->saved_data["ignore_index"].toInt();
     auto label_smoothing = ctx->saved_data["label_smoothing"].toDouble();
@@ -108,9 +96,6 @@ public:
     TORCH_CHECK ( reduction == 1 || reduction == 2 );
     TORCH_CHECK ( !weight_has_value );
     TORCH_CHECK ( ignore_index < 0 );
-    // int valid_batch = 0;
-    // valid_batch = countValidElements<int>(target, ignore_index);
-    TIMING_START;
     auto stream = c10_tpu::getCurrentTPUStream();
     auto status = tpudnnCrossEntropyLossBackwardAsync(
         stream,
@@ -122,9 +107,8 @@ public:
         label_smoothing,
         tpu::TPUGenerateTpudnnTensor(stream, grad_input));
     TORCH_CHECK(status == TPUDNN_STATUS_SUCCESS);
-
-        TIMING_END ( tpu::CROSS_ENTROPY_LOSS_BACKWARD );
 #endif
+    TIMING_END;
     SHOW_TENSOR_OP(input, target, grad_outputs[0], grad_input);
     return {grad_input, at::Tensor(), at::Tensor(), at::Tensor(), at::Tensor(), at::Tensor() };
   }

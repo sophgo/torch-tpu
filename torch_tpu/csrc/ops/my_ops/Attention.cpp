@@ -22,6 +22,7 @@ namespace at
 		Tensor &soft_v,
 		Tensor &out)
 	{
+		TIMING_START;
 		CHECK_TENSOR_IN_DEVICE(input);
 		CHECK_TENSOR_IN_DEVICE(w_attn);
 		CHECK_TENSOR_IN_DEVICE(w_proj);
@@ -36,9 +37,8 @@ namespace at
 		CHECK_TENSOR_IN_DEVICE(soft_v);
 		CHECK_TENSOR_IN_DEVICE(out);
 
-		TIMING_START;
         TORCH_CHECK(0, "Not implemented");
-		TIMING_END(tpu::ATTN_FORWARD);
+		TIMING_END;
 		return out;
 	}
 
@@ -59,6 +59,7 @@ namespace at
 		const c10::optional<Tensor> &grad_b_attn,
 		const c10::optional<Tensor> &grad_b_proj)
 	{
+		TIMING_START;
 		CHECK_TENSOR_IN_DEVICE(grad_output);
 		CHECK_TENSOR_IN_DEVICE(input);
 		CHECK_TENSOR_IN_DEVICE(w_attn);
@@ -77,9 +78,8 @@ namespace at
 		if (grad_b_proj.has_value())
 			CHECK_TENSOR_IN_DEVICE(grad_b_proj.value());
 
-		TIMING_START;
         TORCH_CHECK(0, "Not implemented");
-		TIMING_END(tpu::ATTN_BACKWARD);
+		TIMING_END;
 		return std::tuple<Tensor, Tensor, Tensor, c10::optional<Tensor>, c10::optional<Tensor>>(grad_input, grad_w_attn, grad_w_proj, grad_b_attn, grad_b_proj);
 	}
 }

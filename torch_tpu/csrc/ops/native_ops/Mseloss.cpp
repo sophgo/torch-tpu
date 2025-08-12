@@ -11,6 +11,7 @@ namespace at
 {
 Tensor mse_loss_tpu(const at::Tensor & self, const at::Tensor & target, int64_t reduction)
 {
+    TIMING_START;
     if ( self.numel() == 0 && reduction == 1) { return torch::tensor( NAN, self.options() ); }
     CHECK_TENSOR_IN_DEVICE ( self );
     CHECK_TENSOR_IN_DEVICE ( target );
@@ -40,7 +41,6 @@ Tensor mse_loss_tpu(const at::Tensor & self, const at::Tensor & target, int64_t 
     else if ( reduction != 0 ){
         out = torch::tensor( 0., self.options() );
     }
-    TIMING_START;
 
     auto stream = c10_tpu::getCurrentTPUStream();
     auto status = tpudnnMselossAsync(
@@ -50,7 +50,7 @@ Tensor mse_loss_tpu(const at::Tensor & self, const at::Tensor & target, int64_t 
         tpu::TPUGenerateTpudnnTensor(stream, out),
         reduction);
     TORCH_CHECK(status == TPUDNN_STATUS_SUCCESS);
-        TIMING_END(tpu::MSE_LOSS);
+    TIMING_END;
     SHOW_TENSOR_OP(self, target);
     return out;
 #endif
@@ -68,6 +68,7 @@ TORCH_LIBRARY_IMPL ( aten, TPU, m )
 * dC/dx <- "x dz1/dx " <- dC/dz1 <- "x dz2/dz1 " <- dC/dz2 <- "x (dL/dz2)" <- dC/dL
 */
 Tensor mse_loss_backward_tpu( const Tensor & grad_output, const Tensor & self, const Tensor & target, int64_t reduction ){
+  TIMING_START;
   CHECK_TENSOR_IN_DEVICE ( grad_output );
   CHECK_TENSOR_IN_DEVICE ( self );
   CHECK_TENSOR_IN_DEVICE ( target );
@@ -94,11 +95,10 @@ Tensor mse_loss_backward_tpu( const Tensor & grad_output, const Tensor & self, c
     TORCH_CHECK( false );
   }
 
-  TIMING_START;
   // TODO: use a kernel func =
 
-    TIMING_END(tpu::MSE_LOSS_BACKWARD);
 #endif
+  TIMING_END;
   SHOW_TENSOR_OP(grad_output, self, target, grad_in);
   return grad_in;
 }

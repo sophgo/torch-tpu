@@ -10,6 +10,7 @@
 namespace at {
 
 Tensor nonzero_tpu(const Tensor &self) {
+  TIMING_START;
 #if 1
   CPU_IMPL_WARNING();
   auto out_cpu = nonzero(self.cpu());
@@ -19,7 +20,6 @@ Tensor nonzero_tpu(const Tensor &self) {
   int size = self.numel();
   Tensor out_temp = empty({size, self.dim()}, self.options().dtype(kInt));
   Tensor num = empty({1}, self.options().dtype(kInt));
-  TIMING_START;
 
   auto stream = c10_tpu::getCurrentTPUStream();
   auto status = tpudnnNonzeroAsync(
@@ -28,12 +28,12 @@ Tensor nonzero_tpu(const Tensor &self) {
       tpu::TPUGenerateTpudnnTensor(stream, out_temp),
       tpu::TPUGenerateTpudnnTensor(stream, num));
   TORCH_CHECK(status == TPUDNN_STATUS_SUCCESS);
-    TIMING_END(tpu::NONZERO);
 
   Tensor out = out_temp.index({Slice(0, num.item().toInt()), "..."});
 #endif
   // wait tpu support resize_
   // out.resize_((num.item().toInt(), self.dim()), c10::nullopt);
+  TIMING_END;
   SHOW_TENSOR_OP(self);
   return out;
 }

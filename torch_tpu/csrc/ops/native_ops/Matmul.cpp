@@ -52,13 +52,13 @@ Tensor & addmm_out_tpu ( const Tensor & self, const Tensor & mat1, const Tensor 
       tpu::TPUGenerateTpudnnTensor(stream, out));
     TORCH_CHECK ( status == TPUDNN_STATUS_SUCCESS );
 
-    TIMING_END( tpu::ADDMM );
   }
   else
   {
     TORCH_CHECK ( false );
   }
 #endif
+  TIMING_END;
   SHOW_TENSOR_OP(self, mat1, mat2, out);
   return out;
 }
@@ -69,6 +69,7 @@ TORCH_LIBRARY_IMPL ( aten, TPU, m )
 
 Tensor & mm_out_tpu ( const Tensor & self, const Tensor & mat2, Tensor & out )
 {
+  TIMING_START;
   CHECK_TENSOR_IN_DEVICE_NO_CONTIGUOUS ( self );
   CHECK_TENSOR_IN_DEVICE_NO_CONTIGUOUS ( mat2 );
   CHECK_TENSOR_IN_DEVICE ( out );
@@ -81,8 +82,6 @@ Tensor & mm_out_tpu ( const Tensor & self, const Tensor & mat2, Tensor & out )
   auto self_ = self.is_contiguous() == false && is_transposed ( self ) == false ? self.contiguous() : self;
   auto mat2_ = mat2.is_contiguous() == false && is_transposed ( mat2 ) == false ? mat2.contiguous() : mat2;
 
-  TIMING_START;
-
   auto stream = c10_tpu::getCurrentTPUStream();
   auto status = tpudnnMatmulAsync(
     stream,
@@ -91,8 +90,8 @@ Tensor & mm_out_tpu ( const Tensor & self, const Tensor & mat2, Tensor & out )
     tpudnnUndefinedTensor(),
     tpu::TPUGenerateTpudnnTensor(stream, out));
   TORCH_CHECK ( status == TPUDNN_STATUS_SUCCESS );
-  TIMING_END( tpu::MM );
 #endif
+  TIMING_END;
   SHOW_TENSOR_OP(self, mat2, out);
   return out;
 }
@@ -103,6 +102,7 @@ TORCH_LIBRARY_IMPL ( aten, TPU, m )
 
 Tensor & bmm_out_tpu ( const Tensor & self, const Tensor & mat2, Tensor & out )
 {
+  TIMING_START;
   CHECK_TENSOR_IN_DEVICE_NO_CONTIGUOUS ( self );
   CHECK_TENSOR_IN_DEVICE_NO_CONTIGUOUS ( mat2 );
   CHECK_TENSOR_IN_DEVICE ( out );
@@ -113,8 +113,6 @@ Tensor & bmm_out_tpu ( const Tensor & self, const Tensor & mat2, Tensor & out )
   auto self_ = self.is_contiguous() == false && is_transposed ( self ) == false ? self.contiguous() : self;
   auto mat2_ = mat2.is_contiguous() == false && is_transposed ( mat2 ) == false ? mat2.contiguous() : mat2;
 
-  TIMING_START;
-
   auto stream = c10_tpu::getCurrentTPUStream();
   auto status = tpudnnMatmulAsync(
     stream,
@@ -123,9 +121,8 @@ Tensor & bmm_out_tpu ( const Tensor & self, const Tensor & mat2, Tensor & out )
     tpudnnUndefinedTensor(),
     tpu::TPUGenerateTpudnnTensor(stream, out));
   TORCH_CHECK ( status == TPUDNN_STATUS_SUCCESS );
-
-  TIMING_END( tpu::BMM );
 #endif
+  TIMING_END;
   SHOW_TENSOR_OP(self, mat2, out);
   return out;
 }

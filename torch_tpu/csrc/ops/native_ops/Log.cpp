@@ -11,6 +11,7 @@
 namespace at {
 
 Tensor &logx_out_tpu(const Tensor &self, Tensor &out, tensor_log_type_t log_type) {
+  TIMING_START;
   if (self.dim() > 0) {
     CHECK_TENSOR_IN_DEVICE(self);
   }
@@ -20,15 +21,7 @@ Tensor &logx_out_tpu(const Tensor &self, Tensor &out, tensor_log_type_t log_type
   tpu::TPUCopyHostToDevice(out.data_ptr(), out_cpu.contiguous().data_ptr(),
                            out.nbytes());
 #else
-  if (self.dim() == 0) {
-    CPU_IMPL_WARNING();
-    TIMING_START;
-    auto out_cpu = log(self.cpu());
-    tpu::TPUCopyHostToDevice(out.data_ptr(), out_cpu.contiguous().data_ptr(),
-                             out.nbytes());
-    TIMING_END(tpu::CPU_LAYER);
-  } else if (IS_TPU_TENSOR(self)) {
-    TIMING_START;
+  if (IS_TPU_TENSOR(self)) {
     auto stream = c10_tpu::getCurrentTPUStream();
     auto status = tpudnnLogAsync(
         stream,
@@ -36,11 +29,11 @@ Tensor &logx_out_tpu(const Tensor &self, Tensor &out, tensor_log_type_t log_type
         tpu::TPUGenerateTpudnnTensor(stream, out),
         log_type);
     TORCH_CHECK(status == TPUDNN_STATUS_SUCCESS);
-        TIMING_END(tpu::LOG_FORWARD)
   } else {
     TORCH_CHECK(false, "At least one input is required in TPU device");
   }
 #endif
+  TIMING_END;
   SHOW_TENSOR_OP(self, out);
   return out;
 }

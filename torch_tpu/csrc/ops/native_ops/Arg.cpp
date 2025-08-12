@@ -16,6 +16,7 @@
 namespace at {
 Tensor &argmax_out_tpu(const Tensor &self, c10::optional<int64_t> dim,
                        bool keepdim, Tensor &out) {
+  TIMING_START;
   CHECK_TENSOR_IN_DEVICE(out);
   CHECK_TENSOR_IN_DEVICE(self);
 #if 0
@@ -27,10 +28,8 @@ Tensor &argmax_out_tpu(const Tensor &self, c10::optional<int64_t> dim,
        self.dtype() == caffe2::TypeMeta::Make<int>() )
   {
     CPU_IMPL_WARNING();
-    TIMING_START;
     auto out_cpu = argmax( self.cpu(), dim, keepdim );
     out = out_cpu.to(out.device()).to(out.dtype());
-    TIMING_END(tpu::CPU_LAYER);
     return out;
   }
 
@@ -40,7 +39,6 @@ Tensor &argmax_out_tpu(const Tensor &self, c10::optional<int64_t> dim,
     }
     TORCH_CHECK(dim.value() >= 0 || dim.value() < self.dim());
   }
-  TIMING_START;
   auto stream = c10_tpu::getCurrentTPUStream();
   auto status = tpudnnArgAsync(
       stream,
@@ -49,8 +47,8 @@ Tensor &argmax_out_tpu(const Tensor &self, c10::optional<int64_t> dim,
       tpudnnUndefinedTensor(),
       tpu::TPUGenerateTpudnnTensor(stream, out));
   TORCH_CHECK(status == TPUDNN_STATUS_SUCCESS);
-  TIMING_END(tpu::ARGMAX);
 #endif
+  TIMING_END;
   SHOW_TENSOR_OP(self, out);
   return out;
 }
@@ -100,6 +98,7 @@ TORCH_LIBRARY_IMPL(aten, TPU, m) { m.impl("argmax.out", argmax_out_tpu); }
 
 Tensor &argmin_out_tpu(const Tensor &self, c10::optional<int64_t> dim,
                        bool keepdim, Tensor &out) {
+  TIMING_START;
   CHECK_TENSOR_IN_DEVICE(out);
   CHECK_TENSOR_IN_DEVICE(self);
 #if 0
@@ -113,7 +112,6 @@ Tensor &argmin_out_tpu(const Tensor &self, c10::optional<int64_t> dim,
     }
     TORCH_CHECK(dim.value() >= 0 || dim.value() < self.dim());
   }
-  TIMING_START;
   auto stream = c10_tpu::getCurrentTPUStream();
   auto status = tpudnnArgAsync(
       stream,
@@ -122,7 +120,7 @@ Tensor &argmin_out_tpu(const Tensor &self, c10::optional<int64_t> dim,
       tpudnnUndefinedTensor(),
       tpu::TPUGenerateTpudnnTensor(stream, out));
   TORCH_CHECK(status == TPUDNN_STATUS_SUCCESS);
-  TIMING_END(tpu::ARGMIN);
+  TIMING_END;
 #endif
   return out;
 }
@@ -174,6 +172,7 @@ std::tuple<Tensor &, Tensor &> max_dim_max_out_tpu(const Tensor &self,
                                                    int64_t dim, bool keepdim,
                                                    Tensor &values,
                                                    Tensor &indices) {
+  TIMING_START;
   CHECK_TENSOR_IN_DEVICE(indices);
   CHECK_TENSOR_IN_DEVICE(values);
   CHECK_TENSOR_IN_DEVICE(self);
@@ -188,7 +187,6 @@ std::tuple<Tensor &, Tensor &> max_dim_max_out_tpu(const Tensor &self,
   }
   TORCH_CHECK(dim >= 0 || dim < self.dim());
 
-  TIMING_START;
   auto stream = c10_tpu::getCurrentTPUStream();
   auto status = tpudnnArgAsync(
       stream,
@@ -198,8 +196,8 @@ std::tuple<Tensor &, Tensor &> max_dim_max_out_tpu(const Tensor &self,
       tpu::TPUGenerateTpudnnTensor(stream, values),
       tpu::TPUGenerateTpudnnTensor(stream, indices));
   TORCH_CHECK(status == TPUDNN_STATUS_SUCCESS);
-  TIMING_END(tpu::MAX_DIM);
 #endif
+  TIMING_END;
   return {values, indices};
 }
 std::tuple<Tensor, Tensor> max_dim_tpu(const Tensor &self,
@@ -234,6 +232,7 @@ std::tuple<Tensor &, Tensor &> min_dim_min_out_tpu(const Tensor &self,
                                                    int64_t dim, bool keepdim,
                                                    Tensor &values,
                                                    Tensor &indices) {
+  TIMING_START;
   CHECK_TENSOR_IN_DEVICE(indices);
   CHECK_TENSOR_IN_DEVICE(values);
   CHECK_TENSOR_IN_DEVICE(self);
@@ -248,7 +247,6 @@ std::tuple<Tensor &, Tensor &> min_dim_min_out_tpu(const Tensor &self,
   }
   TORCH_CHECK(dim >= 0 || dim < self.dim());
 
-  TIMING_START;
   auto stream = c10_tpu::getCurrentTPUStream();
   auto status = tpudnnArgAsync(
       stream,
@@ -258,8 +256,8 @@ std::tuple<Tensor &, Tensor &> min_dim_min_out_tpu(const Tensor &self,
       tpu::TPUGenerateTpudnnTensor(stream, values),
       tpu::TPUGenerateTpudnnTensor(stream, indices));
   TORCH_CHECK(status == TPUDNN_STATUS_SUCCESS);
-  TIMING_END(tpu::MIN_DIM);
 #endif
+  TIMING_END;
   return {values, indices};
 }
 

@@ -30,7 +30,6 @@ Tensor &binary_op_tpu(const Tensor &self, const Tensor &other,
         other.item().toFloat() * alpha.toFloat(),
         tpu::TPUGenerateTpudnnTensor(stream, out), binary_type, 0);
     TORCH_CHECK(status == TPUDNN_STATUS_SUCCESS);
-    TIMING_END(tpu::BINARYOP_C);  
   }
   else if ( self.dim() == 0 && IS_CPU_TENSOR(self) ) {
     CHECK_TENSOR_IN_DEVICE(other);
@@ -40,18 +39,12 @@ Tensor &binary_op_tpu(const Tensor &self, const Tensor &other,
         self.item().toFloat() * alpha.toFloat(),
         tpu::TPUGenerateTpudnnTensor(stream, out), binary_type, 1);
     TORCH_CHECK(status == TPUDNN_STATUS_SUCCESS);
-    TIMING_END(tpu::BINARYOP_C);
   }
   else if (tpu::TPUIsSameShape(self, other)) {
     CHECK_TENSOR_IN_DEVICE(self);
     CHECK_TENSOR_IN_DEVICE(other);
     TORCH_CHECK( self.scalar_type()  != ScalarType::Long );
     TORCH_CHECK( other.scalar_type() != ScalarType::Long );
-    // TORCH_CHECK(
-    //   self.scalar_type() == out.scalar_type(),
-    //   "Expected ", self.scalar_type(), " to match ", out.scalar_type(), " (at ",
-    //   __FILE__, ":", __LINE__, ")"
-    // );
 
     auto stream = c10_tpu::getCurrentTPUStream();
     auto status = tpudnnBinaryAsync(
@@ -61,18 +54,12 @@ Tensor &binary_op_tpu(const Tensor &self, const Tensor &other,
         alpha.toDouble(),
         tpu::TPUGenerateTpudnnTensor(stream, out), binary_type);
     TORCH_CHECK(status == TPUDNN_STATUS_SUCCESS);
-    TIMING_END(tpu::BINARYOP)
   }
   else {
     CHECK_TENSOR_IN_DEVICE(self);
     CHECK_TENSOR_IN_DEVICE(other);
     TORCH_CHECK( self.scalar_type()  != ScalarType::Long );
     TORCH_CHECK( other.scalar_type() != ScalarType::Long );
-    // TORCH_CHECK(
-    //   self.scalar_type() == out.scalar_type(),
-    //   "Expected ", self.scalar_type(), " to match ", out.scalar_type(), " (at ",
-    //   __FILE__, ":", __LINE__, ")"
-    // );
 
     int self_dim = self.dim(), other_dim = other.dim();
     int max_dim = std::max(self_dim, other_dim);
@@ -117,8 +104,8 @@ Tensor &binary_op_tpu(const Tensor &self, const Tensor &other,
     auto status = tpudnnBinaryBcastAsync(stream, self_t, other_t,
                                    alpha.toDouble(), out_t, binary_type);
     TORCH_CHECK(status == TPUDNN_STATUS_SUCCESS);
-    TIMING_END(tpu::BINARYOP_BCAST)
   }
+  TIMING_END;
   return out;
 }
 
@@ -130,13 +117,11 @@ Tensor &add_out_tpu(const Tensor &self, const Tensor &other,
       out = add(self.contiguous(), other.contiguous(), alpha);
     } else {
       auto out_ = add(self.contiguous(), other.contiguous(), alpha);
-      TIMING_START;
       auto handle = c10_tpu::getCurrentTPUStream();
       tpudnnStridedCopyAsync(
           handle,
           tpu::TPUGenerateTpudnnTensor(handle, out_),
           tpu::TPUGenerateTpudnnTensor(handle, out));
-      TIMING_END(tpu::STRIDED_COPY);
     }
     SHOW_TENSOR_OP(self, other, out);
     return out;
@@ -156,13 +141,11 @@ Tensor &sub_out_tpu(const Tensor &self, const Tensor &other,
       out = sub(self.contiguous(), other.contiguous(), alpha);
     } else {
       auto out_ = sub(self.contiguous(), other.contiguous(), alpha);
-      TIMING_START;
       auto handle = c10_tpu::getCurrentTPUStream();
       tpudnnStridedCopyAsync(
           handle,
           tpu::TPUGenerateTpudnnTensor(handle, out_),
           tpu::TPUGenerateTpudnnTensor(handle, out)); 
-      TIMING_END(tpu::STRIDED_COPY);
     }
     SHOW_TENSOR_OP(self, other, out);
     return out;
@@ -181,13 +164,11 @@ Tensor &mul_out_tpu(const Tensor &self, const Tensor &other, Tensor &out) {
       out = mul(self.contiguous(), other.contiguous());
     } else {
       auto out_ = mul(self.contiguous(), other.contiguous());
-      TIMING_START;
       auto handle = c10_tpu::getCurrentTPUStream();
       tpudnnStridedCopyAsync(
           handle,
           tpu::TPUGenerateTpudnnTensor(handle, out_),
           tpu::TPUGenerateTpudnnTensor(handle, out));
-      TIMING_END(tpu::STRIDED_COPY);
     }
     SHOW_TENSOR_OP(self, other, out);
     return out;
@@ -206,13 +187,11 @@ Tensor &div_out_tpu(const Tensor &self, const Tensor &other, Tensor &out) {
       out = div(self.contiguous(), other.contiguous());
     } else {
       auto out_ = div(self.contiguous(), other.contiguous());
-      TIMING_START;
       auto handle = c10_tpu::getCurrentTPUStream();
       tpudnnStridedCopyAsync(
           handle,
           tpu::TPUGenerateTpudnnTensor(handle, out_),
           tpu::TPUGenerateTpudnnTensor(handle, out));
-      TIMING_END(tpu::STRIDED_COPY);
     }
     SHOW_TENSOR_OP(self, other, out);
     return out;
@@ -228,39 +207,30 @@ TORCH_LIBRARY_IMPL(aten, TPU, m) { m.impl("div.out", div_out_tpu); }
 /* ******************************************************************************************** */
 template <typename Mode, typename UnaryFunc, typename BinaryFunc, typename CpuFunc>
 void binary_impl(const Tensor &self, const Tensor &other, Tensor &out,
-                 tpu::OpType type, Mode mode, UnaryFunc unary_func,
+                 Mode mode, UnaryFunc unary_func,
                  BinaryFunc binary_func, CpuFunc cpu_func) {
+  TIMING_START;
   CHECK_TENSOR_IN_DEVICE(out);
   const auto handle = c10_tpu::getCurrentTPUStream();
   if ( other.dim() == 0 && IS_CPU_TENSOR(other) )
   {
     CHECK_TENSOR_IN_DEVICE(self);
     TORCH_CHECK( self.scalar_type()  != ScalarType::Long );
-    TIMING_START;
     auto status = unary_func(handle, self, other, out);
     TORCH_CHECK(status == TPUDNN_STATUS_SUCCESS);
-    TIMING_END(type);
   }
   else if (self.dim() == 0 && IS_CPU_TENSOR(self))
   {
     CHECK_TENSOR_IN_DEVICE(other);
     TORCH_CHECK( other.scalar_type()  != ScalarType::Long );
-    TIMING_START;
     auto status = unary_func(handle, self, other, out);
     TORCH_CHECK(status == TPUDNN_STATUS_SUCCESS);
-    TIMING_END(type);
   }
   else {
     CHECK_TENSOR_IN_DEVICE(self);
     CHECK_TENSOR_IN_DEVICE(other);
     TORCH_CHECK( self.scalar_type()  != ScalarType::Long );
     TORCH_CHECK( other.scalar_type() != ScalarType::Long );
-    // TORCH_CHECK(
-    //     self.scalar_type() == out.scalar_type(), "FuncType:", type,
-    //     "Expected ", self.scalar_type(), " to match ", out.scalar_type(), " (at ",
-    //     __FILE__, ":", __LINE__, ")"
-    // );
-    TIMING_START;
     auto status = binary_func(
         handle,
         tpu::TPUGenerateTpudnnTensor(handle, self),
@@ -268,13 +238,14 @@ void binary_impl(const Tensor &self, const Tensor &other, Tensor &out,
         tpu::TPUGenerateTpudnnTensor(handle, out),
         mode);
     TORCH_CHECK(status == TPUDNN_STATUS_SUCCESS);
-    TIMING_END(type);
   }
+  TIMING_END;
 }
 template <typename UnaryFunc, typename BinaryFunc, typename CpuFunc>
 void binary_impl(const Tensor &self, const Tensor &other, Tensor &out,
-                 tpu::OpType type, UnaryFunc unary_func, BinaryFunc binary_func,
+                UnaryFunc unary_func, BinaryFunc binary_func,
                  CpuFunc cpu_func) {
+  TIMING_START;
   CHECK_TENSOR_IN_DEVICE(out);
   const auto handle = c10_tpu::getCurrentTPUStream();
  if ( (self.dim() == 0 && IS_CPU_TENSOR(self)) || (other.dim() == 0 && IS_CPU_TENSOR(other)) ) {
@@ -282,29 +253,21 @@ void binary_impl(const Tensor &self, const Tensor &other, Tensor &out,
     if ( other.dim() == 0 ) CHECK_TENSOR_IN_DEVICE(self);
     TORCH_CHECK( other.scalar_type()  != ScalarType::Long );
 
-    TIMING_START;
     auto status = unary_func(handle, self, other, out);
     TORCH_CHECK(status == TPUDNN_STATUS_SUCCESS);
-    TIMING_END(type);
   } else {
     CHECK_TENSOR_IN_DEVICE(self);
     CHECK_TENSOR_IN_DEVICE(other);
     TORCH_CHECK( self.scalar_type()  != ScalarType::Long );
     TORCH_CHECK( other.scalar_type() != ScalarType::Long );
-    // TORCH_CHECK(
-    //     self.scalar_type() == out.scalar_type(), "FuncType:", type,
-    //     "Expected ", self.scalar_type(), " to match ", out.scalar_type(), " (at ",
-    //     __FILE__, ":", __LINE__, ")"
-    // );
-    TIMING_START;
     auto status = binary_func(
         handle,
         tpu::TPUGenerateTpudnnTensor(handle, self),
         tpu::TPUGenerateTpudnnTensor(handle, other),
         tpu::TPUGenerateTpudnnTensor(handle, out));
     TORCH_CHECK(status == TPUDNN_STATUS_SUCCESS);
-    TIMING_END(type);
   }
+  TIMING_END;
 }
 Tensor &bitwise_xor_out_tpu(const Tensor &self, const Tensor &other,
                             Tensor &out) {
@@ -314,20 +277,18 @@ Tensor &bitwise_xor_out_tpu(const Tensor &self, const Tensor &other,
         out = bitwise_xor(self.contiguous(), other.contiguous());
       } else {
         auto out_ = bitwise_xor(self.contiguous(), other.contiguous());
-        TIMING_START;
         auto handle = c10_tpu::getCurrentTPUStream();
         tpudnnStridedCopyAsync(
             handle,
             tpu::TPUGenerateTpudnnTensor(handle, out_),
             tpu::TPUGenerateTpudnnTensor(handle, out));
-        TIMING_END(tpu::STRIDED_COPY);
       }
       SHOW_TENSOR_OP(self, other, out);
       return out;
     }
 
     binary_impl(
-      self, other, out, tpu::BITWISE_XOR,
+      self, other, out,
       BitwiseMode_t::XOR,
       [](tpudnnHandle_t handle, const Tensor &self, const Tensor &other,
          Tensor &out) {
@@ -355,20 +316,18 @@ Tensor &bitwise_and_out_tpu(const Tensor &self, const Tensor &other,
         out = bitwise_and(self.contiguous(), other.contiguous());
       } else {
         auto out_ = bitwise_and(self.contiguous(), other.contiguous());
-        TIMING_START;
         auto handle = c10_tpu::getCurrentTPUStream();
         tpudnnStridedCopyAsync(
             handle,
             tpu::TPUGenerateTpudnnTensor(handle, out_),
             tpu::TPUGenerateTpudnnTensor(handle, out));
-        TIMING_END(tpu::STRIDED_COPY);
       }
       SHOW_TENSOR_OP(self, other, out);
       return out;
     }
 
     binary_impl(
-      self, other, out, tpu::BITWISE_AND,
+      self, other, out,
       BitwiseMode_t::AND,
       [](tpudnnHandle_t handle, const Tensor &self, const Tensor &other, Tensor &out) {
         return tpudnnBitwiseConstAsync(
@@ -395,20 +354,18 @@ Tensor &bitwise_or_out_tpu(const Tensor &self, const Tensor &other,
         out = bitwise_or(self.contiguous(), other.contiguous());
       } else {
         auto out_ = bitwise_or(self.contiguous(), other.contiguous());
-        TIMING_START;
         auto handle = c10_tpu::getCurrentTPUStream();
         tpudnnStridedCopyAsync(
             handle,
             tpu::TPUGenerateTpudnnTensor(handle, out_),
             tpu::TPUGenerateTpudnnTensor(handle, out));
-        TIMING_END(tpu::STRIDED_COPY);
       }
       SHOW_TENSOR_OP(self, other, out);
       return out;
     }
 
     binary_impl(
-      self, other, out, tpu::BITWISE_OR, BitwiseMode_t::OR,
+      self, other, out, BitwiseMode_t::OR,
       [](tpudnnHandle_t handle, const Tensor &self, const Tensor &other,
          Tensor &out) {
         return tpudnnBitwiseConstAsync(
@@ -434,20 +391,18 @@ Tensor &equal_out_tpu(const Tensor &self, const Tensor &other, Tensor &out) {
       out = eq(self.contiguous(), other.contiguous());
     } else {
       auto out_ = eq(self.contiguous(), other.contiguous());
-      TIMING_START;
       auto handle = c10_tpu::getCurrentTPUStream();
       tpudnnStridedCopyAsync(
           handle,
           tpu::TPUGenerateTpudnnTensor(handle, out_),
           tpu::TPUGenerateTpudnnTensor(handle, out));
-      TIMING_END(tpu::STRIDED_COPY);
     }
     SHOW_TENSOR_OP(self, other, out);
     return out;
   }
 
   binary_impl(
-      self, other, out, tpu::EQUAL, CompareMode_t::TPUDNN_EQ,
+      self, other, out, CompareMode_t::TPUDNN_EQ,
       [](tpudnnHandle_t handle, const Tensor &self, const Tensor &other, Tensor &out) {
         return tpudnnCompareConstAsync(
             handle,
@@ -471,20 +426,18 @@ Tensor &greater_or_equal_out_tpu(const Tensor &self, const Tensor &other,
         out = ge(self.contiguous(), other.contiguous());
       } else {
         auto out_ = ge(self.contiguous(), other.contiguous());
-        TIMING_START;
         auto handle = c10_tpu::getCurrentTPUStream();
         tpudnnStridedCopyAsync(
             handle,
             tpu::TPUGenerateTpudnnTensor(handle, out_),
             tpu::TPUGenerateTpudnnTensor(handle, out));
-        TIMING_END(tpu::STRIDED_COPY);
       }
       SHOW_TENSOR_OP(self, other, out);
       return out;
     }
 
     binary_impl(
-      self, other, out, tpu::GREATER_OR_EQUAL,
+      self, other, out,
       CompareMode_t::TPUDNN_GE,
       [](tpudnnHandle_t handle, const Tensor &self, const Tensor &other, Tensor &out) {
         return tpudnnCompareConstAsync(
@@ -510,20 +463,18 @@ Tensor &greater_out_tpu(const Tensor &self, const Tensor &other, Tensor &out) {
       out = gt(self.contiguous(), other.contiguous());
     } else {
       auto out_ = gt(self.contiguous(), other.contiguous());
-      TIMING_START;
       auto handle = c10_tpu::getCurrentTPUStream();
       tpudnnStridedCopyAsync(
           handle,
           tpu::TPUGenerateTpudnnTensor(handle, out_),
           tpu::TPUGenerateTpudnnTensor(handle, out));
-      TIMING_END(tpu::STRIDED_COPY);
     }
     SHOW_TENSOR_OP(self, other, out);
     return out;
   }
 
   binary_impl(
-      self, other, out, tpu::GREATER, CompareMode_t::TPUDNN_GT,
+      self, other, out, CompareMode_t::TPUDNN_GT,
       [](tpudnnHandle_t handle, const Tensor &self, const Tensor &other, Tensor &out) {
         return tpudnnCompareConstAsync(
             handle,
@@ -547,19 +498,17 @@ Tensor &less_than_or_equal_out_tpu(const Tensor &self, const Tensor &other,
       out = le(self.contiguous(), other.contiguous());
     } else {
       auto out_ = le(self.contiguous(), other.contiguous());
-      TIMING_START;
       auto handle = c10_tpu::getCurrentTPUStream();
       tpudnnStridedCopyAsync(
           handle,
           tpu::TPUGenerateTpudnnTensor(handle, out_),
           tpu::TPUGenerateTpudnnTensor(handle, out));
-      TIMING_END(tpu::STRIDED_COPY);
     }
     SHOW_TENSOR_OP(self, other, out);
     return out;
   }
   binary_impl(
-      self, other, out, tpu::LESS_THAN_OR_EQUAL,
+      self, other, out,
       CompareMode_t::TPUDNN_LE,
       [](tpudnnHandle_t handle, const Tensor &self, const Tensor &other, Tensor &out) {
         return tpudnnCompareConstAsync(
@@ -586,20 +535,18 @@ Tensor &less_than_out_tpu(const Tensor &self, const Tensor &other,
       out = lt(self.contiguous(), other.contiguous());
     } else {
       auto out_ = lt(self.contiguous(), other.contiguous());
-      TIMING_START;
       auto handle = c10_tpu::getCurrentTPUStream();
       tpudnnStridedCopyAsync(
           handle,
           tpu::TPUGenerateTpudnnTensor(handle, out_),
           tpu::TPUGenerateTpudnnTensor(handle, out));
-      TIMING_END(tpu::STRIDED_COPY);
     }
     SHOW_TENSOR_OP(self, other, out);
     return out;
   }
 
   binary_impl(
-      self, other, out, tpu::LESS_THAN, CompareMode_t::TPUDNN_LT,
+      self, other, out, CompareMode_t::TPUDNN_LT,
       [](tpudnnHandle_t handle, const Tensor &self, const Tensor &other, Tensor &out) {
         return tpudnnCompareConstAsync(
             handle,
@@ -623,19 +570,17 @@ Tensor &not_equal_out_tpu(const Tensor &self, const Tensor &other,
       out = ne(self.contiguous(), other.contiguous());
     } else {
       auto out_ = ne(self.contiguous(), other.contiguous());
-      TIMING_START;
       auto handle = c10_tpu::getCurrentTPUStream();
       tpudnnStridedCopyAsync(
           handle,
           tpu::TPUGenerateTpudnnTensor(handle, out_),
           tpu::TPUGenerateTpudnnTensor(handle, out));
-      TIMING_END(tpu::STRIDED_COPY);
     }
     SHOW_TENSOR_OP(self, other, out);
     return out;
   }
   binary_impl(
-      self, other, out, tpu::NOT_EQUAL, CompareMode_t::TPUDNN_NE,
+      self, other, out, CompareMode_t::TPUDNN_NE,
       [](tpudnnHandle_t handle, const Tensor &self, const Tensor &other, Tensor &out) {
         return tpudnnCompareConstAsync(
             handle,
@@ -659,20 +604,18 @@ Tensor &shift_left_out_tpu(const Tensor &self, const Tensor &other,
       out = bitwise_left_shift(self.contiguous(), other.contiguous());
     } else {
       auto out_ = bitwise_left_shift(self.contiguous(), other.contiguous());
-      TIMING_START;
       auto handle = c10_tpu::getCurrentTPUStream();
       tpudnnStridedCopyAsync(
           handle,
           tpu::TPUGenerateTpudnnTensor(handle, out_),
           tpu::TPUGenerateTpudnnTensor(handle, out));
-      TIMING_END(tpu::STRIDED_COPY);
     }
     SHOW_TENSOR_OP(self, other, out);
     return out;
   }
 
   binary_impl(
-      self, other, out, tpu::SHIFT_LEFT, true,
+      self, other, out, true,
       [](tpudnnHandle_t handle, const Tensor &self, const Tensor &other, Tensor &out) {
         return tpudnnShiftConstAsync(
             handle,
@@ -698,20 +641,18 @@ Tensor &shift_right_arithmetic_out_tpu(const Tensor &self, const Tensor &other,
       out = bitwise_right_shift(self.contiguous(), other.contiguous());
     } else {
       auto out_ = bitwise_right_shift(self.contiguous(), other.contiguous());
-      TIMING_START;
       auto handle = c10_tpu::getCurrentTPUStream();
       tpudnnStridedCopyAsync(
           handle,
           tpu::TPUGenerateTpudnnTensor(handle, out_),
           tpu::TPUGenerateTpudnnTensor(handle, out));
-      TIMING_END(tpu::STRIDED_COPY);
     }
     SHOW_TENSOR_OP(self, other, out);
     return out;
   }
 
   binary_impl(
-      self, other, out, tpu::SHIFT_RIGHT_ARITHMETIC, false,
+      self, other, out, false,
       [](tpudnnHandle_t handle, const Tensor &self, const Tensor &other, Tensor &out) {
         return tpudnnShiftConstAsync(
             handle,
@@ -736,20 +677,18 @@ Tensor &minimum_out_tpu(const Tensor &self, const Tensor &other, Tensor &out) {
       out = minimum(self.contiguous(), other.contiguous());
     } else {
       auto out_ = minimum(self.contiguous(), other.contiguous());
-      TIMING_START;
       auto handle = c10_tpu::getCurrentTPUStream();
       tpudnnStridedCopyAsync(
           handle,
           tpu::TPUGenerateTpudnnTensor(handle, out_),
           tpu::TPUGenerateTpudnnTensor(handle, out));
-      TIMING_END(tpu::STRIDED_COPY);
     }
     SHOW_TENSOR_OP(self, other, out);
     return out;
   }
 
   binary_impl(
-      self, other, out, tpu::MINIMUM,
+      self, other, out,
       [](tpudnnHandle_t handle, const Tensor &self, const Tensor &other, Tensor &out) {
         return tpudnnMinimumConstAsync(
             handle,
@@ -772,20 +711,18 @@ Tensor &maximum_out_tpu(const Tensor &self, const Tensor &other, Tensor &out) {
       out = minimum(self.contiguous(), other.contiguous());
     } else {
       auto out_ = minimum(self.contiguous(), other.contiguous());
-      TIMING_START;
       auto handle = c10_tpu::getCurrentTPUStream();
       tpudnnStridedCopyAsync(
           handle,
           tpu::TPUGenerateTpudnnTensor(handle, out_),
           tpu::TPUGenerateTpudnnTensor(handle, out));
-      TIMING_END(tpu::STRIDED_COPY);
     }
     SHOW_TENSOR_OP(self, other, out);
     return out;
   }
 
   binary_impl(
-      self, other, out, tpu::MAXIMUM,
+      self, other, out,
       [](tpudnnHandle_t handle, const Tensor &self, const Tensor &other, Tensor &out) {
         return tpudnnMaximumConstAsync(
             handle,
@@ -818,20 +755,18 @@ Tensor &pow_out_tpu(const Tensor &self, const Tensor &other, Tensor &out) {
       out = pow(self.contiguous(), other.contiguous());
     } else {
       auto out_ = pow(self.contiguous(), other.contiguous());
-      TIMING_START;
       auto handle = c10_tpu::getCurrentTPUStream();
       tpudnnStridedCopyAsync(
           handle,
           tpu::TPUGenerateTpudnnTensor(handle, out_),
           tpu::TPUGenerateTpudnnTensor(handle, out));
-      TIMING_END(tpu::STRIDED_COPY);
     }
     SHOW_TENSOR_OP(self, other, out);
     return out;
   }
 
   binary_impl(
-      self, other, out, tpu::POW,
+      self, other, out,
       [](tpudnnHandle_t handle, const Tensor &self, const Tensor &other,
          Tensor &out) { return TPUDNN_STATUS_FAILED; },
       tpudnnPowerAsync,
@@ -844,6 +779,7 @@ TORCH_LIBRARY_IMPL(aten, TPU, m) {
 }
 
 Tensor &pow_c_out_tpu(const Tensor &self, const Scalar &exponent, Tensor &out) {
+  TIMING_START;
   CHECK_TENSOR_IN_DEVICE(self);
   CHECK_TENSOR_IN_DEVICE(out);
   TORCH_CHECK(exponent.toDouble() > 0);
@@ -861,7 +797,6 @@ Tensor &pow_c_out_tpu(const Tensor &self, const Scalar &exponent, Tensor &out) {
   }
   TORCH_CHECK(exponent.toDouble() > 0);
 
-  TIMING_START;
   auto handle = c10_tpu::getCurrentTPUStream();
   auto status = tpudnnPowerScalarAsync(
       handle,
@@ -869,7 +804,7 @@ Tensor &pow_c_out_tpu(const Tensor &self, const Scalar &exponent, Tensor &out) {
       tpu::TPUGenerateTpudnnTensor(handle, out),
       exponent.toFloat());
   TORCH_CHECK(status == TPUDNN_STATUS_SUCCESS);
-  TIMING_END(tpu::POWC);
+  TIMING_END;
   SHOW_TENSOR_OP(self, out);
   return out;
 }
@@ -878,6 +813,7 @@ TORCH_LIBRARY_IMPL(aten, TPU, m) {
 }
 
 Tensor &c_pow_out_tpu(const Scalar &self, const Tensor &exponent, Tensor &out) {
+  TIMING_START;
   CHECK_TENSOR_IN_DEVICE(exponent);
   CHECK_TENSOR_IN_DEVICE(out);
   TORCH_CHECK(self.toDouble() > 0);
@@ -889,7 +825,6 @@ Tensor &c_pow_out_tpu(const Scalar &self, const Tensor &exponent, Tensor &out) {
     return out;
   }
 
-  TIMING_START;
   auto handle = c10_tpu::getCurrentTPUStream();
   auto status = tpudnnScalarPowerAsync(
       handle,
@@ -897,7 +832,7 @@ Tensor &c_pow_out_tpu(const Scalar &self, const Tensor &exponent, Tensor &out) {
       tpu::TPUGenerateTpudnnTensor(handle, out),
       self.toFloat());
   TORCH_CHECK(status == TPUDNN_STATUS_SUCCESS);
-  TIMING_END(tpu::CPOW);
+  TIMING_END;
   SHOW_TENSOR_OP(exponent, out);
   return out;
 }
@@ -905,6 +840,7 @@ TORCH_LIBRARY_IMPL(aten, TPU, m) { m.impl("pow.Scalar_out", c_pow_out_tpu); }
 
 
 Tensor &atan2_out_tpu(const Tensor &self, const Tensor &other, Tensor &out) {
+  TIMING_START;
   if (self.dim() > 0) {
     CHECK_TENSOR_IN_DEVICE(self);
   }
@@ -914,42 +850,29 @@ Tensor &atan2_out_tpu(const Tensor &self, const Tensor &other, Tensor &out) {
   CHECK_TENSOR_IN_DEVICE(other);
   // self is scalar and other is scalar
   auto handle = c10_tpu::getCurrentTPUStream();
-  if (self.dim() == 0 && other.dim() == 0) {
-    CPU_IMPL_WARNING();
-    TIMING_START;
-    auto out_cpu = atan2(self.cpu(), other.cpu());
-    tpu::TPUCopyHostToDevice(out.data_ptr(), out_cpu.contiguous().data_ptr(),
-                             out.nbytes());
-    TIMING_END(tpu::CPU_LAYER);
-  } else if (self.dim() == 0) {
-    TIMING_START;
+ if (self.dim() == 0) {
     auto status = tpudnnScalarAtan2Async(
         handle,
         tpu::TPUGenerateTpudnnTensor(handle, other.to(out.dtype())),
         tpu::TPUGenerateTpudnnTensor(handle, out),
         self.item().toFloat());
     TORCH_CHECK(status == TPUDNN_STATUS_SUCCESS);
-    TIMING_END(tpu::ATAN2);
   } else if (other.dim() == 0) {
-    TIMING_START;
-
     auto status = tpudnnAtan2ScalarAsync(
         handle,
         tpu::TPUGenerateTpudnnTensor(handle, self.to(out.dtype())),
         tpu::TPUGenerateTpudnnTensor(handle, out),
         other.item().toFloat());
     TORCH_CHECK(status == TPUDNN_STATUS_SUCCESS);
-    TIMING_END(tpu::ATAN2);
   } else {
-    TIMING_START;
     auto status = tpudnnAtan2Async(
         handle,
         tpu::TPUGenerateTpudnnTensor(handle, self.to(torch::kFloat)),
         tpu::TPUGenerateTpudnnTensor(handle, other.to(torch::kFloat)),
         tpu::TPUGenerateTpudnnTensor(handle, out));
-    TIMING_END(tpu::ATAN2);
     TORCH_CHECK(status == TPUDNN_STATUS_SUCCESS);
   }
+  TIMING_END;
   SHOW_TENSOR_OP(self, other, out);
   return out;
 }

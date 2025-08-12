@@ -22,6 +22,7 @@ bool training,
 double momentum,
 double eps )
 {
+  TIMING_START;
   c10::MaybeOwned<Tensor> weight_maybe_owned = at::borrow_from_optional_tensor ( weight_opt );
   const Tensor & weight = *weight_maybe_owned;
   const Tensor & bias = c10::value_or_else ( bias_opt, [] { return Tensor(); } );
@@ -79,7 +80,6 @@ double eps )
          TENSOR_TO_TPU ( std::get<1> ( outputs_cpu ) ),
          TENSOR_TO_TPU ( std::get<2> ( outputs_cpu ) ) );
 #else
-  TIMING_START;
   auto output = torch::empty ( input.sizes(), input.options() );
   auto saved_mean = torch::empty ( { num_features }, input.options() );
   auto saved_invstd = torch::empty ( { num_features }, input.options() );
@@ -97,8 +97,7 @@ double eps )
       tpu::TPUGenerateTpudnnTensor(stream, saved_mean),
       tpu::TPUGenerateTpudnnTensor(stream, saved_invstd));
   TORCH_CHECK(status == TPUDNN_STATUS_SUCCESS);
-  TIMING_END ( tpu::BATCHNORM );
-
+  TIMING_END;
   SHOW_TENSOR_OP(input, weight, bias, running_mean, running_var, output, saved_mean, saved_invstd);
   return std::tuple<Tensor, Tensor, Tensor> ( output, saved_mean, saved_invstd );
 #endif
@@ -120,6 +119,7 @@ bool training,
 double eps,
 std::array<bool, 3> output_mask )
 {
+  TIMING_START;
   c10::MaybeOwned<Tensor> weight_maybe_owned = at::borrow_from_optional_tensor ( weight_opt );
   const Tensor & weight = *weight_maybe_owned;
   const Tensor & saved_mean = c10::value_or_else ( saved_mean_opt, [] { return Tensor(); } );
@@ -166,7 +166,6 @@ std::array<bool, 3> output_mask )
     // We assume that weight and bias have the same data type
     grad_bias = empty ( { weight.size ( 0 ) }, weight.options() );
   }
-  TIMING_START;
   auto stream = c10_tpu::getCurrentTPUStream();
   auto status = tpudnnBatchnorm2dBackwardAsync(
       stream,
@@ -179,7 +178,7 @@ std::array<bool, 3> output_mask )
       output_mask[1] ? tpu::TPUGenerateTpudnnTensor(stream, grad_weight) : tpudnnUndefinedTensor(),
       output_mask[2] ? tpu::TPUGenerateTpudnnTensor(stream, grad_bias) : tpudnnUndefinedTensor());
   TORCH_CHECK(status == TPUDNN_STATUS_SUCCESS);
-  TIMING_END ( tpu::BATCHNORM_BACKWARD );
+  TIMING_END;
   SHOW_TENSOR_OP(grad_out, input, weight, saved_mean, saved_invstd, running_mean, running_var);
   return std::tuple<Tensor, Tensor, Tensor> ( grad_input, grad_weight, grad_bias );
 #endif
@@ -196,6 +195,7 @@ const c10::optional<at::Tensor> &weight_opt,
 const c10::optional<at::Tensor> &bias_opt,
 double eps )
 {
+  TIMING_START;
   c10::MaybeOwned<Tensor> weight_maybe_owned = at::borrow_from_optional_tensor ( weight_opt );
   const Tensor & weight = *weight_maybe_owned;
   const Tensor & bias = c10::value_or_else ( bias_opt, [] { return Tensor(); } );
@@ -233,7 +233,6 @@ double eps )
   auto output = torch::empty ( input_shape, input_.options() );
   auto mean = torch::empty ( stat_shape, input_.options() );
   auto rstd = torch::empty ( stat_shape, input_.options() );
-  TIMING_START;
   auto stream = c10_tpu::getCurrentTPUStream();
   auto status = tpudnnLayernormAsync(
       stream,
@@ -246,7 +245,7 @@ double eps )
       tpu::TPUGenerateTpudnnTensor(stream, mean),
       tpu::TPUGenerateTpudnnTensor(stream, rstd));
   TORCH_CHECK(status == TPUDNN_STATUS_SUCCESS);
-  TIMING_END ( tpu::LAYERNORM );
+  TIMING_END;
   SHOW_TENSOR_OP(input, weight, bias);
   return std::tuple<Tensor, Tensor, Tensor> ( output, mean, rstd );
 #endif
@@ -266,6 +265,7 @@ const c10::optional<Tensor> & weight_opt,
 const c10::optional<Tensor> & bias_opt,
 std::array<bool, 3> output_mask )
 {
+  TIMING_START;
   c10::MaybeOwned<Tensor> weight_maybe_owned = at::borrow_from_optional_tensor ( weight_opt );
   const Tensor & weight = *weight_maybe_owned;
   const Tensor & bias = c10::value_or_else ( bias_opt, [] { return Tensor(); } );
@@ -308,7 +308,6 @@ std::array<bool, 3> output_mask )
   const int normalized_ndim = normalized_shape.size();
   const int axis = input_ndim - normalized_ndim;
 
-  TIMING_START;
   auto stream = c10_tpu::getCurrentTPUStream();
   auto status = tpudnnLayernormBackwardAsync(
       stream,
@@ -323,7 +322,7 @@ std::array<bool, 3> output_mask )
       output_mask[2] ? tpu::TPUGenerateTpudnnTensor(stream, grad_bias) : tpudnnUndefinedTensor(),
       output_mask[0] ? 1 : 0);
   TORCH_CHECK(status == TPUDNN_STATUS_SUCCESS);
-  TIMING_END ( tpu::LAYERNORM_BACKWARD );
+  TIMING_END;
 
   SHOW_TENSOR_OP(grad_out, input, mean, rstd, grad_input, weight, bias);
   return std::tuple<Tensor, Tensor, Tensor> ( grad_input, grad_weight, grad_bias );

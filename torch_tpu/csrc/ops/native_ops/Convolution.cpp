@@ -59,6 +59,7 @@ const bool transposed,
 const IntArrayRef output_padding,
 int64_t groups )
 {
+  TIMING_START;
   CHECK_TENSOR_IN_DEVICE ( input_ );
   CHECK_TENSOR_IN_DEVICE ( weight );
 #if 0
@@ -115,7 +116,6 @@ int64_t groups )
         .groups = ( int ) groups,
       };
 
-      TIMING_START;
       auto stream = c10_tpu::getCurrentTPUStream();
       auto status = tpudnnConv2dAsync(
         stream,
@@ -143,7 +143,6 @@ int64_t groups )
         .groups = ( int ) groups,
       };
 
-      TIMING_START;
       auto stream = c10_tpu::getCurrentTPUStream();
       auto status = tpudnnConv3dAsync(
         stream,
@@ -154,8 +153,8 @@ int64_t groups )
         tpu::TPUGenerateTpudnnTensor(stream, output));
       TORCH_CHECK(status == TPUDNN_STATUS_SUCCESS);
     }
-    TIMING_END ( tpu::CONVOLUTION );
   }
+  TIMING_END;
   SHOW_TENSOR_OP(input_, weight, bias, output);
   return is_batched ? output : output.squeeze ( 0 );
 #endif
@@ -177,41 +176,13 @@ IntArrayRef output_padding,
 int64_t groups,
 std::array<bool, 3> output_mask )
 {
+  TIMING_START;
   auto grad_output_ = grad_output.contiguous();
   CHECK_TENSOR_IN_DEVICE ( grad_output_ );
   CHECK_TENSOR_IN_DEVICE ( input );
   CHECK_TENSOR_IN_DEVICE ( weight );
-  // auto flag = check_output_shape_is_satified ( input, weight, stride, padding, dilation, output_padding, groups );
-  // if ( flag == false )
-  // {
-  //   CPU_IMPL_WARNING();
-  //   std::cout << "123>>>>>>>>>>>>>>" << std::endl;
-  //   TIMING_START;
-  //   auto input_dtype = input.scalar_type();
-  //   // change dtype into f32
-  //   auto outputs_cpu = torch::convolution_backward (
-  //                      grad_output.cpu().to ( at::kFloat ),
-  //                      input.cpu().to ( at::kFloat ),
-  //                      weight.cpu().to ( at::kFloat ),
-  //                      at::OptionalIntArrayRef ( { weight.size ( 0 ) } ),
-  //                      stride,
-  //                      padding,
-  //                      dilation,
-  //                      transposed,
-  //                      output_padding,
-  //                      groups,
-  //                      output_mask );
-  //   TIMING_END ( tpu::CONVOLUTION_BACKWARD );
-  //   Tensor grad_input, grad_weight, grad_bias;
-  //   grad_input  = output_mask[0] ? TENSOR_TO_TPU ( std::get<0> ( outputs_cpu ).to ( input_dtype ) ) : Tensor();
-  //   grad_weight = output_mask[1] ? TENSOR_TO_TPU ( std::get<1> ( outputs_cpu ).to ( input_dtype ) ) : Tensor();
-  //   grad_bias   = output_mask[2] ? TENSOR_TO_TPU ( std::get<2> ( outputs_cpu ).to ( input_dtype ) ) : Tensor();
-  //   SHOW_TENSOR_OP(grad_output_, input, weight, grad_input, grad_weight, grad_bias);
-  //   return std::tuple<Tensor, Tensor, Tensor> ( grad_input, grad_weight, grad_bias);
-  // }
 #if 0
     CPU_IMPL_WARNING();
-    TIMING_START;
     auto input_dtype = input.scalar_type();
     // change dtype into f32
     auto outputs_cpu = torch::convolution_backward (
@@ -226,7 +197,6 @@ std::array<bool, 3> output_mask )
                        output_padding,
                        groups,
                        output_mask );
-    TIMING_END ( tpu::CONVOLUTION_BACKWARD );
     Tensor grad_input, grad_weight, grad_bias;
     grad_input  = output_mask[0] ? TENSOR_TO_TPU ( std::get<0> ( outputs_cpu ).to ( input_dtype ) ) : Tensor();
     grad_weight = output_mask[1] ? TENSOR_TO_TPU ( std::get<1> ( outputs_cpu ).to ( input_dtype ) ) : Tensor();
@@ -276,7 +246,6 @@ std::array<bool, 3> output_mask )
       .dilation_w = ( int ) dilation[1],
       .groups = ( int ) groups,
     };
-    TIMING_START;
     auto stream = c10_tpu::getCurrentTPUStream();
     auto status = tpudnnConv2dBackwardAsync(
       stream,
@@ -288,8 +257,8 @@ std::array<bool, 3> output_mask )
       output_mask[1] ? tpu::TPUGenerateTpudnnTensor (stream,  grad_weight ) : tpudnnUndefinedTensor(),
       output_mask[2] ? tpu::TPUGenerateTpudnnTensor (stream,  grad_bias ) : tpudnnUndefinedTensor() );
     TORCH_CHECK(status == TPUDNN_STATUS_SUCCESS);
-    TIMING_END ( tpu::CONVOLUTION_BACKWARD );
   }
+  TIMING_END;
   SHOW_TENSOR_OP(grad_output_, input, weight, grad_input, grad_weight, grad_bias);
   return std::tuple<Tensor, Tensor, Tensor> ( grad_input, grad_weight, grad_bias );
 #endif

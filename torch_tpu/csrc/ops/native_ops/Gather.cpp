@@ -13,6 +13,7 @@ namespace at
 {
 Tensor &gather_out_tpu(const Tensor &self, int64_t axis, const Tensor &other, bool sparse_grad, Tensor &out )
 {
+    TIMING_START;
     if (self.dim() > 0)
     {
         CHECK_TENSOR_IN_DEVICE(self);
@@ -25,8 +26,7 @@ Tensor &gather_out_tpu(const Tensor &self, int64_t axis, const Tensor &other, bo
 #else
     if (IS_TPU_TENSOR(self) && IS_TPU_TENSOR ( other ))
     {
-    //need to consider broadcast later
-        TIMING_START;
+        //need to consider broadcast later
         auto stream = c10_tpu::getCurrentTPUStream();
         auto status = tpudnnGatherAsync(
             stream,
@@ -34,14 +34,14 @@ Tensor &gather_out_tpu(const Tensor &self, int64_t axis, const Tensor &other, bo
             tpu::TPUGenerateTpudnnTensor(stream, other),
             tpu::TPUGenerateTpudnnTensor(stream, out),
             axis);
-        TORCH_CHECK(status == TPUDNN_STATUS_SUCCESS);
-                    TIMING_END(tpu::GATHER);
+        TORCH_CHECK(status == TPUDNN_STATUS_SUCCESS);         
     }
     else
     {
         TORCH_CHECK(false, "At least one input is required in TPU device");
     }
 #endif
+    TIMING_END;
     SHOW_TENSOR_OP(self, out);
     return out;
 }

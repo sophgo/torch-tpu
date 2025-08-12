@@ -17,6 +17,7 @@ namespace at
 		const c10::optional<Tensor> &b2,
 		Tensor &out)
 	{
+		TIMING_START;
 		CHECK_TENSOR_IN_DEVICE(input);
 		CHECK_TENSOR_IN_DEVICE(w1);
 		CHECK_TENSOR_IN_DEVICE(w2);
@@ -25,7 +26,6 @@ namespace at
 		if (b2.has_value())
 			CHECK_TENSOR_IN_DEVICE(b2.value());
 		CHECK_TENSOR_IN_DEVICE(out);
-		TIMING_START;
 #if defined BACKEND_SG2260
 		auto stream = c10_tpu::getCurrentTPUStream();
 		auto status = tpudnnLLaVaMlpAsync(
@@ -40,7 +40,7 @@ namespace at
 #elif defined BACKEND_1684X
 		TORCH_CHECK(false);
 #endif
-		TIMING_END(tpu::LLAVA_MLP);
+		TIMING_END;
 		return out;
 	}
 

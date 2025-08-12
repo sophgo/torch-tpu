@@ -11,26 +11,20 @@
 namespace at {
 
 Tensor &bitwise_not_out_tpu(const Tensor &self, Tensor &out) {
+  TIMING_START;
   if (self.dim() > 0) {
     CHECK_TENSOR_IN_DEVICE(self);
   }
   CHECK_TENSOR_IN_DEVICE(out);
 
-  if ( 0 ) {
-    auto out_cpu = bitwise_not(self.cpu());
-    tpu::TPUCopyHostToDevice(out.data_ptr(), out_cpu.contiguous().data_ptr(),
-                             out.nbytes());
-  } else if (IS_TPU_TENSOR(self)) {
-    TIMING_START;
-    auto stream = c10_tpu::getCurrentTPUStream();
-    auto status = tpudnnBitwiseNotAsync(
-                  stream,
-                  tpu::TPUGenerateTpudnnTensor ( stream,self ),
-                  tpu::TPUGenerateTpudnnTensor ( stream,out ) );
-    TORCH_CHECK(status == TPUDNN_STATUS_SUCCESS );
+  auto stream = c10_tpu::getCurrentTPUStream();
+  auto status = tpudnnBitwiseNotAsync(
+                stream,
+                tpu::TPUGenerateTpudnnTensor ( stream,self ),
+                tpu::TPUGenerateTpudnnTensor ( stream,out ) );
+  TORCH_CHECK(status == TPUDNN_STATUS_SUCCESS );
 
-    TIMING_END(tpu::BITWISE_NOT);
-  }
+  TIMING_END;
   SHOW_TENSOR_OP(self, out);
   return out;
 }
@@ -64,7 +58,7 @@ Tensor &cbrt_out_tpu(const Tensor &self, Tensor &out) {
                   tpu::TPUGenerateTpudnnTensor ( stream,self ),
                   tpu::TPUGenerateTpudnnTensor ( stream,out ) );
     TORCH_CHECK(status == TPUDNN_STATUS_SUCCESS );
-    TIMING_END(tpu::CBRT);
+    TIMING_END;
   }
 #endif
   SHOW_TENSOR_OP(self, out);

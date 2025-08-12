@@ -12,18 +12,15 @@ namespace at
 {
 Tensor & _log_softmax_out_tpu ( const Tensor & self, int64_t dim, bool half_to_float, Tensor & out )
 {
+  TIMING_START;
   CHECK_TENSOR_IN_DEVICE ( self );
   CHECK_TENSOR_IN_DEVICE ( out );
   TORCH_CHECK ( half_to_float == false );
 #if 0
   CPU_IMPL_WARNING();
-  TIMING_START;
   auto out_cpu = _log_softmax ( self.cpu(), dim, half_to_float );
   tpu::TPUCopyHostToDevice ( out.data_ptr(), out_cpu.contiguous().data_ptr(), out.nbytes() );
-  TIMING_END(tpu::CPU_LAYER);
 #else
-
-  TIMING_START;
   auto stream = c10_tpu::getCurrentTPUStream();
   auto status = tpudnnLogSoftmaxAsync(
                 stream,
@@ -31,9 +28,8 @@ Tensor & _log_softmax_out_tpu ( const Tensor & self, int64_t dim, bool half_to_f
                 dim,
                 tpu::TPUGenerateTpudnnTensor ( stream, out ) );
   TORCH_CHECK(status == TPUDNN_STATUS_SUCCESS );
-  TIMING_END(tpu::LOGSOFTMAX);
-
 #endif
+  TIMING_END;
   SHOW_TENSOR_OP(self, out);
   return out;
 }
@@ -59,6 +55,7 @@ TORCH_LIBRARY_IMPL ( aten, TPU, m )
 
 Tensor & _softmax_out_tpu ( const Tensor & self, int64_t dim, bool half_to_float, Tensor & out )
 {
+  TIMING_START;
   CHECK_TENSOR_IN_DEVICE ( self );
   CHECK_TENSOR_IN_DEVICE ( out );
   TORCH_CHECK ( half_to_float == false );
@@ -66,8 +63,6 @@ Tensor & _softmax_out_tpu ( const Tensor & self, int64_t dim, bool half_to_float
   auto out_cpu = _softmax ( self.cpu(), dim, half_to_float );
   tpu::TPUCopyHostToDevice ( out.data_ptr(), out_cpu.contiguous().data_ptr(), out.nbytes() );
 #else
-  TIMING_START;
-
   auto stream = c10_tpu::getCurrentTPUStream();
   auto status = tpudnnSoftmaxAsync(
                       stream,
@@ -75,8 +70,8 @@ Tensor & _softmax_out_tpu ( const Tensor & self, int64_t dim, bool half_to_float
                       dim,
                       tpu::TPUGenerateTpudnnTensor ( stream,out) );
   TORCH_CHECK ( status == TPUDNN_STATUS_SUCCESS  );
-  TIMING_END ( tpu::SOFTMAX );
 #endif
+  TIMING_END;
   SHOW_TENSOR_OP(self, out);
   return out;
 }
@@ -87,6 +82,7 @@ TORCH_LIBRARY_IMPL ( aten, TPU, m )
 
 Tensor & _softmax_backward_data_out_tpu ( const Tensor & grad_output, const Tensor & output, int64_t dim, ScalarType input_dtype, Tensor & grad_input )
 {
+  TIMING_START;
   CHECK_TENSOR_IN_DEVICE ( grad_output );
   CHECK_TENSOR_IN_DEVICE ( output );
   CHECK_TENSOR_IN_DEVICE ( grad_input );
@@ -95,8 +91,6 @@ Tensor & _softmax_backward_data_out_tpu ( const Tensor & grad_output, const Tens
   auto grad_input_cpu = _softmax_backward_data ( grad_output.cpu(), output.cpu(), dim, input_dtype );
   tpu::TPUCopyHostToDevice ( grad_input.data_ptr(), grad_input_cpu.contiguous().data_ptr(), grad_input.nbytes() );
 #else
-  TIMING_START;
-
   auto stream = c10_tpu::getCurrentTPUStream();
   auto status = tpudnnSoftmaxBackwardAsync(
       stream,
@@ -105,8 +99,8 @@ Tensor & _softmax_backward_data_out_tpu ( const Tensor & grad_output, const Tens
       dim,
       tpu::TPUGenerateTpudnnTensor(stream, grad_input));
   TORCH_CHECK(status == TPUDNN_STATUS_SUCCESS);
-  TIMING_END ( tpu::SOFTMAX_BACKWARD );
 #endif
+  TIMING_END;
   SHOW_TENSOR_OP(grad_output, output, grad_input);
   return grad_input;
 }

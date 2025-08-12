@@ -14,6 +14,7 @@ namespace torch{
       static at::Tensor forward(AutogradContext *ctx, const at::Tensor& self,
         double p, bool train)
       {
+        TIMING_START;
         CHECK_TENSOR_IN_DEVICE ( self );
         ctx->saved_data["p"] = p;
         ctx->saved_data["train"] = train;
@@ -22,11 +23,9 @@ namespace torch{
         } else {
     #if 0
           CPU_IMPL_WARNING(Dropout);
-          TIMING_START;
           TensorOptions option = TensorOptions( ).device("cpu").dtype ( self.dtype() );
           at::Tensor mask_cpu = torch::rand_like(self, option) > p;
           at::Tensor mask = mask_cpu.to(self.device()).to(self.dtype());
-          TIMING_END(tpu::CPU_LAYER);
           ctx->save_for_backward( {mask} );
           auto out = mask * self * (1/(1-p));
     #else
@@ -39,7 +38,6 @@ namespace torch{
 
           at::Tensor out = torch::empty( self.sizes(), self.options() );
           at::Tensor mask = torch::empty( self.sizes(), self.options() );
-          TIMING_START;
           auto stream = c10_tpu::getCurrentTPUStream();
           auto status = tpudnnDropoutMultiCoreAsync(
             stream,
@@ -49,12 +47,12 @@ namespace torch{
             p
           );
           TORCH_CHECK(status == TPUDNN_STATUS_SUCCESS);
-          TIMING_END(tpu::DROPOUT);
           // auto mask = (out - self * (1/(1-p))).abs().to(torch::kFloat);
           // mask = (mask == 0.0f);
           // ctx->save_for_backward( { mask.to(self.dtype()) } );
           ctx->save_for_backward( { mask } );
     #endif
+          TIMING_END;
           SHOW_TENSOR_OP(self, out);
           return out;
         }

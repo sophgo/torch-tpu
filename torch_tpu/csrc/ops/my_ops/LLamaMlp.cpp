@@ -22,6 +22,7 @@ namespace at
 		Tensor &output,
 		bool save_mid_res)
 	{
+		TIMING_START;
 		CHECK_TENSOR_IN_DEVICE(input);
 		CHECK_TENSOR_IN_DEVICE(weight0);
 		CHECK_TENSOR_IN_DEVICE(weight1);
@@ -38,7 +39,6 @@ namespace at
 			CHECK_TENSOR_IN_DEVICE(m0.value());
 		CHECK_TENSOR_IN_DEVICE(output);
 
-		TIMING_START;
 #if defined BACKEND_SG2260
 		auto stream = c10_tpu::getCurrentTPUStream();
 		auto status = tpudnnLLamaMlpAsync(
@@ -58,7 +58,7 @@ namespace at
 #elif defined BACKEND_1684X
 		TORCH_CHECK(false);
 #endif
-		TIMING_END(tpu::LLAMA_MLP_FORWARD);
+		TIMING_END;
 		return output;
   }
 
@@ -76,6 +76,7 @@ std::tuple<Tensor, Tensor, Tensor, Tensor> mlp_backward(
     Tensor &grad_weight1,
     Tensor &grad_weight2)
     {
+    TIMING_START;
     CHECK_TENSOR_IN_DEVICE(input);
     CHECK_TENSOR_IN_DEVICE(weight0);
     CHECK_TENSOR_IN_DEVICE(weight1);
@@ -89,8 +90,6 @@ std::tuple<Tensor, Tensor, Tensor, Tensor> mlp_backward(
     CHECK_TENSOR_IN_DEVICE(grad_weight1);
     CHECK_TENSOR_IN_DEVICE(grad_weight2);
 
-
-    TIMING_START;
     auto stream = c10_tpu::getCurrentTPUStream();
     auto status = tpudnnMlpbackward(
       stream,
@@ -108,7 +107,7 @@ std::tuple<Tensor, Tensor, Tensor, Tensor> mlp_backward(
       tpu::TPUGenerateTpudnnTensor(stream, grad_weight2));
 
     TORCH_CHECK(status == TPUDNN_STATUS_SUCCESS);
-    TIMING_END(tpu::MLP_BACKWARD);
+    TIMING_END;
     return std::tuple<Tensor, Tensor, Tensor, Tensor>(grad_input, grad_weight0, grad_weight1, grad_weight2);
 }
 
@@ -162,7 +161,7 @@ Tensor llama_mlp_gptq_forward(
 #elif defined BACKEND_1684X
 		TORCH_CHECK(false);
 #endif
-		TIMING_END(tpu::LLAMA_A16_MLP_FORWARD);
+		TIMING_END;
 		return output;
 	}
 
