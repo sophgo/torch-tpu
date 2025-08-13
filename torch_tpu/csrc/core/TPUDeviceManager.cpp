@@ -581,8 +581,8 @@ void TPUGetTopology(std::vector<std::vector<int>> *topo) {
   for (int i = 0; i < dev_cnt; i++) {
       for (int j = 0; j < dev_cnt; j++) {
           auto info = topology[i][j];
-          if (info.paraent_port != -1) {
-              (*topo)[info.paraent_dev][info.child_dev]=info.paraent_port;
+          if (info.parent_port != -1) {
+              (*topo)[info.parent_dev][info.child_dev]=info.parent_port;
           }
       }
   }

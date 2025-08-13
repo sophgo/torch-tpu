@@ -45,11 +45,11 @@ typedef void* tpuKernelModule_t;
  */
 typedef struct {
   uint32_t device_num;    ///< Number of devices
-  uint16_t paraent_dev;   ///< Parent device ID
+  uint16_t parent_dev;   ///< Parent device ID
   uint16_t child_dev;     ///< Child device ID
-  uint8_t paraent_pcie;   ///< Parent device PCIe information
+  uint8_t parent_pcie;   ///< Parent device PCIe information
   uint8_t child_pcie;     ///< Child device PCIe information
-  int8_t paraent_port;    ///< Parent device port
+  int8_t parent_port;    ///< Parent device port
   int8_t child_port;      ///< Child device port
 } tpuTopology_t;
 
@@ -195,13 +195,13 @@ tpuError_t tpuKernelUnloadModule(tpuKernelModule_t module, tpuStream_t stream);
  * @param args Kernel arguments
  * @param arg_size Arguments size
  * @param group_num Group number
- * @param block_num Block number, like thread-num of cuda with each group
+ * @param group_size Group size, like thread-num of cuda with each group
  * @param stream Stream handle
  * @return tpuError_t Error code
  */
 tpuError_t tpuKernelLaunch(tpuKernelModule_t module, const char* kernel_name,
                            const void* args, uint32_t arg_size,
-                           uint64_t group_num, uint64_t block_num,
+                           uint64_t group_num, uint64_t group_size,
                            tpuStream_t stream);
 
 /**
@@ -211,14 +211,14 @@ tpuError_t tpuKernelLaunch(tpuKernelModule_t module, const char* kernel_name,
  * @param args Kernel arguments
  * @param arg_size Arguments size
  * @param group_num Group number
- * @param block_num Block number, like thread-num of cuda with each group
+ * @param group_size Group size, like thread-num of cuda with each group
  * @param stream Stream handle
  * @return tpuError_t Error code
  */
 tpuError_t tpuKernelLaunchAsync(tpuKernelModule_t module,
                                 const char* kernel_name, const void* args,
                                 uint32_t arg_size, uint64_t group_num,
-                                uint64_t block_num, tpuStream_t stream);
+                                uint64_t group_size, tpuStream_t stream);
 
 /**
  * @brief Allocate memory on device
