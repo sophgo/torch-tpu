@@ -60,24 +60,6 @@ void _fused_adam_out_tpu(
 
     // Get the current TPU stream
     auto stream = c10_tpu::getCurrentTPUStream();
-
-    // Generate TPU-specific tensors
-    // std::vector<at::Tensor> output(self.size());
-    // std::vector<at::Tensor> output_m(exp_avgs.size());
-    // std::vector<at::Tensor> output_v(exp_avg_sqs.size());
-    // std::vector<at::Tensor> output_vmax;
-    // if(amsgrad){
-    //     output_vmax.resize(max_exp_avg_sqs.size());
-    // }
-    // Initialize output vectors with empty tensors
-    // for (size_t i = 0; i < self.size(); ++i) {
-    //     output[i] = std::move(torch::empty(self[i].sizes(), self[i].options()));
-    //     output_m[i] = std::move(torch::empty(exp_avgs[i].sizes(), exp_avgs[i].options()));
-    //     output_v[i] = std::move(torch::empty(exp_avg_sqs[i].sizes(), exp_avg_sqs[i].options()));
-    //     if(amsgrad)
-    //         output_vmax[i]= std::move(torch::empty(max_exp_avg_sqs[i].sizes(), max_exp_avg_sqs[i].options()));
-    // }
-
     // Adam need inplace operation
     for (size_t i = 0; i < self.size(); ++i) {
         auto status = tpudnnAdamBackwardMultiCoreAsync(
@@ -102,15 +84,7 @@ void _fused_adam_out_tpu(
         );
         TORCH_CHECK(status == TPUDNN_STATUS_SUCCESS, "_fused_adam_out_tpu failed.");
     }
-    // for(size_t i = 0; i < self.size(); ++i){
-    //     self[i].copy_(output[i]);
-    //     exp_avgs[i].copy_(output_m[i]);
-    //     exp_avg_sqs[i].copy_(output_v[i]);
-    //     if (amsgrad)
-    //         max_exp_avg_sqs[i].copy_(output_vmax[i]);
-    // }
     TIMING_END;
-    //SHOW_TENSOR_OP(self);
 }
 TORCH_LIBRARY_IMPL(aten, TPU, m) {
     m.impl("_fused_adam_", _fused_adam_out_tpu);

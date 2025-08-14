@@ -12,7 +12,6 @@ namespace at
 Tensor & arange_start_out_tpu( const Scalar & start, const Scalar & end, const Scalar & step, Tensor & out)
 {
     TIMING_START;
-    // LOG( WARNING ) << __func__ ;
     CHECK_TENSOR_IN_DEVICE ( out );
 #if 0
     CPU_IMPL_WARNING();
@@ -69,14 +68,12 @@ Tensor arange_start_step_tpu(const Scalar & start, const Scalar & end, const Sca
 
 Tensor arange_start_tpu(const Scalar & start, const Scalar & end, c10::optional<ScalarType> dtype,
                 c10::optional<Layout> layout, c10::optional<Device> device, c10::optional<bool> pin_memory) {
-    // LOG( WARNING ) << __func__ ;
     auto out = arange_start_step_tpu(start, end, 1, dtype, layout, device, pin_memory);
     return out;
 }
 
 Tensor arange_tpu(const Scalar & end, c10::optional<ScalarType> dtype, c10::optional<Layout> layout,
                 c10::optional<Device> device, c10::optional<bool> pin_memory) {
-    // LOG( WARNING ) << __func__ ;
     auto out = arange_start_step_tpu(0, end, 1, dtype, layout, device, pin_memory);
     return out;
 }

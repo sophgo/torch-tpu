@@ -42,4 +42,13 @@ namespace at
     TIMING_END;
     return;
     }
+
+    void reset_tpudnn_optimer()
+    {
+        tpudnnResetOpTimer();
+    }
+    void dump_tpudnn_optimer()
+    {
+        tpudnnDumpOpTimer();
+    }
 }

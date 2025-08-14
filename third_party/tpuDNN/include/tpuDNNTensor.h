@@ -1401,6 +1401,10 @@ tpudnnStatus_t tpudnnEnableProfile(
 tpudnnStatus_t tpudnnDisableProfile(
     tpudnnHandle_t handle);
 
+tpudnnStatus_t tpudnnResetOpTimer();
+tpudnnStatus_t tpudnnDumpOpTimer();
+
+
 tpudnnStatus_t tpudnnMultiHeadAttentionAsync(
     tpudnnHandle_t handle,
     tpudnnTensor_t OUT, // {batch, seq, head, head_dim}

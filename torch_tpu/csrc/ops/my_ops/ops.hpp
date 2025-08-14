@@ -431,6 +431,9 @@ namespace at
 		c10::optional<int64_t> mode);
 	void disable_profile();
 
+	void reset_tpudnn_optimer();
+	void dump_tpudnn_optimer();
+
 	void dynlib_execute(
 		const std::string &so_url,
 		const std::string &func_name,
