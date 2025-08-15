@@ -54,6 +54,57 @@
 
 #include "common/config.h"
 
+#ifdef USING_PPL
+#include "sigmoid.h"
+
+template <typename scalar_t>
+static void active_impl(
+    uint64_t output_addr,
+    uint64_t input_addr,
+    uint32_t inner_size,
+    tensor_active_type_t active_type
+){
+  if (!(active_type == TPUDNN_ACTIVE_SIGMOID)) {
+    TORCH_CHECK(false, "Unsupported active_type: ", active_type);
+  }
+  auto kernel = [&](tpuStream_t stream, tpuKernelModule_t ppl_module,
+    int tile_size) -> int {
+    if constexpr (std::is_same_v<scalar_t, float>) {
+      return activation_sigmoid_impl_float32(
+        stream, ppl_module, output_addr, input_addr, inner_size,
+        tile_size);
+    } else if constexpr (std::is_same_v<scalar_t, at::Half>) {
+      return activation_sigmoid_impl_float16(
+        stream, ppl_module, output_addr, input_addr, inner_size,
+        tile_size);
+    } else if constexpr (std::is_same_v<scalar_t, at::BFloat16>) {
+      return activation_sigmoid_impl_bf16(
+        stream, ppl_module, output_addr, input_addr, inner_size,
+        tile_size);
+    }
+    return -1;
+  };
+
+  tpuStream_t stream = c10_tpu::getCurrentTPUStream().stream();
+  tpuKernelModule_t ppl_module = getPplModule();
+
+  constexpr uint32_t LOCAL_MEM_BYTES = 256 * 1024; // 256KB
+  constexpr uint32_t ELEMENT_SIZE = sizeof(scalar_t);
+  constexpr uint32_t MAX_TILE_SIZE = LOCAL_MEM_BYTES / ELEMENT_SIZE;
+  uint32_t tile_size = std::min(inner_size, MAX_TILE_SIZE);
+  while (tile_size >= 1) {
+    int ret = kernel(stream, ppl_module, tile_size);
+    if (ret == 0) {
+      return;
+    } else {
+      tile_size = tile_size / 2;
+      continue;
+    }
+  }
+  TORCH_CHECK(false, "Tile size reduction failed after attempts");
+}
+#endif
+
 namespace at {
 
 #define IMP_ACTIVE(OP)                                                         \
@@ -71,6 +122,43 @@ namespace at {
 #define IMP_ACTIVE_(OP)                                                        \
   Tensor &OP##__tpu(Tensor &self) { return OP##_out_tpu(self, self); }
 
+#ifdef USING_PPL
+
+  #define IMP_ACTIVE_OUT(OP, ACTIVE_TYPE, TIMING_NAME)                         \
+  Tensor &OP##_out_tpu(const Tensor &self, Tensor &out) {                      \
+    TIMING_START;                                                              \
+    if (self.dim() > 0) {                                                      \
+      CHECK_TENSOR_IN_DEVICE_NO_CONTIGUOUS(self);                              \
+    }                                                                          \
+    CHECK_TENSOR_IN_DEVICE(out);                                               \
+    if (!IS_TPU_TENSOR(self)) {                                                \
+      auto self_cpu = OP(self.cpu());                                          \
+        tpu::TPUCopyHostToDevice(out.data_ptr(),                               \
+                                 self_cpu.contiguous().data_ptr(),             \
+                                 out.nbytes());                                \
+    } else if (IS_TPU_TENSOR(self)) {                                          \
+      auto self_ = self.contiguous();                                          \
+      int length = 1;                                                          \
+      for (const auto i : c10::irange(self_.dim())) {                          \
+        length *= self_.size(i);                                               \
+      }                                                                        \
+      AT_DISPATCH_FLOATING_TYPES_AND2(                                         \
+        at::kHalf, at::kBFloat16, self_.scalar_type(), "active", [&] {\
+          active_impl<scalar_t>(                                       \
+            reinterpret_cast<uint64_t>(out.data_ptr()),                        \
+            reinterpret_cast<uint64_t>(self_.data_ptr()),                      \
+            length,                                                            \
+            ACTIVE_TYPE                                                        \
+            );                                                                 \
+          });                                                                  \
+    } else {                                                                   \
+      TORCH_CHECK(false, "At least one input is required in TPU device");      \
+    }                                                                          \
+    TIMING_END;                                                                \
+    SHOW_TENSOR_OP(self, out);                                                 \
+    return out;                                                                \
+  }
+#else
 
 #define IMP_ACTIVE_OUT(OP, ACTIVE_TYPE, TIMING_NAME)                           \
   Tensor &OP##_out_tpu(const Tensor &self, Tensor &out) {                      \
@@ -100,6 +188,7 @@ namespace at {
     SHOW_TENSOR_OP(self, out);                                                 \
     return out;                                                                \
   }
+#endif // USING_PPL
 
 IMP_ACTIVE_OUT(abs, TPUDNN_ACTIVE_ABSVAL, tpu::ACTIVE)
 IMP_ACTIVE(abs)
