@@ -257,6 +257,20 @@ function build_riscv_whl() {
   return $ret
 }
 
+function check_riscv_thrid_party_version() {
+  FILE1="$CURRENT_DIR/../third_party/tpuDNN/sg2260_lib/libtpudnn.so"
+  FILE2="$CURRENT_DIR/../third_party/tpuDNN/sg2260_lib/libtpudnn-riscv.so"
+  OUTPUT1=$(nm "$FILE1" | grep 1686 | awk 'NR==2 {print $3}')
+  OUTPUT2=$(nm "$FILE2" | grep 1686 | awk 'NR==2 {print $3}')
+  if [ "$OUTPUT1" != "$OUTPUT2" ]; then
+    echo "Version numbers are different, Please using rebuild_TPU1686_riscv to update riscv shared lib."
+    return -1
+  else
+    echo "Version numbers are the same"
+    return 0
+  fi
+}
+
 function run_online_regression_test() {
   echo "[INFO]Ubuntu version"
   version_cmd="cat /etc/os-release"
@@ -341,6 +355,15 @@ function run_online_regression_test() {
         echo "[RESULT-$test_CHIP_ARCH] ret_regression_for_scclHost is computed successfully!"
       else
         echo "[RESULT-$test_CHIP_ARCH] ret_regression_for_scclHost is computed failed!"
+        return -1
+      fi
+    fi
+    if [ $test_CHIP_ARCH = 'sg2260' ]; then
+      check_riscv_thrid_party_version; ret_regression_for_riscv_check=$?
+      if [ $ret_regression_for_riscv_check -eq 0 ];then
+        echo "[RESULT-$test_CHIP_ARCH] riscv shared libs check successfully!"
+      else
+        echo "[RESULT-$test_CHIP_ARCH] riscv shared libs check failed!"
         return -1
       fi
     fi
