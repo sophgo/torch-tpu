@@ -115,6 +115,8 @@ def apply_class_patches():
 
 apply_class_patches()
 
+torch.tpu = torch_tpu.tpu
+
 ## torch-tpu ENVS
 def print_all_torch_tpu_envs():
     print(f"===================== CHIP-ARCH ===========================================")
