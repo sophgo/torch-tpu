@@ -21,3 +21,4 @@ TORCH-TPU开发参考手册
    09_dynamo
    10_Memmory_Format
    11_superParSel
+   Appx.01_supported_ops

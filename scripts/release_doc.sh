@@ -1,6 +1,7 @@
 #!/bin/bash
 
 DIR="$( cd "$( dirname "${BASH_SOURCE[0]}")"/.. >/dev/null 2>&1 && pwd )"
+python docs/generate_operation.py ${DIR}/torch_tpu/csrc/ops/native_ops ${DIR}/torch_tpu/csrc/ops/my_ops/myOps.cpp ${DIR}/build/supported_ops.rst
 
 # generate torch-tpu_quick_start
 # ------------------------------------------------------------------------------

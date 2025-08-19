@@ -123,6 +123,7 @@ htmlhelp_basename = "TORCH-TPU开发参考手册"
 
 # 图片和表格自动编号
 numfig = True
+numfig_secnum_depth = 2
 
 # -- Options for LaTeX output ------------------------------------------------
 latex_engine = 'xelatex'
