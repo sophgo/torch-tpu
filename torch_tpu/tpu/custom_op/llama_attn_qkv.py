@@ -17,8 +17,8 @@ class LLamaAttentionQKVFunc(torch.autograd.Function):
         batch, seq_len, num_attn_head, head_dim = query_states.size()
         num_kv_head = key_states.size(-2)
 
-        cos = cos.repeat(batch, 1, 1).view(batch*seq_len, 1, head_dim)
-        sin = sin.repeat(batch, 1, 1).view(batch*seq_len, 1, head_dim)
+        cos = cos.view(seq_len, 1, head_dim)
+        sin = sin.view(seq_len, 1, head_dim)
         query_states = query_states.view(batch*seq_len, num_attn_head, head_dim)
         key_states = key_states.view(batch*seq_len, num_kv_head, head_dim)
         value_states = value_states.view(batch*seq_len, num_kv_head, head_dim)
@@ -27,7 +27,7 @@ class LLamaAttentionQKVFunc(torch.autograd.Function):
             attention_mask = attention_mask.squeeze(1)
 
         attn_output = torch.empty(query_states.shape, dtype = query_states.dtype, device = query_states.device)
-        softmax_lse = torch.empty([batch*seq_len, num_attn_head, 1], dtype=query_states.dtype, device=query_states.device)
+        softmax_lse = torch.empty([batch*seq_len, num_attn_head, 1], dtype=torch.float32, device=query_states.device)
         input_length = torch.tensor([seq_len] * batch, dtype=torch.int32)
         max_s = input_length.max().item()
 
@@ -54,59 +54,39 @@ class LLamaAttentionQKVFunc(torch.autograd.Function):
         query_states, key_states, value_states, cos, sin, lse, attn_output, attention_mask = ctx.saved_tensors
         batch, seq_len, num_heads, head_dim = attn_output.size()
         num_key_value_heads = key_states.shape[-2]
-        if attention_mask.dim() == 3:
-            attention_mask = attention_mask.unsqueeze(1)
-        query_states = query_states.view(batch, seq_len, num_heads, head_dim)
-        key_states = key_states.view(batch, seq_len, num_key_value_heads, head_dim)
-        value_states = value_states.view(batch, seq_len, num_key_value_heads, head_dim)
+
+        query_states = query_states.view(batch * seq_len, num_heads, head_dim)
+        key_states = key_states.view(batch * seq_len, num_key_value_heads, head_dim)
+        value_states = value_states.view(batch * seq_len, num_key_value_heads, head_dim)
+        attn_output = attn_output.view(batch * seq_len, num_heads, head_dim)
+        grad_output = grad_output.view(batch * seq_len, num_heads, head_dim)
+        lse = lse.view(batch * seq_len, num_heads, 1)
+        cos = cos.view(seq_len, 1, head_dim)
+        sin = sin.view(seq_len, 1, head_dim)
+        attention_mask = attention_mask.view(batch * seq_len, seq_len)
 
         grad_query_states = torch.zeros_like(query_states)
         grad_key_states = torch.zeros_like(key_states)
         grad_value_states = torch.zeros_like(value_states)
 
-        slices = min(batch, 4096 // seq_len)
-        secs = (batch + slices - 1) // slices
-        slices = (batch + secs - 1) // secs
-        for i in range(0, batch, slices):
-            real_slices = min(slices, batch - i)
-            query_states_batch = query_states[i: i + real_slices].view(real_slices * seq_len, num_heads, head_dim)
-            key_states_batch = key_states[i: i + real_slices].view(real_slices * seq_len, num_key_value_heads, head_dim)
-            value_states_batch = value_states[i: i + real_slices].view(real_slices * seq_len, num_key_value_heads, head_dim)
-            attn_output_batch = attn_output[i: i + real_slices].view(real_slices * seq_len, num_heads, head_dim)
-            grad_output_batch = grad_output[i: i + real_slices].view(real_slices * seq_len, num_heads, head_dim)
-            lse_batch = lse[i: i + real_slices].view(real_slices * seq_len, num_heads, 1)
-            cos_batch = cos[i* seq_len: (i + real_slices)* seq_len].view(real_slices * seq_len, 1, head_dim)
-            sin_batch = sin[i* seq_len: (i + real_slices)* seq_len].view(real_slices * seq_len, 1, head_dim)
-            if attention_mask is not None:
-                if real_slices == 1:
-                    attention_mask_batch = attention_mask[0][0]
-                else:
-                    attention_mask_batch = torch.full((real_slices * seq_len, real_slices * seq_len), float("-inf"), dtype=attention_mask.dtype, device=attention_mask.device)
-                    for j in range(real_slices):
-                        attention_mask_batch[j * seq_len: (j + 1) * seq_len, j * seq_len: (j + 1) * seq_len] = attention_mask[i + j][0]
-            else:
-                attention_mask_batch = None
-            grad_query_states_batch = grad_query_states[i: i + real_slices].view(real_slices * seq_len, num_heads, head_dim)
-            grad_key_states_batch = grad_key_states[i: i + real_slices].view(real_slices * seq_len, num_key_value_heads, head_dim)
-            grad_value_states_batch = grad_value_states[i: i + real_slices].view(real_slices * seq_len, num_key_value_heads, head_dim)
-            input_lengths = torch.tensor([seq_len * real_slices], dtype=torch.int32, device=query_states.device)
+        input_lengths = torch.tensor([seq_len] * batch, dtype=torch.int32, device=query_states.device)
 
-            torch.ops.my_ops.llama_attention_backward(
-                query_states_batch,
-                key_states_batch,
-                value_states_batch,
-                attn_output_batch,
-                grad_output_batch,
-                lse_batch,
-                grad_query_states_batch,
-                grad_key_states_batch,
-                grad_value_states_batch,
-                cos_batch,
-                sin_batch,
-                attention_mask_batch,
-                input_lengths,
-                real_slices * seq_len,
-                ctx.softmax_scale)
+        torch.ops.my_ops.llama_attention_backward(
+            query_states,
+            key_states,
+            value_states,
+            attn_output,
+            grad_output,
+            lse,
+            grad_query_states,
+            grad_key_states,
+            grad_value_states,
+            cos,
+            sin,
+            attention_mask,
+            input_lengths,
+            seq_len,
+            ctx.softmax_scale)
 
         return grad_query_states, grad_key_states, grad_value_states, None, None, None, None, None
 
@@ -271,7 +251,7 @@ class MegatronQwen2AttentionQKVFunc(torch.autograd.Function):
             attention_mask_2d = None
 
         attn_output = torch.empty(query_states.shape, dtype = query_states.dtype, device = query_states.device)
-        softmax_lse = torch.empty([batch * seq_len, num_attn_head, 1], dtype=query_states.dtype, device=query_states.device)
+        softmax_lse = torch.empty([batch * seq_len, num_attn_head, 1], dtype=torch.float32, device=query_states.device)
         # input_length = torch.tensor([seq_len * batch], dtype=torch.int32)#TODO:construct data in device 
         max_s = input_length.max().item()
 
@@ -289,7 +269,6 @@ class MegatronQwen2AttentionQKVFunc(torch.autograd.Function):
                                     attention_dropout,
                                     len(input_length))
         attn_output = attn_output.view(output_shape)
-        # softmax_lse = softmax_lse.view(seq_len, batch, num_attn_head, 1)
         ctx.save_for_backward(query_states, key_states, value_states, cos, sin, softmax_lse, attn_output, attention_mask_2d)
         return attn_output
 
@@ -299,15 +278,15 @@ class MegatronQwen2AttentionQKVFunc(torch.autograd.Function):
         if whole_net_trans:
             batch, seq_len, num_heads, head_dim = attn_output.size()
             num_key_value_heads = key_states.shape[-2]
-            
+
             query_states = query_states.view(batch * seq_len, num_heads, head_dim)
             key_states = key_states.view(batch * seq_len, num_key_value_heads, head_dim)
             value_states = value_states.view(batch * seq_len, num_key_value_heads, head_dim)
             attn_output = attn_output.view(batch * seq_len, num_heads, head_dim)
             grad_output = grad_output.view(batch * seq_len, num_heads, head_dim)
             lse = lse.view(batch * seq_len, num_heads, 1)
-            cos = cos.view(1, seq_len, head_dim).repeat(batch, 1, 1).view(batch * seq_len, 1, head_dim)
-            sin = sin.view(1, seq_len, head_dim).repeat(batch, 1, 1).view(batch * seq_len, 1, head_dim)
+            cos = cos.view(seq_len, 1, head_dim)
+            sin = sin.view(seq_len, 1, head_dim)
 
             grad_query_states = torch.zeros_like(query_states)
             grad_key_states = torch.zeros_like(key_states)
@@ -317,7 +296,7 @@ class MegatronQwen2AttentionQKVFunc(torch.autograd.Function):
                 attention_mask = attention_mask.view(batch * seq_len, seq_len)
             else:
                 attention_mask = None
-            
+
             input_lengths = torch.tensor([seq_len] * batch, dtype=torch.int32, device=query_states.device)  
 
             torch.ops.my_ops.llama_attention_backward(
@@ -354,18 +333,18 @@ class MegatronQwen2AttentionQKVFunc(torch.autograd.Function):
             query_states = query_states.view(batch * seq_len, num_heads, head_dim)
             key_states = key_states.view(batch * seq_len, num_key_value_heads, head_dim)
             value_states = value_states.view(batch * seq_len, num_key_value_heads, head_dim)
-            
+
             attn_output = attn_output.view(batch * seq_len, num_heads, head_dim)
             grad_output = grad_output.view(batch * seq_len, num_heads, head_dim)
             lse = lse.view(batch * seq_len, num_heads, 1)
-            cos = cos.view(batch * seq_len, 1, head_dim)
-            sin = sin.view(batch * seq_len, 1, head_dim)
-            
+            cos = cos.view(seq_len, 1, head_dim)
+            sin = sin.view(seq_len, 1, head_dim)
+
             grad_query_states = grad_query_states.view(batch * seq_len, num_heads, head_dim)
             grad_key_states = grad_key_states.view(batch * seq_len, num_key_value_heads, head_dim)
             grad_value_states = grad_value_states.view(batch * seq_len, num_key_value_heads, head_dim)
             
-            input_lengths = torch.tensor([seq_len * batch], dtype=torch.int32, device=query_states.device)
+            input_lengths = torch.tensor([seq_len]* batch, dtype=torch.int32, device=query_states.device)
 
             torch.ops.my_ops.llama_attention_backward(
                 query_states,
