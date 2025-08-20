@@ -110,6 +110,14 @@ def case5():
 
     import pdb; pdb.set_trace()
 
+def case6():
+    boxes = torch.randn((3, 5))
+    boxes_tpu = boxes.to(device)
+
+    boxes[..., [0, 2]] -= 16.0
+    boxes_tpu[..., [0,2]] -= 16.0
+
+    import pdb; pdb.set_trace()
 
 
 if __name__ == "__main__":
@@ -117,4 +125,5 @@ if __name__ == "__main__":
     # case2()
     # case3()
     # case4()
-    case5()
+    # case5()
+    case6()

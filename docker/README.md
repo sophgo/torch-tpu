@@ -31,28 +31,20 @@ docker pull sophgo/torch_tpu:v0.1-py311  # Python 3.11 version (recommended)
 
 Generally, you can enter the docker container by running the following command:
 
-```Shell
 # For Python 3.11 version (recommended)
-docker run -it  --user `id -u`:`id -g` --privileged --cap-add SYS_ADMIN \
-                --name torch_tpu \
-                --env HOME=$HOME \
-                -v /etc/passwd:/etc/passwd:ro -v /etc/group:/etc/group:ro -v /etc/shadow:/etc/shadow:ro \
-                -v $HOME:$HOME \
-                -v /workspace:/workspace \
-                -v /opt:/opt \
-                --shm-size=32G \
-                sophgo/torch_tpu:v0.1-py311  /bin/bash
+```Shell
+# start a docker container(just run once)
+$ docker run --privileged --name torch_tpu_dev_py311 -v $PWD:/workspace --restart always -td sophgo/torch_tpu:v0.1-py311 bash
+# enter a container
+$ docker exec -it torch_tpu_dev_py311 bash
+```
 
 # For Python 3.10 version
-docker run -it  --user `id -u`:`id -g` --privileged --cap-add SYS_ADMIN \
-                --name torch_tpu \
-                --env HOME=$HOME \
-                -v /etc/passwd:/etc/passwd:ro -v /etc/group:/etc/group:ro -v /etc/shadow:/etc/shadow:ro \
-                -v $HOME:$HOME \
-                -v /workspace:/workspace \
-                -v /opt:/opt \
-                --shm-size=32G \
-                sophgo/torch_tpu:v0.1  /bin/bash
+```shell
+# start a docker container(just run once)
+$ docker run --privileged --name torch_tpu_dev_py310 -v $PWD:/workspace --restart always -td sophgo/torch_tpu:v0.1 bash
+# enter a container
+$ docker exec -it torch_tpu_dev_py310 bash
 ```
 
 If you have install driver in host machine (refer  ), you can also use the following command to enter the docker container:

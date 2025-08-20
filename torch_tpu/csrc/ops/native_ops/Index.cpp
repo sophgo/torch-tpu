@@ -202,7 +202,11 @@ Tensor index_tpu(const at::Tensor & self, const c10::List<c10::optional<at::Tens
     for (size_t i = 0; i < indices.size(); i++)
     {
         c10::optional<Tensor> indice = c10::nullopt;
-        if ( indices[i].has_value() ) { indice = indices[i].value().cpu(); }
+        if ( indices[i].has_value() ) {
+          if (indices[i].value().defined()) indice = indices[i].value().cpu();
+          else                              indice = indices[i].value();
+        }
+
         indices_cpu.push_back(indice);
     }
     auto out_cpu = index( self.cpu(), indices_cpu );
@@ -256,18 +260,21 @@ const Tensor& value){
 Tensor & index_put_tpu(Tensor & self, const torch::List<c10::optional<Tensor>>& indices, const Tensor & value, const bool accumulate) {
   SHOW_TENSOR_OP(self, value);
   CHECK_TENSOR_IN_DEVICE ( self );
-#if 0
+#if 1
   CPU_IMPL_WARNING();
   c10::List<c10::optional<Tensor>> indices_cpu;
-  for (int i = 0; i < indices.size(); i++)
+  for (int i = 0; i < (int)indices.size(); i++)
   {
       c10::optional<Tensor> indice = c10::nullopt;
-      if ( indices[i].has_value() ) { indice = indices[i].value().cpu(); }
+      if ( indices[i].has_value() ) {
+        if ( indices[i].value().defined() ) indice = indices[i].value().cpu();
+        else                                indice = indices[i].value();
+      }
       indices_cpu.push_back(indice);
   }
   auto self_cpu = self.cpu();
   auto out_cpu = index_put(self_cpu, indices_cpu, value.cpu(), accumulate);
-  tpu::TPUCopyHostToDevice(self.data_ptr(), out_cpu.contiguous().data_ptr(), out_cpu.nbytes());
+  self.copy_(out_cpu);
 #else
   // copied from torch source and modified
   bool return_flag = false;
@@ -290,7 +297,10 @@ Tensor & index_put_tpu(Tensor & self, const torch::List<c10::optional<Tensor>>& 
     for (int i = 0; i < (int)indices.size(); i++)
     {
         c10::optional<Tensor> indice = c10::nullopt;
-        if ( indices[i].has_value() ) { indice = indices[i].value().cpu(); }
+        if ( indices[i].has_value() ) {
+          if (indices[i].value().defined()) indice = indices[i].value().cpu();
+          else                              indice = indices[i].value();
+        }
         indices_cpu.push_back(indice);
     }
     auto self_cpu = self.cpu();
@@ -310,6 +320,7 @@ TORCH_LIBRARY_IMPL ( aten, TPU, m )
 }
 
 Tensor & index_put_impl_tpu(Tensor & self, const torch::List<c10::optional<Tensor>>& indices, const Tensor & value, const bool accumulate, const bool unsafe) {
+  TIMING_START;
   SHOW_TENSOR_OP(self, value);
   CHECK_TENSOR_IN_DEVICE ( self );
 #if 1
@@ -318,7 +329,10 @@ Tensor & index_put_impl_tpu(Tensor & self, const torch::List<c10::optional<Tenso
   for (size_t i = 0; i < indices.size(); i++)
   {
       c10::optional<Tensor> indice = c10::nullopt;
-      if ( indices[i].has_value() ) { indice = indices[i].value().cpu(); }
+      if ( indices[i].has_value() ) {
+        if ( indices[i].value().defined() ) indice = indices[i].value().cpu();
+        else                                indice = indices[i].value();
+      }
       indices_cpu.push_back(indice);
   }
   auto self_cpu = self.cpu();
@@ -326,6 +340,7 @@ Tensor & index_put_impl_tpu(Tensor & self, const torch::List<c10::optional<Tenso
   tpu::TPUCopyHostToDevice(self.data_ptr(), out_cpu.contiguous().data_ptr(), out_cpu.nbytes());
 #else
 #endif
+  TIMING_END;
   return self;
 }
 
