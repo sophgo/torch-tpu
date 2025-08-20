@@ -225,7 +225,7 @@ class CPPLibBuild(build_clib, ExtBase, object):
         build_dir += '_cmodel'
         if not build_fw:
             fw_path = os.path.join(build_dir, 'libfirmware.so')
-        if not SOC_CROSS:
+        if not SOC_CROSS or arch == 'sg2260' or arch == 'sg2260e':
             args.append('-DUSING_CMODEL=ON')
         build_firmware()
 
