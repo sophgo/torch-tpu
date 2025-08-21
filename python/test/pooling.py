@@ -67,8 +67,21 @@ def test_adaptive_avg_pool2d():
     print("TPU_Pooled_Output:", pooled_output_tpu.cpu())
     print("***************test_adaptive_avg_pool2d end*****************")
 
+def test_maxpooling():
+    inp     = torch.randn((16,256, 14, 21))
+    inp_tpu = inp.to(device).half()
+
+    net = nn.MaxPool2d(kernel_size=5, padding=2, stride=1, ceil_mode=False)
+    net_tpu = net.to(device)
+    # net.eval()
+    # net_tpu.eval()
+
+    y     = net(inp)
+    y_tpu = net_tpu(inp_tpu)
+    import pdb; pdb.set_trace()
 
 if __name__ == "__main__":
     # test_max_pool2d_with_indices()
-    test_avg_pool2d()
-    test_adaptive_avg_pool2d()
+    # test_avg_pool2d()
+    # test_adaptive_avg_pool2d()
+    test_maxpooling()

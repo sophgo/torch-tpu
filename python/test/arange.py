@@ -26,7 +26,7 @@ def case_dtype():
     print("cpu: ", out1)
 
     # TPU: just support arange(int,int,int) currentlly.
-    out2=torch.arange(0, end, step, dtype = torch.float32, device=device)
+    out2=torch.arange(0, end, step, dtype = torch.float16, device=device)
     print("Tpu: ", out2.cpu())
 
     diff = torch.sum( out1 - out2.cpu() )

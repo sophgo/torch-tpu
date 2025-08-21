@@ -60,11 +60,6 @@ const dim4  * output_shape
 int tpu_kernel_api_arange_multi_core ( const void *args )
 {
   sg_api_arange_t * api = ( sg_api_arange_t * ) args;
-  if ( api->isint64 ) {
-    TPUKERNEL_ASSERT(api->dtype == DT_INT32);
-  } else {
-    TPUKERNEL_ASSERT ( api->dtype == DT_INT32 || api->dtype == DT_FP32);
-  }
   tpu_initialize();
   // only support single core current
   if (tpu_core_index() == 0) {

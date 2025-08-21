@@ -44,14 +44,15 @@ Tensor arange_start_step_tpu(const Scalar & start, const Scalar & end, const Sca
     TensorOptions options = TensorOptions(DeviceType::PrivateUse1).dtype(
                                                             end.type() == ScalarType::Double ? 
                                                                 ScalarType::Float : end.type() == ScalarType::Long ?
-                                                                                        ScalarType::Int : ScalarType::Int
+                                                                                        ScalarType::Int : end.type()
                                                             ).layout(layout);
     if ( device.has_value()) { 
         TORCH_CHECK( device.value().is_privateuseone() );
         options = options.device( device );
     }
     if ( dtype.has_value() ) { 
-        TORCH_CHECK( (dtype.value() == torch::kInt32) || (dtype.value() == torch::kFloat32),
+        TORCH_CHECK( (dtype.value() == torch::kInt32) || (dtype.value() == torch::kFloat32) || 
+                     (dtype.value() == torch::kFloat16) || (dtype.value() == torch::kBFloat16),
                     "arange only support int32 & float32 now" );
         options = options.dtype ( dtype );
     }
