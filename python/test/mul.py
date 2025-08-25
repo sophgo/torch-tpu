@@ -30,9 +30,9 @@ def case1():
     print("tpu : ", inp_tpu.cpu())
 
 def case2():
-    B = 6
-    S = 1024
-    H = 768
+    B = 2
+    S = 1
+    H = 8
 
     a = torch.randn((B,S,H))
     b = torch.randn((S,H))
@@ -41,14 +41,14 @@ def case2():
     # a_tpu = a.half().to(device)
     # b_tpu = b.half().to(device)
 
-    a_tpu = a.to(device)
-    b_tpu = b.to(device)
-
-    o = a * b
-    o_tpu = a_tpu * b_tpu
+    a_tpu = a.to(device).half()
+    b_tpu = b.to(device) #.half()
+    o = a + b
+    o_tpu = a_tpu + b_tpu
 
     diff = o - o_tpu.cpu()
     print(torch.max(torch.abs(diff)))
+    import pdb; pdb.set_trace()
 
 
 if __name__ == "__main__":

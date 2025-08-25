@@ -49,9 +49,11 @@ Tensor &binary_op_tpu(const Tensor &self, const Tensor &other,
     auto stream = c10_tpu::getCurrentTPUStream();
     auto status = tpudnnBinaryAsync(
         stream,
-        tpu::TPUGenerateTpudnnTensor(stream, self),
-        tpu::TPUGenerateTpudnnTensor(stream, other),
-        alpha.toDouble(),
+        (self.scalar_type() == out.scalar_type() || binary_type == 3) ? 
+          tpu::TPUGenerateTpudnnTensor(stream, self) : tpu::TPUGenerateTpudnnTensor(stream, other),
+        (self.scalar_type() == out.scalar_type() || binary_type == 3) ? 
+          tpu::TPUGenerateTpudnnTensor(stream, other) : tpu::TPUGenerateTpudnnTensor(stream, self),
+        alpha.toFloat(),
         tpu::TPUGenerateTpudnnTensor(stream, out), binary_type);
     TORCH_CHECK(status == TPUDNN_STATUS_SUCCESS);
   }
@@ -101,8 +103,10 @@ Tensor &binary_op_tpu(const Tensor &self, const Tensor &other,
       change_t.dim = max_dim;
     }
 
-    auto status = tpudnnBinaryBcastAsync(stream, self_t, other_t,
-                                   alpha.toDouble(), out_t, binary_type);
+    auto status = tpudnnBinaryBcastAsync(stream, 
+                        (self.scalar_type() == out.scalar_type() || binary_type == 3) ? self_t  : other_t,
+                        (self.scalar_type() == out.scalar_type() || binary_type == 3) ? other_t : self_t,
+                                   alpha.toFloat(), out_t, binary_type);
     TORCH_CHECK(status == TPUDNN_STATUS_SUCCESS);
   }
   TIMING_END;
@@ -708,9 +712,9 @@ Tensor &maximum_out_tpu(const Tensor &self, const Tensor &other, Tensor &out) {
   if (!self.is_contiguous() || !other.is_contiguous() || !out.is_contiguous()) {
     CONTIGUOUS_WARNING();
     if (out.is_contiguous()) {
-      out = minimum(self.contiguous(), other.contiguous());
+      out = maximum(self.contiguous(), other.contiguous());
     } else {
-      auto out_ = minimum(self.contiguous(), other.contiguous());
+      auto out_ = maximum(self.contiguous(), other.contiguous());
       auto handle = c10_tpu::getCurrentTPUStream();
       tpudnnStridedCopyAsync(
           handle,
@@ -782,7 +786,7 @@ Tensor &pow_c_out_tpu(const Tensor &self, const Scalar &exponent, Tensor &out) {
   TIMING_START;
   CHECK_TENSOR_IN_DEVICE(self);
   CHECK_TENSOR_IN_DEVICE(out);
-  TORCH_CHECK(exponent.toDouble() > 0);
+  TORCH_CHECK(exponent.toFloat() > 0);
   if (self.dim() == 0) {
     Tensor out_cpu = pow(self.cpu(), exponent);
     tpu::TPUCopyHostToDevice(out.data_ptr(), out_cpu.contiguous().data_ptr(),
@@ -790,12 +794,12 @@ Tensor &pow_c_out_tpu(const Tensor &self, const Scalar &exponent, Tensor &out) {
     SHOW_TENSOR_OP(self, out);
     return out;
   }
-  if (exponent.toDouble() == 1.0) {
+  if (exponent.toFloat() == 1.0) {
     tpu::TPUCopyDeviceToDevice(out.data_ptr(), self.data_ptr(), out.nbytes());
     SHOW_TENSOR_OP(self, out);
     return out;
   }
-  TORCH_CHECK(exponent.toDouble() > 0);
+  TORCH_CHECK(exponent.toFloat() > 0);
 
   auto handle = c10_tpu::getCurrentTPUStream();
   auto status = tpudnnPowerScalarAsync(
@@ -816,7 +820,7 @@ Tensor &c_pow_out_tpu(const Scalar &self, const Tensor &exponent, Tensor &out) {
   TIMING_START;
   CHECK_TENSOR_IN_DEVICE(exponent);
   CHECK_TENSOR_IN_DEVICE(out);
-  TORCH_CHECK(self.toDouble() > 0);
+  TORCH_CHECK(self.toFloat() > 0);
   if (exponent.dim() == 0) {
     Tensor out_cpu = pow(self, exponent.cpu());
     tpu::TPUCopyHostToDevice(out.data_ptr(), out_cpu.contiguous().data_ptr(),
