@@ -52,15 +52,17 @@ def _get_git_commit_short_hash():
 
 
 def _get_backend_version():
-    from torch_tpu import lib_pwd
+    from torch_tpu import lib_pwd, arch
     import re
 
     try:
-        tpudnn = os.readlink(os.path.join(lib_pwd, "libtpudnn.so"))
+        tpudnn = os.path.join(lib_pwd, f"libtorch_tpu.{arch}.so")
+        if not os.path.isabs(tpudnn):
+            tpudnn = os.path.normpath(os.path.join(lib_pwd, tpudnn))
         with open(tpudnn, "rb") as f:
-            ret = re.search("tpu1686_revision_([0-9a-z]+)")
+            ret = re.search(b"tpu1686_revision_([0-9a-z]+)", f.read())
             if ret:
-                return ret.group(1)
+                return ret.group(1).decode("utf-8")
             else:
                 return "unknown"
     except (FileNotFoundError, OSError):
