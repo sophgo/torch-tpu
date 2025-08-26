@@ -147,12 +147,10 @@ namespace at
         TIMING_START;
         if (attention_mode == PAGED_ATTENTION_DECODE ||
             attention_mode == PAGED_ATTENTION_PREFILL) {
-        TORCH_CHECK(
-            seqlen.dtype() == torch::kInt32 &&
-                seqlen.device().type() == DeviceType::CPU,
-            "MLA input seqlen must be int32 dtype && on CPU device");
+            TORCH_CHECK(seqlen.dtype() == torch::kInt32);
         }
 
+        bool cpu_lengths = seqlen.device().type() == DeviceType::CPU;
         auto stream = c10_tpu::getCurrentTPUStream();
         auto status = tpudnnPagedLatentAttentionFp8Async(
             stream, tpu::TPUGenerateTpudnnTensor(stream, OUT),
@@ -171,11 +169,14 @@ namespace at
                 : tpudnnUndefinedTensor(),
             tpu::TPUGenerateTpudnnTensor(stream, WUQ_scale),
             tpu::TPUGenerateTpudnnTensor(stream, WUKV_scale),
+            cpu_lengths ? tpudnnUndefinedTensor() : tpu::TPUGenerateTpudnnTensor(stream, seqlen),
+            cpu_lengths ? tpudnnUndefinedTensor() : tpu::TPUGenerateTpudnnTensor(stream, cache_seqlen),
             block_table.has_value()
                 ? tpu::TPUGenerateTpudnnTensor(stream, block_table.value())
                 : tpudnnUndefinedTensor(),//block_table
             tpu::TPUGenerateTpudnnTensor(stream, save_slots), //save slots
-            (const int *)seqlen.data_ptr(), (const int *)cache_seqlen.data_ptr(),
+            cpu_lengths ? (const int *)seqlen.data_ptr() : nullptr,
+            cpu_lengths ? (const int *)cache_seqlen.data_ptr() : nullptr,
             (int)(seqlen.nbytes() / 4), num_heads, generate_token, qk_nope_head_dim,
             qk_rope_head_dim, v_head_dim, q_lora_rank, kv_lora_rank,
             mask_size, quant_block_size, max_paged_block_num, paged_cache_block_size,

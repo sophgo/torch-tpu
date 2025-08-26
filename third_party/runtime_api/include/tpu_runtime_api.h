@@ -2,6 +2,10 @@
 
 #include <unistd.h>
 #include <stdint.h>
+#include <cstring>
+#include <cstdlib>
+#include <vector>
+#include <cassert>
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -304,6 +308,16 @@ tpuError_t tpuSetupTopology();
  * @return tpuError_t Error code
  */
 tpuError_t tpuGetTopology(tpuTopology_t** topology);
+
+
+typedef void *tpuGraph_t;
+typedef void *tpuGraphExec_t;
+tpuError_t tpuStreamBeginCapture(tpuStream_t capture_stream_);
+tpuError_t tpuStreamEndCapture(tpuStream_t capture_stream_, tpuGraph_t* graph_);
+tpuError_t tpuGraphDestroy(tpuGraph_t graph_);
+tpuError_t tpuGraphExecDestroy(tpuGraphExec_t graph_exec_);
+tpuError_t tpuGraphInstantiate(tpuGraphExec_t* graph_exec_, tpuGraph_t graph_, void *ext);
+tpuError_t tpuGraphLaunch(tpuGraphExec_t graph_exec_, tpuStream_t capture_stream_);
 
 #ifdef __cplusplus
 }

@@ -182,6 +182,24 @@ Tensor attention(
  * - This is an optimized version of attention mechanism for inference scenarios.
  * - **If the query is not contiguous, it means that query, key and value will be performed on the packed tensor. See `attention`**
  */
+Tensor paged_attention_v3(
+    Tensor &output,
+    const Tensor &query,
+    const Tensor &key,
+    const Tensor &value,
+    const Tensor &kcache,
+    const Tensor &vcache,
+    const c10::optional<Tensor> &pos_cos,
+    const c10::optional<Tensor> &pos_sin,
+    const Tensor &input_lengths,
+    const Tensor &cache_lengths,
+    const Tensor &save_slots,
+    const Tensor &block_tables,
+    const c10::optional<Tensor> &mask,
+    double softmax_scale,
+    int64_t max_seqlen,
+    int64_t stage);
+
 Tensor paged_attention_v2(
     Tensor &output,
     const Tensor &query,

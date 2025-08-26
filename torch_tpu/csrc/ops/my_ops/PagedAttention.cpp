@@ -65,18 +65,20 @@ namespace at
 		if (attention_mode == 3 || attention_mode == 2){
 			TORCH_CHECK (input_lengths.dtype() == torch::kInt32,
 						"LLammaAttention input lenghts must be int32 dtype");
-			TORCH_CHECK ( input_lengths.device().type() == DeviceType::CPU, 
-						"LLammaAttention input lenghts must on CPU device" );
 		}
-		auto kvcache_shape = Kcache.sizes();
-		int block_num = kvcache_shape[0];
-		int64_t block_need_num = 0;
-		int num_input_lengths = input_lengths.nbytes() / 4;
-		int* input_lengths_ptr = (int*)input_lengths.data_ptr();
-		for (int i = 0; i < num_input_lengths; ++i) {
-			block_need_num += (input_lengths_ptr[i] + block_size - 1) / block_size;
-		}
-		TORCH_CHECK ( block_num >= block_need_num, "LLamatAttention KVCache block_num must be larger than ", block_need_num);
+        bool cpu_lengths = input_lengths.device().type() == DeviceType::CPU;
+        if (cpu_lengths)
+        {
+		    auto kvcache_shape = Kcache.sizes();
+		    int block_num = kvcache_shape[0];
+		    int64_t block_need_num = 0;
+		    int num_input_lengths = input_lengths.nbytes() / 4;
+		    int* input_lengths_ptr = (int*)input_lengths.data_ptr();
+		    for (int i = 0; i < num_input_lengths; ++i) {
+		    	block_need_num += (input_lengths_ptr[i] + block_size - 1) / block_size;
+		    }
+		    TORCH_CHECK ( block_num >= block_need_num, "LLamatAttention KVCache block_num must be larger than ", block_need_num);
+        }
 
   		auto stream = c10_tpu::getCurrentTPUStream();
 		auto status = tpudnnPagedAttentionAsync(
@@ -93,10 +95,11 @@ namespace at
 			block_tables.has_value() ? tpu::TPUGenerateTpudnnTensor(stream, block_tables.value()) : tpudnnUndefinedTensor(),
 			mask.has_value() ? tpu::TPUGenerateTpudnnTensor(stream, mask.value()) : tpudnnUndefinedTensor(),
 			tpudnnUndefinedTensor(), tpudnnUndefinedTensor(), tpudnnUndefinedTensor(),
-			tpudnnUndefinedTensor(),
+			cpu_lengths ? tpudnnUndefinedTensor() : tpu::TPUGenerateTpudnnTensor(stream, input_lengths),
+			!cpu_lengths && cache_lengths.has_value() ? tpu::TPUGenerateTpudnnTensor(stream, cache_lengths.value()) : tpudnnUndefinedTensor(),
             rope_head_size,
-			(int*)input_lengths.data_ptr(),
-			cache_lengths.has_value() ? (int*)cache_lengths.value().data_ptr() : nullptr,
+			cpu_lengths ? (int*)input_lengths.data_ptr() : nullptr,
+			cpu_lengths && cache_lengths.has_value()  ? (int*)cache_lengths.value().data_ptr() : nullptr,
       	    (int)(input_lengths.nbytes()/4),
 			slots_size,
 			fetch_size,
@@ -327,7 +330,7 @@ namespace at
 		return std::tuple<Tensor, Tensor, Tensor>(dQ, dK, dV);
 	}
 
-Tensor paged_attention_v2(
+Tensor paged_attention_v3(
     Tensor &output,
     const Tensor &query,
     const Tensor &key,
@@ -341,10 +344,16 @@ Tensor paged_attention_v2(
     const Tensor &save_slots,
     const Tensor &block_tables,
     const c10::optional<Tensor> &mask,
-    double softmax_scale)
+    double softmax_scale,
+
+    // The following parameters can be calculated
+    // if seqlen tensors are on CPU. But now they
+    // may be on TPU so we pass them in but make 
+    // them optional.
+    int64_t max_seqlen = 0,
+    int64_t stage = 0) // prefill 2, decode 3
 {
-  const auto context_lengths = input_lengths + cache_lengths;
-  if ((input_lengths == 1).all().item().toBool()) {
+  if (stage == 3 || (input_lengths == 1).all().item().toBool()) {
     // decode only
     return paged_attention(
         output,
@@ -355,8 +364,8 @@ Tensor paged_attention_v2(
         const_cast<Tensor &>(vcache),
         pos_cos,
         pos_sin,
-        context_lengths,
-        c10::nullopt,
+        input_lengths,
+        cache_lengths,
         save_slots,
         block_tables,
         mask,
@@ -367,8 +376,13 @@ Tensor paged_attention_v2(
         kcache.size(1),
         softmax_scale,
         3);
-  } else if ((input_lengths > 1).all().item().toBool()) {
+  } else if (stage == 2 || (input_lengths > 1).all().item().toBool()) {
     // prefill only
+    if (max_seqlen <= 0)
+    {
+      const auto seq_lengths = input_lengths + cache_lengths;
+      max_seqlen = seq_lengths.max().item().toInt();
+    }
     return paged_attention(
         output,
         const_cast<Tensor &>(query),
@@ -386,8 +400,7 @@ Tensor paged_attention_v2(
         query.size(-1),
         0, // useless for prefill
         block_tables.size(1),
-        mask.has_value() ? mask.value().size(0)
-                         : context_lengths.max().item().toInt(),
+        mask.has_value() ? mask.value().size(0) : max_seqlen,
         kcache.size(1),
         softmax_scale,
         2);
@@ -419,7 +432,11 @@ Tensor paged_attention_v2(
       auto save_slots_slice = save_slots.slice(0, start_id, end_id);
       auto block_tables_slice = block_tables.slice(0, start_id, end_id);
 
-      auto context_lengths_slice = input_lengths_slice + cache_lengths_slice;
+      if (max_seqlen <= 0)
+      {
+        auto seq_lengths_slice = input_lengths_slice + cache_lengths_slice;
+        max_seqlen = seq_lengths_slice.max().item().toInt();
+      }
       return paged_attention(
           output_slice,
           query_slice,
@@ -429,17 +446,15 @@ Tensor paged_attention_v2(
           const_cast<Tensor &>(vcache),
           cos_slice,
           sin_slice,
-          is_prefill ? input_lengths_slice
-                     : input_lengths_slice + cache_lengths_slice,
-          is_prefill ? c10::make_optional(cache_lengths_slice) : c10::nullopt,
+          input_lengths_slice,
+          cache_lengths_slice,
           save_slots_slice,
           block_tables_slice,
           mask,
           query_slice.size(-1),
           block_tables_slice.size(1),
           block_tables_slice.size(1),
-          mask.has_value() ? mask.value().size(0)
-                           : context_lengths_slice.max().item().toInt(),
+          mask.has_value() ? mask.value().size(0) : max_seqlen,
           kcache.size(1),
           softmax_scale,
           is_prefill ? 2 : 3);
@@ -450,4 +465,26 @@ Tensor paged_attention_v2(
   }
   return output;
 }
+Tensor paged_attention_v2(
+    Tensor &output,
+    const Tensor &query,
+    const Tensor &key,
+    const Tensor &value,
+    const Tensor &kcache,
+    const Tensor &vcache,
+    const c10::optional<Tensor> &pos_cos,
+    const c10::optional<Tensor> &pos_sin,
+    const Tensor &input_lengths,
+    const Tensor &cache_lengths,
+    const Tensor &save_slots,
+    const Tensor &block_tables,
+    const c10::optional<Tensor> &mask,
+    double softmax_scale)
+{
+    return paged_attention_v3(
+        output, query, key, value, kcache, vcache,
+        pos_cos, pos_sin, input_lengths, cache_lengths,
+        save_slots, block_tables, mask, softmax_scale);
+}
+
 }
