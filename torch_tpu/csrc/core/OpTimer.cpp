@@ -1,7 +1,6 @@
 #include "OpTimer.h"
 namespace tpu {
 
-GlobalTimer * GlobalTimer::instance_ = nullptr;
 OpTimer * OpTimer::instance_         = nullptr;
 
 OpTimer & OpTimer::Clear()
@@ -81,27 +80,6 @@ OpTimer & OpTimer::Instance()
   if ( instance_ == nullptr )
   {
     instance_ = new OpTimer;
-  }
-  return *instance_;
-}
-
-
-GlobalTimer & GlobalTimer::Reset()
-{
-  timer_.Start();
-  return *this;
-}
-
-void GlobalTimer::Dump() const
-{
-  std::cout << "TPU Elpased: " << timer_.ElapsedUS() << "us" << std::endl;
-}
-
-GlobalTimer & GlobalTimer::Instance()
-{
-  if ( instance_ == nullptr )
-  {
-    instance_ = new GlobalTimer;
   }
   return *instance_;
 }

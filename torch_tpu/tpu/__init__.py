@@ -84,8 +84,8 @@ __all__ = [
     "OpTimer_reset",
     "is_OpTimer_enabled",
     "OpTimer_dump",
-    "GlobalOpTimer_reset",
-    "GlobalOpTimer_dump",
+    "OpTimer_pause",
+    "OpTimer_start",
     "format_cast",          # tensor format cast
 
     ## custom tpu bmodel runtime funcs

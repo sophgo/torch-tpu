@@ -10,11 +10,11 @@ extern "C" {
     tpu::OpTimer::Instance().Dump();
   }
 
-  void tpu_timer_reset() {
-    tpu::GlobalTimer::Instance().Reset();
+  void tpu_op_timer_pause() {
+    tpu::OpTimer::Instance().Pause();
   }
 
-  void tpu_timer_dump() {
-    tpu::GlobalTimer::Instance().Dump();
+  void tpu_op_timer_start() {
+    tpu::OpTimer::Instance().Start();
   }
 } // extern "C"

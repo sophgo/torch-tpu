@@ -10,7 +10,6 @@
 #endif
 
 namespace tpu{
-
 struct OpTimer
 {
   OpTimer & Clear();
@@ -28,7 +27,6 @@ private:
   std::mutex mutex_;
   static OpTimer * instance_;
 };
-
 struct Timer
 {
   Timer & Start()
@@ -50,14 +48,4 @@ private:
   struct timeval timer;
 };
 
-struct GlobalTimer
-{
-  GlobalTimer & Reset();
-  void Dump() const;
-  static GlobalTimer & Instance();
-private:
-  GlobalTimer() {}
-  Timer timer_;
-  static GlobalTimer * instance_;
-};
 } // namespace tpu

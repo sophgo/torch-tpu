@@ -2,7 +2,7 @@ import torch
 import torch_tpu
 
 __all__ = ["OpTimer_reset", "is_OpTimer_enabled", "OpTimer_dump",
-           "GlobalOpTimer_reset", "GlobalOpTimer_dump"]
+           "OpTimer_pause", "OpTimer_start"]
 
 def is_OpTimer_enabled(enable):
     #TODO
@@ -14,9 +14,9 @@ def OpTimer_reset():
 def OpTimer_dump():
     return torch_tpu._C._Timer_OpDump()
 
-def GlobalOpTimer_reset():
-    return torch_tpu._C._Timer_GlobalReset()
+def OpTimer_pause():
+    return torch_tpu._C._Timer_OpPause()
 
 
-def GlobalOpTimer_dump():
-    return torch_tpu._C._Timer_GlobalDump()
+def OpTimer_start():
+    return torch_tpu._C._Timer_OpStart()
