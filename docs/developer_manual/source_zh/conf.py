@@ -55,7 +55,11 @@ extensions = [
     'sphinx.ext.todo',
     'sphinx.ext.mathjax',
     'sphinx.ext.ifconfig',
+    'breathe',
 ]
+
+breathe_projects = {"CustomAPI": "../../../doxygen/xml"}
+breathe_default_project = "CustomAPI"
 
 # Add any paths that contain templates here, relative to this directory.
 templates_path = ['_templates']

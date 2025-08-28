@@ -5,6 +5,127 @@
 
 namespace at
 {
+
+/**
+ * @brief Gated MLP (Multi-Layer Perceptron) with SwiGLU activation function
+ *
+ * Implements a gated feed-forward network commonly used in transformer architectures:
+ * FFN(x) = down_proj(SwiGLU(gate_proj(x), up_proj(x)))
+ * where SwiGLU(a, b) = silu(a) * b
+ *
+ * @param input Input tensor of shape [..., hidden_size]
+ * @param up_proj Up projection weight matrix of shape [intermediate_size, hidden_size]
+ * @param gate_proj Gate projection weight matrix of shape [intermediate_size, hidden_size]
+ * @param down_proj Down projection weight matrix of shape [intermediate_size, hidden_size]
+ * @param up_bias Optional bias for up projection of shape [intermediate_size]
+ * @param gate_bias Optional bias for gate projection of shape [intermediate_size]
+ * @param down_bias Optional bias for down projection of shape [hidden_size]
+ * @param output Output tensor of same shape as input [..., hidden_size]
+ * @return Tensor Reference to the output tensor
+ *
+ * @details
+ * This function implements a gated MLP which uses a Gated Linear Unit (GLU) variant
+ * with SiLU activation (SwiGLU). The operations performed are:
+ * 1. Projects input through gate_proj and up_proj linear transformations
+ * 2. Applies SwiGLU activation: silu(gate_output) * up_output
+ * 3. Projects the result through down_proj to match the original dimension
+ *
+ * This gated architecture is used in Llama, Llama2, and other related models for
+ * improved performance over standard MLPs.
+ *
+ * @note The function performs in-place operations on the output tensor
+ * @note This is a specialized MLP variant used in transformer architectures like Llama, Qwen, etc.
+ * @see mlp() for standard 2-layer MLP implementation
+ */
+Tensor gated_mlp(
+    const Tensor &input,
+    const Tensor& up_proj,
+    const Tensor& gate_proj,
+    const Tensor& down_proj,
+    const c10::optional<Tensor> &up_bias,
+    const c10::optional<Tensor> &gate_bias,
+    const c10::optional<Tensor> &down_bias,
+    Tensor &output);
+/**
+ * @brief Standard 2-layer MLP (Multi-Layer Perceptron) forward pass
+ *
+ * Implements a traditional feed-forward network with two linear transformations:
+ * MLP(x) = weight2(activation(weight1(x) + bias1) + bias2)
+ *
+ * @param input Input tensor of shape [..., input_size]
+ * @param weight1 First weight matrix of shape [input_size, hidden_size]
+ * @param weight2 Second weight matrix of shape [hidden_size, output_size]
+ * @param bias1 Optional bias for first linear layer of shape [hidden_size]
+ * @param bias2 Optional bias for second linear layer of shape [output_size]
+ * @param activation Activation function type ("gelu", "none")
+ * @param out Output tensor of shape [..., output_size]
+ * @return Tensor Reference to the output tensor
+ *
+ * @details
+ * This function implements a standard MLP with configurable activation function:
+ * 1. Linear transformation: weight1 * input + bias1
+ * 2. Apply specified activation function
+ * 3. Linear transformation: weight2 * activated_result + bias2
+ *
+ * Supported activation functions:
+ * - "gelu": Gaussian Error Linear Unit
+ * - "none": No activation (identity)
+ *
+ * @note This is a simpler MLP variant compared to the gated versions like gated_mlp
+ * @see gated_mlp for gated MLP implementation
+ */
+Tensor mlp(
+    const Tensor &input,
+    const Tensor &weight1,
+    const Tensor &weight2,
+    const c10::optional<Tensor> &bias1,
+    const c10::optional<Tensor> &bias2,
+    const std::string& activation,
+    Tensor &out);
+
+/**
+ * @brief Standard multi-head attention mechanism
+ *
+ * Implements the scaled dot-product attention operation commonly used in transformer architectures:
+ * Attention(Q, K, V) = softmax(QK^T * scale + mask) * V
+ *
+ * @param output Output tensor of shape [..., seq_len, num_heads, head_dim]
+ * @param query Query tensor of shape [..., seq_len, num_heads, head_dim]
+ * @param key Key tensor of shape [..., seq_len, num_heads, head_dim]
+ * @param value Value tensor of shape [..., seq_len, num_heads, head_dim]
+ * @param pos_cos Optional cosine positional embeddings for rotary positional encoding of shape [..., seq_len, 1, head_dim]
+ * @param pos_sin Optional sine positional embeddings for rotary positional encoding of shape [..., seq_len, 1, head_dim]
+ * @param mask Optional attention mask to prevent attention to certain positions of shape [seq_len, seq_len]
+ * @param softmax_scale Scaling factor applied to the dot product before softmax, typically 1/sqrt(head_dim)
+ * @return Tensor The result of attention operation with the same shape as query
+ *
+ * @details
+ * This function computes the standard attention mechanism used in transformer models.
+ * It supports rotary positional embeddings (RoPE) through pos_cos and pos_sin parameters,
+ * and optional masking for causal or other attention patterns.
+ *
+ * The attention computation follows these steps:
+ * 1. Compute scaled dot-product between query and key tensors
+ * 2. Apply rotary positional embeddings if provided
+ * 3. Apply mask if provided
+ * 4. Apply softmax to get attention weights
+ * 5. Multiply attention weights with value tensor
+ *
+ * @note This is a core attention implementation used in various transformer-based models.
+ * **And the query, key and value may be packed into a single tensor which is stored in `query`,
+ * with shape of [..., seq_len, query_head + key_head + value_head, head_dim]**
+ */
+Tensor attention(
+    Tensor &output,
+    const Tensor &query,
+    const Tensor &key,
+    const Tensor &value,
+    const c10::optional<Tensor> &pos_cos,
+    const c10::optional<Tensor> &pos_sin,
+    const c10::optional<Tensor> &mask,
+    double softmax_scale);
+
+  /// @cond INTERNAL
 	Tensor mlp_forward(
 		Tensor &input,
 		Tensor &w1,
@@ -461,4 +582,5 @@ namespace at
 		int64_t n_groups,
 		int64_t topk_groups,
 		int64_t top_k);
+  /// @endcond
 }

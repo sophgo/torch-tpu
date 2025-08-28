@@ -46,4 +46,25 @@ namespace at
 		TIMING_END;
 		return OUT;
 	}
+
+Tensor attention(
+    Tensor &output,
+    const Tensor &query,
+    const Tensor &key,
+    const Tensor &value,
+    const c10::optional<Tensor> &pos_cos,
+    const c10::optional<Tensor> &pos_sin,
+    const c10::optional<Tensor> &mask,
+    double softmax_scale)
+{
+    return llava_attention(
+        output,
+        const_cast<Tensor &>(query),
+        const_cast<Tensor &>(key),
+        const_cast<Tensor &>(value),
+        pos_cos,
+        pos_sin,
+        mask,
+        softmax_scale);
+}
 }

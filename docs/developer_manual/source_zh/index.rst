@@ -16,9 +16,9 @@ TORCH-TPU开发参考手册
    04_device_and_mem
    05_mix_precision
    06_distribute
-   07_custom_op
    08_stream
    09_dynamo
    10_Memmory_Format
    11_superParSel
+   07_custom_op
    Appx.01_supported_ops

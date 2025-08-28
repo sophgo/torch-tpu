@@ -12,6 +12,10 @@ popd
 
 # generate torch-tpu_technical_manual
 # ------------------------------------------------------------------------------
+# generate doxygen document for custom ops
+apt-get update && apt-get install -y doxygen && pip install breathe || exit -1
+doxygen config.doxy || exit -1
+
 pushd ${DIR}/docs/developer_manual
 make clean
 make pdf || exit -1

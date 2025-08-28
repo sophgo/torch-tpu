@@ -30,6 +30,10 @@ namespace at
 	{
 		m.def("dummy", dummy);
 		m.def("dummy_no_kernel_launch", dummy_no_kernel_launch);
+    m.def("gated_mlp", gated_mlp);
+    m.def("mlp", mlp);
+    m.def("attention", attention);
+
 		m.def("llava_mlp", llava_mlp);
 		m.def("llava_attention", llava_attention);
 		m.def("latent_attention", latent_attention);

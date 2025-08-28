@@ -165,4 +165,22 @@ Tensor llama_mlp_gptq_forward(
 		return output;
 	}
 
+Tensor gated_mlp(
+    const Tensor &input,
+    const Tensor& up_proj,
+    const Tensor& gate_proj,
+    const Tensor& down_proj,
+    const c10::optional<Tensor> &up_bias,
+    const c10::optional<Tensor> &gate_bias,
+    const c10::optional<Tensor> &down_bias,
+    Tensor &output)
+{
+  return llama_mlp_forward(
+      const_cast<Tensor&>(input),
+      const_cast<Tensor&>(up_proj),
+      const_cast<Tensor&>(gate_proj),
+      const_cast<Tensor&>(down_proj),
+      up_bias, gate_bias, down_bias, c10::nullopt,
+      c10::nullopt, output, false);
+}
 }

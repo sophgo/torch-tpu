@@ -44,4 +44,20 @@ namespace at
 		return out;
 	}
 
+Tensor mlp(
+    const Tensor &input,
+    const Tensor &weight1,
+    const Tensor &weight2,
+    const c10::optional<Tensor> &bias1,
+    const c10::optional<Tensor> &bias2,
+    const std::string& activation,
+    Tensor &out)
+{
+	TORCH_CHECK(activation == "gelu");
+	return llava_mlp(
+      const_cast<Tensor&>(input),
+      const_cast<Tensor&>(weight1),
+      const_cast<Tensor&>(weight2),
+      bias1, bias2, out);
+}
 }
