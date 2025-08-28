@@ -32,12 +32,14 @@ Tensor & norm_out_tpu ( const at::Tensor & self, const c10::optional<at::Scalar>
   }
   else
   {
+    auto buffer = empty({8}, out.options().dtype(torch::kFloat32));
     TORCH_CHECK ( (int)dim.size() == self.dim() || dim.size() == 0 ); // TODO: Support partial dims
     for (int i = 0; i < (int)dim.size(); i++) { TORCH_CHECK ( dim[i] == i ); }
     auto stream = c10_tpu::getCurrentTPUStream();
     auto status = tpudnnNorm2Async(
         stream,
         tpu::TPUGenerateTpudnnTensor(stream, self),
+        tpu::TPUGenerateTpudnnTensor(stream, buffer),
         keepdim,
         tpu::TPUGenerateTpudnnTensor(stream, out));
     TORCH_CHECK(status == TPUDNN_STATUS_SUCCESS);

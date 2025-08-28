@@ -30,6 +30,18 @@ extern "C"
     tpudnnStatus_t tpudnnLaunchKernel(tpudnnHandle_t handle, const char *kernelName,
                                       void *arg, size_t argBytes, int groupNum, int groupSize);
     tpudnnStatus_t tpudnnSync(tpudnnHandle_t handle);
+
+    tpudnnStatus_t tpudnnMemcpyHostToDevice(tpudnnHandle_t handle, uint64_t dst, void *src, size_t size);
+    tpudnnStatus_t tpudnnMemcpyDeviceToHost(tpudnnHandle_t handle, void *dst, uint64_t src, size_t size);
+
+    typedef void *tpudnnGraph_t;
+    tpudnnStatus_t tpudnnStreamBeginCapture(tpudnnHandle_t handle);
+    tpudnnStatus_t tpudnnStreamEndCapture(tpudnnHandle_t handle, tpudnnGraph_t *graph);
+    tpudnnStatus_t tpudnnGraphDestroy(tpudnnGraph_t graph);
+    typedef void *tpudnnGraphExec_t;
+    tpudnnStatus_t tpudnnGraphInstantiate(tpudnnGraphExec_t *instance, tpudnnGraph_t graph, void *ext);
+    tpudnnStatus_t tpudnnGraphExecDestroy(tpudnnGraphExec_t instance);
+    tpudnnStatus_t tpudnnGraphLaunch(tpudnnGraphExec_t instance, tpudnnHandle_t handle);
 }
 
 #include "tpuDNNTensor.h"

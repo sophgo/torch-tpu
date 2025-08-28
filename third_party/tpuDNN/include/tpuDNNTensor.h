@@ -437,6 +437,7 @@ tpudnnStatus_t tpudnnWhereAsync(
 tpudnnStatus_t tpudnnNorm2Async(
     tpudnnHandle_t handle,
     const tpudnnTensor_t input,
+    const tpudnnTensor_t buffer,
     int keepdim,
     tpudnnTensor_t output);
 

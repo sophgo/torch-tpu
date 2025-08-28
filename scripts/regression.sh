@@ -167,38 +167,6 @@ function regression_for_scclHost() {
     done
 }
 
-# function for online regression
-function link_libsophon() {
-    echo "********************************************"
-    echo "[STEP]install libsophon"
-    CURRENT_DIR=$(dirname ${BASH_SOURCE})
-    LIBSOPHON_LINK_PATTERN=${1:-local}
-    DEB_PATH_STABLE=${2:-none}
-    VERSION_PATH_STABLE=${3:-0.4.8}
-    if [ $LIBSOPHON_LINK_PATTERN = 'stable' ]; then
-      echo "[NOTE]STABLE LIBSOHON IS ADAPATED FROM .deb"
-      if [ $DEB_PATH_STABLE = 'none' ]; then
-        echo "[ERROR]Wrong libsophon .deb upper-path!"
-        return 255
-      else
-        echo "[INFO]LIBSOPHON_PATH_TPU_TRAIN:$DEB_PATH_STABLE"
-        pushd "$DEB_PATH_STABLE"
-        if [  ! -r "$DEB_PATH_STABLE" ]; then
-          echo "[ERROR]libsophon_dependency: $DEB_PATH_STABLE is not found!"
-        else
-          libsohpon_install_cmd="apt install  ./sophon-libsophon_${VERSION_PATH_STABLE}_amd64.deb ./sophon-libsophon-dev_${VERSION_PATH_STABLE}_amd64.deb"
-          $libsohpon_install_cmd
-          device_project="source /etc/profile.d/libsophon-bin-path.sh"
-          $device_project
-        fi
-        popd
-      fi
-    else
-      echo "local LIBSOHON IS ADAPATED from libsophon-file"
-    fi
-    echo "********************************************"
-}
-
 function make_kernel_module() {
   test_CHIP_ARCH=${1:-bm1684x}
   CURRENT_DIR=$(dirname ${BASH_SOURCE})
@@ -234,13 +202,13 @@ function build_kernel_module() {
 function check_third_party() {
   strings third_party/firmware/sg2260/libfirmware_core.a | grep 'remove_polls_flag';
   ret_firmware_check=$?
-  if [ $ret_firmware_check -eq 0 ]; then
-    return 0;
-  else
+  if [ $ret_firmware_check -ne 0 ]; then
     echo "[Error] Not Found 'remove_polls_flag' in third_party/firmware/sg2260/libfirmware_core.a !!!"
     echo "[Error] You should rebuild_TPU1686, with export EXTRA_CONFIG='-DREMOVE_POLLS_IN_LLM=ON'"
     return -1;
   fi
+  check_riscv_third_party_version;
+  return $?;
 }
 
 function build_riscv_whl() {
@@ -257,7 +225,7 @@ function build_riscv_whl() {
   return $ret
 }
 
-function check_riscv_thrid_party_version() {
+function check_riscv_third_party_version() {
   FILE1="$CURRENT_DIR/../third_party/tpuDNN/sg2260_lib/libtpudnn.so"
   FILE2="$CURRENT_DIR/../third_party/tpuDNN/sg2260_lib/libtpudnn-riscv.so"
   OUTPUT1=$(nm "$FILE1" | grep 1686 | awk 'NR==2 {print $3}')
@@ -279,9 +247,9 @@ function run_online_regression_test() {
   echo "********************************************"
   echo "[NOTE]Print_necessary_info"
   echo "[INFO]CURRENT_DIR:$CURRENT_DIR"
-
   bash scripts/release.sh || return -1
   export SKIP_DOC=true
+  export DISABLE_CACHE=1
 
   test_CHIP_ARCH=${1:-bm1684x}
   LIBSOPHON_LINK_PATTERN=${2:-local} #local or stable
@@ -292,8 +260,8 @@ function run_online_regression_test() {
   echo "[INFO]test_CHIP_ARCH:$test_CHIP_ARCH"
   echo "[INFO]LIBSOPHON_LINK_PATTERN=$LIBSOPHON_LINK_PATTERN"
   echo "[INFO]TEST_PATTERN=$TEST_PATTERN"
-  link_libsophon $LIBSOPHON_LINK_PATTERN $DEB_PATH_STABLE $VERSION_PATH_STABLE; ret_libsophon=$?
 
+  echo "********************************* thirdparty checking... ...*********************************"
   check_third_party; ret_check_third_party=$?
   if [ $ret_check_third_party -eq 0 ];then
     echo "[PRECHECK-$test_CHIP_ARCH] third_party's so lib check true!"
@@ -301,82 +269,77 @@ function run_online_regression_test() {
     echo "[PRECHECK-$test_CHIP_ARCH] third_party's so lib check failed!"
     return -1
   fi
+  echo "******************************* thirdparty check Successful *********************************"
 
-  if [ $ret_libsophon -eq 255 ]; then
-    echo "[INFO]test_CHIP_ARCH:$test_CHIP_ARCH libsophon setting failed!"
-    return -1
-  else
-    if [ $LIBSOPHON_LINK_PATTERN = 'stable' ];then
-      echo "[INFO]test_CHIP_ARCH:$test_CHIP_ARCH"
-      source  $CURRENT_DIR/envsetup.sh $test_CHIP_ARCH $LIBSOPHON_LINK_PATTERN
-      new_clean;new_build || return -1
-    elif [ $LIBSOPHON_LINK_PATTERN = 'local' ];then
-      echo "************** $LIBSOPHON_LINK_PATTERN-LIBSOPHON IS REAEDY *********"
-      source  $CURRENT_DIR/envsetup.sh $test_CHIP_ARCH $LIBSOPHON_LINK_PATTERN
-      new_clean;new_build || return -1
-      TPU_TRAIN_CMODEL_PATH=$CURRENT_DIR/../build/firmware_${test_CHIP_ARCH}_cmodel/libfirmware.so
-      echo "[INFO]tpu_train_cmodel_path:$TPU_TRAIN_CMODEL_PATH"
-      set_cmodel_firmware $TPU_TRAIN_CMODEL_PATH
-      echo "*************** CMODEL IS SET *************"
-    fi
-    if [ $test_CHIP_ARCH = 'sg2260' ]; then
-      regression_for_tgi; ret_regression_for_tgi=$?
-      if [ $ret_regression_for_tgi -eq 0 ];then
-        echo "[RESULT-$test_CHIP_ARCH] regression_for_tgi is computed successfully!"
-      else
-        echo "[RESULT-$test_CHIP_ARCH] regression_for_tgi is computed failed!"
-        return -1
-      fi
-    fi
-    if [ $TEST_PATTERN = "online" ] || [ $TEST_PATTERN = "local" ];then
-      # build_libtorch_plugin $TEST_PATTERN
-      echo "*************** LIBTORCH_PLUGIN IS BUILT *************"
-      ops_utest; ret_ops_utest=$?
-      echo "[INFO]ret_ops_utest:$ret_ops_utest"
-      if [ $ret_ops_utest -eq 0 ];then #must return [0,255] otherwise it will cause scripts fault early
-        echo "[RESULT-$test_CHIP_ARCH] all ops_utest are computed, Please check Results above"
-      else
-        echo "[RESULT-$test_CHIP_ARCH] some ops_utest are failed!"
-        return -1
-      fi
-    fi
-    if [ $test_CHIP_ARCH = 'sg2260' ]; then
-      regression_for_sccl; ret_regression_for_sccl=$?
-      if [ $ret_regression_for_sccl -eq 0 ];then
-        echo "[RESULT-$test_CHIP_ARCH] regression_for_sccl is computed successfully!"
-      else
-        echo "[RESULT-$test_CHIP_ARCH] regression_for_sccl is computed failed!"
-        return -1
-      fi
-    fi
-    if [ $test_CHIP_ARCH = 'sg2260' ]; then
-      regression_for_scclHost; ret_regression_for_scclHost=$?
-      if [ $ret_regression_for_scclHost -eq 0 ];then
-        echo "[RESULT-$test_CHIP_ARCH] ret_regression_for_scclHost is computed successfully!"
-      else
-        echo "[RESULT-$test_CHIP_ARCH] ret_regression_for_scclHost is computed failed!"
-        return -1
-      fi
-    fi
-    if [ $test_CHIP_ARCH = 'sg2260' ]; then
-      check_riscv_thrid_party_version; ret_regression_for_riscv_check=$?
-      if [ $ret_regression_for_riscv_check -eq 0 ];then
-        echo "[RESULT-$test_CHIP_ARCH] riscv shared libs check successfully!"
-      else
-        echo "[RESULT-$test_CHIP_ARCH] riscv shared libs check failed!"
-        return -1
-      fi
-    fi
-    if [ $test_CHIP_ARCH = 'sg2260' ]; then
-      build_riscv_whl; ret_regression_for_riscv=$?
-      if [ $ret_regression_for_riscv -eq 0 ];then
-        echo "[RESULT-$test_CHIP_ARCH] riscv torch-tpu.whl is build successfully!"
-      else
-        echo "[RESULT-$test_CHIP_ARCH] riscv torch-tpu.whl is build failed!"
-        return -1
-      fi
+  echo "********************************* Building... ...*************************************"
+  source  $CURRENT_DIR/envsetup.sh $test_CHIP_ARCH $LIBSOPHON_LINK_PATTERN
+  new_clean;new_build || return -1
+  TPU_TRAIN_CMODEL_PATH=$CURRENT_DIR/../build/firmware_${test_CHIP_ARCH}_cmodel/libfirmware.so
+  echo "[INFO]tpu_train_cmodel_path:$TPU_TRAIN_CMODEL_PATH"
+  set_cmodel_firmware $TPU_TRAIN_CMODEL_PATH
+  echo "********************************* Build Successful *********************************"
+
+  echo "****************************** tgi regression...*************************************"
+  if [ $test_CHIP_ARCH = 'sg2260' ]; then
+    regression_for_tgi; ret_regression_for_tgi=$?
+    if [ $ret_regression_for_tgi -eq 0 ];then
+      echo "[RESULT-$test_CHIP_ARCH] regression_for_tgi is computed successfully!"
+    else
+      echo "[RESULT-$test_CHIP_ARCH] regression_for_tgi is computed failed!"
+      return -1
     fi
   fi
+  echo "****************************** tgi  Successful *************************************"
+
+
+  echo "****************************** ops utesting... ...***********************************"
+  ops_utest; ret_ops_utest=$?
+  echo "[INFO]ret_ops_utest:$ret_ops_utest"
+  if [ $ret_ops_utest -eq 0 ];then #must return [0,255] otherwise it will cause scripts fault early
+    echo "[RESULT-$test_CHIP_ARCH] all ops_utest are computed, Please check Results above"
+  else
+    echo "[RESULT-$test_CHIP_ARCH] some ops_utest are failed!"
+    return -1
+  fi
+  echo "****************************** ops utest Successful***********************************"
+
+
+  echo "****************************** sccl utesting ... ...***********************************"
+  if [ $test_CHIP_ARCH = 'sg2260' ]; then
+    regression_for_sccl; ret_regression_for_sccl=$?
+    if [ $ret_regression_for_sccl -eq 0 ];then
+      echo "[RESULT-$test_CHIP_ARCH] regression_for_sccl is computed successfully!"
+    else
+      echo "[RESULT-$test_CHIP_ARCH] regression_for_sccl is computed failed!"
+      return -1
+    fi
+  fi
+  echo "****************************** sccl utest Successful ***********************************"
+
+  echo "****************************** scclHost utesting...  ***********************************"
+  if [ $test_CHIP_ARCH = 'sg2260' ]; then
+    regression_for_scclHost; ret_regression_for_scclHost=$?
+    if [ $ret_regression_for_scclHost -eq 0 ];then
+      echo "[RESULT-$test_CHIP_ARCH] ret_regression_for_scclHost is computed successfully!"
+    else
+      echo "[RESULT-$test_CHIP_ARCH] ret_regression_for_scclHost is computed failed!"
+      return -1
+    fi
+  fi
+  echo "****************************** scclHost utest Successful ********************************"
+
+  echo "****************************** build_riscv_whl ... ...   ********************************"
+  if [ $test_CHIP_ARCH = 'sg2260' ]; then
+    build_riscv_whl; ret_regression_for_riscv=$?
+    if [ $ret_regression_for_riscv -eq 0 ];then
+      echo "[RESULT-$test_CHIP_ARCH] riscv torch-tpu.whl is build successfully!"
+    else
+      echo "[RESULT-$test_CHIP_ARCH] riscv torch-tpu.whl is build failed!"
+      return -1
+    fi
+  fi
+  echo "****************************** build_riscv_whl Successful ********************************"
+  unset DISABLE_CACHE
 }
 
 function run_daily_regression_test() {
@@ -398,83 +361,53 @@ function run_daily_regression_test() {
   echo "[INFO]test_CHIP_ARCH:$test_CHIP_ARCH"
   echo "[INFO]LIBSOPHON_LINK_PATTERN=$LIBSOPHON_LINK_PATTERN"
   echo "[INFO]TEST_PATTERN=$TEST_PATTERN"
-  link_libsophon $LIBSOPHON_LINK_PATTERN $DEB_PATH_STABLE $VERSION_PATH_STABLE; ret_libsophon=$?
-  if [ $ret_libsophon -eq 255 ]; then
-    echo "[INFO]test_CHIP_ARCH:$test_CHIP_ARCH libsophon setting failed!"
-    return -1
-  else
-    if [ $LIBSOPHON_LINK_PATTERN = 'stable' ];then
-      echo "[INFO]test_CHIP_ARCH:$test_CHIP_ARCH"
-      build_kernel_module $test_CHIP_ARCH
-    elif [ $LIBSOPHON_LINK_PATTERN = 'local' ];then
-      echo "************** $LIBSOPHON_LINK_PATTERN-LIBSOPHON IS REAEDY *********"
-      source  $CURRENT_DIR/envsetup.sh $test_CHIP_ARCH $LIBSOPHON_LINK_PATTERN
-      new_clean; new_build
-      TPU_TRAIN_CMODEL_PATH=$CURRENT_DIR/../build/firmware_${test_CHIP_ARCH}_cmodel/libfirmware.so
-      echo "[INFO]tpu_train_cmodel_path:$TPU_TRAIN_CMODEL_PATH"
-      set_cmodel_firmware $TPU_TRAIN_CMODEL_PATH
-      echo "*************** CMODEL IS SET *************"
+
+  echo "************** $LIBSOPHON_LINK_PATTERN-LIBSOPHON IS REAEDY *********"
+  source  $CURRENT_DIR/envsetup.sh $test_CHIP_ARCH $LIBSOPHON_LINK_PATTERN
+  new_clean; new_build
+  TPU_TRAIN_CMODEL_PATH=$CURRENT_DIR/../build/firmware_${test_CHIP_ARCH}_cmodel/libfirmware.so
+  echo "[INFO]tpu_train_cmodel_path:$TPU_TRAIN_CMODEL_PATH"
+  set_cmodel_firmware $TPU_TRAIN_CMODEL_PATH
+  echo "*************** CMODEL IS SET *************"
+  
+  if [ $TEST_PATTERN = "online" ] || [ $TEST_PATTERN = "local" ];then
+    # build_libtorch_plugin $TEST_PATTERN
+    echo "*************** LIBTORCH_PLUGIN IS BUILT *************"
+    ops_utest; ret_ops_utest=$?
+    echo "[INFO]ret_ops_utest:$ret_ops_utest"
+    if [ $ret_ops_utest -eq 0 ];then #must return [0,255] otherwise it will cause scripts fault early
+      echo "[RESULT-$test_CHIP_ARCH] all ops_utest are computed, Please check Results above"
+    else
+      echo "[RESULT-$test_CHIP_ARCH] some ops_utest are failed!"
+      return -1
     fi
-    if [ $TEST_PATTERN = "online" ] || [ $TEST_PATTERN = "local" ];then
-      # build_libtorch_plugin $TEST_PATTERN
-      echo "*************** LIBTORCH_PLUGIN IS BUILT *************"
-      ops_utest; ret_ops_utest=$?
-      echo "[INFO]ret_ops_utest:$ret_ops_utest"
-      if [ $ret_ops_utest -eq 0 ];then #must return [0,255] otherwise it will cause scripts fault early
-        echo "[RESULT-$test_CHIP_ARCH] all ops_utest are computed, Please check Results above"
+    if [ "${test_CHIP_ARCH}" = "sg2260" ]; then
+      gpt3block_test; ret_gpt3block_test=$?
+      echo "[INFO]ret_gpt3block_test:$ret_gpt3block_test"
+      if [ $ret_gpt3block_test -eq 0 ];then #must return [0,255] otherwise it will cause scripts fault early
+        echo "[RESULT-$test_CHIP_ARCH] all gpt3block results are computed, Please check Results above"
       else
-        echo "[RESULT-$test_CHIP_ARCH] some ops_utest are failed!"
+        echo "[RESULT-$test_CHIP_ARCH] some gpt3block results are failed!"
         return -1
       fi
-      if [ "${test_CHIP_ARCH}" = "sg2260" ]; then
-        gpt3block_test; ret_gpt3block_test=$?
-        echo "[INFO]ret_gpt3block_test:$ret_gpt3block_test"
-        if [ $ret_gpt3block_test -eq 0 ];then #must return [0,255] otherwise it will cause scripts fault early
-          echo "[RESULT-$test_CHIP_ARCH] all gpt3block results are computed, Please check Results above"
-        else
-          echo "[RESULT-$test_CHIP_ARCH] some gpt3block results are failed!"
-          return -1
-        fi
+    fi
+    if [ $test_CHIP_ARCH = 'sg2260' ]; then
+      regression_for_sccl; ret_regression_for_sccl=$?
+      if [ $ret_regression_for_sccl -eq 0 ];then
+        echo "[RESULT-$test_CHIP_ARCH] regression_for_sccl is computed successfully!"
+      else
+        echo "[RESULT-$test_CHIP_ARCH] regression_for_sccl is computed failed!"
+        return -1
       fi
-      if [ $test_CHIP_ARCH = 'sg2260' ]; then
-        regression_for_sccl; ret_regression_for_sccl=$?
-        if [ $ret_regression_for_sccl -eq 0 ];then
-          echo "[RESULT-$test_CHIP_ARCH] regression_for_sccl is computed successfully!"
-        else
-          echo "[RESULT-$test_CHIP_ARCH] regression_for_sccl is computed failed!"
-          return -1
-        fi
-      fi
-      if [ $test_CHIP_ARCH = 'sg2260' ]; then
-        build_riscv_whl; ret_regression_for_riscv=$?
-        if [ $ret_regression_for_riscv -eq 0 ];then
-          echo "[RESULT-$test_CHIP_ARCH] riscv torch-tpu.whl is build successfully!"
-        else
-          echo "[RESULT-$test_CHIP_ARCH] riscv torch-tpu.whl is build failed!"
-          return -1
-        fi
+    fi
+    if [ $test_CHIP_ARCH = 'sg2260' ]; then
+      build_riscv_whl; ret_regression_for_riscv=$?
+      if [ $ret_regression_for_riscv -eq 0 ];then
+        echo "[RESULT-$test_CHIP_ARCH] riscv torch-tpu.whl is build successfully!"
+      else
+        echo "[RESULT-$test_CHIP_ARCH] riscv torch-tpu.whl is build failed!"
+        return -1
       fi
     fi
   fi
-}
-
-function fast_build_bm1684x_stable() {
-  DEB_PATH_STABLE=${1:-none}
-  run_online_regression_test bm1684x stable fast $DEB_PATH_STABLE 0.4.8
-}
-
-function fast_build_bm1684x_local() {
-  run_online_regression_test bm1684x local fast
-}
-
-function fast_build_bm1684x_local_and_libtorch_plugin() {
-  run_online_regression_test bm1684x local fast
-}
-
-function fast_build_sg2260_local() {
-  run_online_regression_test sg2260 local fast
-}
-
-function fast_build_sg2260_local_and_libtorch_plugin() {
-  run_online_regression_test sg2260 local fast
 }
