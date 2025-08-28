@@ -11,9 +11,9 @@ list(APPEND CMAKE_MODULE_PATH ${CMAKE_SOURCE_DIR}/../../../cmake)
 
 include(config.cmake)
 
-include_directories($ENV{PPL_PROJECT_ROOT}/runtime/customize/include/)
-include_directories($ENV{PPL_PROJECT_ROOT}/runtime/${CHIP_ARCH}/TPU1686/kernel/include/)
-include_directories($ENV{PPL_PROJECT_ROOT}/runtime/kernel/)
+include_directories($ENV{PPL_INSTALL_PATH}/deps/common/dev/utils/include/)
+include_directories($ENV{PPL_INSTALL_PATH}/deps/common/dev/kernel/)
+include_directories($ENV{PPL_INSTALL_PATH}/deps/chip/tpub_7_1_e/TPU1686/kernel/include/)
 
 macro(compile_ppl_lib relative_path)
     set(abs_path "${CMAKE_CURRENT_SOURCE_DIR}/${relative_path}")
@@ -22,7 +22,7 @@ macro(compile_ppl_lib relative_path)
     foreach(pl_file IN LISTS pl_files)
         get_filename_component(base_name ${pl_file} NAME_WE)
         get_filename_component(dir_path ${pl_file} DIRECTORY)
-        set(PPL_CMD $ENV{PPL_PROJECT_ROOT}/bin/ppl-compile ${pl_file} -o ${dir_path}/${base_name} --chip ${CHIP_ARCH} --mode 6)
+        set(PPL_CMD $ENV{PPL_INSTALL_PATH}/bin/ppl-compile ${pl_file} -o ${dir_path}/${base_name} --chip ${CHIP_ARCH} --mode 6)
         string(JOIN " " PPL_CMD_WITH_SPACES ${PPL_CMD})
         message(${PPL_CMD_WITH_SPACES})
         add_custom_command(

@@ -71,7 +71,7 @@ endmacro()
 collect_ppl_host(csrc/ops/my_ops)
 collect_ppl_host(csrc/ops/native_ops)
 
-include_directories($ENV{PPL_PROJECT_ROOT}/runtime/customize/include/)
+include_directories($ENV{PPL_INSTALL_PATH}/deps/common/host/include/)
 endif()
 
 file(GLOB_RECURSE DIST_SRCS

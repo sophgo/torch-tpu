@@ -163,7 +163,7 @@ export TORCHTPU_STORAGE_CAST=ON
 
 ```bash
 source scripts/envsetup.sh sg2260e
-export PPL_PROJECT_ROOT=/the/path/to/ppl/install/
+export PPL_INSTALL_PATH=/the/path/to/ppl/install/
 rebuild_TPU1686
 develop_torch_tpu
 ```
