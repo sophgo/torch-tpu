@@ -64,12 +64,22 @@ TORCH-TPU可以在Docker中开发, 配置好Docker就可以编译和运行了。
 
 .. code-block:: shell
 
+  对于BM1684X，按以下命令创建容器:
   $ docker run --cap-add SYS_ADMIN -itd --restart always --privileged=true \
       -e LD_LIBRARY_PATH=/opt/sophon/libsophon-current/lib:$LD_LIBRARY_PATH \
       -v /dev=/dev \
       -v /opt:/opt   \
       -v $HOME:/workspace \
       --name my sophgo/torch_tpu:v0.1-py311 bash
+
+  对于SG2260，按以下命令创建容器:
+  $ docker run --cap-add SYS_ADMIN -itd --restart always --privileged=true \
+      -e LD_LIBRARY_PATH=/opt/tpuv7/tpuv7-current/lib:$LD_LIBRARY_PATH \
+      -v /dev=/dev \
+      -v /opt:/opt   \
+      -v $HOME:/workspace \
+      --name my sophgo/torch_tpu:v0.1-py311 bash
+ 
   # myname只是举个名字的例子, 请指定成自己想要的容器的名字
   # -e LD_LIBRARY_PATH=... -e PATH=... 是引入libsophon的环境变量
 

@@ -71,6 +71,7 @@ Docker环境配置
 
 .. code-block:: shell
 
+   对于BM1684X，按以下命令创建容器:
    docker run --cap-add SYS_ADMIN -itd --restart always --privileged \
       -e LD_LIBRARY_PATH=/opt/sophon/libsophon-current/lib:$LD_LIBRARY_PATH \
       -v /dev:/dev \
@@ -79,6 +80,16 @@ Docker环境配置
       -w /workspace \
       --name torch_tpu_0 sophgo/torch_tpu:v0.1-py311 bash
 
+   对于SG2260， 按以下命令创建容器:
+   docker run --cap-add SYS_ADMIN -itd --restart always --privileged \
+      -e LD_LIBRARY_PATH=/opt/tpuv7/tpuv7-current/lib:$LD_LIBRARY_PATH \
+      -v /dev:/dev \
+      -v $HOME:/workspace \
+      -v /opt:/opt   \
+      -w /workspace \
+      --name torch_tpu_0 sophgo/torch_tpu:v0.1-py311 bash
+
+   进入容器：
    docker attach torch_tpu_0
 
   # <torch_tpu_0>为自己想要的容器的名字
