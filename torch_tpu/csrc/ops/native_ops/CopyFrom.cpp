@@ -226,6 +226,35 @@ Tensor _to_copy_tpu(const Tensor &self, c10::optional<ScalarType> dtype_opt,
   return _copy_from_tpu(self_, dst, non_blocking);
 }
 
+// contiguous
+Tensor &clone_out_tpu(const Tensor &self,
+                      c10::optional<MemoryFormat> memory_format_opt,
+                      Tensor &dst) {
+  TIMING_START;
+  if (self.numel() == 0) {return dst;}
+  TORCH_CHECK( self.scalar_type() == dst.scalar_type(), "[clone_out] IO must have same dtype" );
+  TORCH_CHECK( self.device() == dst.device(), "[clone_out] IO must on same device" );
+
+  if (self.is_contiguous() && dst.is_contiguous()) {
+    auto stream = c10_tpu::getCurrentTPUStream();
+    auto status = tpudnnGDMAD2DAsync(
+      stream,
+      tpu::TPUGenerateTpudnnTensor(stream, self),
+      tpu::TPUGenerateTpudnnTensor(stream, dst),
+      dst.nbytes());
+    TORCH_CHECK(status == TPUDNN_STATUS_SUCCESS);
+  } else {
+    auto stream = c10_tpu::getCurrentTPUStream();
+    auto status = tpudnnStridedCopyAsync(
+      stream,
+      tpu::TPUGenerateTpudnnTensor(stream, self),
+      tpu::TPUGenerateTpudnnTensor(stream, dst));
+    TORCH_CHECK(status == TPUDNN_STATUS_SUCCESS);
+  }
+  TIMING_END;
+  return dst;
+}
+
 Tensor clone_tpu(const Tensor &self,
                  c10::optional<MemoryFormat> memory_format_opt) {
   auto memory_format_opt_ = memory_format_opt;
@@ -233,14 +262,7 @@ Tensor clone_tpu(const Tensor &self,
     memory_format_opt_ = self.options().memory_format_opt();
   }
   auto dst = empty(self.sizes(), self.options(), memory_format_opt_);
-  return _copy_from_tpu(self, dst, false);
-}
-
-Tensor &clone_out_tpu(const Tensor &self,
-                      c10::optional<MemoryFormat> memory_format_opt,
-                      Tensor &out) {
-  _copy_from_tpu(self, out, false);
-  return out;
+  return clone_out_tpu(self, memory_format_opt, dst);
 }
 
 TORCH_LIBRARY_IMPL(aten, TPU, m) {

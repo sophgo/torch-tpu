@@ -16,7 +16,7 @@ class _MultiDeviceReplicator:
     def __init__(self, master_tensor: torch.Tensor) -> None:
         assert master_tensor.is_tpu
         self.master = master_tensor
-        self._per_device_tensors: Dict[torch.device, torch.Tensor] = {}
+        self._per_device_tensors: Dict[torch.device, torch.Tensor] = {self.master.device : self.master}
 
     def get(self, device) -> torch.Tensor:
         retval = self._per_device_tensors.get(device, None)

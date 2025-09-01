@@ -7,14 +7,14 @@ import torch_tpu
 def case1(use_fp16):
     ############## config ###################
     device = "tpu"
-    batch = 2
-    sequence = 8
-    hidden_size = 768
+    batch = 1
+    sequence = 1
+    hidden_size = 8
     #########################################
 
-    dq = torch.rand(batch, sequence, hidden_size)
-    dk = torch.rand(batch, sequence, hidden_size)
-    dv = torch.rand(batch, sequence, hidden_size)
+    dq = torch.randn(batch, sequence, hidden_size)
+    dk = torch.randn(batch, sequence, hidden_size)
+    dv = torch.randn(batch, sequence, hidden_size)
 
     dq_tpu = dq.to(device)
     dk_tpu = dk.to(device)
@@ -25,15 +25,22 @@ def case1(use_fp16):
         dv_tpu = dv_tpu.half()
 
     print("=======forward")
-    out = torch.concatenate((dq,dk,dv), dim=-1)
-    out_tpu = torch.concatenate((dq_tpu, dk_tpu, dv_tpu), dim=-1).half()
+    out = torch.concatenate((dq,dk,dv,dq,dk,dk,dv,dq,
+                             dq,dk,dv,dq,dk,dk,dv,dq,
+                             dq,dk,dk,dv,dq,dk,dk,dk,
+                             dk,dk,dk), dim=-1)
+    out_tpu = torch.concatenate((dq_tpu, dk_tpu, dv_tpu, dq_tpu, dk_tpu, dk_tpu, dv_tpu, dq_tpu,
+                                 dq_tpu, dk_tpu, dv_tpu, dq_tpu, dk_tpu, dk_tpu, dv_tpu, dq_tpu,
+                                 dq_tpu, dk_tpu, dk_tpu, dv_tpu, dq_tpu, dk_tpu, dk_tpu, dk_tpu,
+                                 dk_tpu, dk_tpu, dk_tpu), dim=-1)
     if use_fp16: 
         out_tpu = out_tpu.half()
-
     print("============compare result =======")
     diff = out - out_tpu.cpu()
     print("max diff : ", torch.max(abs(diff)))
-    print("max diff : ", out_tpu.cpu())
+    print(diff)
+    import pdb; pdb.set_trace()
+
 def case2():
     """split backward
     """
@@ -62,5 +69,5 @@ def case2():
 
 
 if __name__ == "__main__":
-    case1(use_fp16 =1 )
+    case1(use_fp16 =0 )
     # case2()

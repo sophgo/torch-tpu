@@ -866,7 +866,8 @@ tpudnnStatus_t tpudnnInfCheckAndUnscaleAsync(
     tpudnnHandle_t handle,
     std::vector<tpudnnTensor_t>& inputs,
     tpudnnTensor_t found_inf,
-    float inv_scale);
+    tpudnnTensor_t buffer,
+    tpudnnTensor_t inv_scale);
 
 tpudnnStatus_t tpudnnRmsNormForwardAsync(
     tpudnnHandle_t handle,

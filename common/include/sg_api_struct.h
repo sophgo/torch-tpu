@@ -1894,29 +1894,5 @@ typedef struct
   int dtype;
 } WITH_PLATFORM(sg_api_slice_scatter_t);
 
-typedef struct
-{
-  unsigned long long input_global_addr;
-  unsigned long long found_inf_global_addr;
-  int dim;
-  int shape[FW_MAX_SHAPE_DIMS];
-  float inv_scale;
-  int idtype;
-  int found_inf_dtype;
-} WITH_PLATFORM(sg_api_inf_check_unscale_t);
-
-typedef struct
-{
-  unsigned long long input_global_addr;
-  unsigned long long found_inf_global_addr;
-  unsigned long long found_inf_buffer_global_addr;
-  int dim;
-  int shape[FW_MAX_SHAPE_DIMS];
-  float inv_scale;
-  int idtype;
-  int found_inf_dtype;
-  int need_clear_found_inf;
-} WITH_PLATFORM(sg_api_inf_check_unscale_multi_core_t);
-
 #pragma pack(pop)
 #endif  // SG_API_STRUCT_H

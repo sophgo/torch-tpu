@@ -22,7 +22,7 @@ Tensor & cat_out_tpu ( const ITensorListRef & tensors, int64_t dim, Tensor & out
       break;
     }
   }
-  if ( tensors.size() > TPU_MAX_CONCAT_NUM || flag )
+  if ( flag )
   {
     CPU_IMPL_WARNING();
     std::vector<Tensor> tensors_cpu;
