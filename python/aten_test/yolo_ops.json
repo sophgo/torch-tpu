@@ -1,0 +1,13655 @@
+{
+  "0": {
+    "name": "aten::_convolution",
+    "shape": [
+      [
+        64,
+        3,
+        640,
+        640
+      ],
+      [
+        32,
+        3,
+        6,
+        6
+      ]
+    ],
+    "params": [
+      null,
+      [
+        2,
+        2
+      ],
+      [
+        2,
+        2
+      ],
+      [
+        1,
+        1
+      ],
+      false,
+      [
+        0,
+        0
+      ],
+      1,
+      false,
+      true,
+      true,
+      true
+    ],
+    "dtype": [
+      "float",
+      "float",
+      "",
+      "ScalarList",
+      "ScalarList",
+      "ScalarList",
+      "Scalar",
+      "ScalarList",
+      "Scalar",
+      "Scalar",
+      "Scalar",
+      "Scalar",
+      "Scalar"
+    ]
+  },
+  "1": {
+    "name": "aten::native_batch_norm",
+    "shape": [
+      [
+        64,
+        32,
+        320,
+        320
+      ],
+      [
+        32
+      ],
+      [
+        32
+      ],
+      [
+        32
+      ],
+      [
+        32
+      ]
+    ],
+    "params": [
+      true,
+      0.03,
+      0.001
+    ],
+    "dtype": [
+      "float",
+      "float",
+      "float",
+      "float",
+      "float",
+      "Scalar",
+      "Scalar",
+      "Scalar"
+    ]
+  },
+  "2": {
+    "name": "aten::silu_",
+    "shape": [
+      [
+        64,
+        32,
+        320,
+        320
+      ]
+    ],
+    "params": [],
+    "dtype": [
+      "float"
+    ]
+  },
+  "3": {
+    "name": "aten::_convolution",
+    "shape": [
+      [
+        64,
+        32,
+        320,
+        320
+      ],
+      [
+        64,
+        32,
+        3,
+        3
+      ]
+    ],
+    "params": [
+      null,
+      [
+        2,
+        2
+      ],
+      [
+        1,
+        1
+      ],
+      [
+        1,
+        1
+      ],
+      false,
+      [
+        0,
+        0
+      ],
+      1,
+      false,
+      true,
+      true,
+      true
+    ],
+    "dtype": [
+      "float",
+      "float",
+      "",
+      "ScalarList",
+      "ScalarList",
+      "ScalarList",
+      "Scalar",
+      "ScalarList",
+      "Scalar",
+      "Scalar",
+      "Scalar",
+      "Scalar",
+      "Scalar"
+    ]
+  },
+  "4": {
+    "name": "aten::native_batch_norm",
+    "shape": [
+      [
+        64,
+        64,
+        160,
+        160
+      ],
+      [
+        64
+      ],
+      [
+        64
+      ],
+      [
+        64
+      ],
+      [
+        64
+      ]
+    ],
+    "params": [
+      true,
+      0.03,
+      0.001
+    ],
+    "dtype": [
+      "float",
+      "float",
+      "float",
+      "float",
+      "float",
+      "Scalar",
+      "Scalar",
+      "Scalar"
+    ]
+  },
+  "5": {
+    "name": "aten::silu_",
+    "shape": [
+      [
+        64,
+        64,
+        160,
+        160
+      ]
+    ],
+    "params": [],
+    "dtype": [
+      "float"
+    ]
+  },
+  "6": {
+    "name": "aten::_convolution",
+    "shape": [
+      [
+        64,
+        64,
+        160,
+        160
+      ],
+      [
+        32,
+        64,
+        1,
+        1
+      ]
+    ],
+    "params": [
+      null,
+      [
+        1,
+        1
+      ],
+      [
+        0,
+        0
+      ],
+      [
+        1,
+        1
+      ],
+      false,
+      [
+        0,
+        0
+      ],
+      1,
+      false,
+      true,
+      true,
+      true
+    ],
+    "dtype": [
+      "float",
+      "float",
+      "",
+      "ScalarList",
+      "ScalarList",
+      "ScalarList",
+      "Scalar",
+      "ScalarList",
+      "Scalar",
+      "Scalar",
+      "Scalar",
+      "Scalar",
+      "Scalar"
+    ]
+  },
+  "7": {
+    "name": "aten::native_batch_norm",
+    "shape": [
+      [
+        64,
+        32,
+        160,
+        160
+      ],
+      [
+        32
+      ],
+      [
+        32
+      ],
+      [
+        32
+      ],
+      [
+        32
+      ]
+    ],
+    "params": [
+      true,
+      0.03,
+      0.001
+    ],
+    "dtype": [
+      "float",
+      "float",
+      "float",
+      "float",
+      "float",
+      "Scalar",
+      "Scalar",
+      "Scalar"
+    ]
+  },
+  "8": {
+    "name": "aten::silu_",
+    "shape": [
+      [
+        64,
+        32,
+        160,
+        160
+      ]
+    ],
+    "params": [],
+    "dtype": [
+      "float"
+    ]
+  },
+  "9": {
+    "name": "aten::_convolution",
+    "shape": [
+      [
+        64,
+        32,
+        160,
+        160
+      ],
+      [
+        32,
+        32,
+        1,
+        1
+      ]
+    ],
+    "params": [
+      null,
+      [
+        1,
+        1
+      ],
+      [
+        0,
+        0
+      ],
+      [
+        1,
+        1
+      ],
+      false,
+      [
+        0,
+        0
+      ],
+      1,
+      false,
+      true,
+      true,
+      true
+    ],
+    "dtype": [
+      "float",
+      "float",
+      "",
+      "ScalarList",
+      "ScalarList",
+      "ScalarList",
+      "Scalar",
+      "ScalarList",
+      "Scalar",
+      "Scalar",
+      "Scalar",
+      "Scalar",
+      "Scalar"
+    ]
+  },
+  "10": {
+    "name": "aten::_convolution",
+    "shape": [
+      [
+        64,
+        32,
+        160,
+        160
+      ],
+      [
+        32,
+        32,
+        3,
+        3
+      ]
+    ],
+    "params": [
+      null,
+      [
+        1,
+        1
+      ],
+      [
+        1,
+        1
+      ],
+      [
+        1,
+        1
+      ],
+      false,
+      [
+        0,
+        0
+      ],
+      1,
+      false,
+      true,
+      true,
+      true
+    ],
+    "dtype": [
+      "float",
+      "float",
+      "",
+      "ScalarList",
+      "ScalarList",
+      "ScalarList",
+      "Scalar",
+      "ScalarList",
+      "Scalar",
+      "Scalar",
+      "Scalar",
+      "Scalar",
+      "Scalar"
+    ]
+  },
+  "11": {
+    "name": "aten::narrow",
+    "shape": [
+      [
+        64,
+        64,
+        160,
+        160
+      ]
+    ],
+    "params": [
+      1,
+      0,
+      32
+    ],
+    "dtype": [
+      "float",
+      "Scalar",
+      "Scalar",
+      "Scalar"
+    ]
+  },
+  "12": {
+    "name": "aten::slice",
+    "shape": [
+      [
+        64,
+        64,
+        160,
+        160
+      ]
+    ],
+    "params": [
+      1,
+      0,
+      32,
+      1
+    ],
+    "dtype": [
+      "float",
+      "Scalar",
+      "Scalar",
+      "Scalar",
+      "Scalar"
+    ]
+  },
+  "13": {
+    "name": "aten::_convolution",
+    "shape": [
+      [
+        64,
+        64,
+        160,
+        160
+      ],
+      [
+        64,
+        64,
+        1,
+        1
+      ]
+    ],
+    "params": [
+      null,
+      [
+        1,
+        1
+      ],
+      [
+        0,
+        0
+      ],
+      [
+        1,
+        1
+      ],
+      false,
+      [
+        0,
+        0
+      ],
+      1,
+      false,
+      true,
+      true,
+      true
+    ],
+    "dtype": [
+      "float",
+      "float",
+      "",
+      "ScalarList",
+      "ScalarList",
+      "ScalarList",
+      "Scalar",
+      "ScalarList",
+      "Scalar",
+      "Scalar",
+      "Scalar",
+      "Scalar",
+      "Scalar"
+    ]
+  },
+  "14": {
+    "name": "aten::_convolution",
+    "shape": [
+      [
+        64,
+        64,
+        160,
+        160
+      ],
+      [
+        128,
+        64,
+        3,
+        3
+      ]
+    ],
+    "params": [
+      null,
+      [
+        2,
+        2
+      ],
+      [
+        1,
+        1
+      ],
+      [
+        1,
+        1
+      ],
+      false,
+      [
+        0,
+        0
+      ],
+      1,
+      false,
+      true,
+      true,
+      true
+    ],
+    "dtype": [
+      "float",
+      "float",
+      "",
+      "ScalarList",
+      "ScalarList",
+      "ScalarList",
+      "Scalar",
+      "ScalarList",
+      "Scalar",
+      "Scalar",
+      "Scalar",
+      "Scalar",
+      "Scalar"
+    ]
+  },
+  "15": {
+    "name": "aten::native_batch_norm",
+    "shape": [
+      [
+        64,
+        128,
+        80,
+        80
+      ],
+      [
+        128
+      ],
+      [
+        128
+      ],
+      [
+        128
+      ],
+      [
+        128
+      ]
+    ],
+    "params": [
+      true,
+      0.03,
+      0.001
+    ],
+    "dtype": [
+      "float",
+      "float",
+      "float",
+      "float",
+      "float",
+      "Scalar",
+      "Scalar",
+      "Scalar"
+    ]
+  },
+  "16": {
+    "name": "aten::silu_",
+    "shape": [
+      [
+        64,
+        128,
+        80,
+        80
+      ]
+    ],
+    "params": [],
+    "dtype": [
+      "float"
+    ]
+  },
+  "17": {
+    "name": "aten::_convolution",
+    "shape": [
+      [
+        64,
+        128,
+        80,
+        80
+      ],
+      [
+        64,
+        128,
+        1,
+        1
+      ]
+    ],
+    "params": [
+      null,
+      [
+        1,
+        1
+      ],
+      [
+        0,
+        0
+      ],
+      [
+        1,
+        1
+      ],
+      false,
+      [
+        0,
+        0
+      ],
+      1,
+      false,
+      true,
+      true,
+      true
+    ],
+    "dtype": [
+      "float",
+      "float",
+      "",
+      "ScalarList",
+      "ScalarList",
+      "ScalarList",
+      "Scalar",
+      "ScalarList",
+      "Scalar",
+      "Scalar",
+      "Scalar",
+      "Scalar",
+      "Scalar"
+    ]
+  },
+  "18": {
+    "name": "aten::native_batch_norm",
+    "shape": [
+      [
+        64,
+        64,
+        80,
+        80
+      ],
+      [
+        64
+      ],
+      [
+        64
+      ],
+      [
+        64
+      ],
+      [
+        64
+      ]
+    ],
+    "params": [
+      true,
+      0.03,
+      0.001
+    ],
+    "dtype": [
+      "float",
+      "float",
+      "float",
+      "float",
+      "float",
+      "Scalar",
+      "Scalar",
+      "Scalar"
+    ]
+  },
+  "19": {
+    "name": "aten::silu_",
+    "shape": [
+      [
+        64,
+        64,
+        80,
+        80
+      ]
+    ],
+    "params": [],
+    "dtype": [
+      "float"
+    ]
+  },
+  "20": {
+    "name": "aten::_convolution",
+    "shape": [
+      [
+        64,
+        64,
+        80,
+        80
+      ],
+      [
+        64,
+        64,
+        1,
+        1
+      ]
+    ],
+    "params": [
+      null,
+      [
+        1,
+        1
+      ],
+      [
+        0,
+        0
+      ],
+      [
+        1,
+        1
+      ],
+      false,
+      [
+        0,
+        0
+      ],
+      1,
+      false,
+      true,
+      true,
+      true
+    ],
+    "dtype": [
+      "float",
+      "float",
+      "",
+      "ScalarList",
+      "ScalarList",
+      "ScalarList",
+      "Scalar",
+      "ScalarList",
+      "Scalar",
+      "Scalar",
+      "Scalar",
+      "Scalar",
+      "Scalar"
+    ]
+  },
+  "21": {
+    "name": "aten::_convolution",
+    "shape": [
+      [
+        64,
+        64,
+        80,
+        80
+      ],
+      [
+        64,
+        64,
+        3,
+        3
+      ]
+    ],
+    "params": [
+      null,
+      [
+        1,
+        1
+      ],
+      [
+        1,
+        1
+      ],
+      [
+        1,
+        1
+      ],
+      false,
+      [
+        0,
+        0
+      ],
+      1,
+      false,
+      true,
+      true,
+      true
+    ],
+    "dtype": [
+      "float",
+      "float",
+      "",
+      "ScalarList",
+      "ScalarList",
+      "ScalarList",
+      "Scalar",
+      "ScalarList",
+      "Scalar",
+      "Scalar",
+      "Scalar",
+      "Scalar",
+      "Scalar"
+    ]
+  },
+  "22": {
+    "name": "aten::narrow",
+    "shape": [
+      [
+        64,
+        128,
+        80,
+        80
+      ]
+    ],
+    "params": [
+      1,
+      0,
+      64
+    ],
+    "dtype": [
+      "float",
+      "Scalar",
+      "Scalar",
+      "Scalar"
+    ]
+  },
+  "23": {
+    "name": "aten::slice",
+    "shape": [
+      [
+        64,
+        128,
+        80,
+        80
+      ]
+    ],
+    "params": [
+      1,
+      0,
+      64,
+      1
+    ],
+    "dtype": [
+      "float",
+      "Scalar",
+      "Scalar",
+      "Scalar",
+      "Scalar"
+    ]
+  },
+  "24": {
+    "name": "aten::_convolution",
+    "shape": [
+      [
+        64,
+        128,
+        80,
+        80
+      ],
+      [
+        128,
+        128,
+        1,
+        1
+      ]
+    ],
+    "params": [
+      null,
+      [
+        1,
+        1
+      ],
+      [
+        0,
+        0
+      ],
+      [
+        1,
+        1
+      ],
+      false,
+      [
+        0,
+        0
+      ],
+      1,
+      false,
+      true,
+      true,
+      true
+    ],
+    "dtype": [
+      "float",
+      "float",
+      "",
+      "ScalarList",
+      "ScalarList",
+      "ScalarList",
+      "Scalar",
+      "ScalarList",
+      "Scalar",
+      "Scalar",
+      "Scalar",
+      "Scalar",
+      "Scalar"
+    ]
+  },
+  "25": {
+    "name": "aten::_convolution",
+    "shape": [
+      [
+        64,
+        128,
+        80,
+        80
+      ],
+      [
+        256,
+        128,
+        3,
+        3
+      ]
+    ],
+    "params": [
+      null,
+      [
+        2,
+        2
+      ],
+      [
+        1,
+        1
+      ],
+      [
+        1,
+        1
+      ],
+      false,
+      [
+        0,
+        0
+      ],
+      1,
+      false,
+      true,
+      true,
+      true
+    ],
+    "dtype": [
+      "float",
+      "float",
+      "",
+      "ScalarList",
+      "ScalarList",
+      "ScalarList",
+      "Scalar",
+      "ScalarList",
+      "Scalar",
+      "Scalar",
+      "Scalar",
+      "Scalar",
+      "Scalar"
+    ]
+  },
+  "26": {
+    "name": "aten::native_batch_norm",
+    "shape": [
+      [
+        64,
+        256,
+        40,
+        40
+      ],
+      [
+        256
+      ],
+      [
+        256
+      ],
+      [
+        256
+      ],
+      [
+        256
+      ]
+    ],
+    "params": [
+      true,
+      0.03,
+      0.001
+    ],
+    "dtype": [
+      "float",
+      "float",
+      "float",
+      "float",
+      "float",
+      "Scalar",
+      "Scalar",
+      "Scalar"
+    ]
+  },
+  "27": {
+    "name": "aten::silu_",
+    "shape": [
+      [
+        64,
+        256,
+        40,
+        40
+      ]
+    ],
+    "params": [],
+    "dtype": [
+      "float"
+    ]
+  },
+  "28": {
+    "name": "aten::_convolution",
+    "shape": [
+      [
+        64,
+        256,
+        40,
+        40
+      ],
+      [
+        128,
+        256,
+        1,
+        1
+      ]
+    ],
+    "params": [
+      null,
+      [
+        1,
+        1
+      ],
+      [
+        0,
+        0
+      ],
+      [
+        1,
+        1
+      ],
+      false,
+      [
+        0,
+        0
+      ],
+      1,
+      false,
+      true,
+      true,
+      true
+    ],
+    "dtype": [
+      "float",
+      "float",
+      "",
+      "ScalarList",
+      "ScalarList",
+      "ScalarList",
+      "Scalar",
+      "ScalarList",
+      "Scalar",
+      "Scalar",
+      "Scalar",
+      "Scalar",
+      "Scalar"
+    ]
+  },
+  "29": {
+    "name": "aten::native_batch_norm",
+    "shape": [
+      [
+        64,
+        128,
+        40,
+        40
+      ],
+      [
+        128
+      ],
+      [
+        128
+      ],
+      [
+        128
+      ],
+      [
+        128
+      ]
+    ],
+    "params": [
+      true,
+      0.03,
+      0.001
+    ],
+    "dtype": [
+      "float",
+      "float",
+      "float",
+      "float",
+      "float",
+      "Scalar",
+      "Scalar",
+      "Scalar"
+    ]
+  },
+  "30": {
+    "name": "aten::silu_",
+    "shape": [
+      [
+        64,
+        128,
+        40,
+        40
+      ]
+    ],
+    "params": [],
+    "dtype": [
+      "float"
+    ]
+  },
+  "31": {
+    "name": "aten::_convolution",
+    "shape": [
+      [
+        64,
+        128,
+        40,
+        40
+      ],
+      [
+        128,
+        128,
+        1,
+        1
+      ]
+    ],
+    "params": [
+      null,
+      [
+        1,
+        1
+      ],
+      [
+        0,
+        0
+      ],
+      [
+        1,
+        1
+      ],
+      false,
+      [
+        0,
+        0
+      ],
+      1,
+      false,
+      true,
+      true,
+      true
+    ],
+    "dtype": [
+      "float",
+      "float",
+      "",
+      "ScalarList",
+      "ScalarList",
+      "ScalarList",
+      "Scalar",
+      "ScalarList",
+      "Scalar",
+      "Scalar",
+      "Scalar",
+      "Scalar",
+      "Scalar"
+    ]
+  },
+  "32": {
+    "name": "aten::_convolution",
+    "shape": [
+      [
+        64,
+        128,
+        40,
+        40
+      ],
+      [
+        128,
+        128,
+        3,
+        3
+      ]
+    ],
+    "params": [
+      null,
+      [
+        1,
+        1
+      ],
+      [
+        1,
+        1
+      ],
+      [
+        1,
+        1
+      ],
+      false,
+      [
+        0,
+        0
+      ],
+      1,
+      false,
+      true,
+      true,
+      true
+    ],
+    "dtype": [
+      "float",
+      "float",
+      "",
+      "ScalarList",
+      "ScalarList",
+      "ScalarList",
+      "Scalar",
+      "ScalarList",
+      "Scalar",
+      "Scalar",
+      "Scalar",
+      "Scalar",
+      "Scalar"
+    ]
+  },
+  "33": {
+    "name": "aten::narrow",
+    "shape": [
+      [
+        64,
+        256,
+        40,
+        40
+      ]
+    ],
+    "params": [
+      1,
+      0,
+      128
+    ],
+    "dtype": [
+      "float",
+      "Scalar",
+      "Scalar",
+      "Scalar"
+    ]
+  },
+  "34": {
+    "name": "aten::slice",
+    "shape": [
+      [
+        64,
+        256,
+        40,
+        40
+      ]
+    ],
+    "params": [
+      1,
+      0,
+      128,
+      1
+    ],
+    "dtype": [
+      "float",
+      "Scalar",
+      "Scalar",
+      "Scalar",
+      "Scalar"
+    ]
+  },
+  "35": {
+    "name": "aten::_convolution",
+    "shape": [
+      [
+        64,
+        256,
+        40,
+        40
+      ],
+      [
+        256,
+        256,
+        1,
+        1
+      ]
+    ],
+    "params": [
+      null,
+      [
+        1,
+        1
+      ],
+      [
+        0,
+        0
+      ],
+      [
+        1,
+        1
+      ],
+      false,
+      [
+        0,
+        0
+      ],
+      1,
+      false,
+      true,
+      true,
+      true
+    ],
+    "dtype": [
+      "float",
+      "float",
+      "",
+      "ScalarList",
+      "ScalarList",
+      "ScalarList",
+      "Scalar",
+      "ScalarList",
+      "Scalar",
+      "Scalar",
+      "Scalar",
+      "Scalar",
+      "Scalar"
+    ]
+  },
+  "36": {
+    "name": "aten::_convolution",
+    "shape": [
+      [
+        64,
+        256,
+        40,
+        40
+      ],
+      [
+        512,
+        256,
+        3,
+        3
+      ]
+    ],
+    "params": [
+      null,
+      [
+        2,
+        2
+      ],
+      [
+        1,
+        1
+      ],
+      [
+        1,
+        1
+      ],
+      false,
+      [
+        0,
+        0
+      ],
+      1,
+      false,
+      true,
+      true,
+      true
+    ],
+    "dtype": [
+      "float",
+      "float",
+      "",
+      "ScalarList",
+      "ScalarList",
+      "ScalarList",
+      "Scalar",
+      "ScalarList",
+      "Scalar",
+      "Scalar",
+      "Scalar",
+      "Scalar",
+      "Scalar"
+    ]
+  },
+  "37": {
+    "name": "aten::native_batch_norm",
+    "shape": [
+      [
+        64,
+        512,
+        20,
+        20
+      ],
+      [
+        512
+      ],
+      [
+        512
+      ],
+      [
+        512
+      ],
+      [
+        512
+      ]
+    ],
+    "params": [
+      true,
+      0.03,
+      0.001
+    ],
+    "dtype": [
+      "float",
+      "float",
+      "float",
+      "float",
+      "float",
+      "Scalar",
+      "Scalar",
+      "Scalar"
+    ]
+  },
+  "38": {
+    "name": "aten::silu_",
+    "shape": [
+      [
+        64,
+        512,
+        20,
+        20
+      ]
+    ],
+    "params": [],
+    "dtype": [
+      "float"
+    ]
+  },
+  "39": {
+    "name": "aten::_convolution",
+    "shape": [
+      [
+        64,
+        512,
+        20,
+        20
+      ],
+      [
+        256,
+        512,
+        1,
+        1
+      ]
+    ],
+    "params": [
+      null,
+      [
+        1,
+        1
+      ],
+      [
+        0,
+        0
+      ],
+      [
+        1,
+        1
+      ],
+      false,
+      [
+        0,
+        0
+      ],
+      1,
+      false,
+      true,
+      true,
+      true
+    ],
+    "dtype": [
+      "float",
+      "float",
+      "",
+      "ScalarList",
+      "ScalarList",
+      "ScalarList",
+      "Scalar",
+      "ScalarList",
+      "Scalar",
+      "Scalar",
+      "Scalar",
+      "Scalar",
+      "Scalar"
+    ]
+  },
+  "40": {
+    "name": "aten::native_batch_norm",
+    "shape": [
+      [
+        64,
+        256,
+        20,
+        20
+      ],
+      [
+        256
+      ],
+      [
+        256
+      ],
+      [
+        256
+      ],
+      [
+        256
+      ]
+    ],
+    "params": [
+      true,
+      0.03,
+      0.001
+    ],
+    "dtype": [
+      "float",
+      "float",
+      "float",
+      "float",
+      "float",
+      "Scalar",
+      "Scalar",
+      "Scalar"
+    ]
+  },
+  "41": {
+    "name": "aten::silu_",
+    "shape": [
+      [
+        64,
+        256,
+        20,
+        20
+      ]
+    ],
+    "params": [],
+    "dtype": [
+      "float"
+    ]
+  },
+  "42": {
+    "name": "aten::_convolution",
+    "shape": [
+      [
+        64,
+        256,
+        20,
+        20
+      ],
+      [
+        256,
+        256,
+        1,
+        1
+      ]
+    ],
+    "params": [
+      null,
+      [
+        1,
+        1
+      ],
+      [
+        0,
+        0
+      ],
+      [
+        1,
+        1
+      ],
+      false,
+      [
+        0,
+        0
+      ],
+      1,
+      false,
+      true,
+      true,
+      true
+    ],
+    "dtype": [
+      "float",
+      "float",
+      "",
+      "ScalarList",
+      "ScalarList",
+      "ScalarList",
+      "Scalar",
+      "ScalarList",
+      "Scalar",
+      "Scalar",
+      "Scalar",
+      "Scalar",
+      "Scalar"
+    ]
+  },
+  "43": {
+    "name": "aten::_convolution",
+    "shape": [
+      [
+        64,
+        256,
+        20,
+        20
+      ],
+      [
+        256,
+        256,
+        3,
+        3
+      ]
+    ],
+    "params": [
+      null,
+      [
+        1,
+        1
+      ],
+      [
+        1,
+        1
+      ],
+      [
+        1,
+        1
+      ],
+      false,
+      [
+        0,
+        0
+      ],
+      1,
+      false,
+      true,
+      true,
+      true
+    ],
+    "dtype": [
+      "float",
+      "float",
+      "",
+      "ScalarList",
+      "ScalarList",
+      "ScalarList",
+      "Scalar",
+      "ScalarList",
+      "Scalar",
+      "Scalar",
+      "Scalar",
+      "Scalar",
+      "Scalar"
+    ]
+  },
+  "44": {
+    "name": "aten::narrow",
+    "shape": [
+      [
+        64,
+        512,
+        20,
+        20
+      ]
+    ],
+    "params": [
+      1,
+      0,
+      256
+    ],
+    "dtype": [
+      "float",
+      "Scalar",
+      "Scalar",
+      "Scalar"
+    ]
+  },
+  "45": {
+    "name": "aten::slice",
+    "shape": [
+      [
+        64,
+        512,
+        20,
+        20
+      ]
+    ],
+    "params": [
+      1,
+      0,
+      256,
+      1
+    ],
+    "dtype": [
+      "float",
+      "Scalar",
+      "Scalar",
+      "Scalar",
+      "Scalar"
+    ]
+  },
+  "46": {
+    "name": "aten::_convolution",
+    "shape": [
+      [
+        64,
+        512,
+        20,
+        20
+      ],
+      [
+        512,
+        512,
+        1,
+        1
+      ]
+    ],
+    "params": [
+      null,
+      [
+        1,
+        1
+      ],
+      [
+        0,
+        0
+      ],
+      [
+        1,
+        1
+      ],
+      false,
+      [
+        0,
+        0
+      ],
+      1,
+      false,
+      true,
+      true,
+      true
+    ],
+    "dtype": [
+      "float",
+      "float",
+      "",
+      "ScalarList",
+      "ScalarList",
+      "ScalarList",
+      "Scalar",
+      "ScalarList",
+      "Scalar",
+      "Scalar",
+      "Scalar",
+      "Scalar",
+      "Scalar"
+    ]
+  },
+  "47": {
+    "name": "aten::max_pool2d_with_indices",
+    "shape": [
+      [
+        64,
+        256,
+        20,
+        20
+      ]
+    ],
+    "params": [
+      [
+        5,
+        5
+      ],
+      [
+        1,
+        1
+      ],
+      [
+        2,
+        2
+      ],
+      [
+        1,
+        1
+      ],
+      false
+    ],
+    "dtype": [
+      "float",
+      "ScalarList",
+      "ScalarList",
+      "ScalarList",
+      "ScalarList",
+      "Scalar"
+    ]
+  },
+  "48": {
+    "name": "aten::narrow",
+    "shape": [
+      [
+        64,
+        1024,
+        20,
+        20
+      ]
+    ],
+    "params": [
+      1,
+      0,
+      256
+    ],
+    "dtype": [
+      "float",
+      "Scalar",
+      "Scalar",
+      "Scalar"
+    ]
+  },
+  "49": {
+    "name": "aten::slice",
+    "shape": [
+      [
+        64,
+        1024,
+        20,
+        20
+      ]
+    ],
+    "params": [
+      1,
+      0,
+      256,
+      1
+    ],
+    "dtype": [
+      "float",
+      "Scalar",
+      "Scalar",
+      "Scalar",
+      "Scalar"
+    ]
+  },
+  "50": {
+    "name": "aten::_convolution",
+    "shape": [
+      [
+        64,
+        1024,
+        20,
+        20
+      ],
+      [
+        512,
+        1024,
+        1,
+        1
+      ]
+    ],
+    "params": [
+      null,
+      [
+        1,
+        1
+      ],
+      [
+        0,
+        0
+      ],
+      [
+        1,
+        1
+      ],
+      false,
+      [
+        0,
+        0
+      ],
+      1,
+      false,
+      true,
+      true,
+      true
+    ],
+    "dtype": [
+      "float",
+      "float",
+      "",
+      "ScalarList",
+      "ScalarList",
+      "ScalarList",
+      "Scalar",
+      "ScalarList",
+      "Scalar",
+      "Scalar",
+      "Scalar",
+      "Scalar",
+      "Scalar"
+    ]
+  },
+  "51": {
+    "name": "aten::upsample_nearest2d",
+    "shape": [
+      [
+        64,
+        256,
+        20,
+        20
+      ]
+    ],
+    "params": [
+      null,
+      [
+        2.0,
+        2.0
+      ]
+    ],
+    "dtype": [
+      "float",
+      "",
+      "ScalarList"
+    ]
+  },
+  "52": {
+    "name": "aten::upsample_nearest2d",
+    "shape": [
+      [
+        64,
+        256,
+        20,
+        20
+      ]
+    ],
+    "params": [
+      [
+        40,
+        40
+      ],
+      2.0,
+      2.0
+    ],
+    "dtype": [
+      "float",
+      "ScalarList",
+      "Scalar",
+      "Scalar"
+    ]
+  },
+  "53": {
+    "name": "aten::narrow",
+    "shape": [
+      [
+        64,
+        512,
+        40,
+        40
+      ]
+    ],
+    "params": [
+      1,
+      0,
+      256
+    ],
+    "dtype": [
+      "float",
+      "Scalar",
+      "Scalar",
+      "Scalar"
+    ]
+  },
+  "54": {
+    "name": "aten::slice",
+    "shape": [
+      [
+        64,
+        512,
+        40,
+        40
+      ]
+    ],
+    "params": [
+      1,
+      0,
+      256,
+      1
+    ],
+    "dtype": [
+      "float",
+      "Scalar",
+      "Scalar",
+      "Scalar",
+      "Scalar"
+    ]
+  },
+  "55": {
+    "name": "aten::_convolution",
+    "shape": [
+      [
+        64,
+        512,
+        40,
+        40
+      ],
+      [
+        128,
+        512,
+        1,
+        1
+      ]
+    ],
+    "params": [
+      null,
+      [
+        1,
+        1
+      ],
+      [
+        0,
+        0
+      ],
+      [
+        1,
+        1
+      ],
+      false,
+      [
+        0,
+        0
+      ],
+      1,
+      false,
+      true,
+      true,
+      true
+    ],
+    "dtype": [
+      "float",
+      "float",
+      "",
+      "ScalarList",
+      "ScalarList",
+      "ScalarList",
+      "Scalar",
+      "ScalarList",
+      "Scalar",
+      "Scalar",
+      "Scalar",
+      "Scalar",
+      "Scalar"
+    ]
+  },
+  "56": {
+    "name": "aten::upsample_nearest2d",
+    "shape": [
+      [
+        64,
+        128,
+        40,
+        40
+      ]
+    ],
+    "params": [
+      null,
+      [
+        2.0,
+        2.0
+      ]
+    ],
+    "dtype": [
+      "float",
+      "",
+      "ScalarList"
+    ]
+  },
+  "57": {
+    "name": "aten::upsample_nearest2d",
+    "shape": [
+      [
+        64,
+        128,
+        40,
+        40
+      ]
+    ],
+    "params": [
+      [
+        80,
+        80
+      ],
+      2.0,
+      2.0
+    ],
+    "dtype": [
+      "float",
+      "ScalarList",
+      "Scalar",
+      "Scalar"
+    ]
+  },
+  "58": {
+    "name": "aten::narrow",
+    "shape": [
+      [
+        64,
+        256,
+        80,
+        80
+      ]
+    ],
+    "params": [
+      1,
+      0,
+      128
+    ],
+    "dtype": [
+      "float",
+      "Scalar",
+      "Scalar",
+      "Scalar"
+    ]
+  },
+  "59": {
+    "name": "aten::slice",
+    "shape": [
+      [
+        64,
+        256,
+        80,
+        80
+      ]
+    ],
+    "params": [
+      1,
+      0,
+      128,
+      1
+    ],
+    "dtype": [
+      "float",
+      "Scalar",
+      "Scalar",
+      "Scalar",
+      "Scalar"
+    ]
+  },
+  "60": {
+    "name": "aten::_convolution",
+    "shape": [
+      [
+        64,
+        256,
+        80,
+        80
+      ],
+      [
+        64,
+        256,
+        1,
+        1
+      ]
+    ],
+    "params": [
+      null,
+      [
+        1,
+        1
+      ],
+      [
+        0,
+        0
+      ],
+      [
+        1,
+        1
+      ],
+      false,
+      [
+        0,
+        0
+      ],
+      1,
+      false,
+      true,
+      true,
+      true
+    ],
+    "dtype": [
+      "float",
+      "float",
+      "",
+      "ScalarList",
+      "ScalarList",
+      "ScalarList",
+      "Scalar",
+      "ScalarList",
+      "Scalar",
+      "Scalar",
+      "Scalar",
+      "Scalar",
+      "Scalar"
+    ]
+  },
+  "61": {
+    "name": "aten::_convolution",
+    "shape": [
+      [
+        64,
+        128,
+        80,
+        80
+      ],
+      [
+        128,
+        128,
+        3,
+        3
+      ]
+    ],
+    "params": [
+      null,
+      [
+        2,
+        2
+      ],
+      [
+        1,
+        1
+      ],
+      [
+        1,
+        1
+      ],
+      false,
+      [
+        0,
+        0
+      ],
+      1,
+      false,
+      true,
+      true,
+      true
+    ],
+    "dtype": [
+      "float",
+      "float",
+      "",
+      "ScalarList",
+      "ScalarList",
+      "ScalarList",
+      "Scalar",
+      "ScalarList",
+      "Scalar",
+      "Scalar",
+      "Scalar",
+      "Scalar",
+      "Scalar"
+    ]
+  },
+  "62": {
+    "name": "aten::_convolution",
+    "shape": [
+      [
+        64,
+        256,
+        40,
+        40
+      ],
+      [
+        256,
+        256,
+        3,
+        3
+      ]
+    ],
+    "params": [
+      null,
+      [
+        2,
+        2
+      ],
+      [
+        1,
+        1
+      ],
+      [
+        1,
+        1
+      ],
+      false,
+      [
+        0,
+        0
+      ],
+      1,
+      false,
+      true,
+      true,
+      true
+    ],
+    "dtype": [
+      "float",
+      "float",
+      "",
+      "ScalarList",
+      "ScalarList",
+      "ScalarList",
+      "Scalar",
+      "ScalarList",
+      "Scalar",
+      "Scalar",
+      "Scalar",
+      "Scalar",
+      "Scalar"
+    ]
+  },
+  "63": {
+    "name": "aten::_convolution",
+    "shape": [
+      [
+        64,
+        128,
+        80,
+        80
+      ],
+      [
+        255,
+        128,
+        1,
+        1
+      ],
+      [
+        255
+      ]
+    ],
+    "params": [
+      [
+        1,
+        1
+      ],
+      [
+        0,
+        0
+      ],
+      [
+        1,
+        1
+      ],
+      false,
+      [
+        0,
+        0
+      ],
+      1,
+      false,
+      true,
+      true,
+      true
+    ],
+    "dtype": [
+      "float",
+      "float",
+      "float",
+      "ScalarList",
+      "ScalarList",
+      "ScalarList",
+      "Scalar",
+      "ScalarList",
+      "Scalar",
+      "Scalar",
+      "Scalar",
+      "Scalar",
+      "Scalar"
+    ]
+  },
+  "64": {
+    "name": "aten::_convolution",
+    "shape": [
+      [
+        64,
+        256,
+        40,
+        40
+      ],
+      [
+        255,
+        256,
+        1,
+        1
+      ],
+      [
+        255
+      ]
+    ],
+    "params": [
+      [
+        1,
+        1
+      ],
+      [
+        0,
+        0
+      ],
+      [
+        1,
+        1
+      ],
+      false,
+      [
+        0,
+        0
+      ],
+      1,
+      false,
+      true,
+      true,
+      true
+    ],
+    "dtype": [
+      "float",
+      "float",
+      "float",
+      "ScalarList",
+      "ScalarList",
+      "ScalarList",
+      "Scalar",
+      "ScalarList",
+      "Scalar",
+      "Scalar",
+      "Scalar",
+      "Scalar",
+      "Scalar"
+    ]
+  },
+  "65": {
+    "name": "aten::_convolution",
+    "shape": [
+      [
+        64,
+        512,
+        20,
+        20
+      ],
+      [
+        255,
+        512,
+        1,
+        1
+      ],
+      [
+        255
+      ]
+    ],
+    "params": [
+      [
+        1,
+        1
+      ],
+      [
+        0,
+        0
+      ],
+      [
+        1,
+        1
+      ],
+      false,
+      [
+        0,
+        0
+      ],
+      1,
+      false,
+      true,
+      true,
+      true
+    ],
+    "dtype": [
+      "float",
+      "float",
+      "float",
+      "ScalarList",
+      "ScalarList",
+      "ScalarList",
+      "Scalar",
+      "ScalarList",
+      "Scalar",
+      "Scalar",
+      "Scalar",
+      "Scalar",
+      "Scalar"
+    ]
+  },
+  "66": {
+    "name": "aten::repeat",
+    "shape": [
+      [
+        3,
+        1
+      ]
+    ],
+    "params": [
+      [
+        1,
+        751
+      ]
+    ],
+    "dtype": [
+      "float",
+      "ScalarList"
+    ]
+  },
+  "67": {
+    "name": "aten::alias",
+    "shape": [
+      [
+        3,
+        751
+      ]
+    ],
+    "params": [],
+    "dtype": [
+      "float"
+    ]
+  },
+  "68": {
+    "name": "aten::expand_as",
+    "shape": [
+      [
+        3,
+        1
+      ],
+      [
+        1,
+        751,
+        3,
+        1
+      ]
+    ],
+    "params": [],
+    "dtype": [
+      "float",
+      "float"
+    ]
+  },
+  "69": {
+    "name": "aten::repeat",
+    "shape": [
+      [
+        751,
+        6
+      ]
+    ],
+    "params": [
+      [
+        3,
+        1,
+        1
+      ]
+    ],
+    "dtype": [
+      "float",
+      "ScalarList"
+    ]
+  },
+  "70": {
+    "name": "aten::alias",
+    "shape": [
+      [
+        3,
+        751,
+        6
+      ]
+    ],
+    "params": [],
+    "dtype": [
+      "float"
+    ]
+  },
+  "71": {
+    "name": "aten::expand_as",
+    "shape": [
+      [
+        1,
+        751,
+        6
+      ],
+      [
+        3,
+        1,
+        1,
+        1,
+        751,
+        6
+      ]
+    ],
+    "params": [],
+    "dtype": [
+      "float",
+      "float"
+    ]
+  },
+  "72": {
+    "name": "aten::lift_fresh",
+    "shape": [
+      [
+        5,
+        2
+      ]
+    ],
+    "params": [],
+    "dtype": [
+      "long int"
+    ]
+  },
+  "73": {
+    "name": "aten::detach_",
+    "shape": [
+      [
+        5,
+        2
+      ]
+    ],
+    "params": [],
+    "dtype": [
+      "long int"
+    ]
+  },
+  "74": {
+    "name": "aten::select",
+    "shape": [
+      [
+        3,
+        3,
+        2
+      ]
+    ],
+    "params": [
+      0,
+      0
+    ],
+    "dtype": [
+      "float",
+      "Scalar",
+      "Scalar"
+    ]
+  },
+  "75": {
+    "name": "aten::lift_fresh",
+    "shape": [
+      [
+        5
+      ]
+    ],
+    "params": [],
+    "dtype": [
+      "long int"
+    ]
+  },
+  "76": {
+    "name": "aten::detach_",
+    "shape": [
+      [
+        5
+      ]
+    ],
+    "params": [],
+    "dtype": [
+      "long int"
+    ]
+  },
+  "77": {
+    "name": "aten::lift_fresh",
+    "shape": [
+      [
+        4
+      ]
+    ],
+    "params": [],
+    "dtype": [
+      "long int"
+    ]
+  },
+  "78": {
+    "name": "aten::slice",
+    "shape": [
+      [
+        7
+      ]
+    ],
+    "params": [
+      0,
+      2,
+      6,
+      1
+    ],
+    "dtype": [
+      "float",
+      "Scalar",
+      "Scalar",
+      "Scalar",
+      "Scalar"
+    ]
+  },
+  "79": {
+    "name": "aten::mul",
+    "shape": [
+      [
+        3,
+        751,
+        7
+      ],
+      [
+        7
+      ]
+    ],
+    "params": [],
+    "dtype": [
+      "float",
+      "float"
+    ]
+  },
+  "80": {
+    "name": "aten::slice",
+    "shape": [
+      [
+        3,
+        751,
+        7
+      ]
+    ],
+    "params": [
+      2,
+      4,
+      6,
+      1
+    ],
+    "dtype": [
+      "float",
+      "Scalar",
+      "Scalar",
+      "Scalar",
+      "Scalar"
+    ]
+  },
+  "81": {
+    "name": "aten::slice",
+    "shape": [
+      [
+        3,
+        2
+      ]
+    ],
+    "params": [
+      0,
+      0,
+      9223372036854775807,
+      1
+    ],
+    "dtype": [
+      "float",
+      "Scalar",
+      "Scalar",
+      "Scalar",
+      "Scalar"
+    ]
+  },
+  "82": {
+    "name": "aten::reciprocal",
+    "shape": [
+      [
+        3,
+        751,
+        2
+      ]
+    ],
+    "params": [],
+    "dtype": [
+      "float"
+    ]
+  },
+  "83": {
+    "name": "aten::max",
+    "shape": [
+      [
+        3,
+        751,
+        2
+      ],
+      [
+        3,
+        751,
+        2
+      ]
+    ],
+    "params": [],
+    "dtype": [
+      "float",
+      "float"
+    ]
+  },
+  "84": {
+    "name": "aten::maximum",
+    "shape": [
+      [
+        3,
+        751,
+        2
+      ],
+      [
+        3,
+        751,
+        2
+      ]
+    ],
+    "params": [],
+    "dtype": [
+      "float",
+      "float"
+    ]
+  },
+  "85": {
+    "name": "aten::max",
+    "shape": [
+      [
+        3,
+        751,
+        2
+      ]
+    ],
+    "params": [
+      2,
+      false
+    ],
+    "dtype": [
+      "float",
+      "Scalar",
+      "Scalar"
+    ]
+  },
+  "86": {
+    "name": "aten::nonzero",
+    "shape": [
+      [
+        3,
+        751
+      ]
+    ],
+    "params": [],
+    "dtype": [
+      "bool"
+    ]
+  },
+  "87": {
+    "name": "aten::select",
+    "shape": [
+      [
+        890,
+        2
+      ]
+    ],
+    "params": [
+      1,
+      0
+    ],
+    "dtype": [
+      "long int",
+      "Scalar",
+      "Scalar"
+    ]
+  },
+  "88": {
+    "name": "aten::select",
+    "shape": [
+      [
+        890,
+        2
+      ]
+    ],
+    "params": [
+      1,
+      1
+    ],
+    "dtype": [
+      "long int",
+      "Scalar",
+      "Scalar"
+    ]
+  },
+  "89": {
+    "name": "aten::slice",
+    "shape": [
+      [
+        890,
+        7
+      ]
+    ],
+    "params": [
+      0,
+      0,
+      9223372036854775807,
+      1
+    ],
+    "dtype": [
+      "float",
+      "Scalar",
+      "Scalar",
+      "Scalar",
+      "Scalar"
+    ]
+  },
+  "90": {
+    "name": "aten::slice",
+    "shape": [
+      [
+        890,
+        7
+      ]
+    ],
+    "params": [
+      1,
+      2,
+      4,
+      1
+    ],
+    "dtype": [
+      "float",
+      "Scalar",
+      "Scalar",
+      "Scalar",
+      "Scalar"
+    ]
+  },
+  "91": {
+    "name": "aten::lift_fresh",
+    "shape": [
+      [
+        2
+      ]
+    ],
+    "params": [],
+    "dtype": [
+      "long int"
+    ]
+  },
+  "92": {
+    "name": "aten::select",
+    "shape": [
+      [
+        2,
+        890
+      ]
+    ],
+    "params": [
+      0,
+      0
+    ],
+    "dtype": [
+      "bool",
+      "Scalar",
+      "Scalar"
+    ]
+  },
+  "93": {
+    "name": "aten::select",
+    "shape": [
+      [
+        2,
+        890
+      ]
+    ],
+    "params": [
+      0,
+      1
+    ],
+    "dtype": [
+      "bool",
+      "Scalar",
+      "Scalar"
+    ]
+  },
+  "94": {
+    "name": "aten::narrow",
+    "shape": [
+      [
+        4450
+      ]
+    ],
+    "params": [
+      0,
+      0,
+      890
+    ],
+    "dtype": [
+      "bool",
+      "Scalar",
+      "Scalar",
+      "Scalar"
+    ]
+  },
+  "95": {
+    "name": "aten::slice",
+    "shape": [
+      [
+        4450
+      ]
+    ],
+    "params": [
+      0,
+      0,
+      890,
+      1
+    ],
+    "dtype": [
+      "bool",
+      "Scalar",
+      "Scalar",
+      "Scalar",
+      "Scalar"
+    ]
+  },
+  "96": {
+    "name": "aten::narrow",
+    "shape": [
+      [
+        4450
+      ]
+    ],
+    "params": [
+      0,
+      890,
+      890
+    ],
+    "dtype": [
+      "bool",
+      "Scalar",
+      "Scalar",
+      "Scalar"
+    ]
+  },
+  "97": {
+    "name": "aten::slice",
+    "shape": [
+      [
+        4450
+      ]
+    ],
+    "params": [
+      0,
+      890,
+      1780,
+      1
+    ],
+    "dtype": [
+      "bool",
+      "Scalar",
+      "Scalar",
+      "Scalar",
+      "Scalar"
+    ]
+  },
+  "98": {
+    "name": "aten::narrow",
+    "shape": [
+      [
+        4450
+      ]
+    ],
+    "params": [
+      0,
+      1780,
+      890
+    ],
+    "dtype": [
+      "bool",
+      "Scalar",
+      "Scalar",
+      "Scalar"
+    ]
+  },
+  "99": {
+    "name": "aten::slice",
+    "shape": [
+      [
+        4450
+      ]
+    ],
+    "params": [
+      0,
+      1780,
+      2670,
+      1
+    ],
+    "dtype": [
+      "bool",
+      "Scalar",
+      "Scalar",
+      "Scalar",
+      "Scalar"
+    ]
+  },
+  "100": {
+    "name": "aten::narrow",
+    "shape": [
+      [
+        4450
+      ]
+    ],
+    "params": [
+      0,
+      2670,
+      890
+    ],
+    "dtype": [
+      "bool",
+      "Scalar",
+      "Scalar",
+      "Scalar"
+    ]
+  },
+  "101": {
+    "name": "aten::slice",
+    "shape": [
+      [
+        4450
+      ]
+    ],
+    "params": [
+      0,
+      2670,
+      3560,
+      1
+    ],
+    "dtype": [
+      "bool",
+      "Scalar",
+      "Scalar",
+      "Scalar",
+      "Scalar"
+    ]
+  },
+  "102": {
+    "name": "aten::narrow",
+    "shape": [
+      [
+        4450
+      ]
+    ],
+    "params": [
+      0,
+      3560,
+      890
+    ],
+    "dtype": [
+      "bool",
+      "Scalar",
+      "Scalar",
+      "Scalar"
+    ]
+  },
+  "103": {
+    "name": "aten::slice",
+    "shape": [
+      [
+        4450
+      ]
+    ],
+    "params": [
+      0,
+      3560,
+      4450,
+      1
+    ],
+    "dtype": [
+      "bool",
+      "Scalar",
+      "Scalar",
+      "Scalar",
+      "Scalar"
+    ]
+  },
+  "104": {
+    "name": "aten::repeat",
+    "shape": [
+      [
+        890,
+        7
+      ]
+    ],
+    "params": [
+      [
+        5,
+        1,
+        1
+      ]
+    ],
+    "dtype": [
+      "float",
+      "ScalarList"
+    ]
+  },
+  "105": {
+    "name": "aten::alias",
+    "shape": [
+      [
+        5,
+        890,
+        7
+      ]
+    ],
+    "params": [],
+    "dtype": [
+      "float"
+    ]
+  },
+  "106": {
+    "name": "aten::expand_as",
+    "shape": [
+      [
+        1,
+        890,
+        7
+      ],
+      [
+        5,
+        1,
+        1,
+        1,
+        890,
+        7
+      ]
+    ],
+    "params": [],
+    "dtype": [
+      "float",
+      "float"
+    ]
+  },
+  "107": {
+    "name": "aten::nonzero",
+    "shape": [
+      [
+        5,
+        890
+      ]
+    ],
+    "params": [],
+    "dtype": [
+      "bool"
+    ]
+  },
+  "108": {
+    "name": "aten::select",
+    "shape": [
+      [
+        2659,
+        2
+      ]
+    ],
+    "params": [
+      1,
+      0
+    ],
+    "dtype": [
+      "long int",
+      "Scalar",
+      "Scalar"
+    ]
+  },
+  "109": {
+    "name": "aten::select",
+    "shape": [
+      [
+        2659,
+        2
+      ]
+    ],
+    "params": [
+      1,
+      1
+    ],
+    "dtype": [
+      "long int",
+      "Scalar",
+      "Scalar"
+    ]
+  },
+  "110": {
+    "name": "aten::slice",
+    "shape": [
+      [
+        5,
+        2
+      ]
+    ],
+    "params": [
+      0,
+      0,
+      9223372036854775807,
+      1
+    ],
+    "dtype": [
+      "float",
+      "Scalar",
+      "Scalar",
+      "Scalar",
+      "Scalar"
+    ]
+  },
+  "111": {
+    "name": "aten::narrow",
+    "shape": [
+      [
+        2659,
+        7
+      ]
+    ],
+    "params": [
+      1,
+      0,
+      2
+    ],
+    "dtype": [
+      "float",
+      "Scalar",
+      "Scalar",
+      "Scalar"
+    ]
+  },
+  "112": {
+    "name": "aten::slice",
+    "shape": [
+      [
+        2659,
+        7
+      ]
+    ],
+    "params": [
+      1,
+      0,
+      2,
+      1
+    ],
+    "dtype": [
+      "float",
+      "Scalar",
+      "Scalar",
+      "Scalar",
+      "Scalar"
+    ]
+  },
+  "113": {
+    "name": "aten::narrow",
+    "shape": [
+      [
+        2659,
+        7
+      ]
+    ],
+    "params": [
+      1,
+      2,
+      2
+    ],
+    "dtype": [
+      "float",
+      "Scalar",
+      "Scalar",
+      "Scalar"
+    ]
+  },
+  "114": {
+    "name": "aten::slice",
+    "shape": [
+      [
+        2659,
+        7
+      ]
+    ],
+    "params": [
+      1,
+      2,
+      4,
+      1
+    ],
+    "dtype": [
+      "float",
+      "Scalar",
+      "Scalar",
+      "Scalar",
+      "Scalar"
+    ]
+  },
+  "115": {
+    "name": "aten::narrow",
+    "shape": [
+      [
+        2659,
+        7
+      ]
+    ],
+    "params": [
+      1,
+      4,
+      2
+    ],
+    "dtype": [
+      "float",
+      "Scalar",
+      "Scalar",
+      "Scalar"
+    ]
+  },
+  "116": {
+    "name": "aten::slice",
+    "shape": [
+      [
+        2659,
+        7
+      ]
+    ],
+    "params": [
+      1,
+      4,
+      6,
+      1
+    ],
+    "dtype": [
+      "float",
+      "Scalar",
+      "Scalar",
+      "Scalar",
+      "Scalar"
+    ]
+  },
+  "117": {
+    "name": "aten::narrow",
+    "shape": [
+      [
+        2659,
+        7
+      ]
+    ],
+    "params": [
+      1,
+      6,
+      1
+    ],
+    "dtype": [
+      "float",
+      "Scalar",
+      "Scalar",
+      "Scalar"
+    ]
+  },
+  "118": {
+    "name": "aten::slice",
+    "shape": [
+      [
+        2659,
+        7
+      ]
+    ],
+    "params": [
+      1,
+      6,
+      7,
+      1
+    ],
+    "dtype": [
+      "float",
+      "Scalar",
+      "Scalar",
+      "Scalar",
+      "Scalar"
+    ]
+  },
+  "119": {
+    "name": "aten::select",
+    "shape": [
+      [
+        2,
+        2659
+      ]
+    ],
+    "params": [
+      0,
+      0
+    ],
+    "dtype": [
+      "long int",
+      "Scalar",
+      "Scalar"
+    ]
+  },
+  "120": {
+    "name": "aten::select",
+    "shape": [
+      [
+        2,
+        2659
+      ]
+    ],
+    "params": [
+      0,
+      1
+    ],
+    "dtype": [
+      "long int",
+      "Scalar",
+      "Scalar"
+    ]
+  },
+  "121": {
+    "name": "aten::clamp_",
+    "shape": [
+      [
+        2659
+      ]
+    ],
+    "params": [
+      0,
+      79
+    ],
+    "dtype": [
+      "long int",
+      "Scalar",
+      "Scalar"
+    ]
+  },
+  "122": {
+    "name": "aten::narrow",
+    "shape": [
+      [
+        2659,
+        4
+      ]
+    ],
+    "params": [
+      1,
+      0,
+      2
+    ],
+    "dtype": [
+      "float",
+      "Scalar",
+      "Scalar",
+      "Scalar"
+    ]
+  },
+  "123": {
+    "name": "aten::slice",
+    "shape": [
+      [
+        2659,
+        4
+      ]
+    ],
+    "params": [
+      1,
+      0,
+      2,
+      1
+    ],
+    "dtype": [
+      "float",
+      "Scalar",
+      "Scalar",
+      "Scalar",
+      "Scalar"
+    ]
+  },
+  "124": {
+    "name": "aten::narrow",
+    "shape": [
+      [
+        2659,
+        4
+      ]
+    ],
+    "params": [
+      1,
+      2,
+      2
+    ],
+    "dtype": [
+      "float",
+      "Scalar",
+      "Scalar",
+      "Scalar"
+    ]
+  },
+  "125": {
+    "name": "aten::slice",
+    "shape": [
+      [
+        2659,
+        4
+      ]
+    ],
+    "params": [
+      1,
+      2,
+      4,
+      1
+    ],
+    "dtype": [
+      "float",
+      "Scalar",
+      "Scalar",
+      "Scalar",
+      "Scalar"
+    ]
+  },
+  "126": {
+    "name": "aten::select",
+    "shape": [
+      [
+        3,
+        3,
+        2
+      ]
+    ],
+    "params": [
+      0,
+      1
+    ],
+    "dtype": [
+      "float",
+      "Scalar",
+      "Scalar"
+    ]
+  },
+  "127": {
+    "name": "aten::select",
+    "shape": [
+      [
+        1246,
+        2
+      ]
+    ],
+    "params": [
+      1,
+      0
+    ],
+    "dtype": [
+      "long int",
+      "Scalar",
+      "Scalar"
+    ]
+  },
+  "128": {
+    "name": "aten::select",
+    "shape": [
+      [
+        1246,
+        2
+      ]
+    ],
+    "params": [
+      1,
+      1
+    ],
+    "dtype": [
+      "long int",
+      "Scalar",
+      "Scalar"
+    ]
+  },
+  "129": {
+    "name": "aten::slice",
+    "shape": [
+      [
+        1246,
+        7
+      ]
+    ],
+    "params": [
+      0,
+      0,
+      9223372036854775807,
+      1
+    ],
+    "dtype": [
+      "float",
+      "Scalar",
+      "Scalar",
+      "Scalar",
+      "Scalar"
+    ]
+  },
+  "130": {
+    "name": "aten::slice",
+    "shape": [
+      [
+        1246,
+        7
+      ]
+    ],
+    "params": [
+      1,
+      2,
+      4,
+      1
+    ],
+    "dtype": [
+      "float",
+      "Scalar",
+      "Scalar",
+      "Scalar",
+      "Scalar"
+    ]
+  },
+  "131": {
+    "name": "aten::select",
+    "shape": [
+      [
+        2,
+        1246
+      ]
+    ],
+    "params": [
+      0,
+      0
+    ],
+    "dtype": [
+      "bool",
+      "Scalar",
+      "Scalar"
+    ]
+  },
+  "132": {
+    "name": "aten::select",
+    "shape": [
+      [
+        2,
+        1246
+      ]
+    ],
+    "params": [
+      0,
+      1
+    ],
+    "dtype": [
+      "bool",
+      "Scalar",
+      "Scalar"
+    ]
+  },
+  "133": {
+    "name": "aten::narrow",
+    "shape": [
+      [
+        6230
+      ]
+    ],
+    "params": [
+      0,
+      0,
+      1246
+    ],
+    "dtype": [
+      "bool",
+      "Scalar",
+      "Scalar",
+      "Scalar"
+    ]
+  },
+  "134": {
+    "name": "aten::slice",
+    "shape": [
+      [
+        6230
+      ]
+    ],
+    "params": [
+      0,
+      0,
+      1246,
+      1
+    ],
+    "dtype": [
+      "bool",
+      "Scalar",
+      "Scalar",
+      "Scalar",
+      "Scalar"
+    ]
+  },
+  "135": {
+    "name": "aten::narrow",
+    "shape": [
+      [
+        6230
+      ]
+    ],
+    "params": [
+      0,
+      1246,
+      1246
+    ],
+    "dtype": [
+      "bool",
+      "Scalar",
+      "Scalar",
+      "Scalar"
+    ]
+  },
+  "136": {
+    "name": "aten::slice",
+    "shape": [
+      [
+        6230
+      ]
+    ],
+    "params": [
+      0,
+      1246,
+      2492,
+      1
+    ],
+    "dtype": [
+      "bool",
+      "Scalar",
+      "Scalar",
+      "Scalar",
+      "Scalar"
+    ]
+  },
+  "137": {
+    "name": "aten::narrow",
+    "shape": [
+      [
+        6230
+      ]
+    ],
+    "params": [
+      0,
+      2492,
+      1246
+    ],
+    "dtype": [
+      "bool",
+      "Scalar",
+      "Scalar",
+      "Scalar"
+    ]
+  },
+  "138": {
+    "name": "aten::slice",
+    "shape": [
+      [
+        6230
+      ]
+    ],
+    "params": [
+      0,
+      2492,
+      3738,
+      1
+    ],
+    "dtype": [
+      "bool",
+      "Scalar",
+      "Scalar",
+      "Scalar",
+      "Scalar"
+    ]
+  },
+  "139": {
+    "name": "aten::narrow",
+    "shape": [
+      [
+        6230
+      ]
+    ],
+    "params": [
+      0,
+      3738,
+      1246
+    ],
+    "dtype": [
+      "bool",
+      "Scalar",
+      "Scalar",
+      "Scalar"
+    ]
+  },
+  "140": {
+    "name": "aten::slice",
+    "shape": [
+      [
+        6230
+      ]
+    ],
+    "params": [
+      0,
+      3738,
+      4984,
+      1
+    ],
+    "dtype": [
+      "bool",
+      "Scalar",
+      "Scalar",
+      "Scalar",
+      "Scalar"
+    ]
+  },
+  "141": {
+    "name": "aten::narrow",
+    "shape": [
+      [
+        6230
+      ]
+    ],
+    "params": [
+      0,
+      4984,
+      1246
+    ],
+    "dtype": [
+      "bool",
+      "Scalar",
+      "Scalar",
+      "Scalar"
+    ]
+  },
+  "142": {
+    "name": "aten::slice",
+    "shape": [
+      [
+        6230
+      ]
+    ],
+    "params": [
+      0,
+      4984,
+      6230,
+      1
+    ],
+    "dtype": [
+      "bool",
+      "Scalar",
+      "Scalar",
+      "Scalar",
+      "Scalar"
+    ]
+  },
+  "143": {
+    "name": "aten::repeat",
+    "shape": [
+      [
+        1246,
+        7
+      ]
+    ],
+    "params": [
+      [
+        5,
+        1,
+        1
+      ]
+    ],
+    "dtype": [
+      "float",
+      "ScalarList"
+    ]
+  },
+  "144": {
+    "name": "aten::alias",
+    "shape": [
+      [
+        5,
+        1246,
+        7
+      ]
+    ],
+    "params": [],
+    "dtype": [
+      "float"
+    ]
+  },
+  "145": {
+    "name": "aten::expand_as",
+    "shape": [
+      [
+        1,
+        1246,
+        7
+      ],
+      [
+        5,
+        1,
+        1,
+        1,
+        1246,
+        7
+      ]
+    ],
+    "params": [],
+    "dtype": [
+      "float",
+      "float"
+    ]
+  },
+  "146": {
+    "name": "aten::nonzero",
+    "shape": [
+      [
+        5,
+        1246
+      ]
+    ],
+    "params": [],
+    "dtype": [
+      "bool"
+    ]
+  },
+  "147": {
+    "name": "aten::select",
+    "shape": [
+      [
+        3731,
+        2
+      ]
+    ],
+    "params": [
+      1,
+      0
+    ],
+    "dtype": [
+      "long int",
+      "Scalar",
+      "Scalar"
+    ]
+  },
+  "148": {
+    "name": "aten::select",
+    "shape": [
+      [
+        3731,
+        2
+      ]
+    ],
+    "params": [
+      1,
+      1
+    ],
+    "dtype": [
+      "long int",
+      "Scalar",
+      "Scalar"
+    ]
+  },
+  "149": {
+    "name": "aten::narrow",
+    "shape": [
+      [
+        3731,
+        7
+      ]
+    ],
+    "params": [
+      1,
+      0,
+      2
+    ],
+    "dtype": [
+      "float",
+      "Scalar",
+      "Scalar",
+      "Scalar"
+    ]
+  },
+  "150": {
+    "name": "aten::slice",
+    "shape": [
+      [
+        3731,
+        7
+      ]
+    ],
+    "params": [
+      1,
+      0,
+      2,
+      1
+    ],
+    "dtype": [
+      "float",
+      "Scalar",
+      "Scalar",
+      "Scalar",
+      "Scalar"
+    ]
+  },
+  "151": {
+    "name": "aten::narrow",
+    "shape": [
+      [
+        3731,
+        7
+      ]
+    ],
+    "params": [
+      1,
+      2,
+      2
+    ],
+    "dtype": [
+      "float",
+      "Scalar",
+      "Scalar",
+      "Scalar"
+    ]
+  },
+  "152": {
+    "name": "aten::slice",
+    "shape": [
+      [
+        3731,
+        7
+      ]
+    ],
+    "params": [
+      1,
+      2,
+      4,
+      1
+    ],
+    "dtype": [
+      "float",
+      "Scalar",
+      "Scalar",
+      "Scalar",
+      "Scalar"
+    ]
+  },
+  "153": {
+    "name": "aten::narrow",
+    "shape": [
+      [
+        3731,
+        7
+      ]
+    ],
+    "params": [
+      1,
+      4,
+      2
+    ],
+    "dtype": [
+      "float",
+      "Scalar",
+      "Scalar",
+      "Scalar"
+    ]
+  },
+  "154": {
+    "name": "aten::slice",
+    "shape": [
+      [
+        3731,
+        7
+      ]
+    ],
+    "params": [
+      1,
+      4,
+      6,
+      1
+    ],
+    "dtype": [
+      "float",
+      "Scalar",
+      "Scalar",
+      "Scalar",
+      "Scalar"
+    ]
+  },
+  "155": {
+    "name": "aten::narrow",
+    "shape": [
+      [
+        3731,
+        7
+      ]
+    ],
+    "params": [
+      1,
+      6,
+      1
+    ],
+    "dtype": [
+      "float",
+      "Scalar",
+      "Scalar",
+      "Scalar"
+    ]
+  },
+  "156": {
+    "name": "aten::slice",
+    "shape": [
+      [
+        3731,
+        7
+      ]
+    ],
+    "params": [
+      1,
+      6,
+      7,
+      1
+    ],
+    "dtype": [
+      "float",
+      "Scalar",
+      "Scalar",
+      "Scalar",
+      "Scalar"
+    ]
+  },
+  "157": {
+    "name": "aten::select",
+    "shape": [
+      [
+        2,
+        3731
+      ]
+    ],
+    "params": [
+      0,
+      0
+    ],
+    "dtype": [
+      "long int",
+      "Scalar",
+      "Scalar"
+    ]
+  },
+  "158": {
+    "name": "aten::select",
+    "shape": [
+      [
+        2,
+        3731
+      ]
+    ],
+    "params": [
+      0,
+      1
+    ],
+    "dtype": [
+      "long int",
+      "Scalar",
+      "Scalar"
+    ]
+  },
+  "159": {
+    "name": "aten::clamp_",
+    "shape": [
+      [
+        3731
+      ]
+    ],
+    "params": [
+      0,
+      39
+    ],
+    "dtype": [
+      "long int",
+      "Scalar",
+      "Scalar"
+    ]
+  },
+  "160": {
+    "name": "aten::narrow",
+    "shape": [
+      [
+        3731,
+        4
+      ]
+    ],
+    "params": [
+      1,
+      0,
+      2
+    ],
+    "dtype": [
+      "float",
+      "Scalar",
+      "Scalar",
+      "Scalar"
+    ]
+  },
+  "161": {
+    "name": "aten::slice",
+    "shape": [
+      [
+        3731,
+        4
+      ]
+    ],
+    "params": [
+      1,
+      0,
+      2,
+      1
+    ],
+    "dtype": [
+      "float",
+      "Scalar",
+      "Scalar",
+      "Scalar",
+      "Scalar"
+    ]
+  },
+  "162": {
+    "name": "aten::narrow",
+    "shape": [
+      [
+        3731,
+        4
+      ]
+    ],
+    "params": [
+      1,
+      2,
+      2
+    ],
+    "dtype": [
+      "float",
+      "Scalar",
+      "Scalar",
+      "Scalar"
+    ]
+  },
+  "163": {
+    "name": "aten::slice",
+    "shape": [
+      [
+        3731,
+        4
+      ]
+    ],
+    "params": [
+      1,
+      2,
+      4,
+      1
+    ],
+    "dtype": [
+      "float",
+      "Scalar",
+      "Scalar",
+      "Scalar",
+      "Scalar"
+    ]
+  },
+  "164": {
+    "name": "aten::select",
+    "shape": [
+      [
+        3,
+        3,
+        2
+      ]
+    ],
+    "params": [
+      0,
+      2
+    ],
+    "dtype": [
+      "float",
+      "Scalar",
+      "Scalar"
+    ]
+  },
+  "165": {
+    "name": "aten::select",
+    "shape": [
+      [
+        1056,
+        2
+      ]
+    ],
+    "params": [
+      1,
+      0
+    ],
+    "dtype": [
+      "long int",
+      "Scalar",
+      "Scalar"
+    ]
+  },
+  "166": {
+    "name": "aten::select",
+    "shape": [
+      [
+        1056,
+        2
+      ]
+    ],
+    "params": [
+      1,
+      1
+    ],
+    "dtype": [
+      "long int",
+      "Scalar",
+      "Scalar"
+    ]
+  },
+  "167": {
+    "name": "aten::slice",
+    "shape": [
+      [
+        1056,
+        7
+      ]
+    ],
+    "params": [
+      0,
+      0,
+      9223372036854775807,
+      1
+    ],
+    "dtype": [
+      "float",
+      "Scalar",
+      "Scalar",
+      "Scalar",
+      "Scalar"
+    ]
+  },
+  "168": {
+    "name": "aten::slice",
+    "shape": [
+      [
+        1056,
+        7
+      ]
+    ],
+    "params": [
+      1,
+      2,
+      4,
+      1
+    ],
+    "dtype": [
+      "float",
+      "Scalar",
+      "Scalar",
+      "Scalar",
+      "Scalar"
+    ]
+  },
+  "169": {
+    "name": "aten::select",
+    "shape": [
+      [
+        2,
+        1056
+      ]
+    ],
+    "params": [
+      0,
+      0
+    ],
+    "dtype": [
+      "bool",
+      "Scalar",
+      "Scalar"
+    ]
+  },
+  "170": {
+    "name": "aten::select",
+    "shape": [
+      [
+        2,
+        1056
+      ]
+    ],
+    "params": [
+      0,
+      1
+    ],
+    "dtype": [
+      "bool",
+      "Scalar",
+      "Scalar"
+    ]
+  },
+  "171": {
+    "name": "aten::narrow",
+    "shape": [
+      [
+        5280
+      ]
+    ],
+    "params": [
+      0,
+      0,
+      1056
+    ],
+    "dtype": [
+      "bool",
+      "Scalar",
+      "Scalar",
+      "Scalar"
+    ]
+  },
+  "172": {
+    "name": "aten::slice",
+    "shape": [
+      [
+        5280
+      ]
+    ],
+    "params": [
+      0,
+      0,
+      1056,
+      1
+    ],
+    "dtype": [
+      "bool",
+      "Scalar",
+      "Scalar",
+      "Scalar",
+      "Scalar"
+    ]
+  },
+  "173": {
+    "name": "aten::narrow",
+    "shape": [
+      [
+        5280
+      ]
+    ],
+    "params": [
+      0,
+      1056,
+      1056
+    ],
+    "dtype": [
+      "bool",
+      "Scalar",
+      "Scalar",
+      "Scalar"
+    ]
+  },
+  "174": {
+    "name": "aten::slice",
+    "shape": [
+      [
+        5280
+      ]
+    ],
+    "params": [
+      0,
+      1056,
+      2112,
+      1
+    ],
+    "dtype": [
+      "bool",
+      "Scalar",
+      "Scalar",
+      "Scalar",
+      "Scalar"
+    ]
+  },
+  "175": {
+    "name": "aten::narrow",
+    "shape": [
+      [
+        5280
+      ]
+    ],
+    "params": [
+      0,
+      2112,
+      1056
+    ],
+    "dtype": [
+      "bool",
+      "Scalar",
+      "Scalar",
+      "Scalar"
+    ]
+  },
+  "176": {
+    "name": "aten::slice",
+    "shape": [
+      [
+        5280
+      ]
+    ],
+    "params": [
+      0,
+      2112,
+      3168,
+      1
+    ],
+    "dtype": [
+      "bool",
+      "Scalar",
+      "Scalar",
+      "Scalar",
+      "Scalar"
+    ]
+  },
+  "177": {
+    "name": "aten::narrow",
+    "shape": [
+      [
+        5280
+      ]
+    ],
+    "params": [
+      0,
+      3168,
+      1056
+    ],
+    "dtype": [
+      "bool",
+      "Scalar",
+      "Scalar",
+      "Scalar"
+    ]
+  },
+  "178": {
+    "name": "aten::slice",
+    "shape": [
+      [
+        5280
+      ]
+    ],
+    "params": [
+      0,
+      3168,
+      4224,
+      1
+    ],
+    "dtype": [
+      "bool",
+      "Scalar",
+      "Scalar",
+      "Scalar",
+      "Scalar"
+    ]
+  },
+  "179": {
+    "name": "aten::narrow",
+    "shape": [
+      [
+        5280
+      ]
+    ],
+    "params": [
+      0,
+      4224,
+      1056
+    ],
+    "dtype": [
+      "bool",
+      "Scalar",
+      "Scalar",
+      "Scalar"
+    ]
+  },
+  "180": {
+    "name": "aten::slice",
+    "shape": [
+      [
+        5280
+      ]
+    ],
+    "params": [
+      0,
+      4224,
+      5280,
+      1
+    ],
+    "dtype": [
+      "bool",
+      "Scalar",
+      "Scalar",
+      "Scalar",
+      "Scalar"
+    ]
+  },
+  "181": {
+    "name": "aten::repeat",
+    "shape": [
+      [
+        1056,
+        7
+      ]
+    ],
+    "params": [
+      [
+        5,
+        1,
+        1
+      ]
+    ],
+    "dtype": [
+      "float",
+      "ScalarList"
+    ]
+  },
+  "182": {
+    "name": "aten::alias",
+    "shape": [
+      [
+        5,
+        1056,
+        7
+      ]
+    ],
+    "params": [],
+    "dtype": [
+      "float"
+    ]
+  },
+  "183": {
+    "name": "aten::expand_as",
+    "shape": [
+      [
+        1,
+        1056,
+        7
+      ],
+      [
+        5,
+        1,
+        1,
+        1,
+        1056,
+        7
+      ]
+    ],
+    "params": [],
+    "dtype": [
+      "float",
+      "float"
+    ]
+  },
+  "184": {
+    "name": "aten::nonzero",
+    "shape": [
+      [
+        5,
+        1056
+      ]
+    ],
+    "params": [],
+    "dtype": [
+      "bool"
+    ]
+  },
+  "185": {
+    "name": "aten::select",
+    "shape": [
+      [
+        3157,
+        2
+      ]
+    ],
+    "params": [
+      1,
+      0
+    ],
+    "dtype": [
+      "long int",
+      "Scalar",
+      "Scalar"
+    ]
+  },
+  "186": {
+    "name": "aten::select",
+    "shape": [
+      [
+        3157,
+        2
+      ]
+    ],
+    "params": [
+      1,
+      1
+    ],
+    "dtype": [
+      "long int",
+      "Scalar",
+      "Scalar"
+    ]
+  },
+  "187": {
+    "name": "aten::narrow",
+    "shape": [
+      [
+        3157,
+        7
+      ]
+    ],
+    "params": [
+      1,
+      0,
+      2
+    ],
+    "dtype": [
+      "float",
+      "Scalar",
+      "Scalar",
+      "Scalar"
+    ]
+  },
+  "188": {
+    "name": "aten::slice",
+    "shape": [
+      [
+        3157,
+        7
+      ]
+    ],
+    "params": [
+      1,
+      0,
+      2,
+      1
+    ],
+    "dtype": [
+      "float",
+      "Scalar",
+      "Scalar",
+      "Scalar",
+      "Scalar"
+    ]
+  },
+  "189": {
+    "name": "aten::narrow",
+    "shape": [
+      [
+        3157,
+        7
+      ]
+    ],
+    "params": [
+      1,
+      2,
+      2
+    ],
+    "dtype": [
+      "float",
+      "Scalar",
+      "Scalar",
+      "Scalar"
+    ]
+  },
+  "190": {
+    "name": "aten::slice",
+    "shape": [
+      [
+        3157,
+        7
+      ]
+    ],
+    "params": [
+      1,
+      2,
+      4,
+      1
+    ],
+    "dtype": [
+      "float",
+      "Scalar",
+      "Scalar",
+      "Scalar",
+      "Scalar"
+    ]
+  },
+  "191": {
+    "name": "aten::narrow",
+    "shape": [
+      [
+        3157,
+        7
+      ]
+    ],
+    "params": [
+      1,
+      4,
+      2
+    ],
+    "dtype": [
+      "float",
+      "Scalar",
+      "Scalar",
+      "Scalar"
+    ]
+  },
+  "192": {
+    "name": "aten::slice",
+    "shape": [
+      [
+        3157,
+        7
+      ]
+    ],
+    "params": [
+      1,
+      4,
+      6,
+      1
+    ],
+    "dtype": [
+      "float",
+      "Scalar",
+      "Scalar",
+      "Scalar",
+      "Scalar"
+    ]
+  },
+  "193": {
+    "name": "aten::narrow",
+    "shape": [
+      [
+        3157,
+        7
+      ]
+    ],
+    "params": [
+      1,
+      6,
+      1
+    ],
+    "dtype": [
+      "float",
+      "Scalar",
+      "Scalar",
+      "Scalar"
+    ]
+  },
+  "194": {
+    "name": "aten::slice",
+    "shape": [
+      [
+        3157,
+        7
+      ]
+    ],
+    "params": [
+      1,
+      6,
+      7,
+      1
+    ],
+    "dtype": [
+      "float",
+      "Scalar",
+      "Scalar",
+      "Scalar",
+      "Scalar"
+    ]
+  },
+  "195": {
+    "name": "aten::select",
+    "shape": [
+      [
+        2,
+        3157
+      ]
+    ],
+    "params": [
+      0,
+      0
+    ],
+    "dtype": [
+      "long int",
+      "Scalar",
+      "Scalar"
+    ]
+  },
+  "196": {
+    "name": "aten::select",
+    "shape": [
+      [
+        2,
+        3157
+      ]
+    ],
+    "params": [
+      0,
+      1
+    ],
+    "dtype": [
+      "long int",
+      "Scalar",
+      "Scalar"
+    ]
+  },
+  "197": {
+    "name": "aten::clamp_",
+    "shape": [
+      [
+        3157
+      ]
+    ],
+    "params": [
+      0,
+      19
+    ],
+    "dtype": [
+      "long int",
+      "Scalar",
+      "Scalar"
+    ]
+  },
+  "198": {
+    "name": "aten::narrow",
+    "shape": [
+      [
+        3157,
+        4
+      ]
+    ],
+    "params": [
+      1,
+      0,
+      2
+    ],
+    "dtype": [
+      "float",
+      "Scalar",
+      "Scalar",
+      "Scalar"
+    ]
+  },
+  "199": {
+    "name": "aten::slice",
+    "shape": [
+      [
+        3157,
+        4
+      ]
+    ],
+    "params": [
+      1,
+      0,
+      2,
+      1
+    ],
+    "dtype": [
+      "float",
+      "Scalar",
+      "Scalar",
+      "Scalar",
+      "Scalar"
+    ]
+  },
+  "200": {
+    "name": "aten::narrow",
+    "shape": [
+      [
+        3157,
+        4
+      ]
+    ],
+    "params": [
+      1,
+      2,
+      2
+    ],
+    "dtype": [
+      "float",
+      "Scalar",
+      "Scalar",
+      "Scalar"
+    ]
+  },
+  "201": {
+    "name": "aten::slice",
+    "shape": [
+      [
+        3157,
+        4
+      ]
+    ],
+    "params": [
+      1,
+      2,
+      4,
+      1
+    ],
+    "dtype": [
+      "float",
+      "Scalar",
+      "Scalar",
+      "Scalar",
+      "Scalar"
+    ]
+  },
+  "202": {
+    "name": "aten::sigmoid",
+    "shape": [
+      [
+        2659,
+        2
+      ]
+    ],
+    "params": [],
+    "dtype": [
+      "float"
+    ]
+  },
+  "203": {
+    "name": "aten::mul",
+    "shape": [
+      [
+        2659,
+        2
+      ],
+      [
+        2659,
+        2
+      ]
+    ],
+    "params": [],
+    "dtype": [
+      "float",
+      "float"
+    ]
+  },
+  "204": {
+    "name": "aten::narrow",
+    "shape": [
+      [
+        2659,
+        4
+      ]
+    ],
+    "params": [
+      -1,
+      0,
+      1
+    ],
+    "dtype": [
+      "float",
+      "Scalar",
+      "Scalar",
+      "Scalar"
+    ]
+  },
+  "205": {
+    "name": "aten::slice",
+    "shape": [
+      [
+        2659,
+        4
+      ]
+    ],
+    "params": [
+      -1,
+      0,
+      1,
+      1
+    ],
+    "dtype": [
+      "float",
+      "Scalar",
+      "Scalar",
+      "Scalar",
+      "Scalar"
+    ]
+  },
+  "206": {
+    "name": "aten::narrow",
+    "shape": [
+      [
+        2659,
+        4
+      ]
+    ],
+    "params": [
+      -1,
+      1,
+      1
+    ],
+    "dtype": [
+      "float",
+      "Scalar",
+      "Scalar",
+      "Scalar"
+    ]
+  },
+  "207": {
+    "name": "aten::slice",
+    "shape": [
+      [
+        2659,
+        4
+      ]
+    ],
+    "params": [
+      -1,
+      1,
+      2,
+      1
+    ],
+    "dtype": [
+      "float",
+      "Scalar",
+      "Scalar",
+      "Scalar",
+      "Scalar"
+    ]
+  },
+  "208": {
+    "name": "aten::narrow",
+    "shape": [
+      [
+        2659,
+        4
+      ]
+    ],
+    "params": [
+      -1,
+      2,
+      1
+    ],
+    "dtype": [
+      "float",
+      "Scalar",
+      "Scalar",
+      "Scalar"
+    ]
+  },
+  "209": {
+    "name": "aten::slice",
+    "shape": [
+      [
+        2659,
+        4
+      ]
+    ],
+    "params": [
+      -1,
+      2,
+      3,
+      1
+    ],
+    "dtype": [
+      "float",
+      "Scalar",
+      "Scalar",
+      "Scalar",
+      "Scalar"
+    ]
+  },
+  "210": {
+    "name": "aten::narrow",
+    "shape": [
+      [
+        2659,
+        4
+      ]
+    ],
+    "params": [
+      -1,
+      3,
+      1
+    ],
+    "dtype": [
+      "float",
+      "Scalar",
+      "Scalar",
+      "Scalar"
+    ]
+  },
+  "211": {
+    "name": "aten::slice",
+    "shape": [
+      [
+        2659,
+        4
+      ]
+    ],
+    "params": [
+      -1,
+      3,
+      4,
+      1
+    ],
+    "dtype": [
+      "float",
+      "Scalar",
+      "Scalar",
+      "Scalar",
+      "Scalar"
+    ]
+  },
+  "212": {
+    "name": "aten::minimum",
+    "shape": [
+      [
+        2659,
+        1
+      ],
+      [
+        2659,
+        1
+      ]
+    ],
+    "params": [],
+    "dtype": [
+      "float",
+      "float"
+    ]
+  },
+  "213": {
+    "name": "aten::maximum",
+    "shape": [
+      [
+        2659,
+        1
+      ],
+      [
+        2659,
+        1
+      ]
+    ],
+    "params": [],
+    "dtype": [
+      "float",
+      "float"
+    ]
+  },
+  "214": {
+    "name": "aten::clamp",
+    "shape": [
+      [
+        2659,
+        1
+      ]
+    ],
+    "params": [
+      0,
+      null
+    ],
+    "dtype": [
+      "float",
+      "Scalar",
+      ""
+    ]
+  },
+  "215": {
+    "name": "aten::mul",
+    "shape": [
+      [
+        2659,
+        1
+      ],
+      [
+        2659,
+        1
+      ]
+    ],
+    "params": [],
+    "dtype": [
+      "float",
+      "float"
+    ]
+  },
+  "216": {
+    "name": "aten::mean",
+    "shape": [
+      [
+        2659
+      ]
+    ],
+    "params": [],
+    "dtype": [
+      "float",
+      ""
+    ]
+  },
+  "217": {
+    "name": "aten::mean",
+    "shape": [
+      [
+        2659
+      ]
+    ],
+    "params": [
+      [],
+      false
+    ],
+    "dtype": [
+      "float",
+      "ScalarList",
+      "Scalar",
+      ""
+    ]
+  },
+  "218": {
+    "name": "aten::clamp",
+    "shape": [
+      [
+        2659
+      ]
+    ],
+    "params": [
+      0,
+      null
+    ],
+    "dtype": [
+      "float",
+      "Scalar",
+      ""
+    ]
+  },
+  "219": {
+    "name": "aten::index_put_",
+    "shape": [
+      [
+        64,
+        3,
+        80,
+        80
+      ]
+    ],
+    "params": [
+      false
+    ],
+    "dtype": [
+      "float",
+      "",
+      "float",
+      "Scalar"
+    ]
+  },
+  "220": {
+    "name": "aten::_index_put_impl_",
+    "shape": [
+      [
+        64,
+        3,
+        80,
+        80
+      ]
+    ],
+    "params": [
+      false,
+      false
+    ],
+    "dtype": [
+      "float",
+      "",
+      "float",
+      "Scalar",
+      "Scalar"
+    ]
+  },
+  "221": {
+    "name": "aten::lift_fresh",
+    "shape": [
+      [
+        2659
+      ]
+    ],
+    "params": [],
+    "dtype": [
+      "long int"
+    ]
+  },
+  "222": {
+    "name": "aten::index_put_",
+    "shape": [
+      [
+        2659,
+        80
+      ]
+    ],
+    "params": [
+      false
+    ],
+    "dtype": [
+      "float",
+      "",
+      "float",
+      "Scalar"
+    ]
+  },
+  "223": {
+    "name": "aten::_index_put_impl_",
+    "shape": [
+      [
+        2659,
+        80
+      ]
+    ],
+    "params": [
+      false,
+      false
+    ],
+    "dtype": [
+      "float",
+      "",
+      "float",
+      "Scalar",
+      "Scalar"
+    ]
+  },
+  "224": {
+    "name": "aten::clamp_min_",
+    "shape": [
+      [
+        2659,
+        80
+      ]
+    ],
+    "params": [
+      0
+    ],
+    "dtype": [
+      "float",
+      "Scalar"
+    ]
+  },
+  "225": {
+    "name": "aten::mul",
+    "shape": [
+      [
+        1
+      ],
+      [
+        2659,
+        80
+      ]
+    ],
+    "params": [],
+    "dtype": [
+      "float",
+      "float"
+    ]
+  },
+  "226": {
+    "name": "aten::sub_",
+    "shape": [
+      [
+        2659,
+        80
+      ],
+      [
+        2659,
+        80
+      ]
+    ],
+    "params": [],
+    "dtype": [
+      "float",
+      "float",
+      "Scalar"
+    ]
+  },
+  "227": {
+    "name": "aten::mul_",
+    "shape": [
+      [
+        2659,
+        80
+      ],
+      [
+        2659,
+        80
+      ]
+    ],
+    "params": [],
+    "dtype": [
+      "float",
+      "float"
+    ]
+  },
+  "228": {
+    "name": "aten::mean",
+    "shape": [
+      [
+        2659,
+        80
+      ]
+    ],
+    "params": [],
+    "dtype": [
+      "float",
+      ""
+    ]
+  },
+  "229": {
+    "name": "aten::mean",
+    "shape": [
+      [
+        2659,
+        80
+      ]
+    ],
+    "params": [
+      [],
+      false
+    ],
+    "dtype": [
+      "float",
+      "ScalarList",
+      "Scalar",
+      ""
+    ]
+  },
+  "230": {
+    "name": "aten::select",
+    "shape": [
+      [
+        4,
+        1,
+        1
+      ]
+    ],
+    "params": [
+      0,
+      0
+    ],
+    "dtype": [
+      "float",
+      "Scalar",
+      "Scalar"
+    ]
+  },
+  "231": {
+    "name": "aten::select",
+    "shape": [
+      [
+        64,
+        3,
+        80,
+        80,
+        85
+      ]
+    ],
+    "params": [
+      4,
+      4
+    ],
+    "dtype": [
+      "float",
+      "Scalar",
+      "Scalar"
+    ]
+  },
+  "232": {
+    "name": "aten::clamp_min_",
+    "shape": [
+      [
+        64,
+        3,
+        80,
+        80
+      ]
+    ],
+    "params": [
+      0
+    ],
+    "dtype": [
+      "float",
+      "Scalar"
+    ]
+  },
+  "233": {
+    "name": "aten::mul",
+    "shape": [
+      [
+        1
+      ],
+      [
+        64,
+        3,
+        80,
+        80
+      ]
+    ],
+    "params": [],
+    "dtype": [
+      "float",
+      "float"
+    ]
+  },
+  "234": {
+    "name": "aten::sub_",
+    "shape": [
+      [
+        64,
+        3,
+        80,
+        80
+      ],
+      [
+        64,
+        3,
+        80,
+        80
+      ]
+    ],
+    "params": [],
+    "dtype": [
+      "float",
+      "float",
+      "Scalar"
+    ]
+  },
+  "235": {
+    "name": "aten::mul_",
+    "shape": [
+      [
+        64,
+        3,
+        80,
+        80
+      ],
+      [
+        64,
+        3,
+        80,
+        80
+      ]
+    ],
+    "params": [],
+    "dtype": [
+      "float",
+      "float"
+    ]
+  },
+  "236": {
+    "name": "aten::mean",
+    "shape": [
+      [
+        64,
+        3,
+        80,
+        80
+      ]
+    ],
+    "params": [],
+    "dtype": [
+      "float",
+      ""
+    ]
+  },
+  "237": {
+    "name": "aten::mean",
+    "shape": [
+      [
+        64,
+        3,
+        80,
+        80
+      ]
+    ],
+    "params": [
+      [],
+      false
+    ],
+    "dtype": [
+      "float",
+      "ScalarList",
+      "Scalar",
+      ""
+    ]
+  },
+  "238": {
+    "name": "aten::select",
+    "shape": [
+      [
+        4,
+        1,
+        1,
+        1,
+        1
+      ]
+    ],
+    "params": [
+      0,
+      0
+    ],
+    "dtype": [
+      "float",
+      "Scalar",
+      "Scalar"
+    ]
+  },
+  "239": {
+    "name": "aten::sigmoid",
+    "shape": [
+      [
+        3731,
+        2
+      ]
+    ],
+    "params": [],
+    "dtype": [
+      "float"
+    ]
+  },
+  "240": {
+    "name": "aten::mul",
+    "shape": [
+      [
+        3731,
+        2
+      ],
+      [
+        3731,
+        2
+      ]
+    ],
+    "params": [],
+    "dtype": [
+      "float",
+      "float"
+    ]
+  },
+  "241": {
+    "name": "aten::narrow",
+    "shape": [
+      [
+        3731,
+        4
+      ]
+    ],
+    "params": [
+      -1,
+      0,
+      1
+    ],
+    "dtype": [
+      "float",
+      "Scalar",
+      "Scalar",
+      "Scalar"
+    ]
+  },
+  "242": {
+    "name": "aten::slice",
+    "shape": [
+      [
+        3731,
+        4
+      ]
+    ],
+    "params": [
+      -1,
+      0,
+      1,
+      1
+    ],
+    "dtype": [
+      "float",
+      "Scalar",
+      "Scalar",
+      "Scalar",
+      "Scalar"
+    ]
+  },
+  "243": {
+    "name": "aten::narrow",
+    "shape": [
+      [
+        3731,
+        4
+      ]
+    ],
+    "params": [
+      -1,
+      1,
+      1
+    ],
+    "dtype": [
+      "float",
+      "Scalar",
+      "Scalar",
+      "Scalar"
+    ]
+  },
+  "244": {
+    "name": "aten::slice",
+    "shape": [
+      [
+        3731,
+        4
+      ]
+    ],
+    "params": [
+      -1,
+      1,
+      2,
+      1
+    ],
+    "dtype": [
+      "float",
+      "Scalar",
+      "Scalar",
+      "Scalar",
+      "Scalar"
+    ]
+  },
+  "245": {
+    "name": "aten::narrow",
+    "shape": [
+      [
+        3731,
+        4
+      ]
+    ],
+    "params": [
+      -1,
+      2,
+      1
+    ],
+    "dtype": [
+      "float",
+      "Scalar",
+      "Scalar",
+      "Scalar"
+    ]
+  },
+  "246": {
+    "name": "aten::slice",
+    "shape": [
+      [
+        3731,
+        4
+      ]
+    ],
+    "params": [
+      -1,
+      2,
+      3,
+      1
+    ],
+    "dtype": [
+      "float",
+      "Scalar",
+      "Scalar",
+      "Scalar",
+      "Scalar"
+    ]
+  },
+  "247": {
+    "name": "aten::narrow",
+    "shape": [
+      [
+        3731,
+        4
+      ]
+    ],
+    "params": [
+      -1,
+      3,
+      1
+    ],
+    "dtype": [
+      "float",
+      "Scalar",
+      "Scalar",
+      "Scalar"
+    ]
+  },
+  "248": {
+    "name": "aten::slice",
+    "shape": [
+      [
+        3731,
+        4
+      ]
+    ],
+    "params": [
+      -1,
+      3,
+      4,
+      1
+    ],
+    "dtype": [
+      "float",
+      "Scalar",
+      "Scalar",
+      "Scalar",
+      "Scalar"
+    ]
+  },
+  "249": {
+    "name": "aten::minimum",
+    "shape": [
+      [
+        3731,
+        1
+      ],
+      [
+        3731,
+        1
+      ]
+    ],
+    "params": [],
+    "dtype": [
+      "float",
+      "float"
+    ]
+  },
+  "250": {
+    "name": "aten::maximum",
+    "shape": [
+      [
+        3731,
+        1
+      ],
+      [
+        3731,
+        1
+      ]
+    ],
+    "params": [],
+    "dtype": [
+      "float",
+      "float"
+    ]
+  },
+  "251": {
+    "name": "aten::clamp",
+    "shape": [
+      [
+        3731,
+        1
+      ]
+    ],
+    "params": [
+      0,
+      null
+    ],
+    "dtype": [
+      "float",
+      "Scalar",
+      ""
+    ]
+  },
+  "252": {
+    "name": "aten::mul",
+    "shape": [
+      [
+        3731,
+        1
+      ],
+      [
+        3731,
+        1
+      ]
+    ],
+    "params": [],
+    "dtype": [
+      "float",
+      "float"
+    ]
+  },
+  "253": {
+    "name": "aten::mean",
+    "shape": [
+      [
+        3731
+      ]
+    ],
+    "params": [],
+    "dtype": [
+      "float",
+      ""
+    ]
+  },
+  "254": {
+    "name": "aten::mean",
+    "shape": [
+      [
+        3731
+      ]
+    ],
+    "params": [
+      [],
+      false
+    ],
+    "dtype": [
+      "float",
+      "ScalarList",
+      "Scalar",
+      ""
+    ]
+  },
+  "255": {
+    "name": "aten::clamp",
+    "shape": [
+      [
+        3731
+      ]
+    ],
+    "params": [
+      0,
+      null
+    ],
+    "dtype": [
+      "float",
+      "Scalar",
+      ""
+    ]
+  },
+  "256": {
+    "name": "aten::index_put_",
+    "shape": [
+      [
+        64,
+        3,
+        40,
+        40
+      ]
+    ],
+    "params": [
+      false
+    ],
+    "dtype": [
+      "float",
+      "",
+      "float",
+      "Scalar"
+    ]
+  },
+  "257": {
+    "name": "aten::_index_put_impl_",
+    "shape": [
+      [
+        64,
+        3,
+        40,
+        40
+      ]
+    ],
+    "params": [
+      false,
+      false
+    ],
+    "dtype": [
+      "float",
+      "",
+      "float",
+      "Scalar",
+      "Scalar"
+    ]
+  },
+  "258": {
+    "name": "aten::lift_fresh",
+    "shape": [
+      [
+        3731
+      ]
+    ],
+    "params": [],
+    "dtype": [
+      "long int"
+    ]
+  },
+  "259": {
+    "name": "aten::index_put_",
+    "shape": [
+      [
+        3731,
+        80
+      ]
+    ],
+    "params": [
+      false
+    ],
+    "dtype": [
+      "float",
+      "",
+      "float",
+      "Scalar"
+    ]
+  },
+  "260": {
+    "name": "aten::_index_put_impl_",
+    "shape": [
+      [
+        3731,
+        80
+      ]
+    ],
+    "params": [
+      false,
+      false
+    ],
+    "dtype": [
+      "float",
+      "",
+      "float",
+      "Scalar",
+      "Scalar"
+    ]
+  },
+  "261": {
+    "name": "aten::clamp_min_",
+    "shape": [
+      [
+        3731,
+        80
+      ]
+    ],
+    "params": [
+      0
+    ],
+    "dtype": [
+      "float",
+      "Scalar"
+    ]
+  },
+  "262": {
+    "name": "aten::mul",
+    "shape": [
+      [
+        1
+      ],
+      [
+        3731,
+        80
+      ]
+    ],
+    "params": [],
+    "dtype": [
+      "float",
+      "float"
+    ]
+  },
+  "263": {
+    "name": "aten::sub_",
+    "shape": [
+      [
+        3731,
+        80
+      ],
+      [
+        3731,
+        80
+      ]
+    ],
+    "params": [],
+    "dtype": [
+      "float",
+      "float",
+      "Scalar"
+    ]
+  },
+  "264": {
+    "name": "aten::mul_",
+    "shape": [
+      [
+        3731,
+        80
+      ],
+      [
+        3731,
+        80
+      ]
+    ],
+    "params": [],
+    "dtype": [
+      "float",
+      "float"
+    ]
+  },
+  "265": {
+    "name": "aten::mean",
+    "shape": [
+      [
+        3731,
+        80
+      ]
+    ],
+    "params": [],
+    "dtype": [
+      "float",
+      ""
+    ]
+  },
+  "266": {
+    "name": "aten::mean",
+    "shape": [
+      [
+        3731,
+        80
+      ]
+    ],
+    "params": [
+      [],
+      false
+    ],
+    "dtype": [
+      "float",
+      "ScalarList",
+      "Scalar",
+      ""
+    ]
+  },
+  "267": {
+    "name": "aten::select",
+    "shape": [
+      [
+        64,
+        3,
+        40,
+        40,
+        85
+      ]
+    ],
+    "params": [
+      4,
+      4
+    ],
+    "dtype": [
+      "float",
+      "Scalar",
+      "Scalar"
+    ]
+  },
+  "268": {
+    "name": "aten::clamp_min_",
+    "shape": [
+      [
+        64,
+        3,
+        40,
+        40
+      ]
+    ],
+    "params": [
+      0
+    ],
+    "dtype": [
+      "float",
+      "Scalar"
+    ]
+  },
+  "269": {
+    "name": "aten::mul",
+    "shape": [
+      [
+        1
+      ],
+      [
+        64,
+        3,
+        40,
+        40
+      ]
+    ],
+    "params": [],
+    "dtype": [
+      "float",
+      "float"
+    ]
+  },
+  "270": {
+    "name": "aten::sub_",
+    "shape": [
+      [
+        64,
+        3,
+        40,
+        40
+      ],
+      [
+        64,
+        3,
+        40,
+        40
+      ]
+    ],
+    "params": [],
+    "dtype": [
+      "float",
+      "float",
+      "Scalar"
+    ]
+  },
+  "271": {
+    "name": "aten::mul_",
+    "shape": [
+      [
+        64,
+        3,
+        40,
+        40
+      ],
+      [
+        64,
+        3,
+        40,
+        40
+      ]
+    ],
+    "params": [],
+    "dtype": [
+      "float",
+      "float"
+    ]
+  },
+  "272": {
+    "name": "aten::mean",
+    "shape": [
+      [
+        64,
+        3,
+        40,
+        40
+      ]
+    ],
+    "params": [],
+    "dtype": [
+      "float",
+      ""
+    ]
+  },
+  "273": {
+    "name": "aten::mean",
+    "shape": [
+      [
+        64,
+        3,
+        40,
+        40
+      ]
+    ],
+    "params": [
+      [],
+      false
+    ],
+    "dtype": [
+      "float",
+      "ScalarList",
+      "Scalar",
+      ""
+    ]
+  },
+  "274": {
+    "name": "aten::sigmoid",
+    "shape": [
+      [
+        3157,
+        2
+      ]
+    ],
+    "params": [],
+    "dtype": [
+      "float"
+    ]
+  },
+  "275": {
+    "name": "aten::mul",
+    "shape": [
+      [
+        3157,
+        2
+      ],
+      [
+        3157,
+        2
+      ]
+    ],
+    "params": [],
+    "dtype": [
+      "float",
+      "float"
+    ]
+  },
+  "276": {
+    "name": "aten::narrow",
+    "shape": [
+      [
+        3157,
+        4
+      ]
+    ],
+    "params": [
+      -1,
+      0,
+      1
+    ],
+    "dtype": [
+      "float",
+      "Scalar",
+      "Scalar",
+      "Scalar"
+    ]
+  },
+  "277": {
+    "name": "aten::slice",
+    "shape": [
+      [
+        3157,
+        4
+      ]
+    ],
+    "params": [
+      -1,
+      0,
+      1,
+      1
+    ],
+    "dtype": [
+      "float",
+      "Scalar",
+      "Scalar",
+      "Scalar",
+      "Scalar"
+    ]
+  },
+  "278": {
+    "name": "aten::narrow",
+    "shape": [
+      [
+        3157,
+        4
+      ]
+    ],
+    "params": [
+      -1,
+      1,
+      1
+    ],
+    "dtype": [
+      "float",
+      "Scalar",
+      "Scalar",
+      "Scalar"
+    ]
+  },
+  "279": {
+    "name": "aten::slice",
+    "shape": [
+      [
+        3157,
+        4
+      ]
+    ],
+    "params": [
+      -1,
+      1,
+      2,
+      1
+    ],
+    "dtype": [
+      "float",
+      "Scalar",
+      "Scalar",
+      "Scalar",
+      "Scalar"
+    ]
+  },
+  "280": {
+    "name": "aten::narrow",
+    "shape": [
+      [
+        3157,
+        4
+      ]
+    ],
+    "params": [
+      -1,
+      2,
+      1
+    ],
+    "dtype": [
+      "float",
+      "Scalar",
+      "Scalar",
+      "Scalar"
+    ]
+  },
+  "281": {
+    "name": "aten::slice",
+    "shape": [
+      [
+        3157,
+        4
+      ]
+    ],
+    "params": [
+      -1,
+      2,
+      3,
+      1
+    ],
+    "dtype": [
+      "float",
+      "Scalar",
+      "Scalar",
+      "Scalar",
+      "Scalar"
+    ]
+  },
+  "282": {
+    "name": "aten::narrow",
+    "shape": [
+      [
+        3157,
+        4
+      ]
+    ],
+    "params": [
+      -1,
+      3,
+      1
+    ],
+    "dtype": [
+      "float",
+      "Scalar",
+      "Scalar",
+      "Scalar"
+    ]
+  },
+  "283": {
+    "name": "aten::slice",
+    "shape": [
+      [
+        3157,
+        4
+      ]
+    ],
+    "params": [
+      -1,
+      3,
+      4,
+      1
+    ],
+    "dtype": [
+      "float",
+      "Scalar",
+      "Scalar",
+      "Scalar",
+      "Scalar"
+    ]
+  },
+  "284": {
+    "name": "aten::minimum",
+    "shape": [
+      [
+        3157,
+        1
+      ],
+      [
+        3157,
+        1
+      ]
+    ],
+    "params": [],
+    "dtype": [
+      "float",
+      "float"
+    ]
+  },
+  "285": {
+    "name": "aten::maximum",
+    "shape": [
+      [
+        3157,
+        1
+      ],
+      [
+        3157,
+        1
+      ]
+    ],
+    "params": [],
+    "dtype": [
+      "float",
+      "float"
+    ]
+  },
+  "286": {
+    "name": "aten::clamp",
+    "shape": [
+      [
+        3157,
+        1
+      ]
+    ],
+    "params": [
+      0,
+      null
+    ],
+    "dtype": [
+      "float",
+      "Scalar",
+      ""
+    ]
+  },
+  "287": {
+    "name": "aten::mul",
+    "shape": [
+      [
+        3157,
+        1
+      ],
+      [
+        3157,
+        1
+      ]
+    ],
+    "params": [],
+    "dtype": [
+      "float",
+      "float"
+    ]
+  },
+  "288": {
+    "name": "aten::mean",
+    "shape": [
+      [
+        3157
+      ]
+    ],
+    "params": [],
+    "dtype": [
+      "float",
+      ""
+    ]
+  },
+  "289": {
+    "name": "aten::mean",
+    "shape": [
+      [
+        3157
+      ]
+    ],
+    "params": [
+      [],
+      false
+    ],
+    "dtype": [
+      "float",
+      "ScalarList",
+      "Scalar",
+      ""
+    ]
+  },
+  "290": {
+    "name": "aten::clamp",
+    "shape": [
+      [
+        3157
+      ]
+    ],
+    "params": [
+      0,
+      null
+    ],
+    "dtype": [
+      "float",
+      "Scalar",
+      ""
+    ]
+  },
+  "291": {
+    "name": "aten::index_put_",
+    "shape": [
+      [
+        64,
+        3,
+        20,
+        20
+      ]
+    ],
+    "params": [
+      false
+    ],
+    "dtype": [
+      "float",
+      "",
+      "float",
+      "Scalar"
+    ]
+  },
+  "292": {
+    "name": "aten::_index_put_impl_",
+    "shape": [
+      [
+        64,
+        3,
+        20,
+        20
+      ]
+    ],
+    "params": [
+      false,
+      false
+    ],
+    "dtype": [
+      "float",
+      "",
+      "float",
+      "Scalar",
+      "Scalar"
+    ]
+  },
+  "293": {
+    "name": "aten::lift_fresh",
+    "shape": [
+      [
+        3157
+      ]
+    ],
+    "params": [],
+    "dtype": [
+      "long int"
+    ]
+  },
+  "294": {
+    "name": "aten::index_put_",
+    "shape": [
+      [
+        3157,
+        80
+      ]
+    ],
+    "params": [
+      false
+    ],
+    "dtype": [
+      "float",
+      "",
+      "float",
+      "Scalar"
+    ]
+  },
+  "295": {
+    "name": "aten::_index_put_impl_",
+    "shape": [
+      [
+        3157,
+        80
+      ]
+    ],
+    "params": [
+      false,
+      false
+    ],
+    "dtype": [
+      "float",
+      "",
+      "float",
+      "Scalar",
+      "Scalar"
+    ]
+  },
+  "296": {
+    "name": "aten::clamp_min_",
+    "shape": [
+      [
+        3157,
+        80
+      ]
+    ],
+    "params": [
+      0
+    ],
+    "dtype": [
+      "float",
+      "Scalar"
+    ]
+  },
+  "297": {
+    "name": "aten::mul",
+    "shape": [
+      [
+        1
+      ],
+      [
+        3157,
+        80
+      ]
+    ],
+    "params": [],
+    "dtype": [
+      "float",
+      "float"
+    ]
+  },
+  "298": {
+    "name": "aten::sub_",
+    "shape": [
+      [
+        3157,
+        80
+      ],
+      [
+        3157,
+        80
+      ]
+    ],
+    "params": [],
+    "dtype": [
+      "float",
+      "float",
+      "Scalar"
+    ]
+  },
+  "299": {
+    "name": "aten::mul_",
+    "shape": [
+      [
+        3157,
+        80
+      ],
+      [
+        3157,
+        80
+      ]
+    ],
+    "params": [],
+    "dtype": [
+      "float",
+      "float"
+    ]
+  },
+  "300": {
+    "name": "aten::mean",
+    "shape": [
+      [
+        3157,
+        80
+      ]
+    ],
+    "params": [],
+    "dtype": [
+      "float",
+      ""
+    ]
+  },
+  "301": {
+    "name": "aten::mean",
+    "shape": [
+      [
+        3157,
+        80
+      ]
+    ],
+    "params": [
+      [],
+      false
+    ],
+    "dtype": [
+      "float",
+      "ScalarList",
+      "Scalar",
+      ""
+    ]
+  },
+  "302": {
+    "name": "aten::select",
+    "shape": [
+      [
+        64,
+        3,
+        20,
+        20,
+        85
+      ]
+    ],
+    "params": [
+      4,
+      4
+    ],
+    "dtype": [
+      "float",
+      "Scalar",
+      "Scalar"
+    ]
+  },
+  "303": {
+    "name": "aten::clamp_min_",
+    "shape": [
+      [
+        64,
+        3,
+        20,
+        20
+      ]
+    ],
+    "params": [
+      0
+    ],
+    "dtype": [
+      "float",
+      "Scalar"
+    ]
+  },
+  "304": {
+    "name": "aten::mul",
+    "shape": [
+      [
+        1
+      ],
+      [
+        64,
+        3,
+        20,
+        20
+      ]
+    ],
+    "params": [],
+    "dtype": [
+      "float",
+      "float"
+    ]
+  },
+  "305": {
+    "name": "aten::sub_",
+    "shape": [
+      [
+        64,
+        3,
+        20,
+        20
+      ],
+      [
+        64,
+        3,
+        20,
+        20
+      ]
+    ],
+    "params": [],
+    "dtype": [
+      "float",
+      "float",
+      "Scalar"
+    ]
+  },
+  "306": {
+    "name": "aten::mul_",
+    "shape": [
+      [
+        64,
+        3,
+        20,
+        20
+      ],
+      [
+        64,
+        3,
+        20,
+        20
+      ]
+    ],
+    "params": [],
+    "dtype": [
+      "float",
+      "float"
+    ]
+  },
+  "307": {
+    "name": "aten::mean",
+    "shape": [
+      [
+        64,
+        3,
+        20,
+        20
+      ]
+    ],
+    "params": [],
+    "dtype": [
+      "float",
+      ""
+    ]
+  },
+  "308": {
+    "name": "aten::mean",
+    "shape": [
+      [
+        64,
+        3,
+        20,
+        20
+      ]
+    ],
+    "params": [
+      [],
+      false
+    ],
+    "dtype": [
+      "float",
+      "ScalarList",
+      "Scalar",
+      ""
+    ]
+  },
+  "309": {
+    "name": "aten::sigmoid",
+    "shape": [
+      [
+        64,
+        3,
+        20,
+        20
+      ]
+    ],
+    "params": [],
+    "dtype": [
+      "float"
+    ]
+  },
+  "310": {
+    "name": "aten::select_backward",
+    "shape": [
+      [
+        64,
+        3,
+        20,
+        20
+      ]
+    ],
+    "params": [
+      [
+        64,
+        3,
+        20,
+        20,
+        85
+      ],
+      4,
+      4
+    ],
+    "dtype": [
+      "float",
+      "ScalarList",
+      "Scalar",
+      "Scalar"
+    ]
+  },
+  "311": {
+    "name": "aten::sigmoid",
+    "shape": [
+      [
+        3157,
+        80
+      ]
+    ],
+    "params": [],
+    "dtype": [
+      "float"
+    ]
+  },
+  "312": {
+    "name": "aten::where",
+    "shape": [
+      [
+        3157,
+        1
+      ],
+      [
+        3157,
+        1
+      ],
+      [
+        3157,
+        1
+      ]
+    ],
+    "params": [],
+    "dtype": [
+      "bool",
+      "float",
+      "float"
+    ]
+  },
+  "313": {
+    "name": "aten::masked_fill_",
+    "shape": [
+      [
+        3157,
+        1
+      ],
+      [
+        3157,
+        1
+      ]
+    ],
+    "params": [
+      0
+    ],
+    "dtype": [
+      "float",
+      "bool",
+      "Scalar"
+    ]
+  },
+  "314": {
+    "name": "aten::ge",
+    "shape": [
+      [
+        3157,
+        1
+      ]
+    ],
+    "params": [
+      0
+    ],
+    "dtype": [
+      "float",
+      "Scalar"
+    ]
+  },
+  "315": {
+    "name": "aten::sigmoid_backward",
+    "shape": [
+      [
+        3157,
+        2
+      ],
+      [
+        3157,
+        2
+      ]
+    ],
+    "params": [],
+    "dtype": [
+      "float",
+      "float"
+    ]
+  },
+  "316": {
+    "name": "aten::narrow",
+    "shape": [
+      [
+        3157,
+        85
+      ]
+    ],
+    "params": [
+      1,
+      0,
+      2
+    ],
+    "dtype": [
+      "float",
+      "Scalar",
+      "Scalar",
+      "Scalar"
+    ]
+  },
+  "317": {
+    "name": "aten::slice",
+    "shape": [
+      [
+        3157,
+        85
+      ]
+    ],
+    "params": [
+      1,
+      0,
+      2,
+      1
+    ],
+    "dtype": [
+      "float",
+      "Scalar",
+      "Scalar",
+      "Scalar",
+      "Scalar"
+    ]
+  },
+  "318": {
+    "name": "aten::narrow",
+    "shape": [
+      [
+        3157,
+        85
+      ]
+    ],
+    "params": [
+      1,
+      2,
+      2
+    ],
+    "dtype": [
+      "float",
+      "Scalar",
+      "Scalar",
+      "Scalar"
+    ]
+  },
+  "319": {
+    "name": "aten::slice",
+    "shape": [
+      [
+        3157,
+        85
+      ]
+    ],
+    "params": [
+      1,
+      2,
+      4,
+      1
+    ],
+    "dtype": [
+      "float",
+      "Scalar",
+      "Scalar",
+      "Scalar",
+      "Scalar"
+    ]
+  },
+  "320": {
+    "name": "aten::narrow",
+    "shape": [
+      [
+        3157,
+        85
+      ]
+    ],
+    "params": [
+      1,
+      4,
+      1
+    ],
+    "dtype": [
+      "float",
+      "Scalar",
+      "Scalar",
+      "Scalar"
+    ]
+  },
+  "321": {
+    "name": "aten::slice",
+    "shape": [
+      [
+        3157,
+        85
+      ]
+    ],
+    "params": [
+      1,
+      4,
+      5,
+      1
+    ],
+    "dtype": [
+      "float",
+      "Scalar",
+      "Scalar",
+      "Scalar",
+      "Scalar"
+    ]
+  },
+  "322": {
+    "name": "aten::narrow",
+    "shape": [
+      [
+        3157,
+        85
+      ]
+    ],
+    "params": [
+      1,
+      5,
+      80
+    ],
+    "dtype": [
+      "float",
+      "Scalar",
+      "Scalar",
+      "Scalar"
+    ]
+  },
+  "323": {
+    "name": "aten::slice",
+    "shape": [
+      [
+        3157,
+        85
+      ]
+    ],
+    "params": [
+      1,
+      5,
+      85,
+      1
+    ],
+    "dtype": [
+      "float",
+      "Scalar",
+      "Scalar",
+      "Scalar",
+      "Scalar"
+    ]
+  },
+  "324": {
+    "name": "aten::_index_put_impl_",
+    "shape": [
+      [
+        64,
+        3,
+        20,
+        20,
+        85
+      ]
+    ],
+    "params": [
+      true,
+      true
+    ],
+    "dtype": [
+      "float",
+      "",
+      "float",
+      "Scalar",
+      "Scalar"
+    ]
+  },
+  "325": {
+    "name": "aten::sigmoid",
+    "shape": [
+      [
+        64,
+        3,
+        40,
+        40
+      ]
+    ],
+    "params": [],
+    "dtype": [
+      "float"
+    ]
+  },
+  "326": {
+    "name": "aten::select_backward",
+    "shape": [
+      [
+        64,
+        3,
+        40,
+        40
+      ]
+    ],
+    "params": [
+      [
+        64,
+        3,
+        40,
+        40,
+        85
+      ],
+      4,
+      4
+    ],
+    "dtype": [
+      "float",
+      "ScalarList",
+      "Scalar",
+      "Scalar"
+    ]
+  },
+  "327": {
+    "name": "aten::sigmoid",
+    "shape": [
+      [
+        3731,
+        80
+      ]
+    ],
+    "params": [],
+    "dtype": [
+      "float"
+    ]
+  },
+  "328": {
+    "name": "aten::where",
+    "shape": [
+      [
+        3731,
+        1
+      ],
+      [
+        3731,
+        1
+      ],
+      [
+        3731,
+        1
+      ]
+    ],
+    "params": [],
+    "dtype": [
+      "bool",
+      "float",
+      "float"
+    ]
+  },
+  "329": {
+    "name": "aten::masked_fill_",
+    "shape": [
+      [
+        3731,
+        1
+      ],
+      [
+        3731,
+        1
+      ]
+    ],
+    "params": [
+      0
+    ],
+    "dtype": [
+      "float",
+      "bool",
+      "Scalar"
+    ]
+  },
+  "330": {
+    "name": "aten::ge",
+    "shape": [
+      [
+        3731,
+        1
+      ]
+    ],
+    "params": [
+      0
+    ],
+    "dtype": [
+      "float",
+      "Scalar"
+    ]
+  },
+  "331": {
+    "name": "aten::sigmoid_backward",
+    "shape": [
+      [
+        3731,
+        2
+      ],
+      [
+        3731,
+        2
+      ]
+    ],
+    "params": [],
+    "dtype": [
+      "float",
+      "float"
+    ]
+  },
+  "332": {
+    "name": "aten::narrow",
+    "shape": [
+      [
+        3731,
+        85
+      ]
+    ],
+    "params": [
+      1,
+      0,
+      2
+    ],
+    "dtype": [
+      "float",
+      "Scalar",
+      "Scalar",
+      "Scalar"
+    ]
+  },
+  "333": {
+    "name": "aten::slice",
+    "shape": [
+      [
+        3731,
+        85
+      ]
+    ],
+    "params": [
+      1,
+      0,
+      2,
+      1
+    ],
+    "dtype": [
+      "float",
+      "Scalar",
+      "Scalar",
+      "Scalar",
+      "Scalar"
+    ]
+  },
+  "334": {
+    "name": "aten::narrow",
+    "shape": [
+      [
+        3731,
+        85
+      ]
+    ],
+    "params": [
+      1,
+      2,
+      2
+    ],
+    "dtype": [
+      "float",
+      "Scalar",
+      "Scalar",
+      "Scalar"
+    ]
+  },
+  "335": {
+    "name": "aten::slice",
+    "shape": [
+      [
+        3731,
+        85
+      ]
+    ],
+    "params": [
+      1,
+      2,
+      4,
+      1
+    ],
+    "dtype": [
+      "float",
+      "Scalar",
+      "Scalar",
+      "Scalar",
+      "Scalar"
+    ]
+  },
+  "336": {
+    "name": "aten::narrow",
+    "shape": [
+      [
+        3731,
+        85
+      ]
+    ],
+    "params": [
+      1,
+      4,
+      1
+    ],
+    "dtype": [
+      "float",
+      "Scalar",
+      "Scalar",
+      "Scalar"
+    ]
+  },
+  "337": {
+    "name": "aten::slice",
+    "shape": [
+      [
+        3731,
+        85
+      ]
+    ],
+    "params": [
+      1,
+      4,
+      5,
+      1
+    ],
+    "dtype": [
+      "float",
+      "Scalar",
+      "Scalar",
+      "Scalar",
+      "Scalar"
+    ]
+  },
+  "338": {
+    "name": "aten::narrow",
+    "shape": [
+      [
+        3731,
+        85
+      ]
+    ],
+    "params": [
+      1,
+      5,
+      80
+    ],
+    "dtype": [
+      "float",
+      "Scalar",
+      "Scalar",
+      "Scalar"
+    ]
+  },
+  "339": {
+    "name": "aten::slice",
+    "shape": [
+      [
+        3731,
+        85
+      ]
+    ],
+    "params": [
+      1,
+      5,
+      85,
+      1
+    ],
+    "dtype": [
+      "float",
+      "Scalar",
+      "Scalar",
+      "Scalar",
+      "Scalar"
+    ]
+  },
+  "340": {
+    "name": "aten::_index_put_impl_",
+    "shape": [
+      [
+        64,
+        3,
+        40,
+        40,
+        85
+      ]
+    ],
+    "params": [
+      true,
+      true
+    ],
+    "dtype": [
+      "float",
+      "",
+      "float",
+      "Scalar",
+      "Scalar"
+    ]
+  },
+  "341": {
+    "name": "aten::sigmoid",
+    "shape": [
+      [
+        64,
+        3,
+        80,
+        80
+      ]
+    ],
+    "params": [],
+    "dtype": [
+      "float"
+    ]
+  },
+  "342": {
+    "name": "aten::select_backward",
+    "shape": [
+      [
+        64,
+        3,
+        80,
+        80
+      ]
+    ],
+    "params": [
+      [
+        64,
+        3,
+        80,
+        80,
+        85
+      ],
+      4,
+      4
+    ],
+    "dtype": [
+      "float",
+      "ScalarList",
+      "Scalar",
+      "Scalar"
+    ]
+  },
+  "343": {
+    "name": "aten::sigmoid",
+    "shape": [
+      [
+        2659,
+        80
+      ]
+    ],
+    "params": [],
+    "dtype": [
+      "float"
+    ]
+  },
+  "344": {
+    "name": "aten::where",
+    "shape": [
+      [
+        2659,
+        1
+      ],
+      [
+        2659,
+        1
+      ],
+      [
+        2659,
+        1
+      ]
+    ],
+    "params": [],
+    "dtype": [
+      "bool",
+      "float",
+      "float"
+    ]
+  },
+  "345": {
+    "name": "aten::masked_fill_",
+    "shape": [
+      [
+        2659,
+        1
+      ],
+      [
+        2659,
+        1
+      ]
+    ],
+    "params": [
+      0
+    ],
+    "dtype": [
+      "float",
+      "bool",
+      "Scalar"
+    ]
+  },
+  "346": {
+    "name": "aten::ge",
+    "shape": [
+      [
+        2659,
+        1
+      ]
+    ],
+    "params": [
+      0
+    ],
+    "dtype": [
+      "float",
+      "Scalar"
+    ]
+  },
+  "347": {
+    "name": "aten::sigmoid_backward",
+    "shape": [
+      [
+        2659,
+        2
+      ],
+      [
+        2659,
+        2
+      ]
+    ],
+    "params": [],
+    "dtype": [
+      "float",
+      "float"
+    ]
+  },
+  "348": {
+    "name": "aten::narrow",
+    "shape": [
+      [
+        2659,
+        85
+      ]
+    ],
+    "params": [
+      1,
+      0,
+      2
+    ],
+    "dtype": [
+      "float",
+      "Scalar",
+      "Scalar",
+      "Scalar"
+    ]
+  },
+  "349": {
+    "name": "aten::slice",
+    "shape": [
+      [
+        2659,
+        85
+      ]
+    ],
+    "params": [
+      1,
+      0,
+      2,
+      1
+    ],
+    "dtype": [
+      "float",
+      "Scalar",
+      "Scalar",
+      "Scalar",
+      "Scalar"
+    ]
+  },
+  "350": {
+    "name": "aten::narrow",
+    "shape": [
+      [
+        2659,
+        85
+      ]
+    ],
+    "params": [
+      1,
+      2,
+      2
+    ],
+    "dtype": [
+      "float",
+      "Scalar",
+      "Scalar",
+      "Scalar"
+    ]
+  },
+  "351": {
+    "name": "aten::slice",
+    "shape": [
+      [
+        2659,
+        85
+      ]
+    ],
+    "params": [
+      1,
+      2,
+      4,
+      1
+    ],
+    "dtype": [
+      "float",
+      "Scalar",
+      "Scalar",
+      "Scalar",
+      "Scalar"
+    ]
+  },
+  "352": {
+    "name": "aten::narrow",
+    "shape": [
+      [
+        2659,
+        85
+      ]
+    ],
+    "params": [
+      1,
+      4,
+      1
+    ],
+    "dtype": [
+      "float",
+      "Scalar",
+      "Scalar",
+      "Scalar"
+    ]
+  },
+  "353": {
+    "name": "aten::slice",
+    "shape": [
+      [
+        2659,
+        85
+      ]
+    ],
+    "params": [
+      1,
+      4,
+      5,
+      1
+    ],
+    "dtype": [
+      "float",
+      "Scalar",
+      "Scalar",
+      "Scalar",
+      "Scalar"
+    ]
+  },
+  "354": {
+    "name": "aten::narrow",
+    "shape": [
+      [
+        2659,
+        85
+      ]
+    ],
+    "params": [
+      1,
+      5,
+      80
+    ],
+    "dtype": [
+      "float",
+      "Scalar",
+      "Scalar",
+      "Scalar"
+    ]
+  },
+  "355": {
+    "name": "aten::slice",
+    "shape": [
+      [
+        2659,
+        85
+      ]
+    ],
+    "params": [
+      1,
+      5,
+      85,
+      1
+    ],
+    "dtype": [
+      "float",
+      "Scalar",
+      "Scalar",
+      "Scalar",
+      "Scalar"
+    ]
+  },
+  "356": {
+    "name": "aten::_index_put_impl_",
+    "shape": [
+      [
+        64,
+        3,
+        80,
+        80,
+        85
+      ]
+    ],
+    "params": [
+      true,
+      true
+    ],
+    "dtype": [
+      "float",
+      "",
+      "float",
+      "Scalar",
+      "Scalar"
+    ]
+  },
+  "357": {
+    "name": "aten::convolution_backward",
+    "shape": [
+      [
+        64,
+        255,
+        20,
+        20
+      ],
+      [
+        64,
+        512,
+        20,
+        20
+      ],
+      [
+        255,
+        512,
+        1,
+        1
+      ]
+    ],
+    "params": [
+      [
+        255
+      ],
+      [
+        1,
+        1
+      ],
+      [
+        0,
+        0
+      ],
+      [
+        1,
+        1
+      ],
+      false,
+      [
+        0,
+        0
+      ],
+      1,
+      [
+        true,
+        true,
+        true
+      ]
+    ],
+    "dtype": [
+      "float",
+      "float",
+      "float",
+      "ScalarList",
+      "ScalarList",
+      "ScalarList",
+      "ScalarList",
+      "Scalar",
+      "ScalarList",
+      "Scalar",
+      "ScalarList"
+    ]
+  },
+  "358": {
+    "name": "aten::convolution_backward",
+    "shape": [
+      [
+        64,
+        255,
+        40,
+        40
+      ],
+      [
+        64,
+        256,
+        40,
+        40
+      ],
+      [
+        255,
+        256,
+        1,
+        1
+      ]
+    ],
+    "params": [
+      [
+        255
+      ],
+      [
+        1,
+        1
+      ],
+      [
+        0,
+        0
+      ],
+      [
+        1,
+        1
+      ],
+      false,
+      [
+        0,
+        0
+      ],
+      1,
+      [
+        true,
+        true,
+        true
+      ]
+    ],
+    "dtype": [
+      "float",
+      "float",
+      "float",
+      "ScalarList",
+      "ScalarList",
+      "ScalarList",
+      "ScalarList",
+      "Scalar",
+      "ScalarList",
+      "Scalar",
+      "ScalarList"
+    ]
+  },
+  "359": {
+    "name": "aten::convolution_backward",
+    "shape": [
+      [
+        64,
+        255,
+        80,
+        80
+      ],
+      [
+        64,
+        128,
+        80,
+        80
+      ],
+      [
+        255,
+        128,
+        1,
+        1
+      ]
+    ],
+    "params": [
+      [
+        255
+      ],
+      [
+        1,
+        1
+      ],
+      [
+        0,
+        0
+      ],
+      [
+        1,
+        1
+      ],
+      false,
+      [
+        0,
+        0
+      ],
+      1,
+      [
+        true,
+        true,
+        true
+      ]
+    ],
+    "dtype": [
+      "float",
+      "float",
+      "float",
+      "ScalarList",
+      "ScalarList",
+      "ScalarList",
+      "ScalarList",
+      "Scalar",
+      "ScalarList",
+      "Scalar",
+      "ScalarList"
+    ]
+  },
+  "360": {
+    "name": "aten::native_batch_norm_backward",
+    "shape": [
+      [
+        64,
+        512,
+        20,
+        20
+      ],
+      [
+        64,
+        512,
+        20,
+        20
+      ],
+      [
+        512
+      ],
+      [
+        512
+      ],
+      [
+        512
+      ],
+      [
+        512
+      ],
+      [
+        512
+      ]
+    ],
+    "params": [
+      true,
+      0.001,
+      [
+        true,
+        true,
+        true
+      ]
+    ],
+    "dtype": [
+      "float",
+      "float",
+      "float",
+      "float",
+      "float",
+      "float",
+      "float",
+      "Scalar",
+      "Scalar",
+      "ScalarList"
+    ]
+  },
+  "361": {
+    "name": "aten::convolution_backward",
+    "shape": [
+      [
+        64,
+        512,
+        20,
+        20
+      ],
+      [
+        64,
+        512,
+        20,
+        20
+      ],
+      [
+        512,
+        512,
+        1,
+        1
+      ]
+    ],
+    "params": [
+      [
+        0
+      ],
+      [
+        1,
+        1
+      ],
+      [
+        0,
+        0
+      ],
+      [
+        1,
+        1
+      ],
+      false,
+      [
+        0,
+        0
+      ],
+      1,
+      [
+        true,
+        true,
+        false
+      ]
+    ],
+    "dtype": [
+      "float",
+      "float",
+      "float",
+      "ScalarList",
+      "ScalarList",
+      "ScalarList",
+      "ScalarList",
+      "Scalar",
+      "ScalarList",
+      "Scalar",
+      "ScalarList"
+    ]
+  },
+  "362": {
+    "name": "aten::narrow",
+    "shape": [
+      [
+        64,
+        512,
+        20,
+        20
+      ]
+    ],
+    "params": [
+      1,
+      256,
+      256
+    ],
+    "dtype": [
+      "float",
+      "Scalar",
+      "Scalar",
+      "Scalar"
+    ]
+  },
+  "363": {
+    "name": "aten::slice",
+    "shape": [
+      [
+        64,
+        512,
+        20,
+        20
+      ]
+    ],
+    "params": [
+      1,
+      256,
+      512,
+      1
+    ],
+    "dtype": [
+      "float",
+      "Scalar",
+      "Scalar",
+      "Scalar",
+      "Scalar"
+    ]
+  },
+  "364": {
+    "name": "aten::native_batch_norm_backward",
+    "shape": [
+      [
+        64,
+        256,
+        20,
+        20
+      ],
+      [
+        64,
+        256,
+        20,
+        20
+      ],
+      [
+        256
+      ],
+      [
+        256
+      ],
+      [
+        256
+      ],
+      [
+        256
+      ],
+      [
+        256
+      ]
+    ],
+    "params": [
+      true,
+      0.001,
+      [
+        true,
+        true,
+        true
+      ]
+    ],
+    "dtype": [
+      "float",
+      "float",
+      "float",
+      "float",
+      "float",
+      "float",
+      "float",
+      "Scalar",
+      "Scalar",
+      "ScalarList"
+    ]
+  },
+  "365": {
+    "name": "aten::convolution_backward",
+    "shape": [
+      [
+        64,
+        256,
+        20,
+        20
+      ],
+      [
+        64,
+        512,
+        20,
+        20
+      ],
+      [
+        256,
+        512,
+        1,
+        1
+      ]
+    ],
+    "params": [
+      [
+        0
+      ],
+      [
+        1,
+        1
+      ],
+      [
+        0,
+        0
+      ],
+      [
+        1,
+        1
+      ],
+      false,
+      [
+        0,
+        0
+      ],
+      1,
+      [
+        true,
+        true,
+        false
+      ]
+    ],
+    "dtype": [
+      "float",
+      "float",
+      "float",
+      "ScalarList",
+      "ScalarList",
+      "ScalarList",
+      "ScalarList",
+      "Scalar",
+      "ScalarList",
+      "Scalar",
+      "ScalarList"
+    ]
+  },
+  "366": {
+    "name": "aten::convolution_backward",
+    "shape": [
+      [
+        64,
+        256,
+        20,
+        20
+      ],
+      [
+        64,
+        256,
+        20,
+        20
+      ],
+      [
+        256,
+        256,
+        3,
+        3
+      ]
+    ],
+    "params": [
+      [
+        0
+      ],
+      [
+        1,
+        1
+      ],
+      [
+        1,
+        1
+      ],
+      [
+        1,
+        1
+      ],
+      false,
+      [
+        0,
+        0
+      ],
+      1,
+      [
+        true,
+        true,
+        false
+      ]
+    ],
+    "dtype": [
+      "float",
+      "float",
+      "float",
+      "ScalarList",
+      "ScalarList",
+      "ScalarList",
+      "ScalarList",
+      "Scalar",
+      "ScalarList",
+      "Scalar",
+      "ScalarList"
+    ]
+  },
+  "367": {
+    "name": "aten::convolution_backward",
+    "shape": [
+      [
+        64,
+        256,
+        20,
+        20
+      ],
+      [
+        64,
+        256,
+        20,
+        20
+      ],
+      [
+        256,
+        256,
+        1,
+        1
+      ]
+    ],
+    "params": [
+      [
+        0
+      ],
+      [
+        1,
+        1
+      ],
+      [
+        0,
+        0
+      ],
+      [
+        1,
+        1
+      ],
+      false,
+      [
+        0,
+        0
+      ],
+      1,
+      [
+        true,
+        true,
+        false
+      ]
+    ],
+    "dtype": [
+      "float",
+      "float",
+      "float",
+      "ScalarList",
+      "ScalarList",
+      "ScalarList",
+      "ScalarList",
+      "Scalar",
+      "ScalarList",
+      "Scalar",
+      "ScalarList"
+    ]
+  },
+  "368": {
+    "name": "aten::convolution_backward",
+    "shape": [
+      [
+        64,
+        256,
+        20,
+        20
+      ],
+      [
+        64,
+        256,
+        40,
+        40
+      ],
+      [
+        256,
+        256,
+        3,
+        3
+      ]
+    ],
+    "params": [
+      [
+        0
+      ],
+      [
+        2,
+        2
+      ],
+      [
+        1,
+        1
+      ],
+      [
+        1,
+        1
+      ],
+      false,
+      [
+        0,
+        0
+      ],
+      1,
+      [
+        true,
+        true,
+        false
+      ]
+    ],
+    "dtype": [
+      "float",
+      "float",
+      "float",
+      "ScalarList",
+      "ScalarList",
+      "ScalarList",
+      "ScalarList",
+      "Scalar",
+      "ScalarList",
+      "Scalar",
+      "ScalarList"
+    ]
+  },
+  "369": {
+    "name": "aten::native_batch_norm_backward",
+    "shape": [
+      [
+        64,
+        256,
+        40,
+        40
+      ],
+      [
+        64,
+        256,
+        40,
+        40
+      ],
+      [
+        256
+      ],
+      [
+        256
+      ],
+      [
+        256
+      ],
+      [
+        256
+      ],
+      [
+        256
+      ]
+    ],
+    "params": [
+      true,
+      0.001,
+      [
+        true,
+        true,
+        true
+      ]
+    ],
+    "dtype": [
+      "float",
+      "float",
+      "float",
+      "float",
+      "float",
+      "float",
+      "float",
+      "Scalar",
+      "Scalar",
+      "ScalarList"
+    ]
+  },
+  "370": {
+    "name": "aten::convolution_backward",
+    "shape": [
+      [
+        64,
+        256,
+        40,
+        40
+      ],
+      [
+        64,
+        256,
+        40,
+        40
+      ],
+      [
+        256,
+        256,
+        1,
+        1
+      ]
+    ],
+    "params": [
+      [
+        0
+      ],
+      [
+        1,
+        1
+      ],
+      [
+        0,
+        0
+      ],
+      [
+        1,
+        1
+      ],
+      false,
+      [
+        0,
+        0
+      ],
+      1,
+      [
+        true,
+        true,
+        false
+      ]
+    ],
+    "dtype": [
+      "float",
+      "float",
+      "float",
+      "ScalarList",
+      "ScalarList",
+      "ScalarList",
+      "ScalarList",
+      "Scalar",
+      "ScalarList",
+      "Scalar",
+      "ScalarList"
+    ]
+  },
+  "371": {
+    "name": "aten::narrow",
+    "shape": [
+      [
+        64,
+        256,
+        40,
+        40
+      ]
+    ],
+    "params": [
+      1,
+      128,
+      128
+    ],
+    "dtype": [
+      "float",
+      "Scalar",
+      "Scalar",
+      "Scalar"
+    ]
+  },
+  "372": {
+    "name": "aten::slice",
+    "shape": [
+      [
+        64,
+        256,
+        40,
+        40
+      ]
+    ],
+    "params": [
+      1,
+      128,
+      256,
+      1
+    ],
+    "dtype": [
+      "float",
+      "Scalar",
+      "Scalar",
+      "Scalar",
+      "Scalar"
+    ]
+  },
+  "373": {
+    "name": "aten::native_batch_norm_backward",
+    "shape": [
+      [
+        64,
+        128,
+        40,
+        40
+      ],
+      [
+        64,
+        128,
+        40,
+        40
+      ],
+      [
+        128
+      ],
+      [
+        128
+      ],
+      [
+        128
+      ],
+      [
+        128
+      ],
+      [
+        128
+      ]
+    ],
+    "params": [
+      true,
+      0.001,
+      [
+        true,
+        true,
+        true
+      ]
+    ],
+    "dtype": [
+      "float",
+      "float",
+      "float",
+      "float",
+      "float",
+      "float",
+      "float",
+      "Scalar",
+      "Scalar",
+      "ScalarList"
+    ]
+  },
+  "374": {
+    "name": "aten::convolution_backward",
+    "shape": [
+      [
+        64,
+        128,
+        40,
+        40
+      ],
+      [
+        64,
+        256,
+        40,
+        40
+      ],
+      [
+        128,
+        256,
+        1,
+        1
+      ]
+    ],
+    "params": [
+      [
+        0
+      ],
+      [
+        1,
+        1
+      ],
+      [
+        0,
+        0
+      ],
+      [
+        1,
+        1
+      ],
+      false,
+      [
+        0,
+        0
+      ],
+      1,
+      [
+        true,
+        true,
+        false
+      ]
+    ],
+    "dtype": [
+      "float",
+      "float",
+      "float",
+      "ScalarList",
+      "ScalarList",
+      "ScalarList",
+      "ScalarList",
+      "Scalar",
+      "ScalarList",
+      "Scalar",
+      "ScalarList"
+    ]
+  },
+  "375": {
+    "name": "aten::convolution_backward",
+    "shape": [
+      [
+        64,
+        128,
+        40,
+        40
+      ],
+      [
+        64,
+        128,
+        40,
+        40
+      ],
+      [
+        128,
+        128,
+        3,
+        3
+      ]
+    ],
+    "params": [
+      [
+        0
+      ],
+      [
+        1,
+        1
+      ],
+      [
+        1,
+        1
+      ],
+      [
+        1,
+        1
+      ],
+      false,
+      [
+        0,
+        0
+      ],
+      1,
+      [
+        true,
+        true,
+        false
+      ]
+    ],
+    "dtype": [
+      "float",
+      "float",
+      "float",
+      "ScalarList",
+      "ScalarList",
+      "ScalarList",
+      "ScalarList",
+      "Scalar",
+      "ScalarList",
+      "Scalar",
+      "ScalarList"
+    ]
+  },
+  "376": {
+    "name": "aten::convolution_backward",
+    "shape": [
+      [
+        64,
+        128,
+        40,
+        40
+      ],
+      [
+        64,
+        128,
+        40,
+        40
+      ],
+      [
+        128,
+        128,
+        1,
+        1
+      ]
+    ],
+    "params": [
+      [
+        0
+      ],
+      [
+        1,
+        1
+      ],
+      [
+        0,
+        0
+      ],
+      [
+        1,
+        1
+      ],
+      false,
+      [
+        0,
+        0
+      ],
+      1,
+      [
+        true,
+        true,
+        false
+      ]
+    ],
+    "dtype": [
+      "float",
+      "float",
+      "float",
+      "ScalarList",
+      "ScalarList",
+      "ScalarList",
+      "ScalarList",
+      "Scalar",
+      "ScalarList",
+      "Scalar",
+      "ScalarList"
+    ]
+  },
+  "377": {
+    "name": "aten::convolution_backward",
+    "shape": [
+      [
+        64,
+        128,
+        40,
+        40
+      ],
+      [
+        64,
+        128,
+        80,
+        80
+      ],
+      [
+        128,
+        128,
+        3,
+        3
+      ]
+    ],
+    "params": [
+      [
+        0
+      ],
+      [
+        2,
+        2
+      ],
+      [
+        1,
+        1
+      ],
+      [
+        1,
+        1
+      ],
+      false,
+      [
+        0,
+        0
+      ],
+      1,
+      [
+        true,
+        true,
+        false
+      ]
+    ],
+    "dtype": [
+      "float",
+      "float",
+      "float",
+      "ScalarList",
+      "ScalarList",
+      "ScalarList",
+      "ScalarList",
+      "Scalar",
+      "ScalarList",
+      "Scalar",
+      "ScalarList"
+    ]
+  },
+  "378": {
+    "name": "aten::native_batch_norm_backward",
+    "shape": [
+      [
+        64,
+        128,
+        80,
+        80
+      ],
+      [
+        64,
+        128,
+        80,
+        80
+      ],
+      [
+        128
+      ],
+      [
+        128
+      ],
+      [
+        128
+      ],
+      [
+        128
+      ],
+      [
+        128
+      ]
+    ],
+    "params": [
+      true,
+      0.001,
+      [
+        true,
+        true,
+        true
+      ]
+    ],
+    "dtype": [
+      "float",
+      "float",
+      "float",
+      "float",
+      "float",
+      "float",
+      "float",
+      "Scalar",
+      "Scalar",
+      "ScalarList"
+    ]
+  },
+  "379": {
+    "name": "aten::convolution_backward",
+    "shape": [
+      [
+        64,
+        128,
+        80,
+        80
+      ],
+      [
+        64,
+        128,
+        80,
+        80
+      ],
+      [
+        128,
+        128,
+        1,
+        1
+      ]
+    ],
+    "params": [
+      [
+        0
+      ],
+      [
+        1,
+        1
+      ],
+      [
+        0,
+        0
+      ],
+      [
+        1,
+        1
+      ],
+      false,
+      [
+        0,
+        0
+      ],
+      1,
+      [
+        true,
+        true,
+        false
+      ]
+    ],
+    "dtype": [
+      "float",
+      "float",
+      "float",
+      "ScalarList",
+      "ScalarList",
+      "ScalarList",
+      "ScalarList",
+      "Scalar",
+      "ScalarList",
+      "Scalar",
+      "ScalarList"
+    ]
+  },
+  "380": {
+    "name": "aten::narrow",
+    "shape": [
+      [
+        64,
+        128,
+        80,
+        80
+      ]
+    ],
+    "params": [
+      1,
+      64,
+      64
+    ],
+    "dtype": [
+      "float",
+      "Scalar",
+      "Scalar",
+      "Scalar"
+    ]
+  },
+  "381": {
+    "name": "aten::slice",
+    "shape": [
+      [
+        64,
+        128,
+        80,
+        80
+      ]
+    ],
+    "params": [
+      1,
+      64,
+      128,
+      1
+    ],
+    "dtype": [
+      "float",
+      "Scalar",
+      "Scalar",
+      "Scalar",
+      "Scalar"
+    ]
+  },
+  "382": {
+    "name": "aten::native_batch_norm_backward",
+    "shape": [
+      [
+        64,
+        64,
+        80,
+        80
+      ],
+      [
+        64,
+        64,
+        80,
+        80
+      ],
+      [
+        64
+      ],
+      [
+        64
+      ],
+      [
+        64
+      ],
+      [
+        64
+      ],
+      [
+        64
+      ]
+    ],
+    "params": [
+      true,
+      0.001,
+      [
+        true,
+        true,
+        true
+      ]
+    ],
+    "dtype": [
+      "float",
+      "float",
+      "float",
+      "float",
+      "float",
+      "float",
+      "float",
+      "Scalar",
+      "Scalar",
+      "ScalarList"
+    ]
+  },
+  "383": {
+    "name": "aten::convolution_backward",
+    "shape": [
+      [
+        64,
+        64,
+        80,
+        80
+      ],
+      [
+        64,
+        256,
+        80,
+        80
+      ],
+      [
+        64,
+        256,
+        1,
+        1
+      ]
+    ],
+    "params": [
+      [
+        0
+      ],
+      [
+        1,
+        1
+      ],
+      [
+        0,
+        0
+      ],
+      [
+        1,
+        1
+      ],
+      false,
+      [
+        0,
+        0
+      ],
+      1,
+      [
+        true,
+        true,
+        false
+      ]
+    ],
+    "dtype": [
+      "float",
+      "float",
+      "float",
+      "ScalarList",
+      "ScalarList",
+      "ScalarList",
+      "ScalarList",
+      "Scalar",
+      "ScalarList",
+      "Scalar",
+      "ScalarList"
+    ]
+  },
+  "384": {
+    "name": "aten::convolution_backward",
+    "shape": [
+      [
+        64,
+        64,
+        80,
+        80
+      ],
+      [
+        64,
+        64,
+        80,
+        80
+      ],
+      [
+        64,
+        64,
+        3,
+        3
+      ]
+    ],
+    "params": [
+      [
+        0
+      ],
+      [
+        1,
+        1
+      ],
+      [
+        1,
+        1
+      ],
+      [
+        1,
+        1
+      ],
+      false,
+      [
+        0,
+        0
+      ],
+      1,
+      [
+        true,
+        true,
+        false
+      ]
+    ],
+    "dtype": [
+      "float",
+      "float",
+      "float",
+      "ScalarList",
+      "ScalarList",
+      "ScalarList",
+      "ScalarList",
+      "Scalar",
+      "ScalarList",
+      "Scalar",
+      "ScalarList"
+    ]
+  },
+  "385": {
+    "name": "aten::convolution_backward",
+    "shape": [
+      [
+        64,
+        64,
+        80,
+        80
+      ],
+      [
+        64,
+        64,
+        80,
+        80
+      ],
+      [
+        64,
+        64,
+        1,
+        1
+      ]
+    ],
+    "params": [
+      [
+        0
+      ],
+      [
+        1,
+        1
+      ],
+      [
+        0,
+        0
+      ],
+      [
+        1,
+        1
+      ],
+      false,
+      [
+        0,
+        0
+      ],
+      1,
+      [
+        true,
+        true,
+        false
+      ]
+    ],
+    "dtype": [
+      "float",
+      "float",
+      "float",
+      "ScalarList",
+      "ScalarList",
+      "ScalarList",
+      "ScalarList",
+      "Scalar",
+      "ScalarList",
+      "Scalar",
+      "ScalarList"
+    ]
+  },
+  "386": {
+    "name": "aten::narrow",
+    "shape": [
+      [
+        64,
+        256,
+        80,
+        80
+      ]
+    ],
+    "params": [
+      1,
+      128,
+      128
+    ],
+    "dtype": [
+      "float",
+      "Scalar",
+      "Scalar",
+      "Scalar"
+    ]
+  },
+  "387": {
+    "name": "aten::slice",
+    "shape": [
+      [
+        64,
+        256,
+        80,
+        80
+      ]
+    ],
+    "params": [
+      1,
+      128,
+      256,
+      1
+    ],
+    "dtype": [
+      "float",
+      "Scalar",
+      "Scalar",
+      "Scalar",
+      "Scalar"
+    ]
+  },
+  "388": {
+    "name": "aten::upsample_nearest2d_backward",
+    "shape": [
+      [
+        64,
+        128,
+        80,
+        80
+      ]
+    ],
+    "params": [
+      [
+        80,
+        80
+      ],
+      [
+        64,
+        128,
+        40,
+        40
+      ],
+      2.0,
+      2.0
+    ],
+    "dtype": [
+      "float",
+      "ScalarList",
+      "ScalarList",
+      "Scalar",
+      "Scalar"
+    ]
+  },
+  "389": {
+    "name": "aten::convolution_backward",
+    "shape": [
+      [
+        64,
+        128,
+        40,
+        40
+      ],
+      [
+        64,
+        512,
+        40,
+        40
+      ],
+      [
+        128,
+        512,
+        1,
+        1
+      ]
+    ],
+    "params": [
+      [
+        0
+      ],
+      [
+        1,
+        1
+      ],
+      [
+        0,
+        0
+      ],
+      [
+        1,
+        1
+      ],
+      false,
+      [
+        0,
+        0
+      ],
+      1,
+      [
+        true,
+        true,
+        false
+      ]
+    ],
+    "dtype": [
+      "float",
+      "float",
+      "float",
+      "ScalarList",
+      "ScalarList",
+      "ScalarList",
+      "ScalarList",
+      "Scalar",
+      "ScalarList",
+      "Scalar",
+      "ScalarList"
+    ]
+  },
+  "390": {
+    "name": "aten::narrow",
+    "shape": [
+      [
+        64,
+        512,
+        40,
+        40
+      ]
+    ],
+    "params": [
+      1,
+      256,
+      256
+    ],
+    "dtype": [
+      "float",
+      "Scalar",
+      "Scalar",
+      "Scalar"
+    ]
+  },
+  "391": {
+    "name": "aten::slice",
+    "shape": [
+      [
+        64,
+        512,
+        40,
+        40
+      ]
+    ],
+    "params": [
+      1,
+      256,
+      512,
+      1
+    ],
+    "dtype": [
+      "float",
+      "Scalar",
+      "Scalar",
+      "Scalar",
+      "Scalar"
+    ]
+  },
+  "392": {
+    "name": "aten::upsample_nearest2d_backward",
+    "shape": [
+      [
+        64,
+        256,
+        40,
+        40
+      ]
+    ],
+    "params": [
+      [
+        40,
+        40
+      ],
+      [
+        64,
+        256,
+        20,
+        20
+      ],
+      2.0,
+      2.0
+    ],
+    "dtype": [
+      "float",
+      "ScalarList",
+      "ScalarList",
+      "Scalar",
+      "Scalar"
+    ]
+  },
+  "393": {
+    "name": "aten::convolution_backward",
+    "shape": [
+      [
+        64,
+        512,
+        20,
+        20
+      ],
+      [
+        64,
+        1024,
+        20,
+        20
+      ],
+      [
+        512,
+        1024,
+        1,
+        1
+      ]
+    ],
+    "params": [
+      [
+        0
+      ],
+      [
+        1,
+        1
+      ],
+      [
+        0,
+        0
+      ],
+      [
+        1,
+        1
+      ],
+      false,
+      [
+        0,
+        0
+      ],
+      1,
+      [
+        true,
+        true,
+        false
+      ]
+    ],
+    "dtype": [
+      "float",
+      "float",
+      "float",
+      "ScalarList",
+      "ScalarList",
+      "ScalarList",
+      "ScalarList",
+      "Scalar",
+      "ScalarList",
+      "Scalar",
+      "ScalarList"
+    ]
+  },
+  "394": {
+    "name": "aten::narrow",
+    "shape": [
+      [
+        64,
+        1024,
+        20,
+        20
+      ]
+    ],
+    "params": [
+      1,
+      256,
+      256
+    ],
+    "dtype": [
+      "float",
+      "Scalar",
+      "Scalar",
+      "Scalar"
+    ]
+  },
+  "395": {
+    "name": "aten::slice",
+    "shape": [
+      [
+        64,
+        1024,
+        20,
+        20
+      ]
+    ],
+    "params": [
+      1,
+      256,
+      512,
+      1
+    ],
+    "dtype": [
+      "float",
+      "Scalar",
+      "Scalar",
+      "Scalar",
+      "Scalar"
+    ]
+  },
+  "396": {
+    "name": "aten::narrow",
+    "shape": [
+      [
+        64,
+        1024,
+        20,
+        20
+      ]
+    ],
+    "params": [
+      1,
+      512,
+      256
+    ],
+    "dtype": [
+      "float",
+      "Scalar",
+      "Scalar",
+      "Scalar"
+    ]
+  },
+  "397": {
+    "name": "aten::slice",
+    "shape": [
+      [
+        64,
+        1024,
+        20,
+        20
+      ]
+    ],
+    "params": [
+      1,
+      512,
+      768,
+      1
+    ],
+    "dtype": [
+      "float",
+      "Scalar",
+      "Scalar",
+      "Scalar",
+      "Scalar"
+    ]
+  },
+  "398": {
+    "name": "aten::narrow",
+    "shape": [
+      [
+        64,
+        1024,
+        20,
+        20
+      ]
+    ],
+    "params": [
+      1,
+      768,
+      256
+    ],
+    "dtype": [
+      "float",
+      "Scalar",
+      "Scalar",
+      "Scalar"
+    ]
+  },
+  "399": {
+    "name": "aten::slice",
+    "shape": [
+      [
+        64,
+        1024,
+        20,
+        20
+      ]
+    ],
+    "params": [
+      1,
+      768,
+      1024,
+      1
+    ],
+    "dtype": [
+      "float",
+      "Scalar",
+      "Scalar",
+      "Scalar",
+      "Scalar"
+    ]
+  },
+  "400": {
+    "name": "aten::convolution_backward",
+    "shape": [
+      [
+        64,
+        512,
+        20,
+        20
+      ],
+      [
+        64,
+        256,
+        40,
+        40
+      ],
+      [
+        512,
+        256,
+        3,
+        3
+      ]
+    ],
+    "params": [
+      [
+        0
+      ],
+      [
+        2,
+        2
+      ],
+      [
+        1,
+        1
+      ],
+      [
+        1,
+        1
+      ],
+      false,
+      [
+        0,
+        0
+      ],
+      1,
+      [
+        true,
+        true,
+        false
+      ]
+    ],
+    "dtype": [
+      "float",
+      "float",
+      "float",
+      "ScalarList",
+      "ScalarList",
+      "ScalarList",
+      "ScalarList",
+      "Scalar",
+      "ScalarList",
+      "Scalar",
+      "ScalarList"
+    ]
+  },
+  "401": {
+    "name": "aten::convolution_backward",
+    "shape": [
+      [
+        64,
+        256,
+        40,
+        40
+      ],
+      [
+        64,
+        128,
+        80,
+        80
+      ],
+      [
+        256,
+        128,
+        3,
+        3
+      ]
+    ],
+    "params": [
+      [
+        0
+      ],
+      [
+        2,
+        2
+      ],
+      [
+        1,
+        1
+      ],
+      [
+        1,
+        1
+      ],
+      false,
+      [
+        0,
+        0
+      ],
+      1,
+      [
+        true,
+        true,
+        false
+      ]
+    ],
+    "dtype": [
+      "float",
+      "float",
+      "float",
+      "ScalarList",
+      "ScalarList",
+      "ScalarList",
+      "ScalarList",
+      "Scalar",
+      "ScalarList",
+      "Scalar",
+      "ScalarList"
+    ]
+  },
+  "402": {
+    "name": "aten::convolution_backward",
+    "shape": [
+      [
+        64,
+        64,
+        80,
+        80
+      ],
+      [
+        64,
+        128,
+        80,
+        80
+      ],
+      [
+        64,
+        128,
+        1,
+        1
+      ]
+    ],
+    "params": [
+      [
+        0
+      ],
+      [
+        1,
+        1
+      ],
+      [
+        0,
+        0
+      ],
+      [
+        1,
+        1
+      ],
+      false,
+      [
+        0,
+        0
+      ],
+      1,
+      [
+        true,
+        true,
+        false
+      ]
+    ],
+    "dtype": [
+      "float",
+      "float",
+      "float",
+      "ScalarList",
+      "ScalarList",
+      "ScalarList",
+      "ScalarList",
+      "Scalar",
+      "ScalarList",
+      "Scalar",
+      "ScalarList"
+    ]
+  },
+  "403": {
+    "name": "aten::convolution_backward",
+    "shape": [
+      [
+        64,
+        128,
+        80,
+        80
+      ],
+      [
+        64,
+        64,
+        160,
+        160
+      ],
+      [
+        128,
+        64,
+        3,
+        3
+      ]
+    ],
+    "params": [
+      [
+        0
+      ],
+      [
+        2,
+        2
+      ],
+      [
+        1,
+        1
+      ],
+      [
+        1,
+        1
+      ],
+      false,
+      [
+        0,
+        0
+      ],
+      1,
+      [
+        true,
+        true,
+        false
+      ]
+    ],
+    "dtype": [
+      "float",
+      "float",
+      "float",
+      "ScalarList",
+      "ScalarList",
+      "ScalarList",
+      "ScalarList",
+      "Scalar",
+      "ScalarList",
+      "Scalar",
+      "ScalarList"
+    ]
+  },
+  "404": {
+    "name": "aten::native_batch_norm_backward",
+    "shape": [
+      [
+        64,
+        64,
+        160,
+        160
+      ],
+      [
+        64,
+        64,
+        160,
+        160
+      ],
+      [
+        64
+      ],
+      [
+        64
+      ],
+      [
+        64
+      ],
+      [
+        64
+      ],
+      [
+        64
+      ]
+    ],
+    "params": [
+      true,
+      0.001,
+      [
+        true,
+        true,
+        true
+      ]
+    ],
+    "dtype": [
+      "float",
+      "float",
+      "float",
+      "float",
+      "float",
+      "float",
+      "float",
+      "Scalar",
+      "Scalar",
+      "ScalarList"
+    ]
+  },
+  "405": {
+    "name": "aten::convolution_backward",
+    "shape": [
+      [
+        64,
+        64,
+        160,
+        160
+      ],
+      [
+        64,
+        64,
+        160,
+        160
+      ],
+      [
+        64,
+        64,
+        1,
+        1
+      ]
+    ],
+    "params": [
+      [
+        0
+      ],
+      [
+        1,
+        1
+      ],
+      [
+        0,
+        0
+      ],
+      [
+        1,
+        1
+      ],
+      false,
+      [
+        0,
+        0
+      ],
+      1,
+      [
+        true,
+        true,
+        false
+      ]
+    ],
+    "dtype": [
+      "float",
+      "float",
+      "float",
+      "ScalarList",
+      "ScalarList",
+      "ScalarList",
+      "ScalarList",
+      "Scalar",
+      "ScalarList",
+      "Scalar",
+      "ScalarList"
+    ]
+  },
+  "406": {
+    "name": "aten::narrow",
+    "shape": [
+      [
+        64,
+        64,
+        160,
+        160
+      ]
+    ],
+    "params": [
+      1,
+      32,
+      32
+    ],
+    "dtype": [
+      "float",
+      "Scalar",
+      "Scalar",
+      "Scalar"
+    ]
+  },
+  "407": {
+    "name": "aten::slice",
+    "shape": [
+      [
+        64,
+        64,
+        160,
+        160
+      ]
+    ],
+    "params": [
+      1,
+      32,
+      64,
+      1
+    ],
+    "dtype": [
+      "float",
+      "Scalar",
+      "Scalar",
+      "Scalar",
+      "Scalar"
+    ]
+  },
+  "408": {
+    "name": "aten::native_batch_norm_backward",
+    "shape": [
+      [
+        64,
+        32,
+        160,
+        160
+      ],
+      [
+        64,
+        32,
+        160,
+        160
+      ],
+      [
+        32
+      ],
+      [
+        32
+      ],
+      [
+        32
+      ],
+      [
+        32
+      ],
+      [
+        32
+      ]
+    ],
+    "params": [
+      true,
+      0.001,
+      [
+        true,
+        true,
+        true
+      ]
+    ],
+    "dtype": [
+      "float",
+      "float",
+      "float",
+      "float",
+      "float",
+      "float",
+      "float",
+      "Scalar",
+      "Scalar",
+      "ScalarList"
+    ]
+  },
+  "409": {
+    "name": "aten::convolution_backward",
+    "shape": [
+      [
+        64,
+        32,
+        160,
+        160
+      ],
+      [
+        64,
+        64,
+        160,
+        160
+      ],
+      [
+        32,
+        64,
+        1,
+        1
+      ]
+    ],
+    "params": [
+      [
+        0
+      ],
+      [
+        1,
+        1
+      ],
+      [
+        0,
+        0
+      ],
+      [
+        1,
+        1
+      ],
+      false,
+      [
+        0,
+        0
+      ],
+      1,
+      [
+        true,
+        true,
+        false
+      ]
+    ],
+    "dtype": [
+      "float",
+      "float",
+      "float",
+      "ScalarList",
+      "ScalarList",
+      "ScalarList",
+      "ScalarList",
+      "Scalar",
+      "ScalarList",
+      "Scalar",
+      "ScalarList"
+    ]
+  },
+  "410": {
+    "name": "aten::convolution_backward",
+    "shape": [
+      [
+        64,
+        32,
+        160,
+        160
+      ],
+      [
+        64,
+        32,
+        160,
+        160
+      ],
+      [
+        32,
+        32,
+        3,
+        3
+      ]
+    ],
+    "params": [
+      [
+        0
+      ],
+      [
+        1,
+        1
+      ],
+      [
+        1,
+        1
+      ],
+      [
+        1,
+        1
+      ],
+      false,
+      [
+        0,
+        0
+      ],
+      1,
+      [
+        true,
+        true,
+        false
+      ]
+    ],
+    "dtype": [
+      "float",
+      "float",
+      "float",
+      "ScalarList",
+      "ScalarList",
+      "ScalarList",
+      "ScalarList",
+      "Scalar",
+      "ScalarList",
+      "Scalar",
+      "ScalarList"
+    ]
+  },
+  "411": {
+    "name": "aten::convolution_backward",
+    "shape": [
+      [
+        64,
+        32,
+        160,
+        160
+      ],
+      [
+        64,
+        32,
+        160,
+        160
+      ],
+      [
+        32,
+        32,
+        1,
+        1
+      ]
+    ],
+    "params": [
+      [
+        0
+      ],
+      [
+        1,
+        1
+      ],
+      [
+        0,
+        0
+      ],
+      [
+        1,
+        1
+      ],
+      false,
+      [
+        0,
+        0
+      ],
+      1,
+      [
+        true,
+        true,
+        false
+      ]
+    ],
+    "dtype": [
+      "float",
+      "float",
+      "float",
+      "ScalarList",
+      "ScalarList",
+      "ScalarList",
+      "ScalarList",
+      "Scalar",
+      "ScalarList",
+      "Scalar",
+      "ScalarList"
+    ]
+  },
+  "412": {
+    "name": "aten::convolution_backward",
+    "shape": [
+      [
+        64,
+        64,
+        160,
+        160
+      ],
+      [
+        64,
+        32,
+        320,
+        320
+      ],
+      [
+        64,
+        32,
+        3,
+        3
+      ]
+    ],
+    "params": [
+      [
+        0
+      ],
+      [
+        2,
+        2
+      ],
+      [
+        1,
+        1
+      ],
+      [
+        1,
+        1
+      ],
+      false,
+      [
+        0,
+        0
+      ],
+      1,
+      [
+        true,
+        true,
+        false
+      ]
+    ],
+    "dtype": [
+      "float",
+      "float",
+      "float",
+      "ScalarList",
+      "ScalarList",
+      "ScalarList",
+      "ScalarList",
+      "Scalar",
+      "ScalarList",
+      "Scalar",
+      "ScalarList"
+    ]
+  },
+  "413": {
+    "name": "aten::native_batch_norm_backward",
+    "shape": [
+      [
+        64,
+        32,
+        320,
+        320
+      ],
+      [
+        64,
+        32,
+        320,
+        320
+      ],
+      [
+        32
+      ],
+      [
+        32
+      ],
+      [
+        32
+      ],
+      [
+        32
+      ],
+      [
+        32
+      ]
+    ],
+    "params": [
+      true,
+      0.001,
+      [
+        true,
+        true,
+        true
+      ]
+    ],
+    "dtype": [
+      "float",
+      "float",
+      "float",
+      "float",
+      "float",
+      "float",
+      "float",
+      "Scalar",
+      "Scalar",
+      "ScalarList"
+    ]
+  },
+  "414": {
+    "name": "aten::convolution_backward",
+    "shape": [
+      [
+        64,
+        32,
+        320,
+        320
+      ],
+      [
+        64,
+        3,
+        640,
+        640
+      ],
+      [
+        32,
+        3,
+        6,
+        6
+      ]
+    ],
+    "params": [
+      [
+        0
+      ],
+      [
+        2,
+        2
+      ],
+      [
+        2,
+        2
+      ],
+      [
+        1,
+        1
+      ],
+      false,
+      [
+        0,
+        0
+      ],
+      1,
+      [
+        false,
+        true,
+        false
+      ]
+    ],
+    "dtype": [
+      "float",
+      "float",
+      "float",
+      "ScalarList",
+      "ScalarList",
+      "ScalarList",
+      "ScalarList",
+      "Scalar",
+      "ScalarList",
+      "Scalar",
+      "ScalarList"
+    ]
+  },
+  "415": {
+    "name": "aten::select",
+    "shape": [
+      [
+        3
+      ]
+    ],
+    "params": [
+      0,
+      0
+    ],
+    "dtype": [
+      "float",
+      "Scalar",
+      "Scalar"
+    ]
+  },
+  "416": {
+    "name": "aten::select",
+    "shape": [
+      [
+        3
+      ]
+    ],
+    "params": [
+      0,
+      1
+    ],
+    "dtype": [
+      "float",
+      "Scalar",
+      "Scalar"
+    ]
+  },
+  "417": {
+    "name": "aten::select",
+    "shape": [
+      [
+        3
+      ]
+    ],
+    "params": [
+      0,
+      2
+    ],
+    "dtype": [
+      "float",
+      "Scalar",
+      "Scalar"
+    ]
+  },
+  "418": {
+    "name": "aten::_convolution",
+    "shape": [
+      [
+        1,
+        3,
+        640,
+        640
+      ],
+      [
+        32,
+        3,
+        6,
+        6
+      ]
+    ],
+    "params": [
+      null,
+      [
+        2,
+        2
+      ],
+      [
+        2,
+        2
+      ],
+      [
+        1,
+        1
+      ],
+      false,
+      [
+        0,
+        0
+      ],
+      1,
+      false,
+      true,
+      true,
+      true
+    ],
+    "dtype": [
+      "float",
+      "float",
+      "",
+      "ScalarList",
+      "ScalarList",
+      "ScalarList",
+      "Scalar",
+      "ScalarList",
+      "Scalar",
+      "Scalar",
+      "Scalar",
+      "Scalar",
+      "Scalar"
+    ]
+  },
+  "419": {
+    "name": "aten::native_batch_norm",
+    "shape": [
+      [
+        1,
+        32,
+        320,
+        320
+      ],
+      [
+        32
+      ],
+      [
+        32
+      ],
+      [
+        32
+      ],
+      [
+        32
+      ]
+    ],
+    "params": [
+      true,
+      0.03,
+      0.001
+    ],
+    "dtype": [
+      "float",
+      "float",
+      "float",
+      "float",
+      "float",
+      "Scalar",
+      "Scalar",
+      "Scalar"
+    ]
+  },
+  "420": {
+    "name": "aten::silu_",
+    "shape": [
+      [
+        1,
+        32,
+        320,
+        320
+      ]
+    ],
+    "params": [],
+    "dtype": [
+      "float"
+    ]
+  },
+  "421": {
+    "name": "aten::_convolution",
+    "shape": [
+      [
+        1,
+        32,
+        320,
+        320
+      ],
+      [
+        64,
+        32,
+        3,
+        3
+      ]
+    ],
+    "params": [
+      null,
+      [
+        2,
+        2
+      ],
+      [
+        1,
+        1
+      ],
+      [
+        1,
+        1
+      ],
+      false,
+      [
+        0,
+        0
+      ],
+      1,
+      false,
+      true,
+      true,
+      true
+    ],
+    "dtype": [
+      "float",
+      "float",
+      "",
+      "ScalarList",
+      "ScalarList",
+      "ScalarList",
+      "Scalar",
+      "ScalarList",
+      "Scalar",
+      "Scalar",
+      "Scalar",
+      "Scalar",
+      "Scalar"
+    ]
+  },
+  "422": {
+    "name": "aten::native_batch_norm",
+    "shape": [
+      [
+        1,
+        64,
+        160,
+        160
+      ],
+      [
+        64
+      ],
+      [
+        64
+      ],
+      [
+        64
+      ],
+      [
+        64
+      ]
+    ],
+    "params": [
+      true,
+      0.03,
+      0.001
+    ],
+    "dtype": [
+      "float",
+      "float",
+      "float",
+      "float",
+      "float",
+      "Scalar",
+      "Scalar",
+      "Scalar"
+    ]
+  },
+  "423": {
+    "name": "aten::silu_",
+    "shape": [
+      [
+        1,
+        64,
+        160,
+        160
+      ]
+    ],
+    "params": [],
+    "dtype": [
+      "float"
+    ]
+  },
+  "424": {
+    "name": "aten::_convolution",
+    "shape": [
+      [
+        1,
+        64,
+        160,
+        160
+      ],
+      [
+        32,
+        64,
+        1,
+        1
+      ]
+    ],
+    "params": [
+      null,
+      [
+        1,
+        1
+      ],
+      [
+        0,
+        0
+      ],
+      [
+        1,
+        1
+      ],
+      false,
+      [
+        0,
+        0
+      ],
+      1,
+      false,
+      true,
+      true,
+      true
+    ],
+    "dtype": [
+      "float",
+      "float",
+      "",
+      "ScalarList",
+      "ScalarList",
+      "ScalarList",
+      "Scalar",
+      "ScalarList",
+      "Scalar",
+      "Scalar",
+      "Scalar",
+      "Scalar",
+      "Scalar"
+    ]
+  },
+  "425": {
+    "name": "aten::native_batch_norm",
+    "shape": [
+      [
+        1,
+        32,
+        160,
+        160
+      ],
+      [
+        32
+      ],
+      [
+        32
+      ],
+      [
+        32
+      ],
+      [
+        32
+      ]
+    ],
+    "params": [
+      true,
+      0.03,
+      0.001
+    ],
+    "dtype": [
+      "float",
+      "float",
+      "float",
+      "float",
+      "float",
+      "Scalar",
+      "Scalar",
+      "Scalar"
+    ]
+  },
+  "426": {
+    "name": "aten::silu_",
+    "shape": [
+      [
+        1,
+        32,
+        160,
+        160
+      ]
+    ],
+    "params": [],
+    "dtype": [
+      "float"
+    ]
+  },
+  "427": {
+    "name": "aten::_convolution",
+    "shape": [
+      [
+        1,
+        32,
+        160,
+        160
+      ],
+      [
+        32,
+        32,
+        1,
+        1
+      ]
+    ],
+    "params": [
+      null,
+      [
+        1,
+        1
+      ],
+      [
+        0,
+        0
+      ],
+      [
+        1,
+        1
+      ],
+      false,
+      [
+        0,
+        0
+      ],
+      1,
+      false,
+      true,
+      true,
+      true
+    ],
+    "dtype": [
+      "float",
+      "float",
+      "",
+      "ScalarList",
+      "ScalarList",
+      "ScalarList",
+      "Scalar",
+      "ScalarList",
+      "Scalar",
+      "Scalar",
+      "Scalar",
+      "Scalar",
+      "Scalar"
+    ]
+  },
+  "428": {
+    "name": "aten::_convolution",
+    "shape": [
+      [
+        1,
+        32,
+        160,
+        160
+      ],
+      [
+        32,
+        32,
+        3,
+        3
+      ]
+    ],
+    "params": [
+      null,
+      [
+        1,
+        1
+      ],
+      [
+        1,
+        1
+      ],
+      [
+        1,
+        1
+      ],
+      false,
+      [
+        0,
+        0
+      ],
+      1,
+      false,
+      true,
+      true,
+      true
+    ],
+    "dtype": [
+      "float",
+      "float",
+      "",
+      "ScalarList",
+      "ScalarList",
+      "ScalarList",
+      "Scalar",
+      "ScalarList",
+      "Scalar",
+      "Scalar",
+      "Scalar",
+      "Scalar",
+      "Scalar"
+    ]
+  },
+  "429": {
+    "name": "aten::narrow",
+    "shape": [
+      [
+        1,
+        64,
+        160,
+        160
+      ]
+    ],
+    "params": [
+      1,
+      0,
+      32
+    ],
+    "dtype": [
+      "float",
+      "Scalar",
+      "Scalar",
+      "Scalar"
+    ]
+  },
+  "430": {
+    "name": "aten::slice",
+    "shape": [
+      [
+        1,
+        64,
+        160,
+        160
+      ]
+    ],
+    "params": [
+      1,
+      0,
+      32,
+      1
+    ],
+    "dtype": [
+      "float",
+      "Scalar",
+      "Scalar",
+      "Scalar",
+      "Scalar"
+    ]
+  },
+  "431": {
+    "name": "aten::_convolution",
+    "shape": [
+      [
+        1,
+        64,
+        160,
+        160
+      ],
+      [
+        64,
+        64,
+        1,
+        1
+      ]
+    ],
+    "params": [
+      null,
+      [
+        1,
+        1
+      ],
+      [
+        0,
+        0
+      ],
+      [
+        1,
+        1
+      ],
+      false,
+      [
+        0,
+        0
+      ],
+      1,
+      false,
+      true,
+      true,
+      true
+    ],
+    "dtype": [
+      "float",
+      "float",
+      "",
+      "ScalarList",
+      "ScalarList",
+      "ScalarList",
+      "Scalar",
+      "ScalarList",
+      "Scalar",
+      "Scalar",
+      "Scalar",
+      "Scalar",
+      "Scalar"
+    ]
+  },
+  "432": {
+    "name": "aten::_convolution",
+    "shape": [
+      [
+        1,
+        64,
+        160,
+        160
+      ],
+      [
+        128,
+        64,
+        3,
+        3
+      ]
+    ],
+    "params": [
+      null,
+      [
+        2,
+        2
+      ],
+      [
+        1,
+        1
+      ],
+      [
+        1,
+        1
+      ],
+      false,
+      [
+        0,
+        0
+      ],
+      1,
+      false,
+      true,
+      true,
+      true
+    ],
+    "dtype": [
+      "float",
+      "float",
+      "",
+      "ScalarList",
+      "ScalarList",
+      "ScalarList",
+      "Scalar",
+      "ScalarList",
+      "Scalar",
+      "Scalar",
+      "Scalar",
+      "Scalar",
+      "Scalar"
+    ]
+  },
+  "433": {
+    "name": "aten::native_batch_norm",
+    "shape": [
+      [
+        1,
+        128,
+        80,
+        80
+      ],
+      [
+        128
+      ],
+      [
+        128
+      ],
+      [
+        128
+      ],
+      [
+        128
+      ]
+    ],
+    "params": [
+      true,
+      0.03,
+      0.001
+    ],
+    "dtype": [
+      "float",
+      "float",
+      "float",
+      "float",
+      "float",
+      "Scalar",
+      "Scalar",
+      "Scalar"
+    ]
+  },
+  "434": {
+    "name": "aten::silu_",
+    "shape": [
+      [
+        1,
+        128,
+        80,
+        80
+      ]
+    ],
+    "params": [],
+    "dtype": [
+      "float"
+    ]
+  },
+  "435": {
+    "name": "aten::_convolution",
+    "shape": [
+      [
+        1,
+        128,
+        80,
+        80
+      ],
+      [
+        64,
+        128,
+        1,
+        1
+      ]
+    ],
+    "params": [
+      null,
+      [
+        1,
+        1
+      ],
+      [
+        0,
+        0
+      ],
+      [
+        1,
+        1
+      ],
+      false,
+      [
+        0,
+        0
+      ],
+      1,
+      false,
+      true,
+      true,
+      true
+    ],
+    "dtype": [
+      "float",
+      "float",
+      "",
+      "ScalarList",
+      "ScalarList",
+      "ScalarList",
+      "Scalar",
+      "ScalarList",
+      "Scalar",
+      "Scalar",
+      "Scalar",
+      "Scalar",
+      "Scalar"
+    ]
+  },
+  "436": {
+    "name": "aten::native_batch_norm",
+    "shape": [
+      [
+        1,
+        64,
+        80,
+        80
+      ],
+      [
+        64
+      ],
+      [
+        64
+      ],
+      [
+        64
+      ],
+      [
+        64
+      ]
+    ],
+    "params": [
+      true,
+      0.03,
+      0.001
+    ],
+    "dtype": [
+      "float",
+      "float",
+      "float",
+      "float",
+      "float",
+      "Scalar",
+      "Scalar",
+      "Scalar"
+    ]
+  },
+  "437": {
+    "name": "aten::silu_",
+    "shape": [
+      [
+        1,
+        64,
+        80,
+        80
+      ]
+    ],
+    "params": [],
+    "dtype": [
+      "float"
+    ]
+  },
+  "438": {
+    "name": "aten::_convolution",
+    "shape": [
+      [
+        1,
+        64,
+        80,
+        80
+      ],
+      [
+        64,
+        64,
+        1,
+        1
+      ]
+    ],
+    "params": [
+      null,
+      [
+        1,
+        1
+      ],
+      [
+        0,
+        0
+      ],
+      [
+        1,
+        1
+      ],
+      false,
+      [
+        0,
+        0
+      ],
+      1,
+      false,
+      true,
+      true,
+      true
+    ],
+    "dtype": [
+      "float",
+      "float",
+      "",
+      "ScalarList",
+      "ScalarList",
+      "ScalarList",
+      "Scalar",
+      "ScalarList",
+      "Scalar",
+      "Scalar",
+      "Scalar",
+      "Scalar",
+      "Scalar"
+    ]
+  },
+  "439": {
+    "name": "aten::_convolution",
+    "shape": [
+      [
+        1,
+        64,
+        80,
+        80
+      ],
+      [
+        64,
+        64,
+        3,
+        3
+      ]
+    ],
+    "params": [
+      null,
+      [
+        1,
+        1
+      ],
+      [
+        1,
+        1
+      ],
+      [
+        1,
+        1
+      ],
+      false,
+      [
+        0,
+        0
+      ],
+      1,
+      false,
+      true,
+      true,
+      true
+    ],
+    "dtype": [
+      "float",
+      "float",
+      "",
+      "ScalarList",
+      "ScalarList",
+      "ScalarList",
+      "Scalar",
+      "ScalarList",
+      "Scalar",
+      "Scalar",
+      "Scalar",
+      "Scalar",
+      "Scalar"
+    ]
+  },
+  "440": {
+    "name": "aten::narrow",
+    "shape": [
+      [
+        1,
+        128,
+        80,
+        80
+      ]
+    ],
+    "params": [
+      1,
+      0,
+      64
+    ],
+    "dtype": [
+      "float",
+      "Scalar",
+      "Scalar",
+      "Scalar"
+    ]
+  },
+  "441": {
+    "name": "aten::slice",
+    "shape": [
+      [
+        1,
+        128,
+        80,
+        80
+      ]
+    ],
+    "params": [
+      1,
+      0,
+      64,
+      1
+    ],
+    "dtype": [
+      "float",
+      "Scalar",
+      "Scalar",
+      "Scalar",
+      "Scalar"
+    ]
+  },
+  "442": {
+    "name": "aten::_convolution",
+    "shape": [
+      [
+        1,
+        128,
+        80,
+        80
+      ],
+      [
+        128,
+        128,
+        1,
+        1
+      ]
+    ],
+    "params": [
+      null,
+      [
+        1,
+        1
+      ],
+      [
+        0,
+        0
+      ],
+      [
+        1,
+        1
+      ],
+      false,
+      [
+        0,
+        0
+      ],
+      1,
+      false,
+      true,
+      true,
+      true
+    ],
+    "dtype": [
+      "float",
+      "float",
+      "",
+      "ScalarList",
+      "ScalarList",
+      "ScalarList",
+      "Scalar",
+      "ScalarList",
+      "Scalar",
+      "Scalar",
+      "Scalar",
+      "Scalar",
+      "Scalar"
+    ]
+  },
+  "443": {
+    "name": "aten::_convolution",
+    "shape": [
+      [
+        1,
+        128,
+        80,
+        80
+      ],
+      [
+        256,
+        128,
+        3,
+        3
+      ]
+    ],
+    "params": [
+      null,
+      [
+        2,
+        2
+      ],
+      [
+        1,
+        1
+      ],
+      [
+        1,
+        1
+      ],
+      false,
+      [
+        0,
+        0
+      ],
+      1,
+      false,
+      true,
+      true,
+      true
+    ],
+    "dtype": [
+      "float",
+      "float",
+      "",
+      "ScalarList",
+      "ScalarList",
+      "ScalarList",
+      "Scalar",
+      "ScalarList",
+      "Scalar",
+      "Scalar",
+      "Scalar",
+      "Scalar",
+      "Scalar"
+    ]
+  },
+  "444": {
+    "name": "aten::native_batch_norm",
+    "shape": [
+      [
+        1,
+        256,
+        40,
+        40
+      ],
+      [
+        256
+      ],
+      [
+        256
+      ],
+      [
+        256
+      ],
+      [
+        256
+      ]
+    ],
+    "params": [
+      true,
+      0.03,
+      0.001
+    ],
+    "dtype": [
+      "float",
+      "float",
+      "float",
+      "float",
+      "float",
+      "Scalar",
+      "Scalar",
+      "Scalar"
+    ]
+  },
+  "445": {
+    "name": "aten::silu_",
+    "shape": [
+      [
+        1,
+        256,
+        40,
+        40
+      ]
+    ],
+    "params": [],
+    "dtype": [
+      "float"
+    ]
+  },
+  "446": {
+    "name": "aten::_convolution",
+    "shape": [
+      [
+        1,
+        256,
+        40,
+        40
+      ],
+      [
+        128,
+        256,
+        1,
+        1
+      ]
+    ],
+    "params": [
+      null,
+      [
+        1,
+        1
+      ],
+      [
+        0,
+        0
+      ],
+      [
+        1,
+        1
+      ],
+      false,
+      [
+        0,
+        0
+      ],
+      1,
+      false,
+      true,
+      true,
+      true
+    ],
+    "dtype": [
+      "float",
+      "float",
+      "",
+      "ScalarList",
+      "ScalarList",
+      "ScalarList",
+      "Scalar",
+      "ScalarList",
+      "Scalar",
+      "Scalar",
+      "Scalar",
+      "Scalar",
+      "Scalar"
+    ]
+  },
+  "447": {
+    "name": "aten::native_batch_norm",
+    "shape": [
+      [
+        1,
+        128,
+        40,
+        40
+      ],
+      [
+        128
+      ],
+      [
+        128
+      ],
+      [
+        128
+      ],
+      [
+        128
+      ]
+    ],
+    "params": [
+      true,
+      0.03,
+      0.001
+    ],
+    "dtype": [
+      "float",
+      "float",
+      "float",
+      "float",
+      "float",
+      "Scalar",
+      "Scalar",
+      "Scalar"
+    ]
+  },
+  "448": {
+    "name": "aten::silu_",
+    "shape": [
+      [
+        1,
+        128,
+        40,
+        40
+      ]
+    ],
+    "params": [],
+    "dtype": [
+      "float"
+    ]
+  },
+  "449": {
+    "name": "aten::_convolution",
+    "shape": [
+      [
+        1,
+        128,
+        40,
+        40
+      ],
+      [
+        128,
+        128,
+        1,
+        1
+      ]
+    ],
+    "params": [
+      null,
+      [
+        1,
+        1
+      ],
+      [
+        0,
+        0
+      ],
+      [
+        1,
+        1
+      ],
+      false,
+      [
+        0,
+        0
+      ],
+      1,
+      false,
+      true,
+      true,
+      true
+    ],
+    "dtype": [
+      "float",
+      "float",
+      "",
+      "ScalarList",
+      "ScalarList",
+      "ScalarList",
+      "Scalar",
+      "ScalarList",
+      "Scalar",
+      "Scalar",
+      "Scalar",
+      "Scalar",
+      "Scalar"
+    ]
+  },
+  "450": {
+    "name": "aten::_convolution",
+    "shape": [
+      [
+        1,
+        128,
+        40,
+        40
+      ],
+      [
+        128,
+        128,
+        3,
+        3
+      ]
+    ],
+    "params": [
+      null,
+      [
+        1,
+        1
+      ],
+      [
+        1,
+        1
+      ],
+      [
+        1,
+        1
+      ],
+      false,
+      [
+        0,
+        0
+      ],
+      1,
+      false,
+      true,
+      true,
+      true
+    ],
+    "dtype": [
+      "float",
+      "float",
+      "",
+      "ScalarList",
+      "ScalarList",
+      "ScalarList",
+      "Scalar",
+      "ScalarList",
+      "Scalar",
+      "Scalar",
+      "Scalar",
+      "Scalar",
+      "Scalar"
+    ]
+  },
+  "451": {
+    "name": "aten::narrow",
+    "shape": [
+      [
+        1,
+        256,
+        40,
+        40
+      ]
+    ],
+    "params": [
+      1,
+      0,
+      128
+    ],
+    "dtype": [
+      "float",
+      "Scalar",
+      "Scalar",
+      "Scalar"
+    ]
+  },
+  "452": {
+    "name": "aten::slice",
+    "shape": [
+      [
+        1,
+        256,
+        40,
+        40
+      ]
+    ],
+    "params": [
+      1,
+      0,
+      128,
+      1
+    ],
+    "dtype": [
+      "float",
+      "Scalar",
+      "Scalar",
+      "Scalar",
+      "Scalar"
+    ]
+  },
+  "453": {
+    "name": "aten::_convolution",
+    "shape": [
+      [
+        1,
+        256,
+        40,
+        40
+      ],
+      [
+        256,
+        256,
+        1,
+        1
+      ]
+    ],
+    "params": [
+      null,
+      [
+        1,
+        1
+      ],
+      [
+        0,
+        0
+      ],
+      [
+        1,
+        1
+      ],
+      false,
+      [
+        0,
+        0
+      ],
+      1,
+      false,
+      true,
+      true,
+      true
+    ],
+    "dtype": [
+      "float",
+      "float",
+      "",
+      "ScalarList",
+      "ScalarList",
+      "ScalarList",
+      "Scalar",
+      "ScalarList",
+      "Scalar",
+      "Scalar",
+      "Scalar",
+      "Scalar",
+      "Scalar"
+    ]
+  },
+  "454": {
+    "name": "aten::_convolution",
+    "shape": [
+      [
+        1,
+        256,
+        40,
+        40
+      ],
+      [
+        512,
+        256,
+        3,
+        3
+      ]
+    ],
+    "params": [
+      null,
+      [
+        2,
+        2
+      ],
+      [
+        1,
+        1
+      ],
+      [
+        1,
+        1
+      ],
+      false,
+      [
+        0,
+        0
+      ],
+      1,
+      false,
+      true,
+      true,
+      true
+    ],
+    "dtype": [
+      "float",
+      "float",
+      "",
+      "ScalarList",
+      "ScalarList",
+      "ScalarList",
+      "Scalar",
+      "ScalarList",
+      "Scalar",
+      "Scalar",
+      "Scalar",
+      "Scalar",
+      "Scalar"
+    ]
+  },
+  "455": {
+    "name": "aten::native_batch_norm",
+    "shape": [
+      [
+        1,
+        512,
+        20,
+        20
+      ],
+      [
+        512
+      ],
+      [
+        512
+      ],
+      [
+        512
+      ],
+      [
+        512
+      ]
+    ],
+    "params": [
+      true,
+      0.03,
+      0.001
+    ],
+    "dtype": [
+      "float",
+      "float",
+      "float",
+      "float",
+      "float",
+      "Scalar",
+      "Scalar",
+      "Scalar"
+    ]
+  },
+  "456": {
+    "name": "aten::silu_",
+    "shape": [
+      [
+        1,
+        512,
+        20,
+        20
+      ]
+    ],
+    "params": [],
+    "dtype": [
+      "float"
+    ]
+  },
+  "457": {
+    "name": "aten::_convolution",
+    "shape": [
+      [
+        1,
+        512,
+        20,
+        20
+      ],
+      [
+        256,
+        512,
+        1,
+        1
+      ]
+    ],
+    "params": [
+      null,
+      [
+        1,
+        1
+      ],
+      [
+        0,
+        0
+      ],
+      [
+        1,
+        1
+      ],
+      false,
+      [
+        0,
+        0
+      ],
+      1,
+      false,
+      true,
+      true,
+      true
+    ],
+    "dtype": [
+      "float",
+      "float",
+      "",
+      "ScalarList",
+      "ScalarList",
+      "ScalarList",
+      "Scalar",
+      "ScalarList",
+      "Scalar",
+      "Scalar",
+      "Scalar",
+      "Scalar",
+      "Scalar"
+    ]
+  },
+  "458": {
+    "name": "aten::native_batch_norm",
+    "shape": [
+      [
+        1,
+        256,
+        20,
+        20
+      ],
+      [
+        256
+      ],
+      [
+        256
+      ],
+      [
+        256
+      ],
+      [
+        256
+      ]
+    ],
+    "params": [
+      true,
+      0.03,
+      0.001
+    ],
+    "dtype": [
+      "float",
+      "float",
+      "float",
+      "float",
+      "float",
+      "Scalar",
+      "Scalar",
+      "Scalar"
+    ]
+  },
+  "459": {
+    "name": "aten::silu_",
+    "shape": [
+      [
+        1,
+        256,
+        20,
+        20
+      ]
+    ],
+    "params": [],
+    "dtype": [
+      "float"
+    ]
+  },
+  "460": {
+    "name": "aten::_convolution",
+    "shape": [
+      [
+        1,
+        256,
+        20,
+        20
+      ],
+      [
+        256,
+        256,
+        1,
+        1
+      ]
+    ],
+    "params": [
+      null,
+      [
+        1,
+        1
+      ],
+      [
+        0,
+        0
+      ],
+      [
+        1,
+        1
+      ],
+      false,
+      [
+        0,
+        0
+      ],
+      1,
+      false,
+      true,
+      true,
+      true
+    ],
+    "dtype": [
+      "float",
+      "float",
+      "",
+      "ScalarList",
+      "ScalarList",
+      "ScalarList",
+      "Scalar",
+      "ScalarList",
+      "Scalar",
+      "Scalar",
+      "Scalar",
+      "Scalar",
+      "Scalar"
+    ]
+  },
+  "461": {
+    "name": "aten::_convolution",
+    "shape": [
+      [
+        1,
+        256,
+        20,
+        20
+      ],
+      [
+        256,
+        256,
+        3,
+        3
+      ]
+    ],
+    "params": [
+      null,
+      [
+        1,
+        1
+      ],
+      [
+        1,
+        1
+      ],
+      [
+        1,
+        1
+      ],
+      false,
+      [
+        0,
+        0
+      ],
+      1,
+      false,
+      true,
+      true,
+      true
+    ],
+    "dtype": [
+      "float",
+      "float",
+      "",
+      "ScalarList",
+      "ScalarList",
+      "ScalarList",
+      "Scalar",
+      "ScalarList",
+      "Scalar",
+      "Scalar",
+      "Scalar",
+      "Scalar",
+      "Scalar"
+    ]
+  },
+  "462": {
+    "name": "aten::narrow",
+    "shape": [
+      [
+        1,
+        512,
+        20,
+        20
+      ]
+    ],
+    "params": [
+      1,
+      0,
+      256
+    ],
+    "dtype": [
+      "float",
+      "Scalar",
+      "Scalar",
+      "Scalar"
+    ]
+  },
+  "463": {
+    "name": "aten::slice",
+    "shape": [
+      [
+        1,
+        512,
+        20,
+        20
+      ]
+    ],
+    "params": [
+      1,
+      0,
+      256,
+      1
+    ],
+    "dtype": [
+      "float",
+      "Scalar",
+      "Scalar",
+      "Scalar",
+      "Scalar"
+    ]
+  },
+  "464": {
+    "name": "aten::_convolution",
+    "shape": [
+      [
+        1,
+        512,
+        20,
+        20
+      ],
+      [
+        512,
+        512,
+        1,
+        1
+      ]
+    ],
+    "params": [
+      null,
+      [
+        1,
+        1
+      ],
+      [
+        0,
+        0
+      ],
+      [
+        1,
+        1
+      ],
+      false,
+      [
+        0,
+        0
+      ],
+      1,
+      false,
+      true,
+      true,
+      true
+    ],
+    "dtype": [
+      "float",
+      "float",
+      "",
+      "ScalarList",
+      "ScalarList",
+      "ScalarList",
+      "Scalar",
+      "ScalarList",
+      "Scalar",
+      "Scalar",
+      "Scalar",
+      "Scalar",
+      "Scalar"
+    ]
+  },
+  "465": {
+    "name": "aten::max_pool2d_with_indices",
+    "shape": [
+      [
+        1,
+        256,
+        20,
+        20
+      ]
+    ],
+    "params": [
+      [
+        5,
+        5
+      ],
+      [
+        1,
+        1
+      ],
+      [
+        2,
+        2
+      ],
+      [
+        1,
+        1
+      ],
+      false
+    ],
+    "dtype": [
+      "float",
+      "ScalarList",
+      "ScalarList",
+      "ScalarList",
+      "ScalarList",
+      "Scalar"
+    ]
+  },
+  "466": {
+    "name": "aten::narrow",
+    "shape": [
+      [
+        1,
+        1024,
+        20,
+        20
+      ]
+    ],
+    "params": [
+      1,
+      0,
+      256
+    ],
+    "dtype": [
+      "float",
+      "Scalar",
+      "Scalar",
+      "Scalar"
+    ]
+  },
+  "467": {
+    "name": "aten::slice",
+    "shape": [
+      [
+        1,
+        1024,
+        20,
+        20
+      ]
+    ],
+    "params": [
+      1,
+      0,
+      256,
+      1
+    ],
+    "dtype": [
+      "float",
+      "Scalar",
+      "Scalar",
+      "Scalar",
+      "Scalar"
+    ]
+  },
+  "468": {
+    "name": "aten::_convolution",
+    "shape": [
+      [
+        1,
+        1024,
+        20,
+        20
+      ],
+      [
+        512,
+        1024,
+        1,
+        1
+      ]
+    ],
+    "params": [
+      null,
+      [
+        1,
+        1
+      ],
+      [
+        0,
+        0
+      ],
+      [
+        1,
+        1
+      ],
+      false,
+      [
+        0,
+        0
+      ],
+      1,
+      false,
+      true,
+      true,
+      true
+    ],
+    "dtype": [
+      "float",
+      "float",
+      "",
+      "ScalarList",
+      "ScalarList",
+      "ScalarList",
+      "Scalar",
+      "ScalarList",
+      "Scalar",
+      "Scalar",
+      "Scalar",
+      "Scalar",
+      "Scalar"
+    ]
+  },
+  "469": {
+    "name": "aten::upsample_nearest2d",
+    "shape": [
+      [
+        1,
+        256,
+        20,
+        20
+      ]
+    ],
+    "params": [
+      null,
+      [
+        2.0,
+        2.0
+      ]
+    ],
+    "dtype": [
+      "float",
+      "",
+      "ScalarList"
+    ]
+  },
+  "470": {
+    "name": "aten::upsample_nearest2d",
+    "shape": [
+      [
+        1,
+        256,
+        20,
+        20
+      ]
+    ],
+    "params": [
+      [
+        40,
+        40
+      ],
+      2.0,
+      2.0
+    ],
+    "dtype": [
+      "float",
+      "ScalarList",
+      "Scalar",
+      "Scalar"
+    ]
+  },
+  "471": {
+    "name": "aten::narrow",
+    "shape": [
+      [
+        1,
+        512,
+        40,
+        40
+      ]
+    ],
+    "params": [
+      1,
+      0,
+      256
+    ],
+    "dtype": [
+      "float",
+      "Scalar",
+      "Scalar",
+      "Scalar"
+    ]
+  },
+  "472": {
+    "name": "aten::slice",
+    "shape": [
+      [
+        1,
+        512,
+        40,
+        40
+      ]
+    ],
+    "params": [
+      1,
+      0,
+      256,
+      1
+    ],
+    "dtype": [
+      "float",
+      "Scalar",
+      "Scalar",
+      "Scalar",
+      "Scalar"
+    ]
+  },
+  "473": {
+    "name": "aten::_convolution",
+    "shape": [
+      [
+        1,
+        512,
+        40,
+        40
+      ],
+      [
+        128,
+        512,
+        1,
+        1
+      ]
+    ],
+    "params": [
+      null,
+      [
+        1,
+        1
+      ],
+      [
+        0,
+        0
+      ],
+      [
+        1,
+        1
+      ],
+      false,
+      [
+        0,
+        0
+      ],
+      1,
+      false,
+      true,
+      true,
+      true
+    ],
+    "dtype": [
+      "float",
+      "float",
+      "",
+      "ScalarList",
+      "ScalarList",
+      "ScalarList",
+      "Scalar",
+      "ScalarList",
+      "Scalar",
+      "Scalar",
+      "Scalar",
+      "Scalar",
+      "Scalar"
+    ]
+  },
+  "474": {
+    "name": "aten::upsample_nearest2d",
+    "shape": [
+      [
+        1,
+        128,
+        40,
+        40
+      ]
+    ],
+    "params": [
+      null,
+      [
+        2.0,
+        2.0
+      ]
+    ],
+    "dtype": [
+      "float",
+      "",
+      "ScalarList"
+    ]
+  },
+  "475": {
+    "name": "aten::upsample_nearest2d",
+    "shape": [
+      [
+        1,
+        128,
+        40,
+        40
+      ]
+    ],
+    "params": [
+      [
+        80,
+        80
+      ],
+      2.0,
+      2.0
+    ],
+    "dtype": [
+      "float",
+      "ScalarList",
+      "Scalar",
+      "Scalar"
+    ]
+  },
+  "476": {
+    "name": "aten::narrow",
+    "shape": [
+      [
+        1,
+        256,
+        80,
+        80
+      ]
+    ],
+    "params": [
+      1,
+      0,
+      128
+    ],
+    "dtype": [
+      "float",
+      "Scalar",
+      "Scalar",
+      "Scalar"
+    ]
+  },
+  "477": {
+    "name": "aten::slice",
+    "shape": [
+      [
+        1,
+        256,
+        80,
+        80
+      ]
+    ],
+    "params": [
+      1,
+      0,
+      128,
+      1
+    ],
+    "dtype": [
+      "float",
+      "Scalar",
+      "Scalar",
+      "Scalar",
+      "Scalar"
+    ]
+  },
+  "478": {
+    "name": "aten::_convolution",
+    "shape": [
+      [
+        1,
+        256,
+        80,
+        80
+      ],
+      [
+        64,
+        256,
+        1,
+        1
+      ]
+    ],
+    "params": [
+      null,
+      [
+        1,
+        1
+      ],
+      [
+        0,
+        0
+      ],
+      [
+        1,
+        1
+      ],
+      false,
+      [
+        0,
+        0
+      ],
+      1,
+      false,
+      true,
+      true,
+      true
+    ],
+    "dtype": [
+      "float",
+      "float",
+      "",
+      "ScalarList",
+      "ScalarList",
+      "ScalarList",
+      "Scalar",
+      "ScalarList",
+      "Scalar",
+      "Scalar",
+      "Scalar",
+      "Scalar",
+      "Scalar"
+    ]
+  },
+  "479": {
+    "name": "aten::_convolution",
+    "shape": [
+      [
+        1,
+        128,
+        80,
+        80
+      ],
+      [
+        128,
+        128,
+        3,
+        3
+      ]
+    ],
+    "params": [
+      null,
+      [
+        2,
+        2
+      ],
+      [
+        1,
+        1
+      ],
+      [
+        1,
+        1
+      ],
+      false,
+      [
+        0,
+        0
+      ],
+      1,
+      false,
+      true,
+      true,
+      true
+    ],
+    "dtype": [
+      "float",
+      "float",
+      "",
+      "ScalarList",
+      "ScalarList",
+      "ScalarList",
+      "Scalar",
+      "ScalarList",
+      "Scalar",
+      "Scalar",
+      "Scalar",
+      "Scalar",
+      "Scalar"
+    ]
+  },
+  "480": {
+    "name": "aten::_convolution",
+    "shape": [
+      [
+        1,
+        256,
+        40,
+        40
+      ],
+      [
+        256,
+        256,
+        3,
+        3
+      ]
+    ],
+    "params": [
+      null,
+      [
+        2,
+        2
+      ],
+      [
+        1,
+        1
+      ],
+      [
+        1,
+        1
+      ],
+      false,
+      [
+        0,
+        0
+      ],
+      1,
+      false,
+      true,
+      true,
+      true
+    ],
+    "dtype": [
+      "float",
+      "float",
+      "",
+      "ScalarList",
+      "ScalarList",
+      "ScalarList",
+      "Scalar",
+      "ScalarList",
+      "Scalar",
+      "Scalar",
+      "Scalar",
+      "Scalar",
+      "Scalar"
+    ]
+  },
+  "481": {
+    "name": "aten::_convolution",
+    "shape": [
+      [
+        1,
+        128,
+        80,
+        80
+      ],
+      [
+        255,
+        128,
+        1,
+        1
+      ],
+      [
+        255
+      ]
+    ],
+    "params": [
+      [
+        1,
+        1
+      ],
+      [
+        0,
+        0
+      ],
+      [
+        1,
+        1
+      ],
+      false,
+      [
+        0,
+        0
+      ],
+      1,
+      false,
+      true,
+      true,
+      true
+    ],
+    "dtype": [
+      "float",
+      "float",
+      "float",
+      "ScalarList",
+      "ScalarList",
+      "ScalarList",
+      "Scalar",
+      "ScalarList",
+      "Scalar",
+      "Scalar",
+      "Scalar",
+      "Scalar",
+      "Scalar"
+    ]
+  },
+  "482": {
+    "name": "aten::_convolution",
+    "shape": [
+      [
+        1,
+        256,
+        40,
+        40
+      ],
+      [
+        255,
+        256,
+        1,
+        1
+      ],
+      [
+        255
+      ]
+    ],
+    "params": [
+      [
+        1,
+        1
+      ],
+      [
+        0,
+        0
+      ],
+      [
+        1,
+        1
+      ],
+      false,
+      [
+        0,
+        0
+      ],
+      1,
+      false,
+      true,
+      true,
+      true
+    ],
+    "dtype": [
+      "float",
+      "float",
+      "float",
+      "ScalarList",
+      "ScalarList",
+      "ScalarList",
+      "Scalar",
+      "ScalarList",
+      "Scalar",
+      "Scalar",
+      "Scalar",
+      "Scalar",
+      "Scalar"
+    ]
+  },
+  "483": {
+    "name": "aten::_convolution",
+    "shape": [
+      [
+        1,
+        512,
+        20,
+        20
+      ],
+      [
+        255,
+        512,
+        1,
+        1
+      ],
+      [
+        255
+      ]
+    ],
+    "params": [
+      [
+        1,
+        1
+      ],
+      [
+        0,
+        0
+      ],
+      [
+        1,
+        1
+      ],
+      false,
+      [
+        0,
+        0
+      ],
+      1,
+      false,
+      true,
+      true,
+      true
+    ],
+    "dtype": [
+      "float",
+      "float",
+      "float",
+      "ScalarList",
+      "ScalarList",
+      "ScalarList",
+      "Scalar",
+      "ScalarList",
+      "Scalar",
+      "Scalar",
+      "Scalar",
+      "Scalar",
+      "Scalar"
+    ]
+  },
+  "484": {
+    "name": "aten::select",
+    "shape": [
+      [
+        1
+      ]
+    ],
+    "params": [
+      0,
+      0
+    ],
+    "dtype": [
+      "long int",
+      "Scalar",
+      "Scalar"
+    ]
+  }
+}

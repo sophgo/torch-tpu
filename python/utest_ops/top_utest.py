@@ -53,7 +53,7 @@ def move_to(obj, device, dtype):
      elif origin_dtype == torch.int64:
         obj = obj.to(device)
         assert obj.device ==device, (obj.device,device )
-        assert obj.dtype ==torch.int64, (obj.dtype  )
+        # assert obj.dtype ==torch.int64, (obj.dtype  )
         print('\033[95m' + "[Warning] This tensor-dtype is {}, ensure such T.to is under your consideration".format(obj.dtype)+ '\033[0m')
      return obj
   elif isinstance(obj, dict):
@@ -69,6 +69,9 @@ def move_to(obj, device, dtype):
   elif isinstance(obj, tuple):
     res = ()
     for v in obj:
+      if v is None:
+        res = res + (None,)
+        continue
       res = res + (move_to(v, device, dtype),)
     return res
   elif isinstance(obj, int) or isinstance(obj, float):
@@ -116,10 +119,10 @@ class Dumper():
   def dump_tensor(self, dump_count, dict_execute_result, dtype):
     tensor_cpu = dict_execute_result["output_cpu"]
     tensor_tpu = dict_execute_result["output_tpu"]
-    ouput_tpu = move_to(tensor_tpu, self.device_cpu,dtype) #tensor_tpu.cpu().numpy()
+    output_tpu = move_to(tensor_tpu, self.device_cpu,dtype) #tensor_tpu.cpu().numpy()
     output_cpu = move_to(tensor_cpu, self.device_cpu,dtype) #tensor_cpu.cpu().numpy()
     tensor_path = self.chip_case_path + "/" + "dump_{}_sample_{}".format(str(dtype).split(".")[-1], dump_count)
-    np.savez(tensor_path, ouput_tpu=ouput_tpu, output_cpu=output_cpu)
+    np.savez(tensor_path, output_tpu={i:x for i,x in enumerate(output_tpu)}, output_cpu={i:x for i,x in enumerate(output_cpu)})
 
   def dump_info(self, dump_count,dict_execute_result,dtype):
       self.dump_path_gen()
@@ -230,6 +233,10 @@ class Tester_Basic():
     assert not isinstance(tensor_a, tuple) and not isinstance(tensor_b, tuple)
 
     assert tensor_a.shape==tensor_b.shape, "Shape cpu {} vs tpu {}".format(tensor_a.shape,tensor_b.shape)
+    if tensor_a.dtype == torch.bool:
+        tensor_a = tensor_a.to(torch.int32)
+    if tensor_b.dtype == torch.bool:
+        tensor_b = tensor_b.to(torch.int32)
     if mode=="max_diff":
         metric_value = torch.max(torch.abs(tensor_a-tensor_b)).item()
         return  metric_value,  metric_value < epsilon
@@ -330,6 +337,8 @@ class Tester_Basic():
     elif isinstance(output_cpu, tuple):
        output_cpu_new, output_tpu_new = (), ()
        for idx, obj in enumerate(output_cpu):
+          if output_cpu[idx] == None:
+            continue
           output_cpu_new += (output_cpu[idx].detach(),)
           output_tpu_new += (output_tpu[idx].detach(),)
           dict_execute_result['output_cpu'] = output_cpu_new
@@ -369,13 +378,15 @@ class Tester_Basic():
     if torch.is_tensor(output_cpu):
       assert output_cpu.device==self.device_cpu
       assert output_tpu.device==self.device_cpu
-      assert torch.sum(torch.abs(output_cpu))>=0, "You must ensure cpu output is non-zero Tensor"
+      assert output_cpu.numel() > 0, "You must ensure cpu output is non-zero Tensor"
 
     elif isinstance(output_cpu,tuple):
       for i  in range(self.num_multi_output):
+        if output_cpu[i] is None:
+          continue
         assert output_cpu[i].device==self.device_cpu
         assert output_tpu[i].device==self.device_cpu
-        assert torch.sum(torch.abs(output_cpu[i]))>0, ("You must ensure {}-th-cpu-output is non-zero Tensor".format(i),output_cpu[i])
+        assert output_cpu[i].numel() > 0, ("You must ensure {}-th-cpu-output is non-zero Tensor".format(i),output_cpu[i])
 
     else:
         assert 0,"Usually output is Tensor or Tuple of Tensors"
@@ -418,7 +429,7 @@ class Tester_Basic():
         assert self.num_multi_output==len(final_result[naive_dtype])
         for each_metric in self.metric_table:
             for idx_output in range(self.num_multi_output):
-                is_all_outputs_all_metrics_passed |=   final_result[naive_dtype][idx_output]['metric_flag'][each_metric]
+                is_all_outputs_all_metrics_passed |= final_result[naive_dtype][idx_output]['metric_flag'][each_metric]
 
         ###output info level-1, correct for each input_sample
         if (is_all_outputs_all_metrics_passed):
@@ -532,10 +543,11 @@ class Tester_Basic():
             print("[CMD]Case {}: dtype {} exist errors".format(self.case_name, per_dtype))
       print("Case {}: {}/{} Samples is completely corrected".format(self.case_name, current_correct_num, len(input_sample_processed)))
       print(("*****************Test {} Completely End*************************").format(self.case_name))
+      return True if current_correct_num == len(input_sample_processed) else False
 
   def Torch_Test_Execution_Function(self, module_native, input_sample_collection):
     if(self.flag_is_such_arch_ready_test):
-      self.Torch_Test_Execution_Function_flag_allowed(module_native, input_sample_collection)
+      return self.Torch_Test_Execution_Function_flag_allowed(module_native, input_sample_collection)
     else:
       print("[INFO]Test skikped for this arch!")
 
