@@ -82,6 +82,10 @@ Tensor _copy_from_tpu(const Tensor &self, const Tensor &dst,
     TORCH_CHECK(self.nbytes() == dst.nbytes(),
                 "SELF and dst number bytes must be the same");
     if (IS_CPU_TENSOR(self) && IS_TPU_TENSOR(dst)) {
+      if (!self.is_contiguous()) {
+        //avoid self.contiguous() be destructed when non_blocking is true
+        non_blocking = false;
+      }
       if (dst.is_contiguous()) {
         tpu::TPUCopyHostToDevice(dst.data_ptr(), self.contiguous().data_ptr(),
                                  dst.nbytes(), non_blocking);
@@ -118,6 +122,9 @@ Tensor _copy_from_tpu(const Tensor &self, const Tensor &dst,
     }
   } else {
     if (IS_CPU_TENSOR(self) && IS_TPU_TENSOR(dst)) {
+      if ((!self.is_contiguous()) || (self.dtype() != dst.dtype())) {
+        non_blocking = false;
+      }
       tpu::TPUCopyHostToDevice ( dst.data_ptr(), self.contiguous().to(dst.dtype()).data_ptr(), dst.nbytes(), non_blocking );
     } else if (IS_TPU_TENSOR(self) && IS_CPU_TENSOR(dst)) {
       dst.copy_(self.to(dst.dtype()), non_blocking);
@@ -129,6 +136,7 @@ Tensor _copy_from_tpu(const Tensor &self, const Tensor &dst,
       if ( !tpu::IsSupportDtype(self.dtype()) || !tpu::IsSupportDtype( dst.dtype() ))
       {
         CPU_IMPL_WARNING("unsupport dtype.");
+        non_blocking = false; // avoid dst_cpu be destructed when non_blocking is true
         auto dst_cpu = self.cpu().to ( dst.dtype() );
         tpu::TPUCopyHostToDevice ( dst.data_ptr(), dst_cpu.contiguous().data_ptr(), dst.nbytes(), non_blocking );
       }
@@ -203,6 +211,10 @@ Tensor _to_copy_tpu(const Tensor &self, c10::optional<ScalarType> dtype_opt,
   {
     dtype = ScalarType::Int;
     self_ = self.to(dtype);
+    // self_ is a temp var, maybe destructed after to(dtype) when non_blocking is true
+    // non_blocking need to be false
+    non_blocking = false;
+
   }
 
   auto layout = layout_opt.has_value() ? layout_opt.value() : option.layout();
