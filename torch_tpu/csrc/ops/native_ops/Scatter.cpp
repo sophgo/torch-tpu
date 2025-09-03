@@ -110,4 +110,23 @@ TORCH_LIBRARY_IMPL(aten, TPU, m) {
   m.impl("scatter_add_", scatter_add_tpu);
 }
 
+Tensor& scatter_src_tpu(at::Tensor & self, int64_t dim, const at::Tensor & index, const at::Tensor & src)
+{
+TIMING_START;
+#if 1
+  CPU_IMPL_WARNING();
+  auto self_cpu = self.cpu();
+  auto index_cpu = index.cpu().to(torch::kInt64);
+  auto src_cpu = src.cpu();
+  self_cpu.scatter_(dim, index_cpu, src_cpu);
+  auto self_ = self_cpu.to(self.device()).to(self.dtype());
+  self.copy_(self_);
+#endif
+  return self;
+TIMING_END;
+}
+
+TORCH_LIBRARY_IMPL(aten, TPU, m) {
+  m.impl("scatter_.src", scatter_src_tpu);
+}
 }  // namespace at
