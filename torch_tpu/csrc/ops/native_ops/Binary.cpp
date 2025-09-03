@@ -18,6 +18,7 @@ namespace at {
 
 Tensor &binary_op_tpu(const Tensor &self, const Tensor &other,
                       const Scalar &alpha, Tensor &out, int binary_type) {
+  if (out.numel() == 0) return out;
   TIMING_START;
   CHECK_TENSOR_IN_DEVICE(out);
   TORCH_CHECK( out.scalar_type()   != ScalarType::Long );
@@ -213,6 +214,7 @@ template <typename Mode, typename UnaryFunc, typename BinaryFunc, typename CpuFu
 void binary_impl(const Tensor &self, const Tensor &other, Tensor &out,
                  Mode mode, UnaryFunc unary_func,
                  BinaryFunc binary_func, CpuFunc cpu_func) {
+  if (out.numel() == 0) return;
   TIMING_START;
   CHECK_TENSOR_IN_DEVICE(out);
   const auto handle = c10_tpu::getCurrentTPUStream();
@@ -249,6 +251,7 @@ template <typename UnaryFunc, typename BinaryFunc, typename CpuFunc>
 void binary_impl(const Tensor &self, const Tensor &other, Tensor &out,
                 UnaryFunc unary_func, BinaryFunc binary_func,
                  CpuFunc cpu_func) {
+  if (out.numel() == 0) return;
   TIMING_START;
   CHECK_TENSOR_IN_DEVICE(out);
   const auto handle = c10_tpu::getCurrentTPUStream();
@@ -690,7 +693,7 @@ Tensor &minimum_out_tpu(const Tensor &self, const Tensor &other, Tensor &out) {
     SHOW_TENSOR_OP(self, other, out);
     return out;
   }
-
+  TORCH_CHECK(other.is_contiguous() && out.is_contiguous());
   binary_impl(
       self, other, out,
       [](tpudnnHandle_t handle, const Tensor &self, const Tensor &other, Tensor &out) {

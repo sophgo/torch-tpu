@@ -11,6 +11,7 @@ namespace at {
 // ========== clamp
 Tensor & clamp_out_tpu( const Tensor & self, const c10::optional<Scalar> & min,
                         const c10::optional<Scalar> & max, Tensor & out) {
+    if (out.numel() == 0) return out;
     TIMING_START;
     if ( self.dim() > 0 )  { CHECK_TENSOR_IN_DEVICE_NO_CONTIGUOUS ( self ); }
     auto self_ = self.contiguous();
