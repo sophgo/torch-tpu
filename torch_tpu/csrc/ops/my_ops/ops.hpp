@@ -604,7 +604,7 @@ Tensor paged_attention_v2(
         Tensor &matmul_res,
         Tensor &softmax_res);
 
-    Tensor fused_moe_fused_experts(
+	Tensor fused_moe_fused_experts(
         Tensor &output,
         Tensor &input,
         const c10::optional<Tensor> &output_sample,
@@ -620,7 +620,7 @@ Tensor paged_attention_v2(
         const c10::optional<Tensor> &num_select_experts,
         const c10::optional<Tensor> &select_experts_middle,
         const c10::optional<Tensor> &routing_weights_middle,
-        int64_t blocksize,
+		int64_t blocksize,
         int64_t num_experts,
         int64_t num_experts_per_tok,
         bool use_grouped_topk,
@@ -630,6 +630,35 @@ Tensor paged_attention_v2(
         const c10::optional<Tensor> &sigmoid,
         const c10::optional<Tensor> &m0,
         bool save_mid_res);
+
+	Tensor fused_moe_fused_experts_v2(
+		Tensor &output,
+		Tensor &input,
+		const c10::optional<Tensor> &output_sample,
+		const c10::optional<Tensor> &input_sample,
+		Tensor &gate_weights,
+		Tensor &up_weights,
+		Tensor &down_weights,
+		const c10::optional<Tensor>  &gate_scales,
+		const c10::optional<Tensor>  &up_scales,
+		const c10::optional<Tensor>  &down_scales,
+		Tensor &select_experts,
+		Tensor &routing_weights,
+		const c10::optional<Tensor> &num_select_experts,
+		const c10::optional<Tensor> &select_experts_middle,
+		const c10::optional<Tensor> &routing_weights_middle,
+		const c10::optional<Tensor> &gather_buffer,
+		const c10::optional<Tensor> &scatter_buffer,
+		int64_t blocksize,
+		int64_t num_experts,
+		int64_t num_experts_per_tok,
+		bool use_grouped_topk,
+		int64_t num_expert_group,
+		int64_t topk_group,
+		const c10::optional<Tensor> &silu,
+		const c10::optional<Tensor> &sigmoid,
+		const c10::optional<Tensor> &m0,
+		bool save_mid_res);
 
 	void TGI_input_ids_update_decode_phase(
 		Tensor &all_input_ids,

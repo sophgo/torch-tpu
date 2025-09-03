@@ -71,6 +71,7 @@ namespace at
 		m.def("format_cast", FormatCast);
 		m.def("fused_moe_grouped_topk", fused_moe_grouped_topk);
 		m.def("fused_moe_fused_experts", fused_moe_fused_experts);
+		m.def("fused_moe_fused_experts_v2", fused_moe_fused_experts_v2);
 		m.def("nms", nms);
 		m.def("noaux_tc_topk", noaux_tc_topk);
 		m.def("set_env", set_env);

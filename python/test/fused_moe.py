@@ -68,8 +68,8 @@ class DeepseekMoE(nn.Module):
         self.num_experts_per_tok = num_experts_per_tok
         self.experts = nn.ModuleList([deepseek_mlp.DeepseekMlp(w0[i], w1[i], w2[i], s0[i], s1[i], s2[i], blocksize) for i in range(num_experts)])
 
-    def forward(self, x, selected_experts):
-        out = torch.zeros(x.shape[0], self.num_experts_per_tok, x.shape[1]).to(x.dtype).to(x.device)
+    def forward(self, x, selected_experts, out):
+        # out = torch.zeros(x.shape[0], self.num_experts_per_tok, x.shape[1]).to(x.dtype).to(x.device)
         for i in range(selected_experts.shape[0]):
             for j in range(selected_experts.shape[1]):
                 out[i, j, :] = self.experts[selected_experts[i, j]](x[i])
@@ -78,29 +78,44 @@ class DeepseekMoE(nn.Module):
 class DeepseekMoEFunc(torch.autograd.Function):
     @staticmethod
     def forward(ctx, x, w0, w1, w2, s0, s1, s2,
-                num_experts, num_experts_per_tok, blocksize, selected_experts, routing_weights):
+                num_experts, num_experts_per_tok, blocksize, selected_experts, routing_weights, 
+                gathered_experts_out_buf, select_experts_middle, routing_weights_middle, gather_buffer, scatter_buffer, use_ppl):
         output_sample = None
         input_sample = None
         num_select_experts = None
-        select_experts_middle = None
-        routing_weights_middle = None
+        # select_experts_middle = None
+        # routing_weights_middle = None
+        # select_experts_middle = torch.empty(num_experts, x.shape[0], dtype = torch.int32, device = x.device)
+        # routing_weights_middle = torch.empty(num_experts, x.shape[0], dtype = torch.int32, device = x.device)
         use_grouped_topk = True
         num_expert_group = 8
         topk_group = 4
         # gathered_experts_out_buf is of shape (seq x k x hs)
-        gathered_experts_out_buf = torch.empty(x.shape[0], num_experts_per_tok, x.shape[1], dtype = x.dtype, device = x.device)
-        #output = torch.empty(x.shape, dtype = x.dtype, device = x.device)
-        print(f"selected_experts shape: {selected_experts.shape}, selected_experts: {selected_experts}")
-        torch.ops.my_ops.fused_moe_fused_experts(gathered_experts_out_buf, x,
-                                                 output_sample, input_sample,
-                                                 w0, w1, w2,
-                                                 s0, s1, s2,
-                                                 selected_experts, routing_weights,
-                                                 num_select_experts,
-                                                 select_experts_middle, routing_weights_middle,
-                                                 blocksize, num_experts, num_experts_per_tok,
-                                                 use_grouped_topk, num_expert_group, topk_group,
-                                                 None, None, None, False)
+        # gathered_experts_out_buf = torch.empty(x.shape[0], num_experts_per_tok, x.shape[1], dtype = x.dtype, device = x.device)
+        # print(f"selected_experts shape: {selected_experts.shape}, selected_experts: {selected_experts}")
+        if use_ppl:
+            torch.ops.my_ops.fused_moe_fused_experts_v2(gathered_experts_out_buf, x,
+                                                     output_sample, input_sample,
+                                                     w0, w1, w2,
+                                                     s0, s1, s2,
+                                                     selected_experts, routing_weights,
+                                                     num_select_experts,
+                                                     select_experts_middle, routing_weights_middle,
+                                                     gather_buffer,scatter_buffer,
+                                                     blocksize, num_experts, num_experts_per_tok,
+                                                     use_grouped_topk, num_expert_group, topk_group,
+                                                     None, None, None, False)
+        else:
+            torch.ops.my_ops.fused_moe_fused_experts(gathered_experts_out_buf, x,
+                                                output_sample, input_sample,
+                                                w0, w1, w2,
+                                                s0, s1, s2,
+                                                selected_experts, routing_weights,
+                                                num_select_experts,
+                                                select_experts_middle, routing_weights_middle,
+                                                blocksize, num_experts, num_experts_per_tok,
+                                                use_grouped_topk, num_expert_group, topk_group,
+                                                None, None, None, False)
         return gathered_experts_out_buf
 
 class DeepseekMoEBlock(nn.Module):
@@ -116,10 +131,11 @@ class DeepseekMoEBlock(nn.Module):
         self.s2 = s2
         self.blocksize = blocksize
 
-    def forward(self, x, selected_experts, routing_weights):
+    def forward(self, x, selected_experts, routing_weights, gathered_experts_out_buf, select_experts_middle, routing_weights_middle, gather_buffer, scatter_buffer, use_ppl):
         return DeepseekMoEFunc.apply(x, self.w0, self.w1, self.w2, self.s0, self.s1, self.s2,
                                      self.num_experts, self.num_experts_per_tok,
-                                     self.blocksize, selected_experts, routing_weights)
+                                     self.blocksize, selected_experts, routing_weights, 
+                                     gathered_experts_out_buf, select_experts_middle, routing_weights_middle, gather_buffer, scatter_buffer, use_ppl)
 
 def cal_diff(x: torch.Tensor, y: torch.Tensor, name: str) -> None:
     x, y = x.double(), y.double()
@@ -130,7 +146,7 @@ def cal_diff(x: torch.Tensor, y: torch.Tensor, name: str) -> None:
     #assert cos_diff < 1e-5
     return cos_diff, RMSE, amax_diff
 
-def test_deepseek_moe(batch_size, input_w, middle_w, num_experts, num_experts_per_tok):
+def test_deepseek_moe(batch_size, input_w, middle_w, num_experts, num_experts_per_tok, use_ppl):
     assert num_experts_per_tok <= num_experts
 
     blocksize = 128
@@ -141,11 +157,17 @@ def test_deepseek_moe(batch_size, input_w, middle_w, num_experts, num_experts_pe
     for i in range(batch_size):
         selected_experts_list.append(random.sample(range(num_experts), num_experts_per_tok))
     selected_experts = torch.tensor(selected_experts_list, dtype=torch.int32).reshape(batch_size, num_experts_per_tok)
+    print(selected_experts.unique().shape)
+    # import pdb
+    # pdb.set_trace()
 
-    if num_experts == 256 and batch_size == 8:
-        selected_experts = SELECTED_EXPERTS_B8_E256
-    elif num_experts == 256 and batch_size == 22:
-        selected_experts = SELECTED_EXPERTS_B22_E256
+    # if num_experts == 256 and batch_size == 8
+    #     selected_experts = SELECTED_EXPERTS_B8_E256
+    # elif num_experts == 256 and batch_size == 22:
+    #     selected_experts = SELECTED_EXPERTS_B22_E256
+
+    # import numpy as np
+    # selected_experts = torch.from_numpy(np.load("../moe_select_expert.npy").astype(np.int32))
 
     routing_weights = torch.randn(batch_size, num_experts_per_tok, dtype=torch.bfloat16)
 
@@ -158,11 +180,24 @@ def test_deepseek_moe(batch_size, input_w, middle_w, num_experts, num_experts_pe
     w0 = w0.to(torch.float8_e4m3fn)
     w1 = w1.to(torch.float8_e4m3fn)
     w2 = w2.to(torch.float8_e4m3fn)
-    net_cpu = DeepseekMoE(num_experts, num_experts_per_tok, w0, w1, w2, s0, s1, s2, blocksize)
     x = torch.randn(batch_size, input_w)
-    out_cpu = net_cpu(x, selected_experts)
 
-    device = "tpu"
+    # import numpy as np
+    # tpu_out = np.load('../ppl/test_moe_multi_core/data/moe_multi_core_tar.npz')
+    # w0 = torch.from_numpy(tpu_out['2']).to(torch.float8_e4m3fn).reshape(num_experts, middle_w, input_w)
+    # w1 = torch.from_numpy(tpu_out['3']).to(torch.float8_e4m3fn).reshape(num_experts, middle_w, input_w)
+    # w2 = torch.from_numpy(tpu_out['4']).to(torch.float8_e4m3fn).reshape(num_experts, middle_w, input_w).transpose(1,2).contiguous()
+    # s0 = torch.from_numpy(tpu_out['5']).to(torch.bfloat16).reshape(num_experts, scale_m, scale_n)
+    # s1 = torch.from_numpy(tpu_out['6']).to(torch.bfloat16).reshape(num_experts, scale_m, scale_n)
+    # s2 = torch.from_numpy(tpu_out['7']).to(torch.bfloat16).reshape(num_experts, scale_m, scale_n).transpose(1,2).contiguous()
+    # x = torch.from_numpy(tpu_out['1']).to(torch.bfloat16).reshape(batch_size, input_w)
+    # selected_experts = torch.from_numpy(tpu_out['8']).to(torch.int).reshape(batch_size, num_experts_per_tok)
+
+    net_cpu = DeepseekMoE(num_experts, num_experts_per_tok, w0, w1, w2, s0, s1, s2, blocksize)
+    out = torch.zeros(x.shape[0], num_experts_per_tok, x.shape[1]).to(x.dtype).to(x.device)
+    #out_cpu = net_cpu(x, selected_experts, out)
+
+    device = "tpu:0"
     x_tpu = x.to(device)
     w0_tpu = w0.to(device)
     w1_tpu = w1.to(device)
@@ -172,11 +207,22 @@ def test_deepseek_moe(batch_size, input_w, middle_w, num_experts, num_experts_pe
     s2_tpu = s2.transpose(1, 2).to(device) # transpose for TPU
     selected_experts_tpu = selected_experts.to(device)
     routing_weights_tpu = routing_weights.to(device)
+    
     net_tpu = DeepseekMoEBlock(num_experts, num_experts_per_tok, w0_tpu, w1_tpu, w2_tpu, s0_tpu, s1_tpu, s2_tpu, blocksize)
-    out_tpu = net_tpu(x_tpu, selected_experts_tpu, routing_weights_tpu)
+    select_experts_middle = torch.empty(num_experts, x.shape[0], dtype = torch.int32).to(device)
+    routing_weights_middle = torch.empty(num_experts, x.shape[0], dtype = torch.int32).to(device)
+    gathered_experts_out_buf = torch.empty(x.shape[0], num_experts_per_tok, x.shape[1], dtype = x.dtype).to(device)
+    gather_buffer = torch.empty(num_experts, x.shape[0], dtype = torch.int32).to(device)
+    scatter_buffer = torch.empty(num_experts, x.shape[0], num_experts_per_tok, dtype = torch.int32).to(device)
+    #torch.ops.my_ops.enable_profile(None, 2)
 
+    out_tpu = net_tpu(x_tpu, selected_experts_tpu, routing_weights_tpu, 
+                gathered_experts_out_buf, select_experts_middle, routing_weights_middle, gather_buffer, scatter_buffer, use_ppl)
+    #torch.ops.my_ops.disable_profile()
+    print("tpu done")
+    out_cpu = net_cpu(x, selected_experts, out)
     out_cpu = out_cpu.float().flatten()
-    out_tpu = out_tpu.float().to("cpu").flatten()
+    out_tpu = out_tpu.to("cpu").float().flatten()
     cosm = deepseek_mlp.cos_sim(out_cpu.numpy(), out_tpu.numpy())
     cos_diff, RMSE, amax_diff = cal_diff(out_cpu, out_tpu, "fused_experts")
 
@@ -185,6 +231,7 @@ def test_deepseek_moe(batch_size, input_w, middle_w, num_experts, num_experts_pe
         print(f"  out_tpu shape: {out_tpu.shape}, out_tpu: {out_tpu.cpu().flatten()[0:8]}")
         print(f"  out_cpu shape: {out_cpu.shape}, out_cpu: {out_cpu.flatten()[0:8]}")
         print(f"  cosm: {cosm}, cos_diff: {cos_diff}, RMSE: {RMSE}, amax_diff: {amax_diff}")
+        import pdb; pdb.set_trace()
         return False
     else:
         return True
@@ -194,13 +241,15 @@ if __name__ == "__main__":
     torch.manual_seed(1000)
     random.seed(1000)
 
+    ppl_used = 0
     ret = []
-    ret.append(test_deepseek_moe(batch_size=1, input_w=7168, middle_w=256, num_experts=1, num_experts_per_tok=1))
-    ret.append(test_deepseek_moe(batch_size=2, input_w=7168, middle_w=256, num_experts=2, num_experts_per_tok=2))
-    ret.append(test_deepseek_moe(batch_size=1, input_w=7168, middle_w=256, num_experts=16, num_experts_per_tok=8))
-    ret.append(test_deepseek_moe(batch_size=1, input_w=7168, middle_w=256, num_experts=256, num_experts_per_tok=8))
-    ret.append(test_deepseek_moe(batch_size=8, input_w=7168, middle_w=256, num_experts=256, num_experts_per_tok=8))
-    ret.append(test_deepseek_moe(batch_size=22, input_w=7168, middle_w=256, num_experts=256, num_experts_per_tok=8))
+    ret.append(test_deepseek_moe(batch_size=1, input_w=7168, middle_w=256, num_experts=1, num_experts_per_tok=1, use_ppl=ppl_used))
+    ret.append(test_deepseek_moe(batch_size=2, input_w=7168, middle_w=256, num_experts=2, num_experts_per_tok=2, use_ppl=ppl_used))
+    ret.append(test_deepseek_moe(batch_size=1, input_w=7168, middle_w=256, num_experts=16, num_experts_per_tok=8, use_ppl=ppl_used))
+    ret.append(test_deepseek_moe(batch_size=1, input_w=7168, middle_w=256, num_experts=256, num_experts_per_tok=8, use_ppl=ppl_used))
+    ret.append(test_deepseek_moe(batch_size=8, input_w=7168, middle_w=256, num_experts=256, num_experts_per_tok=8, use_ppl=ppl_used))
+    
+    # ret.append(test_deepseek_moe(batch_size=16384, input_w=7168, middle_w=128, num_experts=256, num_experts_per_tok=8, use_ppl=ppl_used))
     if all(ret):
         print("all pass")
     else:
