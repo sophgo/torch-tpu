@@ -122,8 +122,8 @@ TIMING_START;
   auto self_ = self_cpu.to(self.device()).to(self.dtype());
   self.copy_(self_);
 #endif
-  return self;
 TIMING_END;
+  return self;
 }
 
 TORCH_LIBRARY_IMPL(aten, TPU, m) {

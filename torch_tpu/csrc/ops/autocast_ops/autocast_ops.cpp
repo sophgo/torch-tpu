@@ -14,7 +14,7 @@ TORCH_LIBRARY_IMPL(aten, AutocastPrivateUse1, m) {
   KERNEL_PRIVATEUSEONE(addmm, lower_precision_fp)
   KERNEL_PRIVATEUSEONE(matmul, lower_precision_fp)
   KERNEL_PRIVATEUSEONE(convolution_overrideable, lower_precision_fp)
-  KERNEL_PRIVATEUSEONE(convolution_backward_overrideable, lower_precision_fp)
+
   // f32
 }
 
