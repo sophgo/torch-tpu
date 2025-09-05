@@ -207,7 +207,7 @@ void ProcessGroupSCCL::broadcastUniqueSCCLID(scclHandle_t handle,
     auto vec = store_->get(key);
     TORCH_CHECK(vec.size() == SCCL_UNIQUE_ID_BYTES,
                 "Invalid size for scclUniqueID\n");
-    memcpy(scclID, vec.data(), sizeof(vec.size()));
+    memcpy(scclID, vec.data(), vec.size());
   }
 }
 
