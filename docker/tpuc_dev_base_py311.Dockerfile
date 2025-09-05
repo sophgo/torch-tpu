@@ -40,7 +40,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     # ssh
     openssh-server openssh-client \
     # for document
-    texlive-xetex \
+    texlive-xetex doxygen \
     # fix bug: https://bugs.archlinux.org/task/67856
     texlive-lang-chinese texlive-fonts-recommended && \
     # clenup
