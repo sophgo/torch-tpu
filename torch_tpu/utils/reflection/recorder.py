@@ -1,4 +1,5 @@
 import torch
+from .timestamp import Timestamp
 from typing import Callable
 import numpy as np
 from torch import Tensor
@@ -140,6 +141,9 @@ class Operation(Node):
 
     def __repr__(self):
         return f"{self.__class__.__name__}(id={self.node_id}, operation={self.operation_name})"
+
+    def get_timing_profile(self) -> List[Union[float, Timestamp]]:
+        return []
 
 
 class SetItem(Operation):
