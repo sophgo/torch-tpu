@@ -59,7 +59,7 @@ class TensorLike:
         ret = self._tensor[item]
         ret = TensorLike(ret)
         append_to_graph(
-            self._tensor.__getitem__, [], {"tensor": self._tensor, "item": item}, ret
+            self._tensor.__class__.__getitem__, [], {"tensor": self._tensor, "item": item}, ret
         )
         return ret
 
@@ -67,7 +67,7 @@ class TensorLike:
         self._tensor[item] = value
         # 对于 setitem 操作，我们需要特殊处理参数
         append_to_graph(
-            self._tensor.__setitem__,
+            self._tensor.__class__.__setitem__,
             [],
             {"tensor": self._tensor, "item": item, "value": value},
             None,

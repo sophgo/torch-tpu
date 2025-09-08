@@ -1,4 +1,5 @@
 import torch
+from typing import Callable
 import numpy as np
 from torch import Tensor
 from typing import Union, List, Dict, Any, Optional, Set
@@ -32,15 +33,15 @@ class Node:
         self.name = name
         self.node_id = str(uuid.uuid4())
         self.node_type = node_type
-        self.incoming_edges: List[Edge] = []
-        self.outgoing_edges: List[Edge] = []
+        self.incoming_edges: List[UseEdge] = []
+        self.outgoing_edges: List[UseEdge] = []
         self.metadata: Dict[str, Any] = {}
 
-    def add_incoming_edge(self, edge: "Edge"):
+    def add_incoming_edge(self, edge: "UseEdge"):
         """添加输入边"""
         self.incoming_edges.append(edge)
 
-    def add_outgoing_edge(self, edge: "Edge"):
+    def add_outgoing_edge(self, edge: "UseEdge"):
         """添加输出边"""
         self.outgoing_edges.append(edge)
 
@@ -90,6 +91,35 @@ class ValueAttr(Node):
 class Operation(Node):
     """操作节点，表示计算操作"""
 
+    @classmethod
+    def from_function(cls, operation_func, args, kwargs):
+        """
+        优先从子类中 retrieve Operation 的子类，如果没有则创建新的 Operation 子类
+        """
+        for sub_class in cls.sub_classes.values():
+            if sub_class.is_target_class(operation_func, args, kwargs):
+                return sub_class(operation_func)
+        return cls(operation_func)
+
+    @classmethod
+    def is_target_class(cls, operation_func, args, kwargs):
+
+        if cls.target_function == operation_func:
+            return True
+        if cls.target_funcname == operation_func.__name__:
+            return True
+
+        return cls.__name__ == operation_func.__name__
+
+    sub_classes: Dict[str, "Operation"] = {}
+
+    target_function: Callable = None
+    target_funcname: str = None
+
+    def __init_subclass__(cls):
+        super().__init_subclass__()
+        cls.sub_classes[cls.__name__] = cls
+
     def __init__(
         self,
         operation_func,
@@ -109,10 +139,18 @@ class Operation(Node):
         self.result_nodes.append(result_node)
 
     def __repr__(self):
-        return f"OperationNode(id={self.node_id}, operation={self.operation_name})"
+        return f"{self.__class__.__name__}(id={self.node_id}, operation={self.operation_name})"
 
 
-class Edge:
+class SetItem(Operation):
+    target_function = torch.Tensor.__setitem__
+
+
+class GetItem(Operation):
+    target_function = torch.Tensor.__getitem__
+
+
+class UseEdge:
     """计算图边，连接节点"""
 
     def __init__(self, source: Node, target: Node, edge_type: EdgeType):
@@ -126,12 +164,12 @@ class Edge:
         return f"Edge(id={self.edge_id}, {self.source.node_id} -> {self.target.node_id}, type={self.edge_type})"
 
 
-class Operand(Edge):
+class Operand(UseEdge):
     def __init__(self, source: Node, target: Node, edge_id: str = None):
         super().__init__(source, target, EdgeType.OPERAND, edge_id)
 
 
-class Result(Edge):
+class Result(UseEdge):
     def __init__(self, source: Node, target: Node, edge_id: str = None):
         super().__init__(source, target, EdgeType.RESULT, edge_id)
 
@@ -143,7 +181,7 @@ class ComputeGraph:
         self.name = name or f"graph_{uuid.uuid4().hex[:8]}"
         self.parent_graph = parent_graph
         self.nodes: Dict[str, Node] = {}
-        self.edges: Dict[str, Edge] = {}
+        self.edges: Dict[str, UseEdge] = {}
         self.sub_graphs: List["ComputeGraph"] = []
         self.input_nodes: List[Value] = []
         self.output_nodes: List[Value] = []
@@ -154,7 +192,7 @@ class ComputeGraph:
         self.nodes[node.node_id] = node
         return node
 
-    def add_edge(self, edge: Edge) -> Edge:
+    def add_edge(self, edge: UseEdge) -> UseEdge:
         """添加边到计算图"""
         self.edges[edge.edge_id] = edge
         # 更新节点的边列表
@@ -172,19 +210,19 @@ class ComputeGraph:
         self, operation_func, args: tuple = None, kwargs: dict = None
     ) -> Operation:
         """创建操作节点"""
-        node = Operation(operation_func, args, kwargs)
+        node = Operation.from_function(operation_func, args, kwargs)
         self.add_node(node)
         return node
 
-    def connect_operand(self, source: Value, target: Operation) -> Edge:
+    def connect_operand(self, source: Value, target: Operation) -> UseEdge:
         """连接操作数（输入）"""
-        edge = Edge(source, target, EdgeType.OPERAND)
+        edge = UseEdge(source, target, EdgeType.OPERAND)
         self.add_edge(edge)
         return edge
 
-    def connect_result(self, source: Operation, target: Value) -> Edge:
+    def connect_result(self, source: Operation, target: Value) -> UseEdge:
         """连接结果（输出）"""
-        edge = Edge(source, target, EdgeType.RESULT)
+        edge = UseEdge(source, target, EdgeType.RESULT)
         self.add_edge(edge)
         source.add_result(target)
         return edge
@@ -388,7 +426,9 @@ def _print_graph_hierarchy(graph: ComputeGraph, indent_level: int = 0):
     if operation_nodes:
         for op_node in operation_nodes:
             op_indent = "  " * (indent_level + 1)
-            print(f"{op_indent}{op_node.operation_name} (id={op_node.node_id})")
+            print(
+                f"{op_indent}{op_node.operation_name} (id={op_node.__class__.__name__})"
+            )
 
             # 收集操作数节点
             operand_nodes = []
