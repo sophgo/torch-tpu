@@ -6,6 +6,34 @@ fi
 
 MEGATRON_PATH=$(pwd)
 
+function hf2mcore()
+{
+    DEFAULT_TARGET_MC_MODEL="${MEGATRON_PATH}/qwen-ckpts/Qwen2-7B-mcore"
+    TARGET_MC_MODEL=${1:-$DEFAULT_TARGET_MC_MODEL}
+    rm -rf "${TARGET_MC_MODEL}"
+    mkdir -p "${TARGET_MC_MODEL}"
+
+    DEFAULT_REF_HG_MODEL="${MEGATRON_PATH}/qwen-ckpts/Qwen2-7B"
+    REF_HG_MODEL=${3:-$DEFAULT_REF_HG_MODEL}
+
+    pushd "${MEGATRON_PATH}/toolkits/model_checkpoints_convertor/qwen" > /dev/null
+
+    QWEN2_WHOLE_NET_TRANS=1 DISABLE_CACHE=1 bash hf2mcore_qwen2_convertor.sh \
+        7B \
+        "${REF_HG_MODEL}" \
+        "${TARGET_MC_MODEL}" \
+        2 \
+        1 \
+        1 \
+        bf16 \
+        false \
+        false \
+        "${REF_HG_MODEL}"
+
+    popd > /dev/null
+}
+
+
 function mcore_to_hg()
 {
     DEFAULT_TARGET_HG_MODEL="${MEGATRON_PATH}/qwen-ckpts/Qwen2-7B-mcore-to-hg-tp2-pp1"

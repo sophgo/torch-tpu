@@ -8,6 +8,9 @@ import time
 # from nnmoduletools.module_debugger.utils import print_log
 from nnmoduletools.module_debugger.tensor_utils import get_tensor_info
 
+# Cache the default pg_options used at init so subgroups inherit chip_map
+_default_pg_options = None
+
 class Noop:
     def wait(self):
         return None
@@ -80,14 +83,16 @@ def all_gather_into_tensor_wrapper(func):
 def init_wrapper(func):
     @wraps(func)
     def wrapper(backend=None, init_method=None, timeout=default_pg_timeout, world_size=-1, rank=-1, store=None, group_name="", pg_options=None):
+        global _default_pg_options
         if pg_options is None:
             pg_options = torch_tpu.ProcessGroupSCCLOptions()
         if world_size == -1:
             world_size = int(os.environ.get("WORLD_SIZE", "1"))
-        pg_options.chip_map = list(range(world_size))
+        if not getattr(pg_options, "chip_map", None):
+            pg_options.chip_map = list(range(world_size))
         if rank == -1:
             rank = int(os.environ.get('RANK', '0'))
-        torch_tpu.tpu.set_device(rank)
+        _default_pg_options = pg_options
         return func(backend=backend, init_method=init_method, timeout=timeout, world_size=world_size, rank=rank, store=store, group_name=group_name, pg_options=pg_options)
     return wrapper
 
@@ -96,12 +101,17 @@ def new_group_wrapper(func):
     def wrapper(ranks=None, timeout=default_pg_timeout, backend=None, pg_options=None, use_local_synchronization=False):
         if len(ranks) == 1:
             return func(ranks=ranks, timeout=timeout, backend="gloo", pg_options=pg_options, use_local_synchronization=use_local_synchronization)
+        # Ensure chip_map persists for subgroups
         if pg_options is None:
-            pg_options = torch_tpu.ProcessGroupSCCLOptions()
-        world_size = int(os.environ.get("WORLD_SIZE", "1"))
-        pg_options.chip_map = list(range(world_size))
-        rank = os.environ.get('RANK', '0')
-        torch_tpu.tpu.set_device(int(rank))
+            # Prefer inheriting from the default options used at init
+            if _default_pg_options is not None:
+                inherited = torch_tpu.ProcessGroupSCCLOptions()
+                # Copy chip_map only; other fields fall back to defaults
+                inherited.chip_map = list(getattr(_default_pg_options, 'chip_map', []) or [])
+                pg_options = inherited
+            else:
+                pg_options = torch_tpu.ProcessGroupSCCLOptions()
+                torch_tpu.tpu.set_chip_map(pg_options, use_rank_table=False)
         return func(ranks=ranks, timeout=timeout, backend=backend, pg_options=pg_options, use_local_synchronization=use_local_synchronization)
     return wrapper
 

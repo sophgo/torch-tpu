@@ -87,7 +87,9 @@ class LLamaAttentionQKVFunc(torch.autograd.Function):
             input_lengths,
             seq_len,
             ctx.softmax_scale)
-
+        grad_query_states = grad_query_states.reshape(batch, seq_len, num_heads, head_dim)
+        grad_key_states = grad_key_states.reshape(batch, seq_len, num_key_value_heads, head_dim)
+        grad_value_states = grad_value_states.reshape(batch, seq_len, num_key_value_heads, head_dim)
         return grad_query_states, grad_key_states, grad_value_states, None, None, None, None, None
 
 llama_attn_qkv_fn = LLamaAttentionQKVFunc.apply

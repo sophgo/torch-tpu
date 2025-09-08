@@ -166,16 +166,13 @@ eval_options=" \
         --save ${CKPT_DIR} \
         --save-interval 10"
 
-for rank in `seq 0 $((TP*PP-1))`;
-do
-# echo \
-MASTER_ADDR=127.0.0.1 \
-MASTER_PORT=6000 \
-RANK=$rank \
-WORLD_SIZE=$((TP*PP)) \
-LOCAL_RANK=$rank \
-LOCAL_WORLD_SIZE=$((TP*PP)) \
-python examples/qwen2/pretrain_qwen.py \
+TPUS_PER_NODE=$((TP*PP))
+NNODES=1
+MASTER_ADDR=localhost
+MASTER_PORT=6000
+
+DISTRIBUTED_ARGS="--nproc_per_node $TPUS_PER_NODE --nnodes $NNODES --master_addr $MASTER_ADDR --master_port $MASTER_PORT"
+run_cmd="torchrun $DISTRIBUTED_ARGS examples/qwen2/pretrain_qwen.py \
     ${megatron_options} \
     ${fuse_options} \
     ${te_options} \
@@ -186,7 +183,10 @@ python examples/qwen2/pretrain_qwen.py \
     ${extra_options} \
     ${comm_overlap_option} \
     ${tensorboard_option} \
-    ${eval_options} &
-done
+    ${eval_options}
+"
+
+echo $run_cmd
+eval $run_cmd
 
 set +x

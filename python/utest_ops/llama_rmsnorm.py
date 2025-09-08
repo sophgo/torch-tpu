@@ -77,7 +77,7 @@ def check_rmsnorm():
     vocab_size = 32000
     label_cpu = torch.randint(0,vocab_size,(batch,hidden_size))
     label_tpu = copy.deepcopy(label_cpu).to(device)
-    classifier_cpu = nn.Linear(hidden_size, hidden_size)
+    classifier_cpu = nn.Linear(hidden_size, hidden_size, bias=False)
     classifier_tpu = copy.deepcopy(classifier_cpu).to(device)
     logits_cpu = classifier_cpu(out_cpu.view(batch, hidden_size)) 
     loss_cpu = (logits_cpu - label_cpu).sum()

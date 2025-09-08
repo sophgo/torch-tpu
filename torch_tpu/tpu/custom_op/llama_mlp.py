@@ -287,8 +287,9 @@ def fuse_megatron_qwen2_mlp():
                 buf_fwd,
                 buf_bwd
             )
-            if get_tensor_model_parallel_group() and hidden_states.requires_grad:
+            if get_tensor_model_parallel_group():
                 torch.distributed.all_reduce(output, group=get_tensor_model_parallel_group())
+            if hidden_states.requires_grad:
                 hidden_states.register_hook(hook)
             return output, None
         else:
