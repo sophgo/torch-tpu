@@ -25,6 +25,7 @@ fi
 ## package example
 pushd $CUR_DIR/../dist
 cp -rf $CUR_DIR/../examples .
+cp -rf $CUR_DIR/../python/regression .
 popd
 
 ## src

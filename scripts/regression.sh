@@ -18,6 +18,19 @@ function ops_utest() {
     return $cmd_utest_result
 }
 
+function ops_pytest() {
+    CURRENT_DIR=$(dirname ${BASH_SOURCE})
+    PYTHON_TEST_PATH=$CURRENT_DIR/../python/regression
+    echo "[INFO]PYTHON_TEST_PATH:$PYTHON_TEST_PATH"
+    pushd $PYTHON_TEST_PATH
+    DISABLE_CACHE=1 timeout 1500s pytest $PYTHON_TEST_PATH
+    cmd_pytest_result=$?
+    echo "[INFO]cmd_pytest_result:$cmd_pytest_result"
+    popd
+    echo "*********** PYTEST ENDED ***************"
+    return $cmd_pytest_result
+}
+
 function gpt3block_test() {
     start_time=$(date +%s) 
     CURRENT_DIR=$(dirname ${BASH_SOURCE})

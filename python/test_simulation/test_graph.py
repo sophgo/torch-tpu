@@ -44,5 +44,4 @@ def test_graph():
     y = model(x)
     from torch_tpu.utils.reflection.recorder import print_graph_summary
 
-    breakpoint()
     print_graph_summary()

@@ -59,7 +59,10 @@ class TensorLike:
         ret = self._tensor[item]
         ret = TensorLike(ret)
         append_to_graph(
-            self._tensor.__class__.__getitem__, [], {"tensor": self._tensor, "item": item}, ret
+            self._tensor.__class__.__getitem__,
+            [],
+            {"tensor": self._tensor, "item": item},
+            ret,
         )
         return ret
 
@@ -110,6 +113,151 @@ class TensorLike:
         ret = wrap_tensor(ret)
         append_to_graph(func, ori_args, ori_kwargs, ret)
         return ret
+
+    def __add__(self, other):
+        return self.__torch_function__(
+            self._tensor.__class__.__add__, None, [self._tensor, other], {}
+        )
+
+    def __radd__(self, other):
+        return self.__torch_function__(
+            self._tensor.__class__.__radd__, None, [self._tensor, other], {}
+        )
+
+    def __iadd__(self, other):
+        return self.__torch_function__(
+            self._tensor.__class__.__iadd__, None, [self._tensor, other], {}
+        )
+
+    def __rsub__(self, other):
+        return self.__torch_function__(
+            self._tensor.__class__.__rsub__, None, [self._tensor, other], {}
+        )
+
+    def __isub__(self, other):
+        return self.__torch_function__(
+            self._tensor.__class__.__isub__, None, [self._tensor, other], {}
+        )
+
+    def __sub__(self, other):
+        return self.__torch_function__(
+            self._tensor.__class__.__sub__, None, [self._tensor, other], {}
+        )
+
+    def __rsub__(self, other):
+        return self.__torch_function__(
+            self._tensor.__class__.__rsub__, None, [self._tensor, other], {}
+        )
+
+    def __isub__(self, other):
+        return self.__torch_function__(
+            self._tensor.__class__.__isub__, None, [self._tensor, other], {}
+        )
+
+    def __mul__(self, other):
+        return self.__torch_function__(
+            self._tensor.__class__.__mul__, None, [self._tensor, other], {}
+        )
+
+    def __rmul__(self, other):
+        return self.__torch_function__(
+            self._tensor.__class__.__rmul__, None, [self._tensor, other], {}
+        )
+
+    def __imul__(self, other):
+        return self.__torch_function__(
+            self._tensor.__class__.__imul__, None, [self._tensor, other], {}
+        )
+
+    def __truediv__(self, other):
+        return self.__torch_function__(
+            self._tensor.__class__.__truediv__, None, [self._tensor, other], {}
+        )
+
+    def __rtruediv__(self, other):
+        return self.__torch_function__(
+            self._tensor.__class__.__rtruediv__, None, [self._tensor, other], {}
+        )
+
+    def __itruediv__(self, other):
+        return self.__torch_function__(
+            self._tensor.__class__.__itruediv__, None, [self._tensor, other], {}
+        )
+
+    def __pow__(self, other):
+        return self.__torch_function__(
+            self._tensor.__class__.__pow__, None, [self._tensor, other], {}
+        )
+
+    def __rpow__(self, other):
+        return self.__torch_function__(
+            self._tensor.__class__.__rpow__, None, [self._tensor, other], {}
+        )
+
+    def __ipow__(self, other):
+        return self.__torch_function__(
+            self._tensor.__class__.__ipow__, None, [self._tensor, other], {}
+        )
+
+    def __mod__(self, other):
+        return self.__torch_function__(
+            self._tensor.__class__.__mod__, None, [self._tensor, other], {}
+        )
+
+    def __rmod__(self, other):
+        return self.__torch_function__(
+            self._tensor.__class__.__rmod__, None, [self._tensor, other], {}
+        )
+
+    def __imod__(self, other):
+        return self.__torch_function__(
+            self._tensor.__class__.__imod__, None, [self._tensor, other], {}
+        )
+
+    def __floordiv__(self, other):
+        return self.__torch_function__(
+            self._tensor.__class__.__floordiv__, None, [self._tensor, other], {}
+        )
+
+    def __rfloordiv__(self, other):
+        return self.__torch_function__(
+            self._tensor.__class__.__rfloordiv__, None, [self._tensor, other], {}
+        )
+
+    def __ifloordiv__(self, other):
+        return self.__torch_function__(
+            self._tensor.__class__.__ifloordiv__, None, [self._tensor, other], {}
+        )
+
+    def __and__(self, other):
+        return self.__torch_function__(
+            self._tensor.__class__.__and__, None, [self._tensor, other], {}
+        )
+
+    def __rand__(self, other):
+        return self.__torch_function__(
+            self._tensor.__class__.__rand__, None, [self._tensor, other], {}
+        )
+
+    def __iand__(self, other):
+        return self.__torch_function__(
+            self._tensor.__class__.__iand__, None, [self._tensor, other], {}
+        )
+
+    def __or__(self, other):
+        return self.__torch_function__(
+            self._tensor.__class__.__or__, None, [self._tensor, other], {}
+        )
+
+    def __ror__(self, other):
+        return self.__torch_function__(
+            self._tensor.__class__.__ror__, None, [self._tensor, other], {}
+        )
+
+    def __ior__(self, other):
+        return self.__torch_function__(
+            self._tensor.__class__.__ior__, None, [self._tensor, other], {}
+        )
 
 
 class ParameterLike(TensorLike):
@@ -225,7 +373,7 @@ class ModuleWrapper(nn.Module):
             param_tensor = param
 
         append_to_graph(
-            self.register_parameter, [], {"name": name, "param": param}, None
+            super().register_parameter, [], {"name": name, "param": param}, None
         )
         super().register_parameter(name, param_tensor)
 

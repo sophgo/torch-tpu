@@ -10,7 +10,7 @@ import pytest
 import torch_tpu
 
 
-def rmsnorm_tpu(x, scale=None, bias=None, axis=-1, eps=1e-8, profiler=None):
+def rmsnorm_tpu(x, scale=None, bias=None, axis=-1, eps=1e-8):
     """使用自定义 TPU 算子的 RMSNorm 函数式实现"""
     # 第一步：创建输出张量，保持与输入相同的形状和类型
     output = torch.empty(x.shape, dtype=x.dtype, device=x.device)
@@ -23,7 +23,7 @@ def rmsnorm_tpu(x, scale=None, bias=None, axis=-1, eps=1e-8, profiler=None):
     return output
 
 
-def rmsnorm_tpu2(x, scale=None, bias=None, axis=-1, eps=1e-8, profiler=None):
+def rmsnorm_tpu2(x, scale=None, bias=None, axis=-1, eps=1e-8):
     """使用自定义 TPU 算子的 RMSNorm 函数式实现"""
     # 第一步：创建输出张量，保持与输入相同的形状和类型
     output = torch.empty(x.shape, dtype=x.dtype, device=x.device)
@@ -52,7 +52,6 @@ def test_deepseek_rmsnorm(
     with_bias,
     device,
     setup_random_seed,
-    profiler,
 ):
     """
     测试 RMSNorm 的 TPU 实现与 CPU 参考实现的一致性
@@ -66,7 +65,6 @@ def test_deepseek_rmsnorm(
         with_bias: 是否使用偏置参数
         device: 测试设备（由 fixture 提供）
         setup_random_seed: 随机种子设置（由 fixture 提供）
-        profiler: 性能分析器（由 fixture 提供）
     """
 
     # 第一步：生成测试输入数据
@@ -101,17 +99,13 @@ def test_deepseek_rmsnorm(
 
     # 第四步：运行 TPU 实现，在这里进行性能分析
     # 在 profiler 上下文中执行 TPU RMSNorm 计算
-    out_tpu = rmsnorm_tpu(
-        x_tpu, scale=scale, bias=bias, axis=axis, eps=eps, profiler=profiler
-    )
-    out_tpu2 = rmsnorm_tpu2(
-        x_tpu, scale=scale, bias=bias, axis=axis, eps=eps, profiler=profiler
-    )
+    out_tpu = rmsnorm_tpu(x_tpu, scale=scale, bias=bias, axis=axis, eps=eps)
+    out_tpu2 = rmsnorm_tpu2(x_tpu, scale=scale, bias=bias, axis=axis, eps=eps)
     x_tpu[0] = 1
 
     out_tpu = out_tpu.float().cpu().detach()
     out_tpu2 = out_tpu2.float().cpu().detach()
-    
+
     print_graph_summary()
 
     # 第五步：计算差异并验证结果

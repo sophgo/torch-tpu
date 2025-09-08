@@ -99,8 +99,8 @@ class Operation(Node):
         """
         for sub_class in cls.sub_classes.values():
             if sub_class.is_target_class(operation_func, args, kwargs):
-                return sub_class(operation_func)
-        return cls(operation_func)
+                return sub_class(operation_func, args, kwargs)
+        return cls(operation_func, args, kwargs)
 
     @classmethod
     def is_target_class(cls, operation_func, args, kwargs):
@@ -144,6 +144,14 @@ class Operation(Node):
 
     def get_timing_profile(self) -> List[Union[float, Timestamp]]:
         return []
+
+
+class RMSNorm(Operation):
+    target_function = torch.ops.my_ops.rmsnorm_forward
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        # breakpoint()
 
 
 class SetItem(Operation):

@@ -1,4 +1,4 @@
-from torch_tpu.utils.tensor_like import TensorLike
+from torch_tpu.utils.reflection import TensorLike
 from torch import nn
 import torch
 

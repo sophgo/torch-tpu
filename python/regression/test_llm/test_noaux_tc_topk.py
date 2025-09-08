@@ -153,6 +153,7 @@ def cmp_noaux_tc_topk(values_gt, indices_gt, values_v2, indices_v2):
     )
     assert torch.allclose(indices_gt, indices_v2.long())
 
+
 # TODO: fixme
 # def test_noaux_tc_topk_err(device):
 #     """测试 noaux_tc_topk 的不同实现版本是否与ground truth一致"""
