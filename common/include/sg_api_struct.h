@@ -225,21 +225,6 @@ typedef struct
   int dtype;
 } WITH_PLATFORM(sg_api_relu_backward_t);
 
-typedef struct
-{
-  unsigned long long input_global_addr;
-  unsigned long long weight_global_addr;
-  unsigned long long bias_global_addr;
-  unsigned long long output_global_addr;
-  int input_shape[4];
-  int groups;
-  int output_c;
-  int kernel[2];
-  int stride[2];
-  int dilation[2];
-  int pad[4];
-  int dtype;
-} WITH_PLATFORM(sg_api_conv2d_t);
 
 typedef struct
 {
