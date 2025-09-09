@@ -579,6 +579,12 @@ tpudnnStatus_t tpudnnPoolingForwardAsync (
     tpudnnTensor_t output,
     TPUDNN_PoolingDescriptor_t pooling_desc);
 
+tpudnnStatus_t tpudnnAvgPoolingBackwardAsync (
+    tpudnnHandle_t handle,
+    tpudnnTensor_t input,
+    tpudnnTensor_t output,
+    int kernel_size);
+
 tpudnnStatus_t tpudnnMaxPoolingWithMaskForwardAsync (
     tpudnnHandle_t handle,
     tpudnnTensor_t input,
