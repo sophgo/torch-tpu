@@ -29,7 +29,7 @@ PREBUILT_PATH=$CURRENT_DIR/../../bm_prebuilt_toolchains
 export ARM_TOOLCHAIN=$PREBUILT_PATH/gcc-arm-10.3-2021.07-x86_64-aarch64-none-linux-gnu
 export RISCV_TOOLCHAIN=$PREBUILT_PATH/riscv64-linux-x86_64
 
-if [ ! -d "${ARM_TOOLCHAIN}" ]; then
+if [ "${CHIP_ARCH}" == "bm1684x" -a ! -d "${ARM_TOOLCHAIN}" ]; then
   echo "[WARNING] not found arm_toolchain in ${ARM_TOOLCHAIN}"
   CROSS_TOOLCHAINS=$CURRENT_DIR/../toolchains_dir
   echo "[WARNING] will use $CROSS_TOOLCHAINS"
