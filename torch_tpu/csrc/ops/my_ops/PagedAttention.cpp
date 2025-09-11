@@ -327,4 +327,127 @@ namespace at
 		return std::tuple<Tensor, Tensor, Tensor>(dQ, dK, dV);
 	}
 
+Tensor paged_attention_v2(
+    Tensor &output,
+    const Tensor &query,
+    const Tensor &key,
+    const Tensor &value,
+    const Tensor &kcache,
+    const Tensor &vcache,
+    const c10::optional<Tensor> &pos_cos,
+    const c10::optional<Tensor> &pos_sin,
+    const Tensor &input_lengths,
+    const Tensor &cache_lengths,
+    const Tensor &save_slots,
+    const Tensor &block_tables,
+    const c10::optional<Tensor> &mask,
+    double softmax_scale)
+{
+  const auto context_lengths = input_lengths + cache_lengths;
+  if ((input_lengths == 1).all().item().toBool()) {
+    // decode only
+    return paged_attention(
+        output,
+        const_cast<Tensor &>(query), 
+        const_cast<Tensor &>(key),
+        const_cast<Tensor &>(value),
+        const_cast<Tensor &>(kcache),
+        const_cast<Tensor &>(vcache),
+        pos_cos,
+        pos_sin,
+        context_lengths,
+        c10::nullopt,
+        save_slots,
+        block_tables,
+        mask,
+        query.size(-1),
+        block_tables.size(1), // use block size as slots size
+        0, // useless for decode
+        0, // useless for decode
+        kcache.size(1),
+        softmax_scale,
+        3);
+  } else if ((input_lengths > 1).all().item().toBool()) {
+    // prefill only
+    return paged_attention(
+        output,
+        const_cast<Tensor &>(query),
+        const_cast<Tensor &>(key),
+        const_cast<Tensor &>(value),
+        const_cast<Tensor &>(kcache),
+        const_cast<Tensor &>(vcache),
+        pos_cos,
+        pos_sin,
+        input_lengths,
+        cache_lengths,
+        save_slots,
+        block_tables,
+        mask,
+        query.size(-1),
+        0, // useless for prefill
+        block_tables.size(1),
+        mask.has_value() ? mask.value().size(0)
+                         : context_lengths.max().item().toInt(),
+        kcache.size(1),
+        softmax_scale,
+        2);
+  } else {
+    // prefill + decode
+    auto prefill_indices = torch::where(input_lengths > 1)[0];
+    for (int64_t i = 1; i < prefill_indices.numel(); i++) {
+        TORCH_CHECK(prefill_indices[i].item().toInt() == prefill_indices[i - 1].item().toInt() + 1,
+                    "prefill_indices must be continuous");
+    }
+    int64_t start_prefill_id = prefill_indices[0].item().toInt();
+    auto seperate_tensors = [&](int64_t start_id, c10::optional<int64_t> end_id,
+                                bool is_prefill) {
+      auto output_slice = output.slice(0, start_id, end_id);
+      auto query_slice = query.slice(0, start_id, end_id);
+      auto key_slice = key.slice(0, start_id, end_id);
+      auto value_slice = value.slice(0, start_id, end_id);
+      auto cos_slice =
+          pos_cos.has_value()
+              ? c10::make_optional(pos_cos.value().slice(0, start_id, end_id))
+              : c10::nullopt;
+      auto sin_slice =
+          pos_sin.has_value()
+              ? c10::make_optional(pos_sin.value().slice(0, start_id, end_id))
+              : c10::nullopt;
+
+      auto input_lengths_slice = input_lengths.slice(0, start_id, end_id);
+      auto cache_lengths_slice = cache_lengths.slice(0, start_id, end_id);
+      auto save_slots_slice = save_slots.slice(0, start_id, end_id);
+      auto block_tables_slice = block_tables.slice(0, start_id, end_id);
+
+      auto context_lengths_slice = input_lengths_slice + cache_lengths_slice;
+      return paged_attention(
+          output_slice,
+          query_slice,
+          key_slice,
+          value_slice,
+          const_cast<Tensor &>(kcache),
+          const_cast<Tensor &>(vcache),
+          cos_slice,
+          sin_slice,
+          is_prefill ? input_lengths_slice
+                     : input_lengths_slice + cache_lengths_slice,
+          is_prefill ? c10::make_optional(cache_lengths_slice) : c10::nullopt,
+          save_slots_slice,
+          block_tables_slice,
+          mask,
+          query_slice.size(-1),
+          block_tables_slice.size(1),
+          block_tables_slice.size(1),
+          mask.has_value() ? mask.value().size(0)
+                           : context_lengths_slice.max().item().toInt(),
+          kcache.size(1),
+          softmax_scale,
+          is_prefill ? 2 : 3);
+    };
+
+    seperate_tensors(0, start_prefill_id, false);
+    return seperate_tensors(start_prefill_id, None, true);
+  }
+  return output;
+}
 }

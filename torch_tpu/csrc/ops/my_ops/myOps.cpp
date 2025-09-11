@@ -33,6 +33,7 @@ namespace at
     m.def("gated_mlp", gated_mlp);
     m.def("mlp", mlp);
     m.def("attention", attention);
+    m.def("paged_attention_v2", paged_attention_v2);
 
 		m.def("llava_mlp", llava_mlp);
 		m.def("llava_attention", llava_attention);

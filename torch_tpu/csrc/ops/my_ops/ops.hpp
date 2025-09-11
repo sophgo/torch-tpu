@@ -111,9 +111,15 @@ Tensor mlp(
  * 4. Apply softmax to get attention weights
  * 5. Multiply attention weights with value tensor
  *
- * @note This is a core attention implementation used in various transformer-based models.
- * **And the query, key and value may be packed into a single tensor which is stored in `query`,
- * with shape of [..., seq_len, query_head + key_head + value_head, head_dim]**
+ * @note
+ * - This is a core attention implementation used in various transformer-based models.
+ * - **And the query, key and value may be packed into a single tensor which is stored in `query`,
+ * with shape of [..., seq_len, query_head + key_head + value_head, head_dim]**.
+ * - If the query is not contiguous, it means that query, key and value will be performed on the packed tensor.
+ * - Usage:
+ * - qkv = torch.linear(input, qkv_weight, bias=qkv_bias), # [..., seq_len, query_head + key_head + value_head, head_dim]
+ * - q, k, v = torch.split(qkv, [query_head, key_head, value_head], dim=-2) # [..., seq_len, query_head, head_dim], [..., seq_len, key_head, head_dim], [..., seq_len, value_head, head_dim]
+ * - and now the attention is performed on packed tensor.
  */
 Tensor attention(
     Tensor &output,
@@ -122,6 +128,73 @@ Tensor attention(
     const Tensor &value,
     const c10::optional<Tensor> &pos_cos,
     const c10::optional<Tensor> &pos_sin,
+    const c10::optional<Tensor> &mask,
+    double softmax_scale);
+
+/**
+ * @brief Paged attention mechanism V2 implementation for efficient attention computation.
+ * Which is optimized with flash attention algorithm.
+ *
+ * Implements an optimized paged attention operation that utilizes cached key and value tensors
+ * with paged memory management. This version supports rotary positional embeddings and 
+ * various attention masking strategies.
+ * 
+ * **The function uniform the prefill and decode stages, and also supports prefill-chunking and prefix-caching,
+ * with different input lengths and cache lengths.**
+ * 
+ * If the value of input lengths is 1, the decode stage is used, otherwise, the prefill stage is used.
+ * 
+ * **when a request contains both decode and prefill stages,
+ * the data and parameters are stored in the same tensor with decode data placed first, followed by prefill data.**
+ * 
+ * Attention(Q, K, V) = softmax(QK^T * scale + mask) * V
+ *
+ * @param output Output tensor to store the result
+ * @param query Query tensor of shape [..., num_heads, head_dim]
+ * @param key Key tensor of shape [..., num_heads, head_dim]
+ * @param value Value tensor of shape [..., num_heads, head_dim]
+ * @param kcache Cached key tensor for paged attention of shape [..., block_size, num_kv_heads, head_dim]
+ * @param vcache Cached value tensor for paged attention of shape [..., block_size, num_kv_heads, head_dim]
+ * @param pos_cos Optional cosine positional embeddings for rotary positional encoding of shape [..., seq_len, head_dim]
+ * @param pos_sin Optional sine positional embeddings for rotary positional encoding of shape [..., seq_len, head_dim]
+ * @param input_lengths Tensor containing the lengths of input sequences of shape [batch]
+ * @param cache_lengths Tensor containing the lengths of cached sequences of shape [batch]
+ * @param save_slots Tensor indicating where to save the attention results in cache of shape [input_lengths]
+ * @param block_tables Tensor containing block tables for paged attention of shape [batch, num_blocks]
+ * @param mask Optional attention mask to prevent attention to the future positions. The mask should be of shape [max_seqlen, max_seqlen],
+ *             where max_seqlen is the maximum sequence length of the input sequences. The mask should be symmetric and causal.
+ *             The mask is only used for the prefill stage. If the mask is None, the function will generate the mask based on the input lengths.
+ * @param softmax_scale Scaling factor applied to the dot product before softmax
+ * @return Tensor The result of the paged attention operation
+ *
+ * @details
+ * This function computes attention with paged memory management, which is especially useful
+ * for autoregressive decoding in large language models. It supports:
+ * 1. Rotary positional embeddings through pos_cos and pos_sin parameters
+ * 2. Paged key-value caching via Kcache and Vcache
+ * 3. Flexible attention masking
+ * 4. Configurable softmax scaling
+ *
+ * The paged attention approach helps reduce memory fragmentation and enables efficient
+ * management of key-value caches during inference.
+ *
+ * @note
+ * - This is an optimized version of attention mechanism for inference scenarios.
+ * - **If the query is not contiguous, it means that query, key and value will be performed on the packed tensor. See `attention`**
+ */
+Tensor paged_attention_v2(
+    Tensor &output,
+    const Tensor &query,
+    const Tensor &key,
+    const Tensor &value,
+    const Tensor &kcache,
+    const Tensor &vcache,
+    const c10::optional<Tensor> &pos_cos,
+    const c10::optional<Tensor> &pos_sin,
+    const Tensor &input_lengths,
+    const Tensor &cache_lengths,
+    const Tensor &save_slots,
+    const Tensor &block_tables,
     const c10::optional<Tensor> &mask,
     double softmax_scale);
 

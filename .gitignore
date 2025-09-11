@@ -50,4 +50,5 @@ site-packages
 *.mlir
 *.npz
 *.ref_files.json
+*doxygen
 #*.tar.gz
