@@ -292,10 +292,12 @@ public:
     tpuError_t Status = tryAllocate();
     if (Status != tpuSuccess) {
       std::cout << "First allocation failed, trying to free cache and retry. Device: #" << Index << " Size: " << Size << "bytes" << std::endl;
+      // c10_tpu::getCurrentTPUStream().synchronize(); // sync for free memory but reduce performance
       EmptyCache(Index);
       Status = tryAllocate();
     }
-    TORCH_CHECK(Status == tpuSuccess, "Failed to allocate memory on TPU device #", Index, " size = ", Size, "bytes");
+    TORCH_CHECK(Status == tpuSuccess, "Failed to allocate memory on TPU device #", Index, " size = ", Size, " bytes. ",
+                                      "If OOM, please try lowering the environment variable 'TPU_ALLOCATOR_FREE_DELAY_IN_MS' and current value is ", free_delay_, "ms. ");
 
     MemInfo info;
     info.size = Size;
