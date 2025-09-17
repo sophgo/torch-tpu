@@ -275,4 +275,6 @@ static inline bool TPUIsSameShape ( const at::Tensor & Tensor1, const at::Tensor
   return true;
 }
 
+class OpCalDtype;
+
 } // namespace tpu

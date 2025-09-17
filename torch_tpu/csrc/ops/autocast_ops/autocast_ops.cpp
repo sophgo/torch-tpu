@@ -16,5 +16,4 @@ TORCH_LIBRARY_IMPL(aten, AutocastPrivateUse1, m) {
 
   // f32
 }
-
 }//namespace

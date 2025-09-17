@@ -300,14 +300,6 @@ typedef struct
   unsigned long long output_global_addr;
   int shape[4];
   int mode;
-} WITH_PLATFORM(sg_api_conv_weight_reorder_t);
-
-typedef struct
-{
-  unsigned long long input_global_addr;
-  unsigned long long output_global_addr;
-  int shape[4];
-  int mode;
 } WITH_PLATFORM(sg_api_conv_weight_recover_t);
 
 typedef struct

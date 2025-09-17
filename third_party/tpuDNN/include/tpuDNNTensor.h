@@ -135,6 +135,7 @@ typedef struct
   int dilation_h;
   int dilation_w;
   int groups;
+  tpudnnDataType_t calDtype;
 }tpudnnConv2dParam_t;
 
 typedef struct

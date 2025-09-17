@@ -180,37 +180,6 @@ function regression_for_scclHost() {
     done
 }
 
-function make_kernel_module() {
-  test_CHIP_ARCH=${1:-bm1684x}
-  CURRENT_DIR=$(dirname ${BASH_SOURCE})
-  if [ "${test_CHIP_ARCH}" = "sg2260" ]; then
-      echo "chip 2260 kernel_module building is 'invalid'"
-  else
-    dumpinstall="apt-get install bsdmainutils"
-    $dumpinstall
-    pushd $CURRENT_DIR/..
-    rm -rf build
-    mkdir build && cd build
-    cmake_cmd_kerenl="cmake .. -DCMAKE_BUILD_TYPE=Debug -DUSING_CMODEL=OFF -DPCIE_MODE=ON -DSOC_MODE=OFF"
-    echo "[CMD-INFO] $cmake_cmd_kerenl"
-    $cmake_cmd_kerenl
-    make kernel_module
-    make -j$(($(nproc)-2))
-    popd
-  fi
-}
-
-function build_kernel_module() {
-  CURRENT_DIR=$(dirname ${BASH_SOURCE})
-  export CROSS_TOOLCHAINS="$CURRENT_DIR/../../bm_prebuilt_toolchains/"
-  test_CHIP_ARCH=${1:-bm1684x}
-  if [ ! -d $CROSS_TOOLCHAINS ]; then
-    echo "[bm_prebuilt_toolchains]:$CROSS_TOOLCHAINS is not found !"
-  else
-    make_kernel_module $test_CHIP_ARCH
-  fi
-}
-
 # currently, for sg2260 libfirmware_core.a must compiled with DE
 function check_third_party() {
   strings third_party/firmware/sg2260/libfirmware_core.a | grep 'remove_polls_flag';
@@ -241,8 +210,8 @@ function build_riscv_whl() {
 function check_riscv_third_party_version() {
   FILE1="$CURRENT_DIR/../third_party/tpuDNN/sg2260_lib/libtpudnn.so"
   FILE2="$CURRENT_DIR/../third_party/tpuDNN/sg2260_lib/libtpudnn-riscv.so"
-  OUTPUT1=$(nm "$FILE1" | grep 1686 | awk 'NR==2 {print $3}')
-  OUTPUT2=$(nm "$FILE2" | grep 1686 | awk 'NR==2 {print $3}')
+  OUTPUT1=$(nm "$FILE1" | grep tpu1686 | awk 'NR==2 {print $3}')
+  OUTPUT2=$(nm "$FILE2" | grep tpu1686 | awk 'NR==2 {print $3}')
   if [ "$OUTPUT1" != "$OUTPUT2" ]; then
     echo "Version numbers are different, Please using rebuild_TPU1686_riscv to update riscv shared lib."
     return -1

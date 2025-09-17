@@ -23,7 +23,7 @@ static std::tuple<Tensor, bool> batchify ( const Tensor & input, const int64_t n
 static bool check_output_shape_is_satified ( const Tensor & input, const Tensor & weight, IntArrayRef stride, IntArrayRef padding, IntArrayRef dilation, IntArrayRef output_padding, int64_t groups )
 {
   // check dtype if f32 return true
-  if ( input.scalar_type() == at::kFloat )
+  if ( input.scalar_type() ==kFloat )
   {
     return true;
   }
@@ -48,7 +48,7 @@ static bool check_output_shape_is_satified ( const Tensor & input, const Tensor 
   return true;
 }
 
-Tensor convolution_tpu (
+Tensor convolution_overrideable_tpu (
 const Tensor & input_,
 const Tensor & weight,
 const c10::optional<Tensor> & bias_opt,
@@ -66,9 +66,9 @@ int64_t groups )
   c10::MaybeOwned<Tensor> bias_maybe_owned = borrow_from_optional_tensor ( bias_opt );
   const Tensor & bias = *bias_maybe_owned;
   auto input_dtype = input_.scalar_type();
-  auto output_cpu = torch::convolution ( input_.cpu().to( at::kFloat ),
-                                         weight.cpu().to( at::kFloat ),
-                                         c10::optional<Tensor> ( bias.defined() ? bias.cpu().to( at::kFloat ) : Tensor() ),
+  auto output_cpu = torch::convolution ( input_.cpu().to(kFloat ),
+                                         weight.cpu().to(kFloat ),
+                                         c10::optional<Tensor> ( bias.defined() ? bias.cpu().to(kFloat ) : Tensor() ),
                                          stride,
                                          padding,
                                          dilation,
@@ -76,12 +76,14 @@ int64_t groups )
                                          output_padding,
                                          groups );
   output_cpu = output_cpu.to ( input_dtype );
+  TIMING_END;
   return TENSOR_TO_TPU ( output_cpu );
 #else
-  TORCH_CHECK ( at::isComplexType ( input_.scalar_type() ) == false, "Complex convolution is unsupported by TPU" );
+  TORCH_CHECK (isComplexType ( input_.scalar_type() ) == false, "Complex convolution is unsupported by TPU" );
   c10::MaybeOwned<Tensor> bias_maybe_owned = borrow_from_optional_tensor ( bias_opt );
   const Tensor & bias = *bias_maybe_owned;
   TORCH_CHECK ( !bias.defined() || bias.dtype() == input_.dtype(), "Input type (", input_.dtype().name(), ") and bias type (", bias.dtype().name(), ") should be the same" );
+  TORCH_CHECK( weight.dtype() == input_.dtype(), "Input type (", input_.dtype().name(), ") and weight type (", weight.dtype().name(), ") should be the same"  )
   if ( bias.defined() ) { CHECK_TENSOR_IN_DEVICE ( bias ); }
   auto num_spatial_dims = weight.dim() - 2;
   Tensor input;
@@ -100,8 +102,9 @@ int64_t groups )
   else
   {
     TORCH_CHECK ( num_spatial_dims == 2 || num_spatial_dims == 3, "TPU ", num_spatial_dims, "D convolution is not implemented" );
-    auto output_shape = at::native::conv_output_size ( input.sizes(), weight.sizes(), padding, stride, dilation );
+    auto output_shape =native::conv_output_size ( input.sizes(), weight.sizes(), padding, stride, dilation );
     output = torch::empty ( output_shape, input.options() );
+
     if(num_spatial_dims == 2){
       tpudnnConv2dParam_t conv_param =
       {
@@ -114,6 +117,7 @@ int64_t groups )
         .dilation_h = ( int ) dilation[0],
         .dilation_w = ( int ) dilation[1],
         .groups = ( int ) groups,
+        .calDtype = tpu::OpCalDtype::Instance().get_convDtype(),
       };
 
       auto stream = c10_tpu::getCurrentTPUStream();
@@ -159,10 +163,6 @@ int64_t groups )
   return is_batched ? output : output.squeeze ( 0 );
 #endif
 }
-TORCH_LIBRARY_IMPL ( aten, TPU, m )
-{
-  m.impl ( "convolution_overrideable", convolution_tpu );
-}
 
 std::tuple<Tensor, Tensor, Tensor> convolution_backward_overrideable_tpu (
 const Tensor & grad_output,
@@ -177,19 +177,21 @@ int64_t groups,
 std::array<bool, 3> output_mask )
 {
   TIMING_START;
+  if ( !grad_output.is_contiguous() ) CONTIGUOUS_WARNING();
   auto grad_output_ = grad_output.contiguous();
   CHECK_TENSOR_IN_DEVICE ( grad_output_ );
   CHECK_TENSOR_IN_DEVICE ( input );
   CHECK_TENSOR_IN_DEVICE ( weight );
-#if 0
+  TORCH_CHECK (isComplexType ( input.scalar_type() ) == false,
+                "Complex convolution backward is unsupported by TPU" );
+  if ( 0 ){
     CPU_IMPL_WARNING();
-    auto input_dtype = input.scalar_type();
     // change dtype into f32
     auto outputs_cpu = torch::convolution_backward (
-                       grad_output.cpu().to ( at::kFloat ),
-                       input.cpu().to ( at::kFloat ),
-                       weight.cpu().to ( at::kFloat ),
-                       at::OptionalIntArrayRef ( { weight.size ( 0 ) } ),
+                       grad_output.cpu().to (kFloat ),
+                       input.cpu().to (kFloat ),
+                       weight.cpu().to (kFloat ),
+                      OptionalIntArrayRef ( { weight.size ( 0 ) } ),
                        stride,
                        padding,
                        dilation,
@@ -198,14 +200,13 @@ std::array<bool, 3> output_mask )
                        groups,
                        output_mask );
     Tensor grad_input, grad_weight, grad_bias;
-    grad_input  = output_mask[0] ? TENSOR_TO_TPU ( std::get<0> ( outputs_cpu ).to ( input_dtype ) ) : Tensor();
-    grad_weight = output_mask[1] ? TENSOR_TO_TPU ( std::get<1> ( outputs_cpu ).to ( input_dtype ) ) : Tensor();
-    grad_bias   = output_mask[2] ? TENSOR_TO_TPU ( std::get<2> ( outputs_cpu ).to ( input_dtype ) ) : Tensor();
+    grad_input  = output_mask[0] ? TENSOR_TO_TPU ( std::get<0> ( outputs_cpu ).to ( input.scalar_type() ) ) : Tensor();
+    grad_weight = output_mask[1] ? TENSOR_TO_TPU ( std::get<1> ( outputs_cpu ).to ( weight.scalar_type() ) ) : Tensor();
+    grad_bias   = output_mask[2] ? TENSOR_TO_TPU ( std::get<2> ( outputs_cpu ).to ( weight.scalar_type() ) ) : Tensor();
     SHOW_TENSOR_OP(grad_output_, input, weight, grad_input, grad_weight, grad_bias);
     return std::tuple<Tensor, Tensor, Tensor> ( grad_input, grad_weight, grad_bias);
-#else
-  TORCH_CHECK ( at::isComplexType ( input.scalar_type() ) == false,
-                "Complex convolution backward is unsupported by TPU" );
+  }
+
   auto num_spatial_dims = weight.dim() - 2;
   Tensor grad_input, grad_weight, grad_bias;
   if ( output_mask[0] == true )
@@ -221,7 +222,6 @@ std::array<bool, 3> output_mask )
   }
   if ( output_mask[2] == true )
   {
-    // We assume that weight and bias have the same data type
     grad_bias = empty ( { weight.size ( 0 ) }, weight.options() );
   }
   if ( transposed == true )
@@ -245,6 +245,7 @@ std::array<bool, 3> output_mask )
       .dilation_h = ( int ) dilation[0],
       .dilation_w = ( int ) dilation[1],
       .groups = ( int ) groups,
+      .calDtype = TPUDNN_DTYPE_UNKNOWN,
     };
     auto stream = c10_tpu::getCurrentTPUStream();
     auto status = tpudnnConv2dBackwardAsync(
@@ -260,11 +261,12 @@ std::array<bool, 3> output_mask )
   }
   TIMING_END;
   SHOW_TENSOR_OP(grad_output_, input, weight, grad_input, grad_weight, grad_bias);
-  return std::tuple<Tensor, Tensor, Tensor> ( grad_input, grad_weight, grad_bias );
-#endif
+  return std::make_tuple( grad_input, grad_weight, grad_bias );
 }
+
 TORCH_LIBRARY_IMPL ( aten, TPU, m )
 {
+  m.impl ( "convolution_overrideable", convolution_overrideable_tpu );
   m.impl ( "convolution_backward_overrideable", convolution_backward_overrideable_tpu );
 }
 } // namespace at
