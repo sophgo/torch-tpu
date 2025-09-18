@@ -51,8 +51,49 @@ if (USING_CMODEL)
         "$ORIGIN;")
     install(TARGETS firmware DESTINATION lib)
 else()
-    set_target_properties(firmware PROPERTIES LINK_FLAGS -s)
-    target_link_options(firmware PRIVATE -Wl,-allow-multiple-definition) # FIXME
-    target_link_libraries(firmware PRIVATE -Wl,--whole-archive TPU1686::firmware -Wl,--no-whole-archive dl m)
-    target_link_options(firmware PRIVATE -Wl,--no-undefined)
+    if(USING_RTTHREAD)
+        include_directories(${CMAKE_CURRENT_SOURCE_DIR}/../../tpuv7-runtime/rt-thread/bsp/sophgo/sg2260_tpu/install/include)
+
+        set(CMAKE_FIND_LIBRARY_SUFFIXES .a)
+        find_library(LIBM_STATIC_LIB c)
+        if(NOT LIBM_STATIC_LIB)
+            message(FATAL_ERROR "Static libc (libc.a) not found!")
+        endif()
+        set(CMAKE_FIND_LIBRARY_SUFFIXES .so .a)
+        message(INFO 输出了 ${LIBM_STATIC_LIB})
+
+        target_link_options(firmware PRIVATE
+            "LINKER:-Bstatic"
+            "LINKER:${LIBM_STATIC_LIB}"
+            "LINKER:-Bdynamic"
+        )
+
+        if(NOT EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/../../tpuv7-runtime/rt-thread/bsp/sophgo/sg2260_tpu/libtp_Image_0.a")
+            message(FATAL_ERROR "Error: Not found libtp_Image_0.a\n")
+        endif()
+
+        target_link_libraries(firmware PRIVATE
+            # ${LIBM_STATIC_LIB}
+            ${CMAKE_CURRENT_SOURCE_DIR}/../../bm_prebuilt_toolchains/gcc-riscv-musl/lib/gcc/riscv64-unknown-linux-musl/13.2.0/libgcc.a
+            ${CMAKE_CURRENT_SOURCE_DIR}/../../tpuv7-runtime/rt-thread/bsp/sophgo/sg2260_tpu/libtp_Image_0.a
+        )
+
+        set_target_properties(firmware PROPERTIES LINK_FLAGS -s)
+        target_link_options(firmware PRIVATE -Wl,-allow-multiple-definition) # FIXME
+
+        message("LIBM_STATIC_LIB = ${LIBM_STATIC_LIB} ")
+        target_link_libraries(firmware PRIVATE
+            "-Wl,--verbose,--whole-archive"
+            ${LIBM_STATIC_LIB}
+            TPU1686::firmware
+            "-Wl,--no-whole-archive"
+        )
+        target_link_options(firmware PRIVATE -Wl,--no-undefined)
+    else()
+        set_target_properties(firmware PROPERTIES LINK_FLAGS -s)
+        target_link_options(firmware PRIVATE -Wl,-allow-multiple-definition) # FIXME
+        target_link_libraries(firmware PRIVATE -Wl,--whole-archive TPU1686::firmware -Wl,--no-whole-archive dl m)
+        target_link_options(firmware PRIVATE -Wl,--no-undefined)
+    endif()
+
 endif()

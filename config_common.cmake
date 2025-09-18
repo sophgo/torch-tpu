@@ -10,6 +10,9 @@ option(BACKEND_1686          "Opt for 1686"                                    O
 option(USING_CMODEL          "option for using cmodel"                         OFF)
 
 option(DUMP_INS              "option for control dump ins, cmodel only"        OFF)
+
+option(USING_RTTHREAD          "option for rtthread"                            OFF)
+
 ######################################
 ### CHIP BACKEND
 ######################################
@@ -99,4 +102,9 @@ endif()
 
 if(DUMP_INS)
   add_definitions(-DDUMP_INS)
+endif()
+
+if(USING_RTTHREAD)
+    add_definitions(-D__RTTHREAD__)
+    add_definitions(-DDCONFIG_64BIT)
 endif()

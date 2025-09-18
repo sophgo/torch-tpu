@@ -24,10 +24,19 @@ download_riscv_toolchain(){
 }
 
 
+download_rtthread_toolchain(){
+  echo "Please download from bm_prebuilt_toolchains"
+  echo "not support url to download now"
+  #wget https://soc.ustc.edu.cn/CECS/appendix/riscv64.tar.gz
+}
+
+
 CURRENT_DIR=$(cd $(dirname "${BASH_SOURCE[0]}") && pwd)
 PREBUILT_PATH=$CURRENT_DIR/../../bm_prebuilt_toolchains
 export ARM_TOOLCHAIN=$PREBUILT_PATH/gcc-arm-10.3-2021.07-x86_64-aarch64-none-linux-gnu
 export RISCV_TOOLCHAIN=$PREBUILT_PATH/riscv64-linux-x86_64
+export RTTHREAD_TOOLCHAIN=$PREBUILT_PATH/gcc-riscv-musl
+
 
 if [ "${CHIP_ARCH}" == "bm1684x" -a ! -d "${ARM_TOOLCHAIN}" ]; then
   echo "[WARNING] not found arm_toolchain in ${ARM_TOOLCHAIN}"
@@ -46,8 +55,17 @@ if [ ! -d "${RISCV_TOOLCHAIN}" ]; then
   download_riscv_toolchain $CROSS_TOOLCHAINS
 fi
 
+if [ ! -d "${RTTHREAD_TOOLCHAIN}" ]; then
+  echo "not found RTTHREAD_TOOLCHAIN in ${RTTHREAD_TOOLCHAIN}"
+  CROSS_TOOLCHAINS=$CURRENT_DIR/../toolchains_dir
+  echo "try to download to  $CROSS_TOOLCHAINS ..."
+  export CROSS_TOOLCHAINS=$CROSS_TOOLCHAINS
+  download_rtthread_toolchain $CROSS_TOOLCHAINS
+fi
+
 echo "[INFO]export ARM_TOOLCHAIN=$ARM_TOOLCHAIN"
 echo "[INFO]export RISCV_TOOLCHAIN=$RISCV_TOOLCHAIN"
+echo "[INFO]export RTTHREAD_TOOLCHAIN=$RTTHREAD_TOOLCHAIN"
 # popd>>/dev/null
 
 function soc_build_env_prepare()
