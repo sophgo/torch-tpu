@@ -117,25 +117,6 @@ typedef struct {
   int scalar;
 } WITH_PLATFORM(sg_api_upsample2d_backward_t);
 
-typedef struct {
-  unsigned long long input_global_addr;
-  unsigned long long weight_global_addr;
-  unsigned long long grad_output_global_addr;
-  unsigned long long grad_input_global_addr;
-  unsigned long long grad_weight_global_addr;
-  unsigned long long grad_bias_global_addr;
-  unsigned long long buffer_global_addr;
-  int input_shape[4];
-  int output_shape[4];
-  int groups;
-  int kernel[2];
-  int stride[2];
-  int dilation[2];
-  int pad[4];
-  int dtype;
-  int weight_formated;
-} WITH_PLATFORM(sg_api_conv2d_backward_t);
-
 typedef struct
 {
   unsigned long long input_global_addr;
