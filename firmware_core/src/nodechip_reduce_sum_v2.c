@@ -343,6 +343,10 @@ static inline void nodechip_reduce_sum_2d_multi_core_single_stage(
       {
         tpu_bdc_fp_avg_pool2d ( reduce_tile_fp32_addrs[index], input_local_addrs[index], &tile_shape, &kernel, &zero_pad, &stride_one, &dilation_one, DT_FP32, one_fp32 );
       }
+      else if ( dtype == DT_INT8 || dtype == DT_UINT8)
+      {
+        tpu_bdc_int8_avg_pool2d( reduce_tile_fp32_addrs[index], input_local_addrs[index], &tile_shape, &kernel, &zero_pad, &stride_one, &dilation_one, dtype, dtype, 1, 0);
+      }
       else
       {
         tpu_bdc_cast ( input_fp32_local_addr, input_local_addrs[index], &tile_shape, NULL, NULL, DT_FP32, dtype, RM_HALF_TO_EVEN );
@@ -350,7 +354,13 @@ static inline void nodechip_reduce_sum_2d_multi_core_single_stage(
       }
       if ( wdone > 0 )
       {
-        tpu_bdc_fp_add ( reduce_tile_fp32_addrs[index], reduce_tile_fp32_addrs[index], reduce_tile_fp32_addrs[1 - index], &reduce_tile_shape, NULL, NULL, NULL, DT_FP32 );
+        if ( dtype == DT_INT8 || dtype == DT_UINT8 ) {
+          tpu_bdc_int_add ( reduce_tile_fp32_addrs[index], reduce_tile_fp32_addrs[index], reduce_tile_fp32_addrs[1 - index], &reduce_tile_shape, NULL, NULL, NULL,
+                            dtype, dtype, dtype, 0, RM_HALF_TO_EVEN, true );
+        }
+        else{
+          tpu_bdc_fp_add ( reduce_tile_fp32_addrs[index], reduce_tile_fp32_addrs[index], reduce_tile_fp32_addrs[1 - index], &reduce_tile_shape, NULL, NULL, NULL, DT_FP32 );
+        }
       }
       wtodo -= shape.w;
       wdone += shape.w;
@@ -370,6 +380,11 @@ static inline void nodechip_reduce_sum_2d_multi_core_single_stage(
     {
       dim2 kernel = { .h = 1, .w = tile };
       tpu_bdc_fp_avg_pool2d ( output_local_addrs[1 - index], reduce_tile_fp32_addrs[1 - index], &reduce_tile_shape, &kernel, &zero_pad, &stride_one, &dilation_one, DT_FP32, C_fp32 );
+    }
+    else if ( dtype == DT_INT8 || dtype == DT_UINT8 )
+    {
+      dim2 kernel = { .h = 1, .w = tile };
+      tpu_bdc_int8_avg_pool2d ( output_local_addrs[1 - index], reduce_tile_fp32_addrs[1 - index], &reduce_tile_shape, &kernel, &zero_pad, &stride_one, &dilation_one, dtype, dtype, 1, 0 );
     }
     else
     {
@@ -450,7 +465,8 @@ void nodechip_reduce_sum_2d_multi_core (
 int tpu_kernel_api_reduce_multi_core ( const void *args )
 {
   sg_api_reduce_t * api = ( sg_api_reduce_t * ) args;
-  TPUKERNEL_ASSERT ( api->dtype == DT_FP32 || api->dtype == DT_FP16 || api->dtype == DT_BFP16 );
+  TPUKERNEL_ASSERT ( api->dtype == DT_FP32 || api->dtype == DT_FP16 || api->dtype == DT_BFP16 ||
+                    api->dtype == DT_INT32 || api->dtype == DT_INT8 || api->dtype == DT_UINT8);
   TPUKERNEL_ASSERT ( api->mode == 0 || api->mode == 1 );
   tpu_initialize();
 #ifdef BACKEND_SG2260
