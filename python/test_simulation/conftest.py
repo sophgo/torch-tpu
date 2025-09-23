@@ -25,6 +25,17 @@ def pytest_configure(config):
 
     inject()
 
+    from torch_tpu.utils.reflection.config import set_global_config
+
+    from torch_tpu.utils.reflection.config import (
+        GlobalConfig,
+        ArchConfig,
+        EstimationConfig,
+    )
+    # set_global_config(
+    #     GlobalConfig(arch=ArchConfig(est=EstimationConfig(ddr_utilization=0.7)))
+    # )
+
 
 def pytest_unconfigure(config):
     from torch_tpu.utils.reflection.torch_inject import restore

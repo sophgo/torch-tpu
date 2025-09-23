@@ -1,5 +1,6 @@
 from torch import nn
 import torch
+from torch_tpu.utils.reflection.graph import print_graph_summary
 
 
 class Attention(nn.Module):
@@ -16,7 +17,6 @@ class EncodeLayer(nn.Module):
         super().__init__()
         self.linear = nn.Linear(10, 10)
         self.attention = Attention()
-
 
     def forward(self, x):
         x = self.attention(x)
@@ -42,6 +42,5 @@ def test_graph():
     x = torch.rand(10, 10)
     model = Transformer()
     y = model(x)
-    from torch_tpu.utils.reflection.recorder import print_graph_summary
 
     print_graph_summary()

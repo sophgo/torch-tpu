@@ -1,5 +1,5 @@
 import torch
-from .timestamp import Timestamp
+from .time_model import Timestamp
 from typing import Callable
 import numpy as np
 from torch import Tensor
@@ -37,6 +37,20 @@ class Node:
         self.incoming_edges: List[UseEdge] = []
         self.outgoing_edges: List[UseEdge] = []
         self.metadata: Dict[str, Any] = {}
+
+        self.attributes = {}
+
+    def __setitem__(self, key: str, value: Any):
+        self.attributes[key] = value
+
+    def __getitem__(self, key: str) -> Any:
+        return self.attributes[key]
+
+    def __delitem__(self, key: str):
+        del self.attributes[key]
+
+    def __contains__(self, key: str) -> bool:
+        return key in self.attributes
 
     def add_incoming_edge(self, edge: "UseEdge"):
         """添加输入边"""
@@ -370,6 +384,7 @@ def append_to_graph(operation_func, args, kwargs, result):
             current_graph.connect_result(op_node, result_node)
         else:
             breakpoint()
+    return op_node
 
 
 def create_subgraph(module_name: str, suffix: str = "") -> ComputeGraph:
@@ -438,9 +453,15 @@ def _print_graph_hierarchy(graph: ComputeGraph, indent_level: int = 0):
     if operation_nodes:
         for op_node in operation_nodes:
             op_indent = "  " * (indent_level + 1)
-            print(
-                f"{op_indent}{op_node.operation_name} (id={op_node.__class__.__name__})"
-            )
+
+            op_str = [
+                op_indent,
+                op_node.operation_name,
+                f" (id={op_node.__class__.__name__}) ",
+            ]
+            if "time_ret" in op_node:
+                op_str.append(f" time={op_node['time_ret'].time()}")
+            print("".join(op_str))
 
             # 收集操作数节点
             operand_nodes = []

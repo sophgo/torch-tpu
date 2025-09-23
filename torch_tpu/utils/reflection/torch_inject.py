@@ -1,4 +1,7 @@
-from .recorder import enter_subgraph, exit_subgraph
+from .graph import enter_subgraph, exit_subgraph, append_to_graph
+from .base import NoneOp
+from .opinfer import OpInfer
+from .config import get_global_config
 import torch
 from torch import Tensor
 from torch.nn.modules.module import (
@@ -11,10 +14,7 @@ from typing import Union
 import torch.nn as nn
 from functools import wraps
 
-# 导入图相关的类和操作
-from .recorder import (
-    append_to_graph,
-)
+from .base import TensorLikeBase
 
 
 def unwrap_tensor(tensor):
@@ -41,50 +41,71 @@ def wrap_tensor(tensor):
     return tensor
 
 
-class TensorLike:
-    def __init__(self, tensor):
-        self._tensor = tensor
+class CallDispatch:
+    def __init__(self, func, self_obj=None):
+        self.func = func
+        self.self_obj = self_obj
 
-    def wrap_callback(self, func):
+    def __call__(self, *args, **kwargs):
+        ori_args = unwrap_tensor(args)
+        ori_kwargs = unwrap_tensor(kwargs)
+
+        config = get_global_config()
+        ret = NoneOp()
+        op_node = None
+
+        if self.self_obj is not None:
+            args = [self.self_obj, *args]
+
+        if config.reflect.call_func:
+            ret = self.func(*ori_args, **ori_kwargs)
+            op_node = append_to_graph(self.func, args, kwargs, ret)
+            if config.reflect.store_cmd:
+                op_node["cmd"] = "TODO: store cmd path, cmd id, cmd inst..."
+
+        if config.reflect.op_infer:
+
+            infer = OpInfer.from_function(
+                self.func,
+                args,
+                kwargs,
+                ret,
+            )
+            
+            if config.reflect.op_infer.tensor_infer:
+                tensor_ret = infer.tensor_infer()
+                if isinstance(ret, NoneOp):
+                    ret = tensor_ret
+                    op_node = append_to_graph(self.func, args, kwargs, ret)
+                else:
+                    op_node["tensor_ret"] = tensor_ret
+
+            if config.reflect.op_infer.time_infer:
+                time_ret = infer.time_infer(config)
+                op_node["time_ret"] = time_ret
+
+        assert not isinstance(ret, NoneOp), "sanity check"
+
+        ret = wrap_tensor(ret)
+        return ret
+
+
+class TensorLike(TensorLikeBase):
+
+    def _wrap_callback(self, func):
         @wraps(func)
         def wrapper(*args, **kwargs):
-            ret = func(*args, **kwargs)
-            ret = wrap_tensor(ret)
-            append_to_graph(func, [self, *args], kwargs, ret)
+            ret = CallDispatch(func, self)(*args, **kwargs)
             return ret
 
         return wrapper
 
     def __getitem__(self, item):
-        ret = self._tensor[item]
-        ret = TensorLike(ret)
-        append_to_graph(
-            self._tensor.__class__.__getitem__,
-            [],
-            {"tensor": self._tensor, "item": item},
-            ret,
-        )
+        ret = CallDispatch(self._tensor.__class__.__getitem__)(self._tensor, item)
         return ret
 
     def __setitem__(self, item, value):
-        self._tensor[item] = value
-        # 对于 setitem 操作，我们需要特殊处理参数
-        append_to_graph(
-            self._tensor.__class__.__setitem__,
-            [],
-            {"tensor": self._tensor, "item": item, "value": value},
-            None,
-        )
-
-    def __getattr__(self, name):
-        ret = getattr(self._tensor, name)
-        if name == "_tensor":
-            return super().__getattr__(name)
-        if callable(ret):
-            return self.wrap_callback(ret)
-        elif isinstance(ret, torch.Tensor):
-            return TensorLike(ret)
-        return ret
+        CallDispatch(self._tensor.__class__.__setitem__)(self._tensor, item, value)
 
     @classmethod
     def __torch_function__(cls, func, types, args=(), kwargs=None):
@@ -106,158 +127,9 @@ class TensorLike:
         else:
             kwargs = {}
 
-            # .simulate()
-
         # 第四步：调用原始函数
-        ret = func(*args, **kwargs)
-        ret = wrap_tensor(ret)
-        append_to_graph(func, ori_args, ori_kwargs, ret)
+        ret = CallDispatch(func)(*args, **kwargs)
         return ret
-
-    def __add__(self, other):
-        return self.__torch_function__(
-            self._tensor.__class__.__add__, None, [self._tensor, other], {}
-        )
-
-    def __radd__(self, other):
-        return self.__torch_function__(
-            self._tensor.__class__.__radd__, None, [self._tensor, other], {}
-        )
-
-    def __iadd__(self, other):
-        return self.__torch_function__(
-            self._tensor.__class__.__iadd__, None, [self._tensor, other], {}
-        )
-
-    def __rsub__(self, other):
-        return self.__torch_function__(
-            self._tensor.__class__.__rsub__, None, [self._tensor, other], {}
-        )
-
-    def __isub__(self, other):
-        return self.__torch_function__(
-            self._tensor.__class__.__isub__, None, [self._tensor, other], {}
-        )
-
-    def __sub__(self, other):
-        return self.__torch_function__(
-            self._tensor.__class__.__sub__, None, [self._tensor, other], {}
-        )
-
-    def __rsub__(self, other):
-        return self.__torch_function__(
-            self._tensor.__class__.__rsub__, None, [self._tensor, other], {}
-        )
-
-    def __isub__(self, other):
-        return self.__torch_function__(
-            self._tensor.__class__.__isub__, None, [self._tensor, other], {}
-        )
-
-    def __mul__(self, other):
-        return self.__torch_function__(
-            self._tensor.__class__.__mul__, None, [self._tensor, other], {}
-        )
-
-    def __rmul__(self, other):
-        return self.__torch_function__(
-            self._tensor.__class__.__rmul__, None, [self._tensor, other], {}
-        )
-
-    def __imul__(self, other):
-        return self.__torch_function__(
-            self._tensor.__class__.__imul__, None, [self._tensor, other], {}
-        )
-
-    def __truediv__(self, other):
-        return self.__torch_function__(
-            self._tensor.__class__.__truediv__, None, [self._tensor, other], {}
-        )
-
-    def __rtruediv__(self, other):
-        return self.__torch_function__(
-            self._tensor.__class__.__rtruediv__, None, [self._tensor, other], {}
-        )
-
-    def __itruediv__(self, other):
-        return self.__torch_function__(
-            self._tensor.__class__.__itruediv__, None, [self._tensor, other], {}
-        )
-
-    def __pow__(self, other):
-        return self.__torch_function__(
-            self._tensor.__class__.__pow__, None, [self._tensor, other], {}
-        )
-
-    def __rpow__(self, other):
-        return self.__torch_function__(
-            self._tensor.__class__.__rpow__, None, [self._tensor, other], {}
-        )
-
-    def __ipow__(self, other):
-        return self.__torch_function__(
-            self._tensor.__class__.__ipow__, None, [self._tensor, other], {}
-        )
-
-    def __mod__(self, other):
-        return self.__torch_function__(
-            self._tensor.__class__.__mod__, None, [self._tensor, other], {}
-        )
-
-    def __rmod__(self, other):
-        return self.__torch_function__(
-            self._tensor.__class__.__rmod__, None, [self._tensor, other], {}
-        )
-
-    def __imod__(self, other):
-        return self.__torch_function__(
-            self._tensor.__class__.__imod__, None, [self._tensor, other], {}
-        )
-
-    def __floordiv__(self, other):
-        return self.__torch_function__(
-            self._tensor.__class__.__floordiv__, None, [self._tensor, other], {}
-        )
-
-    def __rfloordiv__(self, other):
-        return self.__torch_function__(
-            self._tensor.__class__.__rfloordiv__, None, [self._tensor, other], {}
-        )
-
-    def __ifloordiv__(self, other):
-        return self.__torch_function__(
-            self._tensor.__class__.__ifloordiv__, None, [self._tensor, other], {}
-        )
-
-    def __and__(self, other):
-        return self.__torch_function__(
-            self._tensor.__class__.__and__, None, [self._tensor, other], {}
-        )
-
-    def __rand__(self, other):
-        return self.__torch_function__(
-            self._tensor.__class__.__rand__, None, [self._tensor, other], {}
-        )
-
-    def __iand__(self, other):
-        return self.__torch_function__(
-            self._tensor.__class__.__iand__, None, [self._tensor, other], {}
-        )
-
-    def __or__(self, other):
-        return self.__torch_function__(
-            self._tensor.__class__.__or__, None, [self._tensor, other], {}
-        )
-
-    def __ror__(self, other):
-        return self.__torch_function__(
-            self._tensor.__class__.__ror__, None, [self._tensor, other], {}
-        )
-
-    def __ior__(self, other):
-        return self.__torch_function__(
-            self._tensor.__class__.__ior__, None, [self._tensor, other], {}
-        )
 
 
 class ParameterLike(TensorLike):
@@ -271,6 +143,11 @@ class TorchWrapper:
         return TensorLike(ret)
 
     @classmethod
+    def empty_like(cls, *args, **kwargs):
+        ret = origin_empty_like(*args, **kwargs)
+        return TensorLike(ret)
+
+    @classmethod
     def randn(cls, *args, **kwargs):
         ret = origin_randn(*args, **kwargs)
         return TensorLike(ret)
@@ -281,8 +158,18 @@ class TorchWrapper:
         return TensorLike(ret)
 
     @classmethod
+    def rand_like(cls, *args, **kwargs):
+        ret = origin_rand_like(*args, **kwargs)
+        return TensorLike(ret)
+
+    @classmethod
     def zeros(cls, *args, **kwargs):
         ret = origin_zeros(*args, **kwargs)
+        return TensorLike(ret)
+
+    @classmethod
+    def zeros_like(cls, *args, **kwargs):
+        ret = origin_zeros_like(*args, **kwargs)
         return TensorLike(ret)
 
     @classmethod
@@ -296,18 +183,33 @@ class TorchWrapper:
         return TensorLike(ret)
 
     @classmethod
+    def ones_like(cls, *args, **kwargs):
+        ret = origin_ones_like(*args, **kwargs)
+        return TensorLike(ret)
+
+    @classmethod
+    def randint(cls, *args, **kwargs):
+        ret = origin_randint(*args, **kwargs)
+        return TensorLike(ret)
+
+    @classmethod
+    def randperm(cls, *args, **kwargs):
+        ret = origin_randperm(*args, **kwargs)
+        return TensorLike(ret)
+
+    @classmethod
     def all_gather(cls, *args, **kwargs):
         unwrap_args = unwrap_tensor(args)
         unwrap_kwargs = unwrap_tensor(kwargs)
-        origin_all_gather(*unwrap_args, **unwrap_kwargs)
-        append_to_graph(origin_all_gather, args, kwargs, None)
+        CallDispatch(origin_all_gather)(*unwrap_args, **unwrap_kwargs)
+        # append_to_graph(origin_all_gather, args, kwargs, None)
 
     @classmethod
     def all_reduce(cls, *args, **kwargs):
         unwrap_args = unwrap_tensor(args)
         unwrap_kwargs = unwrap_tensor(kwargs)
-        origin_all_reduce(*unwrap_args, **unwrap_kwargs)
-        append_to_graph(origin_all_reduce, args, kwargs, None)
+        CallDispatch(origin_all_reduce)(*unwrap_args, **unwrap_kwargs)
+        # append_to_graph(origin_all_reduce, args, kwargs, None)
 
 
 class PostInitHook(type):
@@ -372,9 +274,9 @@ class ModuleWrapper(nn.Module):
         else:
             param_tensor = param
 
-        append_to_graph(
-            super().register_parameter, [], {"name": name, "param": param}, None
-        )
+        # append_to_graph(
+        #     super().register_parameter, [], {"name": name, "param": param}, None
+        # )
         super().register_parameter(name, param_tensor)
 
     def __setattr__(self, name: str, value: Union[Tensor, "Module"]) -> None:
@@ -485,6 +387,12 @@ origin_parameter = nn.Parameter
 origin_parameter_new__ = nn.Parameter.__new__
 origin_empty = torch.empty
 origin_randn = torch.randn
+origin_randint = torch.randint
+origin_randperm = torch.randperm
+origin_empty_like = torch.empty_like
+origin_rand_like = torch.rand_like
+origin_ones_like = torch.ones_like
+origin_zeros_like = torch.zeros_like
 origin_rand = torch.rand
 origin_zeros = torch.zeros
 origin_ones = torch.ones
@@ -500,8 +408,14 @@ def inject():
     """注入 torch 包，拦截所有调用"""
     # 创建包装器
     torch.randn = TorchWrapper.randn
+    torch.randint = TorchWrapper.randint
+    torch.randperm = TorchWrapper.randperm
     torch.rand = TorchWrapper.rand
+    torch.rand_like = TorchWrapper.rand_like
     torch.empty = TorchWrapper.empty
+    torch.empty_like = TorchWrapper.empty_like
+    torch.ones_like = TorchWrapper.ones_like
+    torch.zeros_like = TorchWrapper.zeros_like
     torch.zeros = TorchWrapper.zeros
     torch.ones = TorchWrapper.ones
     torch.tensor = TorchWrapper.tensor
@@ -516,8 +430,14 @@ def inject():
 def restore():
     """恢复原始的 torch 包"""
     torch.randn = origin_randn
+    torch.randint = origin_randint
+    torch.randperm = origin_randperm
     torch.rand = origin_rand
+    torch.rand_like = origin_rand_like
     torch.empty = origin_empty
+    torch.empty_like = origin_empty_like
+    torch.ones_like = origin_ones_like
+    torch.zeros_like = origin_zeros_like
     torch.zeros = origin_zeros
     torch.ones = origin_ones
     torch.tensor = origin_tensor

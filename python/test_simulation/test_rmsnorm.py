@@ -1,13 +1,13 @@
 import torch
-from torch_tpu.utils.reflection.recorder import print_graph_summary
+from torch_tpu.utils.reflection.graph import print_graph_summary
 
-from torch_tpu.utils.reflection.recorder import print_graph_summary
 import os
 import torch.nn as nn
 import torch.nn.functional as F
 import numpy as np
 import pytest
 import torch_tpu
+import ctypes as ct
 
 
 def rmsnorm_tpu(x, scale=None, bias=None, axis=-1, eps=1e-8):
@@ -16,8 +16,8 @@ def rmsnorm_tpu(x, scale=None, bias=None, axis=-1, eps=1e-8):
     output = torch.empty(x.shape, dtype=x.dtype, device=x.device)
     # 第二步：调用自定义的 TPU RMSNorm 前向传播算子
     # os.environ['FORBID_CMD_EXECUTE'] = "1"
-    # torch.ops.my_ops.set_env("FILE_DUMP_CMD", "rmsnorm/ins")
-    # os.makedirs("rmsnorm", exist_ok=True)
+    torch.ops.my_ops.set_env("FILE_DUMP_CMD", "rmsnorm/ins")
+    os.makedirs("rmsnorm", exist_ok=True)
 
     torch.ops.my_ops.rmsnorm_forward(x, scale, bias, output, axis, eps)
     return output
@@ -29,8 +29,8 @@ def rmsnorm_tpu2(x, scale=None, bias=None, axis=-1, eps=1e-8):
     output = torch.empty(x.shape, dtype=x.dtype, device=x.device)
     # 第二步：调用自定义的 TPU RMSNorm 前向传播算子
     # os.environ['FORBID_CMD_EXECUTE'] = "1"
-    # torch.ops.my_ops.set_env("FILE_DUMP_CMD", "rmsnorm2/ins")
-    # os.makedirs("rmsnorm2", exist_ok=True)
+    torch.ops.my_ops.set_env("FILE_DUMP_CMD", "rmsnorm2/ins")
+    os.makedirs("rmsnorm2", exist_ok=True)
     torch.ops.my_ops.rmsnorm_forward(x, scale, bias, output, axis, eps)
     return output
 
@@ -38,9 +38,7 @@ def rmsnorm_tpu2(x, scale=None, bias=None, axis=-1, eps=1e-8):
 @pytest.mark.parametrize(
     "batch_size, hidden_size, axis, eps, with_scale, with_bias",
     [
-        (64, 512, 3, 1e-5, True, True),
-        # (32, 1536, 3, 1e-5, True, True),
-        # (128, 1536, 3, 1e-5, False, True),
+        (256, 7168, 3, 1e-5, True, True),
     ],
 )
 def test_deepseek_rmsnorm(
@@ -104,7 +102,7 @@ def test_deepseek_rmsnorm(
     x_tpu[0] = 1
 
     out_tpu = out_tpu.float().cpu().detach()
-    out_tpu2 = out_tpu2.float().cpu().detach()
+    # out_tpu2 = out_tpu2.float().cpu().detach()
 
     print_graph_summary()
 

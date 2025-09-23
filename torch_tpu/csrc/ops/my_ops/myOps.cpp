@@ -73,5 +73,7 @@ namespace at
 		m.def("fused_moe_fused_experts", fused_moe_fused_experts);
 		m.def("nms", nms);
 		m.def("noaux_tc_topk", noaux_tc_topk);
+		m.def("set_env", set_env);
+		m.def("clear_env", clear_env);
 	}
 }

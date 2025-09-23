@@ -1,3 +1,6 @@
+#ifndef OPS_HPP
+#define OPS_HPP
+
 #include <torch/library.h>
 #include <torch/torch.h>
 #include <ATen/core/TensorBase.h>
@@ -673,5 +676,13 @@ Tensor paged_attention_v2(
 		int64_t n_groups,
 		int64_t topk_groups,
 		int64_t top_k);
-  /// @endcond
+
+	void set_env(
+		const std::string &env_name,
+		const std::string &env_value);
+
+	void clear_env(
+		const std::string &env_name);
 }
+
+#endif // OPS_HPP
