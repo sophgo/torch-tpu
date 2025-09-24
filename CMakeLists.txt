@@ -35,5 +35,5 @@ set(CMAKE_CXX_FLAGS "${CMAKE_C_FLAGS} ${SAFETY_FLAGS} -Wno-invalid-offsetof")
 
 set(PROJECT_ROOT ${PROJECT_SOURCE_DIR})
 
-add_subdirectory(third_party/gloo_sophon)
+# add_subdirectory(third_party/gloo_sophon)
 add_subdirectory(torch_tpu)

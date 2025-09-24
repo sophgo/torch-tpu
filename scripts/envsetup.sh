@@ -10,28 +10,38 @@ function update_pytorch_to_2_1(){
      pip install torch==2.1.0 --index-url https://download.pytorch.org/whl/cpu --force-reinstall
 }
 
+function update_pytorch_to_2_8(){
+     echo "[INFO] updating pytorch to 2.8 ..."
+     pip install torch==2.8.0 --index-url https://download.pytorch.org/whl/cpu --force-reinstall
+}
+
 function check_pytorch_version(){
-     target_version="2.1.0"
-     if ! python -c "import torch" &> /dev/null; then
-          echo "[ERROR]错误：未找到 Torch，请确保已安装 Torch $target_version。"
-          update_pytorch_to_2_1;
+     if ! python3 -c "import torch" &> /dev/null; then
+          echo "[ERROR]错误：未找到 Torch，请确保已安装 Torch。"
+          update_pytorch_to_2_8;
      fi
-     torch_version=$(python -c "import torch; print(torch.__version__)")
+     torch_version=$(python3 -c "import torch; print(torch.__version__)")
      torch_major_version=$(echo "$torch_version" | cut -d. -f1-3)
 
-     if [ "$torch_version" == "$torch_major_version" ]; then
-          echo "[INFO]当前Torch版本是 $target_version"
+     if [ "$torch_version" == "2.1.0" ]; then
+          echo "[INFO]当前Torch版本是 $torch_version"
+     elif [ "$torch_version" == "2.8.0" ]; then
+          echo "[INFO]当前Torch版本是 $torch_version"
      else
-          echo "[ERROR]错误：当前Torch版本是 $torch_version，而不是 $target_version"
-          update_pytorch_to_2_1;
+          echo "[ERROR]错误：当前Torch版本是 $torch_version，请安装Torch2.1.0或Torch2.8.0"
      fi
+}
 
-     torch_with_cxx11_abi=$(python -c "import torch; print(torch.compiled_with_cxx11_abi())")
+function set_pytorch_env(){
+     torch_with_cxx11_abi=$(python3 -c "import torch; print(torch.compiled_with_cxx11_abi())")
      export TORCH_CXX11_ABI=${torch_with_cxx11_abi}
+     torch_with_pybind11_abi=$(python3 -c "import torch; print(getattr(torch._C, '_PYBIND11_BUILD_ABI', None))")
+     export TORCH_PYBIND11_ABI=${torch_with_pybind11_abi}
+     echo "TORCH_PYBIND11_ABI版本:${TORCH_PYBIND11_ABI} , TORCH_CXX11_ABI版本: ${TORCH_CXX11_ABI}"
 }
 
 function get_pytorch_install_dir(){
-     pytorch_path=$(python -c \
+     pytorch_path=$(python3 -c \
                     "import torch; \
                      import os; \
                      print(os.path.dirname(os.path.realpath(torch.__file__))) \
@@ -98,7 +108,8 @@ fi
 source ${TPUTRAIN_TOP}/scripts/prepare_toolchains.sh
 
 ############### PYTORCH ################
-check_pytorch_version;
+# check_pytorch_version;
+set_pytorch_env;
 get_pytorch_install_dir;
 
 echo "[INFO]export TPUTRAIN_TOP=${TPUTRAIN_TOP}"

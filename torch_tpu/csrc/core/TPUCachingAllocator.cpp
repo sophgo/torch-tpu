@@ -1448,7 +1448,7 @@ void CachingTPUAllocator::emptyCache(MempoolId_t mempool_id) {
   }
 }
 
-c10::DataPtr CachingTPUAllocator::allocate(size_t size) const {
+at::DataPtr CachingTPUAllocator::allocate(size_t size) {
   auto device = c10_tpu::current_device();
   void* r = nullptr;
   if (size != 0) {

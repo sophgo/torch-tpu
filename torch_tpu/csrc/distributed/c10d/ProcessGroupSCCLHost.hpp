@@ -7,7 +7,6 @@
 #include <unordered_map>
 #include <vector>
 
-#include <gloo/rendezvous/store.h>
 #include <gloo/algorithm.h>
 #include <gloo/common/error.h>
 #include <gloo/context.h>
@@ -16,10 +15,11 @@
 
 #include <c10/util/hash.h>
 
-#include <torch/csrc/distributed/c10d/ProcessGroup.hpp>
+#include <torch/csrc/distributed/c10d/Backend.hpp>
 #include <torch/csrc/distributed/c10d/Store.hpp>
 #include <torch/csrc/distributed/c10d/Types.hpp>
 #include <torch/csrc/distributed/c10d/Utils.hpp>
+#include <torch/csrc/distributed/c10d/sequence_num.hpp>
 namespace c10d {
 
 constexpr const char* SCCL_HOST_BACKEND_NAME = "scclHost";
@@ -47,7 +47,7 @@ constexpr const char* SCCL_HOST_BACKEND_NAME = "scclHost";
 // number can be automatically tuned, but only if we let a single
 // process take charge, and have it broadcast the limits.
 //
-class TORCH_API ProcessGroupSCCLHost : public ProcessGroup {
+class TORCH_API ProcessGroupSCCLHost : public Backend {
  public:
   // AsyncWork is the Gloo specific superclass for asynchronous work items.
   // We can split asynchronous work into 3 phases:
@@ -197,19 +197,20 @@ class TORCH_API ProcessGroupSCCLHost : public ProcessGroup {
     int srcRank_;
   };
 
-  struct TORCH_API Options : public ProcessGroup::Options {
+  struct TORCH_API Options : public Backend::Options {
     explicit Options(
-        std::chrono::milliseconds timeout = kProcessGroupDefaultTimeout);
+        std::chrono::milliseconds timeout = kBackendDefaultTimeout);
 
     // return intrusive_ptr of the object
     static c10::intrusive_ptr<Options> create(
-        std::chrono::milliseconds timeout = kProcessGroupDefaultTimeout) {
+        std::chrono::milliseconds timeout = kBackendDefaultTimeout) {
       return c10::make_intrusive<Options>(timeout);
     }
 
     std::vector<std::shared_ptr<::gloo::transport::Device>> devices;
     int threads;
     std::vector<int> chip_map;
+    std::chrono::milliseconds timeout;
   };
 
   const std::string getBackendName() const override {
@@ -374,13 +375,15 @@ class TORCH_API ProcessGroupSCCLHost : public ProcessGroup {
   std::mutex workMutex_;
   std::condition_variable workProduceCV_;
   std::condition_variable workConsumeCV_;
-
+  
 public:
-  static c10::intrusive_ptr<ProcessGroup> createProcessGroupSCCLHost(
+  static c10::intrusive_ptr<Backend> createProcessGroupSCCLHost(
     const c10::intrusive_ptr<::c10d::Store>& store,
     int rank,
     int size,
     const std::chrono::duration<float>& timeout);
+
+  c10::optional<c10d::SequenceNum> sequenceNum_ = c10::nullopt;
 
 };
 

@@ -9,7 +9,7 @@ function new_build()
 function develop_torch_tpu(){
   uninstall_torch_tpu_deploy
   pushd ${TPUTRAIN_TOP}
-  python setup.py develop --user
+  python3 setup.py develop --user
   if [ $? -ne 0 ]; then popd; return -1; fi
   popd
 }
@@ -18,7 +18,7 @@ function develop_torch_tpu(){
 function bdist_wheel()
 {
   pushd ${TPUTRAIN_TOP}
-  python setup.py bdist_wheel
+  python3 setup.py bdist_wheel
 
   if [ $# -ne 1 ]; then
     echo -e "[message] wheel not installed, use reinstall_torch_tpu to install wheel package"
@@ -27,7 +27,7 @@ function bdist_wheel()
 }
 
 function uninstall_torch_tpu_dev(){
-  python setup.py develop --uninstall
+  python3 setup.py develop --uninstall
 }
 
 function uninstall_torch_tpu_deploy(){
@@ -63,7 +63,7 @@ function soc_build()
   mkdir -p ${TPUTRAIN_TOP}/toolchains_dir
   export CROSS_TOOLCHAINS=${TPUTRAIN_TOP}/toolchains_dir/
   export SOC_CROSS_MODE=ON
-  python setup.py build bdist_wheel --plat-name=aarch64
+  python3 setup.py build bdist_wheel --plat-name=aarch64
   unset SOC_CROSS_MODE
   popd
 }

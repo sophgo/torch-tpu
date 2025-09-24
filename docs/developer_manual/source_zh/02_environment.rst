@@ -40,7 +40,7 @@ TORCH-TPU可以在Docker中开发, 配置好Docker就可以编译和运行了。
 
 .. code-block:: shell
 
-   $ docker pull sophgo/torch_tpu:v0.1-py311
+   $ docker pull sophgo/torch_tpu:v0.1-py312
 
 
 如果是首次使用Docker, 可执行下述命令进行安装和配置(仅首次执行):
@@ -70,7 +70,7 @@ TORCH-TPU可以在Docker中开发, 配置好Docker就可以编译和运行了。
       -v /dev=/dev \
       -v /opt:/opt   \
       -v $HOME:/workspace \
-      --name my sophgo/torch_tpu:v0.1-py311 bash
+      --name my sophgo/torch_tpu:v0.1-py312 bash
 
   对于SG2260，按以下命令创建容器:
   $ docker run --cap-add SYS_ADMIN -itd --restart always --privileged=true \
@@ -78,7 +78,7 @@ TORCH-TPU可以在Docker中开发, 配置好Docker就可以编译和运行了。
       -v /dev=/dev \
       -v /opt:/opt   \
       -v $HOME:/workspace \
-      --name my sophgo/torch_tpu:v0.1-py311 bash
+      --name my sophgo/torch_tpu:v0.1-py312 bash
  
   # myname只是举个名字的例子, 请指定成自己想要的容器的名字
   # -e LD_LIBRARY_PATH=... -e PATH=... 是引入libsophon的环境变量
