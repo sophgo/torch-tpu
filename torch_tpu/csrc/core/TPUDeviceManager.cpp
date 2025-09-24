@@ -120,6 +120,8 @@ public:
       mutexes_ = std::vector<std::mutex>(DeviceCount);;
       free_tbds_.resize(DeviceCount);
       mem_info_.resize(DeviceCount);
+      alloc_current_ = std::vector<size_t> ( DeviceCount, 0 );
+      alloc_peak_ = std::vector<size_t> ( DeviceCount, 0 );
 
       devices_init_ = std::vector<std::atomic<bool>> ( DeviceCount );
       device_count_ = DeviceCount;
@@ -276,7 +278,12 @@ public:
 
     auto reused = processFreeTBDs(Size, Index);
     if (reused)
+    {
+      std::lock_guard<std::mutex> lock(getMutex(Index));
+      alloc_current_[Index] += Size;
+      alloc_peak_[Index] = std::max(alloc_peak_[Index], alloc_current_[Index]);
       return (void*)UnifiedAddr((unsigned long long) reused, Index);
+    }
 
     if ( Size == 0 )
     {
@@ -304,6 +311,8 @@ public:
     auto ptr = ( void * ) UnifiedAddr((unsigned long long) dev_ptr, Index);
     std::lock_guard<std::mutex> lock(getMutex(Index));
     getMemInfo(Index)[dev_ptr] = info;
+    alloc_current_[Index] += Size;
+    alloc_peak_[Index] = std::max(alloc_peak_[Index], alloc_current_[Index]);
 
     // std::cout << "Alloc " << ptr << " of size " << Size << std::endl;
     return ptr;
@@ -323,6 +332,8 @@ public:
     auto &memInfo = getMemInfo(Index);
     if (memInfo.find(Ptr) == memInfo.end())
       return;
+
+    alloc_current_[Index] -= memInfo[Ptr].size;
 
     auto &freeTBDs = getFreeTBDs(Index);
     if (freeTBDs.find(Ptr) != freeTBDs.end())
@@ -417,6 +428,20 @@ public:
     TORCH_CHECK (Status == TPUDNN_STATUS_SUCCESS, "TPU device #", Index, "D2D failed! Error Code : #", Status);
   }
 
+  size_t getCurrentAllocSize(int Index)
+  {
+    return alloc_current_[Index];
+  }
+  size_t getPeakAllocSize(int Index)
+  {
+    return alloc_peak_[Index];
+  }
+  void resetPeakAllocSize(int Index)
+  {
+    std::lock_guard<std::mutex> lock(getMutex(Index));
+    alloc_peak_[Index] = alloc_current_[Index];
+  }
+
 private:
   std::mutex& getMutex(int i) { return mutexes_[i]; }
   std::unordered_map<void *, MemInfo>& getMemInfo(int i) { return mem_info_[i]; }
@@ -425,6 +450,9 @@ private:
   std::vector<std::mutex> mutexes_;
   std::vector<std::unordered_map<void *, MemToFree>> free_tbds_;
   std::vector<std::unordered_map<void *, MemInfo>> mem_info_;
+
+  std::vector<size_t> alloc_current_;
+  std::vector<size_t> alloc_peak_;
 
   int device_count_;
   size_t free_delay_, forced_ttl_;
@@ -601,6 +629,30 @@ bool can_device_access_peer(c10::DeviceIndex device_id, c10::DeviceIndex peer_de
   std::vector<std::vector<int>> topology(dev_cnt, std::vector<int>(dev_cnt, -1));
   TPUGetTopology(&topology);
   return topology[device_id][peer_device_id] != -1;
+}
+
+void TPUGetMemStats(std::unordered_map<std::string, int64_t> *stats, int index) {
+  auto alloc_current = TPUDeviceManager::GetInstance().getCurrentAllocSize(index);
+  auto alloc_peak = TPUDeviceManager::GetInstance().getPeakAllocSize(index);
+  (*stats)["allocated_bytes.all.peak"] = alloc_peak;
+  (*stats)["allocated_bytes.all.current"] = alloc_current;
+}
+
+void TPUGetMemInfo(size_t *free, size_t *total) {
+  
+  size_t totalMemSize = 0;
+  size_t freeMemSize = 0;
+  auto status = tpuGetAllMemory(&totalMemSize);
+  TORCH_CHECK (status == tpuSuccess, " tpuGetAllMemory failed! Error Code : #", status);
+  status = tpuGetFreeMemory(&freeMemSize);
+  TORCH_CHECK (status == tpuSuccess, " tpuGetFreeMemory failed! Error Code : #", status);
+  *total = totalMemSize;
+  *free = freeMemSize;
+}
+
+void TPUResetPeakMemoryStats(int index)
+{
+  TPUDeviceManager::GetInstance().resetPeakAllocSize(index);
 }
 
 } // namespace tpu

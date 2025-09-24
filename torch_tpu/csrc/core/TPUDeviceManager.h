@@ -79,6 +79,13 @@ void TPUGetTopology(std::vector<std::vector<int>> *topo);
 void TPUGetC2CRing(int world_size, int *chipMap);
 int  TPUCheckChipMap(int world_size, int *chipMap);
 
+/**
+ * Memory stats related.
+ */
+void TPUGetMemStats(std::unordered_map<std::string, int64_t> *stats, int index);
+void TPUGetMemInfo(size_t* free, size_t* total);
+void TPUResetPeakMemoryStats(int index);
+
 bool can_device_access_peer(c10::DeviceIndex device_id, c10::DeviceIndex peer_device_id);
 
 } // namespace tpu

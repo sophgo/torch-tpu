@@ -28,7 +28,8 @@ __all__ = [
     "memory_cached",
     "max_memory_cached",
     "memory_snapshot",
-    "memory_summary"
+    "memory_summary",
+    "mem_get_info",
 ]
 
 
@@ -551,19 +552,17 @@ def memory_summary(device=None, abbreviated=False):
 #     """
 #     return "not impl now"
 
-# def mem_get_info(device: Union[Device, int] = None) -> Tuple[int, int]:
-#     r"""Return the global free and total GPU memory for a given device using cudaMemGetInfo.
+def mem_get_info(device: Union[Device, int] = None) -> Tuple[int, int]:
+    r"""Return the global free and total GPU memory for a given device using cudaMemGetInfo.
 
-#     Args:
-#         device (torch.device or int, optional): selected device. Returns
-#             statistic for the current device, given by :func:`~torch.cuda.current_device`,
-#             if :attr:`device` is ``None`` (default).
+    Args:
+        device (torch.device or int, optional): selected device. Returns
+            statistic for the current device, given by :func:`~torch.cuda.current_device`,
+            if :attr:`device` is ``None`` (default).
 
-#     .. note::
-#         See :ref:`cuda-memory-management` for more
-#         details about GPU memory management.
-#     """
-#     if device is None:
-#         device = torch.cuda.current_device()
-#     device = _get_device_index(device)
-#     return torch.cuda.cudart().cudaMemGetInfo(device)
+    .. note::
+        See :ref:`cuda-memory-management` for more
+        details about GPU memory management.
+    """
+    device = _get_device_index(device, optional=True)
+    return torch_tpu._C._tpu_memoryInfo(device)

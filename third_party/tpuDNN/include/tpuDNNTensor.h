@@ -828,6 +828,12 @@ tpudnnStatus_t tpudnnConv2dBackwardAsync (
     tpudnnTensor_t grad_weight,
     tpudnnTensor_t grad_bias);
 
+tpudnnStatus_t tpudnnMaskedSelectAsync(
+    tpudnnHandle_t handle,
+    tpudnnTensor_t input,
+    tpudnnTensor_t mask,
+    tpudnnTensor_t output);
+
 tpudnnStatus_t tpudnnConv3dAsync (
     tpudnnHandle_t handle,
     tpudnnTensor_t input,

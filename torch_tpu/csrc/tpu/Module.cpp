@@ -458,6 +458,45 @@ PyObject* THPTModule_tensor_construct_from_storage(PyObject* self, PyObject* arg
   END_HANDLE_TH_ERRORS
 }
 
+PyObject* THPTModule_memoryStats(PyObject* self, PyObject* args) {
+  HANDLE_TH_ERRORS
+  int device = THPUtils_unpackLong(args);
+  std::unordered_map<std::string, int64_t> stats;
+  tpu::TPUGetMemStats(&stats, device);
+  auto dict = PyDict_New();
+  for (const auto& pair : stats) {
+    PyObject* key = PyUnicode_FromString(pair.first.c_str());
+    PyObject* value = PyLong_FromLong(pair.second);
+    PyDict_SetItem(dict, key, value);
+    Py_DECREF(key);
+    Py_DECREF(value);
+  }
+  return dict;
+  END_HANDLE_TH_ERRORS
+}
+
+PyObject* THPTModule_resetPeakMemoryStats(PyObject* self, PyObject* args) {
+  HANDLE_TH_ERRORS
+  int device = THPUtils_unpackLong(args);
+  tpu::TPUResetPeakMemoryStats(device);
+  END_HANDLE_TH_ERRORS
+  Py_RETURN_NONE;
+}
+
+PyObject* THPTModule_memoryInfo(PyObject* self, PyObject* args) {
+  HANDLE_TH_ERRORS
+  int device = THPUtils_unpackLong(args);
+  THPUtils_assert(device == tpu::TPUGetDeviceIndex(), "Not support query other device memory info");
+  size_t free_mem = 0;
+  size_t total_mem = 0;
+  tpu::TPUGetMemInfo(&free_mem, &total_mem);
+  PyObject* output_tuple = PyTuple_New(2);
+  PyTuple_SetItem(output_tuple, 0, PyLong_FromLong(free_mem));
+  PyTuple_SetItem(output_tuple, 1, PyLong_FromLong(total_mem));
+  return output_tuple;
+  END_HANDLE_TH_ERRORS
+}
+
 static struct PyMethodDef THPTModule_methods[] = {
     {"_tpu_init", (PyCFunction)THPTModule_initExtension, METH_NOARGS, nullptr},
     {"_tpu_set_run_yet_variable_to_false", (PyCFunction)THPTModule_set_run_yet_variable_to_false_wrap, METH_NOARGS, nullptr},
@@ -477,6 +516,11 @@ static struct PyMethodDef THPTModule_methods[] = {
     {"_tpu_setStream", (PyCFunction)THPTModule_setStream_wrap,  METH_VARARGS | METH_KEYWORDS, nullptr},
     // allocator related
     {"_tpu_emptyCache", THPTModule_emptyCache, METH_NOARGS, nullptr},
+
+    // memory stats related
+    {"_tpu_memoryStats", THPTModule_memoryStats, METH_O, nullptr},
+    {"_tpu_resetPeakMemoryStats", THPTModule_resetPeakMemoryStats, METH_O, nullptr},
+    {"_tpu_memoryInfo", THPTModule_memoryInfo, METH_O, nullptr},
 
     {"_tensor_construct_from_storage", (PyCFunction)THPTModule_tensor_construct_from_storage, METH_VARARGS, nullptr},
     {nullptr}
