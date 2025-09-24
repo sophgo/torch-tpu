@@ -98,7 +98,7 @@ def check_a16_matmul():
         out_cpu = net_cpu(q_cpu[0][0], k_deq, bias_cpu)
     else:
         net_cpu = NativeMatmul()
-        k_deq = (k_cpu_qt - 3) * 0.1
+        k_deq = ((k_cpu_qt - 3) * 0.1).reshape(-1, d)
         out_cpu = net_cpu(q_cpu[0][0], k_deq, bias_cpu)
 
     weight_bits = 8
