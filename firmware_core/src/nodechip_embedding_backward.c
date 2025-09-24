@@ -119,7 +119,7 @@ bool is_index_int64 ) {
   local_addr_t to_local_addr = from_local_addr + DIV_UP ( window_size, NPU_NUM ) * tpu_aligned_feature_size ( 1, o_shape.w, grad_dtype );
   local_addr_t res_local_addr = to_local_addr +  DIV_UP ( window_size, NPU_NUM ) * tpu_aligned_feature_size ( 1, o_shape.w, grad_dtype );
   TPUKERNEL_ASSERT ( ( 3 * DIV_UP ( window_size, NPU_NUM ) * tpu_aligned_feature_size ( 1, o_shape.w, grad_dtype ) )
-                     < LOCAL_MEM_SIZE );
+                     < LOCAL_MEM_SIZE);
   int window_cur = 0;
   int *in_idx_window =  ( int* ) malloc ( window_size * sizeof ( int ) );
   int *out_idx_window = ( int* ) malloc ( window_size * sizeof ( int ) );

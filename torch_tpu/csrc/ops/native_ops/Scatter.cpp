@@ -36,6 +36,121 @@
 #define REPLICATE (3)
 #define CIRCULAR (4)
 
+#ifdef USING_PPL
+#include "Scatter.h"
+#define AT_DISPATCH_FLOAT_INT_TYPES(scalar_type, name, func)  \
+AT_DISPATCH_SWITCH(                   \
+scalar_type, name,                    \
+AT_DISPATCH_CASE(at::kFloat, func)    \
+AT_DISPATCH_CASE(at::kHalf, func)     \
+AT_DISPATCH_CASE(at::kBFloat16, func) \
+AT_DISPATCH_CASE(at::kInt, func)      \
+AT_DISPATCH_CASE(at::kShort, func)    \
+AT_DISPATCH_CASE(at::kChar, func)     \
+AT_DISPATCH_CASE(at::kByte, func))
+
+template <typename scalar_t>
+static void slice_scatter_impl(
+  uint64_t param_addr,
+  uint64_t input_addr,
+  uint64_t index_addr,
+  uint64_t output_addr,
+  uint32_t outer_size,
+  int axis,
+  uint32_t inner_size,
+  int param_h
+  )
+{
+  auto kernel = [&](tpuStream_t stream, tpuKernelModule_t ppl_module) -> int {
+    if constexpr (std::is_same_v<scalar_t, float>) {
+      return scatter_fp32(
+        stream, ppl_module, output_addr, param_addr, input_addr, index_addr,
+        outer_size, axis, inner_size, param_h
+        );
+    } else if constexpr (std::is_same_v<scalar_t, at::Half>) {
+      return scatter_fp16(
+        stream, ppl_module, output_addr, param_addr, input_addr, index_addr,
+        outer_size, axis, inner_size, param_h
+        );
+    } else if constexpr (std::is_same_v<scalar_t, at::BFloat16>) {
+      return scatter_bf16(
+        stream, ppl_module, output_addr, param_addr, input_addr, index_addr,
+        outer_size, axis, inner_size, param_h
+        );
+    } else if constexpr (std::is_same_v<scalar_t, int32_t>) {
+      return scatter_int32(
+        stream, ppl_module, output_addr, param_addr, input_addr, index_addr,
+        outer_size, axis, inner_size, param_h
+        );
+    }
+    return -1;
+  };
+
+	tpuStream_t stream = c10_tpu::getCurrentTPUStream().stream();
+	tpuKernelModule_t ppl_module = getPplModule();
+  int ret = kernel(stream, ppl_module);
+  if (ret == 0) {
+    return;
+  }
+	TORCH_CHECK(false, "Scatter failed!");
+}
+
+template <typename scalar_t>
+static void scatter_add_impl(
+  uint64_t output_addr,
+  uint64_t src_addr,
+  uint64_t index_addr,
+  uint32_t outer_size,
+  uint32_t inner_size,
+  int param_h
+  )
+{
+  auto kernel = [&](tpuStream_t stream, tpuKernelModule_t ppl_module) -> int {
+    if constexpr (std::is_same_v<scalar_t, float>) {
+      return scatter_add_fp32(
+        stream, ppl_module, output_addr, src_addr, index_addr,
+        outer_size, inner_size, param_h
+        );
+    }  else if constexpr (std::is_same_v<scalar_t, at::Half>) {
+      return scatter_add_fp16(
+        stream, ppl_module, output_addr, src_addr, index_addr,
+        outer_size, inner_size, param_h
+        );
+    } else if constexpr (std::is_same_v<scalar_t, at::BFloat16>) {
+      return scatter_add_bf16(
+        stream, ppl_module, output_addr, src_addr, index_addr,
+        outer_size, inner_size, param_h
+        );
+    } else if constexpr (std::is_same_v<scalar_t, int32_t>) {
+      return scatter_add_int32(
+        stream, ppl_module, output_addr, src_addr, index_addr,
+        outer_size, inner_size, param_h
+        );
+    } else if constexpr (std::is_same_v<scalar_t, int16_t>) {
+      return scatter_add_int16(
+        stream, ppl_module, output_addr, src_addr, index_addr,
+        outer_size, inner_size, param_h
+        );
+    } else if constexpr (std::is_same_v<scalar_t, int8_t>) {
+      return scatter_add_int8(
+        stream, ppl_module, output_addr, src_addr, index_addr,
+        outer_size, inner_size, param_h
+        );
+    }
+    return -1;
+  };
+
+	tpuStream_t stream = c10_tpu::getCurrentTPUStream().stream();
+	tpuKernelModule_t ppl_module = getPplModule();
+  int ret = kernel(stream, ppl_module);
+  if (ret == 0) {
+    return;
+  }
+	TORCH_CHECK(false, "Scatter add failed!");
+}
+
+#endif
+
 namespace at {
 Tensor &slice_scatter_out_tpu(const Tensor &self, const Tensor &src,
                               int64_t dim, c10::optional<int64_t> start,
@@ -61,7 +176,25 @@ Tensor &slice_scatter_out_tpu(const Tensor &self, const Tensor &src,
                        .unsqueeze(-1)
                        .expand({1, num_c, -1, 1})
                        .to(self.device());
+#ifdef USING_PPL
+  uint32_t inner_size = 1;
+  for (const auto i : c10::irange((dim + 1), self.dim())) {
+    inner_size *= self.size(i);
+  }
 
+  AT_DISPATCH_FLOAT_INT_TYPES( self.scalar_type(), "slice_scatter", [&] {
+        slice_scatter_impl<scalar_t>(
+              reinterpret_cast<uint64_t>(src.data_ptr()),
+              reinterpret_cast<uint64_t>(self.data_ptr()),
+              reinterpret_cast<uint64_t>(indices.data_ptr()),
+              reinterpret_cast<uint64_t>(out.data_ptr()),
+              num_c,
+              self.size(dim),
+              inner_size,
+              src.size(dim)
+            );
+      });
+#else
   auto stream = c10_tpu::getCurrentTPUStream();
   auto status = tpudnnSliceScatterAsync(
       stream,
@@ -71,6 +204,7 @@ Tensor &slice_scatter_out_tpu(const Tensor &self, const Tensor &src,
       dim,
       tpu::TPUGenerateTpudnnTensor(stream, out));
   TORCH_CHECK(status == TPUDNN_STATUS_SUCCESS);
+#endif
 #endif
   TIMING_END;
   SHOW_TENSOR_OP(self, out);
@@ -93,6 +227,25 @@ TORCH_LIBRARY_IMPL(aten, TPU, m) {
 Tensor &scatter_add_tpu(Tensor &self, int64_t dim, const Tensor &index,
                        const Tensor &src) {
   TIMING_START;
+#ifdef USING_PPL
+  uint32_t outer_size = 1;
+  uint32_t inner_size = 1;
+  for (const auto i : c10::irange(dim)) {
+    outer_size *= self.size(i);
+  }
+  for (const auto i : c10::irange((dim), self.dim())) {
+    inner_size *= self.size(i);
+  }
+
+  AT_DISPATCH_FLOAT_INT_TYPES( self.scalar_type(), "scatter_add", [&] {
+        scatter_add_impl<scalar_t>(
+              reinterpret_cast<uint64_t>(self.data_ptr()),
+              reinterpret_cast<uint64_t>(src.data_ptr()),
+              reinterpret_cast<uint64_t>(index.data_ptr()),
+              outer_size, inner_size, index.size(dim)
+            );
+      });
+#else
   auto stream = c10_tpu::getCurrentTPUStream();
   auto status = tpudnnScatterAddAsync(
       stream,
@@ -101,6 +254,7 @@ Tensor &scatter_add_tpu(Tensor &self, int64_t dim, const Tensor &index,
       tpu::TPUGenerateTpudnnTensor(stream, index),
       dim);
   TORCH_CHECK(status == TPUDNN_STATUS_SUCCESS);
+#endif
   TIMING_END;
   SHOW_TENSOR_OP(self, self);
   return self;
