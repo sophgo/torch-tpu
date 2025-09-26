@@ -215,7 +215,6 @@ def paged_latent_attention_fp8_tpu(
     seqlen,
     cache_seqlen,
     num_heads,
-    generate_token,
     q_lora_rank,
     kv_lora_rank,
     qk_nope_head_dim,
@@ -259,7 +258,7 @@ def paged_latent_attention_fp8_tpu(
                 output_tpu, query_tpu, normed_lkv_nope_tpu, key_pe_tpu, q_b_weight_tpu, kv_b_weight_tpu,
                 paged_kvcache_tpu, paged_pecache_tpu, cos_tpu, sin_tpu, q_b_scale_tpu,
                 kv_b_scale_tpu, block_tables_tpu, slots_tpu, kvu_tpu,
-                mask_tpu, seqlen, cache_seqlen, num_heads, generate_token,
+                mask_tpu, seqlen, cache_seqlen, num_heads, 
                 q_lora_rank, kv_lora_rank, qk_nope_head_dim,
                 qk_rope_head_dim, v_head_dim, mask_size,
                 block_size, blocks_per_seq,
@@ -271,7 +270,7 @@ def paged_latent_attention_fp8_tpu(
             output_tpu, query_tpu, normed_lkv_nope_tpu, key_pe_tpu, q_b_weight_tpu, kv_b_weight_tpu,
             paged_kvcache_tpu, paged_pecache_tpu, cos_tpu, sin_tpu, q_b_scale_tpu,
             kv_b_scale_tpu, block_tables_tpu, slots_tpu, kvu_tpu,
-            mask_tpu, seqlen, cache_seqlen, num_heads, generate_token,
+            mask_tpu, seqlen, cache_seqlen, num_heads, 
             q_lora_rank, kv_lora_rank, qk_nope_head_dim,
             qk_rope_head_dim, v_head_dim, mask_size,
             block_size, blocks_per_seq,
@@ -384,7 +383,6 @@ def test_paged_latent_attention_fp8(
     slots = torch.randint(0, max_seq_len, (batch_size,), dtype=torch.int32)
     kvu = None
     mask = None
-    generate_token = 1
     mask_size = 0
     paged_block_size = 16
     softmax_scale = 192**-0.5 * 0.3  # 基于mla.py
@@ -415,7 +413,7 @@ def test_paged_latent_attention_fp8(
         output, query, normed_lkv_nope, key_pe, q_b_weight, kv_b_weight,
         paged_kvcache, paged_pecache, cos, sin, q_b_scale, kv_b_scale,
         block_tables, slots, kvu, mask, seqlen, cache_seqlen,
-        num_heads, generate_token, query_dim, kv_nope_dim,
+        num_heads, query_dim, kv_nope_dim,
         qk_nope_head_dim, qk_rope_head_dim, v_head_dim, mask_size,
         fp8_block_size, num_blocks, paged_block_size, softmax_scale,
         attention_mode, device=device, profiler=profiler

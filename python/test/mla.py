@@ -75,8 +75,16 @@ class MLAConfig:
 
     def random_tensors(self):
         assert self.max_cache_size >= self.context_len + self.generate_token, "max_cache_size should be larger than context_len + generate_token"
-        seqlen = torch.tensor([self.context_len for _ in range(self.batch)], dtype = torch.int32)
-        cache_seqlen = torch.tensor([self.cache_len for _ in range(self.batch)], dtype = torch.int32)
+        if self.attention_mode in (
+            AttentionMode.CONTINUOUS_PREFILL,
+            AttentionMode.PAGED_PREFILL,
+        ):
+            seqlen = torch.tensor([self.context_len for _ in range(self.batch)], dtype = torch.int32)
+            cache_seqlen = torch.tensor([self.cache_len for _ in range(self.batch)], dtype = torch.int32)
+        else:
+            seqlen = torch.ones((self.batch), dtype = torch.int32)
+            cache_seqlen = torch.tensor([self.context_len for _ in range(self.batch)], dtype = torch.int32)
+
         WUQ = (torch.randn((self.num_heads * (self.qk_nope_head_dim + self.qk_rope_head_dim), self.q_lora_rank),
                         dtype = self.dtype) / math.sqrt(self.q_lora_rank)).to(self.weight_dtype)
         WUKV = (torch.randn((self.num_heads * (self.qk_nope_head_dim + self.v_head_dim), self.kv_lora_rank),
@@ -232,7 +240,7 @@ class MLATpu(MLA):
                 torch.ops.my_ops.latent_attention_fp8(
                     tensors.output, tensors.Q, tensors.KV, tensors.PE, tensors.WUQ, tensors.WUKV,
                     tensors.kv_cache, tensors.pe_cache, tensors.cos, tensors.sin, tensors.WUQ_scale,
-                    tensors.WUKV_scale, tensors.KVU, tensors.mask, tensors.seqlen, self.config.num_heads, self.config.generate_token,
+                    tensors.WUKV_scale, tensors.KVU, tensors.mask, tensors.seqlen, self.config.num_heads,
                     self.config.q_lora_rank, self.config.kv_lora_rank, self.config.qk_nope_head_dim,
                     self.config.qk_rope_head_dim, self.config.v_head_dim, self.config.mask_size,
                     self.config.block_size, self.config.max_cache_size, self.config.softmax_scale,
@@ -243,7 +251,7 @@ class MLATpu(MLA):
                     tensors.output, tensors.Q, tensors.KV, tensors.PE, tensors.WUQ, tensors.WUKV,
                     tensors.paged_kvcache, tensors.paged_pecache, tensors.cos, tensors.sin, tensors.WUQ_scale,
                     tensors.WUKV_scale, tensors.block_tables, tensors.slots, tensors.KVU,
-                    tensors.mask, tensors.seqlen, tensors.cache_seqlen, self.config.num_heads, self.config.generate_token,
+                    tensors.mask, tensors.seqlen, tensors.cache_seqlen, self.config.num_heads,
                     self.config.q_lora_rank, self.config.kv_lora_rank, self.config.qk_nope_head_dim,
                     self.config.qk_rope_head_dim, self.config.v_head_dim, self.config.mask_size,
                     self.config.block_size, tensors.block_tables.shape[1],
@@ -251,12 +259,11 @@ class MLATpu(MLA):
                     self.config.attention_mode.value)
             elif self.config.attention_mode == AttentionMode.PAGED_DECODE :
                 # paged attention
-                input_seqlen = torch.ones_like(tensors.seqlen)
                 torch.ops.my_ops.paged_latent_attention_fp8(
                     tensors.output, tensors.Q, tensors.KV, tensors.PE, tensors.WUQ, tensors.WUKV,
                     tensors.paged_kvcache, tensors.paged_pecache, tensors.cos, tensors.sin, tensors.WUQ_scale,
                     tensors.WUKV_scale, tensors.block_tables, tensors.slots, tensors.KVU,
-                    tensors.mask, input_seqlen, tensors.seqlen, self.config.num_heads, self.config.generate_token,
+                    tensors.mask, tensors.seqlen, tensors.cache_seqlen, self.config.num_heads,
                     self.config.q_lora_rank, self.config.kv_lora_rank, self.config.qk_nope_head_dim,
                     self.config.qk_rope_head_dim, self.config.v_head_dim, self.config.mask_size,
                     self.config.block_size, tensors.block_tables.shape[1],
@@ -268,7 +275,7 @@ class MLATpu(MLA):
                 torch.ops.my_ops.latent_attention(
                     tensors.output, tensors.Q, tensors.KV, tensors.PE,
                     tensors.WUQ, tensors.WUKV, tensors.kv_cache, tensors.pe_cache, tensors.cos,
-                    tensors.sin, tensors.KVU, tensors.mask, tensors.seqlen, self.config.num_heads, self.config.generate_token,
+                    tensors.sin, tensors.KVU, tensors.mask, tensors.seqlen, self.config.num_heads,
                     self.config.q_lora_rank, self.config.kv_lora_rank, self.config.qk_nope_head_dim,
                     self.config.qk_rope_head_dim, self.config.v_head_dim,
                     self.config.mask_size, self.config.max_cache_size, self.config.softmax_scale,
@@ -279,7 +286,7 @@ class MLATpu(MLA):
                     tensors.output, tensors.Q, tensors.KV, tensors.PE,
                     tensors.WUQ, tensors.WUKV, tensors.paged_kvcache, tensors.paged_pecache,
                     tensors.cos, tensors.sin, tensors.block_tables, tensors.slots, tensors.KVU, tensors.mask,
-                    tensors.seqlen, tensors.cache_seqlen, self.config.num_heads, self.config.generate_token,
+                    tensors.seqlen, tensors.cache_seqlen, self.config.num_heads,
                     self.config.q_lora_rank, self.config.kv_lora_rank, self.config.qk_nope_head_dim,
                     self.config.qk_rope_head_dim, self.config.v_head_dim, self.config.mask_size,
                     tensors.block_tables.shape[1], self.config.paged_block_size, self.config.softmax_scale,
@@ -527,24 +534,24 @@ if __name__ == "__main__":
     # print(f"Test MLA Decode BF16 continuous_decode:")
     # mla_decode(torch.bfloat16, torch.bfloat16, AttentionMode.CONTINUOUS_DECODE)
     # print(f"----------------------------------")
-    print(f"Test MLA Decode BF16 paged_decode:")
-    mla_decode(torch.bfloat16, torch.bfloat16, AttentionMode.PAGED_DECODE)
-    print(f"----------------------------------")
+    # print(f"Test MLA Decode BF16 paged_decode:")
+    # mla_decode(torch.bfloat16, torch.bfloat16, AttentionMode.PAGED_DECODE)
+    # print(f"----------------------------------")
     # print(f"\nTest MLA Decode FP8_E4M3 continuous_decode:")
     # mla_decode(torch.bfloat16, torch.float8_e4m3fn, AttentionMode.CONTINUOUS_DECODE)
     # print(f"----------------------------------")
     print(f"\nTest MLA Decode FP8_E4M3 paged_decode:")
     mla_decode(torch.bfloat16, torch.float8_e4m3fn, AttentionMode.PAGED_DECODE)
     print(f"----------------------------------")
-    print(f"Test MLA Prefill BF16 continuous_prefill:")
-    mla_prefill(torch.bfloat16, torch.bfloat16, AttentionMode.CONTINUOUS_PREFILL)
-    print(f"----------------------------------")
-    print(f"Test MLA Prefill BF16 paged_prefill:")
-    mla_prefill(torch.bfloat16, torch.bfloat16, AttentionMode.PAGED_PREFILL)
-    print(f"----------------------------------")
-    print(f"Test MLA Prefill FP8_E4M3 continuous_prefill:")
-    mla_prefill(torch.bfloat16, torch.float8_e4m3fn, AttentionMode.CONTINUOUS_PREFILL)
-    print(f"----------------------------------")
+    # print(f"Test MLA Prefill BF16 continuous_prefill:")
+    # mla_prefill(torch.bfloat16, torch.bfloat16, AttentionMode.CONTINUOUS_PREFILL)
+    # print(f"----------------------------------")
+    # print(f"Test MLA Prefill BF16 paged_prefill:")
+    # mla_prefill(torch.bfloat16, torch.bfloat16, AttentionMode.PAGED_PREFILL)
+    # print(f"----------------------------------")
+    # print(f"Test MLA Prefill FP8_E4M3 continuous_prefill:")
+    # mla_prefill(torch.bfloat16, torch.float8_e4m3fn, AttentionMode.CONTINUOUS_PREFILL)
+    # print(f"----------------------------------")
     print(f"Test MLA Prefill FP8_E4M3 paged_prefill:")
     mla_prefill(torch.bfloat16, torch.float8_e4m3fn, AttentionMode.PAGED_PREFILL)
     print(f"----------------------------------")

@@ -131,9 +131,8 @@ namespace at
         Tensor &sin,
         const c10::optional<Tensor> &KVU,
         const c10::optional<Tensor> &mask, // decode: None
-        const Tensor &input_lengths, 
+        const Tensor &input_lengths,
         int64_t head,
-        int64_t generate_token,
         int64_t q_lora_rank,
         int64_t kv_lora_rank,
         int64_t qk_nope_head_dim,
@@ -209,7 +208,6 @@ namespace at
             (int*)input_lengths.data_ptr(),
             (int)(input_lengths.nbytes()/4),
             head,
-            generate_token,
             q_lora_rank,
             kv_lora_rank,
             qk_nope_head_dim,
@@ -233,7 +231,7 @@ namespace at
         Tensor &save_slots,
         const c10::optional<Tensor> &KVU,
         const c10::optional<Tensor> &mask, // decode: None
-        const Tensor &input_lengths, const Tensor &cache_lengths, int64_t head, int64_t generate_token,
+        const Tensor &input_lengths, const Tensor &cache_lengths, int64_t head,
         int64_t q_lora_rank, int64_t kv_lora_rank,
         int64_t qk_nope_head_dim, int64_t qk_rope_head_dim,
         int64_t v_head_dim, int64_t mask_size,
@@ -247,6 +245,8 @@ namespace at
                     "MLA input lenghts must be int32 dtype");
         TORCH_CHECK(input_lengths.device().type() == DeviceType::CPU,
                     "MLA input lenghts must on CPU device");
+        TORCH_CHECK(input_lengths.is_contiguous(),
+                    "MLA input lengths must be contiguous tensor");
       }
 #ifdef USING_PPL
         int max_cache_size = 0;
@@ -254,7 +254,7 @@ namespace at
             TORCH_CHECK(generate_token == 1, "MLA decode only support 1 generate token");
         }
         int batch = (int)(input_lengths.nbytes() / 4);
-        std::vector<uint32_t> seq(2 * batch, 0); 
+        std::vector<uint32_t> seq(2 * batch, 0);
         memcpy(seq.data(), input_lengths.data_ptr(), batch * sizeof(int));
         memcpy(seq.data() + batch * sizeof(int), cache_lengths.data_ptr(), batch * sizeof(int));
             AT_DISPATCH_FLOATING_TYPES_AND2(
@@ -313,7 +313,7 @@ namespace at
           tpu::TPUGenerateTpudnnTensor(stream, save_slots),
           max_paged_block_num, paged_cache_block_size,
           (int *)input_lengths.data_ptr(), (int *)cache_lengths.data_ptr(),
-          (int)(input_lengths.nbytes() / 4), head, generate_token, q_lora_rank, kv_lora_rank,
+          (int)(input_lengths.nbytes() / 4), head, q_lora_rank, kv_lora_rank,
           qk_nope_head_dim, qk_rope_head_dim, v_head_dim, mask_size,
           C, (AttentionMode_t)attention_mode);
       TORCH_CHECK(status == TPUDNN_STATUS_SUCCESS);
@@ -331,7 +331,7 @@ namespace at
         const c10::optional<Tensor> &KVU,
         const c10::optional<Tensor> &mask, // decode: None
         const Tensor &seqlen, const Tensor &cache_seqlen,
-        int64_t num_heads, int64_t generate_token, int64_t q_lora_rank,
+        int64_t num_heads, int64_t q_lora_rank,
         int64_t kv_lora_rank, int64_t qk_nope_head_dim,
         int64_t qk_rope_head_dim, int64_t v_head_dim, int64_t mask_size,
         int64_t quant_block_size, int64_t max_paged_block_num,
@@ -342,6 +342,8 @@ namespace at
         if (attention_mode == PAGED_ATTENTION_DECODE ||
             attention_mode == PAGED_ATTENTION_PREFILL) {
             TORCH_CHECK(seqlen.dtype() == torch::kInt32);
+            TORCH_CHECK(seqlen.is_contiguous(),
+            "MLA seqlen must be contiguous tensor");
         }
 #ifdef USING_PPL
 
@@ -350,7 +352,7 @@ namespace at
             TORCH_CHECK(generate_token == 1, "MLA decode only support 1 generate token");
         }
         int batch = (int)(seqlen.nbytes() / 4);
-        std::vector<uint32_t> seq(2 * batch, 0); 
+        std::vector<uint32_t> seq(2 * batch, 0);
         memcpy(seq.data(), seqlen.data_ptr(), batch * sizeof(uint32_t));
         memcpy(seq.data() + batch * sizeof(uint32_t), cache_seqlen.data_ptr(), batch * sizeof(uint32_t));
     AT_DISPATCH_FLOATING_TYPES_AND2(
@@ -419,7 +421,7 @@ namespace at
             tpu::TPUGenerateTpudnnTensor(stream, save_slots), //save slots
             cpu_lengths ? (const int *)seqlen.data_ptr() : nullptr,
             cpu_lengths ? (const int *)cache_seqlen.data_ptr() : nullptr,
-            (int)(seqlen.nbytes() / 4), num_heads, generate_token, qk_nope_head_dim,
+            (int)(seqlen.nbytes() / 4), num_heads, qk_nope_head_dim,
             qk_rope_head_dim, v_head_dim, q_lora_rank, kv_lora_rank,
             mask_size, quant_block_size, max_paged_block_num, paged_cache_block_size,
             softmax_scale, true, (AttentionMode_t)attention_mode);
@@ -435,7 +437,7 @@ namespace at
         Tensor &sin, Tensor &WUQ_scale, Tensor &WUKV_scale,
         const c10::optional<Tensor> &KVU,
         const c10::optional<Tensor> &mask, // decode: None
-        const Tensor &seqlen, int64_t num_heads, int64_t generate_token, int64_t q_lora_rank,
+        const Tensor &seqlen, int64_t num_heads, int64_t q_lora_rank,
         int64_t kv_lora_rank, int64_t qk_nope_head_dim,
         int64_t qk_rope_head_dim, int64_t v_head_dim, int64_t mask_size,
         int64_t quant_block_size, int64_t max_cache_size,
@@ -512,7 +514,7 @@ namespace at
             tpu::TPUGenerateTpudnnTensor(stream, WUQ_scale),
             tpu::TPUGenerateTpudnnTensor(stream, WUKV_scale),
             (const int *)seqlen.data_ptr(),
-            (int)(seqlen.nbytes() / 4), num_heads, generate_token, qk_nope_head_dim,
+            (int)(seqlen.nbytes() / 4), num_heads, qk_nope_head_dim,
             qk_rope_head_dim, v_head_dim, q_lora_rank, kv_lora_rank,
             mask_size, quant_block_size, max_cache_size,
             softmax_scale, true, (AttentionMode_t)attention_mode);
