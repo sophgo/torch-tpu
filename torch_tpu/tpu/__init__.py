@@ -142,7 +142,7 @@ from .utils import ( _lazy_call, _lazy_init, init,is_initialized, is_available,
                     get_device_capability, get_device_name, get_device_properties,
                     get_gencode_flags, get_sync_debug_mode, ipc_collect,
                     memory_usage, set_sync_debug_mode, utilization, temperature,
-                    power_draw, clock_rate
+                    power_draw, clock_rate, fuse_tensor_utils
                     )
 if os.environ.get('CHIP_ARCH') == "sg2260" or os.environ.get('CHIP_ARCH') == "sg2260e":
     from .streams import Stream, ExternalStream, Event
@@ -153,3 +153,4 @@ from .optimer_utils import * # noqa: F403
 from .custom_op import *
 
 default_generators: Tuple[torch._C.Generator] = ()
+fuse_tensor_utils()

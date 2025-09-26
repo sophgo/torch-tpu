@@ -1,6 +1,8 @@
 import torch
 import torch.nn as nn
 import os
+from typing import Optional
+
 # now rmsnorm with CMODEL_FAST_EXEC=1 has problem
 class cmodel_slow_exec:
     def __init__(self, wait_tensor):
@@ -72,6 +74,44 @@ class RMSNormBlock(nn.Module):
     def forward(self, x):
         return RMSNormFunc.apply(x, self.scale, self.bias, self.axis, self.eps)
 
+class CustomRMSNorm(nn.Module):
+    """
+    Custom RMSNorm implementation that
+    matches torch.nn.RMSNorm API <https://github.com/pytorch/pytorch/blob/v2.4.0/torch/nn/modules/normalization.py#L321>
+    """
+    __constants__ = ['normalized_shape', 'eps', 'elementwise_affine']
+    normalized_shape: tuple
+    eps: float
+    elementwise_affine: bool
+
+    def __init__(self, normalized_shape, eps: Optional[float] = None, elementwise_affine: bool = True, device=None, dtype=None):
+        factory_kwargs = {'device': device, 'dtype': dtype}
+        super().__init__()
+        if isinstance(normalized_shape, int):
+            # mypy error: incompatible types in assignment
+            normalized_shape = (normalized_shape,)  # type: ignore[assignment]
+        self.normalized_shape = tuple(normalized_shape)  # type: ignore[arg-type]
+        self.eps = eps
+        self.elementwise_affine = elementwise_affine
+
+        if self.elementwise_affine:
+            self.weight = nn.Parameter(torch.empty(self.normalized_shape, **factory_kwargs))
+        else:
+            self.register_parameter('weight', None)
+        self.reset_parameters()
+
+    def reset_parameters(self) -> None:
+        if self.elementwise_affine:
+            nn.init.ones_(self.weight)
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        axis = x.dim() - 1
+        return RMSNormFunc.apply(x, self.weight, None, axis, self.eps)
+
+    def extra_repr(self) -> str:
+        return '{normalized_shape}, eps={eps}, ' \
+            'elementwise_affine={elementwise_affine}'.format(**self.__dict__)
+
 def llama_rmsnorm_forward(self, hidden_states):
     dim = hidden_states.dim() - 1
     return RMSNormFunc.apply(hidden_states, self.weight, None, dim, self.variance_epsilon)
@@ -88,3 +128,10 @@ def fuse_megatron_qwen2_rmsnorm():
     import megatron_patch
     from megatron_patch.model.qwen2.rms_norm import Qwen2RMSNorm
     megatron_patch.model.qwen2.rms_norm.Qwen2RMSNorm.forward = llama_rmsnorm_forward
+
+def fuse_torch_rmsnorm():
+    """
+    Support torch.nn.RMSNorm,
+    NOTE: Torch RMSNorm requires PyTorch version >= 2.4.0
+    """
+    torch.nn.RMSNorm = CustomRMSNorm

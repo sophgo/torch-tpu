@@ -8,7 +8,7 @@ import logging
 from functools import lru_cache
 
 import torch
-from typing import List, Any, Optional, Union
+from typing import List, Any, Optional, Union, Iterable
 from torch.types import Device
 from torch._utils import _get_device_index
 
@@ -534,3 +534,56 @@ def clock_rate(device: Optional[Union[Device, int]] = None) -> int:
     """
     warnings.warn("TPU not support clock_rate api now.")
     return 0
+
+def flatten_dense_tensors(tensors: Iterable[torch.Tensor]) -> torch.Tensor:
+    if not tensors:
+        return torch.tensor([], dtype=torch.float32)
+
+    tensor_list = list(tensors)
+    if not tensor_list:
+        return torch.tensor([], dtype=torch.float32)
+
+    first_tensor = tensor_list[0]
+    device = first_tensor.device
+    dtype = first_tensor.dtype
+
+    total_elements = sum(tensor.numel() for tensor in tensor_list)
+    if total_elements == 0:
+        return torch.tensor([], dtype=dtype, device=device)
+    flat_tensor = torch.empty(total_elements, dtype=dtype, device=device)
+
+    offset = 0
+    for tensor in tensor_list:
+        numel = tensor.numel()
+        if numel > 0:
+            flat_tensor[offset:offset + numel] = tensor.view(-1)
+            offset += numel
+
+    return flat_tensor
+
+
+def unflatten_dense_tensors(flat: torch.Tensor, tensors: Iterable[torch.Tensor]) -> List[torch.Tensor]:
+    tensor_list = list(tensors)
+    if not tensor_list:
+        return []
+
+    outputs = []
+    offset = 0
+    for tensor in tensor_list:
+        numel = tensor.numel()
+        if numel == 0:
+            outputs.append(torch.empty_like(tensor))
+        else:
+            unflat_tensor = flat[offset:offset + numel].view(tensor.shape)
+            outputs.append(unflat_tensor)
+            offset += numel
+
+    return outputs
+
+def fuse_tensor_utils():
+    """
+    Replace torch._C._nn.flatten_dense_tensors and torch._C._nn.unflatten_dense_tensors
+    with our custom TPU-optimized implementations.
+    """
+    torch._C._nn.flatten_dense_tensors = flatten_dense_tensors
+    torch._C._nn.unflatten_dense_tensors = unflatten_dense_tensors
