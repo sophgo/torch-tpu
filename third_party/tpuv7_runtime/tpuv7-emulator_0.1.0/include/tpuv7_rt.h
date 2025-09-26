@@ -162,6 +162,30 @@ tpuRtStatus_t tpuRtMallocMedia(void **devPtr, unsigned long long size);
 tpuRtStatus_t tpuRtFree(void **devPtr, int free_num);
 
 /**
+ * @name    tpuRtMallocInstr
+ * @brief   To malloc instruction cache memory
+ * @ingroup tpuv7_rt
+ *
+ * @param [out]	devPtr	memory array
+ * @param [in]  size	memory size
+ * @param [in]  parallel_num	parallelism
+ * @retval  tpuRtSuccess  Succeeds.
+ *          Other code Fails.
+ */
+tpuRtStatus_t tpuRtMallocInstr(void **devPtr, unsigned long long size, int parallel_num);
+
+/**
+ * @name    tpuRtFreeInstr
+ * @brief   To free instruction cache memory
+ * @ingroup tpuv7_rt
+ *
+ * @param [out]	devPtr		memory array
+ * @param [in]  free_num	free memory num
+ * @retval  tpuRtSuccess  Succeeds.
+ *          Other code Fails.
+ */
+tpuRtStatus_t tpuRtFreeInstr(void **devPtr, int free_num);
+/**
  * @name    tpuRtMallocHost
  * @brief   To malloc host memory
  * @ingroup tpuv7_rt
@@ -663,6 +687,51 @@ tpuRtStatus_t tpuRtGetChipSN(int device_id, char *sn);
  *          Other code Fails.
  */
 tpuRtStatus_t tpuRtGetPcieStatus(int device_id, int *pcie_id);
+
+/**
+ * @name    tpuRtGetAllMemory
+ * @brief   To get total device memory of current device
+ * @ingroup tpuv7_rt
+ *
+ * @param [out]	value   total memory size
+ * @retval  tpuRtSuccess  Succeeds.
+ *          Other code Fails.
+ */
+tpuRtStatus_t tpuRtGetAllMemory(uint64_t *value);
+
+/**
+ * @name    tpuRtGetFreeMemory
+ * @brief   To get free device memory of current device
+ * @ingroup tpuv7_rt
+ *
+ * @param [out]	value   free memory size
+ * @retval  tpuRtSuccess  Succeeds.
+ *          Other code Fails.
+ */
+tpuRtStatus_t tpuRtGetFreeMemory(uint64_t *value);
+
+/**
+ * @name    tpuRtGetPeakMemory
+ * @brief   To get peak device memory of current device
+ * @ingroup tpuv7_rt
+ *
+ * @param [out]	value   peak memory size
+ * @retval  tpuRtSuccess  Succeeds.
+ *          Other code Fails.
+ */
+tpuRtStatus_t tpuRtGetPeakMemory(uint64_t *value);
+
+/**
+ * @name    tpuRtResetPeakMemory
+ * @brief   To set peak device memory to 0
+ * @ingroup tpuv7_rt
+ *
+ * @retval  tpuRtSuccess  Succeeds.
+ *          Other code Fails.
+ */
+tpuRtStatus_t tpuRtResetPeakMemory(void);
+
+
 #ifdef __cplusplus
 }
 #endif
