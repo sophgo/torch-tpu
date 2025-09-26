@@ -36,7 +36,7 @@ def all_gather_into_tensor_using_all_gather(output_tensor, input_tensor, group=N
     if async_op:
         handle.wait()
         handle = Noop()
-    output_tensor.copy_(torch.cat(tensor_list, dim=0))
+    output_tensor.copy_((torch.cat(tensor_list, dim=0)).reshape(output_tensor.shape))
     return handle
 
 def init_wrapper(func):

@@ -10,6 +10,8 @@ def get_tpu_device(device=None):
             device = f"tpu:{torch.tpu.current_device()}"
         elif str(device).startswith("cuda"):
             device = str(device).replace("cuda", "tpu")
+        elif str(device) == 'tpu':
+            device = f"tpu:{torch.tpu.current_device()}"
         elif isinstance(device, int):
             device = f"tpu:{device}"
         if str(device) != "cpu":
@@ -89,3 +91,36 @@ torch.tpu.HalfTensor = HalfTensor
 torch.tpu.IntTensor = IntTensor
 torch.tpu.LongTensor = LongTensor
 torch.tpu._is_in_bad_fork = lambda: False
+
+# Save the original get_device_properties function before replacing it
+_original_get_device_properties = torch_tpu.tpu.get_device_properties
+
+class TPUDevicePropertiesWrapper:
+    """Wrapper for TPU device properties to add CUDA-compatible attributes"""
+    def __init__(self, tpu_props):
+        self._tpu_props = tpu_props
+        self.major = 8  # Simulate Ampere architecture
+    def __getattr__(self, name):
+        return getattr(self._tpu_props, name)
+    def __repr__(self):
+        return f"TPUDevicePropertiesWrapper(major={self.major}, {repr(self._tpu_props)})"
+
+def get_device_properties_wrapper(device=None):
+    """Get TPU device properties with CUDA-compatible major attribute"""
+    if device is None:
+        device = torch.tpu.current_device()
+    elif isinstance(device, torch.device):
+        if device.type == 'cuda':
+            device = torch.tpu.current_device()
+        else:
+            device = device.index if device.index is not None else torch.tpu.current_device()
+    elif isinstance(device, str):
+        if device.startswith('cuda'):
+            device = torch.tpu.current_device()
+
+    original_props = _original_get_device_properties(device)
+    return TPUDevicePropertiesWrapper(original_props)
+
+torch.tpu.get_device_properties = get_device_properties_wrapper
+
+torch.cuda.get_device_properties = get_device_properties_wrapper

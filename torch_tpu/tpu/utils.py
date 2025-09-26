@@ -587,3 +587,7 @@ def fuse_tensor_utils():
     """
     torch._C._nn.flatten_dense_tensors = flatten_dense_tensors
     torch._C._nn.unflatten_dense_tensors = unflatten_dense_tensors
+
+def _is_compiled():
+    # workaround for torch/utils/cpp_extension.py
+    return False

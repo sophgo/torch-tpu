@@ -1,0 +1,10 @@
+transformers==4.51.0
+datasets==4.1.1
+triton==3.4.0
+nnmoduletools==0.2.2
+decorator==5.2.1
+einops==0.8.1
+netifaces==0.11.0
+accelerate==1.10.1
+rouge_score==0.1.2
+pybind11==3.0.1

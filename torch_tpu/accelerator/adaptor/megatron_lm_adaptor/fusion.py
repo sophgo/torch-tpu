@@ -1,15 +1,14 @@
 # apply torch_tpu fused kernels
-import torch_tpu
+import torch_tpu, torch
 from torch_tpu.tpu.custom_op.adam import fuse_torch_adam, fuse_torch_adamw
-from torch_tpu.tpu.custom_op.rmsnorm import fuse_megatron_qwen2_rmsnorm
-from torch_tpu.tpu.custom_op.llama_mlp import fuse_megatron_qwen2_mlp
-from torch_tpu.tpu.custom_op.llama_attn_qkv import fuse_megatron_qwen2_attn_qkv
+from .megatron_fusion.attention import fuse_megatron_attn_forward
+from .megatron_fusion.mlp import fuse_megatron_mlp
 
 fuse_torch_adam()
 fuse_torch_adamw()
-fuse_megatron_qwen2_rmsnorm()
-fuse_megatron_qwen2_mlp()
-fuse_megatron_qwen2_attn_qkv()
+fuse_megatron_attn_forward()
+fuse_megatron_mlp()
+
 
 # disable unsupported cuda fused kernels
 import megatron

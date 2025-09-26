@@ -93,7 +93,10 @@ def init_wrapper(func):
         if rank == -1:
             rank = int(os.environ.get('RANK', '0'))
         _default_pg_options = pg_options
-        return func(backend=backend, init_method=init_method, timeout=timeout, world_size=world_size, rank=rank, store=store, group_name=group_name, pg_options=pg_options)
+        ret = func(backend="sccl", init_method=init_method, timeout=timeout, world_size=world_size, rank=rank, store=store, group_name=group_name, pg_options=pg_options)
+        # from torch.distributed.distributed_c10d import _world, GroupMember
+        # _world.pg_default_device[GroupMember.WORLD] = torch.device(f"tpu:{torch.tpu.current_device()}")
+        return ret
     return wrapper
 
 def new_group_wrapper(func):

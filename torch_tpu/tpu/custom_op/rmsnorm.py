@@ -74,7 +74,7 @@ class RMSNormBlock(nn.Module):
     def forward(self, x):
         return RMSNormFunc.apply(x, self.scale, self.bias, self.axis, self.eps)
 
-class CustomRMSNorm(nn.Module):
+class RMSNorm(nn.Module):
     """
     Custom RMSNorm implementation that
     matches torch.nn.RMSNorm API <https://github.com/pytorch/pytorch/blob/v2.4.0/torch/nn/modules/normalization.py#L321>
@@ -104,9 +104,10 @@ class CustomRMSNorm(nn.Module):
         if self.elementwise_affine:
             nn.init.ones_(self.weight)
 
-    def forward(self, x: torch.Tensor) -> torch.Tensor:
-        axis = x.dim() - 1
-        return RMSNormFunc.apply(x, self.weight, None, axis, self.eps)
+    def forward(self, hidden_states: torch.Tensor) -> torch.Tensor:
+        hidden_states = hidden_states.contiguous()
+        axis = hidden_states.dim() - 1
+        return RMSNormFunc.apply(hidden_states, self.weight, None, axis, self.eps)
 
     def extra_repr(self) -> str:
         return '{normalized_shape}, eps={eps}, ' \
@@ -124,14 +125,9 @@ def fuse_qwen2_rmsnorm():
     import transformers
     transformers.models.qwen2.modeling_qwen2.Qwen2RMSNorm.forward = llama_rmsnorm_forward
 
-def fuse_megatron_qwen2_rmsnorm():
-    import megatron_patch
-    from megatron_patch.model.qwen2.rms_norm import Qwen2RMSNorm
-    megatron_patch.model.qwen2.rms_norm.Qwen2RMSNorm.forward = llama_rmsnorm_forward
-
 def fuse_torch_rmsnorm():
     """
     Support torch.nn.RMSNorm,
     NOTE: Torch RMSNorm requires PyTorch version >= 2.4.0
     """
-    torch.nn.RMSNorm = CustomRMSNorm
+    torch.nn.RMSNorm = RMSNorm

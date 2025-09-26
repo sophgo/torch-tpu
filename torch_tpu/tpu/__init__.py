@@ -29,6 +29,7 @@ __all__ = [
     "temperature",
     "power_draw",
     "clock_rate",
+    "_is_compiled",
 
     ## sccl related
     "is_rank_table_valid",
@@ -144,7 +145,7 @@ from .utils import ( _lazy_call, _lazy_init, init,is_initialized, is_available,
                     get_device_capability, get_device_name, get_device_properties,
                     get_gencode_flags, get_sync_debug_mode, ipc_collect,
                     memory_usage, set_sync_debug_mode, utilization, temperature,
-                    power_draw, clock_rate, fuse_tensor_utils
+                    power_draw, clock_rate, fuse_tensor_utils, _is_compiled
                     )
 from .nn import apply_nn_patch
 
@@ -159,3 +160,4 @@ from .custom_op import *
 default_generators: Tuple[torch._C.Generator] = ()
 fuse_tensor_utils()
 apply_nn_patch()
+_is_compiled()

@@ -1,0 +1,978 @@
+Submodule backends/megatron/Megatron-LM-250624 contains modified content
+diff --git a/backends/megatron/Megatron-LM-250624/megatron/core/distributed/finalize_model_grads.py b/backends/megatron/Megatron-LM-250624/megatron/core/distributed/finalize_model_grads.py
+index b175eaae1..48b92630b 100644
+--- a/backends/megatron/Megatron-LM-250624/megatron/core/distributed/finalize_model_grads.py
++++ b/backends/megatron/Megatron-LM-250624/megatron/core/distributed/finalize_model_grads.py
+@@ -357,5 +357,5 @@ def finalize_model_grads(model: List[torch.nn.Module], num_tokens: Optional[torc
+         )
+         for model_chunk in model:
+             if num_tokens > 0:
+-                scaling = 1.0 / num_tokens
++                scaling = 1.0 / num_tokens.float()
+                 model_chunk.scale_gradients(scaling)
+diff --git a/backends/megatron/Megatron-LM-250624/megatron/core/distributed/param_and_grad_buffer.py b/backends/megatron/Megatron-LM-250624/megatron/core/distributed/param_and_grad_buffer.py
+index aba056d6e..3235770dc 100644
+--- a/backends/megatron/Megatron-LM-250624/megatron/core/distributed/param_and_grad_buffer.py
++++ b/backends/megatron/Megatron-LM-250624/megatron/core/distributed/param_and_grad_buffer.py
+@@ -348,23 +348,23 @@ class _ParamAndGradBucketGroup:
+             communication_group = self.data_parallel_group
+ 
+         # Coalesce communication kernels across buckets in the bucket group.
+-        with stream_context, _coalescing_manager(communication_group, async_ops=async_op) as cm:
+-            for bucket in self.buckets:
+-                if self.ddp_config.use_distributed_optimizer:
+-                    local_data_view = shard_buffer(
+-                        bucket.grad_data, self.intra_distributed_optimizer_instance_size
+-                    )[self.intra_distributed_optimizer_instance_rank]
+-                    dist_reduce_scatter_func(
+-                        local_data_view,
+-                        bucket.grad_data,
+-                        op=reduce_op,
+-                        group=communication_group,
+-                        async_op=async_op,
+-                    )
+-                else:
+-                    torch.distributed.all_reduce(
+-                        bucket.grad_data, op=reduce_op, group=communication_group, async_op=async_op
+-                    )
++        # with stream_context, _coalescing_manager(communication_group, async_ops=async_op) as cm:
++        for bucket in self.buckets:
++            if self.ddp_config.use_distributed_optimizer:
++                local_data_view = shard_buffer(
++                    bucket.grad_data, self.intra_distributed_optimizer_instance_size
++                )[self.intra_distributed_optimizer_instance_rank]
++                dist_reduce_scatter_func(
++                    local_data_view,
++                    bucket.grad_data,
++                    op=reduce_op,
++                    group=communication_group,
++                    async_op=async_op,
++                )
++            else:
++                torch.distributed.all_reduce(
++                    bucket.grad_data, op=reduce_op, group=communication_group, async_op=async_op
++                )
+ 
+         # With multiple DistOpt instances, we need to all-reduce across instances.
+         if (
+@@ -390,7 +390,7 @@ class _ParamAndGradBucketGroup:
+                     )
+ 
+         if async_op:
+-            self.grad_reduce_handle = cm
++            self.grad_reduce_handle = None
+         else:
+             # When using `_coalescing_manager`, even if a synchronous op (async_op=False) is used,
+             # `cm` is not None, which is different from when `_coalescing_manager` is not used in
+@@ -418,11 +418,11 @@ class _ParamAndGradBucketGroup:
+         if self.ddp_config.num_distributed_optimizer_instances > 1:
+             torch.cuda.default_stream().wait_stream(self.communication_stream)
+             return
+-        assert self.grad_reduce_handle is not None, (
+-            f'Communication call has not been issued for this bucket '
+-            f'({len(self.params_with_grad)}/{len(self.params)} params have grad available)'
+-        )
+-        self.grad_reduce_handle.wait()
++        # assert self.grad_reduce_handle is not None, (
++        #     f'Communication call has not been issued for this bucket '
++        #     f'({len(self.params_with_grad)}/{len(self.params)} params have grad available)'
++        # )
++        # self.grad_reduce_handle.wait()
+         self.grad_reduce_handle = None
+ 
+     def register_grad_ready(self, param: torch.nn.Parameter):
+@@ -656,18 +656,21 @@ class _ParamAndGradBuffer:
+             else:
+                 # Only re-map param tensors if using distributed optimizer.
+                 if self.ddp_config.use_distributed_optimizer:
+-                    self.param_data = torch.zeros(
++                    self.param_data = torch.empty(
+                         self.numel,
+                         dtype=self.param_dtype,
+                         device=torch.cuda.current_device(),
+                         requires_grad=False,
+                     )
+-                self.grad_data = torch.zeros(
++                self.grad_data = torch.empty(
+                     self.numel,
+                     dtype=self.grad_dtype,
+                     device=torch.cuda.current_device(),
+                     requires_grad=False,
+                 )
++            chunk_size = 1073741824
++            for i in range(0, self.numel, chunk_size):
++                self.grad_data[i: i + chunk_size].zero_()
+ 
+         # Finally, map param.data and param.main_grad fields to buffers.
+         bucket_params = []
+@@ -745,7 +748,12 @@ class _ParamAndGradBuffer:
+ 
+     def scale_gradients(self, scaling_factor: float) -> None:
+         """Scale the gradient data by `scaling_factor`."""
+-        self.grad_data *= scaling_factor
++        # self.grad_data *= scaling_factor
++        
++        # a workaround for tensor shape ge 2^31
++        chunk_size = 1073741824
++        for i in range(0, self.numel, chunk_size):
++            self.grad_data[i: i + chunk_size] *= scaling_factor
+ 
+     def _get(self, shape: torch.Size, start_index: int, buffer_type: BufferType) -> torch.Tensor:
+         """
+@@ -811,7 +819,11 @@ class _ParamAndGradBuffer:
+         """
+         Zero out the underlying grad_buffer.
+         """
+-        self.grad_data.zero_()
++        # self.grad_data.zero_()
++        # a workaround for tensor shape ge 2^31
++        chunk_size = 1073741824
++        for i in range(0, self.numel, chunk_size):
++            self.grad_data[i: i + chunk_size].zero_()
+ 
+ 
+ def partition_buckets(
+diff --git a/backends/megatron/Megatron-LM-250624/megatron/core/jit.py b/backends/megatron/Megatron-LM-250624/megatron/core/jit.py
+index 5b1dfff3e..97d209311 100644
+--- a/backends/megatron/Megatron-LM-250624/megatron/core/jit.py
++++ b/backends/megatron/Megatron-LM-250624/megatron/core/jit.py
+@@ -8,3 +8,5 @@ jit_fuser = torch.jit.script
+ # nvFuser is deprecated in PyTorch JIT starting from 2.2
+ if is_torch_min_version("2.2.0a0"):
+     jit_fuser = torch.compile
++else:
++    jit_fuser = lambda func, *args, **kwargs: func
+diff --git a/backends/megatron/Megatron-LM-250624/megatron/core/models/common/embeddings/language_model_embedding.py b/backends/megatron/Megatron-LM-250624/megatron/core/models/common/embeddings/language_model_embedding.py
+index d3c6596d0..fd2a97df4 100644
+--- a/backends/megatron/Megatron-LM-250624/megatron/core/models/common/embeddings/language_model_embedding.py
++++ b/backends/megatron/Megatron-LM-250624/megatron/core/models/common/embeddings/language_model_embedding.py
+@@ -9,7 +9,8 @@ from megatron.core import tensor_parallel
+ from megatron.core.transformer.module import MegatronModule
+ from megatron.core.transformer.transformer_config import TransformerConfig
+ from megatron.core.utils import get_tensor_model_parallel_group_if_none, nvtx_decorator
+-
++import os
++from distutils.util import strtobool
+ 
+ class LanguageModelEmbedding(MegatronModule):
+     """Language model embeddings.
+@@ -117,8 +118,10 @@ class LanguageModelEmbedding(MegatronModule):
+ 
+         if not self.reduce_scatter_embeddings:
+             # Data format change to avoid explicit tranposes : [b s h] --> [s b h].
+-            embeddings = embeddings.transpose(0, 1).contiguous()
+-
++            # embeddings = embeddings.transpose(0, 1).contiguous()
++            whole_net_trans = strtobool(os.environ.get("WHOLE_NET_TRANS", "0"))
++            if not whole_net_trans:
++                embeddings = embeddings.transpose(0, 1).contiguous()
+         if tokentype_ids is not None:
+             assert self.tokentype_embeddings is not None
+             # [b s h] -> [s b h] (So that it can be added with embeddings)
+diff --git a/backends/megatron/Megatron-LM-250624/megatron/core/models/common/embeddings/rotary_pos_embedding.py b/backends/megatron/Megatron-LM-250624/megatron/core/models/common/embeddings/rotary_pos_embedding.py
+index b777de3ad..ca662c46b 100644
+--- a/backends/megatron/Megatron-LM-250624/megatron/core/models/common/embeddings/rotary_pos_embedding.py
++++ b/backends/megatron/Megatron-LM-250624/megatron/core/models/common/embeddings/rotary_pos_embedding.py
+@@ -26,6 +26,8 @@ from megatron.core.models.common.embeddings.rope_utils import (  # for backward
+     get_pos_emb_on_this_cp_rank,
+ )
+ from megatron.core.utils import deprecate_inference_params
++import os
++from distutils.util import strtobool
+ 
+ logger = logging.getLogger(__name__)
+ 
+@@ -161,7 +163,7 @@ class RotaryEmbedding(nn.Module):
+         """
+         if self.inv_freq.device.type == 'cpu':
+             # move `inv_freq` to GPU once at the first micro-batch forward pass
+-            self.inv_freq = self.inv_freq.to(device=torch.cuda.current_device())
++            self.inv_freq = self.inv_freq.to(f"tpu:{torch.tpu.current_device()}")
+ 
+         freqs = self.get_freqs_non_repeated(max_seq_len, offset)
+         # first part even vector components, second part odd vector components,
+@@ -217,10 +219,13 @@ class RotaryEmbedding(nn.Module):
+         elif inference_context is not None:
+             rotary_seq_len = inference_context.max_sequence_length
+         else:
++            whole_net_trans = strtobool(os.environ.get("WHOLE_NET_TRANS", "0"))
+             if transformer is not None and transformer.input_tensor is not None:
+-                rotary_seq_len = transformer.input_tensor.size(0)
++                # rotary_seq_len = transformer.input_tensor.size(0)
++                rotary_seq_len = transformer.input_tensor.size(0 + int(whole_net_trans))
+             else:
+-                rotary_seq_len = transformer_input.size(0)
++                # rotary_seq_len = transformer_input.size(0)
++                rotary_seq_len = transformer_input.size(0 + int(whole_net_trans))
+ 
+             if transformer_config.sequence_parallel:
+                 rotary_seq_len *= transformer_config.tensor_model_parallel_size
+@@ -268,7 +273,7 @@ class MultimodalRotaryEmbedding(nn.Module):
+         self.inv_freq = 1.0 / (
+             rotary_base
+             ** (
+-                torch.arange(0, dim, 2, dtype=torch.float32, device=torch.cuda.current_device())
++                torch.arange(0, dim, 2, dtype=torch.float32, device=f"tpu:{torch.tpu.current_device()}")
+                 / dim
+             )
+         )
+diff --git a/backends/megatron/Megatron-LM-250624/megatron/core/models/common/language_module/language_module.py b/backends/megatron/Megatron-LM-250624/megatron/core/models/common/language_module/language_module.py
+index 6000e35b5..41cd65b20 100644
+--- a/backends/megatron/Megatron-LM-250624/megatron/core/models/common/language_module/language_module.py
++++ b/backends/megatron/Megatron-LM-250624/megatron/core/models/common/language_module/language_module.py
+@@ -18,7 +18,8 @@ from megatron.core.transformer.enums import AttnBackend
+ from megatron.core.transformer.module import MegatronModule
+ from megatron.core.transformer.transformer_config import TransformerConfig
+ from megatron.core.utils import make_tp_sharded_tensor_for_checkpoint
+-
++import os
++from distutils.util import strtobool
+ 
+ class LanguageModule(MegatronModule):
+     """Base language module that has common helper functions used across GPT, BERT etc.
+@@ -80,7 +81,10 @@ class LanguageModule(MegatronModule):
+             Tensor: Loss tensor of dimensions [batch size, sequence_length]
+         """
+         # [b s] => [s b]
+-        labels = labels.transpose(0, 1).contiguous()
++        # labels = labels.transpose(0, 1).contiguous()
++        whole_net_trans = strtobool(os.environ.get("WHOLE_NET_TRANS", "0"))
++        if not whole_net_trans:
++            labels = labels.transpose(0, 1).contiguous()
+         if self.config.cross_entropy_loss_fusion:
+             if self.config.cross_entropy_fusion_impl == 'te':
+                 if te_parallel_cross_entropy is not None:
+@@ -98,7 +102,9 @@ class LanguageModule(MegatronModule):
+             loss = tensor_parallel.vocab_parallel_cross_entropy(logits, labels)
+ 
+         # [s b] => [b, s]
+-        loss = loss.transpose(0, 1).contiguous()
++        # loss = loss.transpose(0, 1).contiguous()
++        if not whole_net_trans:
++            loss = loss.transpose(0, 1).contiguous()
+         return loss
+ 
+     def setup_embeddings_and_output_layer(self) -> None:
+diff --git a/backends/megatron/Megatron-LM-250624/megatron/core/models/gpt/gpt_model.py b/backends/megatron/Megatron-LM-250624/megatron/core/models/gpt/gpt_model.py
+index e00ba8daf..42f3cea1d 100644
+--- a/backends/megatron/Megatron-LM-250624/megatron/core/models/gpt/gpt_model.py
++++ b/backends/megatron/Megatron-LM-250624/megatron/core/models/gpt/gpt_model.py
+@@ -488,6 +488,11 @@ class GPTModel(LanguageModule):
+ 
+         if labels is None:
+             # [s b h] => [b s h]
++            from distutils.util import strtobool
++            import os
++            whole_net_trans = strtobool(os.environ.get("WHOLE_NET_TRANS", "0"))
++            if whole_net_trans:
++                return logits
+             return logits.transpose(0, 1).contiguous()
+ 
+         loss = self.compute_language_model_loss(labels, logits)
+diff --git a/backends/megatron/Megatron-LM-250624/megatron/core/optimizer/clip_grads.py b/backends/megatron/Megatron-LM-250624/megatron/core/optimizer/clip_grads.py
+index 0f33f919b..f1e9491fa 100644
+--- a/backends/megatron/Megatron-LM-250624/megatron/core/optimizer/clip_grads.py
++++ b/backends/megatron/Megatron-LM-250624/megatron/core/optimizer/clip_grads.py
+@@ -164,7 +164,7 @@ def clip_grad_by_total_norm_fp32(
+                 grads.append(to_local_if_dtensor(param.decoupled_grad).detach())
+         else:
+             if param.grad is not None:
+-                assert param.grad.type() == 'torch.cuda.FloatTensor'
++                assert param.grad.type() in ['torch.cuda.FloatTensor', 'torch.tpu.FloatTensor']
+                 params.append(param)
+                 grads.append(to_local_if_dtensor(param.grad).detach())
+ 
+diff --git a/backends/megatron/Megatron-LM-250624/megatron/core/optimizer/grad_scaler.py b/backends/megatron/Megatron-LM-250624/megatron/core/optimizer/grad_scaler.py
+index abdd1e7b6..6fbbb11c6 100644
+--- a/backends/megatron/Megatron-LM-250624/megatron/core/optimizer/grad_scaler.py
++++ b/backends/megatron/Megatron-LM-250624/megatron/core/optimizer/grad_scaler.py
+@@ -20,7 +20,8 @@ class MegatronGradScaler(ABC):
+ 
+     @property
+     def inv_scale(self):
+-        return self._scale.double().reciprocal().float()
++        device = self._scale.device
++        return self._scale.cpu().double().reciprocal().float().to(device)
+ 
+     @abstractmethod
+     def update(self, found_inf: bool):
+diff --git a/backends/megatron/Megatron-LM-250624/megatron/core/optimizer/optimizer.py b/backends/megatron/Megatron-LM-250624/megatron/core/optimizer/optimizer.py
+index 382a22cc5..6800aef66 100644
+--- a/backends/megatron/Megatron-LM-250624/megatron/core/optimizer/optimizer.py
++++ b/backends/megatron/Megatron-LM-250624/megatron/core/optimizer/optimizer.py
+@@ -610,7 +610,7 @@ class Float16OptimizerWithFloat16Params(MixedPrecisionOptimizer):
+                     if param.requires_grad:
+ 
+                         # float16 params:
+-                        if param.type() in ['torch.cuda.HalfTensor', 'torch.cuda.BFloat16Tensor']:
++                        if param.type() in ['torch.cuda.HalfTensor', 'torch.cuda.BFloat16Tensor', 'torch.tpu.HalfTensor', 'torch.tpu.BFloat16Tensor']:
+                             float16_params_this_group.append(param)
+                             # Create a copy
+                             main_param = param.detach().clone().float()
+@@ -629,7 +629,7 @@ class Float16OptimizerWithFloat16Params(MixedPrecisionOptimizer):
+                             if param in self.optimizer.state:
+                                 self.optimizer.state[main_param] = self.optimizer.state.pop(param)
+                         # fp32 params.
+-                        elif param.type() == 'torch.cuda.FloatTensor':
++                        elif param.type() in ['torch.cuda.FloatTensor', 'torch.tpu.FloatTensor']:
+                             fp32_params_this_group.append(param)
+                             param_group['params'][i] = param
+ 
+diff --git a/backends/megatron/Megatron-LM-250624/megatron/core/parallel_state.py b/backends/megatron/Megatron-LM-250624/megatron/core/parallel_state.py
+index d9eae535e..e9400827f 100644
+--- a/backends/megatron/Megatron-LM-250624/megatron/core/parallel_state.py
++++ b/backends/megatron/Megatron-LM-250624/megatron/core/parallel_state.py
+@@ -178,7 +178,7 @@ def create_group(
+         'use_local_synchronization': use_local_synchronization,
+         'group_desc': group_desc,
+     }
+-    if not is_torch_min_version('2.4.0'):
++    if not is_torch_min_version('2.4.0') or is_torch_min_version('2.8.0'):
+         kwargs.pop('group_desc')
+         if timeout is None:
+             # Old version (e.g. v2.1.2) sets default_pg_timeout as default value to timeout
+diff --git a/backends/megatron/Megatron-LM-250624/megatron/core/tensor_parallel/cross_entropy.py b/backends/megatron/Megatron-LM-250624/megatron/core/tensor_parallel/cross_entropy.py
+index 27c8f0634..d0c31af71 100644
+--- a/backends/megatron/Megatron-LM-250624/megatron/core/tensor_parallel/cross_entropy.py
++++ b/backends/megatron/Megatron-LM-250624/megatron/core/tensor_parallel/cross_entropy.py
+@@ -55,9 +55,12 @@ class VocabParallelCrossEntropy:
+         partition_vocab_size = vocab_parallel_logits.size()[-1]
+         logits_2d = vocab_parallel_logits.view(-1, partition_vocab_size)
+         masked_target_1d = masked_target.view(-1)
+-        arange_1d = torch.arange(start=0, end=logits_2d.size()[0], device=logits_2d.device)
+-        predicted_logits_1d = logits_2d[arange_1d, masked_target_1d]
+-        predicted_logits_1d = predicted_logits_1d.clone().contiguous()
++        # arange_1d = torch.arange(start=0, end=logits_2d.size()[0], device=logits_2d.device)
++        # predicted_logits_1d = logits_2d[arange_1d, masked_target_1d]
++        # predicted_logits_1d = predicted_logits_1d.clone().contiguous()
++        predicted_logits_1d = torch.empty(masked_target_1d.shape[0], 1, dtype = logits_2d.dtype, device = logits_2d.device)
++        torch.gather(logits_2d, 1, masked_target_1d.unsqueeze(1), out=predicted_logits_1d)
++        predicted_logits_1d = predicted_logits_1d.squeeze(1)
+         predicted_logits = predicted_logits_1d.view_as(target)
+         predicted_logits[target_mask] = 0.0
+ 
+@@ -111,7 +114,8 @@ class VocabParallelCrossEntropy:
+     ) -> torch.Tensor:
+         """Calculates gradients."""
+ 
+-        grad_2d[arange_1d, masked_target_1d] -= softmax_update
++        # grad_2d[arange_1d, masked_target_1d] -= softmax_update
++        grad_2d.scatter_add_(dim=1, index=masked_target_1d.unsqueeze(1), src= -softmax_update.unsqueeze(1))
+ 
+         # Finally elementwise multiplication with the output gradients.
+         grad_input.mul_(grad_output.unsqueeze(dim=-1))
+diff --git a/backends/megatron/Megatron-LM-250624/megatron/core/transformer/torch_norm.py b/backends/megatron/Megatron-LM-250624/megatron/core/transformer/torch_norm.py
+index d0ceca7af..6f90fedef 100644
+--- a/backends/megatron/Megatron-LM-250624/megatron/core/transformer/torch_norm.py
++++ b/backends/megatron/Megatron-LM-250624/megatron/core/transformer/torch_norm.py
+@@ -38,9 +38,9 @@ class WrappedTorchNorm:
+         if config.normalization == "LayerNorm":
+             norm_cls = torch.nn.LayerNorm
+         elif config.normalization == "RMSNorm":
+-            assert is_torch_min_version(
+-                "2.4.0a0"
+-            ), 'Torch RMSNorm requires PyTorch version >= 2.4.0'
++            # assert is_torch_min_version(
++            #     "2.4.0a0"
++            # ), 'Torch RMSNorm requires PyTorch version >= 2.4.0'
+ 
+             norm_cls = torch.nn.RMSNorm
+         elif config.normalization == "L2Norm":
+diff --git a/backends/megatron/Megatron-LM-250624/megatron/training/arguments.py b/backends/megatron/Megatron-LM-250624/megatron/training/arguments.py
+index 9d07f4832..f6622cf8e 100644
+--- a/backends/megatron/Megatron-LM-250624/megatron/training/arguments.py
++++ b/backends/megatron/Megatron-LM-250624/megatron/training/arguments.py
+@@ -2287,8 +2287,8 @@ def _add_distributed_args(parser):
+     group.add_argument('--overlap-p2p-communication-warmup-flush', action='store_true',
+                        default=False, help='if set, overlap pipeline parallel communication in warmup and flush',
+                        dest='overlap_p2p_comm_warmup_flush')
+-    group.add_argument('--distributed-backend', default='nccl',
+-                       choices=['nccl', 'gloo'],
++    group.add_argument('--distributed-backend', default='sccl',
++                       choices=['nccl', 'gloo', 'sccl'],
+                        help='Which backend to use for distributed training.')
+     group.add_argument('--distributed-timeout-minutes', type=int, default=10,
+                        help='Timeout minutes for torch.distributed.')
+diff --git a/backends/megatron/Megatron-LM-250624/megatron/training/initialize.py b/backends/megatron/Megatron-LM-250624/megatron/training/initialize.py
+index b4b5aa027..bbdc8aba7 100644
+--- a/backends/megatron/Megatron-LM-250624/megatron/training/initialize.py
++++ b/backends/megatron/Megatron-LM-250624/megatron/training/initialize.py
+@@ -315,7 +315,10 @@ def _initialize_distributed(get_embedding_ranks, get_position_embedding_ranks, s
+             print("> initializing torch distributed ...", flush=True)
+         # Manually set the device ids.
+         if device_count > 0:
+-            torch.cuda.set_device(args.local_rank)
++            import torch_tpu
++            pg_options = torch_tpu.ProcessGroupSCCLOptions()
++            torch_tpu.tpu.set_chip_map(pg_options, use_rank_table=False)
++            torch_tpu.tpu.set_device(args.local_rank)
+             device_id = torch.device(f'cuda:{args.local_rank}')
+         else:
+             device_id = None
+@@ -331,6 +334,7 @@ def _initialize_distributed(get_embedding_ranks, get_position_embedding_ranks, s
+             'world_size': args.world_size,
+             'rank': args.rank,
+             'timeout': timedelta(minutes=args.distributed_timeout_minutes),
++            'pg_options': pg_options if pg_options is not None else None,
+         }
+ 
+         torch.distributed.init_process_group(**init_process_group_kwargs)
+diff --git a/backends/megatron/Megatron-LM-250624/megatron/training/training.py b/backends/megatron/Megatron-LM-250624/megatron/training/training.py
+index d32aca014..1b6e30aca 100644
+--- a/backends/megatron/Megatron-LM-250624/megatron/training/training.py
++++ b/backends/megatron/Megatron-LM-250624/megatron/training/training.py
+@@ -1389,7 +1389,8 @@ def train_step(forward_step_func, data_iterator, model, optimizer, opt_param_sch
+             )
+         else:
+             adjust_tensor_shapes_fn = None
+-
++        torch.tpu.synchronize()
++        timestamp = time.time()
+         # Forward pass.
+         forward_backward_func = get_forward_backward_func()
+         losses_reduced = forward_backward_func(
+@@ -1421,7 +1422,8 @@ def train_step(forward_step_func, data_iterator, model, optimizer, opt_param_sch
+     timers('optimizer', log_level=1).start(barrier=args.barrier_with_L1_time)
+     update_successful, grad_norm, num_zeros_in_grad = optimizer.step()
+     timers('optimizer').stop()
+-
++    torch.tpu.synchronize()
++    print(f"Time elapsed for iter {args.curr_iteration}: {time.time() - timestamp}")
+     # when freezing sub-models we may have a mixture of successful and unsucessful ranks,
+     # so we must gather across mp ranks
+     update_successful = logical_and_across_model_parallel_group(update_successful)
+diff --git a/backends/megatron/Megatron-LM-250624/megatron/training/utils.py b/backends/megatron/Megatron-LM-250624/megatron/training/utils.py
+index 698c5a07d..6b2811612 100644
+--- a/backends/megatron/Megatron-LM-250624/megatron/training/utils.py
++++ b/backends/megatron/Megatron-LM-250624/megatron/training/utils.py
+@@ -256,10 +256,10 @@ def report_memory(name):
+     """Simple GPU memory report."""
+     mega_bytes = 1024.0 * 1024.0
+     string = name + ' memory (MB)'
+-    string += ' | allocated: {}'.format(torch.cuda.memory_allocated() / mega_bytes)
+-    string += ' | max allocated: {}'.format(torch.cuda.max_memory_allocated() / mega_bytes)
+-    string += ' | reserved: {}'.format(torch.cuda.memory_reserved() / mega_bytes)
+-    string += ' | max reserved: {}'.format(torch.cuda.max_memory_reserved() / mega_bytes)
++    string += ' | allocated: {}'.format(0 / mega_bytes)
++    string += ' | max allocated: {}'.format(0 / mega_bytes)
++    string += ' | reserved: {}'.format(0 / mega_bytes)
++    string += ' | max reserved: {}'.format(0 / mega_bytes)
+     if mpu.get_data_parallel_rank() == 0:
+         print("[Rank {}] {}".format(torch.distributed.get_rank(), string), flush=True)
+ 
+Submodule backends/megatron/PAI-Megatron-LM-240718 contains modified content
+diff --git a/backends/megatron/PAI-Megatron-LM-240718/megatron/core/safe_globals.py b/backends/megatron/PAI-Megatron-LM-240718/megatron/core/safe_globals.py
+index 94a05e03c..7ae972f5e 100755
+--- a/backends/megatron/PAI-Megatron-LM-240718/megatron/core/safe_globals.py
++++ b/backends/megatron/PAI-Megatron-LM-240718/megatron/core/safe_globals.py
+@@ -7,7 +7,8 @@ from types import SimpleNamespace
+ import torch
+ from numpy import dtype, ndarray
+ from numpy.core.multiarray import _reconstruct
+-from numpy.dtypes import UInt32DType
++# from numpy.dtypes import UInt32DType
++UInt32DType = dtype('float64')
+ 
+ from megatron.core.enums import ModelType
+ from megatron.core.rerun_state_machine import RerunDiagnostic, RerunMode, RerunState
+diff --git a/examples/qwen3/pretrain_qwen.py b/examples/qwen3/pretrain_qwen.py
+index 673239b..fa4b266 100644
+--- a/examples/qwen3/pretrain_qwen.py
++++ b/examples/qwen3/pretrain_qwen.py
+@@ -21,6 +21,15 @@ import inspect
+ from megatron.core.enums import ModelType
+ from megatron.core.models.gpt import GPTModel
+ from megatron_patch.tokenizer import build_tokenizer
++torch.set_printoptions(profile="full")
++# try:
++import torch_tpu
++from torch_tpu import accelerator
++# except ImportError:
++    # import sys, os
++    # sys.path.append(os.path.join(os.path.dirname(__file__), "..", "..", "..", "tpu-train", "torch_tpu"))
++    # import accelerator
++
+ """
+ from megatron_patch.model.qwen3_moe.gpt_layer_specs import (
+     get_gpt_decoder_block_spec,
+@@ -44,6 +53,8 @@ from megatron.training import get_args, pretrain, print_rank_0
+ 
+ torch._dynamo.config.suppress_errors = True
+ 
++from megatron.core.jit import jit_fuser
++jit_fuser = lambda func, *args, **kwargs: func
+ 
+ def model_provider(pre_process=True, post_process=True) -> Union[GPTModel]:
+     """Builds the model.
+diff --git a/examples/qwen3/run_mcore_qwen3.sh b/examples/qwen3/run_mcore_qwen3.sh
+index e65f03b..d2b53cf 100644
+--- a/examples/qwen3/run_mcore_qwen3.sh
++++ b/examples/qwen3/run_mcore_qwen3.sh
+@@ -12,11 +12,11 @@ if [ $ENV = dsw ]; then
+     MASTER_PORT=$(shuf -n 1 -i 10000-65535)
+     NNODES=1
+     NODE_RANK=0
+-    GPUS_PER_NODE=`python -c "import torch; print(torch.cuda.device_count())"`
++    GPUS_PER_NODE=2
+ elif [ $ENV = dlc ]; then
+     NNODES=${WORLD_SIZE}
+     NODE_RANK=${RANK}
+-    GPUS_PER_NODE=${KUBERNETES_CONTAINER_RESOURCE_GPU}
++    GPUS_PER_NODE=2
+ fi
+ 
+ 
+@@ -271,16 +271,11 @@ if [ -z ${MP_SFT_PACKING} ]; then
+ fi
+ 
+ TP_COMM_OVERLAP=$(( ($TP > 1) ? 1 : 0 ))
+-comm_overlap_option="\
+-    --overlap-grad-reduce \
+-    --overlap-param-gather"
++comm_overlap_option=" "
+ 
+ 
+ if [ $TP_COMM_OVERLAP -eq 1 ]; then
+-    comm_overlap_option="\
+-        --tp-comm-overlap \
+-        --overlap-grad-reduce \
+-        --overlap-param-gather"
++    comm_overlap_option=" "
+ fi
+ 
+ if [ $AC = full ]; then
+@@ -305,8 +300,7 @@ elif [ $AC = offload ]; then
+ 		    --cpu-offloading-num-layers ${MP_AC_LAYERS}"
+     if [ $TP_COMM_OVERLAP -eq 1 ]; then
+         echo "Disable --overlap-grad-reduce and --overlap-param-gather when cpu offloading is on..."
+-        comm_overlap_option="\
+-            --tp-comm-overlap"
++        comm_overlap_option=" "
+     else
+         echo "Disable --overlap-grad-reduce and --overlap-param-gather when cpu offloading is on..."
+         comm_overlap_option=""
+@@ -344,8 +338,7 @@ fi
+ 
+ 
+ if [ $SP = true ] && [ $TP -gt 1 ]; then
+-    sp_option=" \
+-		    --sequence-parallel"
++    sp_option=" "
+ 
+ elif [ $SP = false ]; then
+     sp_option=" \
+@@ -384,7 +377,9 @@ fi
+ if [ $SFT = true ]; then
+     TRAIN_ITERS=${25}
+     LR_WARMUP_ITERS=${26}
++    echo "[sft] TRAIN_ITERS: ${TRAIN_ITERS} LR_WARMUP_ITERS: ${LR_WARMUP_ITERS}"
+     LR_DECAY_ITERS=$(( ${TRAIN_ITERS} - ${LR_WARMUP_ITERS}))
++    echo "[sft] TRAIN_ITERS: ${TRAIN_ITERS} LR_WARMUP_ITERS: ${LR_WARMUP_ITERS} LR_DECAY_ITERS: ${LR_DECAY_ITERS}"
+     PREFIX="finetune-mcore-qwen3-moe-megatron-${MODEL_SIZE}-lr-${LR}-minlr-${MIN_LR}-bs-${BATCH_SIZE}-gbs-${GLOBAL_BATCH_SIZE}-seqlen-${SEQ_LEN}"
+     sft_options=" \
+          --eod-mask-loss \
+@@ -437,6 +432,7 @@ find -L ${PRETRAIN_CHECKPOINT_PATH} -maxdepth 1 -type f -name "merges.txt" -prin
+ 
+ megatron_options="  \
+         --save ${SAVED_PRETRAIN_CHECKPOINT_PATH} \
++        --save-interval 1000 \
+         --lr ${LR} \
+         --min-lr ${MIN_LR} \
+         --lr-decay-style cosine \
+@@ -461,9 +457,8 @@ megatron_options="  \
+         --max-padding-length ${PAD_LEN} \
+         --log-interval 1 \
+         --log-throughput \
+-        --eval-interval 10000 \
++        --eval-interval 100 \
+         --eval-iters 10 \
+-        --save-interval ${SAVE_INTERVAL} \
+         --tensorboard-queue-size 1 \
+         --tensorboard-dir ${TENSORBOARD_DIR} \
+         --log-timers-to-tensorboard \
+@@ -485,11 +480,21 @@ megatron_options="  \
+         --rotary-base ${ROPE_THETA} \
+         --no-save-optim \
+         --ckpt-format torch_dist \
+-        --transformer-impl transformer_engine \
++        --transformer-impl local \
+         --cross-entropy-loss-fusion \
+         --qk-layernorm \
+-        --kv-channels 128 
+-
++        --kv-channels 128 \
++        --no-persist-layer-norm \
++        --no-gradient-accumulation-fusion
++        --no-rope-fusion \
++        --use-cpu-initialization \
++        --disable-tp-comm-bulk-dgrad \
++        --disable-tp-comm-bulk-wgrad \
++        --no-gradient-reduce-div-fusion
++        --accumulate-allreduce-grads-in-fp32 \
++        --overlap-grad-reduce \
++        --no-masked-softmax-fusion
++        --ckpt-assume-constant-structure \
+         "
+ 
+ #        --add-qkv-bias \ # no qkv bias
+diff --git a/megatron_patch/data/utils.py b/megatron_patch/data/utils.py
+index 3652046..b191148 100644
+--- a/megatron_patch/data/utils.py
++++ b/megatron_patch/data/utils.py
+@@ -157,12 +157,12 @@ def get_batch_on_this_tp_rank_original(data_iterator, per_seq_average=False):
+             loss_mask = loss_mask / loss_mask.sum(dim=-1, keepdims=True) # [mbs]       
+ 
+         batch = {
+-            'tokens': tokens.cuda(non_blocking=True),
+-            'labels': labels.cuda(non_blocking=True),
+-            'loss_mask': loss_mask.cuda(non_blocking=True),
+-            'attention_mask': attention_mask.cuda(non_blocking=True),
+-            'position_ids': position_ids.cuda(non_blocking=True),
+-            'num_seqs': num_seqs.cuda(non_blocking=True) if num_seqs is not None else None
++            'tokens': tokens.cuda(non_blocking=False),
++            'labels': labels.cuda(non_blocking=False),
++            'loss_mask': loss_mask.cuda(non_blocking=False),
++            'attention_mask': attention_mask.cuda(non_blocking=False),
++            'position_ids': position_ids.cuda(non_blocking=False),
++            'num_seqs': num_seqs.cuda(non_blocking=False) if num_seqs is not None else None
+         }
+ 
+         if args.pipeline_model_parallel_size == 1:
+@@ -271,7 +271,7 @@ def get_position_id_on_this_tp_rank_idxmap_sft_packing(data_iterator):
+         actual_seqlen = args.seq_length
+         data['tokens'] = data['tokens'].long()
+         tokens = data['tokens'][..., :actual_seqlen]
+-        position_ids = get_ltor_position_ids_packed_seq(tokens).cuda(non_blocking=True)
++        position_ids = get_ltor_position_ids_packed_seq(tokens).cuda(non_blocking=False)
+     else:
+         # dtype: long
+         position_ids = torch.empty((args.micro_batch_size, args.seq_length), dtype=torch.int64,
+@@ -341,12 +341,12 @@ def get_batch_on_this_tp_rank_idxmap_sft(data_iterator, per_seq_average=False):
+                 
+         # dtype: long, long, float, bool, long
+         batch = {
+-            'tokens': tokens.cuda(non_blocking=True),
+-            'labels': labels.cuda(non_blocking=True),
+-            'loss_mask': loss_mask.cuda(non_blocking=True),
+-            'attention_mask': attention_mask.cuda(non_blocking=True) if attention_mask is not None else None,
+-            'position_ids': position_ids.cuda(non_blocking=True),
+-            'num_seqs': num_seqs.cuda(non_blocking=True) if num_seqs is not None else None
++            'tokens': tokens.cuda(non_blocking=False),
++            'labels': labels.cuda(non_blocking=False),
++            'loss_mask': loss_mask.cuda(non_blocking=False),
++            'attention_mask': attention_mask.cuda(non_blocking=False) if attention_mask is not None else None,
++            'position_ids': position_ids.cuda(non_blocking=False),
++            'num_seqs': num_seqs.cuda(non_blocking=False) if num_seqs is not None else None
+         }
+ 
+         if args.pipeline_model_parallel_size == 1:
+diff --git a/megatron_patch/template/helper.py b/megatron_patch/template/helper.py
+index c135fe6..25eef26 100644
+--- a/megatron_patch/template/helper.py
++++ b/megatron_patch/template/helper.py
+@@ -149,7 +149,7 @@ def loss_func(loss_mask: torch.Tensor, num_seqs: torch.Tensor, output_tensor: to
+     # Check individual rank losses are not NaN prior to DP all-reduce.
+     if args.check_for_nan_in_loss_and_grad:
+         global_rank = torch.distributed.get_rank()
+-        assert not loss.isnan().any(), (
++        assert not loss.cpu().isnan().any(), (
+             f"Rank {global_rank}: found NaN in local forward loss calculation. "
+             f"Device: {torch.cuda.current_device()}, node: {os.uname()[1]}"
+         )
+@@ -160,7 +160,7 @@ def loss_func(loss_mask: torch.Tensor, num_seqs: torch.Tensor, output_tensor: to
+     # NOTE: The grad will be scaled down by CP size later, should not remove this multilication factor
+     # LINK: https://github.com/NVIDIA/Megatron-LM/issues/906
+     # The issue is solved since 0926
+-
++    # print(f"loss : {averaged_loss}")
+     if num_seqs is None:
+         # average on token-level
+         return loss[0] / loss[1] * args.context_parallel_size, {"lm loss": averaged_loss}
+diff --git a/toolkits/distributed_checkpoints_convertor/impl/convert.py b/toolkits/distributed_checkpoints_convertor/impl/convert.py
+index f2d57b2..3bdb64f 100644
+--- a/toolkits/distributed_checkpoints_convertor/impl/convert.py
++++ b/toolkits/distributed_checkpoints_convertor/impl/convert.py
+@@ -12,7 +12,10 @@ global_vars.build_tokenizer = partial(global_vars.build_tokenizer, trust_remote_
+ from megatron.training.initialize import initialize_megatron
+ from megatron.training import get_args
+ 
+-@torch.inference_mode()
++import torch_tpu
++from torch_tpu import accelerator
++
++@torch.no_grad()
+ def convert(
+     synchronizer,
+     pretrain_script,
+diff --git a/toolkits/distributed_checkpoints_convertor/impl/general/h2m_synchronizer.py b/toolkits/distributed_checkpoints_convertor/impl/general/h2m_synchronizer.py
+index 4fb21a2..f96be18 100644
+--- a/toolkits/distributed_checkpoints_convertor/impl/general/h2m_synchronizer.py
++++ b/toolkits/distributed_checkpoints_convertor/impl/general/h2m_synchronizer.py
+@@ -60,8 +60,12 @@ class HF2MGSynchronizer(BaseSynchronizer):
+         if not self.args.untie_embeddings_and_output_weights and key == 'lm_head.weight':
+             key = 'model.embed_tokens.weight'
+         file = _get_filename_from_key(key)
+-        with safe_open(file, framework="pt", device=str(self.device)) as f:
+-            return f.get_tensor(key)
++        # with safe_open(file, framework="pt", device=str(self.device)) as f:
++        #     return f.get_tensor(key)
++        with safe_open(file, framework="pt", device="cpu") as f:
++            tensor = f.get_tensor(key)
++            return tensor.to(self.device)
++            
+     
+     def _copy_impl(
+         self, 
+@@ -275,14 +279,14 @@ class HF2MGSynchronizer(BaseSynchronizer):
+             self.copy(hf_layer.input_layernorm.weight, layer.input_layernorm.weight)
+         else:
+             self.set_selfattn_state(layer.self_attention, hf_layer.self_attn)
+-            self.copy(hf_layer.input_layernorm.weight, layer.self_attention.linear_qkv.layer_norm_weight)
++            self.copy(hf_layer.input_layernorm.weight, layer.input_layernorm.weight)
+         
+         if hasattr(layer.mlp, 'router'):
+             self.set_moe_layer_state(layer.mlp, hf_layer.mlp)
+             self.copy(hf_layer.post_attention_layernorm.weight, layer.pre_mlp_layernorm.weight)
+         else:
+             self.set_mlp_state(layer.mlp, hf_layer.mlp)
+-            self.copy(hf_layer.post_attention_layernorm.weight, layer.mlp.linear_fc1.layer_norm_weight)
++            self.copy(hf_layer.post_attention_layernorm.weight, layer.pre_mlp_layernorm.weight)
+ 
+     def check_and_save(self, output_dir):
+         if self.debug:
+diff --git a/toolkits/distributed_checkpoints_convertor/impl/general/m2h_synchronizer.py b/toolkits/distributed_checkpoints_convertor/impl/general/m2h_synchronizer.py
+index 2458c52..40da84f 100644
+--- a/toolkits/distributed_checkpoints_convertor/impl/general/m2h_synchronizer.py
++++ b/toolkits/distributed_checkpoints_convertor/impl/general/m2h_synchronizer.py
+@@ -14,7 +14,7 @@ from huggingface_hub.serialization import split_torch_state_dict_into_shards
+ from megatron.training.checkpointing import load_checkpoint
+ 
+ from general.synchronizer import BaseSynchronizer, ParamType
+-
++import torch_tpu
+ class ParamMergeError(ValueError):
+     ...
+ 
+@@ -295,14 +295,14 @@ class MG2HFSynchronizer(BaseSynchronizer):
+             self.copy(layer.input_layernorm.weight, hf_layer.input_layernorm.weight)
+         else:
+             self.set_selfattn_state(layer.self_attention, hf_layer.self_attn)
+-            self.copy(layer.self_attention.linear_qkv.layer_norm_weight, hf_layer.input_layernorm.weight)
++            self.copy(layer.input_layernorm.weight, hf_layer.input_layernorm.weight)
+ 
+         if hasattr(layer.mlp, 'router'):
+             self.set_moe_layer_state(layer.mlp, hf_layer.mlp)
+             self.copy(layer.pre_mlp_layernorm.weight, hf_layer.post_attention_layernorm.weight)
+         else:
+             self.set_mlp_state(layer.mlp, hf_layer.mlp)
+-            self.copy(layer.mlp.linear_fc1.layer_norm_weight, hf_layer.post_attention_layernorm.weight)
++            self.copy(layer.pre_mlp_layernorm.weight, hf_layer.post_attention_layernorm.weight)
+ 
+     def check_and_save(self, output_dir):
+         sharded_info = split_torch_state_dict_into_shards(
+@@ -414,7 +414,16 @@ class MG2HFSynchronizer(BaseSynchronizer):
+         )
+         for param_id in self._local_params.keys():
+             self._has_param[self.rank][param_id] = True
+-        dist.all_gather_into_tensor(self._has_param, self._has_param[self.rank])
++        # dist.all_gather_into_tensor(self._has_param, self._has_param[self.rank])
++
++        ## workaround for TPU
++        has_param_int = self._has_param[self.rank].to(dtype=torch.int32)
++        has_param_gathered = torch.zeros(
++            [self.world_size, len(self._hf_params_key_to_id)], dtype=torch.int32, device=self.device
++        )
++        dist.all_gather_into_tensor(has_param_gathered, has_param_int)
++        self._has_param = has_param_gathered.to(dtype=torch.bool)
++
+         self._has_param = self._has_param.T        
+         # param_id --> tensor_shape  Dict[int, Tuple[int, ...]]
+         # param_id --> tensor_dtype  Dict[int, dtype]
+@@ -476,16 +485,16 @@ class MG2HFSynchronizer(BaseSynchronizer):
+             shape = self._tensor_shape[param_id]
+             dtype = self._tensor_dtype[param_id]
+ 
+-            offset = shape.numel() * dtype.itemsize
+-            datas.append(buffer[start:start + offset].view(dtype).view(shape).clone())
++            offset = shape.numel()
++            datas.append(buffer[start:start + offset].view(shape).to(dtype).clone())
+             start += offset
+         
+         if start != buffer.numel():
+-            raise ValueError(f"Expect {start} bytes from remote, but got {buffer.numel()} bytes!")
++            raise ValueError(f"Expect {start} bytes from remote, but got {buffer.numel()} elements!")
+         return datas
+ 
+     def _pack_into_byte_buffer(self, tensors: List[torch.Tensor]) -> torch.Tensor:
+-        return torch.cat([t.flatten().view(torch.uint8) for t in tensors])
++        return torch.cat([t.flatten().to(torch.float32) for t in tensors])
+ 
+     def _build_p2p_ops(self, required_keys: List[str]):
+         required_ids = torch.zeros(
+@@ -493,7 +502,15 @@ class MG2HFSynchronizer(BaseSynchronizer):
+         )
+         for k in required_keys:
+             required_ids[self.rank][self._hf_params_key_to_id[k]] = True
+-        dist.all_gather_into_tensor(required_ids, required_ids[self.rank])
++        # dist.all_gather_into_tensor(required_ids, required_ids[self.rank])
++        
++        ## workaround for TPU
++        required_ids_int = required_ids[self.rank].to(dtype=torch.int32)
++        required_ids_gathered = torch.zeros(
++            [self.world_size, self.hf_size], dtype=torch.int32, device=self.device
++        )
++        dist.all_gather_into_tensor(required_ids_gathered, required_ids_int)
++        required_ids = required_ids_gathered.to(dtype=torch.bool)
+ 
+         send_ops = []
+         if self.debug:
+@@ -548,7 +565,7 @@ class MG2HFSynchronizer(BaseSynchronizer):
+                     recv_param_ids[remote_rank].append(param_id)
+                     shape = self._tensor_shape[param_id]
+                     dtype = self._tensor_dtype[param_id]
+-                    buffer_size[remote_rank] += shape.numel() * dtype.itemsize
++                    buffer_size[remote_rank] += shape.numel()
+                     if self.debug:
+                         send_recv_pattern[param_id, remote_rank, self.rank] -= 1
+         
+@@ -556,7 +573,7 @@ class MG2HFSynchronizer(BaseSynchronizer):
+         for remote_rank, rank_size in enumerate(buffer_size):
+             if rank_size == 0:
+                 continue
+-            buffers[remote_rank] = torch.empty(rank_size, dtype=torch.uint8, device=self.device)
++            buffers[remote_rank] = torch.empty(rank_size, dtype=torch.float, device=self.device)
+             recv_ops.append(dist.P2POp(
+                 dist.irecv,
+                 buffers[remote_rank], 
+@@ -573,7 +590,51 @@ class MG2HFSynchronizer(BaseSynchronizer):
+                 raise ValueError("Mismatched send/recv ops detected.")
+             logging.debug(f"[RANK {self.rank}] {len(send_ops)} send op & {len(recv_ops)} recv op.")
+ 
+-        return collected_data, buffers, send_param_ids, recv_param_ids, (send_ops + recv_ops)
++        # Build ops list to avoid deadlock
++        # Strategy: interleave send/recv ops, with send to lower rank first
++        # This ensures sends and recvs are properly paired across ranks
++        ops = []
++        
++        # Create a combined list of (op, peer_rank, is_send) tuples for sorting
++        op_info_list = []
++        for op in send_ops:
++            op_info_list.append((op, op.peer, True))  # True = send
++        for op in recv_ops:
++            op_info_list.append((op, op.peer, False))  # False = recv
++        
++        if len(op_info_list) > 0:
++            # Sort by: 1) peer rank, 2) operation type (recv before send for same peer)
++            # This groups operations by peer and ensures proper ordering
++            op_info_list.sort(key=lambda x: (x[1], x[2]))  # sort by (peer, is_send)
++            
++            # For each peer, decide send/recv order based on rank comparison
++            current_peer = None
++            peer_ops = []
++            
++            for op, peer, is_send in op_info_list:
++                if current_peer is not None and peer != current_peer:
++                    # Process previous peer's ops
++                    if self.rank < current_peer:
++                        # Lower rank sends first
++                        peer_ops.sort(key=lambda x: 0 if x[2] else 1)  # send before recv
++                    else:
++                        # Higher rank recvs first
++                        peer_ops.sort(key=lambda x: 1 if x[2] else 0)  # recv before send
++                    ops.extend([x[0] for x in peer_ops])
++                    peer_ops = []
++                
++                current_peer = peer
++                peer_ops.append((op, peer, is_send))
++            
++            # Process last peer's ops
++            if len(peer_ops) > 0:
++                if self.rank < current_peer:
++                    peer_ops.sort(key=lambda x: 0 if x[2] else 1)  # send before recv
++                else:
++                    peer_ops.sort(key=lambda x: 1 if x[2] else 0)  # recv before send
++                ops.extend([x[0] for x in peer_ops])
++
++        return collected_data, buffers, send_param_ids, recv_param_ids, ops
+ 
+     def _merge_data(self, merge_type: ParamType, tensor_dict) -> torch.Tensor:
+         """Merge ShardedTensor collected across the group on this rank.
+diff --git a/toolkits/distributed_checkpoints_convertor/impl/general/synchronizer.py b/toolkits/distributed_checkpoints_convertor/impl/general/synchronizer.py
+index 5bb5c80..4fa6214 100644
+--- a/toolkits/distributed_checkpoints_convertor/impl/general/synchronizer.py
++++ b/toolkits/distributed_checkpoints_convertor/impl/general/synchronizer.py
+@@ -90,9 +90,8 @@ class BaseSynchronizer(ABC):
+     
+     def sync_params(self, mg_model = None, hf_model = None):
+         # assume TE backend
+-        if self.args.transformer_impl != "transformer_engine":
+-            raise NotImplementedError("Currently only TE model is implemented.")
+-        
++        # if self.args.transformer_impl != "transformer_engine":
++        #     raise NotImplementedError("Currently only TE model is implemented.")
+         if mg_model is None:
+             mg_model = self._mgmodel
+         if hf_model is None:
+diff --git a/toolkits/distributed_checkpoints_convertor/scripts/qwen3/run_8xH20.sh b/toolkits/distributed_checkpoints_convertor/scripts/qwen3/run_8xH20.sh
+index 273e57a..9448749 100644
+--- a/toolkits/distributed_checkpoints_convertor/scripts/qwen3/run_8xH20.sh
++++ b/toolkits/distributed_checkpoints_convertor/scripts/qwen3/run_8xH20.sh
+@@ -10,7 +10,7 @@ export TORCH_FORCE_NO_WEIGHTS_ONLY_LOAD=true # for PyTorch >= 2.6
+ 
+ NUM_NODES=${WORLD_SIZE:-1}
+ NODE_RANK=${RANK:-0}
+-GPUS_PER_NODE=${KUBERNETES_CONTAINER_RESOURCE_GPU:-8}
++GPUS_PER_NODE=${KUBERNETES_CONTAINER_RESOURCE_GPU:-2}
+ MASTER_ADDR=${MASTER_ADDR:-localhost}
+ MASTER_PORT=${MASTER_PORT:-6000}
+ 
+@@ -153,8 +153,8 @@ elif [ $MODEL_SIZE = 8B ]; then
+     )
+     if [ -z  ${MODEL_PARALLEL_ARGS} ]; then
+         MODEL_PARALLEL_ARGS=(
+-            --tensor-model-parallel-size 1
+-            --pipeline-model-parallel-size 4
++            --tensor-model-parallel-size 2
++            --pipeline-model-parallel-size 1
+         )
+     fi
+ elif [ $MODEL_SIZE = 14B ]; then 
+@@ -230,6 +230,11 @@ TRAINING_ARGS=(
+     --min-lr 6.0e-6
+     --lr-warmup-fraction .001 
+     --lr-decay-iters 430000 
++    --no-persist-layer-norm
++    --no-gradient-accumulation-fusion
++    --no-rope-fusion
++    --transformer-impl local
++    --use-cpu-initialization
+ )
+ 
+ EVAL_AND_LOGGING_ARGS=(
+diff --git a/toolkits/sft_data_preprocessing/build_idxmap_sft_dataset.py b/toolkits/sft_data_preprocessing/build_idxmap_sft_dataset.py
+index 920e5d4..f589d01 100644
+--- a/toolkits/sft_data_preprocessing/build_idxmap_sft_dataset.py
++++ b/toolkits/sft_data_preprocessing/build_idxmap_sft_dataset.py
+@@ -239,7 +239,7 @@ def get_args():
+         '--patch-tokenizer-type',
+         type=str,
+         required=True,
+-        choices=['Qwen2Tokenizer', 'LLamaTokenizer', 'DeepSeekV2Tokenizer', 'LLama3Tokenizer'],
++        choices=['Qwen2Tokenizer', 'LLamaTokenizer', 'DeepSeekV2Tokenizer', 'LLama3Tokenizer', 'Qwen3Tokenizer'],
+         help='What type of tokenizer to use.',
+     )
+     group.add_argument('--load',
+diff --git a/toolkits/sft_data_preprocessing/run_build_idxmap_sft_dataset.sh b/toolkits/sft_data_preprocessing/run_build_idxmap_sft_dataset.sh
+index 87e9592..86263dc 100644
+--- a/toolkits/sft_data_preprocessing/run_build_idxmap_sft_dataset.sh
++++ b/toolkits/sft_data_preprocessing/run_build_idxmap_sft_dataset.sh
+@@ -2,7 +2,8 @@
+ START_TIME=$SECONDS
+ 
+ CURRENT_DIR="$( cd "$( dirname "$0" )" && pwd )"
+-MEGATRON_PATCH_PATH=$( dirname $(dirname $( dirname ${CURRENT_DIR})))
++MEGATRON_PATCH_PATH=$( dirname  $( dirname ${CURRENT_DIR}))
++echo ${MEGATRON_PATCH_PATH}
+ export PYTHONPATH=$PYTHONPATH:${MEGATRON_PATCH_PATH}:${MEGATRON_PATCH_PATH}/backends/megatron/PAI-Megatron-LM-240718
+ 
+ 
