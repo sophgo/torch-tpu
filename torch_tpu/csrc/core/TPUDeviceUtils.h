@@ -57,7 +57,7 @@ inline void maybe_initialize_tpu(at::TensorOptions& options) {
 inline void maybe_initialize_tpu(at::Device& device) {
   if (torch_tpu::utils::is_tpu(device)) {
     if (device.index() < 0) {
-      device.set_index(0);
+      device.set_index(tpu::TPUGetDeviceIndex());
     }
         auto status = tpu::TPUDeviceInitialize(device.index());
     if (status != tpu::INIT_SUCCESS) {
