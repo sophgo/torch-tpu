@@ -66,6 +66,7 @@ TORCH_LIBRARY_IMPL(aten, TPU, m) { m.impl("zero_", zero__tpu); }
 
 Tensor &masked_fill_Scalar_tpu(Tensor &self, const Tensor &mask,
                                const Scalar &value) {
+  TIMING_START;
   CHECK_TENSOR_IN_DEVICE(self);
   CHECK_TENSOR_IN_DEVICE(mask);
   auto mask_dim = mask.dim();
@@ -78,22 +79,17 @@ Tensor &masked_fill_Scalar_tpu(Tensor &self, const Tensor &mask,
   tpu::TPUCopyHostToDevice(self.data_ptr(), self_cpu.contiguous().data_ptr(),
                            self.nbytes());
 #else
-  Tensor o = self.clone();
-  Tensor &out = o;
-  Tensor maski = mask.clone().to(self.dtype());
+  Tensor maski = mask.to(self.dtype());
   Tensor &mask_int = maski;
-  TIMING_START;
-
 
   auto stream = c10_tpu::getCurrentTPUStream();
   auto status = tpudnnMaskedFillAsync(
       stream,
       tpu::TPUGenerateTpudnnTensor(stream, self),
       tpu::TPUGenerateTpudnnTensor(stream, mask_int),
-      value.toDouble(),
-      tpu::TPUGenerateTpudnnTensor(stream, out));
+      value.toFloat(),
+      tpu::TPUGenerateTpudnnTensor(stream, self));
   TORCH_CHECK(status == TPUDNN_STATUS_SUCCESS);
-  self = out.clone();
 #endif
   TIMING_END;
   SHOW_TENSOR_OP(self, mask);
