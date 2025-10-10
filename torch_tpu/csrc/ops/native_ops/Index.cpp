@@ -163,6 +163,17 @@ TORCH_LIBRARY_IMPL ( aten, TPU, m )
  m.impl ( "index.Tensor_out",  index_out_tpu);
 }
 
+static bool onlyBC_last(const at::Tensor & self, const c10::List<c10::optional<at::Tensor>> & indices)
+{
+  bool ret = true;
+  for (size_t i = 0; i < indices.size(); i++)
+  {
+    if ( indices[i].has_value() && indices[i].value().defined() ) { continue; }
+    else { ret = false; break;}
+  }
+  return ret;
+}
+
 Tensor index_tpu(const at::Tensor & self, const c10::List<c10::optional<at::Tensor>> & indices)
 {
   TIMING_START;
@@ -170,30 +181,73 @@ Tensor index_tpu(const at::Tensor & self, const c10::List<c10::optional<at::Tens
   Tensor out;
   if ( indices.size() == 1 )
   {
-    if (indices[0].value().scalar_type() == at::ScalarType::Int)
+    auto index_ = indices[0].value().contiguous();
+    if ( index_.scalar_type() == at::ScalarType::Int )
     { 
       out = torch::index_select(self, 0, indices[0].value());
     }
-    else if (indices[0].value().scalar_type() == at::ScalarType::Bool)
+    else if ( index_.scalar_type() == at::ScalarType::Bool )
     {
-      Tensor index;
-      if (IS_TPU_TENSOR(indices[0].value())) { index = indices[0].value().cpu(); }
-      else                                   { index = indices[0].value(); }
-      int64_t num_nonzeros = torch::sum(index).item().toInt();
-      std::vector<int64_t> out_sizes = {num_nonzeros}, self_view_sizes = {index.numel()};
-      for (int i = index.dim(); i < self.dim(); i++) { out_sizes.push_back( self.size(i) ); self_view_sizes.push_back(self.size(i)); }
-      out = torch::empty(out_sizes, self.options());
-      auto index_flatten = index.view( { index.numel() } );
-      auto self_flatten  = self.view( self_view_sizes );
-      int o_i = 0;
-      for (int i = 0; i < index.numel(); i++) {
-        if (index_flatten[i].item().toBool()) { out[o_i].copy_(self_flatten[i]); o_i++; }
+      CPU_IMPL_WARNING();
+      // maskselect must malloc mem with mask's content, 
+      // have no idea how to avoid break stream, just host hack do.
+      c10::List<c10::optional<Tensor>> indices_cpu;
+      for (size_t i = 0; i < indices.size(); i++)
+      {
+          c10::optional<Tensor> indice = c10::nullopt;
+          if ( indices[i].has_value() ) {
+            if (indices[i].value().defined()) indice = indices[i].value().cpu();
+            else                              indice = indices[i].value();
+          }
+          indices_cpu.push_back(indice);
       }
+      auto out_cpu = index( self.cpu(), indices_cpu );
+      out = out_cpu.to( self.device());
+
+      // int64_t num_nonzeros = torch::sum( index_.to(torch::kInt32) ).item().toInt();
+      // std::vector<int64_t> out_sizes = {num_nonzeros};
+      // for (int i = index_.dim(); i < self.dim(); i++) { out_sizes.push_back( self.size(i) ); }
+      // out = torch::empty(out_sizes, self_.options());
+
+      // auto stream = c10_tpu::getCurrentTPUStream();
+      // auto status = tpudnnMaskedSelectAsync(
+      //     stream,
+      //     tpu::TPUGenerateTpudnnTensor(stream, self_),
+      //     tpu::TPUGenerateTpudnnTensor(stream, index_),
+      //     tpu::TPUGenerateTpudnnTensor(stream, out));
+      // TORCH_CHECK(status == TPUDNN_STATUS_SUCCESS);
     }
     else
     {
       TORCH_CHECK( false, "index_tpu should not be called here." )
     }
+  }
+  else if ( onlyBC_last(self, indices) )
+  {
+    auto final_index = zeros(indices[0].value().sizes(), indices[0].value().options());
+    int64_t C = 1;
+    for (int i = (int)indices.size() - 1; i >= 0; i--)
+    {
+      auto stream = c10_tpu::getCurrentTPUStream();
+      auto index_ = indices[i].value().contiguous();
+      auto status = tpudnnBinaryAsync(
+          stream,
+          tpu::TPUGenerateTpudnnTensor(stream, final_index),
+          tpu::TPUGenerateTpudnnTensor(stream, index_ ),
+          (float)C,
+          tpu::TPUGenerateTpudnnTensor(stream, final_index),
+          0);
+      TORCH_CHECK(status == TPUDNN_STATUS_SUCCESS);
+      C = C * self.size(i);
+    }
+    std::vector<int64_t> view_sizes = { C };
+    for (size_t i = indices.size(); i < (unsigned long)self.dim(); i++) 
+    {
+      view_sizes.push_back(self.size(i));
+    }
+    IntArrayRef size_ref( view_sizes.data(), view_sizes.size());
+    auto self_view = self.view(size_ref);
+    out = torch::index_select(self_view, 0, final_index);
   }
   else
   {
@@ -219,42 +273,6 @@ Tensor index_tpu(const at::Tensor & self, const c10::List<c10::optional<at::Tens
 TORCH_LIBRARY_IMPL ( aten, TPU, m )
 {
  m.impl ( "index.Tensor",  index_tpu);
-}
-
-// copied from torch source and modified
-static std::tuple<bool, Tensor> canDispatchToMaskedFill(const Tensor& self, const torch::List<c10::optional<at::Tensor>>& indices,
-const Tensor& value){
-  SHOW_TENSOR_OP(self);
-  if (!(value.numel() == 1 /*&& value.device().is_cpu()*/)){
-    return std::make_tuple(false,Tensor());
-  }
-  int64_t num_ind = 0;
-  Tensor mask;
-  auto self_device = self.device();
-  for (const c10::optional<Tensor>& i: indices) {
-    if (!i.has_value() || !(*i).defined()){
-      num_ind++;
-    } else {
-      const Tensor &index = *i;
-      if ((index.scalar_type() != kByte && index.scalar_type() != kBool) ||
-          index.device() != self_device || mask.defined()){
-        return std::make_tuple(false, Tensor());
-      } else {
-        mask = index;
-        for (const auto j : c10::irange(index.dim())) {
-          int64_t srcIdx = num_ind + j;
-          TORCH_CHECK_INDEX(index.size(j) == self.size(srcIdx), "The shape of the mask ", index.sizes(), " at index ", j,
-  " does not match the shape of the indexed tensor ", self.sizes(), " at index ", srcIdx);
-        }
-        num_ind += mask.ndimension();
-      }
-    }
-  }
-  for (const auto i : c10::irange(num_ind, self.ndimension())) {
-    (void)i; //Suppress unused variable warning
-    mask = mask.unsqueeze(-1);
-  }
-  return std::make_tuple(true, mask);
 }
 
 Tensor & index_put_tpu(Tensor & self, const torch::List<c10::optional<Tensor>>& indices, const Tensor & value, const bool accumulate) {

@@ -9,50 +9,63 @@ torch.set_printoptions(precision=6)
 device = "tpu:0"
 
 def case1():
-    B = 10
-    S = 34
-    H = 34
-    inp = torch.randn((B,S,H))
-    B_ind = torch.LongTensor([1, 2])
-    S_ind = torch.randint(0, S, [1,34,4])
-    inp_tpu = copy.deepcopy(inp).to(device)
-    B_ind_tpu = copy.deepcopy(B_ind).to(device)
-    S_ind_tpu = copy.deepcopy(S_ind).to(device)
-    
-    o_cpu = inp[B_ind]
-    o_tpu = inp_tpu[B_ind_tpu]
-
-    diff = o_cpu - o_tpu.cpu()
-    print("input : ", inp)
-    print("cpu : ", o_cpu)
-    print("tpu : ", o_tpu.cpu())
-    print(f"max diff : {torch.max(abs(diff))}")
-    import pdb;pdb.set_trace()
+    # the num of indexs == 1
+    cases = [ 
+                #    [(3, 804, 7), (3, 804), torch.bool ],
+                #    [(5, 995, 7), (5, 995), torch.bool ],
+                #    [(5, 995, 2), (5, 995), torch.bool ],
+                #    [(5, 1326, 7), (5, 1326), torch.bool ],
+                #    [(5, 1326, 2), (5, 1326), torch.bool ],
+                #    [(5, 1081, 7), (5, 1081), torch.bool ],
+                #    [(5, 1081, 2), (5, 1081), torch.bool ],
+                #    [(7), (2,), torch.int32 ],
+                   [(3,2), (2974,), torch.int32 ],
+                   [(3,2), (3969,), torch.int32 ],
+                  ]
+    for (ishape, indshape, inddype) in cases:
+        inp = torch.randn(ishape)
+        inp_tpu = inp.to(device)
+        if inddype == torch.bool:
+            ind = torch.randint(0, 2, indshape).bool()
+        elif inddype == torch.int32:
+            ind = torch.randint(0, 2, indshape).to(inddype)
+        ind_tpu = ind.to(device)
+        o_cpu = inp[ind]
+        o_tpu = inp_tpu[ind_tpu]
+        diff = o_cpu - o_tpu.cpu()
+        print("input : ", inp)
+        print("index : ", ind)
+        print("cpu : ", o_cpu)
+        print("tpu : ", o_tpu.cpu())
+        print(f"max diff : {torch.max(abs(diff))}")
+        import pdb;pdb.set_trace()
     
 def case2():
-    a = torch.arange(100).reshape(10, 10).float()
-    index0 = torch.arange(0, 10).int()
-    index1 = torch.randint(0, 10, (10, )).int()
-    index2 = torch.randint(0, 2, (10,)).bool()
-
-    a_tpu = a.to(device)
-    index0_tpu = index0.to(device)
-    index1_tpu = index1.to(device)
-    index2_tpu = index2.to(device)
-    
-    a[index0, index1] += 127.
-    a_tpu[index0_tpu, index1_tpu] += 127.
-    
-    a[index2] = 255
-    a_tpu[index2_tpu] = 255
-
-    print('cpu')
-    print(index0, index1)
-    print(a)
-    print('tpu')
-    print(index0_tpu.cpu(), index1_tpu.cpu())
-    print(a_tpu.cpu())
-    print('diff', torch.max(torch.abs(a - a_tpu.cpu())))
+    cases = [   # inp,               ind0,     ind1,    ind2,    ind3,  ind-dtype
+                [(64, 3, 80, 80, 85), (2974,), (2974,), (2974,), (2974,), torch.int32],
+                [(64, 3, 40, 40, 85), (3969,), (3969,), (3969,), (3969,), torch.int32],
+                [(64, 3, 20, 20, 85), (3238,), (3238,), (3238,), (3238,), torch.int32],
+            ]
+    for (ishape, ind0shape, ind1shape, ind2shape, ind3shape, inddype) in cases:
+        inp = torch.randn(ishape)
+        inp_tpu = inp.to(device)
+        ind0 = torch.randint(0, inp.shape[0], ind0shape).to(inddype)
+        ind0_tpu = ind0.to(device)     
+        ind1 = torch.randint(0, inp.shape[1], ind1shape).to(inddype)
+        ind1_tpu = ind1.to(device)     
+        ind2 = torch.randint(0, inp.shape[2], ind2shape).to(inddype)
+        ind2_tpu = ind2.to(device)     
+        ind3 = torch.randint(0, inp.shape[3], ind3shape).to(inddype)
+        ind3_tpu = ind3.to(device)
+        o_cpu = inp[ ind0, ind1, ind2, ind3]
+        o_tpu = inp_tpu[ ind0_tpu, ind1_tpu, ind2_tpu, ind3_ tpu]
+        
+        diff = o_cpu - o_tpu.cpu()
+        print("input : ", inp)
+        print("cpu : ", o_cpu)
+        print("tpu : ", o_tpu.cpu())
+        print(f"max diff : {torch.max(abs(diff))}")
+        import pdb;pdb.set_trace()
 
 def case3():
     w = torch.randn((4001, 8192), dtype=torch.float16)
@@ -122,8 +135,8 @@ def case6():
 
 if __name__ == "__main__":
     # case1()
-    # case2()
+    case2()
     # case3()
     # case4()
     # case5()
-    case6()
+    # case6()

@@ -92,13 +92,27 @@ TORCH_LIBRARY_IMPL ( aten, TPU, m )
 }
 
 Tensor masked_select_tpu(const at::Tensor & self, const at::Tensor & mask) {
+  TIMING_START;
   CHECK_TENSOR_IN_DEVICE ( self );
   CHECK_TENSOR_IN_DEVICE ( mask );
-#if 1
+#if 0
   LOG( WARNING ) << __func__ << " use cpu impl.";
   auto out_cpu = masked_select( self.cpu(), mask.cpu() );
   auto out = TENSOR_TO_TPU ( out_cpu );
+#else
+  int64_t num_nonzeros = torch::sum( mask ).item().toInt();
+  std::vector<int64_t> out_sizes = {num_nonzeros};
+  for (int i = mask.dim(); i < self.dim(); i++) { out_sizes.push_back( self.size(i) ); }
+  auto out = torch::empty(out_sizes, self.options());
+  auto stream = c10_tpu::getCurrentTPUStream();
+  auto status = tpudnnMaskedSelectAsync(
+      stream,
+      tpu::TPUGenerateTpudnnTensor(stream, self),
+      tpu::TPUGenerateTpudnnTensor(stream, mask),
+      tpu::TPUGenerateTpudnnTensor(stream, out));
+  TORCH_CHECK(status == TPUDNN_STATUS_SUCCESS);
 #endif
+  TIMING_END;
   return out;
 }
 
