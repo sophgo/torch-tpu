@@ -12,6 +12,7 @@ global_addr_t saved_mean_global_addr,
 global_addr_t saved_invstd_global_addr,
 global_addr_t output_global_addr,
 dim4          shape,
+int           total_C,
 float         momentum,
 float         eps,
 data_type_t   dtype )
@@ -24,7 +25,7 @@ data_type_t   dtype )
   const int C = shape.c;
   const int H = shape.h;
   const int W = shape.w;
-  const dim4 TotalShape = { .n = N, .c = C, .h = H, .w = W };
+  const dim4 TotalShape = { .n = N, .c = total_C, .h = H, .w = W };
   dim4 GlobalStride;
   tpu_continuous_stride ( &GlobalStride, &TotalShape );
   const int CPerNPU = DIV_UP ( C, NPU_NUM );
@@ -510,21 +511,30 @@ int tpu_kernel_api_batchnorm2d_multi_core ( const void * args )
 {
   sg_api_batchnorm2d_t *api = ( sg_api_batchnorm2d_t * ) args;
   dim4 shape = { api->shape[0], api->shape[1], api->shape[2], api->shape[3] };
+  int total_C = shape.c;
   TPUKERNEL_ASSERT ( api->dtype == DT_FP32 || api->dtype == DT_FP16 || api->dtype == DT_BFP16 );
   tpu_initialize();
 #ifdef BACKEND_SG2260
-  int core_idx = tpu_core_index();
-  if(core_idx == 0){
+  const int core_idx = tpu_core_index();
+  const int core_num = tpu_core_num();
+  int cslice_per_core = DIV_UP(shape.c, core_num);
+  if(core_idx * cslice_per_core < shape.c){
+    int cur_cslice = MIN(shape.c - core_idx * cslice_per_core, cslice_per_core);
+    int dsize = tpu_data_type_size (( data_type_t ) api->dtype);
+    int c_offset = core_idx * cslice_per_core * dsize;
+    u64 chw_offset = (u64)c_offset * shape.h * shape.w;
+    shape.c = cur_cslice;
     nodechip_batchnorm2d_forward_training_parallel (
-    api->input_global_addr,
-    api->running_mean_global_addr,
-    api->running_var_global_addr,
-    api->weight_global_addr,
-    api->bias_global_addr,
-    api->saved_mean_global_addr,
-    api->saved_invstd_global_addr,
-    api->output_global_addr,
+    api->input_global_addr + chw_offset,
+    api->running_mean_global_addr + c_offset,
+    api->running_var_global_addr + c_offset,
+    api->weight_global_addr + c_offset,
+    api->bias_global_addr + c_offset,
+    api->saved_mean_global_addr + c_offset,
+    api->saved_invstd_global_addr + c_offset,
+    api->output_global_addr + chw_offset,
     shape,
+    total_C,
     api->momentum,
     api->eps,
     ( data_type_t ) api->dtype );
@@ -542,6 +552,7 @@ int tpu_kernel_api_batchnorm2d_multi_core ( const void * args )
   api->saved_invstd_global_addr,
   api->output_global_addr,
   shape,
+  total_C,
   api->momentum,
   api->eps,
   ( data_type_t ) api->dtype );
