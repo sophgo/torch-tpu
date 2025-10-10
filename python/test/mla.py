@@ -222,9 +222,9 @@ class MLATpu(MLA):
         super(MLATpu, self).__init__(config)
 
     def forward(self, tensors: MLATensors):
-        if self.config.attention_mode == AttentionMode.PAGED_DECODE or self.config.attention_mode == AttentionMode.CONTINUOUS_DECODE:
-            # keep consistant with TGI, the seqlen is cache-len + decode-len
-            tensors.seqlen += 1
+        # if self.config.attention_mode == AttentionMode.PAGED_DECODE or self.config.attention_mode == AttentionMode.CONTINUOUS_DECODE:
+        #     # keep consistant with TGI, the seqlen is cache-len + decode-len
+        #     tensors.seqlen += 1
         if (tensors.WUQ.dtype == torch.float8_e4m3fn or tensors.WUQ.dtype == torch.float8_e5m2):
             # 0: normal attention
             if self.config.attention_mode == AttentionMode.CONTINUOUS_DECODE \
@@ -237,14 +237,26 @@ class MLATpu(MLA):
                     self.config.qk_rope_head_dim, self.config.v_head_dim, self.config.mask_size,
                     self.config.block_size, self.config.max_cache_size, self.config.softmax_scale,
                     self.config.attention_mode.value)
-            elif self.config.attention_mode == AttentionMode.PAGED_DECODE \
-                or self.config.attention_mode == AttentionMode.PAGED_PREFILL:
+            elif self.config.attention_mode == AttentionMode.PAGED_PREFILL:
                 # paged attention
                 torch.ops.my_ops.paged_latent_attention_fp8(
                     tensors.output, tensors.Q, tensors.KV, tensors.PE, tensors.WUQ, tensors.WUKV,
                     tensors.paged_kvcache, tensors.paged_pecache, tensors.cos, tensors.sin, tensors.WUQ_scale,
                     tensors.WUKV_scale, tensors.block_tables, tensors.slots, tensors.KVU,
                     tensors.mask, tensors.seqlen, tensors.cache_seqlen, self.config.num_heads, self.config.generate_token,
+                    self.config.q_lora_rank, self.config.kv_lora_rank, self.config.qk_nope_head_dim,
+                    self.config.qk_rope_head_dim, self.config.v_head_dim, self.config.mask_size,
+                    self.config.block_size, tensors.block_tables.shape[1],
+                    self.config.paged_block_size, self.config.softmax_scale,
+                    self.config.attention_mode.value)
+            elif self.config.attention_mode == AttentionMode.PAGED_DECODE :
+                # paged attention
+                input_seqlen = torch.ones_like(tensors.seqlen)
+                torch.ops.my_ops.paged_latent_attention_fp8(
+                    tensors.output, tensors.Q, tensors.KV, tensors.PE, tensors.WUQ, tensors.WUKV,
+                    tensors.paged_kvcache, tensors.paged_pecache, tensors.cos, tensors.sin, tensors.WUQ_scale,
+                    tensors.WUKV_scale, tensors.block_tables, tensors.slots, tensors.KVU,
+                    tensors.mask, input_seqlen, tensors.seqlen, self.config.num_heads, self.config.generate_token,
                     self.config.q_lora_rank, self.config.kv_lora_rank, self.config.qk_nope_head_dim,
                     self.config.qk_rope_head_dim, self.config.v_head_dim, self.config.mask_size,
                     self.config.block_size, tensors.block_tables.shape[1],
@@ -512,15 +524,15 @@ def mla_prefill(act_dtype: torch.dtype, weight_dtype: torch.dtype, mode: Attenti
         raise RuntimeError("mla pe-cache failed")
 
 if __name__ == "__main__":
-    print(f"Test MLA Decode BF16 continuous_decode:")
-    mla_decode(torch.bfloat16, torch.bfloat16, AttentionMode.CONTINUOUS_DECODE)
-    print(f"----------------------------------")
+    # print(f"Test MLA Decode BF16 continuous_decode:")
+    # mla_decode(torch.bfloat16, torch.bfloat16, AttentionMode.CONTINUOUS_DECODE)
+    # print(f"----------------------------------")
     print(f"Test MLA Decode BF16 paged_decode:")
     mla_decode(torch.bfloat16, torch.bfloat16, AttentionMode.PAGED_DECODE)
     print(f"----------------------------------")
-    print(f"\nTest MLA Decode FP8_E4M3 continuous_decode:")
-    mla_decode(torch.bfloat16, torch.float8_e4m3fn, AttentionMode.CONTINUOUS_DECODE)
-    print(f"----------------------------------")
+    # print(f"\nTest MLA Decode FP8_E4M3 continuous_decode:")
+    # mla_decode(torch.bfloat16, torch.float8_e4m3fn, AttentionMode.CONTINUOUS_DECODE)
+    # print(f"----------------------------------")
     print(f"\nTest MLA Decode FP8_E4M3 paged_decode:")
     mla_decode(torch.bfloat16, torch.float8_e4m3fn, AttentionMode.PAGED_DECODE)
     print(f"----------------------------------")
