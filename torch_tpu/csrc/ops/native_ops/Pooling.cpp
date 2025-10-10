@@ -144,6 +144,45 @@ TORCH_LIBRARY_IMPL(aten, TPU, m) {
   m.impl("avg_pool2d.out", avg_pool2d_out_tpu);
 }
 
+Tensor &avg_pool2d_backward_grad_input_tpu(const Tensor &grad_output,
+                           const Tensor &self, IntArrayRef kernel_size,
+                           IntArrayRef stride, IntArrayRef padding,
+                           bool ceil_mode, bool count_include_pad,
+                           c10::optional<int64_t> divisor_override,
+                           Tensor &output) {
+  TIMING_START;
+  auto grad_output_ =
+      grad_output.is_contiguous() ? grad_output : grad_output.contiguous();
+  CHECK_TENSOR_IN_DEVICE(grad_output_);
+  CHECK_TENSOR_IN_DEVICE(output);
+#if 0
+  auto output_cpu = avg_pool2d_backward ( grad_output_.to(torch::kFloat32).cpu(), self.to ( torch::kFloat32 ).cpu(),
+                                          kernel_size, stride, padding, ceil_mode, count_include_pad , divisor_override);
+  output = output_cpu.to(output.device()).to(output.dtype());
+#else
+  if (kernel_size[0]!=stride[0] or kernel_size[0]!=kernel_size[1]){
+    CPU_IMPL_WARNING();
+    auto output_cpu = avg_pool2d_backward ( grad_output_.to(torch::kFloat32).cpu(), self.to ( torch::kFloat32 ).cpu(),
+                                            kernel_size, stride, padding, ceil_mode, count_include_pad , divisor_override);
+    output = output_cpu.to(output.device()).to(output.dtype());
+    TIMING_END;
+    SHOW_TENSOR_OP(self, output);
+    return output;
+  }
+  auto stream = c10_tpu::getCurrentTPUStream();
+  auto status = tpudnnAvgPoolingBackwardAsync(
+      stream, tpu::TPUGenerateTpudnnTensor(stream, grad_output_),
+      tpu::TPUGenerateTpudnnTensor(stream, output), int(kernel_size[0]));
+  TORCH_CHECK(status == TPUDNN_STATUS_SUCCESS);
+  TIMING_END;
+#endif
+  SHOW_TENSOR_OP(self, output);
+  return output;
+}
+TORCH_LIBRARY_IMPL(aten, TPU, m) {
+  m.impl("avg_pool2d_backward.grad_input", avg_pool2d_backward_grad_input_tpu);
+}
+
 Tensor adaptive_avg_pool2d_out_tpu(const Tensor &self,
                                    IntArrayRef output_size) {
   TIMING_START;
