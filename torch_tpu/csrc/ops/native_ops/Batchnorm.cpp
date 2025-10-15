@@ -35,7 +35,6 @@ double eps )
   const Tensor & bias = bias_opt.value_or(Tensor());
   const Tensor & running_mean = running_mean_opt.value_or(Tensor());
   const Tensor & running_var = running_var_opt.value_or(Tensor());
-  auto num_features = input.size ( 1 );
   CHECK_TENSOR_IN_DEVICE ( input );
   if ( weight.defined() )       { CHECK_TENSOR_IN_DEVICE ( weight ); }
   if ( bias.defined() )         { CHECK_TENSOR_IN_DEVICE ( bias ); }
@@ -97,11 +96,13 @@ double eps )
   {
     tpu::TPUCopyHostToDevice ( running_var.data_ptr(), running_var_cpu.contiguous().data_ptr(), running_var.nbytes() );
   }
+  TIMING_END;
   return std::tuple<Tensor, Tensor, Tensor> (
          TENSOR_TO_TPU ( std::get<0> ( outputs_cpu ) ),
          TENSOR_TO_TPU ( std::get<1> ( outputs_cpu ) ),
          TENSOR_TO_TPU ( std::get<2> ( outputs_cpu ) ) );
 #else
+  auto num_features = input.size ( 1 );
   auto output = torch::empty ( input.sizes(), input.options() );
   auto saved_mean = torch::empty ( { num_features }, input.options() );
   auto saved_invstd = torch::empty ( { num_features }, input.options() );
@@ -169,6 +170,7 @@ std::array<bool, 3> output_mask )
                      training,
                      eps,
                      output_mask );
+  TIMING_END;
   return std::tuple<Tensor, Tensor, Tensor> (
          output_mask[0] ? TENSOR_TO_TPU ( std::get<0> ( outputs_cpu ) ) : Tensor(),
          output_mask[1] ? TENSOR_TO_TPU ( std::get<1> ( outputs_cpu ) ) : Tensor(),
