@@ -124,11 +124,26 @@ source scripts/envsetup.sh sg2260
 
 # 构建 TPU 基础内核
 rebuild_TPU1686
-# 构建 TPU RISCV 基础内核
-rebuild_TPU1686_riscv
 
 # 以可编辑模式安装 torch-tpu
 develop_torch_tpu
+```
+
+RV version:
+```bash
+cd tpu-train
+source scripts/envsetup.sh sg2260
+
+# Debug TPU1686, optional
+export EXTRA_CONFIG='-DDEBUG=ON -DUSING_FW_PRINT=ON -DUSING_FW_DEBUG=ON'
+
+# Build TPU base kernels
+rebuild_TPU1686_riscv
+
+# Build TPU RISCV base kernels
+build_riscv_whl
+
+# 如果失败，尝试更新 bm_prebuilt_toolchains
 ```
 
 如果一切顺利，现在我们就有了一个可编辑的开发安装。
