@@ -224,7 +224,7 @@ TORCH_LIBRARY_IMPL(aten, TPU, m) {
   // m.impl("slice_scatter.out", slice_scatter_out_tpu);
 }
 
-Tensor &scatter_add_tpu(Tensor &self, int64_t dim, const Tensor &index,
+Tensor &scatter_add_inplace_tpu(Tensor &self, int64_t dim, const Tensor &index,
                        const Tensor &src) {
   TIMING_START;
 #ifdef USING_PPL
@@ -246,13 +246,15 @@ Tensor &scatter_add_tpu(Tensor &self, int64_t dim, const Tensor &index,
             );
       });
 #else
+  int inplace_add = 1;
   auto stream = c10_tpu::getCurrentTPUStream();
-  auto status = tpudnnScatterAddAsync(
+  auto status = tpudnnScatterAsync(
       stream,
       tpu::TPUGenerateTpudnnTensor(stream, self),
       tpu::TPUGenerateTpudnnTensor(stream, src),
       tpu::TPUGenerateTpudnnTensor(stream, index),
-      dim);
+      dim,
+      inplace_add);
   TORCH_CHECK(status == TPUDNN_STATUS_SUCCESS);
 #endif
   TIMING_END;
@@ -261,26 +263,46 @@ Tensor &scatter_add_tpu(Tensor &self, int64_t dim, const Tensor &index,
 }
 
 TORCH_LIBRARY_IMPL(aten, TPU, m) {
-  m.impl("scatter_add_", scatter_add_tpu);
+  m.impl("scatter_add_", scatter_add_inplace_tpu);
 }
 
-Tensor& scatter_src_tpu(at::Tensor & self, int64_t dim, const at::Tensor & index, const at::Tensor & src)
+Tensor& scatter_src_inplace_tpu(at::Tensor & self, int64_t dim, const at::Tensor & index, const at::Tensor & src)
 {
-TIMING_START;
-#if 1
-  CPU_IMPL_WARNING();
-  auto self_cpu = self.cpu();
-  auto index_cpu = index.cpu().to(torch::kInt64);
-  auto src_cpu = src.cpu();
-  self_cpu.scatter_(dim, index_cpu, src_cpu);
-  auto self_ = self_cpu.to(self.device()).to(self.dtype());
-  self.copy_(self_);
-#endif
-TIMING_END;
+  TIMING_START;
+  int inplace_add = 0;
+  auto stream = c10_tpu::getCurrentTPUStream();
+  auto status = tpudnnScatterAsync(
+      stream,
+      tpu::TPUGenerateTpudnnTensor(stream, self),
+      tpu::TPUGenerateTpudnnTensor(stream, src),
+      tpu::TPUGenerateTpudnnTensor(stream, index),
+      dim,
+      inplace_add);
+  TORCH_CHECK(status == TPUDNN_STATUS_SUCCESS);
+  TIMING_END;
   return self;
 }
 
+Tensor scatter_src_tpu(const at::Tensor & self, int64_t dim, const at::Tensor & index, const at::Tensor & src)
+{
+  TIMING_START;
+  at::Tensor out = self.clone();
+  int inplace_add = 0;
+  auto stream = c10_tpu::getCurrentTPUStream();
+  auto status = tpudnnScatterAsync(
+      stream,
+      tpu::TPUGenerateTpudnnTensor(stream, out),
+      tpu::TPUGenerateTpudnnTensor(stream, src),
+      tpu::TPUGenerateTpudnnTensor(stream, index),
+      dim,
+      inplace_add);
+  TORCH_CHECK(status == TPUDNN_STATUS_SUCCESS);
+  TIMING_END;
+  return out;
+}
+
 TORCH_LIBRARY_IMPL(aten, TPU, m) {
-  m.impl("scatter_.src", scatter_src_tpu);
+  m.impl("scatter_.src", scatter_src_inplace_tpu); // inplace
+  m.impl("scatter.src", scatter_src_tpu); // out-of-place
 }
 }  // namespace at

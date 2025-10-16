@@ -81,15 +81,25 @@ TORCH_LIBRARY_IMPL(aten, TPU, m)
 // called by https://pytorch.org/docs/2.1/generated/torch.cumsum.html#torch.cumsum
 Tensor & cumsum_out_tpu(const Tensor & self, int64_t dim, 
                         c10::optional<ScalarType> dtype, Tensor & out) {
-    CPU_IMPL_WARNING();
-    auto out_cpu = torch::cumsum(self.cpu(), dim, dtype);
-    out = out_cpu.to(out.device());
+    ScalarType desired_dtype = dtype.has_value() ? *dtype : out.scalar_type();
+    TORCH_CHECK(desired_dtype == out.scalar_type());
+                            
+    auto stream = c10_tpu::getCurrentTPUStream();
+    auto status = tpudnnCumsumAsync(
+        stream,
+        tpu::TPUGenerateTpudnnTensor(stream, self),
+        tpu::TPUGenerateTpudnnTensor(stream, out),
+        dim
+    );
+    TORCH_CHECK(status == TPUDNN_STATUS_SUCCESS);
     return out;
 }
 Tensor cumsum_tpu(const Tensor & self, int64_t dim, c10::optional<ScalarType> dtype=c10::nullopt) {
-    auto out  = empty(self.sizes(), self.options());
-    return cumsum_out_tpu(self, dim, dtype, out);
+    ScalarType desired_dtype = dtype.has_value() ? *dtype : self.scalar_type();
+    auto out  = empty(self.sizes(), self.options().dtype(desired_dtype));
+    return cumsum_out_tpu(self, dim, c10::optional<ScalarType>(desired_dtype), out);
 }
+
 TORCH_LIBRARY_IMPL(aten, TPU, m)
 {
     m.impl("cumsum.out", cumsum_out_tpu);

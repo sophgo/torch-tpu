@@ -1520,12 +1520,13 @@ tpudnnStatus_t tpudnnDynLibExecuteAsyncCompact(
                     char *args,
                     size_t argBytes);
 
-tpudnnStatus_t tpudnnScatterAddAsync(
+tpudnnStatus_t tpudnnScatterAsync(
     tpudnnHandle_t handle,
     tpudnnTensor_t input,
     tpudnnTensor_t src,
     tpudnnTensor_t indices,
-    int dim);
+    int dim,
+    int inplace_add);
 
 tpudnnStatus_t tpudnnFusedMoEGroupedTopkMultiCoreAsync(
     tpudnnHandle_t handle,
