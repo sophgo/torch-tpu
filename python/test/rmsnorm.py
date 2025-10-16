@@ -59,28 +59,28 @@ class RMSNormBlock(nn.Module):
         return RMSNormFunc.apply(x, self.scale, self.bias, self.axis, self.eps)
 
 def check_rmsnorm():
-    batch = 16
-    hidden_size = 8192
+    batch = 256
+    hidden_size = 1536
     axis = 3
     eps = 1e-5
 
     net_cpu = RMSNorm(d=hidden_size, axis=axis, eps=eps, with_bias=True, with_scale=True)
 
     x = torch.randn((batch, 1, 1, hidden_size), requires_grad=False)
-    x_tpu = x.to(device).half()
+    x_tpu = x.half().to(device)
 
     out_cpu = net_cpu(x)
 
     scale = None
     bias = None
     if 'scale' in net_cpu.state_dict():
-        scale = net_cpu.state_dict()['scale'].clone().detach().contiguous().requires_grad_(False).to(device).half()
+        scale = net_cpu.state_dict()['scale'].clone().detach().contiguous().requires_grad_(False).half().to(device)
     if 'bias' in net_cpu.state_dict():
-        bias = net_cpu.state_dict()['bias'].clone().detach().contiguous().requires_grad_(False).to(device).half()
+        bias = net_cpu.state_dict()['bias'].clone().detach().contiguous().requires_grad_(False).half().to(device)
 
     net_tpu = RMSNormBlock(axis=axis, eps=eps, scale=scale, bias=bias)
     out_tpu = net_tpu(x_tpu)
-    out_tpu = out_tpu.float().to("cpu")
+    out_tpu = out_tpu.to("cpu").float()
 
     out_diff = out_cpu - out_tpu
     print(out_cpu[0][0][0][:50])

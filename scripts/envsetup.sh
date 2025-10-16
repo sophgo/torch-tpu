@@ -83,8 +83,9 @@ function untar_ppl()
 
     # Extract directly into $output, stripping the top-level directory
     tar -xvzf "$tarball" -C $output --wildcards --strip-components=2 '*/bin' '*/deps/common' '*/inc' '*/deps/chip/*/TPU1686/kernel/include' || return -1
-
-    echo "Done. Filtered contents placed in $output"
+    cmt_id=$(echo "$tarball" | sed -n 's/.*-g\([^-]\+\)-.*/\1/p')
+    echo "cmd_id: $cmt_id" > $output/cmt_id.txt
+    echo "Done. Filtered contents placed in $output, cmd_id: $cmt_id"
 }
 
 function set_ppl_env() {

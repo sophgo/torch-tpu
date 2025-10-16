@@ -13,6 +13,122 @@
 #define MAX_DIM_MODE 2
 #define MIN_DIM_MODE 3
 
+#ifdef USING_PPL
+#include "Arg.h"
+#define AT_DISPATCH_FLOAT_INT_TYPES(scalar_type, name, func)  \
+AT_DISPATCH_SWITCH(                   \
+scalar_type, name,                    \
+AT_DISPATCH_CASE(at::kFloat, func)    \
+AT_DISPATCH_CASE(at::kHalf, func)     \
+AT_DISPATCH_CASE(at::kBFloat16, func) \
+AT_DISPATCH_CASE(at::kInt, func)      \
+AT_DISPATCH_CASE(at::kShort, func)    \
+AT_DISPATCH_CASE(at::kChar, func)     \
+AT_DISPATCH_CASE(at::kByte, func))
+
+template <typename scalar_t>
+static void arg_async(
+  uint64_t index_addr,
+  uint64_t input_addr,
+  uint64_t value_addr,
+  int outer_size,
+  int axis_size,
+  int inner_size,
+  bool ismin)
+{
+auto kernel = [&](TPUStream stream, tpuKernelModule_t ppl_module,
+    uint32_t tile_size) -> int {
+  if constexpr (std::is_same_v<scalar_t, float>) {
+    return arg_fp32(
+      stream,
+#ifndef BACKEND_SG2260
+      ppl_module,
+#endif
+      index_addr, input_addr, value_addr,
+      outer_size, axis_size, inner_size,
+      ismin,
+      tile_size);
+  } else if constexpr (std::is_same_v<scalar_t, at::Half>) {
+    return arg_fp16(
+      stream,
+#ifndef BACKEND_SG2260
+      ppl_module,
+#endif
+      index_addr, input_addr, value_addr,
+      outer_size, axis_size, inner_size,
+      ismin,
+      tile_size);
+  } else if constexpr (std::is_same_v<scalar_t, at::BFloat16>) {
+    return arg_bf16(
+      stream,
+#ifndef BACKEND_SG2260
+      ppl_module,
+#endif
+      index_addr, input_addr, value_addr,
+      outer_size, axis_size, inner_size,
+      ismin,
+      tile_size);
+  } else if constexpr (std::is_same_v<scalar_t, int32_t>) {
+    return arg_int32(
+      stream,
+#ifndef BACKEND_SG2260
+      ppl_module,
+#endif
+      index_addr, input_addr, value_addr,
+      outer_size, axis_size, inner_size,
+      ismin,
+      tile_size);
+  } else if constexpr (std::is_same_v<scalar_t, int16_t>) {
+    return arg_int16(
+      stream,
+#ifndef BACKEND_SG2260
+      ppl_module,
+#endif
+      index_addr, input_addr, value_addr,
+      outer_size, axis_size, inner_size,
+      ismin,
+      tile_size);
+  } else if constexpr (std::is_same_v<scalar_t, int8_t>) {
+    return arg_int8(
+      stream,
+#ifndef BACKEND_SG2260
+      ppl_module,
+#endif
+      index_addr, input_addr, value_addr,
+      outer_size, axis_size, inner_size,
+      ismin,
+      tile_size);
+  } else if constexpr (std::is_same_v<scalar_t, uint8_t>) {
+    return arg_uint8(
+      stream,
+#ifndef BACKEND_SG2260
+      ppl_module,
+#endif
+      index_addr, input_addr, value_addr,
+      outer_size, axis_size, inner_size,
+      ismin,
+      tile_size);
+  }
+  return -1;
+};
+
+auto stream = c10_tpu::getCurrentTPUStream();
+tpuKernelModule_t ppl_module = getPplModule();
+int tile_size = inner_size;
+
+while (tile_size >= 1) {
+  int ret = kernel(stream, ppl_module, tile_size);
+  if (ret == 0) {
+    return;
+  } else {
+    tile_size = tile_size / 2;
+    continue;
+  }
+}
+
+TORCH_CHECK(false, "Arg failed!");
+}
+#endif
 namespace at {
 Tensor &argmax_out_tpu(const Tensor &self, c10::optional<int64_t> dim,
                        bool keepdim, Tensor &out) {
@@ -39,14 +155,39 @@ Tensor &argmax_out_tpu(const Tensor &self, c10::optional<int64_t> dim,
     }
     TORCH_CHECK(dim.value() >= 0 || dim.value() < self.dim());
   }
-  auto stream = c10_tpu::getCurrentTPUStream();
-  auto status = tpudnnArgAsync(
-      stream,
-      tpu::TPUGenerateTpudnnTensor(stream, self),
-      dim.has_value() ? dim.value() : self.dim(), ARGMAX_MODE,
-      tpudnnUndefinedTensor(),
-      tpu::TPUGenerateTpudnnTensor(stream, out));
-  TORCH_CHECK(status == TPUDNN_STATUS_SUCCESS);
+#ifdef USING_PPL
+  if (usePPLKernels())
+  {  uint32_t outer_size = 1;
+    uint32_t inner_size = 1;
+    int64_t dim_pos = dim.value();
+    for (const auto i : c10::irange(dim_pos)) {
+        outer_size *= self.size(i);
+    }
+    for (const auto i : c10::irange((dim_pos + 1), self.dim())) {
+        inner_size *= self.size(i);
+    }
+
+    AT_DISPATCH_FLOAT_INT_TYPES( self.scalar_type(), "arg_async", [&] {
+            arg_async<scalar_t>(
+                reinterpret_cast<uint64_t>(out.data_ptr()),
+                reinterpret_cast<uint64_t>(self.data_ptr()),
+                0ULL,
+                outer_size,
+                static_cast<uint32_t>(self.size(dim_pos)),
+                inner_size,
+                ARGMAX_MODE);
+        });} else
+#endif
+  {
+    auto stream = c10_tpu::getCurrentTPUStream();
+    auto status = tpudnnArgAsync(
+        stream,
+        tpu::TPUGenerateTpudnnTensor(stream, self),
+        dim.has_value() ? dim.value() : self.dim(), ARGMAX_MODE,
+        tpudnnUndefinedTensor(),
+        tpu::TPUGenerateTpudnnTensor(stream, out));
+    TORCH_CHECK(status == TPUDNN_STATUS_SUCCESS);
+  }
 #endif
   TIMING_END;
   SHOW_TENSOR_OP(self, out);
@@ -112,14 +253,40 @@ Tensor &argmin_out_tpu(const Tensor &self, c10::optional<int64_t> dim,
     }
     TORCH_CHECK(dim.value() >= 0 || dim.value() < self.dim());
   }
-  auto stream = c10_tpu::getCurrentTPUStream();
-  auto status = tpudnnArgAsync(
-      stream,
-      tpu::TPUGenerateTpudnnTensor(stream, self),
-      dim.has_value() ? dim.value() : self.dim(), ARGMIN_MODE,
-      tpudnnUndefinedTensor(),
-      tpu::TPUGenerateTpudnnTensor(stream, out));
-  TORCH_CHECK(status == TPUDNN_STATUS_SUCCESS);
+#ifdef USING_PPL
+  if (usePPLKernels()){
+    uint32_t outer_size = 1;
+    uint32_t inner_size = 1;
+    int64_t dim_pos = dim.value();
+    for (const auto i : c10::irange(dim_pos)) {
+        outer_size *= self.size(i);
+    }
+    for (const auto i : c10::irange((dim_pos + 1), self.dim())) {
+        inner_size *= self.size(i);
+    }
+
+    AT_DISPATCH_FLOAT_INT_TYPES( self.scalar_type(), "arg_async", [&] {
+            arg_async<scalar_t>(
+                reinterpret_cast<uint64_t>(out.data_ptr()),
+                reinterpret_cast<uint64_t>(self.data_ptr()),
+                0ULL,
+                outer_size,
+                static_cast<uint32_t>(self.size(dim_pos)),
+                inner_size,
+                ARGMIN_MODE);
+        });
+  } else
+#endif
+  {
+    auto stream = c10_tpu::getCurrentTPUStream();
+    auto status = tpudnnArgAsync(
+        stream,
+        tpu::TPUGenerateTpudnnTensor(stream, self),
+        dim.has_value() ? dim.value() : self.dim(), ARGMIN_MODE,
+        tpudnnUndefinedTensor(),
+        tpu::TPUGenerateTpudnnTensor(stream, out));
+    TORCH_CHECK(status == TPUDNN_STATUS_SUCCESS);
+  }
   TIMING_END;
 #endif
   return out;
@@ -186,16 +353,39 @@ std::tuple<Tensor &, Tensor &> max_dim_max_out_tpu(const Tensor &self,
     dim = dim + self.dim();
   }
   TORCH_CHECK(dim >= 0 || dim < self.dim());
-
+#ifdef USING_PPL
+  if (usePPLKernels()){
+    uint32_t outer_size = 1;
+    uint32_t inner_size = 1;
+    for (const auto i : c10::irange(dim)) {
+        outer_size *= self.size(i);
+    }
+    for (const auto i : c10::irange((dim + 1), self.dim())) {
+        inner_size *= self.size(i);
+    }
+    AT_DISPATCH_FLOAT_INT_TYPES( self.scalar_type(), "arg_async", [&] {
+            arg_async<scalar_t>(
+                reinterpret_cast<uint64_t>(indices.data_ptr()),
+                reinterpret_cast<uint64_t>(self.data_ptr()),
+                reinterpret_cast<uint64_t>(values.data_ptr()),
+                outer_size,
+                static_cast<uint32_t>(self.size(dim)),
+                inner_size,
+                ARGMAX_MODE);
+        });
+  } else
+#endif
+  {
   auto stream = c10_tpu::getCurrentTPUStream();
   auto status = tpudnnArgAsync(
       stream,
       tpu::TPUGenerateTpudnnTensor(stream, self),
-      dim, 
+      dim,
       MAX_DIM_MODE,
       tpu::TPUGenerateTpudnnTensor(stream, values),
       tpu::TPUGenerateTpudnnTensor(stream, indices));
   TORCH_CHECK(status == TPUDNN_STATUS_SUCCESS);
+  }
 #endif
   TIMING_END;
   return {values, indices};
@@ -221,7 +411,7 @@ std::tuple<Tensor, Tensor> max_dim_tpu(const Tensor &self,
   TensorOptions idx_options = TensorOptions ( self.device() ).dtype ( torch::kInt32 );
   TensorOptions val_options = TensorOptions ( self.device() ).dtype ( self.dtype() );
   Tensor idx    = empty(sizes, idx_options);
-  Tensor values = empty(sizes, val_options); 
+  Tensor values = empty(sizes, val_options);
   max_dim_max_out_tpu(self, dim, keepdim, values, idx);
   return {values, idx};
 }
@@ -246,16 +436,39 @@ std::tuple<Tensor &, Tensor &> min_dim_min_out_tpu(const Tensor &self,
     dim = dim + self.dim();
   }
   TORCH_CHECK(dim >= 0 || dim < self.dim());
-
+#ifdef USING_PPL
+if (usePPLKernels()){
+  uint32_t outer_size = 1;
+  uint32_t inner_size = 1;
+  for (const auto i : c10::irange(dim)) {
+      outer_size *= self.size(i);
+  }
+  for (const auto i : c10::irange((dim + 1), self.dim())) {
+      inner_size *= self.size(i);
+  }
+  AT_DISPATCH_FLOAT_INT_TYPES( self.scalar_type(), "arg_async", [&] {
+          arg_async<scalar_t>(
+              reinterpret_cast<uint64_t>(indices.data_ptr()),
+              reinterpret_cast<uint64_t>(self.data_ptr()),
+              reinterpret_cast<uint64_t>(values.data_ptr()),
+              outer_size,
+              static_cast<uint32_t>(self.size(dim)),
+              inner_size,
+              ARGMIN_MODE);
+      });
+  } else
+#endif
+  {
   auto stream = c10_tpu::getCurrentTPUStream();
   auto status = tpudnnArgAsync(
       stream,
       tpu::TPUGenerateTpudnnTensor(stream, self),
-      dim, 
+      dim,
       MIN_DIM_MODE,
       tpu::TPUGenerateTpudnnTensor(stream, values),
       tpu::TPUGenerateTpudnnTensor(stream, indices));
   TORCH_CHECK(status == TPUDNN_STATUS_SUCCESS);
+  }
 #endif
   TIMING_END;
   return {values, indices};
@@ -282,7 +495,7 @@ std::tuple<Tensor, Tensor> min_dim_tpu(const Tensor &self,
   TensorOptions idx_options = TensorOptions ( self.device() ).dtype ( torch::kInt32 );
   TensorOptions val_options = TensorOptions ( self.device() ).dtype ( self.dtype() );
   Tensor idx    = empty(sizes, idx_options);
-  Tensor values = empty(sizes, val_options); 
+  Tensor values = empty(sizes, val_options);
   min_dim_min_out_tpu(self, dim, keepdim, values, idx);
   return {values, idx};
 }

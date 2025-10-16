@@ -6,6 +6,64 @@
 #include "TPUTorchUtils.h"
 #include "common/config.h"
 
+#ifdef USING_PPL
+#include "Reduce.h"
+
+template <typename scalar_t>
+    static void reduce_impl(
+    uint64_t output_addr,
+    uint64_t input_addr,
+    uint64_t row,
+    uint64_t column,
+    uint32_t axis,
+    int reduction)
+{
+  auto kernel = [&](TPUStream stream, tpuKernelModule_t ppl_module,
+          uint32_t tile_size) -> int {
+      if constexpr (std::is_same_v<scalar_t, float>) {
+          return reduce_fp32(
+                    stream,
+#ifndef BACKEND_SG2260
+                    ppl_module,
+#endif
+                    output_addr, input_addr, row, column, axis,
+                    reduction, tile_size);
+      } else if constexpr (std::is_same_v<scalar_t, at::Half>) {
+          return reduce_fp16(
+                    stream,
+#ifndef BACKEND_SG2260
+                    ppl_module,
+#endif
+                    output_addr, input_addr, row, column, axis,
+                    reduction, tile_size);
+      } else if constexpr (std::is_same_v<scalar_t, at::BFloat16>) {
+          return reduce_bf16(
+                    stream,
+#ifndef BACKEND_SG2260
+                    ppl_module,
+#endif
+                    output_addr, input_addr, row, column, axis,
+                    reduction, tile_size);
+      }
+      return -1;
+  };
+
+  auto stream = c10_tpu::getCurrentTPUStream();
+  tpuKernelModule_t ppl_module = getPplModule();
+  uint32_t tile_size = axis == 0 ? column : row;
+  bool success = false;
+  while (tile_size >= 1) {
+      int ret = kernel(stream, ppl_module, tile_size);
+      if (ret == 0) {
+          success = true;
+          break;
+      }
+      tile_size = tile_size / 2;
+  }
+  TORCH_CHECK(success, "reduce failed after all tile sizes tried");
+}
+#endif
+
 namespace at {
 Tensor &mean_out_tpu(const Tensor &self, OptionalIntArrayRef dim_opt,
                      bool keepdim, c10::optional<ScalarType> dtype_opt,
@@ -74,15 +132,75 @@ Tensor &sum_IntList_out_tpu(const Tensor &self, OptionalIntArrayRef dim_opt,
     TORCH_CHECK(reduction_dim_vec[i] + 1 == reduction_dim_vec[i + 1],
                 "Reduction only supports contiguous reduction dimension now");
   }
-  const int start_dim = reduction_dim_vec.front();
-  const int end_dim = reduction_dim_vec.back();
+  int start_dim = reduction_dim_vec.front();
+  int end_dim = reduction_dim_vec.back();
   if(start_dim == 0 || end_dim + 1 == self_.dim()){
-    auto stream = c10_tpu::getCurrentTPUStream();
-    auto status = tpudnnReduceAsync(
-        stream, tpu::TPUGenerateTpudnnTensor(stream, self_),
-        start_dim, end_dim + 1, keepdim, 1,
-        tpu::TPUGenerateTpudnnTensor(stream, out));
-    TORCH_CHECK(status == TPUDNN_STATUS_SUCCESS);
+#ifdef USING_PPL
+    if (usePPLKernels()) {
+      if ( start_dim < 0 )
+      {
+        start_dim += self_.dim();
+      }
+      if ( end_dim < 0 )
+      {
+        end_dim += self_.dim();
+      }
+      if ( end_dim < start_dim )
+      {
+        int tmp = end_dim;
+        end_dim = start_dim;
+        start_dim = tmp;
+      }
+      TORCH_CHECK ( end_dim >= start_dim && end_dim <= self_.dim() );
+
+      std::vector<int> self_shape(self_.dim());
+      for (int i = self_.dim() - 1; i >= 0; i--) {
+        self_shape[i] = self_.size(i);
+      }
+      std::vector<int> out_shape(out.dim());
+      for (int i = out.dim() - 1; i >= 0; i--) {
+        out_shape[i] = out.size(i);
+      }
+
+      int row = 1, column = 1;
+      int axis = -1;
+      if (end_dim == self_.dim()-1) {
+        for (int i = 0; i < start_dim; ++i) {
+          row *= self_shape[i];
+        }
+        for (int i = start_dim; i < self_.dim(); ++i) {
+          column *= self_shape[i];
+        }
+        axis = 1;
+      } else if (start_dim == 0) {
+        for (int i = 0; i < end_dim+1; ++i) {
+          row *= self_shape[i];
+        }
+        for (int i = end_dim+1; i < self_.dim(); ++i) {
+          column *= self_shape[i];
+        }
+        axis = 0;
+      } else {
+        TORCH_CHECK(false, "Reduction only supports dim [0, n) or [n, n) now");
+      }
+
+      AT_DISPATCH_FLOATING_TYPES_AND2(
+          at::kHalf, at::kBFloat16, self_.scalar_type(), "reduce", [&] {
+              reduce_impl<scalar_t>(
+                  reinterpret_cast<uint64_t>(out.data_ptr()),
+                  reinterpret_cast<uint64_t>(self_.data_ptr()),
+                  row, column, axis, 1);
+          });
+  }
+#endif
+    {
+      auto stream = c10_tpu::getCurrentTPUStream();
+      auto status = tpudnnReduceAsync(
+          stream, tpu::TPUGenerateTpudnnTensor(stream, self_),
+          start_dim, end_dim + 1, keepdim, 1,
+          tpu::TPUGenerateTpudnnTensor(stream, out));
+      TORCH_CHECK(status == TPUDNN_STATUS_SUCCESS);
+    }
   }
   else{//workaround: matmul to sum
     int64_t M = 1, N = 1, Bsz = 1;
@@ -144,7 +262,7 @@ Tensor &sum_IntList_out_tpu(const Tensor &self, OptionalIntArrayRef dim_opt,
   SHOW_TENSOR_OP(self, out);
   return out;
 }
-Tensor sum_dim_IntList_tpu(const Tensor & self, OptionalIntArrayRef dim, bool keepdim, 
+Tensor sum_dim_IntList_tpu(const Tensor & self, OptionalIntArrayRef dim, bool keepdim,
                            c10::optional<ScalarType> dtype) {
     TORCH_CHECK((dtype.has_value() && dtype.value() == self.scalar_type()) || !dtype.has_value(),
                 "sum_dim_IntList get error dtype setting");

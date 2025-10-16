@@ -19,5 +19,16 @@ def case1():
     print('tpu :',output_tpu)
     print('delta :',torch.min((output_cpu-output_tpu)/output_cpu))
 
+def case2():
+    input0_origin=torch.randint(-100,100,(1,1,4,16)).to(torch.float32)
+    input1_origin=torch.randint(-100,100,(1,1,4,16)).to(torch.float32)
+
+    output_cpu=torch.atan2(input0_origin,input1_origin)
+    output_tpu=torch.atan2(input0_origin.to(device),input1_origin.to(device)).cpu()
+    print('cpu :',output_cpu)
+    print('tpu :',output_tpu)
+    print('delta :',torch.max((output_cpu-output_tpu).abs()))
+
 if __name__ == "__main__":
     case1()
+    # case2()

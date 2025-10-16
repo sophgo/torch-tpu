@@ -296,7 +296,6 @@ Tensor &scatter_add_inplace_tpu(Tensor &self, int64_t dim, const Tensor &index,
   } else
 #endif
   {
-
   int inplace_add = 1;
   auto stream = c10_tpu::getCurrentTPUStream();
   auto status = tpudnnScatterAsync(
@@ -307,7 +306,6 @@ Tensor &scatter_add_inplace_tpu(Tensor &self, int64_t dim, const Tensor &index,
       dim,
       inplace_add);
   TORCH_CHECK(status == TPUDNN_STATUS_SUCCESS);
-
   }
 
   TIMING_END;

@@ -14,8 +14,6 @@
 
 #include <tpuDNN.h>
 
-#undef USING_PPL // FIXME Fix Compare.pl & remove this
-
 #ifdef USING_PPL
 #include "Binary.h"
 #define AT_DISPATCH_FLOAT_INT_TYPES(scalar_type, name, func)  \
@@ -79,64 +77,141 @@ static void binary_const_impl(
   float alpha = 1.0f,
   bool is_scalar_left = false)
 {
-  auto kernel = [&](tpuStream_t stream, tpuKernelModule_t ppl_module,
+  auto kernel = [&](TPUStream stream, tpuKernelModule_t ppl_module,
                     uint32_t tile_size) -> int {
     if constexpr (std::is_same_v<scalar_t, float>) {
-      return binary_async_fp32_scalar(
-        stream, ppl_module, output_addr, input_addr,
-        binary_type, tile_size,
-        length,alpha,is_scalar_left);
+      if (binary_type == 3) {
+        return binary_div_fp32_scalar(
+          stream,
+#ifndef BACKEND_SG2260
+          ppl_module,
+#endif
+          output_addr, input_addr,
+          binary_type, tile_size,
+          length,alpha,is_scalar_left);
+      } else {
+        return binary_async_fp32_scalar(
+          stream,
+#ifndef BACKEND_SG2260
+          ppl_module,
+#endif
+          output_addr, input_addr,
+          binary_type, tile_size,
+          length,alpha,is_scalar_left);
+      }
     } else if constexpr (std::is_same_v<scalar_t, at::Half>) {
-      return binary_async_fp16_scalar(
-        stream, ppl_module, output_addr, input_addr,
-        binary_type, tile_size,
-        length,alpha,is_scalar_left);
+      if (binary_type == 3) {
+        return binary_div_fp16_scalar(
+          stream,
+#ifndef BACKEND_SG2260
+          ppl_module,
+#endif
+          output_addr, input_addr,
+          binary_type, tile_size,
+          length,alpha,is_scalar_left);
+      } else {
+        return binary_async_fp16_scalar(
+          stream,
+#ifndef BACKEND_SG2260
+          ppl_module,
+#endif
+          output_addr, input_addr,
+          binary_type, tile_size,
+          length,alpha,is_scalar_left);
+      }
     } else if constexpr (std::is_same_v<scalar_t, at::BFloat16>) {
-      return binary_async_bf16_scalar(
-        stream, ppl_module, output_addr, input_addr,
-        binary_type, tile_size,
-        length,alpha,is_scalar_left);
+      if (binary_type == 3) {
+        return binary_div_bf16_scalar(
+          stream,
+#ifndef BACKEND_SG2260
+          ppl_module,
+#endif
+          output_addr, input_addr,
+          binary_type, tile_size,
+          length,alpha,is_scalar_left);
+      } else {
+        return binary_async_bf16_scalar(
+          stream,
+#ifndef BACKEND_SG2260
+          ppl_module,
+#endif
+          output_addr, input_addr,
+          binary_type, tile_size,
+          length,alpha,is_scalar_left);
+      }
     } else if constexpr (std::is_same_v<scalar_t, int32_t>) {
       if (binary_type == 3){
         return div_int32_fp32_scalar(
-          stream, ppl_module, output_addr, input_addr, binary_type, tile_size,
+          stream,
+#ifndef BACKEND_SG2260
+          ppl_module,
+#endif
+          output_addr, input_addr, binary_type, tile_size,
           length,alpha,is_scalar_left);
       } else {
         return binary_async_int32_scalar(
-          stream, ppl_module, output_addr, input_addr,
+          stream,
+#ifndef BACKEND_SG2260
+          ppl_module,
+#endif
+          output_addr, input_addr,
           binary_type, tile_size,
           length,alpha,is_scalar_left);
       }
     } else if constexpr (std::is_same_v<scalar_t, int16_t>) {
       if (binary_type == 3){
         return div_int16_fp32_scalar(
-          stream, ppl_module, output_addr, input_addr, binary_type, tile_size,
+          stream,
+#ifndef BACKEND_SG2260
+          ppl_module,
+#endif
+          output_addr, input_addr, binary_type, tile_size,
           length,alpha,is_scalar_left);
       } else {
         return binary_async_int16_scalar(
-          stream, ppl_module, output_addr, input_addr,
+          stream,
+#ifndef BACKEND_SG2260
+          ppl_module,
+#endif
+          output_addr, input_addr,
           binary_type, tile_size,
           length,alpha,is_scalar_left);
       }
     } else if constexpr (std::is_same_v<scalar_t, int8_t>) {
       if (binary_type == 3){
         return div_int8_fp32_scalar(
-          stream, ppl_module, output_addr, input_addr, binary_type, tile_size,
+          stream,
+#ifndef BACKEND_SG2260
+          ppl_module,
+#endif
+          output_addr, input_addr, binary_type, tile_size,
           length,alpha,is_scalar_left);
       } else {
         return binary_async_int8_scalar(
-          stream, ppl_module, output_addr, input_addr,
+          stream,
+#ifndef BACKEND_SG2260
+          ppl_module,
+#endif
+          output_addr, input_addr,
           binary_type, tile_size,
           length,alpha,is_scalar_left);
       }
     } else if constexpr (std::is_same_v<scalar_t, uint8_t>) {
       if (binary_type == 3){
         return div_uint8_fp32_scalar(
-          stream, ppl_module, output_addr, input_addr, binary_type, tile_size,
+          stream,
+#ifndef BACKEND_SG2260
+          ppl_module,
+#endif
+          output_addr, input_addr, binary_type, tile_size,
           length,alpha,is_scalar_left);
       } else {
         return binary_async_uint8_scalar(
-          stream, ppl_module, output_addr, input_addr,
+          stream,
+#ifndef BACKEND_SG2260
+          ppl_module,
+#endif
+          output_addr, input_addr,
           binary_type, tile_size,
           length,alpha,is_scalar_left);
       }
@@ -144,7 +219,7 @@ static void binary_const_impl(
     return -1;
   };
 
-  tpuStream_t stream = c10_tpu::getCurrentTPUStream().stream();
+  auto stream = c10_tpu::getCurrentTPUStream();
   tpuKernelModule_t ppl_module = getPplModule();
   uint32_t tile_size = length;
 
@@ -165,64 +240,141 @@ static void binary_async_impl(
   int outer_size,
   int inner_size)
 {
-  auto kernel = [&](tpuStream_t stream, tpuKernelModule_t ppl_module,
+  auto kernel = [&](TPUStream stream, tpuKernelModule_t ppl_module,
                     uint32_t tile_size) -> int {
     if constexpr (std::is_same_v<scalar_t, float>) {
-      return binary_async_fp32(
-        stream, ppl_module, output_addr, input_addr, other_addr,
+      if (binary_type == 3) {
+        return binary_div_fp32(
+        stream,
+#ifndef BACKEND_SG2260
+        ppl_module,
+#endif
+        output_addr, input_addr, other_addr,
         binary_type, tile_size,
         outer_size, inner_size);
+      } else {
+        return binary_async_fp32(
+        stream,
+#ifndef BACKEND_SG2260
+        ppl_module,
+#endif
+        output_addr, input_addr, other_addr,
+        binary_type, tile_size,
+        outer_size, inner_size);
+      }
     } else if constexpr (std::is_same_v<scalar_t, at::Half>) {
+      if (binary_type == 3) {
+        return binary_div_fp16(
+        stream,
+#ifndef BACKEND_SG2260
+        ppl_module,
+#endif
+        output_addr, input_addr, other_addr,
+        binary_type, tile_size,
+        outer_size, inner_size);
+      } else {
       return binary_async_fp16(
-        stream, ppl_module, output_addr, input_addr, other_addr,
+        stream,
+#ifndef BACKEND_SG2260
+        ppl_module,
+#endif
+        output_addr, input_addr, other_addr,
         binary_type, tile_size,
         outer_size, inner_size);
+      }
     } else if constexpr (std::is_same_v<scalar_t, at::BFloat16>) {
-      return binary_async_bf16(
-        stream, ppl_module, output_addr, input_addr, other_addr,
+      if (binary_type == 3) {
+        return binary_div_bf16(
+        stream,
+#ifndef BACKEND_SG2260
+        ppl_module,
+#endif
+        output_addr, input_addr, other_addr,
         binary_type, tile_size,
         outer_size, inner_size);
+      } else {
+      return binary_async_bf16(
+        stream,
+#ifndef BACKEND_SG2260
+        ppl_module,
+#endif
+        output_addr, input_addr, other_addr,
+        binary_type, tile_size,
+        outer_size, inner_size);
+      }
     } else if constexpr (std::is_same_v<scalar_t, int32_t>) {
       if (binary_type == 3){
         return div_int32_fp32(
-          stream, ppl_module, output_addr, input_addr, other_addr, tile_size,
+          stream,
+#ifndef BACKEND_SG2260
+        ppl_module,
+#endif
+          output_addr, input_addr, other_addr, tile_size,
           outer_size, inner_size);
       } else {
         return binary_async_int32(
-          stream, ppl_module, output_addr, input_addr, other_addr,
+          stream,
+#ifndef BACKEND_SG2260
+        ppl_module,
+#endif
+          output_addr, input_addr, other_addr,
           binary_type, tile_size,
           outer_size, inner_size);
       }
     } else if constexpr (std::is_same_v<scalar_t, int16_t>) {
       if (binary_type == 3){
         return div_int16_fp32(
-          stream, ppl_module, output_addr, input_addr, other_addr, tile_size,
+          stream,
+#ifndef BACKEND_SG2260
+        ppl_module,
+#endif
+          output_addr, input_addr, other_addr, tile_size,
           outer_size, inner_size);
       } else {
         return binary_async_int16(
-        stream, ppl_module, output_addr, input_addr, other_addr,
+        stream,
+#ifndef BACKEND_SG2260
+        ppl_module,
+#endif
+        output_addr, input_addr, other_addr,
         binary_type, tile_size,
         outer_size, inner_size);
       }
     } else if constexpr (std::is_same_v<scalar_t, int8_t>) {
       if (binary_type == 3){
         return div_int8_fp32(
-          stream, ppl_module, output_addr, input_addr, other_addr, tile_size,
+          stream,
+#ifndef BACKEND_SG2260
+        ppl_module,
+#endif
+          output_addr, input_addr, other_addr, tile_size,
           outer_size, inner_size);
       } else {
         return binary_async_int8(
-        stream, ppl_module, output_addr, input_addr, other_addr,
+        stream,
+#ifndef BACKEND_SG2260
+        ppl_module,
+#endif
+        output_addr, input_addr, other_addr,
         binary_type, tile_size,
         outer_size, inner_size);
       }
     } else if constexpr (std::is_same_v<scalar_t, uint8_t>) {
       if (binary_type == 3){
         return div_uint8_fp32(
-          stream, ppl_module, output_addr, input_addr, other_addr, tile_size,
+          stream,
+#ifndef BACKEND_SG2260
+        ppl_module,
+#endif
+          output_addr, input_addr, other_addr, tile_size,
           outer_size, inner_size);
       } else {
         return binary_async_uint8(
-          stream, ppl_module, output_addr, input_addr, other_addr,
+          stream,
+#ifndef BACKEND_SG2260
+        ppl_module,
+#endif
+          output_addr, input_addr, other_addr,
           binary_type, tile_size,
           outer_size, inner_size);
         }
@@ -231,7 +383,7 @@ static void binary_async_impl(
     }
   };
 
-  tpuStream_t stream = c10_tpu::getCurrentTPUStream().stream();
+  auto stream = c10_tpu::getCurrentTPUStream();
   tpuKernelModule_t ppl_module = getPplModule();
   uint32_t tile_size = inner_size;
 
@@ -255,64 +407,141 @@ static void binary_bcast_impl(
   std::vector<int> A4 = self_shape;
   std::vector<int> B4 = other_shape;
   process_shapes(A4, B4);
-  auto kernel = [&](tpuStream_t stream, tpuKernelModule_t ppl_module,
+  auto kernel = [&](TPUStream stream, tpuKernelModule_t ppl_module,
                     uint32_t tile_size) -> int {
     if constexpr (std::is_same_v<scalar_t, float>) {
+      if (binary_type == 3) {
+      return binary_div_bcast_fp32(
+        stream,
+#ifndef BACKEND_SG2260
+        ppl_module,
+#endif
+        output_addr, input_addr, other_addr,
+        binary_type, tile_size,
+        A4[0],A4[1],A4[2],A4[3], B4[0],B4[1],B4[2],B4[3]);
+      } else {
       return binary_bcast_fp32(
-        stream, ppl_module, output_addr, input_addr, other_addr,
+        stream,
+#ifndef BACKEND_SG2260
+        ppl_module,
+#endif
+        output_addr, input_addr, other_addr,
         binary_type, tile_size,
         A4[0],A4[1],A4[2],A4[3], B4[0],B4[1],B4[2],B4[3]);
+      }
     } else if constexpr (std::is_same_v<scalar_t, at::Half>) {
+      if (binary_type == 3) {
+      return binary_div_bcast_fp16(
+        stream,
+#ifndef BACKEND_SG2260
+        ppl_module,
+#endif
+        output_addr, input_addr, other_addr,
+        binary_type, tile_size,
+        A4[0],A4[1],A4[2],A4[3], B4[0],B4[1],B4[2],B4[3]);
+      } else {
       return binary_bcast_fp16(
-        stream, ppl_module, output_addr, input_addr, other_addr,
+        stream,
+#ifndef BACKEND_SG2260
+        ppl_module,
+#endif
+        output_addr, input_addr, other_addr,
         binary_type, tile_size,
         A4[0],A4[1],A4[2],A4[3], B4[0],B4[1],B4[2],B4[3]);
+      }
     } else if constexpr (std::is_same_v<scalar_t, at::BFloat16>) {
-      return binary_bcast_bf16(
-        stream, ppl_module, output_addr, input_addr, other_addr,
+      if (binary_type == 3) {
+      return binary_div_bcast_bf16(
+        stream,
+#ifndef BACKEND_SG2260
+        ppl_module,
+#endif
+        output_addr, input_addr, other_addr,
         binary_type, tile_size,
         A4[0],A4[1],A4[2],A4[3], B4[0],B4[1],B4[2],B4[3]);
+      } else {
+      return binary_bcast_bf16(
+        stream,
+#ifndef BACKEND_SG2260
+        ppl_module,
+#endif
+        output_addr, input_addr, other_addr,
+        binary_type, tile_size,
+        A4[0],A4[1],A4[2],A4[3], B4[0],B4[1],B4[2],B4[3]);
+      }
     } else if constexpr (std::is_same_v<scalar_t, int32_t>) {
       if (binary_type == 3){
         return div_bcast_int32_fp32(
-          stream, ppl_module, output_addr, input_addr, other_addr, tile_size,
+          stream,
+#ifndef BACKEND_SG2260
+        ppl_module,
+#endif
+          output_addr, input_addr, other_addr, tile_size,
           A4[0],A4[1],A4[2],A4[3], B4[0],B4[1],B4[2],B4[3]);
       } else {
         return binary_bcast_int32(
-          stream, ppl_module, output_addr, input_addr, other_addr,
+          stream,
+#ifndef BACKEND_SG2260
+        ppl_module,
+#endif
+          output_addr, input_addr, other_addr,
           binary_type, tile_size,
           A4[0],A4[1],A4[2],A4[3], B4[0],B4[1],B4[2],B4[3]);
       }
     } else if constexpr (std::is_same_v<scalar_t, int16_t>) {
       if (binary_type == 3){
         return div_bcast_int16_fp32(
-          stream, ppl_module, output_addr, input_addr, other_addr, tile_size,
+          stream,
+#ifndef BACKEND_SG2260
+        ppl_module,
+#endif
+          output_addr, input_addr, other_addr, tile_size,
           A4[0],A4[1],A4[2],A4[3], B4[0],B4[1],B4[2],B4[3]);
       } else {
         return binary_bcast_int16(
-        stream, ppl_module, output_addr, input_addr, other_addr,
+        stream,
+#ifndef BACKEND_SG2260
+        ppl_module,
+#endif
+        output_addr, input_addr, other_addr,
         binary_type, tile_size,
         A4[0],A4[1],A4[2],A4[3], B4[0],B4[1],B4[2],B4[3]);
       }
     } else if constexpr (std::is_same_v<scalar_t, int8_t>) {
       if (binary_type == 3){
         return div_bcast_int8_fp32(
-          stream, ppl_module, output_addr, input_addr, other_addr, tile_size,
+          stream,
+#ifndef BACKEND_SG2260
+        ppl_module,
+#endif
+          output_addr, input_addr, other_addr, tile_size,
           A4[0],A4[1],A4[2],A4[3], B4[0],B4[1],B4[2],B4[3]);
       } else {
         return binary_bcast_int8(
-        stream, ppl_module, output_addr, input_addr, other_addr,
+        stream,
+#ifndef BACKEND_SG2260
+        ppl_module,
+#endif
+        output_addr, input_addr, other_addr,
         binary_type, tile_size,
         A4[0],A4[1],A4[2],A4[3], B4[0],B4[1],B4[2],B4[3]);
       }
     } else if constexpr (std::is_same_v<scalar_t, uint8_t>) {
       if (binary_type == 3){
         return div_bcast_uint8_fp32(
-          stream, ppl_module, output_addr, input_addr, other_addr, tile_size,
+          stream,
+#ifndef BACKEND_SG2260
+        ppl_module,
+#endif
+          output_addr, input_addr, other_addr, tile_size,
           A4[0],A4[1],A4[2],A4[3], B4[0],B4[1],B4[2],B4[3]);
       } else {
         return binary_bcast_uint8(
-          stream, ppl_module, output_addr, input_addr, other_addr,
+          stream,
+#ifndef BACKEND_SG2260
+        ppl_module,
+#endif
+          output_addr, input_addr, other_addr,
           binary_type, tile_size,
           A4[0],A4[1],A4[2],A4[3], B4[0],B4[1],B4[2],B4[3]);
         }
@@ -320,7 +549,7 @@ static void binary_bcast_impl(
     }
   };
 
-  tpuStream_t stream = c10_tpu::getCurrentTPUStream().stream();
+  auto stream = c10_tpu::getCurrentTPUStream();
   tpuKernelModule_t ppl_module = getPplModule();
   uint32_t tile_size = A4[3]*A4[2];
 
@@ -348,22 +577,42 @@ struct BinaryOpDispatcher;
 
 template <typename scalar_t, typename Mode>
 struct BinaryOpDispatcher<BinaryOpType::MINMAX, scalar_t, Mode> {
-  static int invoke(tpuStream_t stream, tpuKernelModule_t ppl_module,
+  static int invoke(TPUStream stream, tpuKernelModule_t ppl_module,
                    uint64_t output_addr, uint64_t input_addr, float scalar,
                    bool mode, bool out_is_int, uint32_t outer_size, uint32_t inner_size,
                    uint32_t tile_size) {
     if constexpr (std::is_same_v<scalar_t, int32_t>) {
-      return minmax_int32(stream, ppl_module, output_addr, input_addr,
-                         scalar, mode, outer_size, inner_size, tile_size);
+      return minmax_int32(
+              stream,
+#ifndef BACKEND_SG2260
+              ppl_module,
+#endif
+              output_addr, input_addr,
+              scalar, mode, outer_size, inner_size, tile_size);
     } else if constexpr (std::is_same_v<scalar_t, float>) {
-      return minmax_fp32(stream, ppl_module, output_addr, input_addr,
-                        scalar, mode, outer_size, inner_size, tile_size);
+      return minmax_fp32(
+              stream,
+#ifndef BACKEND_SG2260
+              ppl_module,
+#endif
+              output_addr, input_addr,
+              scalar, mode, outer_size, inner_size, tile_size);
     } else if constexpr (std::is_same_v<scalar_t, at::Half>) {
-      return minmax_fp16(stream, ppl_module, output_addr, input_addr,
-                        scalar, mode, outer_size, inner_size, tile_size);
+      return minmax_fp16(
+              stream,
+#ifndef BACKEND_SG2260
+              ppl_module,
+#endif
+              output_addr, input_addr,
+              scalar, mode, outer_size, inner_size, tile_size);
     } else if constexpr (std::is_same_v<scalar_t, at::BFloat16>) {
-      return minmax_bf16(stream, ppl_module, output_addr, input_addr,
-                        scalar, mode, outer_size, inner_size, tile_size);
+      return minmax_bf16(
+              stream,
+#ifndef BACKEND_SG2260
+              ppl_module,
+#endif
+              output_addr, input_addr,
+              scalar, mode, outer_size, inner_size, tile_size);
     }
     return -1;
   }
@@ -371,13 +620,18 @@ struct BinaryOpDispatcher<BinaryOpType::MINMAX, scalar_t, Mode> {
 
 template <typename scalar_t, typename Mode>
 struct BinaryOpDispatcher<BinaryOpType::SHIFT, scalar_t, Mode> {
-  static int invoke(tpuStream_t stream, tpuKernelModule_t ppl_module,
+  static int invoke(TPUStream stream, tpuKernelModule_t ppl_module,
                    uint64_t output_addr, uint64_t input_addr, float shift_c,
                    bool mode, bool out_is_int, uint32_t outer_size, uint32_t inner_size,
                    uint32_t tile_size) {
     if constexpr (std::is_same_v<scalar_t, int32_t>) {
-      return shift_const_int32(stream, ppl_module, output_addr, input_addr,
-                         shift_c, outer_size, inner_size, tile_size);
+      return shift_const_int32(
+                stream,
+#ifndef BACKEND_SG2260
+                ppl_module,
+#endif
+                output_addr, input_addr,
+                shift_c, outer_size, inner_size, tile_size);
     }
     return -1;
   }
@@ -385,22 +639,42 @@ struct BinaryOpDispatcher<BinaryOpType::SHIFT, scalar_t, Mode> {
 
 template <typename scalar_t, typename Mode>
 struct BinaryOpDispatcher<BinaryOpType::COMPARE, scalar_t, Mode> {
-  static int invoke(tpuStream_t stream, tpuKernelModule_t ppl_module,
+  static int invoke(TPUStream stream, tpuKernelModule_t ppl_module,
                    uint64_t output_addr, uint64_t input_addr, float scalar,
                    Mode mode, bool out_is_int, uint32_t outer_size, uint32_t inner_size,
                    uint32_t tile_size) {
     if constexpr (std::is_same_v<scalar_t, int32_t>) {
-      return compare_const_int32(stream, ppl_module, output_addr, input_addr,
-                               scalar, mode, outer_size, inner_size, tile_size);
+      return compare_const_int32(
+                    stream,
+#ifndef BACKEND_SG2260
+                    ppl_module,
+#endif
+                    output_addr, input_addr,
+                    scalar, mode, outer_size, inner_size, tile_size);
     } else if constexpr (std::is_same_v<scalar_t, float>) {
-      return compare_const_fp32(stream, ppl_module, output_addr, input_addr,
-                              scalar, mode, outer_size, inner_size, tile_size);
+      return compare_const_fp32(
+                    stream,
+#ifndef BACKEND_SG2260
+                    ppl_module,
+#endif
+                    output_addr, input_addr,
+                    scalar, mode, outer_size, inner_size, tile_size);
     } else if constexpr (std::is_same_v<scalar_t, at::Half>) {
-      return compare_const_fp16(stream, ppl_module, output_addr, input_addr,
-                              scalar, mode, outer_size, inner_size, tile_size);
+      return compare_const_fp16(
+                    stream,
+#ifndef BACKEND_SG2260
+                    ppl_module,
+#endif
+                    output_addr, input_addr,
+                    scalar, mode, outer_size, inner_size, tile_size);
     } else if constexpr (std::is_same_v<scalar_t, at::BFloat16>) {
-      return compare_const_bf16(stream, ppl_module, output_addr, input_addr,
-                              scalar, mode, outer_size, inner_size, tile_size);
+      return compare_const_bf16(
+                    stream,
+#ifndef BACKEND_SG2260
+                    ppl_module,
+#endif
+                    output_addr, input_addr,
+                    scalar, mode, outer_size, inner_size, tile_size);
     }
     return -1;
   }
@@ -408,13 +682,18 @@ struct BinaryOpDispatcher<BinaryOpType::COMPARE, scalar_t, Mode> {
 
 template <typename scalar_t, typename Mode>
 struct BinaryOpDispatcher<BinaryOpType::BITWISE, scalar_t, Mode> {
-  static int invoke(tpuStream_t stream, tpuKernelModule_t ppl_module,
+  static int invoke(TPUStream stream, tpuKernelModule_t ppl_module,
                    uint64_t output_addr, uint64_t input_addr, float scalar,
                    bool mode, bool out_is_int, uint32_t outer_size, uint32_t inner_size,
                    uint32_t tile_size) {
     if constexpr (std::is_same_v<scalar_t, int32_t>) {
-      return bitwise_const_int32(stream, ppl_module, output_addr, input_addr,
-                         scalar, mode, outer_size, inner_size, tile_size);
+      return bitwise_const_int32(
+              stream,
+#ifndef BACKEND_SG2260
+              ppl_module,
+#endif
+              output_addr, input_addr,
+              scalar, mode, outer_size, inner_size, tile_size);
     }
     return -1;
   }
@@ -422,47 +701,97 @@ struct BinaryOpDispatcher<BinaryOpType::BITWISE, scalar_t, Mode> {
 
 template <typename scalar_t, typename Mode>
 struct BinaryOpDispatcher<BinaryOpType::POW, scalar_t, Mode> {
-  static int invoke(tpuStream_t stream, tpuKernelModule_t ppl_module,
+  static int invoke(TPUStream stream, tpuKernelModule_t ppl_module,
                    uint64_t output_addr, uint64_t input_addr, double scalar,
                    bool mode, bool out_is_int, uint32_t outer_size, uint32_t inner_size,
                    uint32_t tile_size) {
     if (mode == 0 ){
       if constexpr (std::is_same_v<scalar_t, int32_t>) {
         if (out_is_int) {
-          return powc_const_int32_int32(stream, ppl_module, output_addr, input_addr,
-                                scalar, outer_size, inner_size, tile_size);
+          return powc_const_int32_int32(
+                    stream,
+#ifndef BACKEND_SG2260
+                    ppl_module,
+#endif
+                    output_addr, input_addr,
+                    scalar, outer_size, inner_size, tile_size);
         } else {
-          return powc_const_int32(stream, ppl_module, output_addr, input_addr,
-                                scalar, outer_size, inner_size, tile_size);
+          return powc_const_int32(
+                    stream,
+#ifndef BACKEND_SG2260
+                    ppl_module,
+#endif
+                    output_addr, input_addr,
+                    scalar, outer_size, inner_size, tile_size);
         }
       } else if constexpr (std::is_same_v<scalar_t, float>) {
-        return powc_const_fp32(stream, ppl_module, output_addr, input_addr,
-                                scalar, outer_size, inner_size, tile_size);
+        return powc_const_fp32(
+                    stream,
+#ifndef BACKEND_SG2260
+                    ppl_module,
+#endif
+                    output_addr, input_addr,
+                    scalar, outer_size, inner_size, tile_size);
       } else if constexpr (std::is_same_v<scalar_t, at::Half>) {
-        return powc_const_fp16(stream, ppl_module, output_addr, input_addr,
-                                scalar, outer_size, inner_size, tile_size);
+        return powc_const_fp16(
+                    stream,
+#ifndef BACKEND_SG2260
+                    ppl_module,
+#endif
+                    output_addr, input_addr,
+                    scalar, outer_size, inner_size, tile_size);
       } else if constexpr (std::is_same_v<scalar_t, at::BFloat16>) {
-        return powc_const_bf16(stream, ppl_module, output_addr, input_addr,
-                                scalar, outer_size, inner_size, tile_size);
+        return powc_const_bf16(
+                    stream,
+#ifndef BACKEND_SG2260
+                    ppl_module,
+#endif
+                    output_addr, input_addr,
+                    scalar, outer_size, inner_size, tile_size);
       }
     } else {
       if constexpr (std::is_same_v<scalar_t, int32_t>) {
         if (out_is_int) {
-          return cpow_const_int32_int32(stream, ppl_module, output_addr, input_addr,
-                                scalar, outer_size, inner_size, tile_size);
+          return cpow_const_int32_int32(
+                    stream,
+#ifndef BACKEND_SG2260
+                    ppl_module,
+#endif
+                    output_addr, input_addr,
+                    scalar, outer_size, inner_size, tile_size);
         } else {
-          return cpow_const_int32(stream, ppl_module, output_addr, input_addr,
-                                scalar, outer_size, inner_size, tile_size);
+          return cpow_const_int32(
+                    stream,
+#ifndef BACKEND_SG2260
+                    ppl_module,
+#endif
+                    output_addr, input_addr,
+                    scalar, outer_size, inner_size, tile_size);
         }
       } else if constexpr (std::is_same_v<scalar_t, float>) {
-        return cpow_const_fp32(stream, ppl_module, output_addr, input_addr,
-                                scalar, outer_size, inner_size, tile_size);
+        return cpow_const_fp32(
+                    stream,
+#ifndef BACKEND_SG2260
+                    ppl_module,
+#endif
+                    output_addr, input_addr,
+                    scalar, outer_size, inner_size, tile_size);
       } else if constexpr (std::is_same_v<scalar_t, at::Half>) {
-        return cpow_const_fp16(stream, ppl_module, output_addr, input_addr,
-                                scalar, outer_size, inner_size, tile_size);
+        return cpow_const_fp16(
+                    stream,
+#ifndef BACKEND_SG2260
+                    ppl_module,
+#endif
+                    output_addr, input_addr,
+                    scalar, outer_size, inner_size, tile_size);
       } else if constexpr (std::is_same_v<scalar_t, at::BFloat16>) {
-        return cpow_const_bf16(stream, ppl_module, output_addr, input_addr,
-                                scalar,outer_size, inner_size, tile_size);
+        return cpow_const_bf16(
+                    stream,
+#ifndef BACKEND_SG2260
+                    ppl_module,
+#endif
+                    output_addr, input_addr,
+                    scalar, outer_size, inner_size, tile_size);
       }
     }
     return -1;
@@ -471,22 +800,32 @@ struct BinaryOpDispatcher<BinaryOpType::POW, scalar_t, Mode> {
 
 template <typename scalar_t, typename Mode>
 struct BinaryOpDispatcher<BinaryOpType::ATAN2, scalar_t, Mode> {
-  static int invoke(tpuStream_t stream, tpuKernelModule_t ppl_module,
+  static int invoke(TPUStream stream, tpuKernelModule_t ppl_module,
                    uint64_t output_addr, uint64_t input_addr, double scalar,
                    bool mode, bool out_is_int, uint32_t outer_size, uint32_t inner_size,
                    uint32_t tile_size) {
     if ( mode == 0 ){
       if constexpr (std::is_same_v<scalar_t, float>) {
-        return atan2_const_fp32(stream, ppl_module, output_addr, input_addr,
-                                scalar, mode, outer_size, inner_size, tile_size);
+        return atan2_const_fp32(
+          stream,
+#ifndef BACKEND_SG2260
+          ppl_module,
+#endif
+          output_addr, input_addr,
+          scalar, mode, outer_size, inner_size, tile_size);
       } else {
         TORCH_CHECK(false, "Only float type is supported for powc with mode 0");
       }
     }
     else {
       if constexpr (std::is_same_v<scalar_t, float>) {
-        return const_atan2_fp32(stream, ppl_module, output_addr, input_addr,
-                                scalar, mode, outer_size, inner_size, tile_size);
+        return const_atan2_fp32(
+          stream,
+#ifndef BACKEND_SG2260
+          ppl_module,
+#endif
+          output_addr, input_addr,
+          scalar, mode, outer_size, inner_size, tile_size);
       } else {
         TORCH_CHECK(false, "Only float type is supported for cpow with mode 1");
       }
@@ -505,14 +844,16 @@ static void unified_const_impl(
     uint32_t inner_size,
     bool out_is_int = false) {
 
-  auto kernel = [&](tpuStream_t stream, tpuKernelModule_t ppl_module,
+  auto kernel = [&](TPUStream stream, tpuKernelModule_t ppl_module,
                    uint32_t tile_size) -> int {
     return BinaryOpDispatcher<Op, scalar_t, Mode>::invoke(
-        stream, ppl_module, output_addr, input_addr, scalar,
+        stream,
+        ppl_module,
+        output_addr, input_addr, scalar,
         mode, out_is_int, outer_size, inner_size, tile_size);
   };
 
-  tpuStream_t stream = c10_tpu::getCurrentTPUStream().stream();
+  auto stream = c10_tpu::getCurrentTPUStream();
   tpuKernelModule_t ppl_module = getPplModule();
   uint32_t tile_size = inner_size;
 
@@ -529,57 +870,96 @@ static void unified_const_impl(
   TORCH_CHECK(false, "Unified const operation failed for op type: ", static_cast<int>(Op));
 }
 
-// 非const
 template <BinaryOpType Op, typename scalar_t, typename Mode = void>
 struct BinaryForwardOpDispatcher;
 
 template <typename scalar_t, typename Mode>
 struct BinaryForwardOpDispatcher<BinaryOpType::MINMAX, scalar_t, Mode> {
-  static int invoke_same_shape(tpuStream_t stream, tpuKernelModule_t ppl_module,
+  static int invoke_same_shape(TPUStream stream, tpuKernelModule_t ppl_module,
                              uint64_t output_addr, uint64_t input_addr, uint64_t other_addr,
                              Mode mode, uint32_t outer_size, uint32_t inner_size,
                              uint32_t tile_size) {
     if constexpr (std::is_same_v<scalar_t, int32_t>) {
-      return minmax_forward_int32(stream, ppl_module, output_addr, input_addr, other_addr,
-                                mode, outer_size, inner_size, tile_size);
+      return minmax_forward_int32(
+        stream,
+#ifndef BACKEND_SG2260
+        ppl_module,
+#endif
+        output_addr, input_addr, other_addr,
+        mode, outer_size, inner_size, tile_size);
     } else if constexpr (std::is_same_v<scalar_t, float>) {
-      return minmax_forward_fp32(stream, ppl_module, output_addr, input_addr, other_addr,
-                               mode, outer_size, inner_size, tile_size);
+      return minmax_forward_fp32(
+        stream,
+#ifndef BACKEND_SG2260
+        ppl_module,
+#endif
+        output_addr, input_addr, other_addr,
+        mode, outer_size, inner_size, tile_size);
     } else if constexpr (std::is_same_v<scalar_t, at::Half>) {
-      return minmax_forward_fp16(stream, ppl_module, output_addr, input_addr, other_addr,
-                               mode, outer_size, inner_size, tile_size);
+      return minmax_forward_fp16(
+        stream,
+#ifndef BACKEND_SG2260
+        ppl_module,
+#endif
+        output_addr, input_addr, other_addr,
+        mode, outer_size, inner_size, tile_size);
     } else if constexpr (std::is_same_v<scalar_t, at::BFloat16>) {
-      return minmax_forward_bf16(stream, ppl_module, output_addr, input_addr, other_addr,
-                               mode, outer_size, inner_size, tile_size);
+      return minmax_forward_bf16(
+        stream,
+#ifndef BACKEND_SG2260
+        ppl_module,
+#endif
+        output_addr, input_addr, other_addr,
+        mode, outer_size, inner_size, tile_size);
     }
     return -1;
   }
 
-  static int invoke_bcast_shape(tpuStream_t stream, tpuKernelModule_t ppl_module,
+  static int invoke_bcast_shape(TPUStream stream, tpuKernelModule_t ppl_module,
                               uint64_t output_addr, uint64_t input_addr, uint64_t other_addr,
                               Mode mode, uint32_t outer_size, uint32_t inner_size,
                               uint32_t tile_size, const std::vector<int>& self_shape,
                               const std::vector<int>& other_shape) {
     if constexpr (std::is_same_v<scalar_t, int32_t>) {
-      return minmax_bcast_int32(stream, ppl_module, output_addr, input_addr, other_addr,
-                              mode, outer_size, inner_size, tile_size,
-                              self_shape[0], self_shape[1], self_shape[2], self_shape[3],
-                              other_shape[0], other_shape[1], other_shape[2], other_shape[3]);
+      return minmax_bcast_int32(
+        stream,
+#ifndef BACKEND_SG2260
+        ppl_module,
+#endif
+        output_addr, input_addr, other_addr,
+        mode, outer_size, inner_size, tile_size,
+        self_shape[0], self_shape[1], self_shape[2], self_shape[3],
+        other_shape[0], other_shape[1], other_shape[2], other_shape[3]);
     } else if constexpr (std::is_same_v<scalar_t, float>) {
-      return minmax_bcast_fp32(stream, ppl_module, output_addr, input_addr, other_addr,
-                             mode, outer_size, inner_size, tile_size,
-                              self_shape[0], self_shape[1], self_shape[2], self_shape[3],
-                              other_shape[0], other_shape[1], other_shape[2], other_shape[3]);
+      return minmax_bcast_fp32(
+        stream,
+#ifndef BACKEND_SG2260
+        ppl_module,
+#endif
+        output_addr, input_addr, other_addr,
+        mode, outer_size, inner_size, tile_size,
+        self_shape[0], self_shape[1], self_shape[2], self_shape[3],
+        other_shape[0], other_shape[1], other_shape[2], other_shape[3]);
     } else if constexpr (std::is_same_v<scalar_t, at::Half>) {
-      return minmax_bcast_fp16(stream, ppl_module, output_addr, input_addr, other_addr,
-                             mode, outer_size, inner_size, tile_size,
-                              self_shape[0], self_shape[1], self_shape[2], self_shape[3],
-                              other_shape[0], other_shape[1], other_shape[2], other_shape[3]);
+      return minmax_bcast_fp16(
+        stream,
+#ifndef BACKEND_SG2260
+        ppl_module,
+#endif
+        output_addr, input_addr, other_addr,
+        mode, outer_size, inner_size, tile_size,
+        self_shape[0], self_shape[1], self_shape[2], self_shape[3],
+        other_shape[0], other_shape[1], other_shape[2], other_shape[3]);
     } else if constexpr (std::is_same_v<scalar_t, at::BFloat16>) {
-      return minmax_bcast_bf16(stream, ppl_module, output_addr, input_addr, other_addr,
-                             mode, outer_size, inner_size, tile_size,
-                              self_shape[0], self_shape[1], self_shape[2], self_shape[3],
-                              other_shape[0], other_shape[1], other_shape[2], other_shape[3]);
+      return minmax_bcast_bf16(
+        stream,
+#ifndef BACKEND_SG2260
+        ppl_module,
+#endif
+        output_addr, input_addr, other_addr,
+        mode, outer_size, inner_size, tile_size,
+        self_shape[0], self_shape[1], self_shape[2], self_shape[3],
+        other_shape[0], other_shape[1], other_shape[2], other_shape[3]);
     }
     return -1;
   }
@@ -587,27 +967,37 @@ struct BinaryForwardOpDispatcher<BinaryOpType::MINMAX, scalar_t, Mode> {
 
 template <typename scalar_t, typename Mode>
 struct BinaryForwardOpDispatcher<BinaryOpType::SHIFT, scalar_t, Mode> {
-  static int invoke_same_shape(tpuStream_t stream, tpuKernelModule_t ppl_module,
+  static int invoke_same_shape(TPUStream stream, tpuKernelModule_t ppl_module,
                              uint64_t output_addr, uint64_t input_addr, uint64_t other_addr,
                              Mode mode, uint32_t outer_size, uint32_t inner_size,
                              uint32_t tile_size) {
     if constexpr (std::is_same_v<scalar_t, int32_t>) {
-      return shift_forward_int32(stream, ppl_module, output_addr, input_addr, other_addr,
-                                mode, outer_size, inner_size, tile_size);
+      return shift_forward_int32(
+        stream,
+#ifndef BACKEND_SG2260
+        ppl_module,
+#endif
+        output_addr, input_addr, other_addr,
+        mode, outer_size, inner_size, tile_size);
     } else {
       return -1;
     }
   }
-    static int invoke_bcast_shape(tpuStream_t stream, tpuKernelModule_t ppl_module,
+    static int invoke_bcast_shape(TPUStream stream, tpuKernelModule_t ppl_module,
                               uint64_t output_addr, uint64_t input_addr, uint64_t other_addr,
                               Mode mode, uint32_t outer_size, uint32_t inner_size,
                               uint32_t tile_size, const std::vector<int>& self_shape,
                               const std::vector<int>& other_shape) {
     if constexpr (std::is_same_v<scalar_t, int32_t>) {
-      return shift_bcast_int32(stream, ppl_module, output_addr, input_addr, other_addr,
-                               mode, outer_size, inner_size, tile_size,
-                              self_shape[0], self_shape[1], self_shape[2], self_shape[3],
-                              other_shape[0], other_shape[1], other_shape[2], other_shape[3]);
+      return shift_bcast_int32(
+        stream,
+#ifndef BACKEND_SG2260
+        ppl_module,
+#endif
+        output_addr, input_addr, other_addr,
+        mode, outer_size, inner_size, tile_size,
+        self_shape[0], self_shape[1], self_shape[2], self_shape[3],
+        other_shape[0], other_shape[1], other_shape[2], other_shape[3]);
     } else {
       return -1;
     }
@@ -616,28 +1006,38 @@ struct BinaryForwardOpDispatcher<BinaryOpType::SHIFT, scalar_t, Mode> {
 
 template <typename scalar_t, typename Mode>
 struct BinaryForwardOpDispatcher<BinaryOpType::BITWISE, scalar_t, Mode> {
-  static int invoke_same_shape(tpuStream_t stream, tpuKernelModule_t ppl_module,
+  static int invoke_same_shape(TPUStream stream, tpuKernelModule_t ppl_module,
                              uint64_t output_addr, uint64_t input_addr, uint64_t other_addr,
                              Mode mode, uint32_t outer_size, uint32_t inner_size,
                              uint32_t tile_size) {
     if constexpr (std::is_same_v<scalar_t, int32_t>) {
-      return bitwise_forward_int32(stream, ppl_module, output_addr, input_addr, other_addr,
-                                mode, outer_size, inner_size, tile_size);
+      return bitwise_forward_int32(
+        stream,
+#ifndef BACKEND_SG2260
+        ppl_module,
+#endif
+        output_addr, input_addr, other_addr,
+        mode, outer_size, inner_size, tile_size);
     } else {
       return -1;
     }
   }
 
-    static int invoke_bcast_shape(tpuStream_t stream, tpuKernelModule_t ppl_module,
+    static int invoke_bcast_shape(TPUStream stream, tpuKernelModule_t ppl_module,
                               uint64_t output_addr, uint64_t input_addr, uint64_t other_addr,
                               Mode mode, uint32_t outer_size, uint32_t inner_size,
                               uint32_t tile_size, const std::vector<int>& self_shape,
                               const std::vector<int>& other_shape) {
     if constexpr (std::is_same_v<scalar_t, int32_t>) {
-      return bitwise_bcast_int32(stream, ppl_module, output_addr, input_addr, other_addr,
-                               mode, outer_size, inner_size, tile_size,
-                              self_shape[0], self_shape[1], self_shape[2], self_shape[3],
-                              other_shape[0], other_shape[1], other_shape[2], other_shape[3]);
+      return bitwise_bcast_int32(
+        stream,
+#ifndef BACKEND_SG2260
+        ppl_module,
+#endif
+        output_addr, input_addr, other_addr,
+        mode, outer_size, inner_size, tile_size,
+        self_shape[0], self_shape[1], self_shape[2], self_shape[3],
+        other_shape[0], other_shape[1], other_shape[2], other_shape[3]);
     } else {
       return -1;
     }
@@ -646,28 +1046,38 @@ struct BinaryForwardOpDispatcher<BinaryOpType::BITWISE, scalar_t, Mode> {
 
 template <typename scalar_t, typename Mode>
 struct BinaryForwardOpDispatcher<BinaryOpType::ATAN2, scalar_t, Mode> {
-  static int invoke_same_shape(tpuStream_t stream, tpuKernelModule_t ppl_module,
+  static int invoke_same_shape(TPUStream stream, tpuKernelModule_t ppl_module,
                              uint64_t output_addr, uint64_t input_addr, uint64_t other_addr,
                              Mode mode, uint32_t outer_size, uint32_t inner_size,
                              uint32_t tile_size) {
     if constexpr (std::is_same_v<scalar_t, float>) {
-      return atan2_forward_fp32(stream, ppl_module, output_addr, input_addr, other_addr,
-                                mode, outer_size, inner_size, tile_size);
+      return atan2_forward_fp32(
+        stream,
+#ifndef BACKEND_SG2260
+        ppl_module,
+#endif
+        output_addr, input_addr, other_addr,
+        mode, outer_size, inner_size, tile_size);
     } else {
       return -1;
     }
   }
 
-    static int invoke_bcast_shape(tpuStream_t stream, tpuKernelModule_t ppl_module,
+    static int invoke_bcast_shape(TPUStream stream, tpuKernelModule_t ppl_module,
                               uint64_t output_addr, uint64_t input_addr, uint64_t other_addr,
                               Mode mode, uint32_t outer_size, uint32_t inner_size,
                               uint32_t tile_size, const std::vector<int>& self_shape,
                               const std::vector<int>& other_shape) {
     if constexpr (std::is_same_v<scalar_t, float>) {
-      return atan2_bcast_fp32(stream, ppl_module, output_addr, input_addr, other_addr,
-                               mode, outer_size, inner_size, tile_size,
-                              self_shape[0], self_shape[1], self_shape[2], self_shape[3],
-                              other_shape[0], other_shape[1], other_shape[2], other_shape[3]);
+      return atan2_bcast_fp32(
+        stream,
+#ifndef BACKEND_SG2260
+        ppl_module,
+#endif
+        output_addr, input_addr, other_addr,
+        mode, outer_size, inner_size, tile_size,
+        self_shape[0], self_shape[1], self_shape[2], self_shape[3],
+        other_shape[0], other_shape[1], other_shape[2], other_shape[3]);
     } else {
       return -1;
     }
@@ -676,51 +1086,91 @@ struct BinaryForwardOpDispatcher<BinaryOpType::ATAN2, scalar_t, Mode> {
 
 template <typename scalar_t, typename Mode>
 struct BinaryForwardOpDispatcher<BinaryOpType::POW, scalar_t, Mode> {
-  static int invoke_same_shape(tpuStream_t stream, tpuKernelModule_t ppl_module,
+  static int invoke_same_shape(TPUStream stream, tpuKernelModule_t ppl_module,
                              uint64_t output_addr, uint64_t input_addr, uint64_t other_addr,
                              Mode mode, uint32_t outer_size, uint32_t inner_size,
                              uint32_t tile_size) {
     if constexpr (std::is_same_v<scalar_t, int32_t>) {
-      return pow_forward_int32(stream, ppl_module, output_addr, input_addr, other_addr,
-                                mode, outer_size, inner_size, tile_size);
+      return pow_forward_int32(
+        stream,
+#ifndef BACKEND_SG2260
+        ppl_module,
+#endif
+        output_addr, input_addr, other_addr,
+        mode, outer_size, inner_size, tile_size);
     } else if constexpr (std::is_same_v<scalar_t, float>) {
-      return pow_forward_fp32(stream, ppl_module, output_addr, input_addr, other_addr,
-                               mode, outer_size, inner_size, tile_size);
+      return pow_forward_fp32(
+        stream,
+#ifndef BACKEND_SG2260
+        ppl_module,
+#endif
+        output_addr, input_addr, other_addr,
+        mode, outer_size, inner_size, tile_size);
     } else if constexpr (std::is_same_v<scalar_t, at::Half>) {
-      return pow_forward_fp16(stream, ppl_module, output_addr, input_addr, other_addr,
-                               mode, outer_size, inner_size, tile_size);
+      return pow_forward_fp16(
+        stream,
+#ifndef BACKEND_SG2260
+        ppl_module,
+#endif
+        output_addr, input_addr, other_addr,
+        mode, outer_size, inner_size, tile_size);
     } else if constexpr (std::is_same_v<scalar_t, at::BFloat16>) {
-      return pow_forward_bf16(stream, ppl_module, output_addr, input_addr, other_addr,
-                               mode, outer_size, inner_size, tile_size);
+      return pow_forward_bf16(
+        stream,
+#ifndef BACKEND_SG2260
+        ppl_module,
+#endif
+        output_addr, input_addr, other_addr,
+        mode, outer_size, inner_size, tile_size);
     }
     return -1;
   }
 
-  static int invoke_bcast_shape(tpuStream_t stream, tpuKernelModule_t ppl_module,
+  static int invoke_bcast_shape(TPUStream stream, tpuKernelModule_t ppl_module,
                               uint64_t output_addr, uint64_t input_addr, uint64_t other_addr,
                               Mode mode, uint32_t outer_size, uint32_t inner_size,
                               uint32_t tile_size, const std::vector<int>& self_shape,
                               const std::vector<int>& other_shape) {
     if constexpr (std::is_same_v<scalar_t, int32_t>) {
-      return pow_bcast_int32(stream, ppl_module, output_addr, input_addr, other_addr,
-                              mode, outer_size, inner_size, tile_size,
-                              self_shape[0], self_shape[1], self_shape[2], self_shape[3],
-                              other_shape[0], other_shape[1], other_shape[2], other_shape[3]);
+      return pow_bcast_int32(
+        stream,
+#ifndef BACKEND_SG2260
+        ppl_module,
+#endif
+        output_addr, input_addr, other_addr,
+        mode, outer_size, inner_size, tile_size,
+        self_shape[0], self_shape[1], self_shape[2], self_shape[3],
+        other_shape[0], other_shape[1], other_shape[2], other_shape[3]);
     } else if constexpr (std::is_same_v<scalar_t, float>) {
-      return pow_bcast_fp32(stream, ppl_module, output_addr, input_addr, other_addr,
-                             mode, outer_size, inner_size, tile_size,
-                              self_shape[0], self_shape[1], self_shape[2], self_shape[3],
-                              other_shape[0], other_shape[1], other_shape[2], other_shape[3]);
+      return pow_bcast_fp32(
+        stream,
+#ifndef BACKEND_SG2260
+        ppl_module,
+#endif
+        output_addr, input_addr, other_addr,
+        mode, outer_size, inner_size, tile_size,
+        self_shape[0], self_shape[1], self_shape[2], self_shape[3],
+        other_shape[0], other_shape[1], other_shape[2], other_shape[3]);
     } else if constexpr (std::is_same_v<scalar_t, at::Half>) {
-      return pow_bcast_fp16(stream, ppl_module, output_addr, input_addr, other_addr,
-                             mode, outer_size, inner_size, tile_size,
-                              self_shape[0], self_shape[1], self_shape[2], self_shape[3],
-                              other_shape[0], other_shape[1], other_shape[2], other_shape[3]);
+      return pow_bcast_fp16(
+        stream,
+#ifndef BACKEND_SG2260
+        ppl_module,
+#endif
+        output_addr, input_addr, other_addr,
+        mode, outer_size, inner_size, tile_size,
+        self_shape[0], self_shape[1], self_shape[2], self_shape[3],
+        other_shape[0], other_shape[1], other_shape[2], other_shape[3]);
     } else if constexpr (std::is_same_v<scalar_t, at::BFloat16>) {
-      return pow_bcast_bf16(stream, ppl_module, output_addr, input_addr, other_addr,
-                             mode, outer_size, inner_size, tile_size,
-                              self_shape[0], self_shape[1], self_shape[2], self_shape[3],
-                              other_shape[0], other_shape[1], other_shape[2], other_shape[3]);
+      return pow_bcast_bf16(
+        stream,
+#ifndef BACKEND_SG2260
+        ppl_module,
+#endif
+        output_addr, input_addr, other_addr,
+        mode, outer_size, inner_size, tile_size,
+        self_shape[0], self_shape[1], self_shape[2], self_shape[3],
+        other_shape[0], other_shape[1], other_shape[2], other_shape[3]);
     }
     return -1;
   }
@@ -728,51 +1178,91 @@ struct BinaryForwardOpDispatcher<BinaryOpType::POW, scalar_t, Mode> {
 
 template <typename scalar_t, typename Mode>
 struct BinaryForwardOpDispatcher<BinaryOpType::COMPARE, scalar_t, Mode> {
-  static int invoke_same_shape(tpuStream_t stream, tpuKernelModule_t ppl_module,
+  static int invoke_same_shape(TPUStream stream, tpuKernelModule_t ppl_module,
                              uint64_t output_addr, uint64_t input_addr, uint64_t other_addr,
                              Mode mode, uint32_t outer_size, uint32_t inner_size,
                              uint32_t tile_size) {
     if constexpr (std::is_same_v<scalar_t, int32_t>) {
-      return compare_int32(stream, ppl_module, output_addr, input_addr, other_addr,
-                                 mode, outer_size, inner_size, tile_size);
+      return compare_int32(
+        stream,
+#ifndef BACKEND_SG2260
+        ppl_module,
+#endif
+        output_addr, input_addr, other_addr,
+        mode, outer_size, inner_size, tile_size);
     } else if constexpr (std::is_same_v<scalar_t, float>) {
-      return compare_fp32(stream, ppl_module, output_addr, input_addr, other_addr,
-                                mode, outer_size, inner_size, tile_size);
+      return compare_fp32(
+        stream,
+#ifndef BACKEND_SG2260
+        ppl_module,
+#endif
+        output_addr, input_addr, other_addr,
+        mode, outer_size, inner_size, tile_size);
     } else if constexpr (std::is_same_v<scalar_t, at::Half>) {
-      return compare_fp16(stream, ppl_module, output_addr, input_addr, other_addr,
-                                mode, outer_size, inner_size, tile_size);
+      return compare_fp16(
+        stream,
+#ifndef BACKEND_SG2260
+        ppl_module,
+#endif
+        output_addr, input_addr, other_addr,
+        mode, outer_size, inner_size, tile_size);
     } else if constexpr (std::is_same_v<scalar_t, at::BFloat16>) {
-      return compare_bf16(stream, ppl_module, output_addr, input_addr, other_addr,
-                                mode, outer_size, inner_size, tile_size);
+      return compare_bf16(
+        stream,
+#ifndef BACKEND_SG2260
+        ppl_module,
+#endif
+        output_addr, input_addr, other_addr,
+        mode, outer_size, inner_size, tile_size);
     }
     return -1;
   }
 
-  static int invoke_bcast_shape(tpuStream_t stream, tpuKernelModule_t ppl_module,
+  static int invoke_bcast_shape(TPUStream stream, tpuKernelModule_t ppl_module,
                               uint64_t output_addr, uint64_t input_addr, uint64_t other_addr,
                               Mode mode, uint32_t outer_size, uint32_t inner_size,
                               uint32_t tile_size, const std::vector<int>& self_shape,
                               const std::vector<int>& other_shape) {
     if constexpr (std::is_same_v<scalar_t, int32_t>) {
-      return compare_bcast_int32(stream, ppl_module, output_addr, input_addr, other_addr,
-                               mode, outer_size, inner_size, tile_size,
-                              self_shape[0], self_shape[1], self_shape[2], self_shape[3],
-                              other_shape[0], other_shape[1], other_shape[2], other_shape[3]);
+      return compare_bcast_int32(
+        stream,
+#ifndef BACKEND_SG2260
+        ppl_module,
+#endif
+        output_addr, input_addr, other_addr,
+        mode, outer_size, inner_size, tile_size,
+        self_shape[0], self_shape[1], self_shape[2], self_shape[3],
+        other_shape[0], other_shape[1], other_shape[2], other_shape[3]);
     } else if constexpr (std::is_same_v<scalar_t, float>) {
-      return compare_bcast_fp32(stream, ppl_module, output_addr, input_addr, other_addr,
-                              mode, outer_size, inner_size, tile_size,
-                              self_shape[0], self_shape[1], self_shape[2], self_shape[3],
-                              other_shape[0], other_shape[1], other_shape[2], other_shape[3]);
+      return compare_bcast_fp32(
+        stream,
+#ifndef BACKEND_SG2260
+        ppl_module,
+#endif
+        output_addr, input_addr, other_addr,
+        mode, outer_size, inner_size, tile_size,
+        self_shape[0], self_shape[1], self_shape[2], self_shape[3],
+        other_shape[0], other_shape[1], other_shape[2], other_shape[3]);
     } else if constexpr (std::is_same_v<scalar_t, at::Half>) {
-      return compare_bcast_fp16(stream, ppl_module, output_addr, input_addr, other_addr,
-                              mode, outer_size, inner_size, tile_size,
-                              self_shape[0], self_shape[1], self_shape[2], self_shape[3],
-                              other_shape[0], other_shape[1], other_shape[2], other_shape[3]);
+      return compare_bcast_fp16(
+        stream,
+#ifndef BACKEND_SG2260
+        ppl_module,
+#endif
+        output_addr, input_addr, other_addr,
+        mode, outer_size, inner_size, tile_size,
+        self_shape[0], self_shape[1], self_shape[2], self_shape[3],
+        other_shape[0], other_shape[1], other_shape[2], other_shape[3]);
     } else if constexpr (std::is_same_v<scalar_t, at::BFloat16>) {
-      return compare_bcast_bf16(stream, ppl_module, output_addr, input_addr, other_addr,
-                              mode, outer_size, inner_size, tile_size,
-                              self_shape[0], self_shape[1], self_shape[2], self_shape[3],
-                              other_shape[0], other_shape[1], other_shape[2], other_shape[3]);
+      return compare_bcast_bf16(
+        stream,
+#ifndef BACKEND_SG2260
+        ppl_module,
+#endif
+        output_addr, input_addr, other_addr,
+        mode, outer_size, inner_size, tile_size,
+        self_shape[0], self_shape[1], self_shape[2], self_shape[3],
+        other_shape[0], other_shape[1], other_shape[2], other_shape[3]);
     }
     return -1;
   }
@@ -804,14 +1294,16 @@ static void unified_forward_impl(
     };
 
     if (is_same_shape(self_shape, other_shape)){
-      auto kernel = [&](tpuStream_t stream, tpuKernelModule_t ppl_module,
+      auto kernel = [&](TPUStream stream, tpuKernelModule_t ppl_module,
                       uint32_t tile_size) -> int {
         return BinaryForwardOpDispatcher<Op, scalar_t, Mode>::invoke_same_shape(
-            stream, ppl_module, output_addr, input_addr, other_addr,
+            stream,
+            ppl_module,
+            output_addr, input_addr, other_addr,
             mode, outer_size, inner_size, tile_size);
       };
 
-      tpuStream_t stream = c10_tpu::getCurrentTPUStream().stream();
+      auto stream = c10_tpu::getCurrentTPUStream();
       tpuKernelModule_t ppl_module = getPplModule();
       uint32_t tile_size = inner_size;
 
@@ -830,14 +1322,16 @@ static void unified_forward_impl(
       std::vector<int> processed_other = other_shape;
       process_shapes(processed_self, processed_other);
 
-      auto kernel = [&](tpuStream_t stream, tpuKernelModule_t ppl_module,
+      auto kernel = [&](TPUStream stream, tpuKernelModule_t ppl_module,
                       uint32_t tile_size) -> int {
         return BinaryForwardOpDispatcher<Op, scalar_t, Mode>::invoke_bcast_shape(
-            stream, ppl_module, output_addr, input_addr, other_addr,
+            stream,
+            ppl_module,
+            output_addr, input_addr, other_addr,
             mode, outer_size, inner_size, tile_size, processed_self, processed_other);
       };
 
-      tpuStream_t stream = c10_tpu::getCurrentTPUStream().stream();
+      auto stream = c10_tpu::getCurrentTPUStream();
       tpuKernelModule_t ppl_module = getPplModule();
       uint32_t tile_size = std::max(processed_self[0], processed_other[0]);
 
@@ -868,56 +1362,62 @@ Tensor &binary_op_tpu(const Tensor &self, const Tensor &other,
   if ( other.dim() == 0 && IS_CPU_TENSOR(other) ) {
     CHECK_TENSOR_IN_DEVICE(self);
 #ifdef USING_PPL
-    int outer_size = 1;
-    for (const auto i : c10::irange(self.dim())) {
-        outer_size *= self.size(i);
-    }
-    AT_DISPATCH_FLOAT_INT_TYPES(self.scalar_type(), "constbinary", ([&] {
-      using scalar_t_ = scalar_t;
-      binary_const_impl<scalar_t_>(
-      reinterpret_cast<uint64_t>(out.data_ptr()),
-      reinterpret_cast<uint64_t>(self.data_ptr()),
-      reinterpret_cast<uint64_t>(other.data_ptr()),
-      binary_type,
-      outer_size,
-      other.item().toFloat() * alpha.toFloat(), 1
-      );
-      }));
-#else
-    auto stream = c10_tpu::getCurrentTPUStream();
-    auto status = tpudnnBinaryCAsync(
-        stream, tpu::TPUGenerateTpudnnTensor(stream, self),
-        other.item().toFloat() * alpha.toFloat(),
-        tpu::TPUGenerateTpudnnTensor(stream, out), binary_type, 0);
-    TORCH_CHECK(status == TPUDNN_STATUS_SUCCESS);
+    if (usePPLKernels()){
+      int outer_size = 1;
+      for (const auto i : c10::irange(self.dim())) {
+          outer_size *= self.size(i);
+      }
+      AT_DISPATCH_FLOAT_INT_TYPES(self.scalar_type(), "constbinary", ([&] {
+        using scalar_t_ = scalar_t;
+        binary_const_impl<scalar_t_>(
+        reinterpret_cast<uint64_t>(out.data_ptr()),
+        reinterpret_cast<uint64_t>(self.data_ptr()),
+        reinterpret_cast<uint64_t>(other.data_ptr()),
+        binary_type,
+        outer_size,
+        other.item().toFloat() * alpha.toFloat(), 1
+        );
+        }));
+    } else
 #endif
+    {
+      auto stream = c10_tpu::getCurrentTPUStream();
+      auto status = tpudnnBinaryCAsync(
+          stream, tpu::TPUGenerateTpudnnTensor(stream, self),
+          other.item().toFloat() * alpha.toFloat(),
+          tpu::TPUGenerateTpudnnTensor(stream, out), binary_type, 0);
+      TORCH_CHECK(status == TPUDNN_STATUS_SUCCESS);
+    }
   }
   else if ( self.dim() == 0 && IS_CPU_TENSOR(self) ) {
     CHECK_TENSOR_IN_DEVICE(other);
 #ifdef USING_PPL
-    int outer_size = 1;
-    for (const auto i : c10::irange(other.dim())) {
-        outer_size *= other.size(i);
-    }
-    AT_DISPATCH_FLOAT_INT_TYPES(other.scalar_type(), "binaryconst", ([&] {
-      using scalar_t_ = scalar_t;
-      binary_const_impl<scalar_t_>(
-      reinterpret_cast<uint64_t>(out.data_ptr()),
-      reinterpret_cast<uint64_t>(other.data_ptr()),
-      reinterpret_cast<uint64_t>(self.data_ptr()),
-      binary_type,
-      outer_size,
-      self.item().toFloat() * alpha.toFloat(), 0
-      );
-      }));
-#else
-    auto stream = c10_tpu::getCurrentTPUStream();
-    auto status = tpudnnBinaryCAsync(
-        stream, tpu::TPUGenerateTpudnnTensor(stream, other),
-        self.item().toFloat() * alpha.toFloat(),
-        tpu::TPUGenerateTpudnnTensor(stream, out), binary_type, 1);
-    TORCH_CHECK(status == TPUDNN_STATUS_SUCCESS);
+    if (usePPLKernels()){
+      int outer_size = 1;
+      for (const auto i : c10::irange(other.dim())) {
+          outer_size *= other.size(i);
+      }
+      AT_DISPATCH_FLOAT_INT_TYPES(other.scalar_type(), "binaryconst", ([&] {
+        using scalar_t_ = scalar_t;
+        binary_const_impl<scalar_t_>(
+        reinterpret_cast<uint64_t>(out.data_ptr()),
+        reinterpret_cast<uint64_t>(other.data_ptr()),
+        reinterpret_cast<uint64_t>(self.data_ptr()),
+        binary_type,
+        outer_size,
+        self.item().toFloat() * alpha.toFloat(), 0
+        );
+        }));
+      } else
 #endif
+    {
+      auto stream = c10_tpu::getCurrentTPUStream();
+      auto status = tpudnnBinaryCAsync(
+          stream, tpu::TPUGenerateTpudnnTensor(stream, other),
+          self.item().toFloat() * alpha.toFloat(),
+          tpu::TPUGenerateTpudnnTensor(stream, out), binary_type, 1);
+      TORCH_CHECK(status == TPUDNN_STATUS_SUCCESS);
+    }
   }
   else if (tpu::TPUIsSameShape(self, other)) {
     CHECK_TENSOR_IN_DEVICE(self);
@@ -925,36 +1425,39 @@ Tensor &binary_op_tpu(const Tensor &self, const Tensor &other,
     TORCH_CHECK( self.scalar_type()  != ScalarType::Long );
     TORCH_CHECK( other.scalar_type() != ScalarType::Long );
 #ifdef USING_PPL
-    uint32_t outer_size = 1;
-    for (const auto i : c10::irange(self.dim()-1)) {
-        outer_size *= self.size(i);
-    }
-    uint32_t inner_size = self.size(self.dim()-1);
+    if (usePPLKernels()){
+      uint32_t outer_size = 1;
+      for (const auto i : c10::irange(self.dim()-1)) {
+          outer_size *= self.size(i);
+      }
+      uint32_t inner_size = self.size(self.dim()-1);
 
-    AT_DISPATCH_FLOAT_INT_TYPES(self.scalar_type(), "binaryasync", ([&] {
-      using scalar_t_ = scalar_t;
-      binary_async_impl<scalar_t_>(
-      reinterpret_cast<uint64_t>(out.data_ptr()),
-      (self.scalar_type() == out.scalar_type() || binary_type == 3) ?
-        reinterpret_cast<uint64_t>(self.data_ptr()) : reinterpret_cast<uint64_t>(other.data_ptr()),
-      (self.scalar_type() == out.scalar_type() || binary_type == 3) ?
-        reinterpret_cast<uint64_t>(other.data_ptr()): reinterpret_cast<uint64_t>(self.data_ptr()),
-      binary_type,
-      outer_size, inner_size
-      );
-      }));
-#else
-    auto stream = c10_tpu::getCurrentTPUStream();
-    auto status = tpudnnBinaryAsync(
-        stream,
+      AT_DISPATCH_FLOAT_INT_TYPES(self.scalar_type(), "binaryasync", ([&] {
+        using scalar_t_ = scalar_t;
+        binary_async_impl<scalar_t_>(
+        reinterpret_cast<uint64_t>(out.data_ptr()),
         (self.scalar_type() == out.scalar_type() || binary_type == 3) ?
-          tpu::TPUGenerateTpudnnTensor(stream, self) : tpu::TPUGenerateTpudnnTensor(stream, other),
+          reinterpret_cast<uint64_t>(self.data_ptr()) : reinterpret_cast<uint64_t>(other.data_ptr()),
         (self.scalar_type() == out.scalar_type() || binary_type == 3) ?
-          tpu::TPUGenerateTpudnnTensor(stream, other) : tpu::TPUGenerateTpudnnTensor(stream, self),
-        alpha.toFloat(),
-        tpu::TPUGenerateTpudnnTensor(stream, out), binary_type);
-    TORCH_CHECK(status == TPUDNN_STATUS_SUCCESS);
+          reinterpret_cast<uint64_t>(other.data_ptr()): reinterpret_cast<uint64_t>(self.data_ptr()),
+        binary_type,
+        outer_size, inner_size
+        );
+        }));
+      } else
 #endif
+    {
+      auto stream = c10_tpu::getCurrentTPUStream();
+      auto status = tpudnnBinaryAsync(
+          stream,
+          (self.scalar_type() == out.scalar_type() || binary_type == 3) ?
+            tpu::TPUGenerateTpudnnTensor(stream, self) : tpu::TPUGenerateTpudnnTensor(stream, other),
+          (self.scalar_type() == out.scalar_type() || binary_type == 3) ?
+            tpu::TPUGenerateTpudnnTensor(stream, other) : tpu::TPUGenerateTpudnnTensor(stream, self),
+          alpha.toFloat(),
+          tpu::TPUGenerateTpudnnTensor(stream, out), binary_type);
+      TORCH_CHECK(status == TPUDNN_STATUS_SUCCESS);
+    }
   }
   else {
     CHECK_TENSOR_IN_DEVICE(self);
@@ -986,47 +1489,50 @@ Tensor &binary_op_tpu(const Tensor &self, const Tensor &other,
     }
 
 #ifdef USING_PPL
-    auto A = self.contiguous();
-    auto B = other.contiguous();
-    auto O = out.contiguous();
+    if (usePPLKernels()){
+      auto A = self.contiguous();
+      auto B = other.contiguous();
+      auto O = out.contiguous();
 
-    AT_DISPATCH_FLOAT_INT_TYPES(self.scalar_type(), "binarybcast", ([&] {
-    using scalar_t_ = scalar_t;
-    binary_bcast_impl<scalar_t_>(
-        reinterpret_cast<uint64_t>(O.data_ptr()),
-        (self.scalar_type() == out.scalar_type() || binary_type == 3)?
-          reinterpret_cast<uint64_t>(A.data_ptr()) : reinterpret_cast<uint64_t>(B.data_ptr()),
-        (self.scalar_type() == out.scalar_type() || binary_type == 3)?
-          reinterpret_cast<uint64_t>(B.data_ptr()) : reinterpret_cast<uint64_t>(A.data_ptr()),
-        binary_type,
-        self_shape,
-        other_shape
-      );
-    }));
-#else
-    auto stream = c10_tpu::getCurrentTPUStream();
-    auto other_t = tpu::TPUGenerateTpudnnTensor(stream, other);
-    auto self_t  = tpu::TPUGenerateTpudnnTensor(stream, self);
-    auto out_t   = tpu::TPUGenerateTpudnnTensor(stream, out);
-
-    if (self_dim != other_dim) {
-      auto &change_t = self_dim > other_dim ? other_t : self_t;
-      const auto &change_shape =
-          self_dim > other_dim ? other_shape : self_shape;
-      for (int i = max_dim - 1; i >= 0; i--) {
-        change_t.shape[i] = change_shape[i];
-        change_t.stride[i] =
-            i == max_dim - 1 ? 1 : change_t.stride[i + 1] * change_shape[i + 1];
-      }
-      change_t.dim = max_dim;
-    }
-
-    auto status = tpudnnBinaryBcastAsync(stream,
-                        (self.scalar_type() == out.scalar_type() || binary_type == 3) ? self_t  : other_t,
-                        (self.scalar_type() == out.scalar_type() || binary_type == 3) ? other_t : self_t,
-                                   alpha.toFloat(), out_t, binary_type);
-    TORCH_CHECK(status == TPUDNN_STATUS_SUCCESS);
+      AT_DISPATCH_FLOAT_INT_TYPES(self.scalar_type(), "binarybcast", ([&] {
+      using scalar_t_ = scalar_t;
+      binary_bcast_impl<scalar_t_>(
+          reinterpret_cast<uint64_t>(O.data_ptr()),
+          (self.scalar_type() == out.scalar_type() || binary_type == 3)?
+            reinterpret_cast<uint64_t>(A.data_ptr()) : reinterpret_cast<uint64_t>(B.data_ptr()),
+          (self.scalar_type() == out.scalar_type() || binary_type == 3)?
+            reinterpret_cast<uint64_t>(B.data_ptr()) : reinterpret_cast<uint64_t>(A.data_ptr()),
+          binary_type,
+          self_shape,
+          other_shape
+        );
+      }));
+    } else
 #endif
+    {
+      auto stream = c10_tpu::getCurrentTPUStream();
+      auto other_t = tpu::TPUGenerateTpudnnTensor(stream, other);
+      auto self_t  = tpu::TPUGenerateTpudnnTensor(stream, self);
+      auto out_t   = tpu::TPUGenerateTpudnnTensor(stream, out);
+
+      if (self_dim != other_dim) {
+        auto &change_t = self_dim > other_dim ? other_t : self_t;
+        const auto &change_shape =
+            self_dim > other_dim ? other_shape : self_shape;
+        for (int i = max_dim - 1; i >= 0; i--) {
+          change_t.shape[i] = change_shape[i];
+          change_t.stride[i] =
+              i == max_dim - 1 ? 1 : change_t.stride[i + 1] * change_shape[i + 1];
+        }
+        change_t.dim = max_dim;
+      }
+
+      auto status = tpudnnBinaryBcastAsync(stream,
+                          (self.scalar_type() == out.scalar_type() || binary_type == 3) ? self_t  : other_t,
+                          (self.scalar_type() == out.scalar_type() || binary_type == 3) ? other_t : self_t,
+                                    alpha.toFloat(), out_t, binary_type);
+      TORCH_CHECK(status == TPUDNN_STATUS_SUCCESS);
+    }
   }
   TIMING_END;
   return out;
@@ -1379,34 +1885,38 @@ void binary_impl(const Tensor &self, const Tensor &other, Tensor &out,
     CHECK_TENSOR_IN_DEVICE(self);
     TORCH_CHECK( self.scalar_type()  != ScalarType::Long );
 #ifdef USING_PPL
-    uint32_t outer_size = 1;
-    for (const auto i : c10::irange(self.dim()-1)) {
-        outer_size *= self.size(i);
-    }
-    uint32_t inner_size = self.size(self.dim()-1);
-    ppl_func(self, other, out, mode, outer_size, inner_size);
-#else
-    const auto handle = c10_tpu::getCurrentTPUStream();
-    auto status = unary_func(handle, self, other, out);
-    TORCH_CHECK(status == TPUDNN_STATUS_SUCCESS);
+    if (usePPLKernels())
+    {uint32_t outer_size = 1;
+      for (const auto i : c10::irange(self.dim()-1)) {
+          outer_size *= self.size(i);
+      }
+      uint32_t inner_size = self.size(self.dim()-1);
+      ppl_func(self, other, out, mode, outer_size, inner_size);
+    } else
 #endif
+    {  const auto handle = c10_tpu::getCurrentTPUStream();
+      auto status = unary_func(handle, self, other, out);
+      TORCH_CHECK(status == TPUDNN_STATUS_SUCCESS);
+    }
   }
   else if (self.dim() == 0 && IS_CPU_TENSOR(self))
   {
     CHECK_TENSOR_IN_DEVICE(other);
     TORCH_CHECK( other.scalar_type()  != ScalarType::Long );
 #ifdef USING_PPL
-    uint32_t outer_size = 1;
-    for (const auto i : c10::irange(other.dim()-1)) {
-        outer_size *= other.size(i);
-    }
-    uint32_t inner_size = other.size(other.dim()-1);
-    ppl_func(other, self, out, mode, outer_size, inner_size);
-#else
-    const auto handle = c10_tpu::getCurrentTPUStream();
-    auto status = unary_func(handle, self, other, out);
-    TORCH_CHECK(status == TPUDNN_STATUS_SUCCESS);
+    if (usePPLKernels()){
+      uint32_t outer_size = 1;
+      for (const auto i : c10::irange(other.dim()-1)) {
+          outer_size *= other.size(i);
+      }
+      uint32_t inner_size = other.size(other.dim()-1);
+      ppl_func(other, self, out, mode, outer_size, inner_size);
+    } else
 #endif
+    {  const auto handle = c10_tpu::getCurrentTPUStream();
+      auto status = unary_func(handle, self, other, out);
+      TORCH_CHECK(status == TPUDNN_STATUS_SUCCESS);
+    }
   }
   else {
     CHECK_TENSOR_IN_DEVICE(self);
@@ -1414,32 +1924,35 @@ void binary_impl(const Tensor &self, const Tensor &other, Tensor &out,
     TORCH_CHECK( self.scalar_type()  != ScalarType::Long );
     TORCH_CHECK( other.scalar_type() != ScalarType::Long );
 #ifdef USING_PPL
-    uint32_t outer_size = 1;
-    for (const auto i : c10::irange(self.dim()-1)) {
-        outer_size *= self.size(i);
-    }
-    uint32_t inner_size = self.size(self.dim()-1);
-    int self_dim = self.dim();
-    std::vector<int> self_shape(self_dim);
-    for (int i = self_dim - 1; i >= 0; i--) {
-      self_shape[i] = self.size(i);
-    }
-    int other_dim = other.dim();
-    std::vector<int> other_shape(other_dim);
-    for (int i = other_dim - 1; i >= 0; i--) {
-      other_shape[i] = other.size(i);
-    }
-    ppl_func(self, other, out, mode, outer_size, inner_size);
-#else
-    const auto handle = c10_tpu::getCurrentTPUStream();
-    auto status = binary_func(
-        handle,
-        tpu::TPUGenerateTpudnnTensor(handle, self),
-        tpu::TPUGenerateTpudnnTensor(handle, other),
-        tpu::TPUGenerateTpudnnTensor(handle, out),
-        mode);
-    TORCH_CHECK(status == TPUDNN_STATUS_SUCCESS);
+    if (usePPLKernels()){
+      uint32_t outer_size = 1;
+      for (const auto i : c10::irange(self.dim()-1)) {
+          outer_size *= self.size(i);
+      }
+      uint32_t inner_size = self.size(self.dim()-1);
+      int self_dim = self.dim();
+      std::vector<int> self_shape(self_dim);
+      for (int i = self_dim - 1; i >= 0; i--) {
+        self_shape[i] = self.size(i);
+      }
+      int other_dim = other.dim();
+      std::vector<int> other_shape(other_dim);
+      for (int i = other_dim - 1; i >= 0; i--) {
+        other_shape[i] = other.size(i);
+      }
+      ppl_func(self, other, out, mode, outer_size, inner_size);
+    } else
 #endif
+    {  const auto handle = c10_tpu::getCurrentTPUStream();
+      auto status = binary_func(
+          handle,
+          tpu::TPUGenerateTpudnnTensor(handle, self),
+          tpu::TPUGenerateTpudnnTensor(handle, other),
+          tpu::TPUGenerateTpudnnTensor(handle, out),
+          mode);
+      TORCH_CHECK(status == TPUDNN_STATUS_SUCCESS);
+    }
+
   }
   TIMING_END;
 }
@@ -2020,11 +2533,33 @@ Tensor &minimum_out_tpu(const Tensor &self, const Tensor &other, Tensor &out) {
     return out;
   }
   TORCH_CHECK(other.is_contiguous() && out.is_contiguous());
-  binary_impl(
-      self, other, out,
 #ifdef USING_PPL
-      true,
+  if (usePPLKernels()){
+    binary_impl(
+        self, other, out,
+        true,
+        [](tpudnnHandle_t handle, const Tensor &self, const Tensor &other, Tensor &out) {
+          return tpudnnMinimumConstAsync(
+              handle,
+              tpu::TPUGenerateTpudnnTensor(handle, (self.dim() == 0 && IS_CPU_TENSOR(self))  ? other : self),
+              tpu::TPUGenerateTpudnnTensor(handle, out),
+              (self.dim() == 0 && IS_CPU_TENSOR(self))  ? self.item().toFloat() : other.item().toFloat());
+        },
+        [](tpudnnHandle_t handle, tpudnnTensor_t self, tpudnnTensor_t other, tpudnnTensor_t out, bool /*mode*/ ) {
+          return tpudnnMinimumAsync(handle, self, other, out);
+        },
+        [](const Tensor &a, const Tensor &b) { return minimum(a, b); }
+        , [](const Tensor &self, const Tensor &other, Tensor &out, bool mode,
+        uint32_t outer_size, uint32_t inner_size) {
+        AT_DISPATCH_FLOAT_INT_TYPES(self.scalar_type(), "minimum", ([&] {
+            ppl_minmax_impl<bool>(self, other, out, true, outer_size, inner_size);
+        }));}
+      );
+    } else
 #endif
+  {
+    binary_impl(
+      self, other, out,
       [](tpudnnHandle_t handle, const Tensor &self, const Tensor &other, Tensor &out) {
         return tpudnnMinimumConstAsync(
             handle,
@@ -2033,16 +2568,10 @@ Tensor &minimum_out_tpu(const Tensor &self, const Tensor &other, Tensor &out) {
             (self.dim() == 0 && IS_CPU_TENSOR(self))  ? self.item().toFloat() : other.item().toFloat());
       },
       tpudnnMinimumAsync,
-      [](const Tensor &a, const Tensor &b) { return minimum(a, b); }
-#ifdef USING_PPL
-      , [](const Tensor &self, const Tensor &other, Tensor &out, bool mode,
-      uint32_t outer_size, uint32_t inner_size) {
-      AT_DISPATCH_FLOAT_INT_TYPES(self.scalar_type(), "minimum", ([&] {
-          ppl_minmax_impl<bool>(self, other, out, true, outer_size, inner_size);
-      }));}
-#endif
-    );
-  SHOW_TENSOR_OP(self, other, out);
+      [](const Tensor &a, const Tensor &b) { return minimum(a, b); });
+
+    SHOW_TENSOR_OP(self, other, out);
+  }
   return out;
 }
 
@@ -2064,29 +2593,44 @@ Tensor &maximum_out_tpu(const Tensor &self, const Tensor &other, Tensor &out) {
     SHOW_TENSOR_OP(self, other, out);
     return out;
   }
+#ifdef USING_PPL
+  if (usePPLKernels()){
+    binary_impl(
+        self, other, out,
+        false,
+        [](tpudnnHandle_t handle, const Tensor &self, const Tensor &other, Tensor &out) {
+          return tpudnnMaximumConstAsync(
+              handle,
+              tpu::TPUGenerateTpudnnTensor(handle, (self.dim() == 0 && IS_CPU_TENSOR(self))  ? other : self),
+              tpu::TPUGenerateTpudnnTensor(handle, out),
+              (self.dim() == 0 && IS_CPU_TENSOR(self))  ? self.item().toFloat() : other.item().toFloat());
+        },
+        [](tpudnnHandle_t handle, tpudnnTensor_t self, tpudnnTensor_t other, tpudnnTensor_t out, bool /*mode*/ ) {
+          return tpudnnMaximumAsync(handle, self, other, out);
+        },
+        [](const Tensor &a, const Tensor &b) { return maximum(a, b); }
+        , [](const Tensor &self, const Tensor &other, Tensor &out, bool mode,
+        uint32_t outer_size, uint32_t inner_size) {
+        AT_DISPATCH_FLOAT_INT_TYPES(self.scalar_type(), "maximum", ([&] {
+            ppl_minmax_impl<bool>(self, other, out, false, outer_size, inner_size);
+        }));}
+      );
+    } else
+#endif
+  {
+    binary_impl(
+        self, other, out,
+        [](tpudnnHandle_t handle, const Tensor &self, const Tensor &other, Tensor &out) {
+          return tpudnnMaximumConstAsync(
+              handle,
+              tpu::TPUGenerateTpudnnTensor(handle, (self.dim() == 0 && IS_CPU_TENSOR(self))  ? other : self),
+              tpu::TPUGenerateTpudnnTensor(handle, out),
+              (self.dim() == 0 && IS_CPU_TENSOR(self))  ? self.item().toFloat() : other.item().toFloat());
+        },
+        tpudnnMaximumAsync,
+        [](const Tensor &a, const Tensor &b) { return maximum(a, b); });
+  }
 
-  binary_impl(
-      self, other, out,
-#ifdef USING_PPL
-      false,
-#endif
-      [](tpudnnHandle_t handle, const Tensor &self, const Tensor &other, Tensor &out) {
-        return tpudnnMaximumConstAsync(
-            handle,
-            tpu::TPUGenerateTpudnnTensor(handle, (self.dim() == 0 && IS_CPU_TENSOR(self))  ? other : self),
-            tpu::TPUGenerateTpudnnTensor(handle, out),
-            (self.dim() == 0 && IS_CPU_TENSOR(self))  ? self.item().toFloat() : other.item().toFloat());
-      },
-      tpudnnMaximumAsync,
-      [](const Tensor &a, const Tensor &b) { return maximum(a, b); }
-#ifdef USING_PPL
-      , [](const Tensor &self, const Tensor &other, Tensor &out, bool mode,
-      uint32_t outer_size, uint32_t inner_size) {
-      AT_DISPATCH_FLOAT_INT_TYPES(self.scalar_type(), "maximum", ([&] {
-          ppl_minmax_impl<bool>(self, other, out, false, outer_size, inner_size);
-      }));}
-#endif
-    );
   SHOW_TENSOR_OP(self, other, out);
   return out;
 }
@@ -2119,24 +2663,34 @@ Tensor &pow_out_tpu(const Tensor &self, const Tensor &other, Tensor &out) {
     SHOW_TENSOR_OP(self, other, out);
     return out;
   }
-
-  binary_impl(
-      self, other, out,
 #ifdef USING_PPL
-      false,
+  if (usePPLKernels()){
+    binary_impl(
+        self, other, out,
+        false,
+        [](tpudnnHandle_t handle, const Tensor &self, const Tensor &other,
+          Tensor &out) { return TPUDNN_STATUS_FAILED; },
+        [](tpudnnHandle_t handle, tpudnnTensor_t self, tpudnnTensor_t other, tpudnnTensor_t out, bool /*mode*/ ) {
+          return tpudnnPowerAsync(handle, self, other, out);
+        },
+        [](const Tensor &a, const Tensor &b) { return pow(a, b); }
+        , [](const Tensor &self, const Tensor &other, Tensor &out, bool mode,
+        uint32_t outer_size, uint32_t inner_size) {
+        AT_DISPATCH_FLOAT_INT_TYPES(self.scalar_type(), "pow", ([&] {
+            ppl_pow_impl<bool>(self, other, out, false, outer_size, inner_size);
+        }));}
+      );
+    } else
 #endif
+  {
+    binary_impl(
+      self, other, out,
       [](tpudnnHandle_t handle, const Tensor &self, const Tensor &other,
          Tensor &out) { return TPUDNN_STATUS_FAILED; },
       tpudnnPowerAsync,
-      [](const Tensor &a, const Tensor &b) { return pow(a, b); }
-#ifdef USING_PPL
-      , [](const Tensor &self, const Tensor &other, Tensor &out, bool mode,
-      uint32_t outer_size, uint32_t inner_size) {
-      AT_DISPATCH_FLOAT_INT_TYPES(self.scalar_type(), "pow", ([&] {
-          ppl_pow_impl<bool>(self, other, out, false, outer_size, inner_size);
-      }));}
-#endif
-    );
+      [](const Tensor &a, const Tensor &b) { return pow(a, b); });
+  }
+
   SHOW_TENSOR_OP(self, other, out);
   return out;
 }
@@ -2163,6 +2717,7 @@ Tensor &pow_c_out_tpu(const Tensor &self, const Scalar &exponent, Tensor &out) {
   }
   TORCH_CHECK(exponent.toFloat() > 0);
 #ifdef USING_PPL
+  if (usePPLKernels()) {
     uint32_t outer_size = 1;
     for (const auto i : c10::irange(self.dim()-1)) {
         outer_size *= self.size(i);
@@ -2178,15 +2733,17 @@ Tensor &pow_c_out_tpu(const Tensor &self, const Scalar &exponent, Tensor &out) {
         inner_size,
         out.scalar_type() == at::kInt);
     }));
-#else
-  auto handle = c10_tpu::getCurrentTPUStream();
-  auto status = tpudnnPowerScalarAsync(
-      handle,
-      tpu::TPUGenerateTpudnnTensor(handle, self),
-      tpu::TPUGenerateTpudnnTensor(handle, out),
-      exponent.toFloat());
-  TORCH_CHECK(status == TPUDNN_STATUS_SUCCESS);
+  } else
 #endif
+  {  auto handle = c10_tpu::getCurrentTPUStream();
+    auto status = tpudnnPowerScalarAsync(
+        handle,
+        tpu::TPUGenerateTpudnnTensor(handle, self),
+        tpu::TPUGenerateTpudnnTensor(handle, out),
+        exponent.toFloat());
+    TORCH_CHECK(status == TPUDNN_STATUS_SUCCESS);
+  }
+
   TIMING_END;
   SHOW_TENSOR_OP(self, out);
   return out;
@@ -2208,30 +2765,32 @@ Tensor &c_pow_out_tpu(const Scalar &self, const Tensor &exponent, Tensor &out) {
     return out;
   }
 #ifdef USING_PPL
-    uint32_t outer_size = 1;
-    for (const auto i : c10::irange(exponent.dim()-1)) {
-        outer_size *= exponent.size(i);
-    }
-    uint32_t inner_size = exponent.size(exponent.dim()-1);
-    AT_DISPATCH_FLOAT_INT_TYPES(exponent.scalar_type(), "cpow_const", ([&] {
-      unified_const_impl<BinaryOpType::POW, scalar_t, bool>(
-        reinterpret_cast<uint64_t>(out.data_ptr()),
-        reinterpret_cast<uint64_t>(exponent.data_ptr()),
-        self.toFloat(),
-        1,
-        outer_size,
-        inner_size,
-        out.scalar_type() == at::kInt);
-    }));
-#else
-  auto handle = c10_tpu::getCurrentTPUStream();
-  auto status = tpudnnScalarPowerAsync(
-      handle,
-      tpu::TPUGenerateTpudnnTensor(handle, exponent),
-      tpu::TPUGenerateTpudnnTensor(handle, out),
-      self.toFloat());
-  TORCH_CHECK(status == TPUDNN_STATUS_SUCCESS);
+  if (usePPLKernels()) {
+      uint32_t outer_size = 1;
+      for (const auto i : c10::irange(exponent.dim()-1)) {
+          outer_size *= exponent.size(i);
+      }
+      uint32_t inner_size = exponent.size(exponent.dim()-1);
+      AT_DISPATCH_FLOAT_INT_TYPES(exponent.scalar_type(), "cpow_const", ([&] {
+        unified_const_impl<BinaryOpType::POW, scalar_t, bool>(
+          reinterpret_cast<uint64_t>(out.data_ptr()),
+          reinterpret_cast<uint64_t>(exponent.data_ptr()),
+          self.toFloat(),
+          1,
+          outer_size,
+          inner_size,
+          out.scalar_type() == at::kInt);
+      }));
+  } else
 #endif
+  {  auto handle = c10_tpu::getCurrentTPUStream();
+    auto status = tpudnnScalarPowerAsync(
+        handle,
+        tpu::TPUGenerateTpudnnTensor(handle, exponent),
+        tpu::TPUGenerateTpudnnTensor(handle, out),
+        self.toFloat());
+    TORCH_CHECK(status == TPUDNN_STATUS_SUCCESS);
+  }
   TIMING_END;
   SHOW_TENSOR_OP(exponent, out);
   return out;
@@ -2251,95 +2810,102 @@ Tensor &atan2_out_tpu(const Tensor &self, const Tensor &other, Tensor &out) {
   // self is scalar and other is scalar
  if (self.dim() == 0) {
 #ifdef USING_PPL
-    uint32_t outer_size = 1;
-    for (const auto i : c10::irange(other.dim()-1)) {
-        outer_size *= other.size(i);
-    }
-    uint32_t inner_size = other.size(other.dim()-1);
-    AT_DISPATCH_FLOAT_INT_TYPES(other.scalar_type(), "atan2_const", ([&] {
-      unified_const_impl<BinaryOpType::ATAN2, scalar_t, bool>(
-        reinterpret_cast<uint64_t>(out.data_ptr()),
-        reinterpret_cast<uint64_t>(other.data_ptr()),
-        self.item().toFloat(),
-        1,
-        outer_size,
-        inner_size,
-        out.scalar_type() == at::kInt);
-    }));
-#else
-    auto handle = c10_tpu::getCurrentTPUStream();
-    auto status = tpudnnScalarAtan2Async(
-        handle,
-        tpu::TPUGenerateTpudnnTensor(handle, other.to(out.dtype())),
-        tpu::TPUGenerateTpudnnTensor(handle, out),
-        self.item().toFloat());
-    TORCH_CHECK(status == TPUDNN_STATUS_SUCCESS);
+    if (usePPLKernels()) {
+      uint32_t outer_size = 1;
+      for (const auto i : c10::irange(other.dim()-1)) {
+          outer_size *= other.size(i);
+      }
+      uint32_t inner_size = other.size(other.dim()-1);
+      AT_DISPATCH_FLOAT_INT_TYPES(other.scalar_type(), "atan2_const", ([&] {
+        unified_const_impl<BinaryOpType::ATAN2, scalar_t, bool>(
+          reinterpret_cast<uint64_t>(out.data_ptr()),
+          reinterpret_cast<uint64_t>(other.data_ptr()),
+          self.item().toFloat(),
+          1,
+          outer_size,
+          inner_size,
+          out.scalar_type() == at::kInt);
+      }));
+    } else
 #endif
+    { auto handle = c10_tpu::getCurrentTPUStream();
+      auto status = tpudnnScalarAtan2Async(
+          handle,
+          tpu::TPUGenerateTpudnnTensor(handle, other.to(out.dtype())),
+          tpu::TPUGenerateTpudnnTensor(handle, out),
+          self.item().toFloat());
+      TORCH_CHECK(status == TPUDNN_STATUS_SUCCESS);
+    }
   } else if (other.dim() == 0) {
 #ifdef USING_PPL
-    uint32_t outer_size = 1;
-    for (const auto i : c10::irange(self.dim()-1)) {
-        outer_size *= self.size(i);
-    }
-    uint32_t inner_size = self.size(self.dim()-1);
-    AT_DISPATCH_FLOAT_INT_TYPES(self.scalar_type(), "const_atan2", ([&] {
-      unified_const_impl<BinaryOpType::ATAN2, scalar_t, bool>(
-        reinterpret_cast<uint64_t>(out.data_ptr()),
-        reinterpret_cast<uint64_t>(self.data_ptr()),
-        other.item().toFloat(),
-        0,
-        outer_size,
-        inner_size,
-        out.scalar_type() == at::kInt);
-    }));
-#else
-    auto handle = c10_tpu::getCurrentTPUStream();
-    auto status = tpudnnAtan2ScalarAsync(
-        handle,
-        tpu::TPUGenerateTpudnnTensor(handle, self.to(out.dtype())),
-        tpu::TPUGenerateTpudnnTensor(handle, out),
-        other.item().toFloat());
-    TORCH_CHECK(status == TPUDNN_STATUS_SUCCESS);
+    if (usePPLKernels()) {
+      uint32_t outer_size = 1;
+      for (const auto i : c10::irange(self.dim()-1)) {
+          outer_size *= self.size(i);
+      }
+      uint32_t inner_size = self.size(self.dim()-1);
+      AT_DISPATCH_FLOAT_INT_TYPES(self.scalar_type(), "const_atan2", ([&] {
+        unified_const_impl<BinaryOpType::ATAN2, scalar_t, bool>(
+          reinterpret_cast<uint64_t>(out.data_ptr()),
+          reinterpret_cast<uint64_t>(self.data_ptr()),
+          other.item().toFloat(),
+          0,
+          outer_size,
+          inner_size,
+          out.scalar_type() == at::kInt);
+      }));
+    } else
 #endif
+    { auto handle = c10_tpu::getCurrentTPUStream();
+      auto status = tpudnnAtan2ScalarAsync(
+          handle,
+          tpu::TPUGenerateTpudnnTensor(handle, self.to(out.dtype())),
+          tpu::TPUGenerateTpudnnTensor(handle, out),
+          other.item().toFloat());
+      TORCH_CHECK(status == TPUDNN_STATUS_SUCCESS);
+    }
   } else {
 #ifdef USING_PPL
-    int self_dim = self.dim();
-    std::vector<int> self_shape(self_dim);
-    for (int i = self_dim - 1; i >= 0; i--) {
-      self_shape[i] = self.size(i);
+    if (usePPLKernels())
+    {  int self_dim = self.dim();
+      std::vector<int> self_shape(self_dim);
+      for (int i = self_dim - 1; i >= 0; i--) {
+        self_shape[i] = self.size(i);
+      }
+
+      int other_dim = other.dim();
+      std::vector<int> other_shape(other_dim);
+      for (int i = other_dim - 1; i >= 0; i--) {
+        other_shape[i] = other.size(i);
+      }
+      uint32_t outer_size = 1;
+      for (const auto i : c10::irange(self.dim()-1)) {
+          outer_size *= self.size(i);
+      }
+      uint32_t inner_size = self.size(self.dim()-1);
+      AT_DISPATCH_FLOAT_INT_TYPES(self.scalar_type(), "atan2", ([&] {
+        unified_forward_impl<BinaryOpType::ATAN2, scalar_t, bool>(
+          reinterpret_cast<uint64_t>(out.data_ptr()),
+          reinterpret_cast<uint64_t>(self.data_ptr()),
+          reinterpret_cast<uint64_t>(other.data_ptr()),
+          0,
+          outer_size,
+          inner_size,
+          self_shape,
+          other_shape
+        );
+      }));
+    } else
+#endif
+    {  auto handle = c10_tpu::getCurrentTPUStream();
+      auto status = tpudnnAtan2Async(
+          handle,
+          tpu::TPUGenerateTpudnnTensor(handle, self.to(torch::kFloat)),
+          tpu::TPUGenerateTpudnnTensor(handle, other.to(torch::kFloat)),
+          tpu::TPUGenerateTpudnnTensor(handle, out));
+      TORCH_CHECK(status == TPUDNN_STATUS_SUCCESS);
     }
 
-    int other_dim = other.dim();
-    std::vector<int> other_shape(other_dim);
-    for (int i = other_dim - 1; i >= 0; i--) {
-      other_shape[i] = other.size(i);
-    }
-    uint32_t outer_size = 1;
-    for (const auto i : c10::irange(self.dim()-1)) {
-        outer_size *= self.size(i);
-    }
-    uint32_t inner_size = self.size(self.dim()-1);
-    AT_DISPATCH_FLOAT_INT_TYPES(self.scalar_type(), "atan2", ([&] {
-      unified_forward_impl<BinaryOpType::ATAN2, scalar_t, bool>(
-        reinterpret_cast<uint64_t>(out.data_ptr()),
-        reinterpret_cast<uint64_t>(self.data_ptr()),
-        reinterpret_cast<uint64_t>(other.data_ptr()),
-        0,
-        outer_size,
-        inner_size,
-        self_shape,
-        other_shape
-      );
-    }));
-#else
-    auto handle = c10_tpu::getCurrentTPUStream();
-    auto status = tpudnnAtan2Async(
-        handle,
-        tpu::TPUGenerateTpudnnTensor(handle, self.to(torch::kFloat)),
-        tpu::TPUGenerateTpudnnTensor(handle, other.to(torch::kFloat)),
-        tpu::TPUGenerateTpudnnTensor(handle, out));
-    TORCH_CHECK(status == TPUDNN_STATUS_SUCCESS);
-#endif
   }
   TIMING_END;
   SHOW_TENSOR_OP(self, other, out);
@@ -2518,7 +3084,6 @@ TORCH_LIBRARY_IMPL(aten, TPU, m) {
 
 } // namespace at
 
-// FIXME Fix Compare.pl & uncomment this
-#if (defined(BACKEND_SG2260) || defined(BACKEND_SG2260E)) && !defined(SOC_MODE)
-#define USING_PPL
+#if defined(SOC_MODE)
+#undef USING_PPL
 #endif

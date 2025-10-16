@@ -12,8 +12,8 @@ using namespace ppl;
 #endif
 
 template <typename T>
-void scatter_slice_kernel(T *ptr_output, T *ptr_param, T *ptr_intput, uint32 *ptr_index,
-                            const int outer_size, const int axis, const int inner_size, const int param_h) {
+void scatter_slice_kernel(T *ptr_output, T *ptr_param, T *ptr_input, uint32 *ptr_index,
+                          const int outer_size, const int axis, const int inner_size, const int param_h) {
     ppl::set_block_num(BLOCK_NUM);
     int core_num = get_block_num();
     int core_idx = get_block_index();
@@ -33,33 +33,25 @@ void scatter_slice_kernel(T *ptr_output, T *ptr_param, T *ptr_intput, uint32 *pt
     dim4 index_shape = {1, C, param_h, 1};
 
     auto out_g = gtensor<T>(output_shape, GLOBAL, ptr_output);
-    auto input_g = gtensor<T>(input_shape, GLOBAL, ptr_intput);
+    auto input_g = gtensor<T>(input_shape, GLOBAL, ptr_input);
     auto param_g = gtensor<T>(param_shape, GLOBAL, ptr_param);
     auto index_g = gtensor<uint32>(index_shape, GLOBAL, ptr_index);
 
-    dim4 local_block_output_shape = {1, block_c, H, W};
-    dim4 local_block_input_shape = {1, block_c, H, W};
-    dim4 local_block_param_shape = {1, block_c, param_h, W};
-    dim4 local_block_index_shape = {1, block_c, param_h, 1};
     for (auto c_idx = 0; c_idx < slice_size_for_core; c_idx += block_c) {
         int c = min(block_c, slice_size_for_core - c_idx);
         dim4 input_global_offset = {0, core_offset + c_idx, 0, 0};
-        dim4 local_output_shape = {1, c, H, W};
-        dim4 local_input_shape = {1, c, H, W};
+        dim4 local_shape = {1, c, H, W};
         dim4 local_param_shape = {1, c, param_h, W};
         dim4 local_index_shape = {1, c, param_h, 1};
 
-        auto out_l = make_tensor<T>(local_block_output_shape, local_output_shape);
-        auto input_l = make_tensor<T>(local_block_input_shape, local_input_shape);
-        auto param_l = make_tensor<T>(local_block_param_shape, local_param_shape);
-        auto index_l = make_tensor<uint32>(local_block_index_shape, local_index_shape);
+        auto out_sub_g = out_g.sub_view(local_shape, input_global_offset);
+        auto input_sub_g = input_g.sub_view(local_shape, input_global_offset);
+        auto param_sub_g = param_g.sub_view(local_param_shape, input_global_offset);
+        auto index_sub_g = index_g.sub_view(local_index_shape, input_global_offset);
 
-        dma::load(input_l, input_g.sub_view(local_input_shape, input_global_offset));
-        dma::load(index_l, index_g.sub_view(local_index_shape, input_global_offset));
-        dma::move(out_l, input_l);
-        dma::load(param_l, param_g.sub_view(local_param_shape, input_global_offset));
-        dma::scatter_h(out_l, param_l, index_l);
-        dma::store(out_g.sub_view(local_output_shape, input_global_offset), out_l);
+        dma::move(out_sub_g, input_sub_g);
+
+        dma::scatter_h(out_sub_g, param_sub_g, index_sub_g);
     }
 }
 
@@ -93,7 +85,7 @@ __KERNEL__ void scatter_int32(int32 *ptr_output, int32 *ptr_param, int32 *ptr_in
 
 template <typename T>
 void scatter_add_kernel(T *ptr_output, T *ptr_src, uint32 *ptr_index,
-                            const int outer_size, const int inner_size, const int param_h) {
+                        const int outer_size, const int inner_size, const int param_h) {
     ppl::set_block_num(BLOCK_NUM);
     int core_num = get_block_num();
     int core_idx = get_block_index();
@@ -115,10 +107,6 @@ void scatter_add_kernel(T *ptr_output, T *ptr_src, uint32 *ptr_index,
     auto param_g = gtensor<T>(param_shape, GLOBAL, ptr_src);
     auto index_g = gtensor<uint32>(index_shape, GLOBAL, ptr_index);
 
-    dim4 local_block_output_shape = {1, block_c, H, W};
-    dim4 local_block_param_shape = {1, block_c, param_h, W};
-    dim4 local_block_index_shape = {1, block_c, param_h, 1};
-
     for (auto c_idx = 0; c_idx < slice_size_for_core; c_idx += block_c) {
         int c = min(block_c, slice_size_for_core - c_idx);
         dim4 input_global_offset = {0, core_offset + c_idx, 0, 0};
@@ -126,17 +114,15 @@ void scatter_add_kernel(T *ptr_output, T *ptr_src, uint32 *ptr_index,
         dim4 local_param_shape = {1, c, param_h, W};
         dim4 local_index_shape = {1, c, param_h, 1};
 
-        auto out_l = make_tensor<T>(local_block_output_shape, local_output_shape);
-        auto param_l = make_tensor<T>(local_block_param_shape, local_param_shape);
-        auto index_l = make_tensor<uint32>(local_block_index_shape, local_index_shape);
+        auto out_sub_g = out_g.sub_view(local_output_shape, input_global_offset);
+        auto param_sub_g = param_g.sub_view(local_param_shape, input_global_offset);
+        auto index_sub_g = index_g.sub_view(local_index_shape, input_global_offset);
 
-        dma::load(index_l, index_g.sub_view(local_index_shape, input_global_offset));
-        dma::load(param_l, param_g.sub_view(local_param_shape, input_global_offset));
-        tiu::fill(out_l, 0);
-        dma::scatter_h(out_l, param_l, index_l, 0, 1);
-        dma::store(out_g.sub_view(local_output_shape, input_global_offset), out_l);
+        // tiu::fill(out_sub_g, 0);
+        dma::scatter_h(out_sub_g, param_sub_g, index_sub_g, 0, 1);
     }
 }
+
 
 __KERNEL__ void scatter_add_fp32(fp32 *ptr_output, fp32 *ptr_src, uint32 *ptr_index,
                     const int outer_size, const int inner_size, const int param_h) {

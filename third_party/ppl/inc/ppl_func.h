@@ -5,6 +5,7 @@
 //===----------------------------------------------------------------------===//
 
 #pragma once
+#pragma clang diagnostic ignored "-Wreturn-stack-address"
 #include "ppl_types.h"
 #include "ppl_utils.h"
 

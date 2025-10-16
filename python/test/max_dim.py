@@ -10,12 +10,21 @@ device = "tpu:0"
 
 def case1():
     dim = 1
-    shape = [100,500,200,100]
+    shape = [2,1024,2,1024]
     dtype = torch.float32
     input_origin = (torch.rand(shape)*(-20000)+10000).to(dtype)
     input_tpu=input_origin.to(device)
-    output_cpu,index_cpu=torch.ops.aten.max.dim_max(input_origin,dim=dim)
-    output_tpu,index_tpu=torch.ops.aten.max.dim_max(input_tpu,dim=dim)
+    out_shape = list(input_origin.size())
+    out_shape[dim] = 1
+    values_out_cpu = torch.empty(out_shape, dtype=input_origin.dtype)
+    indices_out_cpu = torch.empty(out_shape, dtype=torch.int64)
+    values_out_tpu = torch.empty(out_shape, dtype=input_origin.dtype, device=device)
+    indices_out_tpu = torch.empty(out_shape, dtype=torch.int32, device=device)
+
+    output_cpu, index_cpu = torch.ops.aten.max.dim_max(
+        input_origin, dim=dim, keepdim=True, max=values_out_cpu, max_values=indices_out_cpu)
+    output_tpu, index_tpu = torch.ops.aten.max.dim_max(
+        input_tpu, dim=dim, keepdim=True, max=values_out_tpu, max_values=indices_out_tpu)
     output_tpu = output_tpu.cpu()
     index_tpu = index_tpu.cpu()
     # print("input_origin : ",input_origin)

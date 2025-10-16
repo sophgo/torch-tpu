@@ -52,6 +52,35 @@ def case2():
     #             if not success:
     #                 raise "CHECK ERROR!!"
 
+def case3():
+    dtypes = [
+        torch.float32,
+        torch.float16,
+        torch.bfloat16,
+        torch.int32,
+        torch.int16,
+        torch.int8
+    ]
+
+    for dtype in dtypes:
+        input_ids_cpu = torch.tensor([[2, 0, 1, 1], [5, 3, 4, 3]], dtype=torch.int32)
+        token_freq_cpu = torch.zeros((2, 10), dtype=dtype)
+        ones_cpu = torch.ones_like(input_ids_cpu, dtype=dtype)
+
+        input_ids = input_ids_cpu.contiguous().to(device)
+        token_freq = token_freq_cpu.contiguous().to(device)
+        ones = ones_cpu.contiguous().to(device)
+
+        token_freq.scatter_add_(1, input_ids, ones)
+
+
+        token_freq_cpu.scatter_add_(
+                1, input_ids_cpu.to(torch.int64), ones_cpu
+            )
+        # print("TPU:",token_freq.cpu())
+        # print("CPU:",token_freq_cpu)
+        print(f"max_diff: {torch.max(abs(token_freq_cpu - token_freq.cpu()))}")
 
 if __name__ == "__main__":
     case1()
+    # case3()

@@ -32,7 +32,7 @@ enum coeff_table_mode_t {
   COS = 3,
   TAN = 4,
   ARCSIN = 5,
-  ERF_TAYLOR = 6,
+  ERF = 6,
   SERIAL_NUMBER = 30, // int32 uint32
 };
 
@@ -52,6 +52,7 @@ enum align_mode_t {
 enum tensor_mode_t {
   L2 = 1,
   GLOBAL = 2,
+  LOCAL = 3,
 };
 
 enum data_type_t {
@@ -85,6 +86,7 @@ enum all_reduce_opcode_t {
   ALL_REDUCE_AMAX = 5,
   ALL_REDUCE_SUM = 6,
   ALL_REDUCE_POWERSUM = 7,
+  ALL_REDUCE_MAC = 8,
 };
 
 enum all_reduce_psum_t {

@@ -24,11 +24,11 @@ AT_DISPATCH_CASE(at::kByte, func))
 
 template <typename scalar_t>
 static void gather_async_impl(
-	uint64_t input_addr,
-	uint64_t index_addr,
-	uint64_t output_addr,
+    uint64_t input_addr,
+    uint64_t index_addr,
+    uint64_t output_addr,
     uint32_t outer_size,
-	uint32_t inner_size,
+    uint32_t inner_size,
     int gather_num,
     int gathered_num
   )

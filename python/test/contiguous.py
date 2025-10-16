@@ -40,7 +40,7 @@ def case3():
     a_tpu_c = a_tpu.contiguous()
     ones_tpu  = torch.range(1, 6).to(torch.float).view(2, 3).to('tpu')
     torch.tpu.OpTimer_dump()
-    
+
     torch.tpu.OpTimer_reset()
     a_tpu_c.backward(ones_tpu)
     torch.tpu.OpTimer_dump()
@@ -80,8 +80,102 @@ def case_mergeSplitpermute_sequence_256(use_fp16 = False):
     diff = q4 - q4_tpu.cpu()
     print("diff", torch.max(abs(diff)))
 
+def test_transpose_2d():
+    print("\n=== Testing 2D Transpose ===")
+    data = torch.arange(0, 8)  # 2x4 tensor
+
+    for dtype in [torch.float32, torch.float16, torch.bfloat16, torch.int32, torch.int16, torch.int8]:
+        print(f"\nTesting dtype: {dtype}")
+
+        a = (data % 128).to(dtype).view(2, 4)
+
+        a_tpu = a.to(device).transpose(0, 1)
+        b_tpu = a_tpu.contiguous()
+
+        a_cpu = a.transpose(0, 1).contiguous()
+
+        diff = a_cpu - b_tpu.cpu()
+        max_diff = torch.max(abs(diff))
+        print(f"Max difference ({dtype}): {max_diff.item()}")
+
+        if dtype.is_floating_point:
+            if dtype == torch.float32:
+                assert torch.allclose(a_cpu, b_tpu.cpu(), atol=1e-6), "float32 test failed"
+            elif dtype == torch.float16:
+                assert torch.allclose(a_cpu, b_tpu.cpu(), atol=1e-3), "float16 test failed"
+            else:  # bfloat16
+                assert torch.allclose(a_cpu, b_tpu.cpu(), atol=1e-2), "bfloat16 test failed"
+        else:
+            assert torch.equal(a_cpu, b_tpu.cpu()), f"{dtype} test failed"
+
+    print("2D transpose tests passed!")
+
+def test_transpose_3d():
+    print("\n=== Testing 3D Transpose ===")
+    data = torch.arange(0, 2*4*6)
+
+    for dtype in [torch.float32, torch.float16, torch.bfloat16, torch.int32, torch.int16, torch.int8]:
+        print(f"\nTesting dtype: {dtype}")
+
+        a = (data % 128).to(dtype).view(2, 4, 6)
+
+        a_tpu = a.to(device).transpose(1, 2)
+        b_tpu = a_tpu.contiguous()
+
+        a_cpu = a.transpose(1, 2).contiguous()
+
+        diff = a_cpu - b_tpu.cpu()
+        max_diff = torch.max(abs(diff))
+        print(f"Max difference ({dtype}): {max_diff.item()}")
+
+        if dtype.is_floating_point:
+            if dtype == torch.float32:
+                assert torch.allclose(a_cpu, b_tpu.cpu(), atol=1e-6), "float32 test failed"
+            elif dtype == torch.float16:
+                assert torch.allclose(a_cpu, b_tpu.cpu(), atol=1e-3), "float16 test failed"
+            else:  # bfloat16
+                assert torch.allclose(a_cpu, b_tpu.cpu(), atol=1e-2), "bfloat16 test failed"
+        else:
+            assert torch.equal(a_cpu, b_tpu.cpu()), f"{dtype} test failed"
+
+    print("3D transpose tests passed!")
+
+def test_transpose_high_dim():
+    print("\n=== Testing High-Dimensional Transpose ===")
+    data = torch.arange(0, 2*4*1*4*4*8)
+
+    for dtype in [torch.float32, torch.float16, torch.bfloat16, torch.int32, torch.int16, torch.int8]:
+        print(f"\nTesting dtype: {dtype}")
+
+        a = (data % 128).to(dtype).view(2, 4, 1, 4, 4, 8)
+
+        a_tpu = a.to(device).transpose(1, 4)
+        b_tpu = a_tpu.contiguous()
+
+        a_cpu = a.transpose(1, 4).contiguous()
+
+        diff = a_cpu - b_tpu.cpu()
+        max_diff = torch.max(abs(diff))
+        print(f"Max difference ({dtype}): {max_diff.item()}")
+
+        if dtype.is_floating_point:
+            if dtype == torch.float32:
+                assert torch.allclose(a_cpu, b_tpu.cpu(), atol=1e-6), "float32 test failed"
+            elif dtype == torch.float16:
+                assert torch.allclose(a_cpu, b_tpu.cpu(), atol=1e-3), "float16 test failed"
+            else:  # bfloat16
+                assert torch.allclose(a_cpu, b_tpu.cpu(), atol=1e-2), "bfloat16 test failed"
+        else:
+            assert torch.equal(a_cpu, b_tpu.cpu()), f"{dtype} test failed"
+
+    print("High-dimensional transpose tests passed!")
+
+
 if __name__ == "__main__":
     # case1()
     # case2()
     case3()
-    #case_mergeSplitpermute_sequence_256(True)
+    # case_mergeSplitpermute_sequence_256(True)
+    # test_transpose_2d()
+    # test_transpose_3d()
+    # test_transpose_high_dim()

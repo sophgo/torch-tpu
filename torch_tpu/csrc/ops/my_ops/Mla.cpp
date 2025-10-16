@@ -164,7 +164,7 @@ namespace at
 		if (attention_mode == NORMAL_ATTENTION_DECODE || attention_mode == NORMAL_ATTENTION_PREFILL){
 			TORCH_CHECK (input_lengths.dtype() == torch::kInt32,
 						"MLA input lenghts must be int32 dtype");
-			TORCH_CHECK ( input_lengths.device().type() == DeviceType::CPU, 
+			TORCH_CHECK ( input_lengths.device().type() == DeviceType::CPU,
 						"MLA input lenghts must on CPU device" );
 		}
 #ifdef USING_PPL
@@ -204,7 +204,7 @@ namespace at
                 (int)(input_lengths.nbytes() / 4),
                 (int *)input_lengths.data_ptr()
             );
-        
+
     });
     } else
 #endif
@@ -311,7 +311,7 @@ namespace at
                 (int)(input_lengths.nbytes() / 4),
                 (int *)seq.data()
             );
-        
+
     });
     } else
 #endif
@@ -415,7 +415,7 @@ namespace at
                 (int)(seqlen.nbytes() / 4),
                 (int *)seq.data()
             );
-        
+
     });
     } else
 #endif
@@ -552,7 +552,7 @@ namespace at
                 (int)(seqlen.nbytes() / 4),
                 (int *)seqlen.data_ptr()
             );
-        
+
     });
     } else
 #endif

@@ -22,6 +22,14 @@ def case1():
     )
     Evaluator().add_abs_evalute().evavlute([TestSigmoid()], ipts)
 
+def case2():
+    x = torch.randn((256,1,1,256), dtype=torch.float32)
+
+    cpu_out = torch.sigmoid(x)
+    tpu_out = torch.ops.aten.sigmoid(x.to(device))
+    print(f"shape: cpu: {cpu_out.shape}, tpu: {tpu_out.shape}")
+    print(f"max_diff: {torch.max(abs(cpu_out - tpu_out.cpu()))}")
 
 if __name__ == "__main__":
     case1()
+    # case2()

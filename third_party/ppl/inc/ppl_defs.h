@@ -25,8 +25,27 @@
 #define DEFAULT_SDMA_PORT -1
 #define None (int)0
 
-using bf16 = __bf16;
-using fp16 = __fp16;
+struct fp8e5m2 {
+  char data;
+};
+struct fp8e4m3 {
+  char data;
+};
+struct int4 {};
+struct uint4 {};
+struct fp4 {};
+struct fp20 {
+  int data : 20;
+};
+struct fp16 {
+  int16_t data;
+};
+struct bf16 {
+  int16_t data;
+};
+
+// using bf16 = __bf16;
+// using fp16 = __fp16;
 using fp32 = float;
 using int32 = int;
 using uint32 = unsigned int;
@@ -44,16 +63,5 @@ using FP32 = fp32;
 using INT8 = int8;
 using UINT8 = uint8;
 using conv_param = int*;
-
-struct fp8e5m2 {
-  char data;
-};
-struct fp8e4m3 {
-  char data;
-};
-struct int4 {};
-struct uint4 {};
-struct fp4 {};
-struct fp20 {
-  int data : 20;
-};
+using deconv_param = int*;
+using pool_param = int*;

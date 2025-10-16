@@ -43,11 +43,13 @@ void cmp_const_kernel(uint8_t *ptr_output, T *ptr_input, float scalar, int mode,
             if (mode == 0) {
                 tiu::eq(res, left, scalar_t, 1);
             } else if (mode == 1) {
-                auto ones = make_tensor<uint8_t>(block_shape, local_in_shape);
-                auto zeros = make_tensor<uint8_t>(block_shape, local_in_shape);
-                tiu::fill(ones, 1);
-                tiu::fill(zeros, 0);
-                tiu::eq_select(res, left, scalar_t, zeros, ones);
+                auto ones = make_tensor<T>(block_shape, local_in_shape);
+                auto zeros = make_tensor<T>(block_shape, local_in_shape);
+                tiu::fill(ones, 1.0f);
+                tiu::fill(zeros, 0.0f);
+                auto res_T = make_tensor<T>(block_shape, local_in_shape);
+                tiu::eq_select(res_T, left, scalar_t, zeros, ones);
+                tiu::cast(res, res_T);
             } else if (mode == 2) {
                 tiu::gt(res, left, scalar_t, 1);
             } else if (mode == 3) {
@@ -126,11 +128,13 @@ void cmp_kernel(uint8_t *ptr_output, T *ptr_input, T *ptr_other, int mode, int o
             if (mode == 0) {
                 tiu::eq(res, left, right, 1);
             } else if (mode == 1) {
-                auto ones = make_tensor<uint8_t>(block_shape, local_in_shape);
-                auto zeros = make_tensor<uint8_t>(block_shape, local_in_shape);
-                tiu::fill(ones, 1);
-                tiu::fill(zeros, 0);
-                tiu::eq_select(res, left, right, zeros, ones);
+                auto ones = make_tensor<T>(block_shape, local_in_shape);
+                auto zeros = make_tensor<T>(block_shape, local_in_shape);
+                tiu::fill(ones, 1.0f);
+                tiu::fill(zeros, 0.0f);
+                auto res_T = make_tensor<T>(block_shape, local_in_shape);
+                tiu::eq_select(res_T, left, right, zeros, ones);
+                tiu::cast(res, res_T);
             } else if (mode == 2) {
                 tiu::gt(res, left, right, 1);
             } else if (mode == 3) {
@@ -370,7 +374,9 @@ void shift_kernel(T *ptr_output, T *ptr_input, T *ptr_other, int mode, int outer
             dma::load(right, r_gtensor.sub_view(local_in_shape, input_offset));
 
             auto res = make_tensor<T>(block_shape, local_in_shape);
-            tiu::shift(res, left, right, RM_TOWARDS_ZERO);
+            auto right_i8 = make_tensor<int8_t>(block_shape, local_in_shape);
+            tiu::cast(right_i8, right);
+            tiu::shift(res, left, right_i8, RM_TOWARDS_ZERO);
             dma::store(res_gtensor.sub_view(local_in_shape, input_offset) , res);
         }
     }
@@ -442,7 +448,9 @@ void shift_bcast_kernel(U* ptr_output, T* ptr_input, T* ptr_other,
         int b_sh = (out_H > ot_H) ? 0 : b_stride_tmp.h;
         int b_sw = (out_W > ot_W) ? 0 : b_stride_tmp.w;
         dim4 b_stride = {b_sn, b_sc, b_sh, b_sw};
-        tiu::shift(o_l, a_l.view(out_local_shape, a_stride), b_l.view(out_local_shape, b_stride), RM_TOWARDS_ZERO);
+        auto b_i8 = make_tensor<int8_t>(out_local_shape_block, out_local_shape);
+        tiu::cast(b_i8, b_l.view(out_local_shape, b_stride));
+        tiu::shift(o_l, a_l.view(out_local_shape, a_stride), b_i8, RM_TOWARDS_ZERO);
         dma::store(dst_g.sub_view(out_local_shape, a_offset), o_l);
     }
 
@@ -1181,19 +1189,14 @@ void pow_bcast_kernel(U* ptr_output, T* ptr_input, T* ptr_other,
         int b_sh = (out_H > ot_H) ? 0 : b_stride_tmp.h;
         int b_sw = (out_W > ot_W) ? 0 : b_stride_tmp.w;
         dim4 b_stride = {b_sn, b_sc, b_sh, b_sw};
-        if constexpr (std::is_same<T, fp32>::value) {
-            pow_f32(o_l, a_l.view(out_local_shape, a_stride), b_l.view(out_local_shape, b_stride), &out_local_shape_block, &out_local_shape);
-        } else if constexpr (std::is_same<T, int32>::value ||
-                                std::is_same<T, fp16>::value ||
-                                std::is_same<T, bf16>::value) {
-            auto left_fp32 = make_tensor<fp32>(a_local_shape_block, a_local_shape);
-            tiu::cast(left_fp32, a_l);
-            auto right_fp32 = make_tensor<fp32>(b_local_shape_block, b_local_shape);
-            tiu::cast(right_fp32, b_l);
-            auto res_fp32 = make_tensor<fp32>(out_local_shape_block, out_local_shape);
-            pow_f32(res_fp32, left_fp32.view(out_local_shape, a_stride), right_fp32.view(out_local_shape, b_stride), &out_local_shape_block, &out_local_shape);
-            tiu::cast(o_l, res_fp32);
-        }
+
+        auto left_fp32 = make_tensor<fp32>(out_local_shape_block, out_local_shape);
+        tiu::cast(left_fp32, a_l.view(out_local_shape, a_stride));
+        auto right_fp32 = make_tensor<fp32>(out_local_shape_block, out_local_shape);
+        tiu::cast(right_fp32, b_l.view(out_local_shape, b_stride));
+        auto res_fp32 = make_tensor<fp32>(out_local_shape_block, out_local_shape);
+        pow_f32(res_fp32, left_fp32, right_fp32, &out_local_shape_block, &out_local_shape);
+        tiu::cast(o_l, res_fp32);
 
         dma::store(dst_g.sub_view(out_local_shape, a_offset), o_l);
     }
@@ -1264,8 +1267,8 @@ void atan2_fp32(tensor<DataType> &out, tensor<DataType> &y, tensor<DataType> &x,
     // Step 1:  y/x
     {
         tiu::eq(mask, x, zeros, ONE);           // mask = (x == 0) ? 1 : 0
-        tiu::mul(work1, mask, EPSILON);         // work1 = (x == 0) ? ε : 0
-        tiu::add(x_safe, x, work1);             // x_safe = x + (x==0 ? ε : 0)
+        tiu::fmul(work1, mask, EPSILON);         // work1 = (x == 0) ? ε : 0
+        tiu::fadd(x_safe, x, work1);             // x_safe = x + (x==0 ? ε : 0)
         tiu::fdiv(div_res, y, x_safe);
     }
 
@@ -1287,7 +1290,7 @@ void atan2_fp32(tensor<DataType> &out, tensor<DataType> &y, tensor<DataType> &x,
         // Subcase 3.1: y > 0 ⇒ π/2
         {
             tiu::gt(work1, y, zeros, ONE);
-            tiu::bitwise_and(work2, mask, work1);
+            tiu::fmul(work2, mask, work1);
             tiu::fmul(work3, work2, half_pi);
             tiu::fadd(out, out, work3);
         }
@@ -1295,7 +1298,7 @@ void atan2_fp32(tensor<DataType> &out, tensor<DataType> &y, tensor<DataType> &x,
         // Subcase 3.2: y < 0 ⇒ -π/2
         {
             tiu::lt(work1, y, zeros, ONE);
-            tiu::bitwise_and(work2, mask, work1);
+            tiu::fmul(work2, mask, work1);
             tiu::fmul(work3, work2, half_pi);
             tiu::fmul(work3, work3, NEG_ONE);
             tiu::fadd(out, out, work3);
@@ -1303,7 +1306,7 @@ void atan2_fp32(tensor<DataType> &out, tensor<DataType> &y, tensor<DataType> &x,
         // Subcase 3.3: y == 0 ⇒ 0
         {
             tiu::eq(work1, y, zeros, ONE);
-            tiu::bitwise_and(work2, mask, work1);
+            tiu::fmul(work2, mask, work1);
             tiu::fmul(work3, out, work2);
             tiu::fsub(out, out, work3);
         }
@@ -1514,9 +1517,14 @@ void atan2_bcast_kernel(U* ptr_output, T* ptr_input, T* ptr_other,
         int b_sh = (out_H > ot_H) ? 0 : b_stride_tmp.h;
         int b_sw = (out_W > ot_W) ? 0 : b_stride_tmp.w;
         dim4 b_stride = {b_sn, b_sc, b_sh, b_sw};
-        auto a_l_bcast = a_l.view(out_local_shape, a_stride);
-        auto b_l_bcast = b_l.view(out_local_shape, b_stride);
-        atan2_fp32<fp32>(o_l, a_l_bcast, b_l_bcast, &out_local_shape_block, &out_local_shape);
+
+        auto a_l_bcast_view = a_l.view(out_local_shape, a_stride);
+        auto b_l_bcast_view = b_l.view(out_local_shape, b_stride);
+        auto a_l_aligned = make_tensor<T>(out_local_shape_block, out_local_shape);
+        auto b_l_aligned = make_tensor<T>(out_local_shape_block, out_local_shape);
+        tiu::cast(a_l_aligned, a_l_bcast_view);
+        tiu::cast(b_l_aligned, b_l_bcast_view);
+        atan2_fp32<fp32>(o_l, a_l_aligned, b_l_aligned, &out_local_shape_block, &out_local_shape);
         dma::store(dst_g.sub_view(out_local_shape, a_offset), o_l);
     }
 

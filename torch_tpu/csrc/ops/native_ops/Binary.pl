@@ -10,7 +10,7 @@ using namespace ppl;
 #endif
 
 int get_max_common_div(int v, int max_v) {
-  for (int i = max_v; i > 0; i--) {
+  for (int i = min(max_v, v); i > 0; i--) {
     if (v % i == 0) {
       return i;
     }
@@ -21,36 +21,37 @@ int get_max_common_div(int v, int max_v) {
 template <typename T, typename U, bool DivMode>
 void binary_const_kernel(U *ptr_dst, T *ptr_src, float rhs, int inner_size,
                   const int block_w, bool is_float, int binary_type, bool is_scalar_left, int relu = 0) {
-  // reshape src [N, C, H, W] -> [1, c_slice, 1, w_slice]
+  // reshape src [N, C, H, W] -> [1, C, 1, W]
   // c_slice <= LANE_NUM
   ppl::set_block_num(BLOCK_NUM);
   int core_num = get_block_num();
   int core_idx = get_block_index();
 
-  int slice_per_core = div_up(inner_size, core_num);
-  int core_offset = slice_per_core * core_idx;
-  int slice_size_for_core = min(slice_per_core, inner_size - core_offset);
+  int C = get_max_common_div(inner_size, LANE_NUM);
+  int W = div_up(inner_size, C);
 
-  int c_slice = get_max_common_div(slice_size_for_core, LANE_NUM);
-  int w_slice = slice_size_for_core / c_slice;
+  int slice_per_core = div_up(C, core_num);
+  int core_offset = slice_per_core * core_idx;
+  int slice_size_for_core = min(slice_per_core, C - core_offset);
+
 
   int block_c = LANE_NUM;
-  int block_w_iter = max(min(block_w, w_slice / 2), 1);
-  dim4 src_shape = {1, c_slice, 1, w_slice};
+  int block_w_iter = max(min(block_w, W / 2), 1);
+  dim4 src_shape = {1, C, 1, W};
   dim4 src_block_shape = {1, block_c, 1, block_w};
 
   auto dst_gtensor = gtensor<U>(src_shape, GLOBAL, ptr_dst);
   auto src_gtensor = gtensor<T>(src_shape, GLOBAL, ptr_src);
 
-  for (int idx_c = 0; idx_c < c_slice; idx_c += block_c) {
-    int cur_c = min(block_c, c_slice - idx_c);
-    for (int idx_w = 0; idx_w < w_slice; idx_w += block_w_iter) {
+  for (int idx_c = 0; idx_c < slice_size_for_core; idx_c += block_c) {
+    int cur_c = min(block_c, slice_size_for_core - idx_c);
+    for (int idx_w = 0; idx_w < W; idx_w += block_w_iter) {
       ppl::enable_pipeline();
-      int cur_w = min(block_w_iter, w_slice - idx_w);
+      int cur_w = min(block_w_iter, W - idx_w);
       dim4 src_real_shape = {1, cur_c, 1, cur_w};
       auto in_tensor = make_tensor<T>(src_block_shape, src_real_shape);
       auto out_tensor = make_tensor<U>(src_block_shape, src_real_shape);
-      dim4 offset = {0, core_offset+idx_c, 0, idx_w};
+      dim4 offset = {0, core_offset + idx_c, 0, idx_w};
       dma::load(in_tensor, src_gtensor.sub_view(src_real_shape, offset));
       if constexpr (DivMode){ // div
         if constexpr (std::is_same<T, fp32>::value) {
@@ -113,35 +114,38 @@ void binary_const_kernel(U *ptr_dst, T *ptr_src, float rhs, int inner_size,
 
 __KERNEL__ void binary_async_fp32_scalar(fp32* ptr_output, fp32* ptr_input, int binary_type, const int block_w,
 int inner_size, float alpha, bool is_scalar_left) {
-  if (binary_type == 3) {
-    binary_const_kernel<fp32, fp32, 1>(ptr_output, ptr_input, alpha, inner_size,
-    block_w, 1, binary_type, is_scalar_left);
-  } else {
-    binary_const_kernel<fp32, fp32, 0>(ptr_output, ptr_input, alpha, inner_size,
-    block_w, 1, binary_type, is_scalar_left);
-  }
+  binary_const_kernel<fp32, fp32, 0>(ptr_output, ptr_input, alpha, inner_size,
+  block_w, 1, binary_type, is_scalar_left);
 }
 
 __KERNEL__ void binary_async_fp16_scalar(fp16* ptr_output, fp16* ptr_input, int binary_type, const int block_w,
 int inner_size, float alpha, bool is_scalar_left) {
-  if (binary_type == 3) {
-    binary_const_kernel<fp16, fp16, 1>(ptr_output, ptr_input, alpha, inner_size,
-    block_w, 1, binary_type, is_scalar_left);
-  } else {
-    binary_const_kernel<fp16, fp16, 0>(ptr_output, ptr_input, alpha, inner_size,
-    block_w, 1, binary_type, is_scalar_left);
-  }
+  binary_const_kernel<fp16, fp16, 0>(ptr_output, ptr_input, alpha, inner_size,
+  block_w, 1, binary_type, is_scalar_left);
 }
 
 __KERNEL__ void binary_async_bf16_scalar(bf16* ptr_output, bf16* ptr_input, int binary_type, const int block_w,
 int inner_size, float alpha, bool is_scalar_left) {
-  if (binary_type == 3) {
-    binary_const_kernel<bf16, bf16, 1>(ptr_output, ptr_input, alpha, inner_size,
-    block_w, 1, binary_type, is_scalar_left);
-  } else {
-    binary_const_kernel<bf16, bf16, 0>(ptr_output, ptr_input, alpha, inner_size,
-    block_w, 1, binary_type, is_scalar_left);
-  }
+  binary_const_kernel<bf16, bf16, 0>(ptr_output, ptr_input, alpha, inner_size,
+  block_w, 1, binary_type, is_scalar_left);
+}
+
+__KERNEL__ void binary_div_fp32_scalar(fp32* ptr_output, fp32* ptr_input, int binary_type, const int block_w,
+int inner_size, float alpha, bool is_scalar_left) {
+  binary_const_kernel<fp32, fp32, 1>(ptr_output, ptr_input, alpha, inner_size,
+  block_w, 1, binary_type, is_scalar_left);
+}
+
+__KERNEL__ void binary_div_fp16_scalar(fp16* ptr_output, fp16* ptr_input, int binary_type, const int block_w,
+int inner_size, float alpha, bool is_scalar_left) {
+  binary_const_kernel<fp16, fp16, 1>(ptr_output, ptr_input, alpha, inner_size,
+  block_w, 1, binary_type, is_scalar_left);
+}
+
+__KERNEL__ void binary_div_bf16_scalar(bf16* ptr_output, bf16* ptr_input, int binary_type, const int block_w,
+int inner_size, float alpha, bool is_scalar_left) {
+  binary_const_kernel<bf16, bf16, 1>(ptr_output, ptr_input, alpha, inner_size,
+  block_w, 1, binary_type, is_scalar_left);
 }
 
 __KERNEL__ void binary_async_int32_scalar(int32* ptr_output, int32* ptr_input, int binary_type, const int block_w,
@@ -386,38 +390,41 @@ void binary_bcast_kernel(U* ptr_output, T* ptr_input, T* ptr_other,
 
 __KERNEL__ void binary_async_fp32(fp32* ptr_output, fp32* ptr_input, fp32* ptr_other,
     int binary_type, const int block_w, int outer_size, int inner_size) {
-  if (binary_type == 3) {
-    binary_async_kernel<fp32, fp32, 1>(ptr_output, ptr_input, ptr_other, 3, block_w,
-                                                    outer_size, inner_size, 1);
-  } else {
-    binary_async_kernel<fp32, fp32, 0>(ptr_output, ptr_input, ptr_other,
-                        binary_type, block_w,
-                        outer_size, inner_size, 1);
-  }
+  binary_async_kernel<fp32, fp32, 0>(ptr_output, ptr_input, ptr_other,
+                      binary_type, block_w,
+                      outer_size, inner_size, 1);
 }
 
 __KERNEL__ void binary_async_fp16(fp16* ptr_output, fp16* ptr_input, fp16* ptr_other,
     int binary_type, const int block_w, int outer_size, int inner_size) {
-  if (binary_type == 3) {
-    binary_async_kernel<fp16, fp16, 1>(ptr_output, ptr_input, ptr_other, 3, block_w,
-                        outer_size, inner_size, 1);
-  } else {
-    binary_async_kernel<fp16, fp16, 0>(ptr_output, ptr_input, ptr_other,
-                        binary_type, block_w,
-                        outer_size, inner_size, 1);
-  }
+  binary_async_kernel<fp16, fp16, 0>(ptr_output, ptr_input, ptr_other,
+                      binary_type, block_w,
+                      outer_size, inner_size, 1);
 }
 
 __KERNEL__ void binary_async_bf16(bf16* ptr_output, bf16* ptr_input, bf16* ptr_other,
     int binary_type, const int block_w, int outer_size, int inner_size) {
-  if (binary_type == 3) {
-    binary_async_kernel<bf16, bf16, 1>(ptr_output, ptr_input, ptr_other, 3, block_w,
-                        outer_size, inner_size, 1);
-  } else {
-    binary_async_kernel<bf16, bf16, 0>(ptr_output, ptr_input, ptr_other,
-                        binary_type, block_w,
-                        outer_size, inner_size, 1);
-    }
+  binary_async_kernel<bf16, bf16, 0>(ptr_output, ptr_input, ptr_other,
+                      binary_type, block_w,
+                      outer_size, inner_size, 1);
+}
+
+__KERNEL__ void binary_div_fp32(fp32* ptr_output, fp32* ptr_input, fp32* ptr_other,
+    int binary_type, const int block_w, int outer_size, int inner_size) {
+  binary_async_kernel<fp32, fp32, 1>(ptr_output, ptr_input, ptr_other, 3, block_w,
+                      outer_size, inner_size, 1);
+}
+
+__KERNEL__ void binary_div_fp16(fp16* ptr_output, fp16* ptr_input, fp16* ptr_other,
+    int binary_type, const int block_w, int outer_size, int inner_size) {
+  binary_async_kernel<fp16, fp16, 1>(ptr_output, ptr_input, ptr_other, 3, block_w,
+                      outer_size, inner_size, 1);
+}
+
+__KERNEL__ void binary_div_bf16(bf16* ptr_output, bf16* ptr_input, bf16* ptr_other,
+    int binary_type, const int block_w, int outer_size, int inner_size) {
+  binary_async_kernel<bf16, bf16, 1>(ptr_output, ptr_input, ptr_other, 3, block_w,
+                      outer_size, inner_size, 1);
 }
 
 __KERNEL__ void binary_async_int32(int32_t* ptr_output, int32_t* ptr_input, int32_t* ptr_other,
@@ -472,44 +479,47 @@ __KERNEL__ void div_uint8_fp32(fp32* ptr_output, uint8_t* ptr_input, uint8_t* pt
 
 __KERNEL__ void binary_bcast_fp32(fp32* ptr_output, fp32* ptr_input, fp32* ptr_other,
     int binary_type, const int block_w, int iN, int iC, int iH, int iW, int oN, int oC, int oH, int oW) {
-  if (binary_type == 3) {
-    binary_bcast_kernel<fp32, fp32, 1>(ptr_output, ptr_input, ptr_other, 3, block_w,
-                                       iN, iC, iH, iW, oN, oC, oH, oW, 1);
-  } else {
-    binary_bcast_kernel<fp32, fp32, 0>(ptr_output, ptr_input, ptr_other,
-                        binary_type, block_w, iN, iC, iH, iW, oN, oC, oH, oW, 1);
-  }
+  binary_bcast_kernel<fp32, fp32, 0>(ptr_output, ptr_input, ptr_other,
+                      binary_type, block_w, iN, iC, iH, iW, oN, oC, oH, oW, 1);
 }
 
 __KERNEL__ void binary_bcast_fp16(fp16* ptr_output, fp16* ptr_input, fp16* ptr_other,
     int binary_type, const int block_w, int iN, int iC, int iH, int iW, int oN, int oC, int oH, int oW) {
-  if (binary_type == 3) {
-    binary_bcast_kernel<fp16, fp16, 1>(ptr_output, ptr_input, ptr_other, 3, block_w,
-                        iN, iC, iH, iW, oN, oC, oH, oW, 1);
-  } else {
-    binary_bcast_kernel<fp16, fp16, 0>(ptr_output, ptr_input, ptr_other,
-                        binary_type, block_w,
-                        iN, iC, iH, iW, oN, oC, oH, oW, 1);
-  }
+  binary_bcast_kernel<fp16, fp16, 0>(ptr_output, ptr_input, ptr_other,
+                      binary_type, block_w,
+                      iN, iC, iH, iW, oN, oC, oH, oW, 1);
 }
 
 __KERNEL__ void binary_bcast_bf16(bf16* ptr_output, bf16* ptr_input, bf16* ptr_other,
     int binary_type, const int block_w, int iN, int iC, int iH, int iW, int oN, int oC, int oH, int oW) {
-  if (binary_type == 3) {
-    binary_bcast_kernel<bf16, bf16, 1>(ptr_output, ptr_input, ptr_other, 3, block_w,
-                        iN, iC, iH, iW, oN, oC, oH, oW, 1);
-  } else {
-    binary_bcast_kernel<bf16, bf16, 0>(ptr_output, ptr_input, ptr_other,
-                        binary_type, block_w,
-                        iN, iC, iH, iW, oN, oC, oH, oW, 1);
-    }
+  binary_bcast_kernel<bf16, bf16, 0>(ptr_output, ptr_input, ptr_other,
+                      binary_type, block_w,
+                      iN, iC, iH, iW, oN, oC, oH, oW, 1);
+}
+
+__KERNEL__ void binary_div_bcast_fp32(fp32* ptr_output, fp32* ptr_input, fp32* ptr_other,
+    int binary_type, const int block_w, int iN, int iC, int iH, int iW, int oN, int oC, int oH, int oW) {
+  binary_bcast_kernel<fp32, fp32, 1>(ptr_output, ptr_input, ptr_other, 3, block_w,
+                                      iN, iC, iH, iW, oN, oC, oH, oW, 1);
+}
+
+__KERNEL__ void binary_div_bcast_fp16(fp16* ptr_output, fp16* ptr_input, fp16* ptr_other,
+    int binary_type, const int block_w, int iN, int iC, int iH, int iW, int oN, int oC, int oH, int oW) {
+  binary_bcast_kernel<fp16, fp16, 1>(ptr_output, ptr_input, ptr_other, 3, block_w,
+                      iN, iC, iH, iW, oN, oC, oH, oW, 1);
+}
+
+__KERNEL__ void binary_div_bcast_bf16(bf16* ptr_output, bf16* ptr_input, bf16* ptr_other,
+    int binary_type, const int block_w, int iN, int iC, int iH, int iW, int oN, int oC, int oH, int oW) {
+  binary_bcast_kernel<bf16, bf16, 1>(ptr_output, ptr_input, ptr_other, 3, block_w,
+                      iN, iC, iH, iW, oN, oC, oH, oW, 1);
 }
 
 __KERNEL__ void binary_bcast_int32(int32_t* ptr_output, int32_t* ptr_input, int32_t* ptr_other,
     int binary_type, const int block_w, int iN, int iC, int iH, int iW, int oN, int oC, int oH, int oW) {
-    binary_bcast_kernel<int32_t, int32_t, 0>(ptr_output, ptr_input, ptr_other,
-                    binary_type, block_w,
-                    iN, iC, iH, iW, oN, oC, oH, oW, 0);
+  binary_bcast_kernel<int32_t, int32_t, 0>(ptr_output, ptr_input, ptr_other,
+                  binary_type, block_w,
+                  iN, iC, iH, iW, oN, oC, oH, oW, 0);
 
 }
 

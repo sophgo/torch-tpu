@@ -60,7 +60,7 @@ static void check_tensor_overflow(void *__parent, void *__sub_tensor,
     size_t max_size = 1;
     max_size += (sub_tensor->shape.n - 1) * sub_tensor->stride.n;
     int c_shape = sub_tensor->shape.c;
-    if (sub_tensor->mode == 0) {
+    if (sub_tensor->mode == 3) {
       c_shape = (c_shape + NPU_NUM - 1) / NPU_NUM;
     }
     max_size += (c_shape - 1) * sub_tensor->stride.c;
