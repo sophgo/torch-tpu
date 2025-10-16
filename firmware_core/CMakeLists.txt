@@ -30,7 +30,10 @@ add_definitions(-Wno-address-of-packed-member
                 -Wno-dev)
 
 if (NOT USING_CMODEL)
-    include($ENV{CHIP_ARCH}-toolchain.cmake)
+    set(CURRENT_SOC_MODE "$ENV{SOC_MODE}")
+    if (NOT CURRENT_SOC_MODE STREQUAL "ON")
+        include($ENV{CHIP_ARCH}-toolchain.cmake)
+    endif()
 endif()
 
 aux_source_directory(src KERNEL_SRC_FILES)

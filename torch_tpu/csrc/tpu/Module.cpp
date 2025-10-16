@@ -537,9 +537,9 @@ static struct PyMethodDef THPTModule_methods[] = {
     {"_tpu_stopCache", THPTModule_stopCache, METH_NOARGS, nullptr},
 
     // memory stats related
-    {"_tpu_memoryStats", THPTModule_memoryStats, METH_O, nullptr},
-    {"_tpu_resetPeakMemoryStats", THPTModule_resetPeakMemoryStats, METH_O, nullptr},
-    {"_tpu_memoryInfo", THPTModule_memoryInfo, METH_O, nullptr},
+    {"_tpu_memoryStats", (PyCFunction)THPTModule_memoryStats, METH_O, nullptr},
+    {"_tpu_resetPeakMemoryStats", (PyCFunction)THPTModule_resetPeakMemoryStats, METH_O, nullptr},
+    {"_tpu_memoryInfo", (PyCFunction)THPTModule_memoryInfo, METH_O, nullptr},
 
     {"_tensor_construct_from_storage", (PyCFunction)THPTModule_tensor_construct_from_storage, METH_VARARGS, nullptr},
     {nullptr}

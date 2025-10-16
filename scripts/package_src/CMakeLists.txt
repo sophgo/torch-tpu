@@ -36,7 +36,7 @@ target_link_directories(torch_tpu_python PRIVATE
                           ${PYTORCH_INSTALL_DIR}/lib
                           $ENV{TORCH_TPU_PATH}/lib
                         )
-if(SOC_CROSS_MODE STREQUAL "ON")
+if(SOC_CROSS_MODE STREQUAL "ON" OR SOC_MODE STREQUAL "ON")
   target_link_libraries(torch_tpu_python torch_tpu.$ENV{CHIP_ARCH} torch_python torch_cpu c10 tpuv7_rt_riscv tpuv7_modelrt_riscv)
 else()
   target_link_libraries(torch_tpu_python torch_tpu.$ENV{CHIP_ARCH} torch_python torch_cpu c10 tpuv7_rt tpuv7_modelrt)

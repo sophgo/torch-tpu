@@ -72,6 +72,7 @@ def get_git_commit_short_hash():
 VERSION = '2.1.0.post1'
 GIT_VERSION = get_git_tag_desc()
 SOC_CROSS = os.environ.get("SOC_CROSS_MODE", None)
+SOC_MODE = os.environ.get("SOC_MODE", None)
 SOC_CROSS = True if SOC_CROSS == "ON" else False
 CROSS_TOOLCHAINS= os.environ.get("CROSS_TOOLCHAINS", None)
 PLATFORM=''
@@ -84,6 +85,8 @@ if SOC_CROSS:
         os.environ["CC"] = f"{CROSS_TOOLCHAINS}/riscv64-linux-x86_64/bin/riscv64-unknown-linux-gnu-gcc"
         os.environ["CXX"] = f"{CROSS_TOOLCHAINS}/riscv64-linux-x86_64/bin/riscv64-unknown-linux-gnu-g++"
         PLATFORM='-riscv64'
+if SOC_MODE:
+    PLATFORM='-riscv64'
 
 def which(thefile):
     path = os.environ.get("PATH", os.defpath).split(os.pathsep)
@@ -579,9 +582,9 @@ class bdist_wheel(_bdist_wheel, ExtBase):
                         lib = os.path.join(BASE_DIR, 'third_party/tpuDNN/bm1686_lib/arm/libtpudnn.so')
                     self.copy_file(lib, os.path.join(pkg_dir, f'lib/libtpudnn.{target}.so'))
                 else:
-                    if 'riscv' in lib and SOC_CROSS:
+                    if 'riscv' in lib and (SOC_CROSS or SOC_MODE):
                         self.copy_file(lib, os.path.join(pkg_dir, f'lib/libtpudnn.{target}.so'))
-                    elif 'riscv' not in lib and not SOC_CROSS:
+                    elif 'riscv' not in lib and not (SOC_CROSS or SOC_MODE):
                         self.copy_file(lib, os.path.join(pkg_dir, f'lib/libtpudnn.{target}.so'))
 
         chip_arch = os.environ.get('CHIP_ARCH')
@@ -597,7 +600,7 @@ class bdist_wheel(_bdist_wheel, ExtBase):
 
         # include libraries just cmodel, for inst-cache use.
         # tpuv7-emulator_0.1.0 is the cmodel version of runtime, no device version contained.
-        base_fw_libs = glob.glob(os.path.join(TPUV7_RUNTIME_PATH, f'tpuv7-emulator_0.1.0/lib/libtpu*_emulator.so')) if not SOC_CROSS else \
+        base_fw_libs = glob.glob(os.path.join(TPUV7_RUNTIME_PATH, f'tpuv7-emulator_0.1.0/lib/libtpu*_emulator.so')) if not (SOC_CROSS or SOC_MODE) else \
                        glob.glob(os.path.join(TPUV7_RUNTIME_PATH, f'tpuv7-emulator_0.1.0/lib/libtpu*_emulator-riscv.so'))
         for lib in base_fw_libs:
             self.copy_file(lib, os.path.join(pkg_dir, f'lib/'))
@@ -621,7 +624,7 @@ if SOC_CROSS:
     if os.environ["CHIP_ARCH"] == "sg2260":
         include_directories.append(os.path.join(CROSS_TOOLCHAINS, "riscv64-linux-x86_64/python3.10"))
     elif os.environ["CHIP_ARCH"] in ["bm1684x", "bm1686"]:
-        include_directories.append(os.path.join(CROSS_TOOLCHAINS, "Python-3.8.2/python_3.8.2/include/python3.8"))    
+        include_directories.append(os.path.join(CROSS_TOOLCHAINS, "Python-3.8.2/python_3.8.2/include/python3.8"))
 lib_directories = [
     os.path.join(BASE_DIR, f"build/{get_build_type()}/packages", "torch_tpu/lib"),
 ] if is_bdist_wheel else [os.path.join(BASE_DIR, "torch_tpu", "lib")]

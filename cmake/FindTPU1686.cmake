@@ -25,7 +25,7 @@ find_path(
     $ENV{TPUTRAIN_TOP}/third_party/sccl/include
     ${TPU1686_PATH}/sccl/include)
 
-if($ENV{SOC_CROSS_MODE} STREQUAL "ON")
+if(("$ENV{SOC_CROSS_MODE}" STREQUAL "ON") OR ("$ENV{SOC_MODE}" STREQUAL "ON"))
     find_library(
         tpurt_LIBRARY
         NAMES tpurt-${PLATFORM} tpurt
@@ -112,7 +112,7 @@ elseif ($ENV{CHIP_ARCH} STREQUAL "bm1686")
             $ENV{TPUTRAIN_TOP}/third_party/firmware/$ENV{CHIP_ARCH}/)
     endif()
 elseif ($ENV{CHIP_ARCH} STREQUAL "sg2260" OR $ENV{CHIP_ARCH} STREQUAL "sg2260e")
-    if($ENV{SOC_CROSS_MODE} STREQUAL "ON")
+    if(("$ENV{SOC_CROSS_MODE}" STREQUAL "ON") OR ("$ENV{SOC_MODE}" STREQUAL "ON"))
         find_library(
             cmodel_firmware_LIBRARY
             NAMES tpuv7_emulator-riscv
@@ -142,7 +142,7 @@ elseif ($ENV{CHIP_ARCH} STREQUAL "sg2260" OR $ENV{CHIP_ARCH} STREQUAL "sg2260e")
 
 endif()
 
-if($ENV{SOC_CROSS_MODE} STREQUAL "ON")
+if(("$ENV{SOC_CROSS_MODE}" STREQUAL "ON") OR ("$ENV{SOC_MODE}" STREQUAL "ON"))
     if ($ENV{CHIP_ARCH} STREQUAL "bm1684x" OR $ENV{CHIP_ARCH} STREQUAL "bm1686")
         find_library(
             tpuDNN_LIBRARY
