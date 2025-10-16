@@ -14,11 +14,11 @@ def case1():
             def __init__(self):
                 super(Test_Module, self).__init__()
             def forward(self,  x0, x1):
+                x0 += 1.1
+                x1 -= 1.1
                 y = x0 + x1
-                y = y + x0
-                y = y + 3.0
-                y = y * 4.0
-                y = 2.0 - y
+                y = y * 0.9
+                y = 1.1 - y
                 return y
 
     #step2: prepare input data, Notice that the input data will be adopted not only their shapes

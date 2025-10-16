@@ -21,7 +21,7 @@ def case1():
     }
     #list is also acceptable
     input_data = [
-        [torch.rand((5,5)),  torch.rand((5,5)),  torch.rand((5,5))],
+        [torch.rand((5,5)),  torch.rand((5,5)) + 0.1,  torch.rand((5,5)) + 0.1],
     ]
     metric_table = ['max_diff','MAE']
     chip_arch_dict = {"bm1684x":1, 'sg2260':1}

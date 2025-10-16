@@ -18,7 +18,7 @@ def case1():
     #step2: prepare input data, Notice that the input data will be adopted not only their shapes
     #list is also acceptable
     input_data = [
-        [torch.rand((30, 2500, 500))],
+        [torch.rand((30, 2500, 500)) * 10 + 0.1],# for f16 precision
     ]
     metric_table = ['max_diff','MAE']
     chip_arch_dict = {"bm1684x":1, 'sg2260':1}

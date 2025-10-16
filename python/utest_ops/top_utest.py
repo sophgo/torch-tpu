@@ -425,11 +425,11 @@ class Tester_Basic():
       count_all_correct_dtype = 0
       dict_is_this_dtype_correct = {}
       for naive_dtype in self.naive_dtype_list:
-        is_all_outputs_all_metrics_passed = False
+        is_all_outputs_all_metrics_passed = True
         assert self.num_multi_output==len(final_result[naive_dtype])
         for each_metric in self.metric_table:
             for idx_output in range(self.num_multi_output):
-                is_all_outputs_all_metrics_passed |= final_result[naive_dtype][idx_output]['metric_flag'][each_metric]
+                is_all_outputs_all_metrics_passed &= final_result[naive_dtype][idx_output]['metric_flag'][each_metric]
 
         ###output info level-1, correct for each input_sample
         if (is_all_outputs_all_metrics_passed):
