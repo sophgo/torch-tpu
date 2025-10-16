@@ -373,7 +373,7 @@ void tpu_topk(
 #ifdef BACKEND_SG2260
 int scalar_topk_multi_core(sg_api_topk_t *api)
 {
-    int axis = api->axis > 0 ? api->axis : api->axis + api->dim;
+    int axis = api->axis >= 0 ? api->axis : api->axis + api->dim;
 
     unsigned outer_num = 1, inner_num = 1;
     unsigned outer_stride = 1, axis_stride = 1, output_stride = 1;
