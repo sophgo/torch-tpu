@@ -12,6 +12,7 @@ namespace at {
 Tensor &repeat_out_tpu(const Tensor &self, const IntArrayRef repeats,
                        Tensor &out) {
   TIMING_START;
+  if (self.nbytes() == 0) {  TIMING_END; SHOW_TENSOR_OP(self, out); return out;}
   Tensor contiguous_self = self.is_contiguous() ? self : self.contiguous();
   std::vector<int> repeat_times;
 #if 0
