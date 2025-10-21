@@ -58,6 +58,31 @@ function set_ppl_env() {
      local chip=$1
      local root_path=$2
      pip install tpu-ppl -i https://pypi.tuna.tsinghua.edu.cn/simple
+
+    [ $CHIP_ARCH != 'sg2260e' ] && return
+
+    # If PPL_INSTALL_PATH is not set, try to infer it
+    if [ -z "$PPL_INSTALL_PATH" ]; then
+      # Look for ppl* dirs near $TPUTRAIN_TOP
+      CANDIDATES=($(ls -d "${TPUTRAIN_TOP}/../ppl"* 2>/dev/null | grep -v '\.bak\|\.old'))
+
+      VALID_DIRS=()
+      for d in "${CANDIDATES[@]}"; do
+        if [ -f "$d/bin/ppl-compile" ]; then
+          VALID_DIRS+=("$d")
+        fi
+      done
+
+      if [ ${#VALID_DIRS[@]} -gt 0 ]; then
+        # Pick the latest (lexicographically sorted last)
+        LATEST_PPL=$(printf '%s\n' "${VALID_DIRS[@]}" | sort | tail -n 1)
+        export PPL_INSTALL_PATH="$LATEST_PPL"
+        echo "📦 Using PPL_INSTALL_PATH=${PPL_INSTALL_PATH}"
+      else
+        echo "⚠️ No valid ppl installation found under ${TPUTRAIN_TOP}/.."
+        return -1
+      fi
+    fi
 }
 
 ######## ===== ENVS TO COMPILE TPUTRAIN ======########
@@ -95,7 +120,7 @@ if [ "${CHIP_ARCH}" != "bm1684x" ]; then
      set_v7runtime_env ${TPUTRAIN_TOP}
 fi
 
-set_ppl_env $CHIP_ARCH ${TPUTRAIN_TOP}
+set_ppl_env $CHIP_ARCH ${TPUTRAIN_TOP} || return -1
 export TPU1686_PATH=$(realpath $TPUTRAIN_TOP/../TPU1686)
 if [ ! -d $TPU1686_PATH ]; then
     unset TPU1686_PATH

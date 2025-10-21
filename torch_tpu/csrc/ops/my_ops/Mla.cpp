@@ -151,9 +151,6 @@ namespace at
 						"MLA input lenghts must on CPU device" );
 		}
 #ifdef USING_PPL
-        if (attention_mode == NORMAL_ATTENTION_DECODE){
-            TORCH_CHECK(generate_token == 1, "MLA decode only support 1 generate token");
-        }
         AT_DISPATCH_FLOATING_TYPES_AND2(
         at::kHalf, at::kBFloat16, Q.scalar_type(), "latent_attention", [&] {
             latent_attention_impl<scalar_t>(
@@ -250,9 +247,6 @@ namespace at
       }
 #ifdef USING_PPL
         int max_cache_size = 0;
-        if (attention_mode == PAGED_ATTENTION_DECODE){
-            TORCH_CHECK(generate_token == 1, "MLA decode only support 1 generate token");
-        }
         int batch = (int)(input_lengths.nbytes() / 4);
         std::vector<uint32_t> seq(2 * batch, 0);
         memcpy(seq.data(), input_lengths.data_ptr(), batch * sizeof(int));
@@ -348,9 +342,6 @@ namespace at
 #ifdef USING_PPL
 
         int max_cache_size = 0;
-        if (attention_mode == PAGED_ATTENTION_DECODE){
-            TORCH_CHECK(generate_token == 1, "MLA decode only support 1 generate token");
-        }
         int batch = (int)(seqlen.nbytes() / 4);
         std::vector<uint32_t> seq(2 * batch, 0);
         memcpy(seq.data(), seqlen.data_ptr(), batch * sizeof(uint32_t));
@@ -453,9 +444,6 @@ namespace at
             "MLA input seqlen must be int32 dtype && on CPU device");
         }
 #ifdef USING_PPL
-        if (attention_mode == NORMAL_ATTENTION_DECODE){
-            TORCH_CHECK(generate_token == 1, "MLA decode only support 1 generate token");
-        }
     AT_DISPATCH_FLOATING_TYPES_AND2(
         at::kHalf, at::kBFloat16, Q.scalar_type(), "latent_attention_fp8", [&] {
             latent_attention_fp8_impl<scalar_t>(

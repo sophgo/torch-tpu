@@ -200,7 +200,7 @@ class CPPLibBuild(build_clib, ExtBase, object):
 
         arch = os.environ.get('CHIP_ARCH')
         build_dir = os.path.join(BASE_DIR, 'build', f'firmware_{arch}')
-        src_dir = os.path.join(BASE_DIR, 'torch_tpu/csrc/ops') if arch == 'sg2260e' else os.path.join(BASE_DIR, 'firmware_core')
+        src_dir = os.path.join(BASE_DIR, 'firmware_core')
         args = [self.cmake, f'-DCHIP_ARCH={arch}', src_dir]
         extra_cmake_opts = os.environ.get('EXTRA_CONFIG')
         if extra_cmake_opts:

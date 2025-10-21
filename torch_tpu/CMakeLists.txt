@@ -54,26 +54,6 @@ file(GLOB SRCS
   csrc/aten/*/*.cpp
 )
 
-if(BACKEND_SG2260E)
-
-macro(collect_ppl_host relative_path)
-    set(abs_path "${CMAKE_CURRENT_SOURCE_DIR}/${relative_path}")
-    file(GLOB pl_files LIST_DIRECTORIES false "${abs_path}/*.pl")
-
-    foreach(pl_file IN LISTS pl_files)
-        get_filename_component(base_name ${pl_file} NAME_WE)
-        get_filename_component(dir_path ${pl_file} DIRECTORY)
-        list(APPEND SRCS "${dir_path}/${base_name}/host/${base_name}.cpp")
-        include_directories("${dir_path}/${base_name}/include")
-    endforeach()
-endmacro()
-
-collect_ppl_host(csrc/ops/my_ops)
-collect_ppl_host(csrc/ops/native_ops)
-
-include_directories($ENV{PPL_INSTALL_PATH}/deps/common/host/include/)
-endif()
-
 file(GLOB_RECURSE DIST_SRCS
   csrc/distributed/c10d/*.cpp
 )
@@ -97,6 +77,19 @@ set(kernel_srcs $<TARGET_PROPERTY:torch_tpu_kernel_data,SOURCES>)
 
 add_library(torch_tpu SHARED ${concated_src} ${kernel_srcs})
 target_link_libraries(torch_tpu c10 torch_cpu TPU1686::tpuDNN torch_tpu_kernel_data TPU1686::sccl TPU1686::tpurt sophon)
+
+set(PPL_SUPPORTED_ARCHES sg2260e)
+if ("$ENV{CHIP_ARCH}" IN_LIST PPL_SUPPORTED_ARCHES)
+    file(GLOB pl_host_srcs ${CMAKE_BINARY_DIR}/../firmware_sg2260e/ppl/*/host/*.cpp)
+    add_library(pl_host ${pl_host_srcs})
+    file(GLOB pl_host_includes ${CMAKE_BINARY_DIR}/../firmware_sg2260e/ppl/*/include)
+    target_include_directories(pl_host PUBLIC
+        $ENV{PPL_INSTALL_PATH}/deps/common/host/include
+        ${pl_host_includes})
+    target_compile_options(pl_host PRIVATE -fPIC)
+    target_link_libraries(pl_host TPU1686::tpurt)
+    target_link_libraries(torch_tpu pl_host)
+endif()
 
 if(BACKEND_1684X OR BACKEND_1686)
   target_link_directories(torch_tpu PRIVATE ${RUNTIME_LIB_PATH} ${MODELRUNTIME_LIB_PATH})

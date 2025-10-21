@@ -29,9 +29,6 @@ add_definitions(-Wno-address-of-packed-member
                 -Werror
                 -Wno-dev)
 
-include_directories(${CMAKE_CURRENT_SOURCE_DIR}/../common/include)
-include_directories(${CMAKE_CURRENT_SOURCE_DIR}/../third_party/firmware/include)
-
 if (NOT USING_CMODEL)
     include($ENV{CHIP_ARCH}-toolchain.cmake)
 endif()
@@ -42,6 +39,10 @@ add_library(firmware SHARED ${KERNEL_SRC_FILES})
 message(STATUS "Building torch-tpu firmware for chip $ENV{CHIP_ARCH}")
 string(TOUPPER "BACKEND_$ENV{CHIP_ARCH}" arch_flag)
 target_compile_definitions(firmware PRIVATE -D${arch_flag})
+target_include_directories(
+    firmware PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}/../common/include
+    ${CMAKE_CURRENT_SOURCE_DIR}/../third_party/firmware/include)
 
 find_package(TPU1686 REQUIRED)
 if (USING_CMODEL)
@@ -95,5 +96,14 @@ else()
         target_link_libraries(firmware PRIVATE -Wl,--whole-archive TPU1686::firmware -Wl,--no-whole-archive dl m)
         target_link_options(firmware PRIVATE -Wl,--no-undefined)
     endif()
+endif()
 
+set(PPL_SUPPORTED_ARCHES sg2260e)
+if ("$ENV{CHIP_ARCH}" IN_LIST PPL_SUPPORTED_ARCHES)
+    include(PPLTools)
+    file(GLOB pl_files LIST_DIRECTORIES false
+        "${CMAKE_CURRENT_SOURCE_DIR}/../torch_tpu/csrc/ops/my_ops/*.pl"
+        "${CMAKE_CURRENT_SOURCE_DIR}/../torch_tpu/csrc/ops/native_ops/*.pl")
+    compile_ppl_lib(${pl_files} pl_firmware)
+    target_link_libraries(firmware PRIVATE -Wl,--whole-archive pl_firmware -Wl,--no-whole-archive)
 endif()

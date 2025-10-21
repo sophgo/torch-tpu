@@ -261,6 +261,11 @@ function run_online_regression_test() {
   set_cmodel_firmware $TPU_TRAIN_CMODEL_PATH
   echo "********************************* Build Successful *********************************"
 
+  echo "******************************SG2260E regression...*************************************"
+  if [ $test_CHIP_ARCH = 'sg2260' ]; then
+      bash $CURRENT_DIR/sg2260e_regression.sh || return -1
+  fi
+
   echo "****************************** tgi regression...*************************************"
   if [ $test_CHIP_ARCH = 'sg2260' ]; then
     regression_for_tgi; ret_regression_for_tgi=$?

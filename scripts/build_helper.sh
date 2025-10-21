@@ -83,14 +83,17 @@ function update_sg2260_third_party()
 {
   update_head_files
   echo "updating libtpudnn.so ..."
+  mkdir -p ${TPUTRAIN_TOP}/third_party/tpuDNN/${CHIP_ARCH}_lib/
   cp ${TPU1686_PATH}/build_${CHIP_ARCH}/tpuDNN/src/libtpudnn.so ${TPUTRAIN_TOP}/third_party/tpuDNN/${CHIP_ARCH}_lib/
   echo "updating libsccl.so ..."
   cp ${TPU1686_PATH}/build_${CHIP_ARCH}/sccl/libsccl.so ${TPUTRAIN_TOP}/third_party/sccl/lib/
   echo "updating libtpuv7_emulator.so ..."
   cp ${TPU1686_PATH}/build_${CHIP_ARCH}/firmware_core/libtpuv7_emulator.so ${TPUTRAIN_TOP}/third_party/tpuv7_runtime/tpuv7-emulator_0.1.0/lib/
   echo "updating libfirmware_core.a ..."
+  mkdir -p ${TPUTRAIN_TOP}/third_party/firmware/${CHIP_ARCH}/
   cp ${TPU1686_PATH}/build_fw_${CHIP_ARCH}/firmware_core/libfirmware_core.a ${TPUTRAIN_TOP}/third_party/firmware/${CHIP_ARCH}/
   echo "updating libtpurt.so ..."
+  mkdir -p ${TPUTRAIN_TOP}/third_party/runtime_api/lib_${CHIP_ARCH}/
   cp ${TPU1686_PATH}/build_${CHIP_ARCH}/runtime/libtpurt.so ${TPUTRAIN_TOP}/third_party/runtime_api/lib_${CHIP_ARCH}/
 }
 
