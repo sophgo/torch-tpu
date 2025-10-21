@@ -2,18 +2,50 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 import copy
-from utils import Optimer
 import torch_tpu
 torch.manual_seed(1000)
-optimer = Optimer("../../build/torch_tpu/libtorch_tpu.so")
 device = "tpu"
 
 def case1():
-    a = torch.rand(10,10)
+    a = torch.range(1, 6).to(torch.float).view(2,3)
     a_tpu = a.to(device)
-    optimer.reset()
+    import pdb; pdb.set_trace()
+    torch.tpu.OpTimer_reset()
+    a_tpu = a_tpu.transpose(1,0)
     b_tpu = a_tpu.contiguous()
-    optimer.dump()
+    torch.tpu.OpTimer_dump()
+
+    import pdb; pdb.set_trace()
+
+def case2():
+    a = torch.range(1, 6).to(torch.float).view(2,3)
+    a_tpu = a.to(device)
+    torch.tpu.OpTimer_reset()
+    a_tpu = a_tpu.transpose(1,0)
+    b_tpu = a_tpu + 1
+    torch.tpu.OpTimer_dump()
+    import pdb; pdb.set_trace()
+
+def case3():
+    a = torch.empty_strided((2, 3), (1, 3), dtype=torch.float32)
+    a.requires_grad = True
+    a_c = a.contiguous()
+    ones  = torch.range(1, 6).to(torch.float).view(2, 3)
+    import pdb; pdb.set_trace()
+    a_c.backward(ones)
+    import pdb; pdb.set_trace()
+    torch.tpu.OpTimer_reset()
+    a_tpu = torch.empty_strided((2, 3), (1, 3), dtype=torch.float32, device='tpu')
+    a_tpu.requires_grad = True
+    a_tpu_c = a_tpu.contiguous()
+    ones_tpu  = torch.range(1, 6).to(torch.float).view(2, 3).to('tpu')
+    torch.tpu.OpTimer_dump()
+    
+    torch.tpu.OpTimer_reset()
+    a_tpu_c.backward(ones_tpu)
+    torch.tpu.OpTimer_dump()
+    import pdb; pdb.set_trace()
+
 
 def case_mergeSplitpermute_sequence_256(use_fp16 = False):
     device = "tpu"
@@ -49,5 +81,7 @@ def case_mergeSplitpermute_sequence_256(use_fp16 = False):
     print("diff", torch.max(abs(diff)))
 
 if __name__ == "__main__":
-    case1()
+    # case1()
+    # case2()
+    case3()
     #case_mergeSplitpermute_sequence_256(True)

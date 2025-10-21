@@ -95,7 +95,7 @@ Tensor _copy_from_tpu(const Tensor &self, const Tensor &dst,
     } else if (IS_TPU_TENSOR(self) && IS_CPU_TENSOR(dst)) {
       if (dst.is_contiguous()) {
         tpu::TPUCopyDeviceToHost(dst.data_ptr(), self.contiguous().data_ptr(),
-                                 dst.nbytes(), non_blocking);
+                                 dst.nbytes(), false);
       } else {
         dst.copy_(self.contiguous().to(dst.device()), non_blocking);
       }
@@ -282,5 +282,57 @@ TORCH_LIBRARY_IMPL(aten, TPU, m) {
   m.impl("_to_copy", _to_copy_tpu);
   m.impl("clone", clone_tpu);
   m.impl("clone.out", clone_out_tpu);
+}
+
+at::Tensor contiguous_tpu(const at::Tensor & self, at::MemoryFormat memory_format)
+{
+  if (self.is_contiguous()) return self;
+  TIMING_START;
+  auto out = empty(self.sizes(), self.options(), memory_format);
+  auto stream = c10_tpu::getCurrentTPUStream();
+  auto status = tpudnnStridedCopyAsync(
+    stream,
+    tpu::TPUGenerateTpudnnTensor(stream, self),
+    tpu::TPUGenerateTpudnnTensor(stream, out));
+  TORCH_CHECK(status == TPUDNN_STATUS_SUCCESS);
+  TIMING_END;
+  return out;
+}
+TORCH_LIBRARY_IMPL(aten, TPU, m) {
+  m.impl("contiguous", contiguous_tpu);
+}
+} // namespace at
+
+
+//////////////// ****************** autogradtpu key ****************** ////////////////
+namespace torch {
+namespace autograd {
+class ContiguousFunction : public torch::autograd::Function<ContiguousFunction>
+{
+public:
+  static at::Tensor forward (
+    AutogradContext *ctx, const at::Tensor & self, at::MemoryFormat memory_format )
+  {
+    auto out =at::contiguous_tpu(self, memory_format);
+    return out;
+  }
+
+  static tensor_list backward ( AutogradContext *ctx, tensor_list grad_outputs )
+  {
+    auto grad_input = clone_tpu(grad_outputs[0], c10::nullopt);
+    return {grad_input,  at::Tensor()};
+  }
+};
+} //namespace autograd
+} //namespace torch
+
+namespace at {
+Tensor contiguous_autogradtpu ( const at::Tensor& self, at::MemoryFormat memory_format)
+{
+  return torch::autograd::ContiguousFunction::apply ( self, memory_format );
+}
+
+TORCH_LIBRARY_IMPL(aten, AutogradPrivateUse1, m) {
+  m.impl("contiguous", contiguous_autogradtpu);
 }
 } // namespace at
