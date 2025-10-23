@@ -408,7 +408,7 @@ data_type_t   dtype )
     /* Compute Output */
     IOIndex = 0;
     NTodo = N, NDone = 0;
-    int NDoneLast = 0, HDoneLast = 0;
+    int NDoneLast = 0, HDoneLast = 0, NLast = NMax, HLast = HMax;
     while ( NTodo > 0 )
     {
       Shape.n = MIN ( NTodo, NMax );
@@ -433,7 +433,8 @@ data_type_t   dtype )
           if ( NDone > 0 || HDone > 0 )
           {
             global_addr_t OGAddr = output_global_addr + ( NDoneLast * GlobalStride.n + CDone * GlobalStride.c + HDoneLast * GlobalStride.h ) * DataSize;
-            tpu_gdma_cpy_L2S ( OGAddr, GDMAIOAddr[1 - IOIndex], &Shape, &GlobalStride, NULL, dtype );
+            dim4 store_shape = {NLast, Shape.c, HLast, Shape.w};
+            tpu_gdma_cpy_L2S ( OGAddr, GDMAIOAddr[1 - IOIndex], &store_shape, &GlobalStride, NULL, dtype );
           }
         }
         if ( Split == true )
@@ -483,6 +484,8 @@ data_type_t   dtype )
         {
           NDoneLast = NDone;
           HDoneLast = HDone;
+          NLast = Shape.n;
+          HLast = Shape.h;
         }
         else
         {
@@ -500,7 +503,8 @@ data_type_t   dtype )
     {
       tpu_parallel_end();
       global_addr_t OGAddr = output_global_addr + ( NDoneLast * GlobalStride.n + CDone * GlobalStride.c + HDoneLast * GlobalStride.h ) * DataSize;
-      tpu_gdma_cpy_L2S ( OGAddr, GDMAIOAddr[1 - IOIndex], &Shape, &GlobalStride, NULL, dtype );
+      dim4 store_shape = {NLast, Shape.c, HLast, Shape.w};
+      tpu_gdma_cpy_L2S ( OGAddr, GDMAIOAddr[1 - IOIndex], &store_shape, &GlobalStride, NULL, dtype );
     }
     CTodo -= Shape.c;
     CDone += Shape.c;
