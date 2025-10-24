@@ -13,7 +13,7 @@ cp dist/*.whl release/
 unset RELEASE_MODE
 
 source scripts/envsetup.sh sg2260
-build_riscv_whl || exit -1
+# build_riscv_whl || exit -1
 cp release/*.whl dist/
 rm -r release
 

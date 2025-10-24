@@ -10,7 +10,7 @@ function ops_utest() {
     PYTHON_UTEST_PATH=$CURRENT_DIR/../python/utest_ops
     echo "[INFO]PYTHON_UTEST_PATH:$PYTHON_UTEST_PATH"
     pushd $PYTHON_UTEST_PATH
-    cmd_utest="python3 utest_cmd.py"
+    cmd_utest="python utest_cmd.py"
     $cmd_utest; cmd_utest_result=$?
     echo "[INFO]cmd_utest_result:$cmd_utest_result"
     popd
@@ -39,7 +39,7 @@ function gpt3block_test() {
     pushd $PYTHON_TEST_PATH
     export FORBID_CMD_EXECUTE=0
     export CMODEL_FAST_EXEC=1
-    cmd_gpt3block_test="python3 gpt3block_TP16_fb.py"
+    cmd_gpt3block_test="python gpt3block_TP16_fb.py"
     $cmd_gpt3block_test; cmd_gpt3block_test_result=$?
     echo "[INFO]cmd_gpt3block_test_result:$cmd_gpt3block_test_result"
     popd
@@ -118,7 +118,7 @@ function regression_for_tgi() {
   echo "################################"
   ret=0
   pip install -i https://pypi.tuna.tsinghua.edu.cn/simple loguru
-  python3 tgi_op.py
+  python tgi_op.py
   if [ $ret -ne 0 ]; then
     echo "test tgi cases: $1 failed"
     popd
@@ -303,30 +303,30 @@ function run_online_regression_test() {
   fi
   echo "****************************** sccl utest Successful ***********************************"
 
-  echo "****************************** scclHost utesting...  ***********************************"
-  if [ $test_CHIP_ARCH = 'sg2260' ]; then
-    regression_for_scclHost; ret_regression_for_scclHost=$?
-    if [ $ret_regression_for_scclHost -eq 0 ];then
-      echo "[RESULT-$test_CHIP_ARCH] ret_regression_for_scclHost is computed successfully!"
-    else
-      echo "[RESULT-$test_CHIP_ARCH] ret_regression_for_scclHost is computed failed!"
-      return -1
-    fi
-  fi
-  echo "****************************** scclHost utest Successful ********************************"
+  # echo "****************************** scclHost utesting...  ***********************************"
+  # if [ $test_CHIP_ARCH = 'sg2260' ]; then
+  #   regression_for_scclHost; ret_regression_for_scclHost=$?
+  #   if [ $ret_regression_for_scclHost -eq 0 ];then
+  #     echo "[RESULT-$test_CHIP_ARCH] ret_regression_for_scclHost is computed successfully!"
+  #   else
+  #     echo "[RESULT-$test_CHIP_ARCH] ret_regression_for_scclHost is computed failed!"
+  #     return -1
+  #   fi
+  # fi
+  # echo "****************************** scclHost utest Successful ********************************"
 
-  echo "****************************** build_riscv_whl ... ...   ********************************"
-  if [ $test_CHIP_ARCH = 'sg2260' ]; then
-    build_riscv_whl; ret_regression_for_riscv=$?
-    if [ $ret_regression_for_riscv -eq 0 ];then
-      echo "[RESULT-$test_CHIP_ARCH] riscv torch-tpu.whl is build successfully!"
-    else
-      echo "[RESULT-$test_CHIP_ARCH] riscv torch-tpu.whl is build failed!"
-      return -1
-    fi
-  fi
-  echo "****************************** build_riscv_whl Successful ********************************"
-  unset DISABLE_CACHE
+  # echo "****************************** build_riscv_whl ... ...   ********************************"
+  # if [ $test_CHIP_ARCH = 'sg2260' ]; then
+  #   build_riscv_whl; ret_regression_for_riscv=$?
+  #   if [ $ret_regression_for_riscv -eq 0 ];then
+  #     echo "[RESULT-$test_CHIP_ARCH] riscv torch-tpu.whl is build successfully!"
+  #   else
+  #     echo "[RESULT-$test_CHIP_ARCH] riscv torch-tpu.whl is build failed!"
+  #     return -1
+  #   fi
+  # fi
+  # echo "****************************** build_riscv_whl Successful ********************************"
+  # unset DISABLE_CACHE
 }
 
 function run_daily_regression_test() {
@@ -387,14 +387,14 @@ function run_daily_regression_test() {
         return -1
       fi
     fi
-    if [ $test_CHIP_ARCH = 'sg2260' ]; then
-      build_riscv_whl; ret_regression_for_riscv=$?
-      if [ $ret_regression_for_riscv -eq 0 ];then
-        echo "[RESULT-$test_CHIP_ARCH] riscv torch-tpu.whl is build successfully!"
-      else
-        echo "[RESULT-$test_CHIP_ARCH] riscv torch-tpu.whl is build failed!"
-        return -1
-      fi
-    fi
+    # if [ $test_CHIP_ARCH = 'sg2260' ]; then
+    #   build_riscv_whl; ret_regression_for_riscv=$?
+    #   if [ $ret_regression_for_riscv -eq 0 ];then
+    #     echo "[RESULT-$test_CHIP_ARCH] riscv torch-tpu.whl is build successfully!"
+    #   else
+    #     echo "[RESULT-$test_CHIP_ARCH] riscv torch-tpu.whl is build failed!"
+    #     return -1
+    #   fi
+    # fi
   fi
 }

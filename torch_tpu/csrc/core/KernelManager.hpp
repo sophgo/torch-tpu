@@ -27,7 +27,18 @@ private:
 
   char *kernel_file_;
 
+  static bool IsReadableCString(const char* s, size_t max_len = 4096) {
+    if (!s) return false;
+    for (size_t i = 0; i < max_len; ++i) {
+        if (s[i] == '\0') return true;
+    }
+    return false;
+  }
+
   void SaveKernelModule(const char *file, const tpuKernelModule_t &module) {
+    if (!IsReadableCString(file)) {
+      std::printf("Kernel Module Save Path: <unknown path>\n");
+    }
     FILE *handle = fopen(file, "wb");
     if (handle == nullptr) {
       LOG(ERROR) << "Failed to open file " << file;
@@ -38,8 +49,9 @@ private:
     }
     fclose(handle);
   }
+
   const char *KernelModuleSavePath() {
-    std::string path =
+    static std::string path =
         std::string(getenv("HOME")) + "/.torch_tpu_kernel_module";
     return path.c_str();
   }

@@ -61,6 +61,9 @@ struct TPUStorageImpl : public c10::StorageImpl {
 c10::intrusive_ptr<c10::StorageImpl> make_tpu_storage_impl(
     c10::StorageImpl::use_byte_size_t,
     c10::SymInt size_bytes,
+#if TORCH_VERSION_MAJOR == 2 && TORCH_VERSION_MINOR >= 3
+    c10::DataPtr data_ptr,
+#endif
     c10::Allocator* allocator,
     bool resizable);
 

@@ -101,7 +101,7 @@ function soc_build_env_prepare()
           echo "Python-3.8.2.tar.xz not found, try to download from sophgo.com"
           pip3 install dfss
           pip3 install --upgrade dfss
-          python3 -m dfss --url=open@sophgo.com:/toolchains/pythons/Python-3.8.2.tar.gz
+          python -m dfss --url=open@sophgo.com:/toolchains/pythons/Python-3.8.2.tar.gz
       fi
       tar zxvf "${python382_path}.tar.gz"
   fi

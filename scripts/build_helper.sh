@@ -7,9 +7,9 @@ function new_build()
 }
 
 function develop_torch_tpu(){
-  uninstall_torch_tpu_deploy
+  uninstall_torch_tpu
   pushd ${TPUTRAIN_TOP}
-  python setup.py develop --user
+  pip install -e . --no-build-isolation -vvv
   if [ $? -ne 0 ]; then popd; return -1; fi
   popd
 }
@@ -26,17 +26,12 @@ function bdist_wheel()
   popd
 }
 
-function uninstall_torch_tpu_dev(){
-  python setup.py develop --uninstall
-}
-
-function uninstall_torch_tpu_deploy(){
+function uninstall_torch_tpu(){
   pip uninstall torch_tpu -y
 }
 
 function reinstall_torch_tpu(){
-  uninstall_torch_tpu_dev
-  uninstall_torch_tpu_deploy
+  uninstall_torch_tpu
   bdist_wheel 1
   pip install $(find dist/ -name "*.whl" ! -name "*+cmodel*")
 }

@@ -180,7 +180,7 @@ tpudnnStatus_t tpudnnMatmulAsync(
   TORCH_CHECK ( status == TPUDNN_STATUS_SUCCESS );
 ```
 
-然后调用 `python setup.py develop` 编译后，执行前述单元测试验证正确性。
+然后调用 `pip install -e . --no-build-isolation` 编译后，执行前述单元测试验证正确性。
 
 #### 测试 1684X
 
@@ -188,7 +188,7 @@ SG2260 的实现通过后，还需要进行 BM1684X 的实现验证。需要退�
 
 + `rm -rvf build` 删除 SG2260 编译；
 + `rebuild_TPU1686` 编译 BM1684X 版本的 `tpuDNN`；
-+ 调用 `python setup.py develop` 编译后，执行前述单元测试验证在 BM1684X 的正确性。
++ 调用 `pip install -e . --no-build-isolation` 编译后，执行前述单元测试验证在 BM1684X 的正确性。
 
 #### 代码提交
 

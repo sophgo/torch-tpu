@@ -5,7 +5,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from parse_json import str2list
-from python.utest_ops.top_utest import  set_bacis_info, Tester_Basic, set_requires_grad, move_to
+from top_utest import  set_bacis_info, Tester_Basic, set_requires_grad, move_to
 
 def get_model(case_name: str)-> callable:
     try:

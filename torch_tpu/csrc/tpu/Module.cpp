@@ -34,9 +34,12 @@ void RegisterTPUProperties(PyObject* module) {
                 << prop.totalGlobalMem / (CHANGE_UNIT_SIZE * CHANGE_UNIT_SIZE) << "MB)";
               return stream.str();
             });
+
   m.def("createProcessGroupSCCL", &c10d::ProcessGroupSCCL::createProcessGroupSCCL);
+  // register ProcessGroupSCCLOptions
   py::class_<c10d::ProcessGroupSCCL::Options>(m, "ProcessGroupSCCLOptions")
     .def(py::init<>())
+    .def_readwrite("timeout", &c10d::ProcessGroupSCCL::Options::timeout)
     .def_readwrite("chip_map", &c10d::ProcessGroupSCCL::Options::chip_map);
 }
 
@@ -347,17 +350,17 @@ PyObject* THPTModule_tpuCanDeviceAccessPeer_wrap(PyObject* self, PyObject* args)
 
 PyObject* THPTModule_getDeviceUtilizationRate_wrap(PyObject* self, PyObject* device_index) {
   HANDLE_TH_ERRORS
-  THPUtils_assert(THPUtils_checkLong(device_index), "invalid argument to getDeviceUtilizationRate");
+  TORCH_CHECK(THPUtils_checkLong(device_index), "invalid argument to getDeviceUtilizationRate");
   //TODO: complete
   int64_t util_rate = 0;
-  THPUtils_assert(util_rate <=100 && util_rate >= 0, "invalid result to util_rate");
+  TORCH_CHECK(util_rate <=100 && util_rate >= 0, "invalid result to util_rate");
   return PyLong_FromLong(util_rate);
   END_HANDLE_TH_ERRORS
 }
 
 PyObject* THPTModule_getCurrentStream_wrap(PyObject* self, PyObject* device_index) {
   HANDLE_TH_ERRORS
-  THPUtils_assert(
+  TORCH_CHECK(
     THPUtils_checkLong(device_index), "invalid argument to getCurrentStream");
   int64_t device = THPUtils_unpackLong(device_index);
   auto stream = c10_tpu::getCurrentTPUStream(device);
@@ -378,7 +381,7 @@ PyObject* THPTModule_getCurrentStream_wrap(PyObject* self, PyObject* device_inde
 
 PyObject* THPTModule_getDefaultStream_wrap(PyObject *self /* unused */, PyObject *device_index) {
   HANDLE_TH_ERRORS
-  THPUtils_assert(THPUtils_checkLong(device_index), "invalid argument to getDefaultStream");
+  TORCH_CHECK(THPUtils_checkLong(device_index), "invalid argument to getDefaultStream");
   int64_t device = THPUtils_unpackLong(device_index);
   auto stream = c10_tpu::getDefaultTPUStream(device);
   PyObject* output_tuple = PyTuple_New(3);
@@ -500,7 +503,7 @@ PyObject* THPTModule_resetPeakMemoryStats(PyObject* self, PyObject* args) {
 PyObject* THPTModule_memoryInfo(PyObject* self, PyObject* args) {
   HANDLE_TH_ERRORS
   int device = THPUtils_unpackLong(args);
-  THPUtils_assert(device == tpu::TPUGetDeviceIndex(), "Not support query other device memory info");
+  TORCH_CHECK(device == tpu::TPUGetDeviceIndex(), "Not support query other device memory info");
   size_t free_mem = 0;
   size_t total_mem = 0;
   tpu::TPUGetMemInfo(&free_mem, &total_mem);

@@ -280,7 +280,7 @@ def attn_bwd(dtype: torch.dtype):
     # print("cpu:dq,dk,dv",dq_cpu[0,0,:10], dk_cpu[0,0,:10], dv_cpu[0,0,:10])
     # print("torch:dq,dk,dv",dq_torch[0,0,:10], dk_torch[0,0,:10], dv_torch[0,0,:10])
     # print("cpu vs torch", torch.max(torch.abs(dq_torch - dq_cpu)), torch.max(torch.abs(dk_torch - dk_cpu)), torch.max(torch.abs(dv_torch - dv_cpu)))
-    # from python.utest_ops.top_utest import TensorComparator
+    # from top_utest import TensorComparator
     # comparator1 = TensorComparator()
     # status_q = comparator1.cmp_result(dq_cpu.cpu().float() , dq_torch, "q_grad")
     # status_k = comparator1.cmp_result(dk_cpu.cpu().float() , dk_torch, "k_grad")
@@ -300,7 +300,7 @@ def attn_bwd(dtype: torch.dtype):
     # print("tpu:dq,dk,dv",dq_tpu.cpu()[0,2,20:30], dk_tpu.cpu()[0,2,:10], dv_tpu.cpu()[0,3,:10])
     # print("torch:dq,dk,dv",dq_torch[0,2,20:30], dk_torch[0,2,:10], dv_torch[0,3,:10])
     # print("tpu vs torch",torch.max(torch.abs(dq_tpu.cpu() - dq_torch)), torch.max(torch.abs(dk_tpu.cpu() - dk_torch)), torch.max(torch.abs(dv_tpu.cpu() - dv_torch)))
-    from python.utest_ops.top_utest import TensorComparator
+    from top_utest import TensorComparator
     comparator = TensorComparator()
     status_q = comparator.cmp_result(dq_tpu.cpu().float(), dq_torch, "q_grad")
     status_k = comparator.cmp_result(dk_tpu.cpu().float(), dk_torch, "k_grad")

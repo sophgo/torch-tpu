@@ -278,7 +278,7 @@ def attn_test(dtype):
 
     # compare results
     # compare fwd: out & lse
-    from python.utest_ops.top_utest import TensorComparator
+    from top_utest import TensorComparator
     comparator = TensorComparator()
     status_lse = comparator.cmp_result(lse_cpu.cpu().float().detach().view(-1), lse_fused.cpu().float().detach().view(-1), "lse_ops")
     status_out = comparator.cmp_result(out_cpu.cpu().float().detach().view(-1), out_fused.cpu().float().detach().view(-1), "out_ops")

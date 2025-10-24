@@ -10,10 +10,11 @@
 #include <mutex>
 
 #include <c10/util/hash.h>
-#include <torch/csrc/distributed/c10d/ProcessGroup.hpp>
+#include <torch/csrc/distributed/c10d/Backend.hpp>
 #include <torch/csrc/distributed/c10d/Store.hpp>
 #include <torch/csrc/distributed/c10d/Types.hpp>
 #include <torch/csrc/distributed/c10d/Utils.hpp>
+#include <torch/csrc/distributed/c10d/sequence_num.hpp>
 #include <unordered_map>
 #include <vector>
 
@@ -21,11 +22,12 @@ namespace c10d {
 
 constexpr const char *SCCL_BACKEND_NAME = "SCCL";
 
-class TORCH_API ProcessGroupSCCL : public ProcessGroup {
+class TORCH_API ProcessGroupSCCL : public Backend {
 public:
-  class TORCH_API WorkSCCL final: public Work {
+  class TORCH_API WorkSCCL : public Work, public std::enable_shared_from_this<WorkSCCL> {
   public:
     explicit WorkSCCL(at::Tensor outputTensor);
+    ~WorkSCCL() override;
 
     std::vector<at::Tensor> result() override;
 
@@ -45,7 +47,7 @@ public:
     std::vector<at::Tensor> barrierTensor_;
   };
 
-  struct TORCH_API Options : public ProcessGroup::Options {
+  struct TORCH_API Options : public Backend::Options {
     explicit Options(
         std::chrono::milliseconds timeout = kBackendDefaultTimeout);
 
@@ -57,6 +59,7 @@ public:
 
     std::vector<std::shared_ptr<::at::Device>> devices;
     std::vector<int> chip_map;
+    std::chrono::milliseconds timeout;
   };
 
   const std::string getBackendName() const override {
@@ -64,7 +67,9 @@ public:
   }
 
   explicit ProcessGroupSCCL(
-      const c10::intrusive_ptr<Store> &store, int rank, int size,
+      const c10::intrusive_ptr<Store> &store,
+      int rank,
+      int size,
       c10::intrusive_ptr<Options> options = Options::create());
 
   ~ProcessGroupSCCL() override;
@@ -162,9 +167,11 @@ protected:
   tpudnnHandle_t dev_handle_;
 
 public:
-  static c10::intrusive_ptr<c10d::ProcessGroup> createProcessGroupSCCL(
+  static c10::intrusive_ptr<Backend> createProcessGroupSCCL(
       const c10d::DistributedBackendOptions &dis_opts,
       Options &options);
+
+  c10::optional<c10d::SequenceNum> sequenceNum_ = c10::nullopt;
 };
 
 } // namespace c10d

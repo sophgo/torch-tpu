@@ -4,7 +4,7 @@ import torch_tpu
 device = "tpu"
 from torch_tpu.tpu.custom_op.llama_attn_qkv import fuse_llama_attn_qkv
 from transformers.models.llama.modeling_llama import LlamaAttention
-from python.utest_ops.top_utest import TensorComparator
+from top_utest import TensorComparator
 from transformers import LlamaConfig
 
 import pkg_resources

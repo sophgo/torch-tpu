@@ -5,17 +5,19 @@ import platform
 import traceback
 import glob
 import re
+import site
+import sysconfig
 from pathlib import Path
 
 from sysconfig import get_paths
 
 import distutils.command.clean
 from distutils.version import LooseVersion
-from distutils.command.build_py import build_py
 
-from setuptools import setup, Extension, distutils
+from setuptools import setup, Extension, distutils, Command
 from setuptools.command.build_clib import build_clib
 from setuptools.command.build_ext import build_ext
+from setuptools.command.build_py import build_py
 from setuptools.command.install import install
 from setuptools.command.egg_info import egg_info
 from wheel.bdist_wheel import bdist_wheel as _bdist_wheel
@@ -26,6 +28,13 @@ THIRD_PARTY_PATH = os.path.join(BASE_DIR, "third_party")
 SCCL_PATH = os.path.join(THIRD_PARTY_PATH, "sccl")
 TPUV7_RUNTIME_PATH = os.path.join(THIRD_PARTY_PATH, "tpuv7_runtime")
 BMLIB_PATH = os.path.join(THIRD_PARTY_PATH, "bmlib")
+
+def is_building_wheel():
+    args = set(sys.argv[1:])
+    if 'bdist_wheel' in args or 'bdist' in args:
+        return True
+    return False
+is_bdist_wheel = is_building_wheel()
 
 def get_git_tag_desc():
     try:
@@ -125,6 +134,9 @@ def get_pytorch_dir():
     if SOC_CROSS:
         print(os.path.join(CROSS_TOOLCHAINS, "torchwhl-2.1.0-cp311/torch"))
         return os.path.join(CROSS_TOOLCHAINS, "torchwhl-2.1.0-cp311/torch")
+    torch_dir_env = os.environ.get("PYTORCH_INSTALL_DIR")
+    if torch_dir_env and os.path.exists(torch_dir_env):
+        return torch_dir_env
     try:
         import torch
         return os.path.dirname(os.path.realpath(torch.__file__))
@@ -132,6 +144,22 @@ def get_pytorch_dir():
         _, _, exc_traceback = sys.exc_info()
         frame_summary = traceback.extract_tb(exc_traceback)[-1]
         return os.path.dirname(frame_summary.filename)
+
+def symlink(src, dst):
+    try:
+        link_val = os.readlink(dst)
+        if link_val == src:
+            return
+        else:
+            os.unlink(dst)
+    except FileNotFoundError:
+        pass
+
+    try:
+        os.symlink(src, dst)
+    except FileExistsError:
+        pass
+dev_path = os.path.join(BASE_DIR, 'torch_tpu/lib')
 
 def CppExtension(name, sources, *args, **kwargs):
     r'''
@@ -167,7 +195,7 @@ def CppExtension(name, sources, *args, **kwargs):
 class ExtBase:
     def get_package_dir(self):
         package_dir = self.distribution.package_dir
-        package_dir = os.path.join(package_dir.get(''), 'torch_tpu') if package_dir \
+        package_dir = os.path.join(package_dir.get(''), 'torch_tpu') if is_bdist_wheel \
             else os.path.join(BASE_DIR, 'torch_tpu')
         package_dir = os.path.abspath(package_dir)
         return package_dir
@@ -177,6 +205,17 @@ class CPPLibBuild(build_clib, ExtBase, object):
         release_mode = os.getenv('RELEASE_MODE') == 'ON'
         if not release_mode:
             self.build()
+            if not is_bdist_wheel:
+                arch = os.environ["CHIP_ARCH"]
+                symlink(
+                    os.path.join(BASE_DIR, f'third_party/tpuDNN/{arch}_lib/libtpudnn.so'),
+                    os.path.join(dev_path, f'libtpudnn.{arch}.so'))
+                symlink(
+                    os.path.join(BASE_DIR, f'third_party/runtime_api/lib_{arch}/libtpurt.so'),
+                    os.path.join(dev_path, f'libtpurt.{arch}.so'))
+                symlink(
+                    os.path.join(BASE_DIR, f'third_party/sccl/lib/libsccl.so'),
+                    os.path.join(dev_path, f'libsccl.so'))
         else:
             # build bmlib
             os.environ['CHIP_ARCH'] = 'bm1684x'
@@ -236,7 +275,7 @@ class CPPLibBuild(build_clib, ExtBase, object):
             '-DPYTHON_INCLUDE_DIR=' + python_path_dir(),
             '-DPYTORCH_INSTALL_DIR=' + get_pytorch_dir(),
             '-DBUILD_LIBTORCH=0',
-            '-DHOSTCCL=ON',
+            '-DHOSTCCL=OFF',
             f'-DKERNEL_MODULE_PATH={fw_path}',
             f'-DCMAKE_INSTALL_PREFIX={package_dir}'
             ]
@@ -273,6 +312,14 @@ class Build(build_ext, ExtBase, object):
             os.path.relpath(os.path.join(BASE_DIR, f"build/{get_build_type()}/packages/torch_tpu/lib")))
         super(Build, self).run()
 
+        if not is_bdist_wheel:
+            built_exts = glob.glob(os.path.join(self.build_lib, 'torch_tpu', '_C*.so'))
+            for so in built_exts:
+                dst = os.path.join(package_dir, os.path.basename(so))
+                if os.path.abspath(so) != os.path.abspath(dst):
+                    import shutil
+                    shutil.copy2(so, dst)
+
         os.unlink(sym_fnc)
 
     def finalize_options(self):
@@ -282,6 +329,19 @@ class Build(build_ext, ExtBase, object):
                 self.plat_name = "aarch64"
             else:
                 self.plat_name = "riscv64"
+
+        if not is_bdist_wheel:
+            dev_lib_dir = os.path.join(BASE_DIR, 'torch_tpu', 'lib')
+            for ext in self.extensions:
+                new_lib_dirs = []
+                for v in getattr(ext, 'library_dirs', []):
+                    if os.path.abspath(v).startswith(os.path.join(BASE_DIR, f"build/{get_build_type()}/packages")):
+                        new_lib_dirs.append(dev_lib_dir)
+                    else:
+                        new_lib_dirs.append(v)
+                ext.library_dirs = new_lib_dirs
+            self.library_dirs = [dev_lib_dir if os.path.abspath(p).startswith(os.path.join(BASE_DIR, f"build/{get_build_type()}/packages")) else p
+                                for p in getattr(self, 'library_dirs', [])]
 
     def get_ext_filename(self, ext_name):
         filename = super().get_ext_filename(ext_name)
@@ -503,12 +563,12 @@ class bdist_wheel(_bdist_wheel, ExtBase):
         fw_libs = glob.glob(os.path.join(BASE_DIR, 'build/firmware_*cmodel/libfirmware.so'))
         pkg_dir = self.get_package_dir()
         for fw in fw_libs:
-            target = re.match('.+firmware_(\w+).+', fw).group(1)
+            target = re.match(r'.+firmware_(\w+).+', fw).group(1)
             self.copy_file(fw, os.path.join(pkg_dir, f'lib/{target}_{"firmware" if "cmodel" in fw else "kernel_module"}.so'))
 
         tpuDNN_libs = glob.glob(os.path.join(BASE_DIR, 'third_party/tpuDNN/*_lib/*.so'))
         for lib in tpuDNN_libs:
-            target = re.match('.+tpuDNN/(\w+)_lib.+', lib).group(1)
+            target = re.match(r'.+tpuDNN/(\w+)_lib.+', lib).group(1)
             if 'tpudnn' in lib:
                 if 'bm1684x' in lib:
                     if SOC_CROSS:
@@ -564,10 +624,10 @@ if SOC_CROSS:
         include_directories.append(os.path.join(CROSS_TOOLCHAINS, "Python-3.8.2/python_3.8.2/include/python3.8"))    
 lib_directories = [
     os.path.join(BASE_DIR, f"build/{get_build_type()}/packages", "torch_tpu/lib"),
-]
+] if is_bdist_wheel else [os.path.join(BASE_DIR, "torch_tpu", "lib")]
 
-DEBUG = os.getenv('TPUTRAIN_DEBUG', default='0').upper() in ['ON', '1', 'YES', 'TRUE', 'Y']
-
+abi_flag = '1' if os.getenv('TORCH_CXX11_ABI', '0').upper() in ['1','TRUE','ON','YES','Y'] else '0'
+print("D_GLIBCXX_USE_CXX11_ABI=", abi_flag)
 extra_link_args = []
 extra_compile_args = [
     '-std=c++17',
@@ -575,9 +635,10 @@ extra_compile_args = [
     '-Wno-deprecated-declarations',
     '-Wno-return-type',
     '-D__FILENAME__=\"$(notdir $(abspath $<))\"',
-    '-D_GLIBCXX_USE_CXX11_ABI=1' if eval(os.getenv('TORCH_CXX11_ABI')) else '-D_GLIBCXX_USE_CXX11_ABI=0'
+    f'-D_GLIBCXX_USE_CXX11_ABI={abi_flag}'
 ]
 
+DEBUG = os.getenv('TPUTRAIN_DEBUG', default='0').upper() in ['ON', '1', 'YES', 'TRUE', 'Y']
 if os.environ.get("CHIP_ARCH", None) == 'sg2260' or os.environ.get("CHIP_ARCH", None) == 'sg2260e':
     extra_compile_args += ["-DBACKEND_SG2260"]
 
@@ -588,51 +649,6 @@ else:
     extra_compile_args += ['-DNDEBUG', '-O3', '-g0']
     extra_link_args += ['-Wl,-z,now,-s,-O3']
 
-def symlink(src, dst):
-    try:
-        link_val = os.readlink(dst)
-        if link_val == src:
-            return
-        else:
-            os.unlink(dst)
-    except FileNotFoundError:
-        pass
-
-    try:
-        os.symlink(src, dst)
-    except FileExistsError:
-        pass
-
-dev_path = os.path.join(BASE_DIR, 'torch_tpu/lib')
-from setuptools.command.develop import develop as _develop
-class CustomDevelop(_develop):
-    def initialize_options(self):
-        # This make setuptools copy extension so into dev_path,
-        # magically.
-        for ext in self.distribution.ext_modules:
-            for i, v in enumerate(ext.library_dirs):
-                if not os.path.abspath(v).startswith(BASE_DIR):
-                    continue
-                ext.library_dirs[i] = dev_path
-                break
-        self.distribution.package_dir = None
-        print("package_dir has been unset for the develop command.")
-
-        _develop.initialize_options(self)
-
-    def run(self):
-        arch = os.environ["CHIP_ARCH"]
-        super(CustomDevelop, self).run()
-        symlink(
-            f'../../third_party/tpuDNN/{arch}_lib/libtpudnn.so',
-            os.path.join(dev_path, f'libtpudnn.{arch}.so'))
-        symlink(
-            f'../../third_party/runtime_api/lib_{arch}/libtpurt.so',
-            os.path.join(dev_path, f'libtpurt.{arch}.so'))
-        symlink(
-            f'../../third_party/sccl/lib/libsccl.so',
-            os.path.join(dev_path, f'libsccl.so'))
-
 setup(
         name=os.environ.get('TORCH_TPU_PACKAGE_NAME', 'torch_tpu'),
         version=VERSION,
@@ -641,7 +657,8 @@ setup(
         description='TPU bridge for PyTorch',
         url='https://github.com/sophgo/torch-tpu',
         packages=["torch_tpu"],
-        package_dir={'': os.path.relpath(os.path.join(BASE_DIR, f"build/{get_build_type()}/packages"))},
+        libraries=[('torch_tpu', {'sources': list()})],
+        package_dir={'': os.path.relpath(os.path.join(BASE_DIR, f"build/{get_build_type()}/packages"))} if is_building_wheel() else None,
         ext_modules=[
             CppExtension(
                 'torch_tpu._C',
@@ -673,7 +690,6 @@ setup(
             ],
         },
         cmdclass={
-            'develop': CustomDevelop,
             'build_clib': CPPLibBuild,
             'build_ext': Build,
             'build_py': PythonPackageBuild,

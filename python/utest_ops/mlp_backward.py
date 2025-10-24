@@ -7,8 +7,8 @@ import copy
 import pdb
 import os
 import torch_tpu
-from python.utest_ops.top_utest import TensorComparator
-from python.utest_ops.llama_mlp import LLamaMlp
+from top_utest import TensorComparator
+from llama_mlp import LLamaMlp
 from torch_tpu.tpu.custom_op.llama_mlp import LLamaMlpFunc
 
 seed=1000

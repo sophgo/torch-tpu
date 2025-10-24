@@ -3,7 +3,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 
 import torch_tpu
-from python.utest_ops.top_utest import TensorComparator
+from top_utest import TensorComparator
 import sys
 import random
 

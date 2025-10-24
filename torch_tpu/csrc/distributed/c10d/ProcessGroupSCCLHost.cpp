@@ -35,6 +35,7 @@
 #include <c10/util/intrusive_ptr.h>
 #include <c10/util/irange.h>
 #include <gloo/config.h>
+#include <gloo/rendezvous/store.h>
 #include <gloo/rendezvous/context.h>
 #include <gloo/rendezvous/prefix_store.h>
 #include "ProcessGroupSCCLHost.hpp"
@@ -557,7 +558,7 @@ void ProcessGroupSCCLHost::RecvTPUWork::abort() {
 }
 
 ProcessGroupSCCLHost::Options::Options(std::chrono::milliseconds timeout)
-    : ProcessGroup::Options(SCCL_HOST_BACKEND_NAME, timeout), threads(2) {}
+    : Backend::Options(SCCL_HOST_BACKEND_NAME, timeout), threads(2) {}
 
 namespace {
 
@@ -654,7 +655,7 @@ ProcessGroupSCCLHost::ProcessGroupSCCLHost(
     int rank,
     int size,
     c10::intrusive_ptr<Options> options)
-    : ProcessGroup(rank, size),
+    : Backend(rank, size),
       store_(new GlooStore(store)),
       options_(options),
       stop_(false),
@@ -1852,7 +1853,7 @@ uint64_t ProcessGroupSCCLHost::getSequenceNumberForGroup() {
   return sequenceNum_->get();
 }
 
-c10::intrusive_ptr<ProcessGroup> ProcessGroupSCCLHost::createProcessGroupSCCLHost(
+c10::intrusive_ptr<Backend> ProcessGroupSCCLHost::createProcessGroupSCCLHost(
     const c10::intrusive_ptr<::c10d::Store>& store,
     int rank,
     int size,

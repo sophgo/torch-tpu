@@ -108,7 +108,7 @@ Diffusers 采用源码安装的方式，目前支持版本为v0.20.0。可执行
     $ git clone https://github.com/huggingface/diffusers.git
     $ cd diffusers
     $ git checkout v0.20.0
-    $ python setup.py build develop
+    $ pip install -e . --no-build-isolation
     $ cd ..
 
 
@@ -122,7 +122,7 @@ Transformers 目前支持版本为v4.29.1。可以采用源码安装的方式，
     $ git clone https://github.com/huggingface/transformers.git
     $ cd transformers
     $ git checkout v4.29.1
-    $ python setup.py build develop
+    $ pip install -e . --no-build-isolation
     $ cd ..
 
 如果因为网络问题无法下载transformers进行源码安装，可以使用下面的命令进行安装：
@@ -191,7 +191,7 @@ accelerate 采用源码安装的方式，目前支持版本为v0.16.0。可执�
 
 .. code-block:: shell
 
-    $ python setup.py build develop
+    $ pip install -e . --no-build-isolation
 
 进行文生图的推理
 ==================

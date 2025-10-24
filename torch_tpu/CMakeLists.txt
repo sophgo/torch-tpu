@@ -5,10 +5,20 @@ include(${CMAKE_SOURCE_DIR}/cross-toolchain.cmake)
 
 include(${CMAKE_CURRENT_SOURCE_DIR}/config.cmake)
 add_compile_options(-std=c++17 -Wno-attributes -Wall -fPIC)
+
+message(STATUS "TORCH_CXX11_ABI=$ENV{TORCH_CXX11_ABI}")
 if ( NOT $ENV{TORCH_CXX11_ABI} )
   message(STATUS "TORCH_CXX11_ABI=0" )
   add_definitions("-D_GLIBCXX_USE_CXX11_ABI=0")
-  add_definitions("-DPYBIND11_BUILD_ABI=\"_cxxabi1011\"")
+endif()
+
+set(TORCH_PYBIND11_ABI_ENV "$ENV{TORCH_PYBIND11_ABI}")
+if(NOT TORCH_PYBIND11_ABI_ENV STREQUAL "")
+  message(STATUS "TORCH_PYBIND11_ABI='${TORCH_PYBIND11_ABI_ENV}'")
+  add_definitions(-DPYBIND11_BUILD_ABI=\"${TORCH_PYBIND11_ABI_ENV}\")
+else()
+  message(STATUS "TORCH_PYBIND11_ABI not set, defaulting to _cxxabi1011")
+  add_definitions(-DPYBIND11_BUILD_ABI=\"_cxxabi1011\")
 endif()
 
 #################### DEPENDS #######################
@@ -57,7 +67,9 @@ file(GLOB SRCS
 )
 
 file(GLOB_RECURSE DIST_SRCS
-  csrc/distributed/c10d/*.cpp
+  # csrc/distributed/c10d/*.cpp
+  csrc/distributed/c10d/ProcessGroupSCCL.cpp
+  csrc/distributed/c10d/ProcessGroupSCCL.hpp
 )
 
 set(concated_src all_in_one.cpp)
@@ -91,7 +103,7 @@ else()
 endif()
 
 add_library(torch_tpu SHARED ${concated_src} ${kernel_srcs})
-target_link_libraries(torch_tpu c10 torch_cpu torch_python TPU1686::tpuDNN torch_tpu_kernel_data TPU1686::sccl TPU1686::tpurt sophon)
+target_link_libraries(torch_tpu c10 torch_cpu torch_python TPU1686::tpuDNN torch_tpu_kernel_data TPU1686::sccl TPU1686::tpurt)# sophon
 
 set(PPL_SUPPORTED_ARCHES sg2260 sg2260e)
 if ("$ENV{CHIP_ARCH}" IN_LIST PPL_SUPPORTED_ARCHES)

@@ -9,6 +9,7 @@
 #pragma once
 
 #include <memory>
+#include <cstring>
 
 namespace gloo {
 

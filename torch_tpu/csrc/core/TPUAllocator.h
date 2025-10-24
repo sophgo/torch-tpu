@@ -6,6 +6,8 @@
 #include <c10/util/Logging.h>
 #include "TPUStream.h"
 #include "tpu_runtime_api.h"
+#include <cstring>
+
 
 namespace c10_tpu
 {

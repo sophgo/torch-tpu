@@ -5,7 +5,7 @@ import sys
 import copy
 
 import transformers.modeling_attn_mask_utils
-from python.utest_ops.top_utest import TensorComparator
+from top_utest import TensorComparator
 import pkg_resources
 from pkg_resources import DistributionNotFound, VersionConflict
 from transformers import Qwen2ForCausalLM, Qwen2Config
