@@ -144,6 +144,8 @@ from .utils import ( _lazy_call, _lazy_init, init,is_initialized, is_available,
                     memory_usage, set_sync_debug_mode, utilization, temperature,
                     power_draw, clock_rate, fuse_tensor_utils
                     )
+from .nn import apply_nn_patch
+
 if os.environ.get('CHIP_ARCH') == "sg2260" or os.environ.get('CHIP_ARCH') == "sg2260e":
     from .streams import Stream, ExternalStream, Event
     from .bmodel_runtime import BmodelRunner, dtype_map
@@ -154,3 +156,4 @@ from .custom_op import *
 
 default_generators: Tuple[torch._C.Generator] = ()
 fuse_tensor_utils()
+apply_nn_patch()
