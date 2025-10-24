@@ -8,7 +8,7 @@ struct DefaultTPUAllocator final : TPUAllocator
 {
   DefaultTPUAllocator() = default;
 
-  c10::DataPtr allocate ( size_t nbytes )  override
+  at::DataPtr allocate ( size_t nbytes ) const override
   {
     void * data = nullptr;
     try
@@ -22,10 +22,6 @@ struct DefaultTPUAllocator final : TPUAllocator
     }
     profiledTPUMemoryReporter().New ( data, nbytes );
     return { data, data, &ReportAndDelete, tpu::TPUGetCurrentDevice() };
-  }
-
-  void copy_data(void* dest, const void* src, std::size_t count) const override {
-    std::memcpy(dest, src, count);
   }
 
   static void ReportAndDelete ( void * ptr )
@@ -49,11 +45,6 @@ struct DefaultTPUAllocator final : TPUAllocator
   void emptyCache(MempoolId_t mempool_id = {0, 0}) {
     tpu::TPUEmptyCache( );
   }
-
-  private:
-    static void raw_delete(void* ptr) {
-      std::free(ptr);
-  }
 };
 
 ProfiledTPUMemoryReporter & profiledTPUMemoryReporter()
@@ -66,6 +57,7 @@ at::Allocator * GetTPUAllocator()
 {
   return GetAllocator ( DeviceType::TPU );
 }
+
 
 // Global default TPU Allocator
 static DefaultTPUAllocator g_tpu_alloc;
@@ -170,7 +162,7 @@ class DynamicAllocatorProxy : public TPUAllocator {
     use_caching_ = (env_val && std::string(env_val) == "caching");
   }
 
-  at::DataPtr allocate(size_t size) override {
+  at::DataPtr allocate(size_t size) const override {
     ensureInit();
     return target()->allocate(size);
   }
@@ -188,10 +180,6 @@ class DynamicAllocatorProxy : public TPUAllocator {
   void emptyCache(MempoolId_t mempool_id = {0, 0}) {
     ensureInit();
     target()->emptyCache();
-  }
-
-  void copy_data(void* dest, const void* src, std::size_t count) const override {
-    std::memcpy(dest, src, count);
   }
 
  private:

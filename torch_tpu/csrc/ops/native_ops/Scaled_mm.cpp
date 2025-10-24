@@ -9,7 +9,6 @@
 // https://github.com/pytorch/pytorch/blob/bc47d539fc380f521dfcc25e895e46e6d5a1fd52/aten/src/ATen/native/cuda/Blas.cpp#L1127
 namespace at
 {
-#if TORCH_VERSION_MAJOR == 2 && TORCH_VERSION_MINOR == 1
 std::tuple<Tensor &,Tensor &> _scaled_mm_out_tpu(
         const Tensor & self,
         const Tensor & mat2,
@@ -47,47 +46,8 @@ std::tuple<Tensor &,Tensor &> _scaled_mm_out_tpu(
     );
     TORCH_CHECK(status == TPUDNN_STATUS_SUCCESS);
     return {out, out_amax};
-
-#elif TORCH_VERSION_MAJOR == 2 && TORCH_VERSION_MINOR >= 5
-// at::Tensor& (at::Tensor const&, at::Tensor const&, at::Tensor const&, at::Tensor const&, std::optional<at::Tensor> const&, std::optional<at::Tensor> const&, std::optional<c10::ScalarType>, bool, at::Tensor&)
-Tensor & _scaled_mm_out_tpu(
-        const Tensor & self,
-        const Tensor & mat2,
-        const Tensor & scale_a,
-        const Tensor & scale_b,
-        const c10::optional<Tensor> & bias,
-        const c10::optional<Tensor> & scale_result,
-        const c10::optional<ScalarType> out_dtype,
-        const bool use_fast_accum,
-        Tensor & out){
-    CHECK_TENSOR_IN_DEVICE( self );
-    CHECK_TENSOR_IN_DEVICE( mat2 );
-    CHECK_TENSOR_IN_DEVICE(scale_a);
-    CHECK_TENSOR_IN_DEVICE(scale_b);
-    if (bias.has_value())
-      CHECK_TENSOR_IN_DEVICE(bias.value());
-    if (scale_result.has_value())
-      CHECK_TENSOR_IN_DEVICE(scale_result.value());
-    CHECK_TENSOR_IN_DEVICE(out);
-
-    auto stream = c10_tpu::getCurrentTPUStream();
-    auto status = tpudnnMatmulFp8Async(
-      stream,
-      tpu::TPUGenerateTpudnnTensor(stream, self),
-      tpu::TPUGenerateTpudnnTensor(stream, mat2),
-      bias.has_value()? tpu::TPUGenerateTpudnnTensor(stream, bias.value()) : tpudnnUndefinedTensor(),
-      tpu::TPUGenerateTpudnnTensor(stream, scale_a),
-      tpu::TPUGenerateTpudnnTensor(stream, scale_b),
-      scale_result.has_value()? tpu::TPUGenerateTpudnnTensor(stream, scale_result.value()) : tpudnnUndefinedTensor(),
-      tpu::TPUGenerateTpudnnTensor(stream, out),
-      tpudnnUndefinedTensor());
-    TORCH_CHECK(status == TPUDNN_STATUS_SUCCESS);
-    return out;
-#endif
 }
 
-// at::Tensor (at::Tensor const&, at::Tensor const&, at::Tensor const&, at::Tensor const&, std::optional<at::Tensor> const&, std::optional<at::Tensor> const&, std::optional<c10::ScalarType>, bool)
-#if TORCH_VERSION_MAJOR == 2 && TORCH_VERSION_MINOR == 1
 std::tuple<Tensor,Tensor> _scaled_mm_tpu(
         const Tensor & self, const Tensor & mat2, const c10::optional<Tensor> & bias, c10::optional<ScalarType> out_dtype,
         const c10::optional<Tensor> & scale_a, const c10::optional<Tensor> & scale_b, const c10::optional<Tensor> & scale_result) {
@@ -101,39 +61,13 @@ std::tuple<Tensor,Tensor> _scaled_mm_tpu(
     Tensor out = empty({mat1_sizes[0], mat2_sizes[0]}, self.options().dtype(out_dtype_));
     Tensor amax = empty({}, self.options().dtype(ScalarType::Float));
     return _scaled_mm_out_tpu(self, mat2, bias, out_dtype, scale_a, scale_b, scale_result, out ,amax);
-
-#elif TORCH_VERSION_MAJOR == 2 && TORCH_VERSION_MINOR >= 5
-at::Tensor _scaled_mm_tpu(
-        const Tensor & self,
-        const Tensor & mat2,
-        const Tensor & scale_a,
-        const Tensor & scale_b,
-        const c10::optional<Tensor> & bias,
-        const c10::optional<Tensor> & scale_result,
-        const c10::optional<ScalarType> out_dtype,
-        bool use_fast_accum
-        ){
-// at::Tensor & _scaled_mm_tpu(
-//         const Tensor & self, const Tensor & mat2, const c10::optional<Tensor> & bias, c10::optional<ScalarType> out_dtype,
-//         const Tensor & scale_a, const Tensor & scale_b, const c10::optional<Tensor> & scale_result) {
-    // Check sizes
-    TORCH_CHECK(self.dim() == 2, "self must be a matrix");
-    TORCH_CHECK(mat2.dim() == 2, "mat2 must be a matrix");
-
-    IntArrayRef mat1_sizes = self.sizes();
-    IntArrayRef mat2_sizes = mat2.sizes();
-    const auto out_dtype_ = out_dtype.value_or(self.scalar_type());
-    Tensor out = empty({mat1_sizes[0], mat2_sizes[0]}, self.options().dtype(out_dtype_));
-    // bool use_fast_accum = false;
-    return _scaled_mm_out_tpu(self, mat2, scale_a, scale_b, bias, scale_result, out_dtype, use_fast_accum, out);
-#endif
 }
 
 
 TORCH_LIBRARY_IMPL (aten, TPU, m)
 {
-  m.impl ("_scaled_mm.out", TORCH_FN(_scaled_mm_out_tpu));
-  m.impl ("_scaled_mm",     TORCH_FN(_scaled_mm_tpu));
+  m.impl ("_scaled_mm.out", _scaled_mm_out_tpu);
+  m.impl ("_scaled_mm",     _scaled_mm_tpu);
 }
 
 } // namespace at

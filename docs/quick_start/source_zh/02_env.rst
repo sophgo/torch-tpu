@@ -54,7 +54,7 @@ Docker环境配置
 
 .. code-block:: shell
 
-   $ docker pull sophgo/torch_tpu:v0.1-py312
+   $ docker pull sophgo/torch_tpu:v0.1-py311
 
 创建容器
 ------------------
@@ -78,7 +78,7 @@ Docker环境配置
       -v $HOME:/workspace \
       -v /opt:/opt   \
       -w /workspace \
-      --name torch_tpu_0 sophgo/torch_tpu:v0.1-py312 bash
+      --name torch_tpu_0 sophgo/torch_tpu:v0.1-py311 bash
 
    对于SG2260， 按以下命令创建容器:
    docker run --cap-add SYS_ADMIN -itd --restart always --privileged \
@@ -87,7 +87,7 @@ Docker环境配置
       -v $HOME:/workspace \
       -v /opt:/opt   \
       -w /workspace \
-      --name torch_tpu_0 sophgo/torch_tpu:v0.1-py312 bash
+      --name torch_tpu_0 sophgo/torch_tpu:v0.1-py311 bash
 
    进入容器：
    docker attach torch_tpu_0

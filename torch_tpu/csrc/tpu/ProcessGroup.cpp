@@ -2,8 +2,6 @@
 #include <torch/python.h>
 
 #include "torch_tpu/csrc/distributed/c10d/ProcessGroupSCCL.hpp"
-#include <torch/csrc/distributed/c10d/Backend.hpp>
-
 
 #if defined HOSTCCL
 #include "torch_tpu/csrc/distributed/c10d/ProcessGroupSCCLHost.hpp"
@@ -18,7 +16,6 @@ __attribute__((constructor)) void ProcessGroupSCCLHostConstructor() {
 //   m.def("createProcessGroupSCCLHost", &ProcessGroupSCCLHost::createProcessGroupSCCLHost);
 // }
 #endif // HOSTCCL
-
 
 __attribute__((constructor)) void ProcessGroupSCCLConstructor() {
   py::object module = py::module::import("torch.distributed");

@@ -129,11 +129,9 @@ void ProcessGroupSCCL::collectiveCounter(){
 }
 
 template <typename F>
-c10::intrusive_ptr<Work> collective(
+c10::intrusive_ptr<ProcessGroupSCCL::WorkSCCL> collective(
     ProcessGroupSCCL& group,
-    at::Tensor &input,
-    at::Tensor &output,
-    F func) {
+    at::Tensor &input, at::Tensor &output, F func) {
   // Bump collective counter
   group.collectiveCounter();
 
@@ -149,8 +147,7 @@ c10::intrusive_ptr<Work> collective(
               "sccl comm destroy rank failed\n");
   TORCH_CHECK(ret == scclSuccess);
 
-  auto work = c10::make_intrusive<ProcessGroupSCCL::WorkSCCL>(output);
-  return work;
+  return c10::make_intrusive<ProcessGroupSCCL::WorkSCCL>(output);
 }
 
 std::vector<at::Tensor> ProcessGroupSCCL::WorkSCCL::result() {
@@ -178,8 +175,6 @@ ProcessGroupSCCL::WorkSCCL::WorkSCCL(at::Tensor outputTensor)
     future_(createFutureAsOutput(outputTensor_)) {
 }
 
-ProcessGroupSCCL::WorkSCCL::~WorkSCCL() {}
-
 bool ProcessGroupSCCL::WorkSCCL::isCompleted() {
   // to do
   return true;
@@ -191,7 +186,7 @@ bool ProcessGroupSCCL::WorkSCCL::wait(std::chrono::milliseconds timeout) {
 }
 
 ProcessGroupSCCL::Options::Options(std::chrono::milliseconds timeout)
-    : Backend::Options(SCCL_BACKEND_NAME, timeout) {}
+    : ProcessGroup::Options(SCCL_BACKEND_NAME, timeout) {}
 
 void ProcessGroupSCCL::broadcastUniqueSCCLID(scclHandle_t handle,
                                               scclUniqueId *scclID,
@@ -219,7 +214,7 @@ void ProcessGroupSCCL::broadcastUniqueSCCLID(scclHandle_t handle,
 ProcessGroupSCCL::ProcessGroupSCCL(const c10::intrusive_ptr<Store> &store,
                                        int rank, int size,
                                        c10::intrusive_ptr<Options> options)
-    : Backend(rank, size), store_(store),
+    : ProcessGroup(rank, size), store_(store),
       options_(options), stop_(false) {
   if (rank == 0) {
     scclSetupC2CTopology();
@@ -789,7 +784,8 @@ uint64_t ProcessGroupSCCL::getSequenceNumberForGroup() {
   return 0;
 }
 
-c10::intrusive_ptr<Backend> ProcessGroupSCCL::createProcessGroupSCCL(
+c10::intrusive_ptr<c10d::ProcessGroup>
+ProcessGroupSCCL::createProcessGroupSCCL(
     const c10d::DistributedBackendOptions &dis_opts, Options &options) {
   if (!options.chip_map.empty()) {
     TORCH_CHECK((int)options.chip_map.size() >= dis_opts.group_size,
@@ -799,8 +795,7 @@ c10::intrusive_ptr<Backend> ProcessGroupSCCL::createProcessGroupSCCL(
   options.timeout =
       std::chrono::duration_cast<std::chrono::milliseconds>(dis_opts.timeout);
   //  NOLINTNEXTLINE(bugprone-narrowing-conversions,cppcoreguidelines-narrowing-conversions)
-
-  return c10::make_intrusive<ProcessGroupSCCL>(
+  return c10::make_intrusive<c10d::ProcessGroupSCCL>(
       dis_opts.store, dis_opts.group_rank, dis_opts.group_size,
       c10::make_intrusive<Options>(options));
 }

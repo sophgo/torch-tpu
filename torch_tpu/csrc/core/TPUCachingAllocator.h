@@ -101,11 +101,7 @@ class CachingTPUAllocator : public TPUAllocator {
 
   void emptyCache(MempoolId_t mempool_id) override;
 
-  at::DataPtr allocate(size_t size) override;
-
-  void copy_data(void* dest, const void* src, std::size_t count) const override {
-    std::memcpy(dest, src, count);
-  }
+  c10::DataPtr allocate(size_t size) const override;
 
   at::DeleterFnPtr raw_deleter() const override;
 

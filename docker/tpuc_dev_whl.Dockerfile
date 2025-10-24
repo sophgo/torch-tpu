@@ -4,8 +4,6 @@ ENV TZ=Asia/Shanghai
 
 WORKDIR /workspace
 COPY requirements.txt ./
-
-RUN pip install --upgrade setuptools 
 RUN pip3 install -r requirements.txt --extra-index-url https://download.pytorch.org/whl/cpu && \
     rm -rf ~/.cache/pip/* requirements.txt
 

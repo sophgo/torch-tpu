@@ -125,10 +125,6 @@ def get_pytorch_dir():
     if SOC_CROSS:
         print(os.path.join(CROSS_TOOLCHAINS, "torchwhl-2.1.0-cp311/torch"))
         return os.path.join(CROSS_TOOLCHAINS, "torchwhl-2.1.0-cp311/torch")
-
-    torch_dir_env = os.environ.get("PYTORCH_INSTALL_DIR")
-    if torch_dir_env and os.path.exists(torch_dir_env):
-        return torch_dir_env
     try:
         import torch
         return os.path.dirname(os.path.realpath(torch.__file__))
@@ -239,7 +235,7 @@ class CPPLibBuild(build_clib, ExtBase, object):
             '-DPYTHON_INCLUDE_DIR=' + python_path_dir(),
             '-DPYTORCH_INSTALL_DIR=' + get_pytorch_dir(),
             '-DBUILD_LIBTORCH=0',
-            '-DHOSTCCL=OFF',
+            '-DHOSTCCL=ON',
             f'-DKERNEL_MODULE_PATH={fw_path}',
             f'-DCMAKE_INSTALL_PREFIX={package_dir}'
             ]
@@ -479,7 +475,6 @@ class EggInfoBuild(egg_info, object):
         super(EggInfoBuild, self).finalize_options()
 
     def run(self):
-        self.run_command('build_py')
         super().run()
 
 class bdist_wheel(_bdist_wheel, ExtBase):
@@ -512,13 +507,12 @@ class bdist_wheel(_bdist_wheel, ExtBase):
         fw_libs = glob.glob(os.path.join(BASE_DIR, 'build/firmware_*cmodel/libfirmware.so'))
         pkg_dir = self.get_package_dir()
         for fw in fw_libs:
-            target = re.match(r'.+firmware_(\w+).+', fw).group(1)
-            
+            target = re.match('.+firmware_(\w+).+', fw).group(1)
             self.copy_file(fw, os.path.join(pkg_dir, f'lib/{target}_{"firmware" if "cmodel" in fw else "kernel_module"}.so'))
 
         tpuDNN_libs = glob.glob(os.path.join(BASE_DIR, 'third_party/tpuDNN/*_lib/*.so'))
         for lib in tpuDNN_libs:
-            target = re.match(r'.+tpuDNN/(\w+)_lib.+', lib).group(1) 
+            target = re.match('.+tpuDNN/(\w+)_lib.+', lib).group(1)
             if 'tpudnn' in lib:
                 if 'bm1684x' in lib:
                     if SOC_CROSS:
@@ -573,11 +567,10 @@ if SOC_CROSS:
         include_directories.append(os.path.join(CROSS_TOOLCHAINS, "Python-3.8.2/python_3.8.2/include/python3.8"))    
 lib_directories = [
     os.path.join(BASE_DIR, f"build/{get_build_type()}/packages", "torch_tpu/lib"),
-    os.path.join(BASE_DIR, "torch_tpu", "lib"),
 ]
 
-abi_flag = '1' if os.getenv('TORCH_CXX11_ABI', '0').upper() in ['1','TRUE','ON','YES','Y'] else '0'
-print("D_GLIBCXX_USE_CXX11_ABI=", abi_flag)
+DEBUG = os.getenv('TPUTRAIN_DEBUG', default='0').upper() in ['ON', '1', 'YES', 'TRUE', 'Y']
+
 extra_link_args = []
 extra_compile_args = [
     '-std=c++17',
@@ -585,13 +578,12 @@ extra_compile_args = [
     '-Wno-deprecated-declarations',
     '-Wno-return-type',
     '-D__FILENAME__=\"$(notdir $(abspath $<))\"',
-    f'-D_GLIBCXX_USE_CXX11_ABI={abi_flag}'
+    '-D_GLIBCXX_USE_CXX11_ABI=1' if eval(os.getenv('TORCH_CXX11_ABI')) else '-D_GLIBCXX_USE_CXX11_ABI=0'
 ]
 
 if os.environ.get("CHIP_ARCH", None) == 'sg2260' or os.environ.get("CHIP_ARCH", None) == 'sg2260e':
     extra_compile_args += ["-DBACKEND_SG2260"]
 
-DEBUG = os.getenv('TPUTRAIN_DEBUG', default='0').upper() in ['ON', '1', 'YES', 'TRUE', 'Y']
 if DEBUG:
     extra_compile_args += ['-O0', '-g']
     extra_link_args += ['-O0', '-g', '-Wl,-z,now']
@@ -613,19 +605,6 @@ class CustomDevelop(_develop):
         print("package_dir has been unset for the develop command.")
         _develop.initialize_options(self)
 
-def wants_package_dir():
-    args = set(sys.argv[1:])
-    packaging_keywords = {
-        'bdist', 'bdist_wheel', 'bdist_egg',
-        'install', 'install_lib', 'install_scripts', 'install_data',
-        'sdist', 'build', 'build_ext', 'build_clib', 'build_py',
-        'egg_info'
-    }
-    editable_keywords = {'develop', 'editable_wheel'}
-    if args & editable_keywords:
-        return False
-    return bool(args & packaging_keywords) or len(args) == 0 
-
 setup(
         name=os.environ.get('TORCH_TPU_PACKAGE_NAME', 'torch_tpu'),
         version=VERSION,
@@ -635,7 +614,7 @@ setup(
         url='https://github.com/sophgo/torch-tpu',
         packages=["torch_tpu"],
         libraries=[('torch_tpu', {'sources': list()})],
-        package_dir={'': os.path.relpath(os.path.join(BASE_DIR, f"build/{get_build_type()}/packages"))} if wants_package_dir() else None,
+        package_dir={'': os.path.relpath(os.path.join(BASE_DIR, f"build/{get_build_type()}/packages"))},
         ext_modules=[
             CppExtension(
                 'torch_tpu._C',

@@ -69,11 +69,7 @@ TORCH_LIBRARY_IMPL ( aten, TPU, m )
   m.impl ( "linalg_vector_norm.out", linalg_vector_norm_out_tpu );
 }
 
-#if TORCH_VERSION_MAJOR == 2 && TORCH_VERSION_MINOR >= 4
-std::vector<at::Tensor> _foreach_norm_tpu(at::TensorList tensors, const at::Scalar & ord, std::optional<c10::ScalarType>) {
-#else
-c10::ArrayRef<at::Tensor>, c10::Scalar const&, std::optional<c10::ScalarType>
-#endif
+std::vector<at::Tensor> _foreach_norm_tpu(at::TensorList tensors, const at::Scalar & ord) {
   std::vector<at::Tensor> outs;
   for (const auto& t : tensors){
     outs.emplace_back(linalg_vector_norm(t, ord));

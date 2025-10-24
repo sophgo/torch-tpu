@@ -6,7 +6,7 @@ import torch
 
 from torch.serialization import _check_dill_version, _open_file_like, _is_zipfile,\
     _open_zipfile_reader, _is_torchscript_zip, _weights_only_unpickler,\
-    _legacy_load, _load, MAP_LOCATION, DEFAULT_PROTOCOL
+    _legacy_load, _load, FILE_LIKE, MAP_LOCATION, DEFAULT_PROTOCOL
 
 ALWAYS_WARN_LEGACY_SERIALIZATION = False
 RE_MAP_CPU = False
@@ -109,16 +109,9 @@ def _remap_result(cpu_result, map_location):
     else:
         return cpu_result
 
-from typing import Union, IO
-from os import PathLike
-import io
-
-FileLike = IO[bytes]
-PathStr = Union[str, PathLike[str]]
-FILE_LIKE_COMPAT = Union[PathStr, FileLike]
 
 def load(
-    f: FILE_LIKE_COMPAT,
+    f: FILE_LIKE,
     map_location: MAP_LOCATION = None,
     pickle_module: Any = None,
     *,
