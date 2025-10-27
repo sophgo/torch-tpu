@@ -347,6 +347,7 @@ public:
     TORCH_CHECK (status == tpuSuccess, "Failed to create event");
     status = tpuEventRecord(tbd.event, tbd.stream);
     TORCH_CHECK (status == tpuSuccess, "Failed to record stream");
+    // std::cout << "[Free] event = "<< tbd.event << "Dataptr = " << tbd.ptr << " of size " << getSize(tbd.ptr, index) << std::endl;
     freeTBDs[Ptr] = tbd;
   }
 
@@ -359,9 +360,9 @@ public:
     {
       auto &event = pair.second.event;
       auto &tbd = pair.second;
-      if (tpuEventQuery(event) == tpuSuccess)
+      if (tbd.freed_timestamp != 0 || tpuEventQuery(event) == tpuSuccess)
       {
-        // std::cout << "Free " << tbd.ptr << " of size " << getSize(tbd.ptr, index) << std::endl;
+        // std::cout << "[EmptyCache] event = "<< event <<"Dataptr = " << tbd.ptr << " of size " << getSize(tbd.ptr, index) << std::endl;
         tpuFree(tbd.ptr);
         getMemInfo(Index).erase(tbd.ptr);
         toRm.push_back(tbd.ptr);
