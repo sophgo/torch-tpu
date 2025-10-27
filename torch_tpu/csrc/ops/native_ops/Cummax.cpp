@@ -81,6 +81,9 @@ TORCH_LIBRARY_IMPL(aten, TPU, m)
 // called by https://pytorch.org/docs/2.1/generated/torch.cumsum.html#torch.cumsum
 Tensor & cumsum_out_tpu(const Tensor & self, int64_t dim, 
                         c10::optional<ScalarType> dtype, Tensor & out) {
+#if defined BACKEND_SG2260
+    CHECK_TENSOR_IN_DEVICE(self);
+    CHECK_TENSOR_IN_DEVICE(out);
     ScalarType desired_dtype = dtype.has_value() ? *dtype : out.scalar_type();
     TORCH_CHECK(desired_dtype == out.scalar_type());
                             
@@ -92,12 +95,18 @@ Tensor & cumsum_out_tpu(const Tensor & self, int64_t dim,
         dim
     );
     TORCH_CHECK(status == TPUDNN_STATUS_SUCCESS);
+#elif defined BACKEND_1684X
+    CPU_IMPL_WARNING();
+    auto out_cpu = torch::cumsum(self.cpu(), dim, dtype);
+    out = out_cpu.to(out.device());
+#endif
     return out;
 }
 Tensor cumsum_tpu(const Tensor & self, int64_t dim, c10::optional<ScalarType> dtype=c10::nullopt) {
     ScalarType desired_dtype = dtype.has_value() ? *dtype : self.scalar_type();
-    auto out  = empty(self.sizes(), self.options().dtype(desired_dtype));
-    return cumsum_out_tpu(self, dim, c10::optional<ScalarType>(desired_dtype), out);
+    int64_t wrapped_dim = maybe_wrap_dim(dim, self.dim());
+    auto out = empty(self.sizes(), self.options().dtype(desired_dtype));
+    return cumsum_out_tpu(self, wrapped_dim, c10::optional<ScalarType>(desired_dtype), out);
 }
 
 TORCH_LIBRARY_IMPL(aten, TPU, m)

@@ -1,4 +1,5 @@
 import numpy as np
+import torch
 
 
 def cos_sim(vector_a, vector_b):
@@ -12,3 +13,10 @@ def cos_sim(vector_a, vector_b):
         cos = np.nan_to_num(num / denom)
     sim = 0.5 + 0.5 * cos
     return sim
+
+def cal_diff(x: torch.Tensor, y: torch.Tensor, name: str) -> None:
+    x, y = x.double(), y.double()
+    RMSE = ((x - y) * (x - y)).mean().sqrt().item()
+    cos_diff = 1 - 2 * (x * y).sum().item() / max((x * x + y * y).sum().item(), 1e-12)
+    amax_diff = (x - y).abs().max().item()
+    return cos_diff, RMSE, amax_diff
