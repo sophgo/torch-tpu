@@ -24,7 +24,7 @@ Cmodel版本的BMlib第三方库。参考bmlib下readme。
 - bm1684x 芯片固件库。参考bm1684x路径下的readme。
 - sg2260  芯片固件库。参考sg2260路径下的readme。
 
-### tpuv7_runtime
+### tpuv7\_runtime
 tpuv7的运行时库。参考对应的readme
 
 ### oneDNN

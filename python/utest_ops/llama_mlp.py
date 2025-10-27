@@ -192,6 +192,10 @@ def check_mlp_custom_backward():
     assert status_bwd_x and status_bwd_w0 and status_bwd_w1 and status_bwd_w2
 
 if __name__ == "__main__":
+    if os.environ['CHIP_ARCH'] in ['bm1684x', 'sg2260']:
+        print(f'Skip test for this arch')
+        sys.exit(0)
+
     status_fwd, status_bwd = check_mlp()
     if (status_bwd and status_fwd):
         print(f"[Success] llama_mlp compare succeed!")

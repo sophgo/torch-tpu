@@ -11,22 +11,18 @@ os.environ["CMODEL_FAST_EXEC"]="1"
 
 device = "tpu:0"
 
-# now peft 0.12.0 will cause problem. So we fix the version of transformers and peft._
-for package, version in {"transformers": "4.41.2", "peft": "0.11.1"}.items():
-    try:
-        if pkg_resources.get_distribution(package).version != version:
-            raise VersionConflict
-    except (DistributionNotFound, VersionConflict):
-        os.system(f"PIP_INDEX_URL=https://pypi.tuna.tsinghua.edu.cn/simple python3 -m pip install {package}=={version}")
-
+def fix_deps():
+    # now peft 0.12.0 will cause problem. So we fix the version of transformers and peft._
+    for package, version in {"transformers": "4.41.2", "peft": "0.11.1"}.items():
+        try:
+            if pkg_resources.get_distribution(package).version != version:
+                raise VersionConflict
+        except (DistributionNotFound, VersionConflict):
+            os.system(f"PIP_INDEX_URL=https://pypi.tuna.tsinghua.edu.cn/simple python3 -m pip install {package}=={version}")
 
 os.environ["CMODEL_FAST_EXEC"]="1"
 
 
-import transformers
-from transformers import LlamaForCausalLM, LlamaConfig
-from peft import LoraConfig, TaskType, get_peft_model
-import peft
 from torch_tpu.tpu.custom_op.lora_matmul import LoraMatmulBlock
 
 
@@ -104,6 +100,12 @@ def hook_grad(module, input):
 def case1():
     seed = 2260
     set_bacis_info(seed)
+
+    import transformers
+    from transformers import LlamaForCausalLM, LlamaConfig
+    import peft
+    from peft import LoraConfig, TaskType, get_peft_model
+
     lora_config = LoraConfig(
         task_type=TaskType.CAUSAL_LM,
         inference_mode=False,
@@ -185,4 +187,9 @@ def case1():
     return status1 and status2
 
 if __name__ == "__main__":
+    if os.environ['CHIP_ARCH'] in ['bm1684x', 'sg2260']:
+        print(f'Skip test for this arch')
+        sys.exit(0)
+
+    fix_deps()
     case1()

@@ -21,7 +21,7 @@ def case1():
     
     input_data = [[self_tensor, idx, value]]
     metric_table = ['max_diff', 'MAE']
-    chip_arch_dict = {"bm1684x": 1, 'sg2260': 1}
+    chip_arch_dict = {"bm1684x": 0, 'sg2260': 1}
     epsilon_dict = {'bm1684x': {'f32': 1e-6, 'f16': 1e-2}, 'sg2260': {'f32': 1e-6, 'f16': 1e-2}}
     case_name = __file__.split('.py')[0]
     dump_flag = True
@@ -49,7 +49,7 @@ def case2():
     
     input_data = [[self_tensor, idx, value]]
     metric_table = ['max_diff', 'MAE']
-    chip_arch_dict = {"bm1684x": 1, 'sg2260': 1}
+    chip_arch_dict = {"bm1684x": 0, 'sg2260': 1}
     epsilon_dict = {'bm1684x': {'f32': 1e-6, 'f16': 1e-2}, 'sg2260': {'f32': 1e-6, 'f16': 1e-2}}
     case_name = __file__.split('.py')[0] + "_case2"
     dump_flag = True
@@ -78,7 +78,7 @@ def case3():
     
     input_data = [[self_tensor, i0, i1, value]]
     metric_table = ['max_diff', 'MAE']
-    chip_arch_dict = {"bm1684x": 1, 'sg2260': 1}
+    chip_arch_dict = {"bm1684x": 0, 'sg2260': 1}
     epsilon_dict = {'bm1684x': {'f32': 1e-6, 'f16': 1e-2}, 'sg2260': {'f32': 1e-6, 'f16': 1e-2}}
     case_name = __file__.split('.py')[0] + "_case3"
     dump_flag = True

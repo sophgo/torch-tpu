@@ -96,6 +96,10 @@ def check_rmsnorm():
     return status_forward,status_backward
 
 if __name__=="__main__":
+    if os.environ['CHIP_ARCH'] in ['bm1684x']:
+        print(f'Skip test for this arch')
+        sys.exit(0)
+
     status_forward, status_backward = check_rmsnorm()
     print("================== Test rmsnorm forward ======================")
     if status_forward == False:

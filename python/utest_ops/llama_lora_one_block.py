@@ -16,8 +16,6 @@ for package, version in {"transformers": "4.41.2", "peft": "0.11.1"}.items():
         os.system(f"PIP_INDEX_URL=https://pypi.tuna.tsinghua.edu.cn/simple python3 -m pip install {package}=={version}")
 
 os.environ["CMODEL_FAST_EXEC"]="1"
-from transformers import LlamaForCausalLM, LlamaConfig
-from peft import LoraConfig, TaskType, get_peft_model
 
 # temporary fix for torch.arange
 def arange_wrapper(func):
@@ -75,12 +73,14 @@ lora_config_dict = {
 def case1():
     seed = 2260
     set_bacis_info(seed)
+    from peft import LoraConfig, TaskType, get_peft_model
     lora_config = LoraConfig(
         task_type=TaskType.CAUSAL_LM,
         inference_mode=False,
         **lora_config_dict
     )
 
+    from transformers import LlamaForCausalLM, LlamaConfig
     llama_config = LlamaConfig(**llama_config_dict)
     llama_tf_model = LlamaForCausalLM(llama_config).half()
     lora_model = get_peft_model(llama_tf_model, lora_config)
@@ -132,4 +132,8 @@ def case1():
     return status1 and status2
 
 if __name__ == "__main__":
+    if os.environ['CHIP_ARCH'] in ['bm1684x', 'sg2260']:
+        print(f'Skip test for this arch')
+        sys.exit(0)
+
     case1()

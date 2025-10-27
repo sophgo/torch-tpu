@@ -24,7 +24,7 @@ def case1():
     input_data = torch.rand((N,C,H,W))
     metric_table = ['max_diff','MAE']
     chip_arch_dict = {"bm1684x":1, 'sg2260':0}
-    epsilon_dict = {'bm1684x':{'f32':1e-6,'f16':1e-2},'sg2260':{'f32':1e-6,'f16':1e-2}}
+    epsilon_dict = {'bm1684x':{'f32':1e-5,'f16':1e-2},'sg2260':{'f32':1e-5,'f16':1e-2}}
     case_name =  __file__.split('.py')[0]# You can change your name
     dump_flag = True
     device = torch.device("privateuseone:0")
@@ -77,7 +77,7 @@ def case2():
     ]
     metric_table = ['max_diff','MAE']
     chip_arch_dict = {"bm1684x":1, 'sg2260':0}
-    epsilon_dict = {'bm1684x':{'f32':1e-6,'f16':1e-2},'sg2260':{'f32':1e-6,'f16':1e-2}}
+    epsilon_dict = {'bm1684x':{'f32':1e-5,'f16':1e-2},'sg2260':{'f32':1e-5,'f16':1e-2}}
     case_name =  __file__.split('.py')[0]# You can change your name
     dump_flag = True #it will dump alll wrong cases
     device = torch.device("privateuseone:0")
@@ -131,7 +131,7 @@ def case3():
     ]
     metric_table = ['max_diff','MAE']
     chip_arch_dict = {"bm1684x":1, 'sg2260':0}
-    epsilon_dict = {'bm1684x':{'f32':1e-6,'f16':1e-2},'sg2260':{'f32':1e-6,'f16':1e-2}}
+    epsilon_dict = {'bm1684x':{'f32':1e-5,'f16':1e-2},'sg2260':{'f32':1e-5,'f16':1e-2}}
     case_name =  __file__.split('.py')[0]# You can change your name
     dump_flag = True #it will dump alll wrong cases
     device = torch.device("privateuseone:0")

@@ -5,19 +5,23 @@ import time
 GLOBAL_FAILED = "fail"
 GLOBAL_FAILED2 = "f2ail"  #TODO:FIX bmlib bug
 
-from top_utest import Tester_Basic
 def runcmd(command):
     try:
-         ret = subprocess.run(command,shell=True, capture_output=True, text=True, encoding="utf-8", errors="ignore", timeout=1000,check=True)
+         ret = subprocess.run(command,shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, encoding="utf-8", errors="ignore",timeout=1000,check=False)
+         print(ret.stdout)
          if ret.returncode == 0:
-            print(ret.stdout)
-            return ret.stdout
+            return 0, ret.stdout
          else:
             print("error:",command, GLOBAL_FAILED)
-            return ret.stdout + GLOBAL_FAILED
+            return ret.returncode, ret.stdout + GLOBAL_FAILED
     except subprocess.CalledProcessError as e:
-        print(e.output)
-        return  "error:"+command +GLOBAL_FAILED2
+        print(command, 'failed!')
+        print(e.stdout)
+        return  -1, "error:"+command +GLOBAL_FAILED2
+    except subprocess.TimeoutExpired as e:
+        print(command, 'timeout!')
+        print(e.stdout)
+        return -1, command
 
 class Global_Regression_Tester():
     # control top file must be skipped
@@ -33,7 +37,7 @@ class Global_Regression_Tester():
 
 
     def __init__(self):
-        self.control_cmd = "python3  "
+        self.control_cmd = "python3 -u "
 
         self.chip = os.environ['CHIP_ARCH']
         self.failed_keys = [GLOBAL_FAILED]
@@ -57,8 +61,11 @@ class Global_Regression_Tester():
 
         self.dict_error_static = {'f32':[],'f16':[]}
 
-        tmp_class = Tester_Basic()
-        self.convert_table = tmp_class.convert_table
+        self.convert_table = {
+                        'f32': 'torch.float32',
+                        'i32': 'torch.int32',
+                        'f16': 'torch.half',
+                        'bf16': 'torch.bfloat16'}
         self.exist_dtype  ={}
         for i in self.convert_table.keys():
             self.exist_dtype[str(self.convert_table[i])] = []
@@ -155,15 +162,14 @@ class Global_Regression_Tester():
             print(single_utest)
             print(f'{i}/{len(self.utest_files_list)}')
             i += 1
-            info = runcmd(single_utest)
-            time.sleep(2)
+            retval, info = runcmd(single_utest)
 
             #this function will gather static info about not-tested dtype for every utest
             self.dtype_check_all_test(info, single_utest)
             if self.search_skip_utest_chip_arch(info, single_utest):
                 continue
             single_utest_name = self.get_file_name(single_utest)
-            if self.search_failed_info(info):
+            if retval != 0 or self.search_failed_info(info):
                 failed_result +=[single_utest_name]
             else:
                 succeed_result +=[single_utest_name]

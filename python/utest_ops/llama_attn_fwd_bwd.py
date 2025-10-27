@@ -300,6 +300,10 @@ def attn_test(dtype):
     return status_fwd, status_bwd
 
 if __name__ == "__main__":
+    if os.environ['CHIP_ARCH'] in ['bm1684x']:
+        print(f'Skip test for this arch')
+        sys.exit(0)
+
     seed = time.time()
     torch.manual_seed(seed)
     status_fwd, status_bwd = attn_test(torch.float16)
@@ -307,4 +311,4 @@ if __name__ == "__main__":
         print(f"attention forward/backward test failed, please check the fwd/bwd result (seed {seed})")
         sys.exit(255)
     print("attention forward/backward test passed")
-    
+

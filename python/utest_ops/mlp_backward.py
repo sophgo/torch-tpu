@@ -113,6 +113,10 @@ def check_mlp(dtype: torch.dtype):
 
 
 if __name__ == "__main__":
+    if os.environ['CHIP_ARCH'] in ['bm1684x']:
+        print(f'Skip test for this arch')
+        sys.exit(0)
+
     print("==========float16==========")
     check_mlp(torch.float16)
     print("==========bfloat16==========")

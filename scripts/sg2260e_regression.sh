@@ -5,6 +5,8 @@ function sg2260e_online_regression_test() {
 
     source $CURRENT_DIR/envsetup.sh sg2260e || return -1
 
+    new_clean
+
     develop_torch_tpu || return -1
 
     bdist_wheel || return -1

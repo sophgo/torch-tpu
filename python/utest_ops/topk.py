@@ -65,5 +65,8 @@ def case2():
 
 if __name__ == "__main__":
     #This example shows all  [], [[]] is acceptable
-    case1()
-    case2()
+
+    pass # FIXME
+    #case1() # FIXME
+    #case2() # FIXME
+

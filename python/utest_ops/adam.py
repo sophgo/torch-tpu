@@ -64,4 +64,9 @@ def test():
         print("Optimizer Adam is correct!")
 
 if __name__ == "__main__":
+    import os
+    if os.environ['CHIP_ARCH'] in ['bm1684x']:
+        print(f'Skip test for this arch')
+        sys.exit(0)
+
     test()

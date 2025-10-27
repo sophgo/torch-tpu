@@ -1,11 +1,11 @@
 ### BMLIB
 
 ## commit id
-f5e30d4e32e5accef7de39a7e21f66292f3417d9
+7fe378c95e3c6b906b6f5169533871a02343edcb
 
 ## intro
 该目录下是芯片设备控制相关接口的软件库-BMLIB。其中，
-- bmlib_runtime.h
+- bmlib\_runtime.h
 - libbmlib.so cmodel版本的库文件。
 
 注意:

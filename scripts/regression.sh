@@ -253,6 +253,12 @@ function run_online_regression_test() {
   fi
   echo "******************************* thirdparty check Successful *********************************"
 
+  if [ $test_CHIP_ARCH = 'sg2260' ]; then
+    echo "******************************SG2260E regression...*************************************"
+    bash $CURRENT_DIR/sg2260e_regression.sh || return -1
+    echo "******************************SG2260E regression succeeded******************************"
+  fi
+
   echo "********************************* Building... ...*************************************"
   source  $CURRENT_DIR/envsetup.sh $test_CHIP_ARCH $LIBSOPHON_LINK_PATTERN
   new_clean;new_build || return -1
@@ -260,11 +266,6 @@ function run_online_regression_test() {
   echo "[INFO]tpu_train_cmodel_path:$TPU_TRAIN_CMODEL_PATH"
   set_cmodel_firmware $TPU_TRAIN_CMODEL_PATH
   echo "********************************* Build Successful *********************************"
-
-  echo "******************************SG2260E regression...*************************************"
-  if [ $test_CHIP_ARCH = 'sg2260' ]; then
-      bash $CURRENT_DIR/sg2260e_regression.sh || return -1
-  fi
 
   echo "****************************** tgi regression...*************************************"
   if [ $test_CHIP_ARCH = 'sg2260' ]; then
@@ -289,7 +290,6 @@ function run_online_regression_test() {
     return -1
   fi
   echo "****************************** ops utest Successful***********************************"
-
 
   echo "****************************** sccl utesting ... ...***********************************"
   if [ $test_CHIP_ARCH = 'sg2260' ]; then

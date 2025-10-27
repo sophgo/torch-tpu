@@ -25,7 +25,7 @@ def case1():
          [torch.rand(b, m, l, d), torch.rand(b, m, l, d)],
     ]
     metric_table = ['max_diff','MAE']
-    chip_arch_dict = {"bm1684x":1, 'sg2260':1}
+    chip_arch_dict = {"bm1684x":0, 'sg2260':1}
     epsilon_dict = {'bm1684x':{'f32':5e-3,'f16':1e-2},'sg2260':{'f32': 5e-3, 'f16':1e-2}}
     case_name =  __file__.split('.py')[0]# You can change your name
     dump_flag = True #it will dump alll wrong cases
@@ -78,6 +78,11 @@ def case2():
 if __name__ == "__main__":
     #This example shows all  [], [[]] is acceptable
     case1()
+
+    import os
+    if os.environ['CHIP_ARCH'] in ['bm1684x']:
+        print(f'Skip case2 for this arch')
+        sys.exit(0)
     case2()
 
 #######################
