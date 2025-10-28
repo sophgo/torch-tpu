@@ -257,9 +257,6 @@ TORCH_LIBRARY_IMPL(aten, TPU, m) {
   m.impl("sigmoid_backward.grad_input", sigmoid_backward_grad_input_tpu);
 }
 
-/*
-* FIXME: The actual silu backward does not pass this route, as it is implemented by several sub-ops.
-*/
 Tensor & silu_backward_grad_input_tpu(const Tensor& grad_output, const Tensor& input, Tensor& grad_input) {
   TIMING_START;
   CHECK_TENSOR_IN_DEVICE(grad_output);
@@ -270,6 +267,13 @@ Tensor & silu_backward_grad_input_tpu(const Tensor& grad_output, const Tensor& i
   auto grad_input_cpu = silu_backward ( grad_output.cpu(), input.cpu() );
   tpu::TPUCopyHostToDevice ( grad_input.data_ptr(), grad_input_cpu.contiguous().data_ptr(), grad_input.nbytes() );
 #else
+  // std::cout << "input: \n shape = ";
+  // for ( auto i = 0; i < input.dim(); ++i ) { std::cout << " " << input.size ( i ); } std::cout << ", stride = ";
+  // for ( auto i = 0; i < input.dim(); ++i ) { std::cout << " " << input.stride ( i ); } std::cout << std::endl;
+  // std::cout << "grad_output: \n shape = ";
+  // for ( auto i = 0; i < grad_output.dim(); ++i ) { std::cout << " " << grad_output.size ( i ); } std::cout << ", stride = ";
+  // for ( auto i = 0; i < grad_output.dim(); ++i ) { std::cout << " " << grad_output.stride ( i ); } std::cout << std::endl;
+  // std::cout << "========+++++ grad_output.is_contiguous() ? " << grad_output.is_contiguous() << std::endl;
   auto stream = c10_tpu::getCurrentTPUStream();
   auto status = tpudnnSiluBackwardAsync(
     stream,
@@ -287,4 +291,18 @@ TORCH_LIBRARY_IMPL(aten, TPU, m) {
   m.impl("silu_backward.grad_input", silu_backward_grad_input_tpu);
 }
 
+} // namespace at
+
+//////////////// ****************** autogradtpu key ****************** ////////////////
+namespace at {
+Tensor silu_backward_autogradtpu ( const at::Tensor & grad_output, const at::Tensor & self )
+{
+    at::Tensor grad_input = empty(self.sizes(), self.options());
+    grad_input = at::silu_backward_grad_input_tpu(grad_output, self, grad_input);
+  return grad_input;
+}
+
+TORCH_LIBRARY_IMPL(aten, AutogradPrivateUse1, m) {
+  m.impl("silu_backward", silu_backward_autogradtpu);
+}
 } // namespace at
