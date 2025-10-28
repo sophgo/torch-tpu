@@ -1,5 +1,5 @@
 #pragma once
-
+#include "tpuDNN.h"
 #include <cstdint>
 #include <cstddef>
 #include<vector>
@@ -1484,6 +1484,14 @@ tpudnnStatus_t tpudnnIndexAdd(
     tpudnnTensor_t add,
     int axis);
 
+tpudnnStatus_t tpudnnIndexPutImpl(
+    tpudnnHandle_t handle,
+    tpudnnTensor_t io,
+    tpudnnTensor_t indices,
+    tpudnnTensor_t value,
+    int axis,
+    bool accumulate);
+    
 tpudnnStatus_t tpudnnC2CDescriptor(
     tpudnnHandle_t handle,
     tpudnnCmd_t* vsdma_cmd,
