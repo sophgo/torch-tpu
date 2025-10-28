@@ -8,7 +8,7 @@ GLOBAL_FAILED2 = "f2ail"  #TODO:FIX bmlib bug
 from top_utest import Tester_Basic
 def runcmd(command):
     try:
-         ret = subprocess.run(command,shell=True, capture_output=True,encoding="utf-8",timeout=1000,check=True)
+         ret = subprocess.run(command,shell=True, capture_output=True, text=True, encoding="utf-8", errors="ignore", timeout=1000,check=True)
          if ret.returncode == 0:
             print(ret.stdout)
             return ret.stdout
