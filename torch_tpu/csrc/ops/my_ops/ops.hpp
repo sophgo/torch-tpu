@@ -515,12 +515,13 @@ Tensor paged_attention_v2(
             const c10::optional<Tensor> &block_table, Tensor &save_slots,
 			const c10::optional<Tensor> &KVU, const c10::optional<Tensor> &mask, // decode: None
             const Tensor &seqlen, const Tensor &cache_seqlen,
+			const c10::optional<Tensor> &topk_indices,
 			int64_t num_heads, int64_t q_lora_rank,
             int64_t kv_lora_rank, int64_t qk_nope_head_dim,
             int64_t qk_rope_head_dim, int64_t v_head_dim, int64_t mask_size,
             int64_t quant_block_size, int64_t max_paged_block_num,
-            int64_t paged_cache_block_size, double softmax_scale,
-            int64_t attention_mode);
+            int64_t paged_cache_block_size, int64_t topk_size,
+			double softmax_scale, int64_t attention_mode);
 
         std::tuple<Tensor, Tensor, Tensor, c10::optional<Tensor>, c10::optional<Tensor>> attn_backward(
 		Tensor &grad_output,

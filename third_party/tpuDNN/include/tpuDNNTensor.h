@@ -300,6 +300,19 @@ static inline bool tpudnnIsTensorContiguous(const tpudnnTensor_t *tensor)
     return true;
 }
 
+static inline bool tpudnnIsTensorInner3DContiguous(const tpudnnTensor_t* t)
+{ 
+    bool succ = true;
+    if ( t->dim < 3 ) { return false; }
+    int stride = 1;
+    for (int i = t->dim - 1; i >= t->dim - 3; i--)
+    {
+        if ( t->stride[i] == stride ) { stride *= t->shape[i]; }
+        else { succ = false; break;}
+    }
+    return succ;
+}
+
 static inline bool tpudnnIsTensorTransposed ( const tpudnnTensor_t * tensor )
 {
     if ( tensor->dim < 2 || tpudnnIsTensorContiguous ( tensor ) )
@@ -1225,6 +1238,7 @@ tpudnnStatus_t tpudnnPagedLatentAttentionFp8Async(
     tpudnnTensor_t cache_length_tensor,
     tpudnnTensor_t block_table,
     tpudnnTensor_t save_slots,
+    tpudnnTensor_t topk_indices,
     const int*     seqlen,
     const int*     cache_seqlen,
     int            batch,
@@ -1238,6 +1252,7 @@ tpudnnStatus_t tpudnnPagedLatentAttentionFp8Async(
     int            quant_block_size,
     int            max_paged_block_num,
     int            paged_cache_block_size,
+    int            topk_size,
     float          softmax_scale,
     int            with_w8a16,
     AttentionMode_t attn_mode);

@@ -325,12 +325,13 @@ namespace at
         const c10::optional<Tensor> &KVU,
         const c10::optional<Tensor> &mask, // decode: None
         const Tensor &seqlen, const Tensor &cache_seqlen,
+        const c10::optional<Tensor> &topk_indices,
         int64_t num_heads, int64_t q_lora_rank,
         int64_t kv_lora_rank, int64_t qk_nope_head_dim,
         int64_t qk_rope_head_dim, int64_t v_head_dim, int64_t mask_size,
         int64_t quant_block_size, int64_t max_paged_block_num,
-        int64_t paged_cache_block_size, double softmax_scale,
-        int64_t attention_mode // prefille 0, decode 1
+        int64_t paged_cache_block_size, int64_t topk_size,
+        double softmax_scale, int64_t attention_mode // prefille 0, decode 1
     ) {
         TIMING_START;
         if (attention_mode == PAGED_ATTENTION_DECODE ||
@@ -410,12 +411,15 @@ namespace at
                 ? tpu::TPUGenerateTpudnnTensor(stream, block_table.value())
                 : tpudnnUndefinedTensor(),//block_table
             tpu::TPUGenerateTpudnnTensor(stream, save_slots), //save slots
+            topk_indices.has_value()
+                ? tpu::TPUGenerateTpudnnTensor(stream, topk_indices.value())
+                : tpudnnUndefinedTensor(),//topk_indices
             cpu_lengths ? (const int *)seqlen.data_ptr() : nullptr,
             cpu_lengths ? (const int *)cache_seqlen.data_ptr() : nullptr,
             (int)(seqlen.nbytes() / 4), num_heads, qk_nope_head_dim,
             qk_rope_head_dim, v_head_dim, q_lora_rank, kv_lora_rank,
             mask_size, quant_block_size, max_paged_block_num, paged_cache_block_size,
-            softmax_scale, true, (AttentionMode_t)attention_mode);
+            topk_size, softmax_scale, true, (AttentionMode_t)attention_mode);
         TORCH_CHECK(status == TPUDNN_STATUS_SUCCESS);
 #endif
         TIMING_END;
