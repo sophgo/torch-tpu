@@ -41,7 +41,7 @@ class TPUDevice(metaclass=MetaDevice):
 
             if rank_index < 0:
                 raise ValueError(f"Invalid local_rank_idx: {rank_index}")
-            return device_mapping[rank_index]
+            return device_mapping[rank_index % len(device_mapping)]
 
         def process_string_device(device_str):
             match = re.match(r"^tpu:(\d+)$", device_str, re.IGNORECASE)
