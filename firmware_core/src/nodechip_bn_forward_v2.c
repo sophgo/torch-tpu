@@ -42,7 +42,7 @@ data_type_t   dtype )
   /*
    *  I: [ NMax, CMax, HMax,     W ]
    *  O: [ NMax, CMax, HMax,     W ]
-   *  P: [ NMax, CMax, HMax,     1 ]
+   *  P: [ NMax, CMax, 1,     W ]
    *  T: [ NMax, CMax,    1,     1 ]
    *  S: [ 1,    CMax,    1,  NMax ]
    *  M: [ 1,    CMax,    1,     1 ]
@@ -59,7 +59,7 @@ data_type_t   dtype )
     OAddr = IAddr + ISize;
     int OSize = ISize;
     PAddr = OAddr + OSize;
-    int PSize = tpu_aligned_feature_size ( HMax, 1, DT_FP32 ) * DIV_UP ( CMax, NPU_NUM ) * NMax;
+    int PSize = tpu_aligned_feature_size ( 1, W, DT_FP32 ) * DIV_UP ( CMax, NPU_NUM ) * NMax;
     TAddr = PAddr + PSize;
     int TSize = tpu_aligned_feature_size ( 1, 1, DT_FP32 ) * DIV_UP ( CMax, NPU_NUM ) * NMax;
     SAddr = TAddr + TSize;
@@ -159,8 +159,8 @@ data_type_t   dtype )
             tpu_bdc_cast ( IAddr, GDMAIAddr, &Shape, NULL, NULL, DT_FP32, dtype, RM_HALF_TO_EVEN );
           }
         }
-        /* P = REDUCE_SUM ( I, [ 3 ] ) */
-        dim2 KernelSizeDim3 = { .h = 1, .w = Shape.w };
+        /* P = REDUCE_SUM ( I, [ 2 ] ) */
+        dim2 KernelSizeDim3 = { .h = Shape.h, .w = 1 };
         if ( Split == true )
         {
           tpu_bdc_fp_avg_pool2d ( PAddr, IOAddr[IOIndex], &Shape, &KernelSizeDim3, &ZeroPadding, &OneStride, &OneDilation, DT_FP32, OneFP );
@@ -169,9 +169,9 @@ data_type_t   dtype )
         {
           tpu_bdc_fp_avg_pool2d ( PAddr, IAddr, &Shape, &KernelSizeDim3, &ZeroPadding, &OneStride, &OneDilation, DT_FP32, OneFP );
         }
-        /* T = REDUCE_SUM ( P, [ 2 ] ) */
-        dim2 KernelSizeDim2 = { .h = Shape.h, .w = 1 };
-        dim4 PShape = { .n = Shape.n, .c = Shape.c, .h = Shape.h, .w = 1 };
+        /* T = REDUCE_SUM ( P, [ 3 ] ) */
+        dim2 KernelSizeDim2 = { .h = 1, .w = Shape.w };
+        dim4 PShape = { .n = Shape.n, .c = Shape.c, .h = 1, .w = Shape.w };
         tpu_bdc_fp_avg_pool2d ( TAddr, PAddr, &PShape, &KernelSizeDim2, &ZeroPadding, &OneStride, &OneDilation, DT_FP32, OneFP );
         dim4 TStride;
         tpu_aligned_stride ( &TStride, 0, &TShape, DT_FP32 );
@@ -280,8 +280,8 @@ data_type_t   dtype )
           tpu_bdc_fp_sub ( IOAddr[IOIndex], IOAddr[IOIndex], MAddr, &Shape, NULL, NULL, &CBcastStride, DT_FP32 );
           /* O = O * O */
           tpu_bdc_fp_mul ( IOAddr[IOIndex], IOAddr[IOIndex], IOAddr[IOIndex], &Shape, NULL, NULL, NULL, DT_FP32 );
-          /* P = REDUCE_SUM ( O, [ 3 ] ) */
-          dim2 KernelSizeDim3 = { .h = 1, .w = Shape.w };
+          /* P = REDUCE_SUM ( O, [ 2 ] ) */
+          dim2 KernelSizeDim3 = { .h = Shape.h, .w = 1 };
           tpu_bdc_fp_avg_pool2d ( PAddr, IOAddr[IOIndex], &Shape, &KernelSizeDim3, &ZeroPadding, &OneStride, &OneDilation, DT_FP32, OneFP );
         }
         else
@@ -290,13 +290,13 @@ data_type_t   dtype )
           tpu_bdc_fp_sub ( OAddr, IAddr, MAddr, &Shape, NULL, NULL, &CBcastStride, DT_FP32 );
           /* O = O * O */
           tpu_bdc_fp_mul ( OAddr, OAddr, OAddr, &Shape, NULL, NULL, NULL, DT_FP32 );
-          /* P = REDUCE_SUM ( O, [ 3 ] ) */
-          dim2 KernelSizeDim3 = { .h = 1, .w = Shape.w };
+          /* P = REDUCE_SUM ( O, [ 2 ] ) */
+          dim2 KernelSizeDim3 = { .h = Shape.h, .w = 1 };
           tpu_bdc_fp_avg_pool2d ( PAddr, OAddr, &Shape, &KernelSizeDim3, &ZeroPadding, &OneStride, &OneDilation, DT_FP32, OneFP );
         }
-        /* T = REDUCE_SUM ( P, [ 2 ] ) */
-        dim2 KernelSizeDim2 = { .h = Shape.h, .w = 1 };
-        dim4 PShape = { .n = Shape.n, .c = Shape.c, .h = Shape.h, .w = 1 };
+        /* T = REDUCE_SUM ( P, [ 3 ] ) */
+        dim2 KernelSizeDim2 = { .h = 1, .w = Shape.w };
+        dim4 PShape = { .n = Shape.n, .c = Shape.c, .h = 1, .w = Shape.w };
         tpu_bdc_fp_avg_pool2d ( TAddr, PAddr, &PShape, &KernelSizeDim2, &ZeroPadding, &OneStride, &OneDilation, DT_FP32, OneFP );
         dim4 TStride;
         tpu_aligned_stride ( &TStride, 0, &TShape, DT_FP32 );
