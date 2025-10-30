@@ -1440,6 +1440,9 @@ void CachingTPUAllocator::free(void* ptr) {
   Block* block = this->get_allocated_block(ptr, /* remove */ true);
   TORCH_CHECK(block, "invalid device pointer: ", ptr);
   device_allocators[block->device]->free(block);
+  if (!start_cache_) {
+    this->emptyCache(MempoolId_t{0, 0});
+  }
 }
 
 void CachingTPUAllocator::emptyCache(MempoolId_t mempool_id) {
@@ -1447,6 +1450,14 @@ void CachingTPUAllocator::emptyCache(MempoolId_t mempool_id) {
     da->emptyCache(mempool_id);
   }
 }
+
+  void CachingTPUAllocator::startCache(MempoolId_t mempool_id) {
+    start_cache_ = true;
+  }
+
+  void CachingTPUAllocator::stopCache(MempoolId_t mempool_id) {
+    start_cache_ = false;
+  }
 
 c10::DataPtr CachingTPUAllocator::allocate(size_t size) const {
   auto device = c10_tpu::current_device();

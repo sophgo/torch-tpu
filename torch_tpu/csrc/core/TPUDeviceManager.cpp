@@ -378,6 +378,18 @@ public:
     }
   }
 
+  void StartCache( int Index )
+  {
+    std::lock_guard<std::mutex> lock(getMutex(Index));
+    free_delay_ = getTPUAllocatorFreeDelay();
+  }
+
+  void StopCache( int Index )
+  {
+    std::lock_guard<std::mutex> lock(getMutex(Index));
+    free_delay_ = 0;
+  }
+
   void CopyHostToDevice ( void * Dst, const void * Src, size_t Size, int Index, bool non_blocking )
   {
     tpuError_t Status;
@@ -547,6 +559,16 @@ void TPUFree ( void * Ptr )
 void TPUEmptyCache ()
 {
   TPUDeviceManager::GetInstance().EmptyCache( TPUGetDeviceIndex() );
+}
+
+void TPUEnableCache ()
+{
+  TPUDeviceManager::GetInstance().StartCache( TPUGetDeviceIndex() );
+}
+
+void TPUDisableCache ()
+{
+  TPUDeviceManager::GetInstance().StopCache( TPUGetDeviceIndex() );
 }
 
 

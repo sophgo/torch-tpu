@@ -437,6 +437,20 @@ PyObject* THPTModule_emptyCache(PyObject* _unused, PyObject* noargs) {
   Py_RETURN_NONE;
 }
 
+PyObject* THPTModule_startCache(PyObject* _unused, PyObject* noargs) {
+  HANDLE_TH_ERRORS
+  c10_tpu::StartCache();
+  END_HANDLE_TH_ERRORS
+  Py_RETURN_NONE;
+}
+
+PyObject* THPTModule_stopCache(PyObject* _unused, PyObject* noargs) {
+  HANDLE_TH_ERRORS
+  c10_tpu::StopCache();
+  END_HANDLE_TH_ERRORS
+  Py_RETURN_NONE;
+}
+
 
 PyObject* THPTModule_tensor_construct_from_storage(PyObject* self, PyObject* args) {
   HANDLE_TH_ERRORS
@@ -516,6 +530,8 @@ static struct PyMethodDef THPTModule_methods[] = {
     {"_tpu_setStream", (PyCFunction)THPTModule_setStream_wrap,  METH_VARARGS | METH_KEYWORDS, nullptr},
     // allocator related
     {"_tpu_emptyCache", THPTModule_emptyCache, METH_NOARGS, nullptr},
+    {"_tpu_startCache", THPTModule_startCache, METH_NOARGS, nullptr},
+    {"_tpu_stopCache", THPTModule_stopCache, METH_NOARGS, nullptr},
 
     // memory stats related
     {"_tpu_memoryStats", THPTModule_memoryStats, METH_O, nullptr},

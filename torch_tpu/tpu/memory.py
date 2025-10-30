@@ -15,6 +15,8 @@ __all__ = [
     "caching_allocator_delete",
     "set_per_process_memory_fraction",
     "empty_cache",
+    "start_cache",
+    "stop_cache",
     "memory_stats",
     "memory_stats_as_nested_dict",
     "reset_accumulated_memory_stats",
@@ -132,6 +134,27 @@ def empty_cache() -> None:
     """
     if is_initialized():
         torch_tpu._C._tpu_emptyCache()
+
+def start_cache() -> None:
+    r"""Enable the caching allocator to cache memory.
+
+    .. note::
+        See :ref:`tpu-memory-management` for more details about TPU memory
+        management.
+    """
+    if is_initialized():
+        torch_tpu._C._tpu_startCache()
+
+def stop_cache() -> None:
+    r"""Disable the caching allocator to cache memory.
+
+    .. note::
+        See :ref:`tpu-memory-management` for more details about TPU memory
+        management.
+    """
+    if is_initialized():
+        print('-------------xxxxxx---------------')
+        torch_tpu._C._tpu_stopCache()
 
 
 def memory_stats(device: Union[Device, int] = None) -> Dict[str, Any]:

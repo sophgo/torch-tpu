@@ -45,6 +45,14 @@ struct DefaultTPUAllocator final : TPUAllocator
   void emptyCache(MempoolId_t mempool_id = {0, 0}) {
     tpu::TPUEmptyCache( );
   }
+  
+  void startCache(MempoolId_t mempool_id = {0, 0}) {
+    tpu::TPUEnableCache( );
+  }
+
+  void stopCache(MempoolId_t mempool_id = {0, 0}) {
+    tpu::TPUDisableCache( );
+  }
 };
 
 ProfiledTPUMemoryReporter & profiledTPUMemoryReporter()
@@ -182,6 +190,16 @@ class DynamicAllocatorProxy : public TPUAllocator {
     target()->emptyCache();
   }
 
+  void startCache(MempoolId_t mempool_id = {0, 0}) {
+    ensureInit();
+    target()->startCache();
+  }
+
+  void stopCache(MempoolId_t mempool_id = {0, 0}) {
+    ensureInit();
+    target()->stopCache();
+  }
+
  private:
 
   void ensureInit() const {
@@ -202,6 +220,16 @@ REGISTER_ALLOCATOR(DeviceType::TPU, &g_dynamic_tpu_alloc);
 void EmptyCache() {
   auto allocator = static_cast<DynamicAllocatorProxy*>(GetTPUAllocator());
   allocator->emptyCache();
+}
+
+void StartCache() {
+  auto allocator = static_cast<DynamicAllocatorProxy*>(GetTPUAllocator());
+  allocator->startCache();
+}
+
+void StopCache() {
+  auto allocator = static_cast<DynamicAllocatorProxy*>(GetTPUAllocator());
+  allocator->stopCache();
 }
 
 } // namespace c10_tpu

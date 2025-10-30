@@ -21,6 +21,8 @@ class TPUAllocator : public c10::Allocator {
  public:
   virtual void* raw_alloc(size_t nbytes) = 0;
   virtual void emptyCache(MempoolId_t mempool_id = {0, 0}) = 0;
+  virtual void startCache(MempoolId_t mempool_id = {0, 0}) = 0;
+  virtual void stopCache(MempoolId_t mempool_id = {0, 0}) = 0;
   virtual void init() {
     printf("NOT need initlization\n");
     return;
@@ -112,4 +114,6 @@ at::Allocator * GetTPUAllocator();
 TPUAllocator* GetDefaultTPUAllocator();
 
 void EmptyCache();
+void StartCache();
+void StopCache();
 } // namepsace c10_tpu

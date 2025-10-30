@@ -60,6 +60,8 @@ __all__ = [
     "caching_allocator_delete",
     "set_per_process_memory_fraction",
     "empty_cache",
+    "start_cache",
+    "stop_cache",
     "memory_stats",
     "memory_stats_as_nested_dict",
     "reset_accumulated_memory_stats",

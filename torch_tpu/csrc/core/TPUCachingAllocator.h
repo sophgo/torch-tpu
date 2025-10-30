@@ -86,6 +86,11 @@ class CachingTPUAllocator : public TPUAllocator {
   mutable std::mutex mutex;
   mutable ska::flat_hash_map<void*, Block*> allocated_blocks;
 
+
+  // Start caching right away
+  // If not, all cache will be released before next allocation or after next free
+  bool start_cache_ = true;
+
   void add_allocated_block(Block* block) const;
 
   Block* get_allocated_block(void* ptr, bool remove = false);
@@ -100,6 +105,9 @@ class CachingTPUAllocator : public TPUAllocator {
   void free(void* ptr) override;
 
   void emptyCache(MempoolId_t mempool_id) override;
+
+  void startCache(MempoolId_t mempool_id) override;
+  void stopCache(MempoolId_t mempool_id) override;
 
   c10::DataPtr allocate(size_t size) const override;
 

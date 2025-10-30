@@ -58,6 +58,16 @@ void TPUFree ( void * Ptr );
 void TPUEmptyCache ();
 
 /**
+ * Enable cached Memory
+ */
+void TPUEnableCache ();
+
+/**
+ * Disable cached Memory
+ */
+void TPUDisableCache ();
+
+/**
  * Copy data from host to TPU device.
  */
 void TPUCopyHostToDevice ( void * Dst, const void * Src, size_t Size, bool non_blocking = false );
