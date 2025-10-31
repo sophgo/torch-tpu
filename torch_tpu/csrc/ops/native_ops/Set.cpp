@@ -10,36 +10,6 @@
 #include "common/config.h"
 
 namespace at {
-namespace native{
-
-template<typename T>
-TensorImpl* resize_impl_tpu_( TensorImpl* self, ArrayRef<T> size, at::OptionalArrayRef<T> stride, bool resize_storage)
-{
-  if (self->generic_sizes<T>() == size && (!stride || self->generic_strides<T>() == stride.value())) {
-    return self;
-  }
-
-  const auto itemsize = self->dtype().itemsize();
-  const auto storage_offset = self->generic_storage_offset<T>();
-  T storage_size = T(1);
-  if (stride) {
-    self->set_sizes_and_strides(size, *stride);
-    storage_size = at::detail::computeStorageNbytes(
-        size, *stride, itemsize, storage_offset);
-  } else {
-    self->generic_set_sizes_contiguous(size);
-    storage_size = at::detail::computeStorageNbytesContiguous(
-        size, itemsize, storage_offset);
-  }
-
-  if (resize_storage) {
-    maybe_resize_storage_tpu(self, std::move(storage_size));
-  }
-
-  return self;
-}
-
-} // namespace native
 
 Tensor& set_tpu_(Tensor & result, Storage source)
 {

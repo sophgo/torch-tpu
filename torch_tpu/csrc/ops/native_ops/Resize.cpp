@@ -1,36 +1,27 @@
 #include "Resize.h"
 #include "TPUTorchUtils.h"
 
-namespace at::native {
-
-void resize_bytes_tpu(StorageImpl* storage, size_t size_bytes) {
-  TORCH_CHECK(storage->resizable(), "Trying to resize storage that is not resizable");
-
-  auto allocator = storage->allocator();
-  TORCH_CHECK(allocator != nullptr, "Trying to resize storage without an allocator");
-
-  c10::Device device = storage->device();
-
-  if (size_bytes == 0) {
-    storage->set_nbytes(0);
-    return;
+namespace at {
+  const Tensor& resize_tpu_(
+    const Tensor& self,
+    IntArrayRef size,
+    c10::optional<MemoryFormat> optional_memory_format) {
+  if (self.has_names()) {
+    return at::native::resize_named_tensor_(self, size, optional_memory_format);
+  }
+  at::OptionalIntArrayRef stride_opt = c10::nullopt;
+  at::native::resize_impl_tpu_(self.unsafeGetTensorImpl(), size, stride_opt, /*resize_storage=*/true);
+  if (optional_memory_format.has_value()) {
+    auto memory_format = optional_memory_format.value();
+    if (memory_format == MemoryFormat::Preserve) {
+      memory_format = self.suggest_memory_format();
+    }
+    self.unsafeGetTensorImpl()->empty_tensor_restride(memory_format);
+  }
+  return self;
   }
 
-  c10_tpu::TPUGuard guard(device.index());
-  at::DataPtr data = allocator->allocate(size_bytes);
-
-  at::DataPtr new_data;
-  if (size_bytes != 0) {
-    new_data = storage->allocator()->allocate(size_bytes);
+  TORCH_LIBRARY_IMPL(aten, TPU, m) {
+    m.impl("resize_", resize_tpu_);
   }
-  at::DataPtr old_data = storage->set_data_ptr(std::move(new_data));
-  const auto old_capacity = storage->nbytes();
-  storage->set_nbytes(size_bytes);
-  const auto copy_capacity = std::min(size_bytes, old_capacity);
-  if (old_data != nullptr && copy_capacity > 0) {
-    tpu::TPUCopyDeviceToDevice(storage->mutable_data(), old_data.get(),
-                                   copy_capacity, true);
-  }
-}
-
-} // namespace at::native {
+} // namespace at
