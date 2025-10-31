@@ -22,10 +22,6 @@ def fix_deps():
 
 os.environ["CMODEL_FAST_EXEC"]="1"
 
-
-from torch_tpu.tpu.custom_op.lora_matmul import LoraMatmulBlock
-
-
 # temporary fix for torch.arange_
 def arange_wrapper(func):
     def wrapper(*args, **kwargs):
@@ -123,6 +119,8 @@ def case1():
     #plan A: call torch_tpu api to replace lora block
     from torch_tpu.tpu.custom_op import lora_matmul
     lora_matmul.create_and_replace(lora_model_tpu, lora_config)
+
+    from torch_tpu.tpu.custom_op.lora_matmul import LoraMatmulBlock
 
     #------------------plan B: replace lora block manually, e.g. v_proj layer-------------------------
     # for i in range(llama_config_dict["num_hidden_layers"]):
