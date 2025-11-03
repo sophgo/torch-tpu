@@ -88,7 +88,7 @@ class Global_Regression_Tester():
 
     #this function will gather static info about not-tested arch utest for global_skip_utest_chip_arch
     def search_skip_utest_chip_arch(self, info, single_utest):
-        if ("[INFO]Test skikped for this arch!" in info):
+        if ("[INFO]Test skipped for this arch!" in info):
             self.global_skip_utest_chip_arch += [self.get_file_name(single_utest)]
             return 1
         return 0

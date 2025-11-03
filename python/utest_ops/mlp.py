@@ -112,7 +112,7 @@ def case1():
          [ torch.randn(batch_size, length, embed_dim, requires_grad=True),w1, w2, b1, b2],
     ]
     metric_table = ['max_diff','MAE']
-    chip_arch_dict = {"bm1684x":1, 'sg2260':0}
+    chip_arch_dict = {"bm1684x":0, 'sg2260':0}
     epsilon_dict = {'bm1684x':{'f32':1e-6,'f16':1e-2},'sg2260':{'f32':1e-6,'f16':1e-2}}
     case_name =  __file__.split('.py')[0]# You can change your name
     dump_flag = True #it will dump alll wrong cases
@@ -140,7 +140,7 @@ def case1():
 
     My_Tester = Tester_Basic(case_name, chip_arch_dict, device, metric_table, epsilon_dict,seed, dump_flag)
     My_Tester.customized_execute_function = customized_execute_function
-    # return My_Tester.Torch_Test_Execution_Function(MLP_Module.cpu(), input_data)
+    return My_Tester.Torch_Test_Execution_Function(MLP_Module.cpu(), input_data)
 
 
 if __name__ == "__main__":

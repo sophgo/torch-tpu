@@ -549,7 +549,7 @@ class Tester_Basic():
     if(self.flag_is_such_arch_ready_test):
       return self.Torch_Test_Execution_Function_flag_allowed(module_native, input_sample_collection)
     else:
-      print("[INFO]Test skikped for this arch!")
+      print("[INFO]Test skipped for this arch!")
 
 class TensorComparator:
     def __init__(self, delta=1e-1, max_error_count=128):

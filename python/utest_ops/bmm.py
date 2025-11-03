@@ -28,7 +28,7 @@ def case1():
          [torch.rand(b, m, k),  torch.rand(b, k, n)],
     ]
     metric_table = ['max_diff','MAE']
-    chip_arch_dict = {"bm1684x":1, 'sg2260':0}
+    chip_arch_dict = {"bm1684x":1, 'sg2260':1}
     epsilon_dict = {'bm1684x':{'f32':5e-4,'f16':1e-2},'sg2260':{'f16':5e-4}}
     case_name =  __file__.split('.py')[0]# You can change your name
     dump_flag = True #it will dump alll wrong cases

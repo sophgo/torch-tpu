@@ -25,7 +25,7 @@ def case1():
          [torch.rand(b, m, l, d), torch.rand(b, m, l, d)],
     ]
     metric_table = ['max_diff','MAE']
-    chip_arch_dict = {"bm1684x":0, 'sg2260':1}
+    chip_arch_dict = {"bm1684x":1, 'sg2260':1}
     epsilon_dict = {'bm1684x':{'f32':5e-3,'f16':1e-2},'sg2260':{'f32': 5e-3, 'f16':1e-2}}
     case_name =  __file__.split('.py')[0]# You can change your name
     dump_flag = True #it will dump alll wrong cases
@@ -54,9 +54,14 @@ def case1():
     return My_Tester.Torch_Test_Execution_Function(Test_Module(), input_data)
 
 def case2():
-    #int8 matmul
     seed=1000
     set_bacis_info(seed)
+    chip_arch_dict = {"bm1684x":0, 'sg2260':1}
+    import os
+    if chip_arch_dict[os.environ['CHIP_ARCH']] == 0:
+        print(f'Test case2 skipped for chip arch {os.environ["CHIP_ARCH"]}')
+        sys.exit(0)
+
     a = torch.randn(1024, 1024, device="tpu", dtype=torch.int8)
     b = torch.randn(1024, 1024, device="tpu", dtype=torch.int8)
     c = torch.matmul(a, b)
@@ -76,13 +81,7 @@ def case2():
         print("int8 matmul is correct!")
 
 if __name__ == "__main__":
-    #This example shows all  [], [[]] is acceptable
     case1()
-
-    import os
-    if os.environ['CHIP_ARCH'] in ['bm1684x']:
-        print(f'Skip case2 for this arch')
-        sys.exit(0)
     case2()
 
 #######################
