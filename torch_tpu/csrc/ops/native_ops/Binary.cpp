@@ -1032,23 +1032,75 @@ Tensor &binary_op_tpu(const Tensor &self, const Tensor &other,
   return out;
 }
 
+#define CONTIGUOUS_FALLBACK(OP_FUNC, self, other, out, alpha)                    \
+do {                                                                              \
+  if (!(self).is_contiguous() || !(other).is_contiguous() || !(out).is_contiguous())\
+  {                                                                               \
+    CONTIGUOUS_WARNING();                                                         \
+    if ((out).is_contiguous()) {                                                  \
+      (out) = OP_FUNC((self).contiguous(), (other).contiguous(), (alpha));        \
+    } else {                                                                      \
+      auto out_ = OP_FUNC((self).contiguous(), (other).contiguous(), (alpha));    \
+      auto handle = c10_tpu::getCurrentTPUStream();                               \
+      tpudnnStridedCopyAsync(                                                     \
+          handle,                                                                 \
+          tpu::TPUGenerateTpudnnTensor(handle, out_),                             \
+          tpu::TPUGenerateTpudnnTensor(handle, (out)));                           \
+    }                                                                             \
+    SHOW_TENSOR_OP((self), (other), (out));                                       \
+    return (out);                                                                 \
+  }                                                                               \
+} while (0)
+
+#define CONTIGUOUS_FALLBACK_v2(OP_FUNC, self, other, out)                       \
+do {                                                                              \
+  if (!(self).is_contiguous() || !(other).is_contiguous() || !(out).is_contiguous())\
+  {                                                                               \
+    CONTIGUOUS_WARNING();                                                         \
+    if ((out).is_contiguous()) {                                                  \
+      (out) = OP_FUNC((self).contiguous(), (other).contiguous());                 \
+    } else {                                                                      \
+      auto out_ = OP_FUNC((self).contiguous(), (other).contiguous());             \
+      auto handle = c10_tpu::getCurrentTPUStream();                               \
+      tpudnnStridedCopyAsync(                                                     \
+          handle,                                                                 \
+          tpu::TPUGenerateTpudnnTensor(handle, out_),                             \
+          tpu::TPUGenerateTpudnnTensor(handle, (out)));                           \
+    }                                                                             \
+    SHOW_TENSOR_OP((self), (other), (out));                                       \
+    return (out);                                                                 \
+  }                                                                               \
+} while (0)
+
+// pattern1: self.shape == other.shape = out.shape, 
+//           self.stride[0] != other.stride[0]
+#define PATTERN1(OP_FUNC, self, other, out, alpha)                              \
+do {                                                                            \
+  if (other.is_contiguous() && out.is_contiguous() && !self.is_contiguous() &&  \
+    tpu::TPUIsSameShapeWithstride(self, other))                                 \
+  {                                                                             \
+    TIMING_START;                                                               \
+    int binary_type = -1;                                                       \
+    if ( strcmp(#OP_FUNC, "add") == 0 ) binary_type = 0;                        \
+    else if ( strcmp(#OP_FUNC, "sub") == 0 ) binary_type = 1;                   \
+    else TORCH_CHECK( false, "only support add/sub");                           \
+    auto stream = c10_tpu::getCurrentTPUStream();                               \
+    auto status = tpudnnBinaryWStrideAsync(                                            \
+        stream,                                                                 \
+        tpu::TPUGenerateTpudnnTensor(stream, self),                             \
+        tpu::TPUGenerateTpudnnTensor(stream, other),                            \
+        alpha.toFloat(),                                                        \
+        tpu::TPUGenerateTpudnnTensor(stream, out), binary_type);                \
+    TORCH_CHECK(status == TPUDNN_STATUS_SUCCESS);                                \
+    TIMING_END;                                                                  \
+    return out;                                                                  \
+  }                                                                              \
+}while (0)                                                                      
+
 Tensor &add_out_tpu(const Tensor &self, const Tensor &other,
                     const Scalar &alpha, Tensor &out) {
-  if (!self.is_contiguous() || !other.is_contiguous() || !out.is_contiguous()) {
-    CONTIGUOUS_WARNING();
-    if (out.is_contiguous()) {
-      out = add(self.contiguous(), other.contiguous(), alpha);
-    } else {
-      auto out_ = add(self.contiguous(), other.contiguous(), alpha);
-      auto handle = c10_tpu::getCurrentTPUStream();
-      tpudnnStridedCopyAsync(
-          handle,
-          tpu::TPUGenerateTpudnnTensor(handle, out_),
-          tpu::TPUGenerateTpudnnTensor(handle, out));
-    }
-    SHOW_TENSOR_OP(self, other, out);
-    return out;
-  }
+  PATTERN1(add, self, other, out, alpha);
+  CONTIGUOUS_FALLBACK(add, self, other, out, alpha);
   // 0:add, 1:sub, 2:mul, 3:div
   binary_op_tpu(self, other, alpha, out, 0);
   SHOW_TENSOR_OP(self, other, out);
@@ -1058,21 +1110,8 @@ TORCH_LIBRARY_IMPL(aten, TPU, m) { m.impl("add.out", add_out_tpu); }
 
 Tensor &sub_out_tpu(const Tensor &self, const Tensor &other,
                     const Scalar &alpha, Tensor &out) {
-  if (!self.is_contiguous() || !other.is_contiguous() || !out.is_contiguous()) {
-    CONTIGUOUS_WARNING();
-    if (out.is_contiguous()) {
-      out = sub(self.contiguous(), other.contiguous(), alpha);
-    } else {
-      auto out_ = sub(self.contiguous(), other.contiguous(), alpha);
-      auto handle = c10_tpu::getCurrentTPUStream();
-      tpudnnStridedCopyAsync(
-          handle,
-          tpu::TPUGenerateTpudnnTensor(handle, out_),
-          tpu::TPUGenerateTpudnnTensor(handle, out));
-    }
-    SHOW_TENSOR_OP(self, other, out);
-    return out;
-  }
+  PATTERN1(sub, self, other, out, alpha);
+  CONTIGUOUS_FALLBACK(sub, self, other, out, alpha);
   // 0:add, 1:sub, 2:mul, 3:div
   binary_op_tpu(self, other, alpha, out, 1);
   SHOW_TENSOR_OP(self, other, out);
@@ -1081,21 +1120,7 @@ Tensor &sub_out_tpu(const Tensor &self, const Tensor &other,
 TORCH_LIBRARY_IMPL(aten, TPU, m) { m.impl("sub.out", sub_out_tpu); }
 
 Tensor &mul_out_tpu(const Tensor &self, const Tensor &other, Tensor &out) {
-  if (!self.is_contiguous() || !other.is_contiguous() || !out.is_contiguous()) {
-    CONTIGUOUS_WARNING();
-    if (out.is_contiguous()) {
-      out = mul(self.contiguous(), other.contiguous());
-    } else {
-      auto out_ = mul(self.contiguous(), other.contiguous());
-      auto handle = c10_tpu::getCurrentTPUStream();
-      tpudnnStridedCopyAsync(
-          handle,
-          tpu::TPUGenerateTpudnnTensor(handle, out_),
-          tpu::TPUGenerateTpudnnTensor(handle, out));
-    }
-    SHOW_TENSOR_OP(self, other, out);
-    return out;
-  }
+  CONTIGUOUS_FALLBACK_v2(mul, self, other, out);
   // 0:add, 1:sub, 2:mul, 3:div
   binary_op_tpu(self, other, 1, out, 2);
   SHOW_TENSOR_OP(self, other, out);
@@ -1104,22 +1129,7 @@ Tensor &mul_out_tpu(const Tensor &self, const Tensor &other, Tensor &out) {
 TORCH_LIBRARY_IMPL(aten, TPU, m) { m.impl("mul.out", mul_out_tpu); }
 
 Tensor &div_out_tpu(const Tensor &self, const Tensor &other, Tensor &out) {
-  if (!self.is_contiguous() || !other.is_contiguous() || !out.is_contiguous()) {
-    CONTIGUOUS_WARNING();
-    if (out.is_contiguous()) {
-      out = div(self.contiguous(), other.contiguous());
-    } else {
-      auto out_ = div(self.contiguous(), other.contiguous());
-      auto handle = c10_tpu::getCurrentTPUStream();
-      tpudnnStridedCopyAsync(
-          handle,
-          tpu::TPUGenerateTpudnnTensor(handle, out_),
-          tpu::TPUGenerateTpudnnTensor(handle, out));
-    }
-    SHOW_TENSOR_OP(self, other, out);
-    return out;
-  }
-
+  CONTIGUOUS_FALLBACK_v2(div, self, other, out);
   // 0:add, 1:sub, 2:mul, 3:div
   binary_op_tpu(self, other, 1, out, 3);
   SHOW_TENSOR_OP(self, other, out);

@@ -301,6 +301,26 @@ static inline bool TPUIsSameShape ( const at::Tensor & Tensor1, const at::Tensor
   return true;
 }
 
+static inline bool TPUIsSameShapeWithstride ( const at::Tensor & Tensor1, const at::Tensor & Tensor2 )
+{
+  if ( Tensor1.dim() != Tensor2.dim() ) return false;
+  for ( auto i = Tensor1.dim() - 1; i >= 0; i-- )
+  {
+    if ( Tensor1.size ( i ) != Tensor2.size ( i ) ) return false;
+    if ( i == 0 )
+    {
+      if ( Tensor1.stride( i ) == Tensor2.stride( i ) ) return false;
+    }
+    else
+    {
+      if ( Tensor1.stride( i ) != Tensor2.stride( i ) ) return false;
+    }
+
+  }
+  return true;
+}
+
+
 class OpCalDtype;
 
 } // namespace tpu

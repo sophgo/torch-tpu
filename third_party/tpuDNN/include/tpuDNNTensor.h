@@ -380,6 +380,14 @@ tpudnnStatus_t tpudnnBinaryAsync(
     tpudnnTensor_t output,
     int binary_type);
 
+tpudnnStatus_t tpudnnBinaryWStrideAsync(
+    tpudnnHandle_t handle,
+    tpudnnTensor_t input,
+    tpudnnTensor_t other,
+    float scalar,
+    tpudnnTensor_t output,
+    int binary_type);
+
 tpudnnStatus_t tpudnnBinaryBcastAsync(
     tpudnnHandle_t handle,
     tpudnnTensor_t input,

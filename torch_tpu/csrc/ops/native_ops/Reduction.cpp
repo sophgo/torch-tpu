@@ -160,6 +160,7 @@ TORCH_LIBRARY_IMPL(aten, TPU, m) {
 
 Tensor &prod_int_out_tpu(const Tensor &self, long dim, bool keepdim,
                          c10::optional<ScalarType> dtype_opt, Tensor &out) {
+  if (out.numel() == 0) return out;
   TIMING_START;
   CHECK_TENSOR_IN_DEVICE(self);
   CHECK_TENSOR_IN_DEVICE(out);

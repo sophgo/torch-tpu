@@ -48,12 +48,25 @@ if not arch:
 if not os.environ.get('TPU_EMULATOR_PATH'):
     os.environ['TPU_EMULATOR_PATH'] = os.path.join(lib_pwd, f'{arch}_cmodel_firmware.so')
 
+def make_symbol():
+    cmodel_path =  os.path.join(lib_pwd, f'{arch}_cmodel_firmware.so')
+    if arch == "sg2260":
+        o_emulator = os.path.join(lib_pwd, "libtpuv7_emulator.so")
+    elif arch == "sg2260e":
+        o_emulator = os.path.join(lib_pwd, "libtpuv7.1_emulator.so")
+    else:
+        o_emulator = ""
+    
+    if os.path.isfile(o_emulator):
+        os.symlink(o_emulator, cmodel_path)
+
 if arch == 'sg2260e':
     os.environ['DISABLE_CACHE'] = '1'
 # OPEN INS-CACHE default
 if os.environ.get('TPU_CACHE_BACKEND') is None:
     if not os.environ.get('DISABLE_CACHE'):
         os.environ['TPU_CACHE_BACKEND'] = os.environ['TPU_EMULATOR_PATH']
+
 
 #open kernel-module save default
 os.environ['TorchTpuSaveKernelModule'] = '1'

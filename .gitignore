@@ -51,4 +51,5 @@ site-packages
 *.npz
 *.ref_files.json
 *doxygen
+third_party/tpuv7_runtime/tpuv7-emulator_0.1.0/lib/libcmodel_firmware.so
 #*.tar.gz
