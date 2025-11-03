@@ -24,12 +24,16 @@ static void latent_attention_fp8_impl(
     int max_paged_block_num, int paged_cache_block_size, int max_cache_size,
     int attention_mode, bool has_mask, int batch, int *seqlen)
 {
-    auto kernel = [&](tpuStream_t stream, tpuKernelModule_t ppl_module) -> int {
+    auto kernel = [&](TPUStream stream, tpuKernelModule_t ppl_module) -> int {
         if constexpr (std::is_same_v<scalar_t, at::BFloat16>) {
             if (attention_mode == PAGED_ATTENTION_DECODE ||
                 attention_mode == NORMAL_ATTENTION_DECODE) {
                 return mla_decode_bf16_fp8e4m3(
-                    stream, ppl_module, Q_addr, KV_addr, PE_addr, KVcache_addr,
+                    stream,
+#ifndef BACKEND_SG2260
+                    ppl_module,
+#endif
+                    Q_addr, KV_addr, PE_addr, KVcache_addr,
                     PEcache_addr, KVU_addr, RoPE_cos_addr, RoPE_sin_addr,
                     WUQ_addr, WUKV_addr, Mask_addr, Y_addr, WUQ_scale_addr,
                     WUKV_scale_addr, block_table_addr, save_slot_addr,
@@ -41,7 +45,11 @@ static void latent_attention_fp8_impl(
             } else if (attention_mode == PAGED_ATTENTION_PREFILL ||
                        attention_mode == NORMAL_ATTENTION_PREFILL) {
                 return mla_prefill_bf16_fp8e4m3(
-                    stream, ppl_module, Q_addr, KV_addr, PE_addr, KVcache_addr,
+                    stream,
+#ifndef BACKEND_SG2260
+                    ppl_module,
+#endif
+                    Q_addr, KV_addr, PE_addr, KVcache_addr,
                     PEcache_addr, KVU_addr, RoPE_cos_addr, RoPE_sin_addr,
                     WUQ_addr, WUKV_addr, Mask_addr, Y_addr, WUQ_scale_addr,
                     WUKV_scale_addr, block_table_addr, save_slot_addr,
@@ -55,7 +63,7 @@ static void latent_attention_fp8_impl(
         return -1;
     };
 
-    tpuStream_t stream = c10_tpu::getCurrentTPUStream().stream();
+    auto stream = c10_tpu::getCurrentTPUStream();
     tpuKernelModule_t ppl_module = getPplModule();
 
     int ret = kernel(stream, ppl_module);
@@ -77,12 +85,16 @@ static void latent_attention_impl(
     int paged_cache_block_size, int max_cache_size, int attention_mode,
     bool has_mask, int batch, int *seqlen)
 {
-    auto kernel = [&](tpuStream_t stream, tpuKernelModule_t ppl_module) -> int {
+    auto kernel = [&](TPUStream stream, tpuKernelModule_t ppl_module) -> int {
         if constexpr (std::is_same_v<scalar_t, at::BFloat16>) {
             if (attention_mode == PAGED_ATTENTION_DECODE ||
                 attention_mode == NORMAL_ATTENTION_DECODE) {
                 return mla_decode_bf16(
-                    stream, ppl_module, Q_addr, KV_addr, PE_addr, KVcache_addr,
+                    stream,
+#ifndef BACKEND_SG2260
+                    ppl_module,
+#endif
+                    Q_addr, KV_addr, PE_addr, KVcache_addr,
                     PEcache_addr, KVU_addr, RoPE_cos_addr, RoPE_sin_addr,
                     WUQ_addr, WUKV_addr, Mask_addr, Y_addr, block_table_addr,
                     save_slot_addr, max_paged_block_num, paged_cache_block_size,
@@ -92,7 +104,11 @@ static void latent_attention_impl(
             } else if (attention_mode == PAGED_ATTENTION_PREFILL ||
                        attention_mode == NORMAL_ATTENTION_PREFILL) {
                 return mla_prefill_bf16(
-                    stream, ppl_module, Q_addr, KV_addr, PE_addr, KVcache_addr,
+                    stream,
+#ifndef BACKEND_SG2260
+                    ppl_module,
+#endif
+                    Q_addr, KV_addr, PE_addr, KVcache_addr,
                     PEcache_addr, KVU_addr, RoPE_cos_addr, RoPE_sin_addr,
                     WUQ_addr, WUKV_addr, Mask_addr, Y_addr, block_table_addr,
                     save_slot_addr, max_paged_block_num, paged_cache_block_size,
@@ -104,7 +120,7 @@ static void latent_attention_impl(
         return -1;
     };
 
-    tpuStream_t stream = c10_tpu::getCurrentTPUStream().stream();
+    auto stream = c10_tpu::getCurrentTPUStream();
     tpuKernelModule_t ppl_module = getPplModule();
 
     int ret = kernel(stream, ppl_module);
@@ -151,6 +167,8 @@ namespace at
 						"MLA input lenghts must on CPU device" );
 		}
 #ifdef USING_PPL
+        if (usePPLKernels())
+        {
         AT_DISPATCH_FLOATING_TYPES_AND2(
         at::kHalf, at::kBFloat16, Q.scalar_type(), "latent_attention", [&] {
             latent_attention_impl<scalar_t>(
@@ -186,7 +204,9 @@ namespace at
             );
         
     });
-#else
+    } else
+#endif
+    {
   		auto stream = c10_tpu::getCurrentTPUStream();
 		auto status = tpudnnLatentAttentionAsync(
             stream,
@@ -215,7 +235,7 @@ namespace at
             C,
             (AttentionMode_t)attention_mode);
         TORCH_CHECK ( status == TPUDNN_STATUS_SUCCESS );
-#endif
+    }
         TIMING_END;
         return OUT;
     }
@@ -246,6 +266,8 @@ namespace at
                     "MLA input lengths must be contiguous tensor");
       }
 #ifdef USING_PPL
+    if (usePPLKernels())
+    {
         int max_cache_size = 0;
         int batch = (int)(input_lengths.nbytes() / 4);
         std::vector<uint32_t> seq(2 * batch, 0);
@@ -286,7 +308,9 @@ namespace at
             );
         
     });
-#else
+    } else
+#endif
+    {
       auto stream = c10_tpu::getCurrentTPUStream();
       auto status = tpudnnPagedLatentAttentionAsync(
           stream, tpu::TPUGenerateTpudnnTensor(stream, OUT),
@@ -311,7 +335,7 @@ namespace at
           qk_nope_head_dim, qk_rope_head_dim, v_head_dim, mask_size,
           C, (AttentionMode_t)attention_mode);
       TORCH_CHECK(status == TPUDNN_STATUS_SUCCESS);
-#endif
+    }
       TIMING_END;
       return OUT;
     }
@@ -341,6 +365,8 @@ namespace at
             "MLA seqlen must be contiguous tensor");
         }
 #ifdef USING_PPL
+    if (usePPLKernels())
+    {
 
         int max_cache_size = 0;
         int batch = (int)(seqlen.nbytes() / 4);
@@ -385,7 +411,9 @@ namespace at
             );
         
     });
-#else 
+    } else
+#endif
+    {
         bool cpu_lengths = seqlen.device().type() == DeviceType::CPU;
         auto stream = c10_tpu::getCurrentTPUStream();
         auto status = tpudnnPagedLatentAttentionFp8Async(
@@ -421,7 +449,7 @@ namespace at
             mask_size, quant_block_size, max_paged_block_num, paged_cache_block_size,
             topk_size, softmax_scale, true, (AttentionMode_t)attention_mode);
         TORCH_CHECK(status == TPUDNN_STATUS_SUCCESS);
-#endif
+    }
         TIMING_END;
         return OUT;
     }
@@ -448,6 +476,8 @@ namespace at
             "MLA input seqlen must be int32 dtype && on CPU device");
         }
 #ifdef USING_PPL
+    if (usePPLKernels())
+    {
     AT_DISPATCH_FLOATING_TYPES_AND2(
         at::kHalf, at::kBFloat16, Q.scalar_type(), "latent_attention_fp8", [&] {
             latent_attention_fp8_impl<scalar_t>(
@@ -486,7 +516,9 @@ namespace at
             );
         
     });
-#else 
+    } else
+#endif
+    {
         auto stream = c10_tpu::getCurrentTPUStream();
         auto status = tpudnnLatentAttentionFp8Async(
             stream, tpu::TPUGenerateTpudnnTensor(stream, OUT),
@@ -512,7 +544,7 @@ namespace at
             softmax_scale, true, (AttentionMode_t)attention_mode);
         TORCH_CHECK(status == TPUDNN_STATUS_SUCCESS);
         TIMING_END;
-#endif
+    }
         return OUT;
     }
 }

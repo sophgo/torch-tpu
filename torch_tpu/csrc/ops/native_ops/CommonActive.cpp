@@ -67,25 +67,37 @@ static void active_impl(
   if (!(active_type == TPUDNN_ACTIVE_SIGMOID)) {
     TORCH_CHECK(false, "Unsupported active_type: ", active_type);
   }
-  auto kernel = [&](tpuStream_t stream, tpuKernelModule_t ppl_module,
+  auto kernel = [&](TPUStream stream, tpuKernelModule_t ppl_module,
     int tile_size) -> int {
     if constexpr (std::is_same_v<scalar_t, float>) {
       return activation_sigmoid_impl_float32(
-        stream, ppl_module, output_addr, input_addr, inner_size,
+        stream,
+#ifndef BACKEND_SG2260
+        ppl_module,
+#endif
+        output_addr, input_addr, inner_size,
         tile_size);
     } else if constexpr (std::is_same_v<scalar_t, at::Half>) {
       return activation_sigmoid_impl_float16(
-        stream, ppl_module, output_addr, input_addr, inner_size,
+        stream,
+#ifndef BACKEND_SG2260
+        ppl_module,
+#endif
+        output_addr, input_addr, inner_size,
         tile_size);
     } else if constexpr (std::is_same_v<scalar_t, at::BFloat16>) {
       return activation_sigmoid_impl_bf16(
-        stream, ppl_module, output_addr, input_addr, inner_size,
+        stream,
+#ifndef BACKEND_SG2260
+        ppl_module,
+#endif
+        output_addr, input_addr, inner_size,
         tile_size);
     }
     return -1;
   };
 
-  tpuStream_t stream = c10_tpu::getCurrentTPUStream().stream();
+  auto stream = c10_tpu::getCurrentTPUStream();
   tpuKernelModule_t ppl_module = getPplModule();
 
   constexpr uint32_t LOCAL_MEM_BYTES = 256 * 1024; // 256KB
@@ -122,73 +134,64 @@ namespace at {
 #define IMP_ACTIVE_(OP)                                                        \
   Tensor &OP##__tpu(Tensor &self) { return OP##_out_tpu(self, self); }
 
+using ActiveOpType = at::Tensor (&)(const at::Tensor&);
+
+template <tensor_active_type_t ActiveType, ActiveOpType op>
+Tensor &active_template(const Tensor &self, Tensor &out) {
+    if (self.dim() > 0) {
+        CHECK_TENSOR_IN_DEVICE_NO_CONTIGUOUS(self);
+    }
+    CHECK_TENSOR_IN_DEVICE(out);
+    if (!IS_TPU_TENSOR(self)) {
+        auto self_cpu = op(self.cpu());
+          tpu::TPUCopyHostToDevice(out.data_ptr(),
+                                   self_cpu.contiguous().data_ptr(),
+                                   out.nbytes());
+    } else if (IS_TPU_TENSOR(self)) {
+        auto self_ = self.contiguous();
+
 #ifdef USING_PPL
+        if (usePPLKernels())
+        {
+            int length = 1;
+            for (const auto i : c10::irange(self_.dim())) {
+              length *= self_.size(i);
+            }
+            AT_DISPATCH_FLOATING_TYPES_AND2(
+              at::kHalf, at::kBFloat16, self_.scalar_type(), "active", [&] {
+                active_impl<scalar_t>(
+                  reinterpret_cast<uint64_t>(out.data_ptr()),
+                  reinterpret_cast<uint64_t>(self_.data_ptr()),
+                  length,
+                 ActiveType
+                  );
+                });
+        } else
+#endif
+        {
+            auto stream = c10_tpu::getCurrentTPUStream();
+            auto status = tpudnnActiveAsync(
+                  stream,
+                  tpu::TPUGenerateTpudnnTensor(stream, self_),
+                  tpu::TPUGenerateTpudnnTensor(stream, out),
+                  ActiveType);
+            TORCH_CHECK(status == TPUDNN_STATUS_SUCCESS);
+        }
+    } else {
+      TORCH_CHECK(false, "At least one input is required in TPU device");
+    }
 
-  #define IMP_ACTIVE_OUT(OP, ACTIVE_TYPE, TIMING_NAME)                         \
-  Tensor &OP##_out_tpu(const Tensor &self, Tensor &out) {                      \
-    TIMING_START;                                                              \
-    if (self.dim() > 0) {                                                      \
-      CHECK_TENSOR_IN_DEVICE_NO_CONTIGUOUS(self);                              \
-    }                                                                          \
-    CHECK_TENSOR_IN_DEVICE(out);                                               \
-    if (!IS_TPU_TENSOR(self)) {                                                \
-      auto self_cpu = OP(self.cpu());                                          \
-        tpu::TPUCopyHostToDevice(out.data_ptr(),                               \
-                                 self_cpu.contiguous().data_ptr(),             \
-                                 out.nbytes());                                \
-    } else if (IS_TPU_TENSOR(self)) {                                          \
-      auto self_ = self.contiguous();                                          \
-      int length = 1;                                                          \
-      for (const auto i : c10::irange(self_.dim())) {                          \
-        length *= self_.size(i);                                               \
-      }                                                                        \
-      AT_DISPATCH_FLOATING_TYPES_AND2(                                         \
-        at::kHalf, at::kBFloat16, self_.scalar_type(), "active", [&] {\
-          active_impl<scalar_t>(                                       \
-            reinterpret_cast<uint64_t>(out.data_ptr()),                        \
-            reinterpret_cast<uint64_t>(self_.data_ptr()),                      \
-            length,                                                            \
-            ACTIVE_TYPE                                                        \
-            );                                                                 \
-          });                                                                  \
-    } else {                                                                   \
-      TORCH_CHECK(false, "At least one input is required in TPU device");      \
-    }                                                                          \
-    TIMING_END;                                                                \
-    SHOW_TENSOR_OP(self, out);                                                 \
-    return out;                                                                \
-  }
-#else
+    return out;
+}
 
-#define IMP_ACTIVE_OUT(OP, ACTIVE_TYPE, TIMING_NAME)                           \
-  Tensor &OP##_out_tpu(const Tensor &self, Tensor &out) {                      \
-    TIMING_START;                                                              \
-    if (self.dim() > 0) {                                                      \
-      CHECK_TENSOR_IN_DEVICE_NO_CONTIGUOUS(self);                              \
-    }                                                                          \
-    CHECK_TENSOR_IN_DEVICE(out);                                               \
-    if (!IS_TPU_TENSOR(self)) {                                                \
-      auto self_cpu = OP(self.cpu());                                          \
-        tpu::TPUCopyHostToDevice(out.data_ptr(),                               \
-                                 self_cpu.contiguous().data_ptr(),             \
-                                 out.nbytes());                                \
-    } else if (IS_TPU_TENSOR(self)) {                                          \
-      auto self_ = self.contiguous();                                          \
-      auto stream = c10_tpu::getCurrentTPUStream();                            \
-      auto status = tpudnnActiveAsync(                                         \
-          stream,                                                              \
-          tpu::TPUGenerateTpudnnTensor(stream, self_),                         \
-          tpu::TPUGenerateTpudnnTensor(stream, out),                           \
-          ACTIVE_TYPE);                                                        \
-      TORCH_CHECK(status == TPUDNN_STATUS_SUCCESS);                            \
-    } else {                                                                   \
-      TORCH_CHECK(false, "At least one input is required in TPU device");      \
-    }                                                                          \
-    TIMING_END;                                                                \
-    SHOW_TENSOR_OP(self, out);                                                 \
-    return out;                                                                \
+#define IMP_ACTIVE_OUT(OP, ACTIVE_TYPE, TIMING_NAME)                    \
+  Tensor &OP##_out_tpu(const Tensor &self, Tensor &out) {               \
+      TIMING_START;                                                     \
+      auto &ret = active_template<ACTIVE_TYPE, OP>(self, out);          \
+      TIMING_END;                                                       \
+      SHOW_TENSOR_OP(self, out);                                        \
+      return ret;                                                       \
   }
-#endif // USING_PPL
 
 IMP_ACTIVE_OUT(abs, TPUDNN_ACTIVE_ABSVAL, tpu::ACTIVE)
 IMP_ACTIVE(abs)

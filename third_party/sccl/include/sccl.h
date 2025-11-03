@@ -46,7 +46,7 @@ typedef enum {
 
 typedef void *scclComm_t;
 
-typedef void *scclHandle_t;
+typedef tpudnnHandle_t scclHandle_t;
 
 #define SCCL_UNIQUE_ID_BYTES (128)
 // NOLINTNEXTLINE(cppcoreguidelines-avoid-c-arrays,modernize-avoid-c-arrays)

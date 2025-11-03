@@ -19,25 +19,37 @@ template <typename scalar_t>
     uint32_t inner_size,
     float eps)
     {
-    auto kernel = [&](tpuStream_t stream, tpuKernelModule_t ppl_module,
+    auto kernel = [&](TPUStream stream, tpuKernelModule_t ppl_module,
             uint32_t tile_size) -> int {
         if constexpr (std::is_same_v<scalar_t, float>) {
             return rmsnorm_fp32(
-                stream, ppl_module, output_addr, input_addr, scale_addr, bias_addr,
+                stream,
+#ifndef BACKEND_SG2260
+                ppl_module,
+#endif
+                output_addr, input_addr, scale_addr, bias_addr,
                 eps, (scale_addr != 0), (bias_addr != 0),
                 static_cast<uint32_t>(outer_size),
                 static_cast<uint32_t>(inner_size),
                 tile_size);
         } else if constexpr (std::is_same_v<scalar_t, at::Half>) {
             return rmsnorm_fp16(
-                stream, ppl_module, output_addr, input_addr, scale_addr, bias_addr,
+                stream,
+#ifndef BACKEND_SG2260
+                ppl_module,
+#endif
+                output_addr, input_addr, scale_addr, bias_addr,
                 eps, (scale_addr != 0), (bias_addr != 0),
                 static_cast<uint32_t>(outer_size),
                 static_cast<uint32_t>(inner_size),
                 tile_size);
         } else if constexpr (std::is_same_v<scalar_t, at::BFloat16>) {
             return rmsnorm_bf16(
-                stream, ppl_module, output_addr, input_addr, scale_addr, bias_addr,
+                stream,
+#ifndef BACKEND_SG2260
+                ppl_module,
+#endif
+                output_addr, input_addr, scale_addr, bias_addr,
                 eps, (scale_addr != 0), (bias_addr != 0),
                 static_cast<uint32_t>(outer_size),
                 static_cast<uint32_t>(inner_size),
@@ -46,7 +58,7 @@ template <typename scalar_t>
         return -1;
     };
 
-    tpuStream_t stream = c10_tpu::getCurrentTPUStream().stream();
+    auto stream = c10_tpu::getCurrentTPUStream();
     tpuKernelModule_t ppl_module = getPplModule();
     uint32_t tile_size = inner_size;
 
@@ -84,36 +96,41 @@ namespace at
             CHECK_TENSOR_IN_DEVICE(bias.value());
         }
 #ifdef USING_PPL
-        uint32_t outer_size = 1;
-        uint32_t inner_size = 1;
-        for (const auto i : c10::irange(axis)) {
-            outer_size *= input.size(i);
-        }
-        for (const auto i : c10::irange(axis, input.dim())) {
-            inner_size *= input.size(i);
-        }
-        AT_DISPATCH_FLOATING_TYPES_AND2(
-            at::kHalf, at::kBFloat16, input.scalar_type(), "rmsnorm_forward", [&] {
-                rmsnorm_forward_impl<scalar_t>(
-                    reinterpret_cast<uint64_t>(output.data_ptr()),
-                    reinterpret_cast<uint64_t>(input.data_ptr()),
-                    scale ? reinterpret_cast<uint64_t>(scale->data_ptr()) : 0,
-                    bias ? reinterpret_cast<uint64_t>(bias->data_ptr()) : 0,
-                    outer_size, inner_size,
-                    static_cast<float>(eps));
-            });
-#else
-        auto stream = c10_tpu::getCurrentTPUStream();
-        tpudnnStatus_t status = tpudnnRmsNormForwardAsync(
-            stream,
-            tpu::TPUGenerateTpudnnTensor(stream, input),
-            scale.has_value() ? tpu::TPUGenerateTpudnnTensor(stream, scale.value()) : tpudnnUndefinedTensor(),
-            bias.has_value() ? tpu::TPUGenerateTpudnnTensor(stream, bias.value()) : tpudnnUndefinedTensor(),
-            tpu::TPUGenerateTpudnnTensor(stream, output),
-            axis,
-            eps);
-        TORCH_CHECK(status == TPUDNN_STATUS_SUCCESS);
+        if (usePPLKernels())
+        {
+          uint32_t outer_size = 1;
+          uint32_t inner_size = 1;
+          for (const auto i : c10::irange(axis)) {
+              outer_size *= input.size(i);
+          }
+          for (const auto i : c10::irange(axis, input.dim())) {
+              inner_size *= input.size(i);
+          }
+          AT_DISPATCH_FLOATING_TYPES_AND2(
+              at::kHalf, at::kBFloat16, input.scalar_type(), "rmsnorm_forward", [&] {
+                  rmsnorm_forward_impl<scalar_t>(
+                      reinterpret_cast<uint64_t>(output.data_ptr()),
+                      reinterpret_cast<uint64_t>(input.data_ptr()),
+                      scale ? reinterpret_cast<uint64_t>(scale->data_ptr()) : 0,
+                      bias ? reinterpret_cast<uint64_t>(bias->data_ptr()) : 0,
+                      outer_size, inner_size,
+                      static_cast<float>(eps));
+              });
+        } else
 #endif
+        {
+          auto stream = c10_tpu::getCurrentTPUStream();
+          tpudnnStatus_t status = tpudnnRmsNormForwardAsync(
+              stream,
+              tpu::TPUGenerateTpudnnTensor(stream, input),
+              scale.has_value() ? tpu::TPUGenerateTpudnnTensor(stream, scale.value()) : tpudnnUndefinedTensor(),
+              bias.has_value() ? tpu::TPUGenerateTpudnnTensor(stream, bias.value()) : tpudnnUndefinedTensor(),
+              tpu::TPUGenerateTpudnnTensor(stream, output),
+              axis,
+              eps);
+          TORCH_CHECK(status == TPUDNN_STATUS_SUCCESS);
+        }
+
         TIMING_END;
         return output;
     }

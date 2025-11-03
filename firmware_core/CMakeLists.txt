@@ -98,7 +98,7 @@ else()
     endif()
 endif()
 
-set(PPL_SUPPORTED_ARCHES sg2260e)
+set(PPL_SUPPORTED_ARCHES sg2260e sg2260)
 if ("$ENV{CHIP_ARCH}" IN_LIST PPL_SUPPORTED_ARCHES)
     include(PPLTools)
     file(GLOB pl_files LIST_DIRECTORIES false

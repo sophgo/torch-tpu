@@ -20,44 +20,88 @@ static void copy_impl(
     at::ScalarType src_type
 )
 {
-  auto kernel = [&](tpuStream_t stream, tpuKernelModule_t ppl_module,
+  auto kernel = [&](TPUStream stream, tpuKernelModule_t ppl_module,
     int tile_size, uint32_t inner_size, uint32_t outer_size) -> int {
 
     if (src_type == at::kHalf) {
       if (dst_type == at::kFloat){
-        return convert_impl_half_to_float(stream, ppl_module, output_addr, input_addr, tile_size, inner_size, outer_size);
+        return convert_impl_half_to_float(stream,
+#ifndef BACKEND_SG2260
+                ppl_module,
+#endif
+                output_addr, input_addr, tile_size, inner_size, outer_size);
       } else if (dst_type == at::kHalf){
-        return convert_impl_half_to_half(stream, ppl_module, output_addr, input_addr, tile_size, inner_size, outer_size);
+        return convert_impl_half_to_half(stream,
+#ifndef BACKEND_SG2260
+                ppl_module,
+#endif
+                output_addr, input_addr, tile_size, inner_size, outer_size);
       }
     } else if (src_type == at::kBFloat16) {
       if (dst_type == at::kFloat){
-        return convert_impl_bf16_to_float(stream, ppl_module, output_addr, input_addr, tile_size, inner_size, outer_size);
+        return convert_impl_bf16_to_float(stream,
+#ifndef BACKEND_SG2260
+                ppl_module,
+#endif
+                output_addr, input_addr, tile_size, inner_size, outer_size);
       } else if (dst_type == at::kBFloat16){
-        return convert_impl_bf16_to_bf16(stream, ppl_module, output_addr, input_addr, tile_size, inner_size, outer_size);
+        return convert_impl_bf16_to_bf16(stream,
+#ifndef BACKEND_SG2260
+                ppl_module,
+#endif
+                output_addr, input_addr, tile_size, inner_size, outer_size);
       }
     } else if (src_type == at::kFloat) {
       if (dst_type == at::kFloat) {
-        return convert_impl_float_to_float(stream, ppl_module, output_addr, input_addr, tile_size, inner_size, outer_size);
+        return convert_impl_float_to_float(stream,
+#ifndef BACKEND_SG2260
+                ppl_module,
+#endif
+                output_addr, input_addr, tile_size, inner_size, outer_size);
       } else if (dst_type == at::kHalf) {
-        return convert_impl_float_to_half(stream, ppl_module, output_addr, input_addr, tile_size, inner_size, outer_size);
+        return convert_impl_float_to_half(stream,
+#ifndef BACKEND_SG2260
+                ppl_module,
+#endif
+                output_addr, input_addr, tile_size, inner_size, outer_size);
       } else if (dst_type == at::kBFloat16) {
-        return convert_impl_float_to_bf16(stream, ppl_module, output_addr, input_addr, tile_size, inner_size, outer_size);
+        return convert_impl_float_to_bf16(stream,
+#ifndef BACKEND_SG2260
+                ppl_module,
+#endif
+                output_addr, input_addr, tile_size, inner_size, outer_size);
       }
     } else if (src_type == at::kInt) {
       if (dst_type == at::kInt){
-        return convert_impl_int32_to_int32(stream, ppl_module, output_addr, input_addr, tile_size, inner_size, outer_size);
+        return convert_impl_int32_to_int32(stream,
+#ifndef BACKEND_SG2260
+                ppl_module,
+#endif
+                output_addr, input_addr, tile_size, inner_size, outer_size);
       } else if(dst_type == at::kFloat){
-        return convert_impl_int32_to_float(stream, ppl_module, output_addr, input_addr, tile_size, inner_size, outer_size);
+        return convert_impl_int32_to_float(stream,
+#ifndef BACKEND_SG2260
+                ppl_module,
+#endif
+                output_addr, input_addr, tile_size, inner_size, outer_size);
       } else if(dst_type == at::kHalf){
-        return convert_impl_int32_to_half(stream, ppl_module, output_addr, input_addr, tile_size, inner_size, outer_size);
+        return convert_impl_int32_to_half(stream,
+#ifndef BACKEND_SG2260
+                ppl_module,
+#endif
+                output_addr, input_addr, tile_size, inner_size, outer_size);
       } else if(dst_type == at::kBFloat16){
-        return convert_impl_int32_to_bf16(stream, ppl_module, output_addr, input_addr, tile_size, inner_size, outer_size);
+        return convert_impl_int32_to_bf16(stream,
+#ifndef BACKEND_SG2260
+                ppl_module,
+#endif
+                output_addr, input_addr, tile_size, inner_size, outer_size);
       }
     }
     return -1;
   };
 
-  tpuStream_t stream = c10_tpu::getCurrentTPUStream().stream();
+  auto stream = c10_tpu::getCurrentTPUStream();
   tpuKernelModule_t ppl_module = getPplModule();
   uint32_t tile_size = inner_size;
   while (tile_size >= 1) {
@@ -145,6 +189,8 @@ Tensor _copy_from_tpu(const Tensor &self, const Tensor &dst,
         auto self_ = self.contiguous();
         if (dst.is_contiguous()) {
 #ifdef USING_PPL
+    if (usePPLKernels())
+    {
           int is_bool = (dst.dtype() == caffe2::TypeMeta::Make<bool>());
           uint32_t outer_size = 1;
           uint32_t inner_size = 1;
@@ -171,7 +217,10 @@ Tensor _copy_from_tpu(const Tensor &self, const Tensor &dst,
             inner_size,
             dst_type,
             self_type);
-#else
+    } else
+#endif
+    {
+
           auto stream = c10_tpu::getCurrentTPUStream();
           int is_bool = (dst.dtype() == caffe2::TypeMeta::Make<bool>());
           auto status = tpudnnConvertAsync(
@@ -180,7 +229,8 @@ Tensor _copy_from_tpu(const Tensor &self, const Tensor &dst,
             tpu::TPUGenerateTpudnnTensor(stream, dst),
             is_bool);
           TORCH_CHECK(status == TPUDNN_STATUS_SUCCESS);
-#endif
+
+    }
           SHOW_TENSOR_OP(self_, dst);
         } else {
           dst.copy_(self_.to(dst.dtype()), non_blocking);

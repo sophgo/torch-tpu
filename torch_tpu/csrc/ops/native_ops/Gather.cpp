@@ -33,42 +33,66 @@ static void gather_async_impl(
     int gathered_num
   )
 {
-  auto kernel = [&](tpuStream_t stream, tpuKernelModule_t ppl_module) -> int {
+  auto kernel = [&](TPUStream stream, tpuKernelModule_t ppl_module) -> int {
     if constexpr (std::is_same_v<scalar_t, float>) {
         return gather_fp32(
-            stream, ppl_module, output_addr, index_addr, input_addr,
+            stream,
+#ifndef BACKEND_SG2260
+            ppl_module,
+#endif
+            output_addr, index_addr, input_addr,
             outer_size, inner_size, gather_num, gathered_num
             );
     } else if constexpr (std::is_same_v<scalar_t, at::Half>) {
         return gather_fp16(
-            stream, ppl_module, output_addr, index_addr, input_addr,
+            stream,
+#ifndef BACKEND_SG2260
+            ppl_module,
+#endif
+            output_addr, index_addr, input_addr,
             outer_size, inner_size, gather_num, gathered_num
             );
     } else if constexpr (std::is_same_v<scalar_t, at::BFloat16>) {
         return gather_bf16(
-            stream, ppl_module, output_addr, index_addr, input_addr,
+            stream,
+#ifndef BACKEND_SG2260
+            ppl_module,
+#endif
+            output_addr, index_addr, input_addr,
             outer_size, inner_size, gather_num, gathered_num
             );
     } else if constexpr (std::is_same_v<scalar_t, int32_t>) {
         return gather_int32(
-            stream, ppl_module, output_addr, index_addr, input_addr,
+            stream,
+#ifndef BACKEND_SG2260
+            ppl_module,
+#endif
+            output_addr, index_addr, input_addr,
             outer_size, inner_size, gather_num, gathered_num
             );
     } else if constexpr (std::is_same_v<scalar_t, int16_t>) {
         return gather_int16(
-            stream, ppl_module, output_addr, index_addr, input_addr,
+            stream,
+#ifndef BACKEND_SG2260
+            ppl_module,
+#endif
+            output_addr, index_addr, input_addr,
             outer_size, inner_size, gather_num, gathered_num
             );
     } else if constexpr (std::is_same_v<scalar_t, int8_t>) {
         return gather_int8(
-            stream, ppl_module, output_addr, index_addr, input_addr,
+            stream,
+#ifndef BACKEND_SG2260
+            ppl_module,
+#endif
+            output_addr, index_addr, input_addr,
             outer_size, inner_size, gather_num, gathered_num
             );
     }
     return -1;
   };
 
-	tpuStream_t stream = c10_tpu::getCurrentTPUStream().stream();
+	auto stream = c10_tpu::getCurrentTPUStream();
 	tpuKernelModule_t ppl_module = getPplModule();
     int ret = kernel(stream, ppl_module);
     if (ret == 0) {
@@ -95,6 +119,9 @@ Tensor &gather_out_tpu(const Tensor &self, int64_t axis, const Tensor &other, bo
     if (IS_TPU_TENSOR(self) && IS_TPU_TENSOR ( other ))
     {
 #ifdef USING_PPL
+    if (usePPLKernels())
+    {
+
     uint32_t inner_size = 1;
     uint32_t outer_size = 1;
     for (const auto i : c10::irange(axis)) {
@@ -114,7 +141,10 @@ Tensor &gather_out_tpu(const Tensor &self, int64_t axis, const Tensor &other, bo
                 other.size(axis)
                 );
         });
-#else
+
+    } else
+#endif
+    {
         //need to consider broadcast later
         auto stream = c10_tpu::getCurrentTPUStream();
         auto status = tpudnnGatherAsync(
@@ -124,7 +154,8 @@ Tensor &gather_out_tpu(const Tensor &self, int64_t axis, const Tensor &other, bo
             tpu::TPUGenerateTpudnnTensor(stream, out),
             axis);
         TORCH_CHECK(status == TPUDNN_STATUS_SUCCESS);
-#endif
+    }
+
     }
     else
     {

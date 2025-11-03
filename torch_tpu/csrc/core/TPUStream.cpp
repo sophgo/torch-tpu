@@ -209,6 +209,16 @@ TPUStream TPUStreamForId(DeviceIndex device_index, StreamId stream_id) {
     return tpudnn_handles[device_index];
   }
 
+  TPUStream::operator bool() const
+  {
+    return this->stream();
+  }
+
+  TPUStream::operator tpuStream_t() const
+  {
+    return this->stream();
+  }
+
  tpuStream_t TPUStream::stream() const {
   c10::DeviceIndex device_index = stream_.device_index();
   StreamId stream_id = stream_.id();

@@ -78,16 +78,20 @@ set(kernel_srcs $<TARGET_PROPERTY:torch_tpu_kernel_data,SOURCES>)
 add_library(torch_tpu SHARED ${concated_src} ${kernel_srcs})
 target_link_libraries(torch_tpu c10 torch_cpu TPU1686::tpuDNN torch_tpu_kernel_data TPU1686::sccl TPU1686::tpurt sophon)
 
-set(PPL_SUPPORTED_ARCHES sg2260e)
+set(PPL_SUPPORTED_ARCHES sg2260 sg2260e)
 if ("$ENV{CHIP_ARCH}" IN_LIST PPL_SUPPORTED_ARCHES)
-    file(GLOB pl_host_srcs ${CMAKE_BINARY_DIR}/../firmware_sg2260e/ppl/*/host/*.cpp)
+    file(GLOB pl_host_srcs ${CMAKE_BINARY_DIR}/../firmware_$ENV{CHIP_ARCH}/ppl/*/host/*.cpp)
     add_library(pl_host ${pl_host_srcs})
-    file(GLOB pl_host_includes ${CMAKE_BINARY_DIR}/../firmware_sg2260e/ppl/*/include)
+    file(GLOB pl_host_includes ${CMAKE_BINARY_DIR}/../firmware_$ENV{CHIP_ARCH}/ppl/*/include)
     target_include_directories(pl_host PUBLIC
         $ENV{PPL_INSTALL_PATH}/deps/common/host/include
         ${pl_host_includes})
     target_compile_options(pl_host PRIVATE -fPIC)
-    target_link_libraries(pl_host TPU1686::tpurt)
+    target_link_libraries(pl_host PRIVATE TPU1686::tpurt)
+    if (BACKEND_SG2260)
+        target_link_libraries(pl_host PRIVATE TPU1686::tpuDNN)
+    endif()
+
     target_link_libraries(torch_tpu pl_host)
 endif()
 

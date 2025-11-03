@@ -1,7 +1,9 @@
 #include "ppl.h"
 using namespace ppl;
 
-#ifndef BLOCK_NUM
+#ifdef __bm1690__
+#define BLOCK_NUM 8
+#elif defined __sg2260e__
 #define BLOCK_NUM 4
 #endif
 

@@ -18,6 +18,32 @@
 #include "TPUStream.h"
 #include "OpTimer.h"
 
+#define AT_DISPATCH_FLOAT_INT_TYPES(scalar_type, name, func)    \
+    AT_DISPATCH_SWITCH(                                         \
+        scalar_type, name,                                      \
+        AT_DISPATCH_CASE(at::kFloat, func)                      \
+        AT_DISPATCH_CASE(at::kHalf, func)                       \
+        AT_DISPATCH_CASE(at::kBFloat16, func)                   \
+        AT_DISPATCH_CASE(at::kInt, func)                        \
+        AT_DISPATCH_CASE(at::kShort, func)                      \
+        AT_DISPATCH_CASE(at::kChar, func)                       \
+        AT_DISPATCH_CASE(at::kByte, func))
+
+static inline bool usePPLKernels()
+{
+    auto flagStr = std::getenv("USE_PPL");
+    if (!flagStr)
+    {
+#ifdef BACKEND_SG2260E
+        return true;
+#else
+        return false;
+#endif
+    }
+
+    return std::atoi(flagStr);
+}
+
 #define DEBUG_SHOW(dtype, func, ...)                    \
 do{                                                     \
   std::cout << __func__ << "|" << #__VA_ARGS__ << "";   \

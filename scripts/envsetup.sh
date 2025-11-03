@@ -54,12 +54,28 @@ function set_v7runtime_env() {
     #export TPUKERNEL_FIRMWARE_PATH=${root_path}/build/firmware_sg2260_cmodel/libfirmware.so
 }
 
+function untar_ppl()
+{
+    local tarball="$1"
+
+    [ -z "$tarball" ] && { echo "No tarball provided"; return 1; }
+    [ ! -f "$tarball" ] && { echo "File not found: $tarball"; return 1; }
+
+    output="$TPUTRAIN_TOP/third_party/ppl"
+
+    # Where we'll place the filtered result
+    rm -rf $output && mkdir -p $output
+
+    # Extract directly into $output, stripping the top-level directory
+    tar -xvzf "$tarball" -C $output --wildcards --strip-components=2 '*/bin' '*/deps/common' '*/inc' '*/deps/chip/*/TPU1686/kernel/include' || return -1
+
+    echo "Done. Filtered contents placed in $output"
+}
+
 function set_ppl_env() {
      local chip=$1
      local root_path=$2
      pip install tpu-ppl -i https://pypi.tuna.tsinghua.edu.cn/simple
-
-    [ $CHIP_ARCH != 'sg2260e' ] && return
 
     # If PPL_INSTALL_PATH is not set, try to infer it
     if [ -z "$PPL_INSTALL_PATH" ]; then
@@ -72,6 +88,7 @@ function set_ppl_env() {
           VALID_DIRS+=("$d")
         fi
       done
+      VALID_DIRS+=("$TPUTRAIN_TOP/third_party/ppl")
 
       if [ ${#VALID_DIRS[@]} -gt 0 ]; then
         # Pick the latest (lexicographically sorted last)

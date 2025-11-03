@@ -61,32 +61,48 @@ static void slice_scatter_impl(
   int param_h
   )
 {
-  auto kernel = [&](tpuStream_t stream, tpuKernelModule_t ppl_module) -> int {
+  auto kernel = [&](TPUStream stream, tpuKernelModule_t ppl_module) -> int {
     if constexpr (std::is_same_v<scalar_t, float>) {
       return scatter_fp32(
-        stream, ppl_module, output_addr, param_addr, input_addr, index_addr,
+        stream,
+#ifndef BACKEND_SG2260
+        ppl_module,
+#endif
+        output_addr, param_addr, input_addr, index_addr,
         outer_size, axis, inner_size, param_h
         );
     } else if constexpr (std::is_same_v<scalar_t, at::Half>) {
       return scatter_fp16(
-        stream, ppl_module, output_addr, param_addr, input_addr, index_addr,
+        stream,
+#ifndef BACKEND_SG2260
+        ppl_module,
+#endif
+        output_addr, param_addr, input_addr, index_addr,
         outer_size, axis, inner_size, param_h
         );
     } else if constexpr (std::is_same_v<scalar_t, at::BFloat16>) {
       return scatter_bf16(
-        stream, ppl_module, output_addr, param_addr, input_addr, index_addr,
+        stream,
+#ifndef BACKEND_SG2260
+        ppl_module,
+#endif
+        output_addr, param_addr, input_addr, index_addr,
         outer_size, axis, inner_size, param_h
         );
     } else if constexpr (std::is_same_v<scalar_t, int32_t>) {
       return scatter_int32(
-        stream, ppl_module, output_addr, param_addr, input_addr, index_addr,
+        stream,
+#ifndef BACKEND_SG2260
+        ppl_module,
+#endif
+        output_addr, param_addr, input_addr, index_addr,
         outer_size, axis, inner_size, param_h
         );
     }
     return -1;
   };
 
-	tpuStream_t stream = c10_tpu::getCurrentTPUStream().stream();
+	auto stream = c10_tpu::getCurrentTPUStream();
 	tpuKernelModule_t ppl_module = getPplModule();
   int ret = kernel(stream, ppl_module);
   if (ret == 0) {
@@ -105,42 +121,66 @@ static void scatter_add_impl(
   int param_h
   )
 {
-  auto kernel = [&](tpuStream_t stream, tpuKernelModule_t ppl_module) -> int {
+  auto kernel = [&](TPUStream stream, tpuKernelModule_t ppl_module) -> int {
     if constexpr (std::is_same_v<scalar_t, float>) {
       return scatter_add_fp32(
-        stream, ppl_module, output_addr, src_addr, index_addr,
+        stream,
+#ifndef BACKEND_SG2260
+        ppl_module,
+#endif
+        output_addr, src_addr, index_addr,
         outer_size, inner_size, param_h
         );
     }  else if constexpr (std::is_same_v<scalar_t, at::Half>) {
       return scatter_add_fp16(
-        stream, ppl_module, output_addr, src_addr, index_addr,
+        stream,
+#ifndef BACKEND_SG2260
+        ppl_module,
+#endif
+        output_addr, src_addr, index_addr,
         outer_size, inner_size, param_h
         );
     } else if constexpr (std::is_same_v<scalar_t, at::BFloat16>) {
       return scatter_add_bf16(
-        stream, ppl_module, output_addr, src_addr, index_addr,
+        stream,
+#ifndef BACKEND_SG2260
+        ppl_module,
+#endif
+        output_addr, src_addr, index_addr,
         outer_size, inner_size, param_h
         );
     } else if constexpr (std::is_same_v<scalar_t, int32_t>) {
       return scatter_add_int32(
-        stream, ppl_module, output_addr, src_addr, index_addr,
+        stream,
+#ifndef BACKEND_SG2260
+        ppl_module,
+#endif
+        output_addr, src_addr, index_addr,
         outer_size, inner_size, param_h
         );
     } else if constexpr (std::is_same_v<scalar_t, int16_t>) {
       return scatter_add_int16(
-        stream, ppl_module, output_addr, src_addr, index_addr,
+        stream,
+#ifndef BACKEND_SG2260
+        ppl_module,
+#endif
+        output_addr, src_addr, index_addr,
         outer_size, inner_size, param_h
         );
     } else if constexpr (std::is_same_v<scalar_t, int8_t>) {
       return scatter_add_int8(
-        stream, ppl_module, output_addr, src_addr, index_addr,
+        stream,
+#ifndef BACKEND_SG2260
+        ppl_module,
+#endif
+        output_addr, src_addr, index_addr,
         outer_size, inner_size, param_h
         );
     }
     return -1;
   };
 
-	tpuStream_t stream = c10_tpu::getCurrentTPUStream().stream();
+	auto stream = c10_tpu::getCurrentTPUStream();
 	tpuKernelModule_t ppl_module = getPplModule();
   int ret = kernel(stream, ppl_module);
   if (ret == 0) {
@@ -177,6 +217,8 @@ Tensor &slice_scatter_out_tpu(const Tensor &self, const Tensor &src,
                        .expand({1, num_c, -1, 1})
                        .to(self.device());
 #ifdef USING_PPL
+    if (usePPLKernels())
+    {
   uint32_t inner_size = 1;
   for (const auto i : c10::irange((dim + 1), self.dim())) {
     inner_size *= self.size(i);
@@ -194,7 +236,9 @@ Tensor &slice_scatter_out_tpu(const Tensor &self, const Tensor &src,
               src.size(dim)
             );
       });
-#else
+    } else
+#endif
+    {
   auto stream = c10_tpu::getCurrentTPUStream();
   auto status = tpudnnSliceScatterAsync(
       stream,
@@ -204,7 +248,7 @@ Tensor &slice_scatter_out_tpu(const Tensor &self, const Tensor &src,
       dim,
       tpu::TPUGenerateTpudnnTensor(stream, out));
   TORCH_CHECK(status == TPUDNN_STATUS_SUCCESS);
-#endif
+    }
 #endif
   TIMING_END;
   SHOW_TENSOR_OP(self, out);
@@ -228,6 +272,9 @@ Tensor &scatter_add_inplace_tpu(Tensor &self, int64_t dim, const Tensor &index,
                        const Tensor &src) {
   TIMING_START;
 #ifdef USING_PPL
+  if (usePPLKernels())
+  {
+
   uint32_t outer_size = 1;
   uint32_t inner_size = 1;
   for (const auto i : c10::irange(dim)) {
@@ -245,7 +292,11 @@ Tensor &scatter_add_inplace_tpu(Tensor &self, int64_t dim, const Tensor &index,
               outer_size, inner_size, index.size(dim)
             );
       });
-#else
+
+  } else
+#endif
+  {
+
   int inplace_add = 1;
   auto stream = c10_tpu::getCurrentTPUStream();
   auto status = tpudnnScatterAsync(
@@ -256,7 +307,9 @@ Tensor &scatter_add_inplace_tpu(Tensor &self, int64_t dim, const Tensor &index,
       dim,
       inplace_add);
   TORCH_CHECK(status == TPUDNN_STATUS_SUCCESS);
-#endif
+
+  }
+
   TIMING_END;
   SHOW_TENSOR_OP(self, self);
   return self;

@@ -92,6 +92,8 @@ public:
   /// Explicit conversion to tpuStream_t.
   tpuStream_t stream() const;
 
+  operator bool() const;
+  operator tpuStream_t() const;
   operator tpudnnHandle_t() const;
 
   /// Implicit conversion to pytorch Stream.

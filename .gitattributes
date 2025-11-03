@@ -3,3 +3,4 @@ third_party/firmware/**/*.a filter=lfs diff=lfs merge=lfs -text
 third_party/**/**/**/*.so* filter=lfs diff=lfs merge=lfs -text
 third_party/**/**/*.so* filter=lfs diff=lfs merge=lfs -text
 third_party/openmpi/bin/* filter=lfs diff=lfs merge=lfs -text
+third_party/ppl/bin/ppl-compile filter=lfs diff=lfs merge=lfs -text

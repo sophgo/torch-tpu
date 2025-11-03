@@ -22,30 +22,34 @@ static void topk_async(
   bool largest,
   bool sorted)
 {
-auto kernel = [&](tpuStream_t stream, tpuKernelModule_t ppl_module,
-    uint32_t tile_size) -> int {
-  if constexpr (std::is_same_v<scalar_t, float>) {
-    return topk_fp32(
-      stream, ppl_module, index_addr, input_addr, value_addr,
-      outer_size, axis_size, inner_size,
-      k, largest,
-      tile_size);
-  }
-  return -1;
-};
+  auto kernel = [&](TPUStream stream, tpuKernelModule_t ppl_module,
+      uint32_t tile_size) -> int {
+    if constexpr (std::is_same_v<scalar_t, float>) {
+      return topk_fp32(
+        stream,
+#ifndef BACKEND_SG2260
+        ppl_module,
+#endif
+        index_addr, input_addr, value_addr,
+        outer_size, axis_size, inner_size,
+        k, largest,
+        tile_size);
+    }
+    return -1;
+  };
 
-tpuStream_t stream = c10_tpu::getCurrentTPUStream().stream();
-tpuKernelModule_t ppl_module = getPplModule();
-int tile_size = std::min(axis_size, 64);
+  auto stream = c10_tpu::getCurrentTPUStream();
+  tpuKernelModule_t ppl_module = getPplModule();
+  int tile_size = std::min(axis_size, 64);
 
-while (tile_size >= 1) {
-  int ret = kernel(stream, ppl_module, tile_size);
-  if (ret == 0) {
-    return;
-  } else {
-    tile_size = tile_size / 2;
-    continue;
-  }
+  while (tile_size >= 1) {
+    int ret = kernel(stream, ppl_module, tile_size);
+    if (ret == 0) {
+      return;
+    } else {
+      tile_size = tile_size / 2;
+      continue;
+    }
 }
 
 TORCH_CHECK(false, "Topk failed!");
@@ -83,6 +87,9 @@ std::tuple<Tensor &, Tensor &> topk_values_tpu(const Tensor &self, int64_t k,
   TORCH_CHECK(axis <= self.dim())
   TORCH_CHECK(k <= self.size(axis));
 #ifdef USING_PPL
+  if (usePPLKernels())
+  {
+
   uint32_t outer_size = 1;
   uint32_t inner_size = 1;
   for (const auto i : c10::irange(axis)) {
@@ -104,7 +111,11 @@ std::tuple<Tensor &, Tensor &> topk_values_tpu(const Tensor &self, int64_t k,
               largest,
               sorted);
       });
-#else
+
+  } else
+#endif
+  {
+
   if (self.size(axis) <= 256) {
     auto stream = c10_tpu::getCurrentTPUStream();
     auto status = tpudnnTopkAsync(
@@ -144,7 +155,9 @@ std::tuple<Tensor &, Tensor &> topk_values_tpu(const Tensor &self, int64_t k,
       values = values_temp.to(values.dtype());
     }
   }
-#endif
+
+  }
+
   TIMING_END;
   SHOW_TENSOR_OP(self, values, indices);
   return {values, indices};

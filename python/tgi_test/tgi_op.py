@@ -20,20 +20,20 @@ model_params_mapping = {
         'cases': ['add', 'rmsnorm', 'mmqkv','attn', 'mlp', 'attn_fc'],
         'seqs': [4096]
     },
-    'llama2_7b': {
-        'tp': [1],
-        'quantize': ['gptq'],
-        'batches': [16],
-        'cases': ['add', 'rmsnorm', 'mmqkv','attn', 'mlp', 'attn_fc'],
-        'seqs': [4096]
-    },
-    'llama2_70b': {
-        'tp': [4,8],
-        'quantize': ['gptq'],
-        'batches': [16],
-        'cases': ['add', 'rmsnorm', 'mmqkv','attn', 'mlp', 'attn_fc'],
-        'seqs': [4096]
-    },
+#    'llama2_7b': {
+#        'tp': [1],
+#        'quantize': ['gptq'],
+#        'batches': [16],
+#        'cases': ['add', 'rmsnorm', 'mmqkv','attn', 'mlp', 'attn_fc'],
+#        'seqs': [4096]
+#    },
+#    'llama2_70b': {
+#        'tp': [4,8],
+#        'quantize': ['gptq'],
+#        'batches': [16],
+#        'cases': ['add', 'rmsnorm', 'mmqkv','attn', 'mlp', 'attn_fc'],
+#        'seqs': [4096]
+#    },
     'llama3_8b': {
         'tp': [1,4,8],
         'quantize': ['gptq'],
@@ -41,13 +41,13 @@ model_params_mapping = {
         'cases': ['add', 'rmsnorm', 'mmqkv','attn', 'mlp', 'attn_fc'],
         'seqs': [4096]
     },
-    'llama3_70b': {
-        'tp': [2,4,8],
-        'quantize': ['gptq'],
-        'batches': [16],
-        'cases': ['add', 'rmsnorm', 'mmqkv','attn', 'mlp', 'attn_fc'],
-        'seqs': [4096]
-    }
+#    'llama3_70b': {
+#        'tp': [2,4,8],
+#        'quantize': ['gptq'],
+#        'batches': [16],
+#        'cases': ['add', 'rmsnorm', 'mmqkv','attn', 'mlp', 'attn_fc'],
+#        'seqs': [4096]
+#    }
 }
 
 
@@ -67,7 +67,7 @@ for model, params in model_params_mapping.items():
 
     for batch, tp, quantize, case, seq in parameter_combinations:
         #decode
-        command_dec = f'python tgi_test.py --model {model} --batch {batch} --tp {tp} --case {case} --seq {seq} --test'
+        command_dec = f'python -u tgi_test.py --model {model} --batch {batch} --tp {tp} --case {case} --seq {seq} --test'
         if quantize == 'gptq' and case in ['mmqkv', 'attn_fc', 'mlp']:
             command_dec += ' --w4a16'
         # if case in ['rmsnorm']:
@@ -83,7 +83,7 @@ for model, params in model_params_mapping.items():
         else:
             print("Decode command executed successfully.")
         #prefill
-        command_pre = f'python tgi_test.py --model {model} --batch {batch} --tp {tp} --case {case} --seq 6 --prefill --test'
+        command_pre = f'python -u tgi_test.py --model {model} --batch {batch} --tp {tp} --case {case} --seq 6 --prefill --test'
         if case in ['mlp']:
             continue
         else:

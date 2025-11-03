@@ -13,6 +13,9 @@
 #include <float.h>
 
 #include <tpuDNN.h>
+
+#undef USING_PPL // FIXME Fix Compare.pl & remove this
+
 #ifdef USING_PPL
 #include "Binary.h"
 #define AT_DISPATCH_FLOAT_INT_TYPES(scalar_type, name, func)  \
@@ -2504,3 +2507,8 @@ TORCH_LIBRARY_IMPL(aten, TPU, m) {
 }
 
 } // namespace at
+
+// FIXME Fix Compare.pl & uncomment this
+#if defined(BACKEND_SG2260) || defined(BACKEND_SG2260E)
+#define USING_PPL
+#endif
