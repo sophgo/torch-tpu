@@ -149,4 +149,3 @@ fi
 export TPU_SCALAER_EMULATOR_WORKDIR=${TPUTRAIN_TOP}/build
 
 export PS1="\[\e[1;35m\]("train-"${CHIP_ARCH}):\[\e[1;33m\]\w\[\e[1;34m\]\$ \[\e[0m\]"
-export PPL_BACKEND_LIB=${TPUTRAIN_TOP}/build/firmware_${CHIP_ARCH}_cmodel/libfirmware.so

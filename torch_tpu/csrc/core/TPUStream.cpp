@@ -147,12 +147,7 @@ static void initDeviceStreamState(c10::DeviceIndex device_index) {
   tpudnn_handles[device_index] = tpudnnHandleFromStream(device_index, stream, module);
 
 #ifdef USING_PPL
-  const char* ppl_lib = getenv("PPL_BACKEND_LIB");
-  if (ppl_lib) {
-    ppl_module = tpuKernelModuleLoadFromFile(ppl_lib, stream);
-  } else {
-    TORCH_CHECK(false, "Please set PPL backend libaray to env: PPL_BACKEND_LIB");
-  }
+  ppl_module = module; // TODO Fix this all together
 #endif
 }
 
