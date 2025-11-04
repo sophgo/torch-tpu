@@ -42,9 +42,14 @@ function get_pytorch_install_dir(){
 function set_v7runtime_env() {
     local root_path=$1
     local v7_lib_path=${root_path}/third_party/tpuv7_runtime/tpuv7-emulator_0.1.0/lib
-    if [[ ! -d ${root_path}/../TPU1686 && "$LD_LIBRARY_PATH" != *tpuv7_runtime* ]]; then
+    if [[ "$LD_LIBRARY_PATH" != *tpuv7_runtime* ]]; then
         export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:${v7_lib_path}
     fi
+
+    if [ "${CHIP_ARCH}" == "bm1684x" ]; then
+        return
+    fi
+
     build_type=Release
     if [ "$TPUTRAIN_DEBUG" = "ON" ]; then
          build_type=Debug
@@ -130,12 +135,10 @@ source ${TPUTRAIN_TOP}/scripts/build_helper.sh
 source ${TPUTRAIN_TOP}/scripts/regression.sh
 export SOC_CROSS_MODE="OFF"
 if [[ "$LD_LIBRARY_PATH" != *oneDNN* ]]; then
-    export LD_LIBRARY_PATH=$TPUTRAIN_TOP/third_party/oneDNN/lib:$LD_LIBRARY_PATH
+    export LD_LIBRARY_PATH=$TPUTRAIN_TOP/third_party/bmlib/lib:$TPUTRAIN_TOP/third_party/oneDNN/lib:$LD_LIBRARY_PATH
 fi
 
-if [ "${CHIP_ARCH}" != "bm1684x" ]; then
-     set_v7runtime_env ${TPUTRAIN_TOP}
-fi
+set_v7runtime_env ${TPUTRAIN_TOP}
 
 set_ppl_env $CHIP_ARCH ${TPUTRAIN_TOP} || return -1
 export TPU1686_PATH=$(realpath $TPUTRAIN_TOP/../TPU1686)

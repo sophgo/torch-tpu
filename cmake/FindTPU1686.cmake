@@ -171,11 +171,8 @@ find_package_handle_standard_args(
     REQUIRED_VARS tpuDNN_INCLUDE_DIR cmodel_firmware_LIBRARY firmware_LIBRARY tpuDNN_LIBRARY tpurt_INCLUDE_DIR tpurt_LIBRARY)
 
 if (TPU1686_FOUND)
-    add_library(TPU1686::tpuDNN IMPORTED SHARED)
-    set_target_properties(
-        TPU1686::tpuDNN PROPERTIES
-        INTERFACE_INCLUDE_DIRECTORIES ${tpuDNN_INCLUDE_DIR}
-        IMPORTED_LOCATION ${tpuDNN_LIBRARY})
+    add_library(TPU1686::tpuDNN IMPORTED INTERFACE)
+    target_include_directories(TPU1686::tpuDNN INTERFACE ${tpuDNN_INCLUDE_DIR})
 
     add_library(TPU1686::cmodel_firmware IMPORTED SHARED)
     set_target_properties(
@@ -187,14 +184,9 @@ if (TPU1686_FOUND)
         TPU1686::firmware PROPERTIES
         IMPORTED_LOCATION ${firmware_LIBRARY})
 
-    add_library(TPU1686::sccl IMPORTED SHARED)
-    set_target_properties(TPU1686::sccl PROPERTIES
-        IMPORTED_LOCATION ${SCCL_LIBRARY}
-        INTERFACE_INCLUDE_DIRECTORIES ${SCCL_INCLUDE_DIR})
+    add_library(TPU1686::sccl IMPORTED INTERFACE)
+    target_include_directories(TPU1686::sccl INTERFACE ${SCCL_INCLUDE_DIR})
 
-    add_library(TPU1686::tpurt SHARED IMPORTED)
-    set_target_properties(
-        TPU1686::tpurt PROPERTIES
-        INTERFACE_INCLUDE_DIRECTORIES ${tpurt_INCLUDE_DIR}
-        IMPORTED_LOCATION ${tpurt_LIBRARY})
+    add_library(TPU1686::tpurt IMPORTED INTERFACE)
+    target_include_directories(TPU1686::tpurt INTERFACE ${tpurt_INCLUDE_DIR})
 endif()

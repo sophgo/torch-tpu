@@ -4,12 +4,14 @@
 #include "torch_tpu/csrc/aten/TPUNativeFunctions.h"
 #include "torch_tpu/csrc/aten/TPUBmodelRuntime.h"
 
+#if defined(BACKEND_SG2260) || defined(BACKEND_SG2260E)
+#include <tpuv7_modelrt.h>
+#endif
 
 namespace at_tpu{
 namespace modelrt{
 
 #if defined(BACKEND_SG2260) || defined(BACKEND_SG2260E)
-#include <tpuv7_modelrt.h>
 void CHECKDTYPE(tpuRtDataType_t model_iodtype, at::ScalarType tensor_dtype )
 {
     if (model_iodtype == TPU_FLOAT32) {

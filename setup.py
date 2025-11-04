@@ -262,14 +262,10 @@ class Build(build_ext, ExtBase, object):
         self.run_command('build_clib')
         package_dir = self.get_package_dir()
         sym_fnc = os.path.join(package_dir, 'lib/libtorch_tpu.so')
-        sym_fnpy = os.path.join(package_dir, 'lib/libtorch_tpu_python.so')
 
         if not os.path.exists(sym_fnc):
             lib_fn = glob.glob(os.path.join(package_dir, 'lib/*libtorch_tpu*.so'))[0]
             os.symlink(lib_fn, sym_fnc)
-        if not os.path.exists(sym_fnpy):
-            lib_fn = glob.glob(os.path.join(package_dir, 'lib/*libtorch_tpu_python*.so'))[0]
-            os.symlink(lib_fn, sym_fnpy)
 
         self.build_lib = os.path.relpath(os.path.join(BASE_DIR, f"build/{get_build_type()}/packages"))
         self.library_dirs.append(
@@ -277,7 +273,6 @@ class Build(build_ext, ExtBase, object):
         super(Build, self).run()
 
         os.unlink(sym_fnc)
-        os.unlink(sym_fnpy)
 
     def finalize_options(self):
         build_ext.finalize_options(self)
@@ -534,16 +529,17 @@ class bdist_wheel(_bdist_wheel, ExtBase):
             self.copy_file(lib, os.path.join(pkg_dir, f'lib/libsccl.so'))
 
         # runtime libs
-        runtime_libs = glob.glob(os.path.join(BASE_DIR, f'third_party/runtime_api/lib_{chip_arch}/libtpurt{PLATFORM}.so'))
+        runtime_libs = glob.glob(os.path.join(BASE_DIR, f'third_party/runtime_api/lib_*/libtpurt{PLATFORM}.so'))
         for lib in runtime_libs:
-            self.copy_file(lib, os.path.join(pkg_dir, 'lib/libtpurt.so'))
+            arch = os.path.basename(os.path.dirname(lib)).replace('lib_', '')
+            self.copy_file(lib, os.path.join(pkg_dir, f'lib/libtpurt.{arch}.so'))
 
         # include libraries just cmodel, for inst-cache use.
         # tpuv7-emulator_0.1.0 is the cmodel version of runtime, no device version contained.
-        base_fw_libs = glob.glob(os.path.join(TPUV7_RUNTIME_PATH, f'tpuv7-emulator_0.1.0/lib/libtpuv7_emulator.so')) if not SOC_CROSS else \
-                       glob.glob(os.path.join(TPUV7_RUNTIME_PATH, f'tpuv7-emulator_0.1.0/lib/libtpuv7_emulator-riscv.so'))
+        base_fw_libs = glob.glob(os.path.join(TPUV7_RUNTIME_PATH, f'tpuv7-emulator_0.1.0/lib/libtpu*_emulator.so')) if not SOC_CROSS else \
+                       glob.glob(os.path.join(TPUV7_RUNTIME_PATH, f'tpuv7-emulator_0.1.0/lib/libtpu*_emulator-riscv.so'))
         for lib in base_fw_libs:
-            self.copy_file(lib, os.path.join(pkg_dir, f'lib/libtpuv7_emulator.so'))
+            self.copy_file(lib, os.path.join(pkg_dir, f'lib/'))
         dnn_libs = glob.glob(os.path.join(TPUV7_RUNTIME_PATH, 'tpuv7-emulator_0.1.0/lib/libdnnl.so.3'))
         for lib in dnn_libs:
             target = os.path.join(pkg_dir, f'lib/', os.path.basename(lib))
@@ -591,19 +587,50 @@ else:
     extra_compile_args += ['-DNDEBUG', '-O3', '-g0']
     extra_link_args += ['-Wl,-z,now,-s,-O3']
 
+def symlink(src, dst):
+    try:
+        link_val = os.readlink(dst)
+        if link_val == src:
+            return
+        else:
+            os.unlink(dst)
+    except FileNotFoundError:
+        pass
+
+    try:
+        os.symlink(src, dst)
+    except FileExistsError:
+        pass
+
+dev_path = os.path.join(BASE_DIR, 'torch_tpu/lib')
 from setuptools.command.develop import develop as _develop
 class CustomDevelop(_develop):
     def initialize_options(self):
+        # This make setuptools copy extension so into dev_path,
+        # magically.
         for ext in self.distribution.ext_modules:
             for i, v in enumerate(ext.library_dirs):
                 if not os.path.abspath(v).startswith(BASE_DIR):
                     continue
-                dev_path = os.path.join(BASE_DIR, 'torch_tpu/lib')
                 ext.library_dirs[i] = dev_path
                 break
         self.distribution.package_dir = None
         print("package_dir has been unset for the develop command.")
+
         _develop.initialize_options(self)
+
+    def run(self):
+        arch = os.environ["CHIP_ARCH"]
+        super(CustomDevelop, self).run()
+        symlink(
+            f'../../third_party/tpuDNN/{arch}_lib/libtpudnn.so',
+            os.path.join(dev_path, f'libtpudnn.{arch}.so'))
+        symlink(
+            f'../../third_party/runtime_api/lib_{arch}/libtpurt.so',
+            os.path.join(dev_path, f'libtpurt.{arch}.so'))
+        symlink(
+            f'../../third_party/sccl/lib/libsccl.so',
+            os.path.join(dev_path, f'libsccl.so'))
 
 setup(
         name=os.environ.get('TORCH_TPU_PACKAGE_NAME', 'torch_tpu'),
@@ -613,13 +640,11 @@ setup(
         description='TPU bridge for PyTorch',
         url='https://github.com/sophgo/torch-tpu',
         packages=["torch_tpu"],
-        libraries=[('torch_tpu', {'sources': list()})],
         package_dir={'': os.path.relpath(os.path.join(BASE_DIR, f"build/{get_build_type()}/packages"))},
         ext_modules=[
             CppExtension(
                 'torch_tpu._C',
                 sources=["torch_tpu/csrc/InitTpuBindings.cpp"],
-                libraries=["torch_tpu_python"],
                 include_dirs=include_directories,
                 extra_compile_args=extra_compile_args + ['-fstack-protector-all'],
                 library_dirs=lib_directories,

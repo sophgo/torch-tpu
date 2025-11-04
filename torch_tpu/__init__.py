@@ -1,64 +1,47 @@
 import os
 import pkgutil
 
-def symlink(src, dst):
-    try:
-        link_val = os.readlink(dst)
-        if link_val == src:
-            return
-        else:
-            os.unlink(dst)
-    except FileNotFoundError:
-        pass
-
-    try:
-        os.symlink(src, dst)
-    except FileExistsError:
-        pass
-
 pkg_path = os.path.dirname(pkgutil.get_loader('torch_tpu').get_filename())
 lib_pwd = os.path.join(pkg_path, 'lib/')
 
 arch_list = ['sg2260', 'bm1684x']
 arch = arch_env = os.environ.get('CHIP_ARCH')
-def make_symlinks(arch_sel):
-    tpudnn = f'libtpudnn.{arch_sel}.so'
-    sofn   = f'libtorch_tpu.{arch_sel}.so'
-    pysofn = f'libtorch_tpu_python.{arch_sel}.so'
-    symlink(pysofn, os.path.join(lib_pwd, 'libtorch_tpu_python.so'))
-    symlink(sofn,   os.path.join(lib_pwd, 'libtorch_tpu.so'))
-    symlink(tpudnn, os.path.join(lib_pwd, 'libtpudnn.so'))
+
+from ctypes import CDLL, RTLD_GLOBAL
+
+import torch
+
+def load_objects_for_arch(arch_sel):
+    libs = [
+        f'libtpudnn.{arch_sel}.so',
+        f'libtpurt.{arch_sel}.so',
+        f'libsccl.so',
+        f'libtorch_tpu.{arch_sel}.so']
+
+    for lib in libs:
+        try:
+            CDLL(os.path.join(lib_pwd, lib), mode=RTLD_GLOBAL)
+        except:
+            print(f'Failed to load {lib}')
+            raise
 
 if arch_env:
     # Env overrides everything
-    make_symlinks(arch_env)
-
-if not arch:
-    # Try existing symlinks
-    import re
-    try:
-        tpudnn = os.readlink(os.path.join(lib_pwd, 'libtpudnn.so'))
-        m = re.match(r'^libtpudnn.(\w+).so$', tpudnn)
-        if not m:
-            re.match(r'.+TPU1686.+build_(\w+).+', tpudnn)
-        arch = m.group(1) if m else 'sg2260' # default to sg2260
-        if arch in arch_list:
-            os.environ['CHIP_ARCH'] = arch
-    except FileNotFoundError:
-        pass
+    print(f'Arch {arch_env} specified by env var')
+    load_objects_for_arch(arch_env)
 
 if not arch:
     # Select arch by checking if coresponding tpuDNN works
-    from ctypes import cdll
     for arch_iter in arch_list:
         tpudnn = f'libtpudnn.{arch_iter}.so'
         try:
-            cdll.LoadLibrary(os.path.join(lib_pwd, tpudnn))
+            CDLL(os.path.join(lib_pwd, tpudnn))
         except:
             print(f"ERROR: unable to load {os.path.join(lib_pwd, tpudnn)}")
             continue
         arch = arch_iter
-        make_symlinks(arch_iter)
+        print(f'Arch {arch} selected because {tpudnn} works')
+        load_objects_for_arch(arch_iter)
         os.environ['CHIP_ARCH'] = arch
         break
 
@@ -83,7 +66,6 @@ if not os.environ.get('TORCH_TPU_CPP_LOG_LEVEL'):
 if not os.environ.get('TPU_ALLOCATOR_FREE_DELAY_IN_MS'):
     os.environ['TPU_ALLOCATOR_FREE_DELAY_IN_MS'] = '99999'
 
-import torch
 import torch_tpu._C
 import torch_tpu.tpu
 from .tpu.jit import (jit, CallCppDynLib)

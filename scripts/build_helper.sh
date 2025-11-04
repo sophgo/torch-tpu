@@ -87,8 +87,10 @@ function update_sg2260_third_party()
   cp ${TPU1686_PATH}/build_${CHIP_ARCH}/tpuDNN/src/libtpudnn.so ${TPUTRAIN_TOP}/third_party/tpuDNN/${CHIP_ARCH}_lib/
   echo "updating libsccl.so ..."
   cp ${TPU1686_PATH}/build_${CHIP_ARCH}/sccl/libsccl.so ${TPUTRAIN_TOP}/third_party/sccl/lib/
+
   echo "updating libtpuv7_emulator.so ..."
-  cp ${TPU1686_PATH}/build_${CHIP_ARCH}/firmware_core/libtpuv7_emulator.so ${TPUTRAIN_TOP}/third_party/tpuv7_runtime/tpuv7-emulator_0.1.0/lib/
+  cp ${TPU1686_PATH}/build_${CHIP_ARCH}/firmware_core/libtpu*_emulator.so ${TPUTRAIN_TOP}/third_party/tpuv7_runtime/tpuv7-emulator_0.1.0/lib/
+
   echo "updating libfirmware_core.a ..."
   mkdir -p ${TPUTRAIN_TOP}/third_party/firmware/${CHIP_ARCH}/
   cp ${TPU1686_PATH}/build_fw_${CHIP_ARCH}/firmware_core/libfirmware_core.a ${TPUTRAIN_TOP}/third_party/firmware/${CHIP_ARCH}/

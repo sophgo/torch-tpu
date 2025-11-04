@@ -52,6 +52,8 @@ file(GLOB SRCS
   csrc/ops/autocast_ops/*.cpp
   csrc/aten/*.cpp
   csrc/aten/*/*.cpp
+  csrc/tpu/*.cpp
+  csrc/utils/*.cpp
 )
 
 file(GLOB_RECURSE DIST_SRCS
@@ -75,8 +77,21 @@ include(ResourceTools)
 compile_binary_file(${KERNEL_MODULE_PATH} torch_tpu_kernel_data)
 set(kernel_srcs $<TARGET_PROPERTY:torch_tpu_kernel_data,SOURCES>)
 
+### torch-tpu python api interface
+if($ENV{SOC_CROSS_MODE} STREQUAL "ON")
+  if($ENV{CHIP_ARCH} STREQUAL "sg2260" OR $ENV{CHIP_ARCH} STREQUAL "sg2260e")
+    include_directories($ENV{CROSS_TOOLCHAINS}/riscv64-linux-x86_64/python3.10)
+  elseif($ENV{CHIP_ARCH} STREQUAL "bm1684x" OR $ENV{CHIP_ARCH} STREQUAL "bm1686")
+    include_directories($ENV{CROSS_TOOLCHAINS}/Python-3.8.2/python_3.8.2/include/python3.8)
+  else()
+    message(FATAL_ERROR "chip not support: $ENV{CHIP_ARCH}")
+  endif()
+else()
+  include_directories(${PYTHON_INCLUDE_DIR})
+endif()
+
 add_library(torch_tpu SHARED ${concated_src} ${kernel_srcs})
-target_link_libraries(torch_tpu c10 torch_cpu TPU1686::tpuDNN torch_tpu_kernel_data TPU1686::sccl TPU1686::tpurt sophon)
+target_link_libraries(torch_tpu c10 torch_cpu torch_python TPU1686::tpuDNN torch_tpu_kernel_data TPU1686::sccl TPU1686::tpurt sophon)
 
 set(PPL_SUPPORTED_ARCHES sg2260 sg2260e)
 if ("$ENV{CHIP_ARCH}" IN_LIST PPL_SUPPORTED_ARCHES)
@@ -134,43 +149,3 @@ add_custom_command(TARGET torch_tpu POST_BUILD
     COMMAND patchelf --set-soname libtorch_tpu.so $<TARGET_FILE:torch_tpu>
     COMMENT "Change SONAME of libtorch_tpu.so"
     DEPENDS torch_tpu VERBATIM)
-
-### torch-tpu python api interface
-if($ENV{SOC_CROSS_MODE} STREQUAL "ON")
-  if($ENV{CHIP_ARCH} STREQUAL "sg2260" OR $ENV{CHIP_ARCH} STREQUAL "sg2260e")
-    include_directories($ENV{CROSS_TOOLCHAINS}/riscv64-linux-x86_64/python3.10)
-  elseif($ENV{CHIP_ARCH} STREQUAL "bm1684x" OR $ENV{CHIP_ARCH} STREQUAL "bm1686")
-    include_directories($ENV{CROSS_TOOLCHAINS}/Python-3.8.2/python_3.8.2/include/python3.8)
-  else()
-    message(FATAL_ERROR "chip not support: $ENV{CHIP_ARCH}")
-  endif()
-else()
-  include_directories(${PYTHON_INCLUDE_DIR})
-endif()
-message(STATUS "PYTHON API ENABLE")
-file(GLOB_RECURSE PYC_SRCS
-  csrc/tpu/*.cpp
-  csrc/utils/*.cpp
-)
-add_library(torch_tpu_python SHARED ${PYC_SRCS})
-
-if ((BACKEND_SG2260 OR BACKEND_SG2260E) AND (EXISTS ${TPUv7_RUNTIME_REPO_PATH}))
-  target_link_directories(torch_tpu_python PRIVATE ${TPUv7_REPO_RT_LIB_PATH}
-                                                  ${TPUv7_REPO_RT_AP_LIB_PATH}
-                                                  ${TPUv7_REPO_MODEL_RT_LIB_PATH}
-                                                  ${TPUv7_REPO_MODEL_BMODEL_LIB_PATH})
-else()
-  target_link_directories(torch_tpu_python PRIVATE ${RUNTIME_LIB_PATH} ${MODELRUNTIME_LIB_PATH})
-endif()
-
-target_link_libraries(torch_tpu_python torch_tpu)
-
-set_target_properties(torch_tpu_python PROPERTIES INSTALL_RPATH
-      "$ORIGIN;${tpuv7_rpath};${tpuDNNPath};${tpurtPath};${scclPath};${RUNTIME_LIB_PATH};${MODELRUNTIME_LIB_PATH}")
-install(TARGETS torch_tpu_python DESTINATION lib)
-
-set_target_properties(torch_tpu_python PROPERTIES SUFFIX ".$ENV{CHIP_ARCH}.so")
-add_custom_command(TARGET torch_tpu_python POST_BUILD
-    COMMAND patchelf --set-soname libtorch_tpu_python.so $<TARGET_FILE:torch_tpu_python>
-    COMMENT "Change SONAME of torch_tpu_python.so"
-    DEPENDS torch_tpu_python VERBATIM)
