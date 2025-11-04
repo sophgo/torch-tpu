@@ -45,6 +45,7 @@ docker run -it  \
         -v /opt:/opt \
         sophgo/torch_tpu:v0.1-py312  /bin/bash
 ```
+ 如在CMODEL模式下进行开发，无需映射`/opt`目录
 
 2. 安装 torch-tpu
 

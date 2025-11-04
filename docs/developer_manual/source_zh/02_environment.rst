@@ -83,7 +83,9 @@ TORCH-TPU可以在Docker中开发, 配置好Docker就可以编译和运行了。
   # myname只是举个名字的例子, 请指定成自己想要的容器的名字
   # -e LD_LIBRARY_PATH=... -e PATH=... 是引入libsophon的环境变量
 
-注意TORCH-TPU工程在docker中的路径应该是/workspace/tpu-train
+注意：
+1. TORCH-TPU工程在docker中的路径应该是/workspace/tpu-train
+2. 如在CMODEL模式下进行开发，无需映射`/opt`目录
 
 .. _compiler :
 
