@@ -13,7 +13,8 @@ device = "tpu:0"
 
 def test():
     num_step = 15
-    n, c, h, w = random.randint(10, 100), random.randint(10, 100), random.randint(10, 100), random.randint(10, 100)
+    n, c, h, w = random.randint(10, 40), random.randint(10, 40), random.randint(10, 100), random.randint(10, 100)
+    print(f'AdamW n={n}, c={c}, h={h}, w={w}')
     params = [torch.randn((n, c, h, w), requires_grad=True).to(device) for _ in range(num_step)]
     params_grad = [torch.randn_like(params[i]).to(device) for i in range(num_step)]  
 

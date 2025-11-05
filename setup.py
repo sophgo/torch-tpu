@@ -186,8 +186,9 @@ class CPPLibBuild(build_clib, ExtBase, object):
             # build tpuv7_runtime
             os.environ['CHIP_ARCH'] = 'sg2260'
             self.build()
-            # os.environ['CHIP_ARCH'] = 'sg2260e'
-            # self.build()
+
+            os.environ['CHIP_ARCH'] = 'sg2260e'
+            self.build()
 
     def build(self):
         cmake = get_cmake_command()
