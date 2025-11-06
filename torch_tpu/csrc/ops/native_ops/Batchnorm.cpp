@@ -12,6 +12,13 @@
 namespace at
 {
 
+static inline Tensor broadcast_like_channel(const Tensor& vecC, const Tensor& x) {
+  // vecC shape [C] -> broadcast to [1, C, 1, 1, ...] for arithmetic with x
+  std::vector<int64_t> shape(x.dim(), 1);
+  shape[1] = vecC.size(0);
+  return vecC.view(shape);
+}
+
 std::tuple<Tensor, Tensor, Tensor> native_batch_norm_tpu (
 const Tensor & input,
 const c10::optional<Tensor> & weight_opt,
@@ -33,24 +40,39 @@ double eps )
   if ( weight.defined() )       { CHECK_TENSOR_IN_DEVICE ( weight ); }
   if ( bias.defined() )         { CHECK_TENSOR_IN_DEVICE ( bias ); }
   if( !training ) {
-    auto dtype = input.scalar_type();
-    // implement inference mode
-    CPU_IMPL_WARNING("infer mode");
-    auto running_mean_cpu = running_mean.defined() ? running_mean.cpu().to(torch::kFloat) : Tensor();
-    auto running_var_cpu  = running_var.defined() ? running_var.cpu().to(torch::kFloat) : Tensor();
-    auto outputs_cpu = native_batch_norm (
-                       input.cpu().to(torch::kFloat),
-                       c10::optional<Tensor> ( weight.defined() ? weight.cpu().to(torch::kFloat) : Tensor() ),
-                       c10::optional<Tensor> ( bias.defined() ? bias.cpu().to(torch::kFloat) : Tensor() ),
-                       c10::optional<Tensor> ( running_mean_cpu ),
-                       c10::optional<Tensor> ( running_var_cpu ),
-                       training,
-                       momentum,
-                       eps );
-    return std::tuple<Tensor, Tensor, Tensor> (
-            TENSOR_TO_TPU ( std::get<0> ( outputs_cpu ).to(dtype) ),
-            TENSOR_TO_TPU ( std::get<1> ( outputs_cpu ).to(dtype) ),
-            TENSOR_TO_TPU ( std::get<2> ( outputs_cpu ).to(dtype) ) );
+    Tensor invstd = (running_var + eps).rsqrt();
+    Tensor mean_bc = broadcast_like_channel(running_mean, input);
+    Tensor invstd_bc = broadcast_like_channel(invstd, input);
+    Tensor output = (input - mean_bc) * invstd_bc;
+
+    if (weight.defined()) {
+        output = output * broadcast_like_channel(weight, input);
+    }
+    if (bias.defined()) {
+        output = output + broadcast_like_channel(bias, input);
+    }
+    TIMING_END;
+    return std::tuple<Tensor, Tensor, Tensor> ( output, Tensor(), Tensor() );
+
+    // auto dtype = input.scalar_type();
+    // // implement inference mode
+    // CPU_IMPL_WARNING("infer mode");
+    // auto running_mean_cpu = running_mean.defined() ? running_mean.cpu().to(torch::kFloat) : Tensor();
+    // auto running_var_cpu  = running_var.defined() ? running_var.cpu().to(torch::kFloat) : Tensor();
+    // auto outputs_cpu = native_batch_norm (
+    //                    input.cpu().to(torch::kFloat),
+    //                    c10::optional<Tensor> ( weight.defined() ? weight.cpu().to(torch::kFloat) : Tensor() ),
+    //                    c10::optional<Tensor> ( bias.defined() ? bias.cpu().to(torch::kFloat) : Tensor() ),
+    //                    c10::optional<Tensor> ( running_mean_cpu ),
+    //                    c10::optional<Tensor> ( running_var_cpu ),
+    //                    training,
+    //                    momentum,
+    //                    eps );
+    // TIMING_END;
+    // return std::tuple<Tensor, Tensor, Tensor> (
+    //         TENSOR_TO_TPU ( std::get<0> ( outputs_cpu ).to(dtype) ),
+    //         TENSOR_TO_TPU ( std::get<1> ( outputs_cpu ).to(dtype) ),
+    //         TENSOR_TO_TPU ( std::get<2> ( outputs_cpu ).to(dtype) ) );
    }
   TORCH_CHECK ( training == true, "Batchnorm only supports training mode for now" );
   if ( running_mean.defined() ) { CHECK_TENSOR_IN_DEVICE ( running_mean ); }
