@@ -7,7 +7,7 @@
 
 namespace at_tpu {
 
-#ifdef USING_PPL
+#ifdef BACKEND_SG2260E
 auto& StreamBeginCapture = tpuStreamBeginCapture;
 auto& StreamEndCapture = tpuStreamEndCapture;
 auto& GraphDestroy = tpuGraphDestroy;
@@ -38,12 +38,7 @@ c10_tpu::MempoolId_t graph_pool_handle() {
 
 TPUGraph::TPUGraph(bool keep_graph)
   // TPUStreams may not be default-constructed.
-  : keep_graph_(keep_graph) {
-#ifdef USING_PPL
-  capture_stream_ = c10_tpu::getCurrentTPUStream().stream();
-#else
-  capture_stream_ = c10_tpu::getCurrentTPUStream();
-#endif
+  : capture_stream_(c10_tpu::getCurrentTPUStream()), keep_graph_(keep_graph) {
 }
 
 void TPUGraph::capture_begin(c10_tpu::MempoolId_t pool/*=0*/) {

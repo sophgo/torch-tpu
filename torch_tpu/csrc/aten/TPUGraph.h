@@ -9,12 +9,10 @@ namespace at_tpu {
 // to TPUGraph::capture_begin
 c10_tpu::MempoolId_t graph_pool_handle();
 
-#ifdef USING_PPL
-using streamOrHandle_t = tpuStream_t;
+#ifdef BACKEND_SG2260E
 using Graph_t = tpuGraph_t;
 using GraphExec_t = tpuGraphExec_t;
 #else
-using streamOrHandle_t = tpudnnHandle_t;
 using Graph_t = tpudnnGraph_t;
 using GraphExec_t = tpudnnGraphExec_t;
 #endif
@@ -65,7 +63,7 @@ struct TPUGraph {
   c10_tpu::MempoolId_t mempool_id_;
 
   // Stream on which capture began
-  streamOrHandle_t capture_stream_;
+  TPUStream capture_stream_;
 
   // Device where capture occurred. Right now, for simplicity, we require all ops
   // in a capture to run on the same device, but this is a limitation of TPUGraph,
