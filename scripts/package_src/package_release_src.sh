@@ -28,7 +28,6 @@ cp -r $pyc_tpu_src     $package_csrc
 cp -r $pyc_utils_src   $package_csrc
 cp $pyc_cmake       $package_csrc
 rm $package_src/torch_tpu/_C*.so # _C.so
-rm $package_src/torch_tpu/lib/libtorch_tpu_python.*.so # libtorch_tpu_python
 rm -rf *.egg-info
 rm -rf *.dist-info
 
