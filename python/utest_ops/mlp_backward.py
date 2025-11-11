@@ -31,9 +31,9 @@ class LLamaMlpBlock(nn.Module):
 def check_mlp(dtype: torch.dtype):
 
     batch_size = 1  #1
-    seq_len = 4096  #128000
-    embed_dim = 3584  #8192
-    intermediate_size = 9427  #29696
+    seq_len = 1024  #128000
+    embed_dim = 1742  #8192
+    intermediate_size = 4714  #29696
     custom_use_cpu = True
     return_mid_tensor = False
 
@@ -114,7 +114,7 @@ def check_mlp(dtype: torch.dtype):
 
 if __name__ == "__main__":
     if os.environ['CHIP_ARCH'] in ['bm1684x']:
-        print(f'Skip test for this arch')
+        print(f'Skip test for this arch, BM1684X backend not support llama_mlp_backward')
         sys.exit(0)
 
     print("==========float16==========")

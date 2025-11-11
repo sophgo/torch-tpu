@@ -56,7 +56,7 @@ namespace at
 			save_mid_res);
 		TORCH_CHECK(status == TPUDNN_STATUS_SUCCESS);
 #elif defined BACKEND_1684X
-		TORCH_CHECK(false);
+		TORCH_CHECK(false, "BM1684X backend not support llama_mlp_forward");
 #endif
 		TIMING_END;
 		return output;
@@ -159,7 +159,7 @@ Tensor llama_mlp_gptq_forward(
 			tpu::TPUGenerateTpudnnTensor( stream,output));
 		TORCH_CHECK(status == TPUDNN_STATUS_SUCCESS);
 #elif defined BACKEND_1684X
-		TORCH_CHECK(false);
+		TORCH_CHECK(false, "BM1684X backend not support llama_mlp_gptq_forward");
 #endif
 		TIMING_END;
 		return output;

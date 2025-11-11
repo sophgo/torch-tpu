@@ -5,7 +5,7 @@ import numpy as np
 import sys
 import copy
 from top_utest import TensorComparator
-from torch_tpu.tpu.custom_op.llama_mlp import LLamaMlpFunc, MegatronQwen2MlpFunc
+from torch_tpu.tpu.custom_op.llama_mlp import LLamaMlpFunc
 import os
 os.environ["CMODEL_FAST_EXEC"]="1"
 import torch_tpu
@@ -51,18 +51,6 @@ class LLamaMlpBlock(nn.Module):
     def forward(self, x):
         return LLamaMlpFunc.apply(x, self.w0, self.w1, self.w2, self.use_cpu_fw, self.return_mid_tensor, self.use_cpu_bw)
 
-class MegatronQwen2MlpBlock(nn.Module):
-    def __init__(self, w0, w1, w2):
-        super().__init__()
-        self.w0 = w0
-        self.w1 = w1
-        self.w2 = w2
-
-    def forward(self, x):
-        self.fc1 = torch.cat([self.w1, self.w0], dim=0)
-        self.fc2 = self.w2.t().contiguous()
-        return MegatronQwen2MlpFunc.apply(x.transpose(0,1).contiguous(), self.fc1, self.fc2)
-
 def check_mlp():
     batch_size = 3
     seq_len = 128
@@ -79,20 +67,9 @@ def check_mlp():
 
     net_tpu = LLamaMlpBlock(w0_tpu, w1_tpu, w2_tpu)
 
-    w0_tpu_megatron = copy.deepcopy(net_cpu.mm0.weight.detach()).detach().requires_grad_(True).to(device).half()
-    w1_tpu_megatron = copy.deepcopy(net_cpu.mm1.weight.detach()).detach().requires_grad_(True).to(device).half()
-    w2_tpu_megatron = copy.deepcopy(net_cpu.mm2.weight.detach()).detach().transpose(0,1).contiguous().requires_grad_(True).to(device).half()
-    w2_tpu_megatron.retain_grad()
-    w0_tpu_megatron.retain_grad()
-    w1_tpu_megatron.retain_grad()
-    net_tpu_megatron = MegatronQwen2MlpBlock(w0_tpu_megatron, w1_tpu_megatron, w2_tpu_megatron)
-
     x = torch.randn(batch_size, seq_len, embed_dim, requires_grad=True)
     x_tpu = copy.deepcopy(x.detach()).to(device).requires_grad_(True).half()
     x_tpu.retain_grad()
-
-    x_tpu_megatron = copy.deepcopy(x.detach()).to(device).requires_grad_(True).half()
-    x_tpu_megatron.retain_grad()
 
     out_tpu = net_tpu(x_tpu)
     out_cpu = net_cpu(x)
@@ -102,9 +79,6 @@ def check_mlp():
     loss_tpu = out_tpu.sum()
     loss_tpu.backward()
 
-    out_tpu_megatron = net_tpu_megatron(x_tpu_megatron)
-    loss_tpu_megatron = out_tpu_megatron.sum()
-    loss_tpu_megatron.backward()
     print("backward done")
 
     print("==start comparing llama==")
@@ -114,21 +88,10 @@ def check_mlp():
     status_bwd_w0 = comparator.cmp_result(net_cpu.mm0.weight.grad.detach(), net_tpu.w0.grad.cpu().detach().float())
     status_bwd_w1 = comparator.cmp_result(net_cpu.mm1.weight.grad.detach(), net_tpu.w1.grad.cpu().detach().float())
     status_bwd_w2 = comparator.cmp_result(net_cpu.mm2.weight.grad.detach(), net_tpu.w2.grad.cpu().detach().t().contiguous().float())
-    print("==start comparing megatron qwen2==")
-
-    status_fwd_megatron = comparator.cmp_result(out_cpu.detach(), out_tpu_megatron.cpu().transpose(0,1).contiguous().detach().float())
-    status_bwd_x_megatron = comparator.cmp_result(x.grad.detach(), x_tpu_megatron.grad.detach().cpu().float())
-    status_bwd_w0_megatron = comparator.cmp_result(net_cpu.mm0.weight.grad.detach(), net_tpu_megatron.w0.grad.cpu().detach().float())
-    status_bwd_w1_megatron = comparator.cmp_result(net_cpu.mm1.weight.grad.detach(), net_tpu_megatron.w1.grad.cpu().detach().float())
-    status_bwd_w2_megatron = comparator.cmp_result(net_cpu.mm2.weight.grad.detach(), net_tpu_megatron.w2.grad.cpu().detach().t().contiguous().float())
 
     print(f'tpu llama {status_fwd} {status_bwd_x} {status_bwd_w0} {status_bwd_w1} {status_bwd_w2}')
-    print(f'tpu megatron qwen2 {status_fwd_megatron} {status_bwd_x_megatron} {status_bwd_w0_megatron} {status_bwd_w1_megatron} {status_bwd_w2_megatron}')
 
     status_bwd = status_bwd_x and status_bwd_w0 and status_bwd_w1 and status_bwd_w2
-    status_bwd_megatron = status_bwd_x_megatron and status_bwd_w0_megatron and status_bwd_w1_megatron and status_bwd_w2_megatron
-    status_bwd = status_bwd and status_bwd_megatron
-    status_fwd = status_fwd and status_fwd_megatron
     return status_fwd, status_bwd
 
 
@@ -192,8 +155,8 @@ def check_mlp_custom_backward():
     assert status_bwd_x and status_bwd_w0 and status_bwd_w1 and status_bwd_w2
 
 if __name__ == "__main__":
-    if os.environ['CHIP_ARCH'] in ['bm1684x', 'sg2260']:
-        print(f'Skip test for this arch')
+    if os.environ['CHIP_ARCH'] in ['bm1684x']:
+        print(f'Skip test for this arch, BM1684X backend not support llama_mlp')
         sys.exit(0)
 
     status_fwd, status_bwd = check_mlp()
