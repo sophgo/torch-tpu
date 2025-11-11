@@ -84,7 +84,12 @@ function update_sg2260_third_party()
   cp ${TPU1686_PATH}/build_${CHIP_ARCH}/sccl/libsccl.so ${TPUTRAIN_TOP}/third_party/sccl/lib/
 
   echo "updating libtpuv7_emulator.so ..."
-  cp ${TPU1686_PATH}/build_${CHIP_ARCH}/firmware_core/libtpu*_emulator.so ${TPUTRAIN_TOP}/third_party/tpuv7_runtime/tpuv7-emulator_0.1.0/lib/
+  if [ "${CHIP_ARCH}" == "sg2260" ]; then
+      emu_name="libtpuv7_emulator.so"
+  elif [ "${CHIP_ARCH}" == "sg2260e" ]; then
+      emu_name="libtpuv7.1_emulator.so"
+  fi
+  cp ${TPU1686_PATH}/build_${CHIP_ARCH}/firmware_core/libcmodel_firmware.so ${TPUTRAIN_TOP}/third_party/tpuv7_runtime/tpuv7-emulator_0.1.0/lib/$emu_name
 
   echo "updating libfirmware_core.a ..."
   mkdir -p ${TPUTRAIN_TOP}/third_party/firmware/${CHIP_ARCH}/
