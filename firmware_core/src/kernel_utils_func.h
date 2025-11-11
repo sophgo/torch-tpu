@@ -23,6 +23,12 @@ void tpu_bdc_fp_isinf(local_addr_t dst_addr, local_addr_t src_addr,
                       local_addr_t work0_addr, const dim4 *shape,
                       data_type_t dtype);
 
+void tpu_bdc_fp_isneginf(local_addr_t dst_addr, local_addr_t src_addr, const dim4 *shape,
+                         data_type_t dtype);
+
+void tpu_bdc_fp_isposinf(local_addr_t dst_addr, local_addr_t src_addr, const dim4 *shape,
+                         data_type_t dtype);
+
 void tpu_bdc_fp_isnan(local_addr_t dst_addr, local_addr_t src_addr,
                       local_addr_t work0_addr, local_addr_t work1_addr,
                       local_addr_t work2_addr, const dim4 *shape,

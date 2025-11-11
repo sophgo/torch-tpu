@@ -74,6 +74,28 @@ void tpu_bdc_fp_isinf(local_addr_t dst_addr, local_addr_t src_addr,
                   dtype);
 }
 
+void tpu_bdc_fp_isneginf(local_addr_t dst_addr, local_addr_t src_addr, const dim4 *shape,
+                         data_type_t dtype) {
+  scalar_t neg_inf_C = {.u32 = (dtype == DT_FP32
+                                    ? 0xff800000
+                                    : (dtype == DT_FP16 ? 0xfc00 : 0xff80))};
+  scalar_t C = {.u8 = 1};
+
+  tpu_bdc_equal_C(dst_addr, src_addr, neg_inf_C, C, shape, NULL, NULL, DT_UINT8,
+                  dtype);
+}
+
+void tpu_bdc_fp_isposinf(local_addr_t dst_addr, local_addr_t src_addr, const dim4 *shape,
+                         data_type_t dtype) {
+  scalar_t pos_inf_C = {.u32 = (dtype == DT_FP32
+                                    ? 0x7f800000
+                                    : (dtype == DT_FP16 ? 0x7c00 : 0x7f80))};
+  scalar_t C = {.u8 = 1};
+
+  tpu_bdc_equal_C(dst_addr, src_addr, pos_inf_C, C, shape, NULL, NULL, DT_UINT8,
+                  dtype);
+}
+
 void tpu_bdc_fp_isnan(local_addr_t dst_addr, local_addr_t src_addr,
                       local_addr_t work0_addr, local_addr_t work1_addr,
                       local_addr_t work2_addr, const dim4 *shape,

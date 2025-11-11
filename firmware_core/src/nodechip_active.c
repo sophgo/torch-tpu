@@ -137,7 +137,7 @@ void nodechip_active_v2(global_addr_t in_global_addr,
 
   const unsigned int bank_bsize = tpu_local_mem_size_per_npu() / tpu_bank_num();
   int dtype_size = tpu_data_type_size(dtype);
-  data_type_t out_dtype = (active_type == ACTIVE_ISINF ||
+  data_type_t out_dtype = (active_type == ACTIVE_ISINF || active_type == ACTIVE_ISNEGINF || active_type == ACTIVE_ISPOSINF ||
                      active_type == ACTIVE_ISNAN) ? DT_UINT8 : dtype;
   int output_size = tpu_data_type_size(out_dtype);
   int tensor_num = 2 + 2; //  2 inputs, 2 outputs
@@ -296,6 +296,12 @@ void nodechip_active_v2(global_addr_t in_global_addr,
         tpu_bdc_fp_isinf(out_local_addr[(stage_idx - 1) & 0x1],
                          in_local_addr[(stage_idx - 1) & 0x1], BOFFSET(0),
                          &cur_shape, dtype);
+      } else if (active_type == ACTIVE_ISNEGINF) {
+        tpu_bdc_fp_isneginf(out_local_addr[(stage_idx - 1) & 0x1],
+                         in_local_addr[(stage_idx - 1) & 0x1], &cur_shape, dtype);
+      } else if (active_type == ACTIVE_ISPOSINF) {
+        tpu_bdc_fp_isposinf(out_local_addr[(stage_idx - 1) & 0x1],
+                         in_local_addr[(stage_idx - 1) & 0x1], &cur_shape, dtype);
       } else if (active_type == ACTIVE_ISNAN) {
         tpu_bdc_fp_isnan(out_local_addr[(stage_idx - 1) & 0x1],
                          in_local_addr[(stage_idx - 1) & 0x1], BOFFSET(0),
@@ -343,7 +349,7 @@ int tpu_kernel_api_active_multi_core(const void *args) {
   sg_api_active_t *api = (sg_api_active_t *)args;
   data_type_t dtype = (data_type_t)api->dtype;
 #ifdef ENABLE_MULTI_CORE
-  data_type_t out_dtype = (api->active_type == ACTIVE_ISINF ||
+  data_type_t out_dtype = (api->active_type == ACTIVE_ISINF || api->active_type == ACTIVE_ISNEGINF || api->active_type == ACTIVE_ISPOSINF ||
                            api->active_type == ACTIVE_ISNAN) ? DT_UINT8 : dtype;
   int output_size = tpu_data_type_size(out_dtype);
   TPUKERNEL_ASSERT(dtype == DT_FP32 || dtype == DT_FP16 || dtype == DT_BFP16);

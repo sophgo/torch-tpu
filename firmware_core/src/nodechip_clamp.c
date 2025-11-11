@@ -1,14 +1,18 @@
 #include "sg_api_struct.h"
 #include "tpu_kernel.h"
 
+typedef union {
+  float f32val;
+  signed int i32val;
+} ValUnion;
 
 extern void nodechip_clip_fp(
     global_addr_t A_global_addr,
     global_addr_t res_global_addr,
     const int* shape,
     int shape_dim,
-    float min,
-    float max,
+    ValUnion min,
+    ValUnion max,
     data_type_t dtype,
     int if_relu,
     float relu_upper_limit);
@@ -32,13 +36,17 @@ int tpu_kernel_api_clamp_multi_core ( const void *args )
   int length_slice = DIV_UP(length, core_num);
   int length_secs = DIV_UP(length, length_slice);
   TPUKERNEL_ASSERT(length_secs <= core_num);
+  ValUnion min;
+  ValUnion max;
+  min.f32val = api->min;
+  max.f32val = api->max;
   nodechip_clip_fp(
       api->input_global_addr + (length_slice * core_idx) * tpu_data_type_size(api->dtype),
       api->output_global_addr + (length_slice * core_idx) * tpu_data_type_size(api->dtype),
       shape,
       api->dim,
-      api->min,
-      api->max,
+      min,
+      max,
       ( data_type_t )api->dtype,
       /*if_relu*/0,
       /*relu_upper_limit*/0.0f );
@@ -52,13 +60,17 @@ int tpu_kernel_api_clamp_multi_core ( const void *args )
   {
     shape[i] = api->shape[i];
   }
+  ValUnion min;
+  ValUnion max;
+  min.f32val = api->min;
+  max.f32val = api->max;
   nodechip_clip_fp (
   api->input_global_addr,
   api->output_global_addr,
   shape,
   api->dim,
-  api->min,
-  api->max,
+  min,
+  max,
   ( data_type_t )api->dtype,
   /*if_relu*/0,
   /*relu_upper_limit*/0.0f );

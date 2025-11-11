@@ -43,6 +43,8 @@
  * + ACTIVE_RECIPROCAL = 39,  **new implementation**(Reciprocal.cpp)
  * + ACTIVE_EXP2 = 40, **new implementation**
  * + ACTIVE_TRUNC = 41, **new implementation**
+ * + ACTIVE_ISNEGINF = 43, **new implementation**
+ * + ACTIVE_ISPOSINF = 44, **new implementation**
  */
 #include <ATen/EmptyTensor.h>
 #include <ATen/core/TensorBase.h>
@@ -267,6 +269,10 @@ IMP_ACTIVE_OUT(isnan, TPUDNN_ACTIVE_ISNAN, tpu::ACTIVE)
 IMP_ACTIVE_BOOL(isnan)
 IMP_ACTIVE_OUT(isinf, TPUDNN_ACTIVE_ISINF, tpu::ACTIVE)
 IMP_ACTIVE_BOOL(isinf)
+IMP_ACTIVE_OUT(isneginf, TPUDNN_ACTIVE_ISNEGINF, tpu::ACTIVE)
+IMP_ACTIVE_BOOL(isneginf)
+IMP_ACTIVE_OUT(isposinf, TPUDNN_ACTIVE_ISPOSINF, tpu::ACTIVE)
+IMP_ACTIVE_BOOL(isposinf)
 
 TORCH_LIBRARY_IMPL(aten, TPU, m) {
   m.impl("isfinite.out", isfinite_out_tpu);
@@ -275,6 +281,10 @@ TORCH_LIBRARY_IMPL(aten, TPU, m) {
   m.impl("isinf", isinf_tpu);
   m.impl("isnan.out", isnan_out_tpu);
   m.impl("isnan", isnan_tpu);
+  m.impl("isneginf.out", isneginf_out_tpu);
+  m.impl("isneginf", isneginf_tpu);
+  m.impl("isposinf.out", isposinf_out_tpu);
+  m.impl("isposinf", isposinf_tpu);
 }
 
 TORCH_LIBRARY_IMPL(aten, AutogradPrivateUse1, m) {
