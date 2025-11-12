@@ -269,6 +269,13 @@ function run_online_regression_test() {
 
   echo "****************************** tgi regression...*************************************"
   if [ $test_CHIP_ARCH = 'sg2260' ]; then
+
+    echo "****************************** PPL ops smoke test***********************************"
+    pushd $CURRENT_DIR/../python/test
+    USE_PPL=1 python rmsnorm.py || return -1
+    popd
+    echo "****************************** PPL ops Successful***********************************"
+
     regression_for_tgi; ret_regression_for_tgi=$?
     if [ $ret_regression_for_tgi -eq 0 ];then
       echo "[RESULT-$test_CHIP_ARCH] regression_for_tgi is computed successfully!"
@@ -278,7 +285,6 @@ function run_online_regression_test() {
     fi
   fi
   echo "****************************** tgi  Successful *************************************"
-
 
   echo "****************************** ops utesting... ...***********************************"
   ops_utest; ret_ops_utest=$?
