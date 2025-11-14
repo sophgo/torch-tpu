@@ -207,6 +207,16 @@ function build_riscv_whl() {
   return $ret
 }
 
+function build_riscv_whl_soc() {
+  export CMAKE_ARGS="-DCMAKE_POLICY_VERSION_MINIMUM=3.5"
+  export CMAKE_POLICY_VERSION_MINIMUM=3.5
+  export RISCV_TOOLCHAIN=/usr/
+  export CMAKE_POLICY_DEFAULT_CMP0000=NEW
+  export SOC_MODE=ON
+  new_clean && bdist_wheel
+  return $?;
+}
+
 function check_riscv_third_party_version() {
   FILE1="$CURRENT_DIR/../third_party/tpuDNN/sg2260_lib/libtpudnn.so"
   FILE2="$CURRENT_DIR/../third_party/tpuDNN/sg2260_lib/libtpudnn-riscv.so"

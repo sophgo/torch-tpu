@@ -2509,6 +2509,6 @@ TORCH_LIBRARY_IMPL(aten, TPU, m) {
 } // namespace at
 
 // FIXME Fix Compare.pl & uncomment this
-#if defined(BACKEND_SG2260) || defined(BACKEND_SG2260E)
+#if (defined(BACKEND_SG2260) || defined(BACKEND_SG2260E)) && !defined(SOC_MODE)
 #define USING_PPL
 #endif

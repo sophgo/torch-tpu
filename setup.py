@@ -603,7 +603,10 @@ class bdist_wheel(_bdist_wheel, ExtBase):
         base_fw_libs = glob.glob(os.path.join(TPUV7_RUNTIME_PATH, f'tpuv7-emulator_0.1.0/lib/libtpu*_emulator.so')) if not (SOC_CROSS or SOC_MODE) else \
                        glob.glob(os.path.join(TPUV7_RUNTIME_PATH, f'tpuv7-emulator_0.1.0/lib/libtpu*_emulator-riscv.so'))
         for lib in base_fw_libs:
-            self.copy_file(lib, os.path.join(pkg_dir, f'lib/'))
+            filename = os.path.basename(lib)
+            if filename.endswith('_emulator-riscv.so'):
+                filename = filename.replace('_emulator-riscv.so', '_emulator.so')
+            self.copy_file(lib, os.path.join(pkg_dir, f'lib/{filename}'))
         dnn_libs = glob.glob(os.path.join(TPUV7_RUNTIME_PATH, 'tpuv7-emulator_0.1.0/lib/libdnnl.so.3'))
         for lib in dnn_libs:
             target = os.path.join(pkg_dir, f'lib/', os.path.basename(lib))

@@ -29,8 +29,8 @@ add_definitions(-Wno-address-of-packed-member
                 -Werror
                 -Wno-dev)
 
+set(CURRENT_SOC_MODE "$ENV{SOC_MODE}")
 if (NOT USING_CMODEL)
-    set(CURRENT_SOC_MODE "$ENV{SOC_MODE}")
     if (NOT CURRENT_SOC_MODE STREQUAL "ON")
         include($ENV{CHIP_ARCH}-toolchain.cmake)
     endif()
@@ -102,7 +102,7 @@ else()
 endif()
 
 set(PPL_SUPPORTED_ARCHES sg2260e sg2260)
-if ("$ENV{CHIP_ARCH}" IN_LIST PPL_SUPPORTED_ARCHES)
+if ("$ENV{CHIP_ARCH}" IN_LIST PPL_SUPPORTED_ARCHES AND NOT CURRENT_SOC_MODE STREQUAL "ON")
     include(PPLTools)
     file(GLOB pl_files LIST_DIRECTORIES false
         "${CMAKE_CURRENT_SOURCE_DIR}/../torch_tpu/csrc/ops/my_ops/*.pl"

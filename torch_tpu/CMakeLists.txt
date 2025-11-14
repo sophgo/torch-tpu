@@ -109,7 +109,7 @@ add_library(torch_tpu SHARED ${concated_src} ${kernel_srcs})
 target_link_libraries(torch_tpu c10 torch_cpu torch_python TPU1686::tpuDNN torch_tpu_kernel_data TPU1686::sccl TPU1686::tpurt)# sophon
 
 set(PPL_SUPPORTED_ARCHES sg2260 sg2260e)
-if ("$ENV{CHIP_ARCH}" IN_LIST PPL_SUPPORTED_ARCHES)
+if ("$ENV{CHIP_ARCH}" IN_LIST PPL_SUPPORTED_ARCHES AND NOT "$ENV{SOC_MODE}" STREQUAL "ON")
     file(GLOB pl_host_srcs ${CMAKE_BINARY_DIR}/../firmware_$ENV{CHIP_ARCH}/ppl/*/host/*.cpp)
     add_library(pl_host ${pl_host_srcs})
     file(GLOB pl_host_includes ${CMAKE_BINARY_DIR}/../firmware_$ENV{CHIP_ARCH}/ppl/*/include)

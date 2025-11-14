@@ -193,16 +193,16 @@ export EXTRA_CONFIG='-DDEBUG=ON -DUSING_FW_PRINT=ON -DUSING_FW_DEBUG=ON'
 # Build TPU base kernels
 rebuild_TPU1686_riscv
 
-# Make sure we have a clean env
-pip uninstall --yes torch-tpu
+# if failed, try to update bm_prebuilt_toolchains
+```
 
+RV version torch-tpu(built in SOC environment):
+```bash
 # Debug torch-tpu, optional
 export TPUTRAIN_DEBUG=ON
 
-# Build torch-tpu and install editable
-build_riscv_whl
-
-# if failed, try to update bm_prebuilt_toolchains
+# build torch-tpu in SOC environment
+build_riscv_whl_soc
 ```
 
 
