@@ -5,7 +5,7 @@ void firmware_kernel_tick();
 void firmware_kernel_tock(int);
 
 
-#ifdef BACKEND_SG2260
+#ifdef ENABLE_MULTI_CORE
 extern
 void nodechip_rmsnorm_forward_multi_core(
     global_addr_t input_global_addr,

@@ -100,7 +100,7 @@ int tpu_kernel_api_pad(const void *args) {
 }
 TPUKERNEL_FUNC_REGISTER(tpu_kernel_api_pad);
 
-#ifdef BACKEND_SG2260
+#ifdef ENABLE_MULTI_CORE
 int tpu_kernel_api_pad_multi_core(const void *args) {
   sg_api_pad_t *api = (sg_api_pad_t *)args;
   TPUKERNEL_ASSERT(api->dtype == DT_FP32 || api->dtype == DT_FP16 ||

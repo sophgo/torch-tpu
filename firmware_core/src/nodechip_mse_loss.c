@@ -203,7 +203,7 @@ int tpu_kernel_api_mse_loss_multi_core(const void* args){
     length *= api->shape[i];
   }
   tpu_initialize();
-#ifdef BACKEND_SG2260
+#ifdef ENABLE_MULTI_CORE
   int core_idx = tpu_core_index();
   if (core_idx == 0) {
     nodechip_mse_loss_forward(

@@ -101,6 +101,11 @@ else()
     endif()
 endif()
 
+set(MULTI_CORE_ARCHES sg2260e sg2260)
+if ("$ENV{CHIP_ARCH}" IN_LIST MULTI_CORE_ARCHES)
+    target_compile_definitions(firmware PRIVATE -DENABLE_MULTI_CORE)
+endif()
+
 set(PPL_SUPPORTED_ARCHES sg2260e sg2260)
 if ("$ENV{CHIP_ARCH}" IN_LIST PPL_SUPPORTED_ARCHES AND NOT CURRENT_SOC_MODE STREQUAL "ON")
     include(PPLTools)

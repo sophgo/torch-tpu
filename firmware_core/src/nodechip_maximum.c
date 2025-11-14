@@ -100,7 +100,7 @@ int tpu_kernel_api_maximumc(const void *args) {
 }
 TPUKERNEL_FUNC_REGISTER(tpu_kernel_api_maximumc);
 
-#ifdef BACKEND_SG2260
+#ifdef ENABLE_MULTI_CORE
 int tpu_kernel_api_maximumc_multi_core(const void *args) {
   sg_api_maximumc_t *api = (sg_api_maximumc_t *)args;
   TPUKERNEL_ASSERT(api->dtype == DT_FP32 || api->dtype == DT_FP16 ||
@@ -246,7 +246,7 @@ int tpu_kernel_api_maximum(const void *args) {
 }
 TPUKERNEL_FUNC_REGISTER(tpu_kernel_api_maximum);
 
-#ifdef BACKEND_SG2260
+#ifdef ENABLE_MULTI_CORE
 int tpu_kernel_api_maximum_multi_core(const void *args) {
   sg_api_maximum_t *api = (sg_api_maximum_t *)args;
   TPUKERNEL_ASSERT(api->dtype == DT_FP32 || api->dtype == DT_FP16 ||
@@ -504,7 +504,7 @@ int tpu_kernel_api_maximum_bcast(const void *args) {
 }
 TPUKERNEL_FUNC_REGISTER(tpu_kernel_api_maximum_bcast);
 
-#ifdef BACKEND_SG2260
+#ifdef ENABLE_MULTI_CORE
 int tpu_kernel_api_maximum_bcast_multi_core(const void *args) {
   sg_api_maximum_bcast_t *api = (sg_api_maximum_bcast_t *)args;
   TPUKERNEL_ASSERT(api->output_dim > 0 && api->output_dim <= 4);

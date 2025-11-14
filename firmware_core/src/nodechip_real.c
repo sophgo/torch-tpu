@@ -166,10 +166,10 @@ int tpu_kernel_api_real(const void *args)
 }
 TPUKERNEL_FUNC_REGISTER(tpu_kernel_api_real);
 
-#ifdef BACKEND_SG2260
+#ifdef ENABLE_MULTI_CORE
 int tpu_kernel_api_real_multi_core(const void *args)
 {
-#ifdef BACKEND_SG2260
+#ifdef ENABLE_MULTI_CORE
   TPUKERNEL_ASSERT_INFO(false, "not implementated");
   return 0;
 #else

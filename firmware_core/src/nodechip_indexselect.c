@@ -221,7 +221,7 @@ int tpu_kernel_api_index_select ( const void * args )
 TPUKERNEL_FUNC_REGISTER ( tpu_kernel_api_index_select );
 
 
-#ifdef BACKEND_SG2260
+#ifdef ENABLE_MULTI_CORE
 static inline void compute_current_slice_info_multi_core(int total_num, int* expected_current_slice,
                                                          int* expected_avg_slice, int* expected_secs) {
   const int core_num = tpu_core_num();

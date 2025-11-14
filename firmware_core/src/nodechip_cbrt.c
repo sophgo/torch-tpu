@@ -101,7 +101,7 @@ int tpu_kernel_api_cbrt_multi_core(const void *args) {
       length *= api->shape[i];
     }
     tpu_initialize();
-#ifdef BACKEND_SG2260
+#ifdef ENABLE_MULTI_CORE
     int core_num = tpu_core_num();
     int core_idx = tpu_core_index();
 

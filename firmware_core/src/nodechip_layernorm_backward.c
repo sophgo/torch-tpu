@@ -39,7 +39,7 @@ int tpu_kernel_api_layernorm_backward_multi_core ( const void *args )
   sg_api_layernorm_backward_t *api = ( sg_api_layernorm_backward_t * ) args;
   TPUKERNEL_ASSERT ( api->dtype == DT_FP32 || api->dtype == DT_FP16 || api->dtype == DT_BFP16 );
   tpu_initialize();
-#ifdef BACKEND_SG2260
+#ifdef ENABLE_MULTI_CORE
 #ifdef USING_PERF_MODE
     tpu_sync_all();
 #endif

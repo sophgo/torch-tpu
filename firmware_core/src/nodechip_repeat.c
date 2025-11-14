@@ -198,7 +198,7 @@ bool is_last_dim_spec(sg_api_repeat_t *api, int* row, int* col, int* repeat) {
 
 int tpu_kernel_api_repeat_multi_core(const void *args) {
   sg_api_repeat_t *api = (sg_api_repeat_t *)args;
-#ifdef BACKEND_SG2260
+#ifdef ENABLE_MULTI_CORE
 #ifndef REMOVE_POLLS_IN_LLM
   tpu_initialize();
 #else

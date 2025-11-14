@@ -124,7 +124,7 @@ int tpu_kernel_api_gather_multi_core ( const void *args )
 {
   sg_api_gather_t *api = ( sg_api_gather_t * ) args;
   tpu_initialize();
-#ifdef BACKEND_SG2260
+#ifdef ENABLE_MULTI_CORE
   long long int inner_num = 1, gather_num = 1, gathered_num = 1, outer_num = 1;
   for (int i = 0; i < api->axis; ++i) {
     inner_num *= api->input_shape[i];

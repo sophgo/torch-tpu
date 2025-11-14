@@ -233,7 +233,7 @@ extern void nodechip_where_multi_core(
 int tpu_kernel_api_where_multi_core(const void * args)
 {
   sg_api_where_multi_core_t * api = (sg_api_where_multi_core_t *) args;
-#ifdef BACKEND_SG2260
+#ifdef ENABLE_MULTI_CORE
   TPUKERNEL_ASSERT ( api->dtype == DT_FP32 || api->dtype == DT_INT32 ||
                      api->dtype == DT_FP16 || api->dtype == DT_BFP16);
   tpu_initialize();

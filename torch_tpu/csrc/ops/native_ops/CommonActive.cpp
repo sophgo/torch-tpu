@@ -151,7 +151,7 @@ Tensor &active_template(const Tensor &self, Tensor &out) {
         auto self_ = self.contiguous();
 
 #ifdef USING_PPL
-        if (usePPLKernels())
+        if (usePPLKernels() && ActiveType == TPUDNN_ACTIVE_SIGMOID)
         {
             int length = 1;
             for (const auto i : c10::irange(self_.dim())) {

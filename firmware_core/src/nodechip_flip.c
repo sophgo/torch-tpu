@@ -8,7 +8,7 @@ extern void nodechip_reverse(global_addr_t bottom_global_offset,
                              data_type_t dtype);
 
 int tpu_kernel_api_flip_multi_core(const void *args) {
-#ifdef BACKEND_SG2260
+#ifdef ENABLE_MULTI_CORE
   TPUKERNEL_ASSERT_INFO(false, "not implementated");
   return 0;
 #else

@@ -1474,7 +1474,7 @@ void nodechip_native_group_norm(
 #endif
  
 int tpu_kernel_api_native_group_norm_multi_core(const void *args) {
-#ifdef BACKEND_SG2260
+#ifdef ENABLE_MULTI_CORE
   TPUKERNEL_ASSERT_INFO(false, "not implementated");
   return 0;
 #else

@@ -926,7 +926,7 @@ int tpu_kernel_api_softmax_multi_core ( const void *args )
   sg_api_softmax_t *api = ( sg_api_softmax_t * ) args;
   TPUKERNEL_ASSERT ( api->dtype == DT_FP32 || api->dtype == DT_FP16 || api->dtype == DT_BFP16 );
   tpu_initialize();
-  #ifdef BACKEND_SG2260
+  #ifdef ENABLE_MULTI_CORE
   nodechip_softmax_forward_multi_core_v2 (
    api->input_global_addr,
    api->output_global_addr,
@@ -967,7 +967,7 @@ int tpu_kernel_api_log_softmax_multi_core(const void *args) {
   if (api->axis != api->dim - 1) {
     TPUKERNEL_ASSERT_INFO(false, "not support axis != dim-1 now");
   }
-  #ifdef BACKEND_SG2260
+  #ifdef ENABLE_MULTI_CORE
   dim4 new_shape = {.n = 1, .c = 1, .h = 1, .w = 1};
   // new_shape.h = shape[axis];
   for (int i = 0; i < api->axis; i++) {

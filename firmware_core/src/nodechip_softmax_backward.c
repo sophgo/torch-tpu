@@ -26,7 +26,7 @@ int tpu_kernel_api_softmax_backward_multi_core ( const void *args )
 {
   sg_api_softmax_backward_t *api = ( sg_api_softmax_backward_t * ) args;
   tpu_initialize();
-  #ifdef BACKEND_SG2260
+  #ifdef ENABLE_MULTI_CORE
   TPUKERNEL_ASSERT ( api->axis == api->dim - 1 );
   nodechip_softmax_backward_multi_core (
     api->grad_input_global_addr,

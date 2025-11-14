@@ -133,7 +133,7 @@ void nodechip_scale_conj(
 
 int tpu_kernel_api_conj_multi_core(const void *args)
 {
-#ifdef BACKEND_SG2260
+#ifdef ENABLE_MULTI_CORE
   TPUKERNEL_ASSERT_INFO(false, "not implementated");
   return 0;
 #else

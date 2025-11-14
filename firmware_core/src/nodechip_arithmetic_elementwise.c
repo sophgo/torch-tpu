@@ -238,7 +238,7 @@ int tpu_kernel_api_arithmetic_eltwise ( const void *args )
 
 // TPUKERNEL_FUNC_REGISTER (tpu_kernel_api_div_eltwise);
 
-#ifdef BACKEND_SG2260
+#ifdef ENABLE_MULTI_CORE
 int tpu_kernel_api_arithmetic_eltwise_multi_core(const void *args)
 {
   TPUKERNEL_ASSERT_INFO(false, "not implementated");

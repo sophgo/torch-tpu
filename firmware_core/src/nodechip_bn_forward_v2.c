@@ -518,7 +518,7 @@ int tpu_kernel_api_batchnorm2d_multi_core ( const void * args )
   int total_C = shape.c;
   TPUKERNEL_ASSERT ( api->dtype == DT_FP32 || api->dtype == DT_FP16 || api->dtype == DT_BFP16 );
   tpu_initialize();
-#ifdef BACKEND_SG2260
+#ifdef ENABLE_MULTI_CORE
   const int core_idx = tpu_core_index();
   const int core_num = tpu_core_num();
   int cslice_per_core = DIV_UP(shape.c, core_num);

@@ -2,7 +2,7 @@
 #include "tpu_kernel.h"
 
 
-#ifdef BACKEND_SG2260
+#ifdef ENABLE_MULTI_CORE
 extern
 void nodechip_layernorm_matmul_fuse_multi_core(
     global_addr_t   input_global_addr,

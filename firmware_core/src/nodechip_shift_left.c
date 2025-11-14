@@ -124,7 +124,7 @@ int tpu_kernel_api_shift_left ( const void * args )
 }
 TPUKERNEL_FUNC_REGISTER ( tpu_kernel_api_shift_left );
 
-#ifdef BACKEND_SG2260
+#ifdef ENABLE_MULTI_CORE
 int tpu_kernel_api_shift_left_multi_core(const void *args)
 {
   sg_api_shift_left_t * api = ( sg_api_shift_left_t * ) args;
@@ -266,7 +266,7 @@ int tpu_kernel_api_shift_left_c ( const void * args )
 }
 TPUKERNEL_FUNC_REGISTER ( tpu_kernel_api_shift_left_c );
 
-#ifdef BACKEND_SG2260
+#ifdef ENABLE_MULTI_CORE
 int tpu_kernel_api_shift_left_c_multi_core(const void *args)
 {
   sg_api_shift_left_c_t * api = ( sg_api_shift_left_c_t * ) args;

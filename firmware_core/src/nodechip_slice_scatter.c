@@ -31,7 +31,7 @@ int tpu_kernel_api_slice_scatter_multi_core(const void *args) {
   for (int i = api->dim + 1; i < api->input_dim; i++) {
     input_shape[3] *= api->input_shape[i];
   }
-  #ifdef BACKEND_SG2260
+  #ifdef ENABLE_MULTI_CORE
   tpu_initialize();
   int core_num = tpu_core_num();
   int core_idx = tpu_core_index();

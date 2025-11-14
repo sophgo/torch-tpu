@@ -14,7 +14,7 @@ int tpu_kernel_api_reduce_max_or_min_multi_core(const void *args) {
   TPUKERNEL_ASSERT(api->mode == 0 || api->mode == 1);
   int mode = api->mode == 0 ? REDUCE_MAX : REDUCE_MIN;
 
-#ifdef BACKEND_SG2260
+#ifdef ENABLE_MULTI_CORE
   int length = 1;
   if (api->dim > 0) {
     length = api->shape[0];

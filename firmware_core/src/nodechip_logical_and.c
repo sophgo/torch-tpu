@@ -106,7 +106,7 @@ void nodechip_logical_and(
 int tpu_kernel_api_logical_and_multi_core(const void *args)
 {
   sg_api_logical_and_t * api = ( sg_api_logical_and_t * ) args;
-#ifdef BACKEND_SG2260
+#ifdef ENABLE_MULTI_CORE
   TPUKERNEL_ASSERT(api->dtype == DT_FP32 || api->dtype == DT_FP16 || api->dtype == DT_BFP16);
   int length = 1;
   for ( int i = 0; i < api->dim; ++i )

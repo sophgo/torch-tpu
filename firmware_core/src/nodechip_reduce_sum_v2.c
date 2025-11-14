@@ -469,7 +469,7 @@ int tpu_kernel_api_reduce_multi_core ( const void *args )
                     api->dtype == DT_INT32 || api->dtype == DT_INT8 || api->dtype == DT_UINT8);
   TPUKERNEL_ASSERT ( api->mode == 0 || api->mode == 1 );
   tpu_initialize();
-#ifdef BACKEND_SG2260
+#ifdef ENABLE_MULTI_CORE
 #ifdef USING_PERF_MODE
     tpu_sync_all();
 #endif

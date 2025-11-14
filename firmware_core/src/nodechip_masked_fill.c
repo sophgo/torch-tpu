@@ -31,7 +31,7 @@ extern void nodechip_select_fp(
 int tpu_kernel_api_masked_fill_multi_core ( const void * args )
 {
     sg_api_masked_fill_t *api = ( sg_api_masked_fill_t * ) args;
-#ifdef BACKEND_SG2260
+#ifdef ENABLE_MULTI_CORE
     int is_bcast[FW_MAX_SHAPE_DIMS] = {0};
     for (int i = 0; i < api->mask_dims; ++i)
         is_bcast[api->input_dims-1-i] = (api->mask_shape[api->mask_dims-1-i] == 1) && api->mask_shape[api->mask_dims-1-i] != api->input_shape[api->input_dims-1-i];

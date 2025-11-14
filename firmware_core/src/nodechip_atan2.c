@@ -210,7 +210,7 @@ int tpu_kernel_api_atan2c(const void *args) {
 }
 TPUKERNEL_FUNC_REGISTER(tpu_kernel_api_atan2c);
 
-#ifdef BACKEND_SG2260
+#ifdef ENABLE_MULTI_CORE
 int tpu_kernel_api_atan2c_multi_core(const void *args) {
   sg_api_atan2c_t *api = (sg_api_atan2c_t *)args;
   TPUKERNEL_ASSERT(api->dtype == DT_FP32 || api->dtype == DT_FP16 ||
@@ -467,7 +467,7 @@ int tpu_kernel_api_atan2_c(const void *args) {
 }
 TPUKERNEL_FUNC_REGISTER(tpu_kernel_api_atan2_c);
 
-#ifdef BACKEND_SG2260
+#ifdef ENABLE_MULTI_CORE
 int tpu_kernel_api_atan2_c_multi_core(const void *args) {
   sg_api_atan2_c_t *api = (sg_api_atan2_c_t *)args;
   TPUKERNEL_ASSERT(api->dtype == DT_FP32 || api->dtype == DT_FP16 ||
@@ -801,7 +801,7 @@ int tpu_kernel_api_atan2(const void *args) {
 }
 TPUKERNEL_FUNC_REGISTER(tpu_kernel_api_atan2);
 
-#ifdef BACKEND_SG2260
+#ifdef ENABLE_MULTI_CORE
 int tpu_kernel_api_atan2_multi_core(const void *args) {
   sg_api_atan2_t *api = (sg_api_atan2_t *)args;
   TPUKERNEL_ASSERT(api->dtype == DT_FP32 || api->dtype == DT_FP16 ||
@@ -1238,7 +1238,7 @@ int tpu_kernel_api_atan2_bcast(const void *args) {
 }
 TPUKERNEL_FUNC_REGISTER(tpu_kernel_api_atan2_bcast);
 
-#ifdef BACKEND_SG2260
+#ifdef ENABLE_MULTI_CORE
 int tpu_kernel_api_atan2_bcast_multi_core(const void *args) {
   sg_api_atan2_bcast_t *api = (sg_api_atan2_bcast_t *)args;
   TPUKERNEL_ASSERT(api->output_dim > 0 && api->output_dim <= 4);

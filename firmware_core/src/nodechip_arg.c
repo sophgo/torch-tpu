@@ -39,7 +39,7 @@ int tpu_kernel_api_arg_muti_core(const void *args) {
 
   sg_api_reduce_arg_t *api = (sg_api_reduce_arg_t *)args;
   // TPUKERNEL_ASSERT(api->dtype == DT_FP32);
-#ifdef BACKEND_SG2260
+#ifdef ENABLE_MULTI_CORE
 #ifdef USING_LLM_TICK_TOCK_PROFILE
   firmware_kernel_tick();
 #endif

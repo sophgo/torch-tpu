@@ -100,7 +100,7 @@
 //     true,
 //     0,
 //     nnvlc_param );
-// #ifdef BACKEND_SG2260
+// #ifdef ENABLE_MULTI_CORE
 //   tpu_sync_all();
 // #endif
 //   tpu_poll();

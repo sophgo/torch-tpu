@@ -218,7 +218,7 @@ int tpu_kernel_api_nextafterc(const void *args) {
 }
 TPUKERNEL_FUNC_REGISTER(tpu_kernel_api_nextafterc);
 
-#ifdef BACKEND_SG2260
+#ifdef ENABLE_MULTI_CORE
 int tpu_kernel_api_nextafterc_multi_core(const void *args) {
   sg_api_nextafterc_t *api = (sg_api_nextafterc_t *)args;
   TPUKERNEL_ASSERT(api->dtype == DT_FP32 || api->dtype == DT_BFP16);
@@ -494,7 +494,7 @@ int tpu_kernel_api_nextafter_c(const void *args) {
 }
 TPUKERNEL_FUNC_REGISTER(tpu_kernel_api_nextafter_c);
 
-#ifdef BACKEND_SG2260
+#ifdef ENABLE_MULTI_CORE
 int tpu_kernel_api_nextafter_c_multi_core(const void *args) {
   sg_api_nextafter_c_t *api = (sg_api_nextafter_c_t *)args;
   TPUKERNEL_ASSERT(api->dtype == DT_FP32 || api->dtype == DT_BFP16);
@@ -787,7 +787,7 @@ int tpu_kernel_api_nextafter(const void *args) {
 }
 TPUKERNEL_FUNC_REGISTER(tpu_kernel_api_nextafter);
 
-#ifdef BACKEND_SG2260
+#ifdef ENABLE_MULTI_CORE
 int tpu_kernel_api_nextafter_multi_core(const void *args) {
   sg_api_nextafter_t *api = (sg_api_nextafter_t *)args;
   TPUKERNEL_ASSERT(api->dtype == DT_FP32 || api->dtype == DT_BFP16);
@@ -1189,7 +1189,7 @@ int tpu_kernel_api_nextafter_bcast(const void *args) {
 }
 TPUKERNEL_FUNC_REGISTER(tpu_kernel_api_nextafter_bcast);
 
-#ifdef BACKEND_SG2260
+#ifdef ENABLE_MULTI_CORE
 int tpu_kernel_api_nextafter_bcast_multi_core(const void *args) {
   sg_api_nextafter_bcast_t *api = (sg_api_nextafter_bcast_t *)args;
   TPUKERNEL_ASSERT(api->output_dim > 0 && api->output_dim <= 4);

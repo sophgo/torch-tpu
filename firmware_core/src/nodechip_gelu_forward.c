@@ -119,7 +119,7 @@ int tpu_kernel_api_gelu_multi_core ( const void * args )
 {
   sg_api_gelu_t * api = ( sg_api_gelu_t * ) args;
   TPUKERNEL_ASSERT ( api->dtype == DT_FP32 || api->dtype == DT_FP16 || api->dtype == DT_BFP16 );
-#ifdef BACKEND_SG2260
+#ifdef ENABLE_MULTI_CORE
   tpu_initialize();
 #ifdef USING_PERF_MODE
     tpu_sync_all();

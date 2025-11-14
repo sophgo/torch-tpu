@@ -61,7 +61,8 @@ def make_symbol():
         os.symlink(o_emulator, cmodel_path)
 
 if arch == 'sg2260e':
-    os.environ['DISABLE_CACHE'] = '1'
+    os.environ['TPU_RT_CORE_NUM'] = '4'
+
 # OPEN INS-CACHE default
 if os.environ.get('TPU_CACHE_BACKEND') is None:
     if not os.environ.get('DISABLE_CACHE'):

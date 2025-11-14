@@ -128,7 +128,7 @@ void nodechip_reduce_nonzero(
 
 int tpu_kernel_api_nonzero_multicore(const void *args) {
   sg_api_nonzero_multi_core_t *api = (sg_api_nonzero_multi_core_t *)args;
-#ifdef BACKEND_SG2260
+#ifdef ENABLE_MULTI_CORE
   data_type_t dtype = (data_type_t)api->dtype;
   int dsize = tpu_data_type_size(dtype);
   int split_dim = 0;

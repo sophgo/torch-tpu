@@ -318,7 +318,7 @@ int tpu_kernel_api_csub ( const void * args )
 }
 TPUKERNEL_FUNC_REGISTER ( tpu_kernel_api_csub );
 
-#ifdef BACKEND_SG2260
+#ifdef ENABLE_MULTI_CORE
 extern void nodechip_const_binary_fp_multi_core(
     global_addr_t A_global_addr,
     global_addr_t res_global_addr,

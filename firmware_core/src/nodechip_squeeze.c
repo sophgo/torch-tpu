@@ -71,7 +71,7 @@ int tpu_kernel_api_squeeze_multi_core(const void *args) {
   }
 
   tpu_initialize();
-  #ifdef BACKEND_SG2260
+  #ifdef ENABLE_MULTI_CORE
   int core_num = tpu_core_num();
   int core_idx = tpu_core_index();
 

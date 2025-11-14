@@ -105,7 +105,7 @@ int tpu_kernel_api_logical_not_multi_core(const void *args)
 {
   sg_api_logical_not_t * api = ( sg_api_logical_not_t * ) args;
   TPUKERNEL_ASSERT(api->dtype == DT_FP32 || api->dtype == DT_FP16 || api->dtype == DT_BFP16);
-#ifdef BACKEND_SG2260
+#ifdef ENABLE_MULTI_CORE
   int length = 1;
   for ( int i = 0; i < api->dim; ++i )
   {

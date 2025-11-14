@@ -70,7 +70,7 @@ void _tpu_bdc_fp_sigmoid(local_addr_t dst_addr, local_addr_t src_addr,
 /**
  * tpu_bdc_fp_sqrt only support DT_FP32
  */
-#ifdef BACKEND_SG2260
+#ifdef ENABLE_MULTI_CORE
 void tpu_bdc_fp_sqrt_v2(local_addr_t dst_addr, local_addr_t src_addr,
                         local_addr_t dst_fp32_addr, local_addr_t src_fp32_addr,
                         const dim4 *shape, data_type_t dtype) {
@@ -342,7 +342,7 @@ void nodechip_active_v2(global_addr_t in_global_addr,
 int tpu_kernel_api_active_multi_core(const void *args) {
   sg_api_active_t *api = (sg_api_active_t *)args;
   data_type_t dtype = (data_type_t)api->dtype;
-#ifdef BACKEND_SG2260
+#ifdef ENABLE_MULTI_CORE
   data_type_t out_dtype = (api->active_type == ACTIVE_ISINF ||
                            api->active_type == ACTIVE_ISNAN) ? DT_UINT8 : dtype;
   int output_size = tpu_data_type_size(out_dtype);

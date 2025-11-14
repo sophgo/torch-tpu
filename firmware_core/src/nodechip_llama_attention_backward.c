@@ -1,7 +1,7 @@
 #include "sg_api_struct.h"
 #include "tpu_kernel.h"
 
-#ifdef BACKEND_SG2260
+#ifdef ENABLE_MULTI_CORE
 // #ifdef 1
 extern
 void nodechip_llama2_qkv_backward_multi_core(

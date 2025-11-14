@@ -3539,7 +3539,7 @@
 //     padding_t pad = {api->pad[0], api->pad[1], api->pad[2], api->pad[3]};
 
 //     tpu_initialize();
-// #ifdef BACKEND_SG2260
+// #ifdef ENABLE_MULTI_CORE
 //     int core_idx = tpu_core_index();
 //     if(core_idx == 0){
 //     nodechip_conv_backward(

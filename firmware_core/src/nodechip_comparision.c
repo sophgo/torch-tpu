@@ -175,7 +175,7 @@ int tpu_kernel_api_comparision(const void *args) {
 }
 TPUKERNEL_FUNC_REGISTER(tpu_kernel_api_comparision);
 
-#ifdef BACKEND_SG2260
+#ifdef ENABLE_MULTI_CORE
 int tpu_kernel_api_comparision_multi_core(const void *args) {
     sg_api_comparision_t *api = (sg_api_comparision_t*) args;
     int length = 1;
@@ -489,7 +489,7 @@ int tpu_kernel_api_comparision_bcast(const void *args) {
 }
 TPUKERNEL_FUNC_REGISTER(tpu_kernel_api_comparision_bcast);
 
-#ifdef BACKEND_SG2260
+#ifdef ENABLE_MULTI_CORE
 int tpu_kernel_api_comparision_bcast_multi_core(const void *args) {
     sg_api_comparision_bcast_t *api = (sg_api_comparision_bcast_t*) args;
     TPUKERNEL_ASSERT(api->input_dim > 0 && api->input_dim <= 4 &&
@@ -779,7 +779,7 @@ int tpu_kernel_api_comparision_c(const void *args) {
 }
 TPUKERNEL_FUNC_REGISTER(tpu_kernel_api_comparision_c);
 
-#ifdef BACKEND_SG2260
+#ifdef ENABLE_MULTI_CORE
 int tpu_kernel_api_comparision_c_multi_core(const void *args) {
     sg_api_comparision_c_t *api = (sg_api_comparision_c_t*)args;
     scalar_t value;

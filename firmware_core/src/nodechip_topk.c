@@ -370,7 +370,7 @@ void tpu_topk(
         DT_UINT32);
 }
 
-#ifdef BACKEND_SG2260
+#ifdef ENABLE_MULTI_CORE
 int scalar_topk_multi_core(sg_api_topk_t *api)
 {
     int axis = api->axis >= 0 ? api->axis : api->axis + api->dim;

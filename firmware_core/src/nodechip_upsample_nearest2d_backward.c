@@ -1390,7 +1390,7 @@ int tpu_kernel_api_upsample_nearest2d_backward_multi_core(const void *args) {
   sg_api_upsample2d_backward_t *api = (sg_api_upsample2d_backward_t *)args;
   TPUKERNEL_ASSERT(api->dtype == DT_FP32 || api->dtype == DT_FP16 ||
                    api->dtype == DT_BFP16);
-#ifdef BACKEND_SG2260
+#ifdef ENABLE_MULTI_CORE
   tpu_initialize();
   int core_idx = tpu_core_index();
   if(core_idx==0){
