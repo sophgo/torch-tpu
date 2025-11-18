@@ -301,7 +301,7 @@ static inline bool tpudnnIsTensorContiguous(const tpudnnTensor_t *tensor)
 }
 
 static inline bool tpudnnIsTensorInner3DContiguous(const tpudnnTensor_t* t)
-{ 
+{
     bool succ = true;
     if ( t->dim < 3 ) { return false; }
     int stride = 1;
@@ -409,6 +409,14 @@ tpudnnStatus_t tpudnnMatmulAsync(
     tpudnnTensor_t left,
     tpudnnTensor_t right,
     tpudnnTensor_t bias,
+    tpudnnTensor_t output);
+
+tpudnnStatus_t tpudnnMatmulAsync_f32io_16_cal(
+    tpudnnHandle_t handle,
+    tpudnnTensor_t left,
+    tpudnnTensor_t right,
+    tpudnnTensor_t bias,
+    tpudnnDataType_t calDtype,
     tpudnnTensor_t output);
 
 tpudnnStatus_t tpudnnSliceScatterAsync(
@@ -1514,7 +1522,7 @@ tpudnnStatus_t tpudnnIndexPutImpl(
     tpudnnTensor_t value,
     int axis,
     bool accumulate);
-    
+
 tpudnnStatus_t tpudnnC2CDescriptor(
     tpudnnHandle_t handle,
     tpudnnCmd_t* vsdma_cmd,

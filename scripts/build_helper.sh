@@ -10,16 +10,6 @@ function develop_torch_tpu(){
   uninstall_torch_tpu
   pushd ${TPUTRAIN_TOP}
 
-  ## make cmodel_symbol
-  dst_emulator=${TPUTRAIN_TOP}/third_party/tpuv7_runtime/tpuv7-emulator_0.1.0/lib/libcmodel_firmware.so
-  if [ "${CHIP_ARCH}" == "sg2260e" ]; then
-      ori_emulator=${TPUTRAIN_TOP}/third_party/tpuv7_runtime/tpuv7-emulator_0.1.0/lib/libtpuv7.1_emulator.so
-      ln -sf $ori_emulator $dst_emulator
-  elif [ "${CHIP_ARCH}" == "sg2260" ]; then
-      ori_emulator=${TPUTRAIN_TOP}/third_party/tpuv7_runtime/tpuv7-emulator_0.1.0/lib/libtpuv7_emulator.so
-      ln -sf $ori_emulator $dst_emulator
-  fi
-
   pip install -e . --no-build-isolation -vvv
   if [ $? -ne 0 ]; then popd; return -1; fi
   popd
@@ -85,6 +75,38 @@ function update_head_files() {
   cp ${TPU1686_PATH}/runtime/tpu_runtime_api.h ${TPUTRAIN_TOP}/third_party/runtime_api/include/
 }
 
+if [ "${CHIP_ARCH}" == "sg2260" ]; then
+    emu_name="libtpuv7_emulator.so"
+elif [ "${CHIP_ARCH}" == "sg2260e" ]; then
+    emu_name="libtpuv7.1_emulator.so"
+fi
+
+function copy_and_update_soname() {
+    local src="$1"
+    local dst="$2"
+    local soname="$3"
+
+    if [[ -z "$src" || -z "$dst" ]]; then
+        echo "Usage: copy_and_update_soname <src> <dst>" >&2
+        return 1
+    fi
+
+    if [ -z "$soname" ]; then
+        soname="$(basename "$dst")"
+    fi
+
+    # Copy the file
+    cp -f "$src" "$dst" || return 1
+
+    # If destination ends with .so (including things like .so.1), update the SONAME
+    if [[ "$dst" =~ \.so($|\.) ]]; then
+        patchelf --set-soname "$soname" "$dst" || {
+            echo "Failed to set SONAME on $dst" >&2
+            return 1
+        }
+    fi
+}
+
 function update_sg2260_third_party()
 {
   update_head_files
@@ -95,12 +117,7 @@ function update_sg2260_third_party()
   cp ${TPU1686_PATH}/build_${CHIP_ARCH}/sccl/libsccl.so ${TPUTRAIN_TOP}/third_party/sccl/lib/
 
   echo "updating libtpuv7_emulator.so ..."
-  if [ "${CHIP_ARCH}" == "sg2260" ]; then
-      emu_name="libtpuv7_emulator.so"
-  elif [ "${CHIP_ARCH}" == "sg2260e" ]; then
-      emu_name="libtpuv7.1_emulator.so"
-  fi
-  cp ${TPU1686_PATH}/build_${CHIP_ARCH}/firmware_core/libcmodel_firmware.so ${TPUTRAIN_TOP}/third_party/tpuv7_runtime/tpuv7-emulator_0.1.0/lib/$emu_name
+  copy_and_update_soname ${TPU1686_PATH}/build_${CHIP_ARCH}/firmware_core/libcmodel_firmware.so ${TPUTRAIN_TOP}/third_party/tpuv7_runtime/tpuv7-emulator_0.1.0/lib/$emu_name
 
   echo "updating libfirmware_core.a ..."
   mkdir -p ${TPUTRAIN_TOP}/third_party/firmware/${CHIP_ARCH}/
@@ -117,13 +134,10 @@ function update_sg2260_riscv_third_party()
   cp ${TPU1686_PATH}/build_${CHIP_ARCH}_riscv/tpuDNN/src/libtpudnn.so ${TPUTRAIN_TOP}/third_party/tpuDNN/${CHIP_ARCH}_lib/libtpudnn-riscv.so
   echo "updating libsccl.so ..."
   cp ${TPU1686_PATH}/build_${CHIP_ARCH}_riscv/sccl/libsccl.so ${TPUTRAIN_TOP}/third_party/sccl/lib/libsccl-riscv64.so
+
   echo "updating libtpuv7_emulator.so ..."
-  if [ "${CHIP_ARCH}" == "sg2260" ]; then
-      emu_name="libtpuv7_emulator.so"
-  elif [ "${CHIP_ARCH}" == "sg2260e" ]; then
-      emu_name="libtpuv7.1_emulator.so"
-  fi
-  cp ${TPU1686_PATH}/build_${CHIP_ARCH}_riscv/firmware_core/libcmodel_firmware.so ${TPUTRAIN_TOP}/third_party/tpuv7_runtime/tpuv7-emulator_0.1.0/lib/$emu_name
+  copy_and_update_soname ${TPU1686_PATH}/build_${CHIP_ARCH}_riscv/firmware_core/libcmodel_firmware.so ${TPUTRAIN_TOP}/third_party/tpuv7_runtime/tpuv7-emulator_0.1.0/lib/${emu_name/.so/-riscv.so} $emu_name
+
   echo "updating libfirmware_core.a ..."
   cp ${TPU1686_PATH}/build_fw_${CHIP_ARCH}/firmware_core/libfirmware_core.a ${TPUTRAIN_TOP}/third_party/firmware/${CHIP_ARCH}/libfirmware_core-riscv.a
   echo "updating libtpurt.so ..."
