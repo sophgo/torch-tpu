@@ -32,9 +32,9 @@ double eps )
   TIMING_START;
   c10::MaybeOwned<Tensor> weight_maybe_owned = at::borrow_from_optional_tensor ( weight_opt );
   const Tensor & weight = *weight_maybe_owned;
-  const Tensor & bias = c10::value_or_else ( bias_opt, [] { return Tensor(); } );
-  const Tensor & running_mean = c10::value_or_else ( running_mean_opt, [] { return Tensor(); } );
-  const Tensor & running_var = c10::value_or_else ( running_var_opt, [] { return Tensor(); } );
+  const Tensor & bias = bias_opt.value_or(Tensor());
+  const Tensor & running_mean = running_mean_opt.value_or(Tensor());
+  const Tensor & running_var = running_var_opt.value_or(Tensor());
   auto num_features = input.size ( 1 );
   CHECK_TENSOR_IN_DEVICE ( input );
   if ( weight.defined() )       { CHECK_TENSOR_IN_DEVICE ( weight ); }
@@ -144,10 +144,10 @@ std::array<bool, 3> output_mask )
   TIMING_START;
   c10::MaybeOwned<Tensor> weight_maybe_owned = at::borrow_from_optional_tensor ( weight_opt );
   const Tensor & weight = *weight_maybe_owned;
-  const Tensor & saved_mean = c10::value_or_else ( saved_mean_opt, [] { return Tensor(); } );
-  const Tensor & saved_invstd = c10::value_or_else ( saved_invstd_opt, [] { return Tensor(); } );
-  const Tensor & running_mean = c10::value_or_else ( running_mean_opt, [] { return Tensor(); } );
-  const Tensor & running_var = c10::value_or_else ( running_var_opt, [] { return Tensor(); } );
+  const Tensor & saved_mean = saved_mean_opt.value_or(Tensor());
+  const Tensor & saved_invstd = saved_invstd_opt.value_or(Tensor());
+  const Tensor & running_mean = running_mean_opt.value_or(Tensor());
+  const Tensor & running_var = running_var_opt.value_or(Tensor());
   TORCH_CHECK ( training == true, "Batchnorm backward only supports training mode for now" );
   TORCH_CHECK ( weight.defined(), "weight must be defined" );
   TORCH_CHECK ( saved_mean.defined(), "saved_mean must be defined" );
@@ -220,7 +220,7 @@ double eps )
   TIMING_START;
   c10::MaybeOwned<Tensor> weight_maybe_owned = at::borrow_from_optional_tensor ( weight_opt );
   const Tensor & weight = *weight_maybe_owned;
-  const Tensor & bias = c10::value_or_else ( bias_opt, [] { return Tensor(); } );
+  const Tensor & bias = bias_opt.value_or(Tensor());
 
   auto input_ = input.contiguous();
   CHECK_TENSOR_IN_DEVICE ( input_ );
@@ -290,7 +290,7 @@ std::array<bool, 3> output_mask )
   TIMING_START;
   c10::MaybeOwned<Tensor> weight_maybe_owned = at::borrow_from_optional_tensor ( weight_opt );
   const Tensor & weight = *weight_maybe_owned;
-  const Tensor & bias = c10::value_or_else ( bias_opt, [] { return Tensor(); } );
+  const Tensor & bias = bias_opt.value_or(Tensor());
   CHECK_TENSOR_IN_DEVICE ( grad_out );
   CHECK_TENSOR_IN_DEVICE_NO_CONTIGUOUS ( input ); //TODO: why not contiguous
   CHECK_TENSOR_IN_DEVICE ( mean );

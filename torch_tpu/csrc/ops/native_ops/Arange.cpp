@@ -57,7 +57,7 @@ Tensor arange_start_step_tpu(const Scalar & start, const Scalar & end, const Sca
         options = options.dtype ( dtype );
     }
 
-    TORCH_CHECK( (start.isIntegral() && end.isIntegral()) ||
+    TORCH_CHECK( (start.isIntegral(false) && end.isIntegral(false)) ||
                  (start.toDouble() - (int)start.toDouble() == 0.0 && end.toDouble() - (int)end.toDouble() == 0.0),
                  "arange Decimal places are not supported now" )
 

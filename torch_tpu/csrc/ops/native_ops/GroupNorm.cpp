@@ -46,7 +46,7 @@ std::tuple<Tensor, Tensor, Tensor> native_group_norm_tpu(
   c10::MaybeOwned<Tensor> gamma_maybe_owned =
       at::borrow_from_optional_tensor(gamma_opt);
   const Tensor &gamma = *gamma_maybe_owned;
-  const Tensor &beta = c10::value_or_else(beta_opt, [] { return Tensor(); });
+  const Tensor &beta = beta_opt.value_or(Tensor());
 
   // nodechip need eps > 0
   if (eps <= 0)
