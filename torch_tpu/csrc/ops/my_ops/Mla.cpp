@@ -149,6 +149,7 @@ namespace at
         const c10::optional<Tensor> &mask, // decode: None
         const Tensor &input_lengths,
         int64_t head,
+        int64_t generate_token,
         int64_t q_lora_rank,
         int64_t kv_lora_rank,
         int64_t qk_nope_head_dim,
@@ -187,6 +188,7 @@ namespace at
                 0,
                 0,
                 head,
+                // generate_token,
                 qk_nope_head_dim,
                 qk_rope_head_dim,
                 v_head_dim,
@@ -225,6 +227,7 @@ namespace at
             (int*)input_lengths.data_ptr(),
             (int)(input_lengths.nbytes()/4),
             head,
+            generate_token,
             q_lora_rank,
             kv_lora_rank,
             qk_nope_head_dim,
@@ -249,6 +252,7 @@ namespace at
         const c10::optional<Tensor> &KVU,
         const c10::optional<Tensor> &mask, // decode: None
         const Tensor &input_lengths, const Tensor &cache_lengths, int64_t head,
+        int64_t generate_token,
         int64_t q_lora_rank, int64_t kv_lora_rank,
         int64_t qk_nope_head_dim, int64_t qk_rope_head_dim,
         int64_t v_head_dim, int64_t mask_size,
@@ -291,6 +295,7 @@ namespace at
                 block_table.has_value() ? reinterpret_cast<uint64_t>(block_table->data_ptr()) : 0,
                 reinterpret_cast<uint64_t>(save_slots.data_ptr()),
                 head,
+                // generate_token,
                 qk_nope_head_dim,
                 qk_rope_head_dim,
                 v_head_dim,
@@ -331,7 +336,7 @@ namespace at
           tpu::TPUGenerateTpudnnTensor(stream, save_slots),
           max_paged_block_num, paged_cache_block_size,
           (int *)input_lengths.data_ptr(), (int *)cache_lengths.data_ptr(),
-          (int)(input_lengths.nbytes() / 4), head, q_lora_rank, kv_lora_rank,
+          (int)(input_lengths.nbytes() / 4), head, generate_token, q_lora_rank, kv_lora_rank,
           qk_nope_head_dim, qk_rope_head_dim, v_head_dim, mask_size,
           C, (AttentionMode_t)attention_mode);
       TORCH_CHECK(status == TPUDNN_STATUS_SUCCESS);
@@ -350,7 +355,7 @@ namespace at
         const c10::optional<Tensor> &mask, // decode: None
         const Tensor &seqlen, const Tensor &cache_seqlen,
         const c10::optional<Tensor> &topk_indices,
-        int64_t num_heads, int64_t q_lora_rank,
+        int64_t num_heads, int64_t generate_token, int64_t q_lora_rank,
         int64_t kv_lora_rank, int64_t qk_nope_head_dim,
         int64_t qk_rope_head_dim, int64_t v_head_dim, int64_t mask_size,
         int64_t quant_block_size, int64_t max_paged_block_num,
@@ -393,6 +398,7 @@ namespace at
                 block_table.has_value() ? reinterpret_cast<uint64_t>(block_table->data_ptr()) : 0,
                 reinterpret_cast<uint64_t>(save_slots.data_ptr()),
                 num_heads,
+                // generate_token,
                 qk_nope_head_dim,
                 qk_rope_head_dim,
                 v_head_dim,
@@ -444,7 +450,7 @@ namespace at
                 : tpudnnUndefinedTensor(),//topk_indices
             cpu_lengths ? (const int *)seqlen.data_ptr() : nullptr,
             cpu_lengths ? (const int *)cache_seqlen.data_ptr() : nullptr,
-            (int)(seqlen.nbytes() / 4), num_heads, qk_nope_head_dim,
+            (int)(seqlen.nbytes() / 4), num_heads, generate_token, qk_nope_head_dim,
             qk_rope_head_dim, v_head_dim, q_lora_rank, kv_lora_rank,
             mask_size, quant_block_size, max_paged_block_num, paged_cache_block_size,
             topk_size, softmax_scale, true, (AttentionMode_t)attention_mode);
@@ -463,7 +469,7 @@ namespace at
         const c10::optional<Tensor> &KVU,
         const c10::optional<Tensor> &mask, // decode: None
         const Tensor &seqlen, const Tensor &cache_seqlen,
-        int64_t num_heads, int64_t q_lora_rank,
+        int64_t num_heads, int64_t generate_token, int64_t q_lora_rank,
         int64_t kv_lora_rank, int64_t qk_nope_head_dim,
         int64_t qk_rope_head_dim, int64_t v_head_dim, int64_t mask_size,
         int64_t quant_block_size, int64_t max_paged_block_num,
@@ -477,7 +483,7 @@ namespace at
             block_table, save_slots, KVU, mask,
             seqlen, cache_seqlen,
             c10::nullopt, // No DSA index
-            num_heads, q_lora_rank,
+            num_heads, generate_token, q_lora_rank,
             kv_lora_rank, qk_nope_head_dim,
             qk_rope_head_dim, v_head_dim, mask_size,
             quant_block_size, max_paged_block_num, paged_cache_block_size,
@@ -491,7 +497,7 @@ namespace at
         Tensor &sin, Tensor &WUQ_scale, Tensor &WUKV_scale,
         const c10::optional<Tensor> &KVU,
         const c10::optional<Tensor> &mask, // decode: None
-        const Tensor &seqlen, int64_t num_heads, int64_t q_lora_rank,
+        const Tensor &seqlen, int64_t num_heads, int64_t generate_token, int64_t q_lora_rank,
         int64_t kv_lora_rank, int64_t qk_nope_head_dim,
         int64_t qk_rope_head_dim, int64_t v_head_dim, int64_t mask_size,
         int64_t quant_block_size, int64_t max_cache_size,
@@ -529,6 +535,7 @@ namespace at
                 0,
                 0,
                 num_heads,
+                // generate_token,
                 qk_nope_head_dim,
                 qk_rope_head_dim,
                 v_head_dim,
@@ -569,7 +576,7 @@ namespace at
             tpu::TPUGenerateTpudnnTensor(stream, WUQ_scale),
             tpu::TPUGenerateTpudnnTensor(stream, WUKV_scale),
             (const int *)seqlen.data_ptr(),
-            (int)(seqlen.nbytes() / 4), num_heads, qk_nope_head_dim,
+            (int)(seqlen.nbytes() / 4), num_heads, generate_token, qk_nope_head_dim,
             qk_rope_head_dim, v_head_dim, q_lora_rank, kv_lora_rank,
             mask_size, quant_block_size, max_cache_size,
             softmax_scale, true, (AttentionMode_t)attention_mode);

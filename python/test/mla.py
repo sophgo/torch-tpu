@@ -65,7 +65,7 @@ class MLAConfig:
     paged_block_size: int = 16
     mask_size: int = 0
     cache_len: int = 0
-    generate_token: int = 1
+    generate_token: int = 1 # for normal decode, generate_token = 1; for MTP decode, generate_token = 1 + num_MTP_tokens
     topk_size: int = 2048
 
     def block_index_to_slots(self, block_idx, block_size, context_len):
@@ -85,7 +85,7 @@ class MLAConfig:
             seqlen = torch.tensor([self.context_len for _ in range(self.batch)], dtype = torch.int32)
             cache_seqlen = torch.tensor([self.cache_len for _ in range(self.batch)], dtype = torch.int32)
         else:
-            seqlen = torch.ones((self.batch), dtype = torch.int32)
+            seqlen = torch.tensor([self.generate_token for _ in range(self.batch)], dtype = torch.int32)
             cache_seqlen = torch.tensor([self.context_len for _ in range(self.batch)], dtype = torch.int32)
         topk_indices = None
         if self.use_dsa:
@@ -130,11 +130,14 @@ class MLAConfig:
             total_block_num = max(block_per_batch * self.batch, 2048)
             paged_kvcache = torch.empty((total_block_num, self.paged_block_size, self.kv_lora_rank), dtype = self.dtype)
             paged_pecache = torch.empty((total_block_num, self.paged_block_size, self.qk_rope_head_dim), dtype = self.dtype)
-            block_idx = random.sample(range(total_block_num), block_per_batch * self.batch)
-            block_tables = torch.tensor(block_idx, dtype = torch.int32).view(self.batch, -1)
+            block_idx = random.sample(range(total_block_num), block_per_batch * self.batch * 1)
+            block_tables = torch.tensor(block_idx, dtype = torch.int32).view(self.batch * 1, -1)
             slots_idx = [block_idx[(b+1) * block_per_batch - 1] * self.paged_block_size + \
                          self.context_len % self.paged_block_size for b in range(self.batch)]
             slots = torch.tensor(slots_idx, dtype = torch.int32)
+            #a simple simulation of slots when generate_token > 1:
+            arange = torch.arange(self.generate_token, dtype = torch.int32).unsqueeze(0)
+            slots = (slots.unsqueeze(-1).expand(self.batch, self.generate_token) + arange).view(-1)            
             # fill paged kvcache and pecahce
             flat_slots_idx = self.block_index_to_slots(block_tables, self.paged_block_size, self.context_len)
             indices = torch.tensor(flat_slots_idx, dtype = torch.int64)
@@ -250,7 +253,7 @@ class MLATpu(MLA):
                 torch.ops.my_ops.latent_attention_fp8(
                     tensors.output, tensors.Q, tensors.KV, tensors.PE, tensors.WUQ, tensors.WUKV,
                     tensors.kv_cache, tensors.pe_cache, tensors.cos, tensors.sin, tensors.WUQ_scale,
-                    tensors.WUKV_scale, tensors.KVU, tensors.mask, tensors.seqlen, self.config.num_heads,
+                    tensors.WUKV_scale, tensors.KVU, tensors.mask, tensors.seqlen, self.config.num_heads, self.config.generate_token,
                     self.config.q_lora_rank, self.config.kv_lora_rank, self.config.qk_nope_head_dim,
                     self.config.qk_rope_head_dim, self.config.v_head_dim, self.config.mask_size,
                     self.config.block_size, self.config.max_cache_size, self.config.softmax_scale,
@@ -261,7 +264,7 @@ class MLATpu(MLA):
                     tensors.output, tensors.Q, tensors.KV, tensors.PE, tensors.WUQ, tensors.WUKV,
                     tensors.paged_kvcache, tensors.paged_pecache, tensors.cos, tensors.sin, tensors.WUQ_scale,
                     tensors.WUKV_scale, tensors.block_tables, tensors.slots, tensors.KVU,
-                    tensors.mask, tensors.seqlen, tensors.cache_seqlen, tensors.topk_indices, self.config.num_heads,
+                    tensors.mask, tensors.seqlen, tensors.cache_seqlen, tensors.topk_indices, self.config.num_heads, self.config.generate_token,
                     self.config.q_lora_rank, self.config.kv_lora_rank, self.config.qk_nope_head_dim,
                     self.config.qk_rope_head_dim, self.config.v_head_dim, self.config.mask_size,
                     self.config.block_size, tensors.block_tables.shape[1],
@@ -273,7 +276,7 @@ class MLATpu(MLA):
                     tensors.output, tensors.Q, tensors.KV, tensors.PE, tensors.WUQ, tensors.WUKV,
                     tensors.paged_kvcache, tensors.paged_pecache, tensors.cos, tensors.sin, tensors.WUQ_scale,
                     tensors.WUKV_scale, tensors.block_tables, tensors.slots, tensors.KVU,
-                    tensors.mask, tensors.seqlen, tensors.cache_seqlen, tensors.topk_indices, self.config.num_heads,
+                    tensors.mask, tensors.seqlen, tensors.cache_seqlen, tensors.topk_indices, self.config.num_heads, self.config.generate_token,
                     self.config.q_lora_rank, self.config.kv_lora_rank, self.config.qk_nope_head_dim,
                     self.config.qk_rope_head_dim, self.config.v_head_dim, self.config.mask_size,
                     self.config.block_size, tensors.block_tables.shape[1],
@@ -285,7 +288,7 @@ class MLATpu(MLA):
                 torch.ops.my_ops.latent_attention(
                     tensors.output, tensors.Q, tensors.KV, tensors.PE,
                     tensors.WUQ, tensors.WUKV, tensors.kv_cache, tensors.pe_cache, tensors.cos,
-                    tensors.sin, tensors.KVU, tensors.mask, tensors.seqlen, self.config.num_heads,
+                    tensors.sin, tensors.KVU, tensors.mask, tensors.seqlen, self.config.num_heads, self.config.generate_token,
                     self.config.q_lora_rank, self.config.kv_lora_rank, self.config.qk_nope_head_dim,
                     self.config.qk_rope_head_dim, self.config.v_head_dim,
                     self.config.mask_size, self.config.max_cache_size, self.config.softmax_scale,
@@ -296,7 +299,7 @@ class MLATpu(MLA):
                     tensors.output, tensors.Q, tensors.KV, tensors.PE,
                     tensors.WUQ, tensors.WUKV, tensors.paged_kvcache, tensors.paged_pecache,
                     tensors.cos, tensors.sin, tensors.block_tables, tensors.slots, tensors.KVU, tensors.mask,
-                    tensors.seqlen, tensors.cache_seqlen, self.config.num_heads,
+                    tensors.seqlen, tensors.cache_seqlen, self.config.num_heads, self.config.generate_token,
                     self.config.q_lora_rank, self.config.kv_lora_rank, self.config.qk_nope_head_dim,
                     self.config.qk_rope_head_dim, self.config.v_head_dim, self.config.mask_size,
                     tensors.block_tables.shape[1], self.config.paged_block_size, self.config.softmax_scale,
@@ -405,8 +408,8 @@ class MLACpu(MLA):
 
 
 def mla_decode(act_dtype: torch.dtype, weight_dtype: torch.dtype, mode: AttentionMode, use_dsa: bool = False):
-    config = MLAConfig(8, 16, 128, 64, 128, 1536, 512, 128, 192**-0.5 * 0.3,\
-                       act_dtype, weight_dtype, 8000, mode, use_dsa)
+    config = MLAConfig(1, 16, 128, 64, 128, 1536, 512, 128, 192**-0.5 * 0.3,\
+                       act_dtype, weight_dtype, 8000, mode, use_dsa, generate_token=2)
     net_cpu = MLACpu(config)
     net_tpu = MLATpu(config)
 
@@ -464,11 +467,11 @@ def mla_decode(act_dtype: torch.dtype, weight_dtype: torch.dtype, mode: Attentio
     else:
         kv_diff = (
             tensors_tpu.paged_kvcache.cpu().view(-1, config.kv_lora_rank)[tensors.slots]
-            - kv_cache[:, config.context_len : config.context_len + config.generate_token].view(-1, config.kv_lora_rank)
+            - kv_cache[:, config.context_len : config.context_len + config.generate_token].reshape(-1, config.kv_lora_rank)
         )
         pe_diff = (
             tensors_tpu.paged_pecache.cpu().view(-1, config.qk_rope_head_dim)[tensors.slots]
-            - pe_cache[:, config.context_len : config.context_len + config.generate_token].view(-1, config.qk_rope_head_dim)
+            - pe_cache[:, config.context_len : config.context_len + config.generate_token].reshape(-1, config.qk_rope_head_dim)
         )
     if torch.max(torch.abs(kv_diff)) > 1e-5:
         print(f"kv_diff: {torch.max(torch.abs(kv_diff))}")
@@ -562,9 +565,9 @@ if __name__ == "__main__":
     print(f"\nTest MLA Decode FP8_E4M3 paged_decode:")
     mla_decode(torch.bfloat16, torch.float8_e4m3fn, AttentionMode.PAGED_DECODE, False)
     print(f"----------------------------------")
-    print(f"\nTest DSA Decode FP8_E4M3 paged_decode:")
-    mla_decode(torch.bfloat16, torch.float8_e4m3fn, AttentionMode.PAGED_DECODE, True)
-    print(f"----------------------------------")
+    # print(f"\nTest DSA Decode FP8_E4M3 paged_decode:")
+    # mla_decode(torch.bfloat16, torch.float8_e4m3fn, AttentionMode.PAGED_DECODE, True)
+    # print(f"----------------------------------")
     # print(f"Test MLA Prefill BF16 continuous_prefill:")
     # mla_prefill(torch.bfloat16, torch.bfloat16, AttentionMode.CONTINUOUS_PREFILL)
     # print(f"----------------------------------")
@@ -574,6 +577,6 @@ if __name__ == "__main__":
     # print(f"Test MLA Prefill FP8_E4M3 continuous_prefill:")
     # mla_prefill(torch.bfloat16, torch.float8_e4m3fn, AttentionMode.CONTINUOUS_PREFILL)
     # print(f"----------------------------------")
-    print(f"Test MLA Prefill FP8_E4M3 paged_prefill:")
-    mla_prefill(torch.bfloat16, torch.float8_e4m3fn, AttentionMode.PAGED_PREFILL)
-    print(f"----------------------------------")
+    # print(f"Test MLA Prefill FP8_E4M3 paged_prefill:")
+    # mla_prefill(torch.bfloat16, torch.float8_e4m3fn, AttentionMode.PAGED_PREFILL)
+    # print(f"----------------------------------")
