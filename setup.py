@@ -36,6 +36,7 @@ def is_building_wheel():
     return False
 is_bdist_wheel = is_building_wheel()
 
+VERSION = '2.8.0.post1'
 def get_git_tag_desc():
     try:
         result = subprocess.check_output(
@@ -45,7 +46,7 @@ def get_git_tag_desc():
         ).decode('utf-8').strip()
         return result
     except (subprocess.CalledProcessError, FileNotFoundError):
-        return '2.1.0.post1'
+        return VERSION
 
 def get_git_commit_hash():
     try:
@@ -69,7 +70,6 @@ def get_git_commit_short_hash():
     except (subprocess.CalledProcessError, FileNotFoundError):
         return "unknown"
 
-VERSION = '2.1.0.post1'
 GIT_VERSION = get_git_tag_desc()
 SOC_CROSS = os.environ.get("SOC_CROSS_MODE", None)
 SOC_MODE = os.environ.get("SOC_MODE", None)
@@ -135,8 +135,8 @@ def python_path_dir():
 
 def get_pytorch_dir():
     if SOC_CROSS:
-        print(os.path.join(CROSS_TOOLCHAINS, "torchwhl-2.1.0-cp311/torch"))
-        return os.path.join(CROSS_TOOLCHAINS, "torchwhl-2.1.0-cp311/torch")
+        print(os.path.join(CROSS_TOOLCHAINS, "torchwhl-2.8.0-cp311/torch"))
+        return os.path.join(CROSS_TOOLCHAINS, "torchwhl-2.8.0-cp311/torch")
     torch_dir_env = os.environ.get("PYTORCH_INSTALL_DIR")
     if torch_dir_env and os.path.exists(torch_dir_env):
         return torch_dir_env

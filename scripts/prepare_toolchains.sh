@@ -89,7 +89,7 @@ function soc_build_env_prepare()
       echo "torch not found, try to download from web"
       wget https://pypi.tuna.tsinghua.edu.cn/packages/c3/83/67aba34223e77556ebe7d49d6d93eccfbea847f37a95f41a961b62476569/torch-2.1.0-cp38-cp38-manylinux2014_aarch64.whl
       mkdir -p ${torch_path}
-      mv torch-2.1.0-cp38-cp38-manylinux2014_aarch64.whl ${torch_path}
+      mv torch-2.8.0-cp38-cp38-manylinux2014_aarch64.whl ${torch_path}
       pushd ${torch_path}
       unzip *whl
       popd

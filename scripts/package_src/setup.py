@@ -10,7 +10,7 @@ from distutils.version import LooseVersion
 
 FORMTER = "===="*10 + "\n" + "=== {}\n" + "===="*10
 
-VERSION = '2.1.0.post1'
+VERSION = '2.8.0.post1'
 CHIP_ARCH           = os.environ["CHIP_ARCH"]  = "sg2260"
 print(FORMTER.format(f"CHIP_ARCH={CHIP_ARCH}"))
 os.environ['BASE_DIR']            = BASE_DIR           = os.path.dirname(os.path.realpath(__file__)) + "/.."

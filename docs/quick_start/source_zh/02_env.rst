@@ -284,7 +284,7 @@ torch需要适配当前支持版本torch2.1.0：
 
 .. code-block:: shell
 
-   $ pip install torch==2.1.0 torchvision==0.16.0 torchaudio==2.1.0 --index-url https://download.pytorch.org/whl/cpu
+   $ pip install torch==2.8.0 torchvision==0.16.0 torchaudio==2.8.0 --index-url https://download.pytorch.org/whl/cpu
 
 torch-tpu安装
 -----------------------
@@ -294,7 +294,7 @@ torch-tpu安装
 
 .. code-block:: shell
    
-   $ pip install torch_tpu-2.1.0.post1-cp310-cp310-linux_x86_64.whl
+   $ pip install torch_tpu-2.8.0.post1-cp310-cp310-linux_x86_64.whl
 
 安装测试
 -----------------------

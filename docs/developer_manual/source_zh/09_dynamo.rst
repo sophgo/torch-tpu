@@ -36,7 +36,7 @@ Docker准备
 Python环境准备
 ~~~~~~~~~~~~~~
 
-torch 2.1.0，若使用上述NVIDIA驱动选项参数，torch需安装为cuda版本
+torch 2.8.0，若使用上述NVIDIA驱动选项参数，torch需安装为cuda版本
 
 transformers 4.31.0
 

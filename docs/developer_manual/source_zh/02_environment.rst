@@ -92,12 +92,12 @@ TORCH-TPU可以在Docker中开发, 配置好Docker就可以编译和运行了。
 代码编译
 ----------------
 
-TORCH-TPU的代码依赖于PyTorch，因此需要提前安装PyTorch。在docker容器中已经安装好了pytorch==2.1.0，
+TORCH-TPU的代码依赖于PyTorch，因此需要提前安装PyTorch。在docker容器中已经安装好了pytorch==2.8.0，
 如果未使用docker请按照如下的方式安装PyTorch:
 
 .. code-block:: shell
 
-   $ pip install torch==2.1.0 torchvision==0.16.0 torchaudio==2.1.0 --index-url https://download.pytorch.org/whl/cpu
+   $ pip install torch==2.8.0 torchvision==0.16.0 torchaudio==2.8.0 --index-url https://download.pytorch.org/whl/cpu
 
 TORCH-TPU会从安装的PyTorch包导入头文件和库文件，请确保PyTorch的版本正确。
 

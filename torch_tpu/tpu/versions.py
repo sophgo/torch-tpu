@@ -18,7 +18,7 @@ def _get_git_tag_desc():
         )
         return result
     except (subprocess.CalledProcessError, FileNotFoundError):
-        return "2.1.0.post1"
+        return "2.8.0.post1"
 
 
 def _get_git_commit_hash():
