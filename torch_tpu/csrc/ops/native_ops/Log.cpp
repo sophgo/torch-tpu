@@ -87,4 +87,21 @@ TORCH_LIBRARY_IMPL(aten, TPU, m) {
   m.impl("log10", log10_tpu);
 }
 
+
+/*************** logsigmoid ***********************/
+std::tuple<at::Tensor,at::Tensor> log_sigmoid_forward_tpu(const at::Tensor & self) {
+  TIMING_START;
+  // TODO: impl it
+  auto out    = empty(self.sizes(), self.options());
+  auto buffer = empty(self.sizes(), self.options());
+  auto min    = torch::minimum(self, torch::zeros_like(self));
+  buffer      = self.abs().neg().exp();
+  out         = min - buffer.log1p();
+  TIMING_END;
+  return {out, buffer};
+}
+TORCH_LIBRARY_IMPL(aten, TPU, m) {
+  m.impl("log_sigmoid_forward", log_sigmoid_forward_tpu);
+}
+
 } // namespace at
