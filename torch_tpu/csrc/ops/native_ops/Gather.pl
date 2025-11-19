@@ -22,7 +22,6 @@ void gather_kernel(T *ptr_output, uint32 *ptr_index, T *ptr_intput,
     int C = outer_size;
     int H = gathered_num;
     int W = inner_size;
-    int block_c = LANE_NUM;
 
     int slice_per_core = div_up(C, core_num);
     int core_offset = slice_per_core * core_idx;
@@ -36,26 +35,11 @@ void gather_kernel(T *ptr_output, uint32 *ptr_index, T *ptr_intput,
     auto input_g = gtensor<T>(input_shape, GLOBAL, ptr_intput);
     auto index_g = gtensor<uint32>(index_shape, GLOBAL, ptr_index);
 
-    dim4 local_block_output_shape = {1, block_c, H, W};
-    dim4 local_block_input_shape = {1, block_c, gather_num, W};
-    dim4 local_block_index_shape = {1, block_c, H, 1};
-    for (auto c_idx = 0; c_idx < slice_size_for_core; c_idx += block_c) {
-        int c = min(block_c, slice_size_for_core - c_idx);
-        dim4 input_global_offset = {0, core_offset + c_idx, 0, 0};
-        dim4 local_output_shape = {1, c, H, W};
-        dim4 local_input_shape = {1, c, gather_num, W};
-        dim4 local_index_shape = {1, c, H, 1};
+    dim4 offset = {0, core_offset, 0, 0};
 
-        auto out_l = make_tensor<T>(local_block_output_shape, local_output_shape);
-        auto input_l = make_tensor<T>(local_block_input_shape, local_input_shape);
-        auto index_l = make_tensor<uint32>(local_block_index_shape, local_index_shape);
-
-        dma::load(input_l, input_g.sub_view(local_input_shape, input_global_offset));
-        dma::load(index_l, index_g.sub_view(local_index_shape, input_global_offset));
-
-        dma::gather_h(out_l, input_l, index_l, 1);
-        dma::store(out_g.sub_view(local_output_shape, input_global_offset), out_l);
-    }
+    dma::gather_h(out_g.sub_view(output_shape, offset),
+                  input_g.sub_view(input_shape, offset),
+                  index_g.sub_view(index_shape, offset), 0);
 }
 
 __KERNEL__ void gather_fp32(fp32 *ptr_output, uint32 *ptr_index, fp32 *ptr_input,
