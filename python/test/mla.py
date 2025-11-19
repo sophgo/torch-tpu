@@ -257,7 +257,7 @@ class MLATpu(MLA):
                     self.config.attention_mode.value)
             elif self.config.attention_mode == AttentionMode.PAGED_PREFILL:
                 # paged attention
-                torch.ops.my_ops.paged_latent_attention_fp8(
+                torch.ops.my_ops.paged_sparse_attention_fp8(
                     tensors.output, tensors.Q, tensors.KV, tensors.PE, tensors.WUQ, tensors.WUKV,
                     tensors.paged_kvcache, tensors.paged_pecache, tensors.cos, tensors.sin, tensors.WUQ_scale,
                     tensors.WUKV_scale, tensors.block_tables, tensors.slots, tensors.KVU,
@@ -269,7 +269,7 @@ class MLATpu(MLA):
                      self.config.softmax_scale, self.config.attention_mode.value)
             elif self.config.attention_mode == AttentionMode.PAGED_DECODE :
                 # paged attention
-                torch.ops.my_ops.paged_latent_attention_fp8(
+                torch.ops.my_ops.paged_sparse_attention_fp8(
                     tensors.output, tensors.Q, tensors.KV, tensors.PE, tensors.WUQ, tensors.WUKV,
                     tensors.paged_kvcache, tensors.paged_pecache, tensors.cos, tensors.sin, tensors.WUQ_scale,
                     tensors.WUKV_scale, tensors.block_tables, tensors.slots, tensors.KVU,
