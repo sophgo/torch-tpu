@@ -100,8 +100,9 @@ bool          multi_core)
     shape[split_dim] = num_for_current_core;
     in_offset_for_current_core = avgnum_each_core * core_idx * in_stride[split_dim];
     out_offset_for_current_core = avgnum_each_core * core_idx * out_stride[split_dim];
-  } 
+  }
 
+#ifndef BACKEND_SG2260E
   if ( dim == 2 && in_stride[0] == 1 && out_stride[1] == 1 )
   {
     dim4 copy_in_stride = { .n = 1, .c = in_stride[1], .h = 1, .w = in_stride[0] };
@@ -173,7 +174,9 @@ bool          multi_core)
       ndone += copy_shape.n;
     }
   }
-  else if ( dim == 3 && in_stride[2] == 1 && out_stride[2] == 1 /* && in_stride[0] == shape[2] && out_stride[1] == shape[2] */ )
+  else
+#endif
+  if ( dim == 3 && in_stride[2] == 1 && out_stride[2] == 1 /* && in_stride[0] == shape[2] && out_stride[1] == shape[2] */ )
   {
     dim4 copy_shape = { .n = shape[0], .c = shape[1], .h = 1, .w = shape[2] };
     dim4 copy_in_stride = { .n = in_stride[1], .c = in_stride[0], .h = 1, .w = in_stride[2] };
@@ -392,7 +395,7 @@ int tpu_kernel_api_strided_copy_multi_core(const void *args) {
     api->shape,
     api->input_stride,
     api->output_stride,
-    ( data_type_t ) api->dtype, 
+    ( data_type_t ) api->dtype,
     false);
   tpu_poll();
   return 0;
