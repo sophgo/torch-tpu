@@ -214,6 +214,8 @@ function rebuild_TPU1686()
 
 function update_tpuv7()
 {
+  # compile emulator.so
+  rebuild_test sgdnn
   export TPURT_TOP=$TPUTRAIN_TOP/../tpuv7-runtime
   pushd $TPURT_TOP
   rm -rf build
@@ -225,6 +227,11 @@ function update_tpuv7()
   make install
   popd
   cp -r $TPURT_TOP/install/tpuv7-runtime-emulator-onednn_*/* $TPUTRAIN_TOP/third_party/tpuv7_runtime/tpuv7-emulator_0.1.0/
+  rm -rf $TPUTRAIN_TOP/third_party/tpuv7_runtime/tpuv7-emulator_0.1.0/bin
+  rm -rf $TPUTRAIN_TOP/third_party/tpuv7_runtime/tpuv7-emulator_0.1.0/data
+  git_commit_id=$(git -C $TPURT_TOP rev-parse HEAD)
+  echo "tpuv7-runtime git commit id: $git_commit_id"
+  echo $git_commit_id > $TPUTRAIN_TOP/third_party/tpuv7_runtime/tpuv7-emulator_0.1.0/git_commit_id
 }
 
 function TorchTpuDebugMode()
