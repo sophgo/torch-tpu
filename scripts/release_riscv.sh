@@ -13,7 +13,7 @@ cp -rf $CUR_DIR/../python/regression .
 popd
 
 ## src
-source scripts/package_src/package_release_src.sh
+# source scripts/package_src/package_release_src.sh
 
 # ------------------------------------------------------------------------------
 release_archive="./dist"
