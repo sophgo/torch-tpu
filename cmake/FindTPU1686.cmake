@@ -112,10 +112,17 @@ elseif ($ENV{CHIP_ARCH} STREQUAL "bm1686")
             $ENV{TPUTRAIN_TOP}/third_party/firmware/$ENV{CHIP_ARCH}/)
     endif()
 elseif ($ENV{CHIP_ARCH} STREQUAL "sg2260" OR $ENV{CHIP_ARCH} STREQUAL "sg2260e")
+
+    if ($ENV{CHIP_ARCH} STREQUAL "sg2260")
+        set(emu_name tpuv7_emulator)
+    else()
+        set(emu_name tpuv7.1_emulator)
+    endif()
+
     if(("$ENV{SOC_CROSS_MODE}" STREQUAL "ON") OR ("$ENV{SOC_MODE}" STREQUAL "ON"))
         find_library(
             cmodel_firmware_LIBRARY
-            NAMES tpuv7_emulator-riscv
+            NAMES ${emu_name}-riscv
             HINTS
             $ENV{TPUTRAIN_TOP}/third_party/tpuv7_runtime/tpuv7-emulator_0.1.0/lib/)
 
@@ -127,7 +134,7 @@ elseif ($ENV{CHIP_ARCH} STREQUAL "sg2260" OR $ENV{CHIP_ARCH} STREQUAL "sg2260e")
     else()
         find_library(
             cmodel_firmware_LIBRARY
-            NAMES cmodel_firmware tpuv7_emulator
+            NAMES ${emu_name}
             HINTS
             $ENV{TPUTRAIN_TOP}/third_party/tpuv7_runtime/tpuv7-emulator_0.1.0/lib/
             ${TPU1686_PATH}/build_$ENV{CHIP_ARCH}/firmware_core/)
