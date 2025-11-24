@@ -9,6 +9,8 @@ function sg2260e_online_regression_test() {
 
     develop_torch_tpu || return -1
 
+    python $CURRENT_DIR/../python/utest_ops/ppl_hardcraft_mixed.py || return -1
+
     bdist_wheel || return -1
 }
 

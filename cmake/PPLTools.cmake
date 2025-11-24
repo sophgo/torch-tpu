@@ -3,6 +3,7 @@ function (compile_ppl_lib)
     set(pl_files "${ARGV}")
 
     set(chip_arch $ENV{CHIP_ARCH})
+    set(tputrain_debug $ENV{TPUTRAIN_DEBUG})
     set(srcs)
 
     if ("${chip_arch}" STREQUAL "sg2260")
@@ -13,17 +14,24 @@ function (compile_ppl_lib)
         set(ppl_mode 6)
     endif()
 
+    if ("${tputrain_debug}" STREQUAL "ON")
+        set(PPL_DEBUG_FLAG "--g")
+    else()
+        set(PPL_DEBUG_FLAG "")
+    endif()
+
     foreach (pl_file IN LISTS pl_files)
         get_filename_component(base_name ${pl_file} NAME_WE)
         set(output_dir ${CMAKE_BINARY_DIR}/ppl/${base_name})
         file(MAKE_DIRECTORY ${output_dir})
-        set(PPL_CMD $ENV{PPL_INSTALL_PATH}/bin/ppl-compile ${pl_file} -o ${output_dir} --chip ${ppl_arch} --mode ${ppl_mode})
+        set(PPL_CMD $ENV{PPL_INSTALL_PATH}/bin/ppl-compile ${pl_file} -o ${output_dir} ${PPL_DEBUG_FLAG} --chip ${ppl_arch} --mode ${ppl_mode})
         set(output_h ${output_dir}/include/${base_name}.h)
         set(output_c ${output_dir}/device/${base_name}.c)
         add_custom_command(
             OUTPUT ${output_c} ${output_h}
             COMMAND ${PPL_CMD}
             COMMAND sed -i "/TPUKERNEL_FUNC_REGISTER/d" ${output_c}
+            COMMAND sed -i "/rvt_sync_i(0xdeadbeef, 0);/d" ${output_c}
             COMMAND sed -i "s/__cplusplus/__alwaysundefined/g" ${output_h}
             DEPENDS ${pl_file}
             VERBATIM)

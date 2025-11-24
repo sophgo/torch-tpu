@@ -123,7 +123,7 @@ export TPUTRAIN_TOP=$(cd $(dirname "${BASH_SOURCE[0]}")/.. && pwd)
 export CHIP_ARCH=${1:-bm1684x}  #sg2260
 export EXTRA_CONFIG=""
 
-if [ "${CHIP_ARCH}" == "sg2260" ]; then
+if [ "${CHIP_ARCH}" == "sg2260" ] || [ "${CHIP_ARCH}" == "sg2260e" ]; then
     export EXTRA_CONFIG="-DREMOVE_POLLS_IN_LLM=ON $EXTRA_CONFIG"
 fi
 
