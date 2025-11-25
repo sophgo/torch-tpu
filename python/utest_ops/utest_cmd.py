@@ -37,11 +37,12 @@ class Global_Regression_Tester():
 
 
     def __init__(self):
+        self.current_file_dir = os.path.dirname(os.path.abspath(__file__))
         self.control_cmd = "python3 -u "
 
         self.chip = os.environ['CHIP_ARCH']
         self.failed_keys = [GLOBAL_FAILED]
-        self.any_utest_files_list =  os.listdir("./")
+        self.any_utest_files_list =  os.listdir(self.current_file_dir)
         self.utest_files_list =[]
         self.top_python_file_list = ['top_utest.py', 'utest_cmd.py']
         self.global_skip_utest_manifest_multi_arch = {"bm1684x":['mlp.py','slice.py','stack.py',  'assignment.py', 'llama_attention.py', 'mla.py'], 
@@ -55,7 +56,7 @@ class Global_Regression_Tester():
         # self.global_skip_utest_manifest = []
         # self.any_utest_files_list =["add.py","mul.py"]
         ###########################################################################
-        self.cmp_old_test_files_list = os.listdir("./../test")
+        self.cmp_old_test_files_list = os.listdir(os.path.join(self.current_file_dir, "..", "test"))
         self.skip_old_test = ['utils.py']
         self.filter_skipped_path_old_test()
 
