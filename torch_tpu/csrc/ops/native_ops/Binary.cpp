@@ -16,6 +16,10 @@
 
 #ifdef USING_PPL
 #include "Binary.h"
+#include "Gdmad2d.h"
+template <typename scalar_t>
+static void stridedcopy_async_impl(uint64_t, uint64_t, int*, int*, int*, int);
+#define FW_MAX_SHAPE_DIMS      8
 #define AT_DISPATCH_FLOAT_INT_TYPES(scalar_type, name, func)  \
 AT_DISPATCH_SWITCH(                   \
 scalar_type, name,                    \
@@ -66,6 +70,73 @@ auto process_shapes = [](std::vector<int>& self_shape, std::vector<int>& other_s
     TORCH_CHECK(dim == 4, "can not reduce dims to 4: got ", dim);
   }
 };
+
+static inline void simplify(int* shape, int* src_stride, int* dst_stride, int* dim) {
+  for (int i = 0; i < (*dim) - 1; ) {
+    bool src_contiguous = (src_stride[i+1] * shape[i+1] == src_stride[i]);
+    bool dst_contiguous = (dst_stride[i+1] * shape[i+1] == dst_stride[i]);
+
+    if (src_contiguous && dst_contiguous && shape[i] * shape[i+1] < (1 << 16)) {
+      shape[i] *= shape[i+1];
+      src_stride[i] = src_stride[i+1];
+      dst_stride[i] = dst_stride[i+1];
+
+      for (int j = i + 1; j < (*dim) - 1; ++j) {
+        shape[j] = shape[j+1];
+        src_stride[j] = src_stride[j+1];
+        dst_stride[j] = dst_stride[j+1];
+      }
+      --(*dim);
+    } else {
+      ++i;
+    }
+  }
+
+  for (int i = *dim; i < FW_MAX_SHAPE_DIMS; ++i) {
+    shape[i] = 1;
+    src_stride[i] = 1;
+    dst_stride[i] = 1;
+  }
+
+  if (*dim == 5 && shape[1] == 1 && shape[2] == 1) {
+    return;
+  }
+
+  if (*dim > 4) {
+    int merged_b = 1;
+    int preserved_stride_src = src_stride[0];
+    int preserved_stride_dst = dst_stride[0];
+
+    for (int i = 0; i < *dim - 4; ++i) {
+      merged_b *= shape[i];
+      preserved_stride_src = std::min(preserved_stride_src, src_stride[i]);
+      preserved_stride_dst = std::min(preserved_stride_dst, dst_stride[i]);
+    }
+
+    int new_shape[5] = {merged_b, shape[*dim-4], shape[*dim-3], shape[*dim-2], shape[*dim-1]};
+    int new_src_stride[5] = {
+      preserved_stride_src,
+      src_stride[*dim-4],
+      src_stride[*dim-3],
+      src_stride[*dim-2],
+      src_stride[*dim-1]
+    };
+    int new_dst_stride[5] = {
+      preserved_stride_dst,
+      dst_stride[*dim-4],
+      dst_stride[*dim-3],
+      dst_stride[*dim-2],
+      dst_stride[*dim-1]
+    };
+
+    for (int i = 0; i < 5; ++i) {
+      shape[i] = new_shape[i];
+      src_stride[i] = new_src_stride[i];
+      dst_stride[i] = new_dst_stride[i];
+    }
+    *dim = 5;
+  }
+}
 
 template <typename scalar_t>
 static void binary_const_impl(
@@ -1538,6 +1609,57 @@ Tensor &binary_op_tpu(const Tensor &self, const Tensor &other,
   return out;
 }
 
+void copy_noncontig_by_backend(const at::Tensor& src, const at::Tensor& dst) {
+#if defined(USING_PPL)
+  if (usePPLKernels()) {
+    int dim = src.dim();
+    int shape[FW_MAX_SHAPE_DIMS] = {1};
+    int src_stride[FW_MAX_SHAPE_DIMS] = {1};
+    int dst_stride[FW_MAX_SHAPE_DIMS] = {1};
+
+    for (int i = 0; i < dim; ++i) {
+      shape[i]      = src.size(i);
+      src_stride[i] = src.stride(i);
+      dst_stride[i] = dst.stride(i);
+    }
+    simplify(shape, src_stride, dst_stride, &dim);
+
+    AT_DISPATCH_FLOAT_INT_TYPES(src.scalar_type(), "stridedcopy", [&] {
+      using scalar_t_ = scalar_t;
+      scalar_t_* input_ptr  = src.data_ptr<scalar_t_>();
+      scalar_t_* output_ptr = dst.data_ptr<scalar_t_>();
+
+      if (dim > 4) {
+        const int batch_size = shape[0];
+        shape[0] = 1;
+        for (int b = 0; b < batch_size; ++b) {
+          uint64_t cur_input_addr  =
+              reinterpret_cast<uint64_t>(input_ptr  + b * src_stride[0]);
+          uint64_t cur_output_addr =
+              reinterpret_cast<uint64_t>(output_ptr + b * dst_stride[0]);
+          stridedcopy_async_impl<scalar_t_>(
+              cur_input_addr, cur_output_addr,
+              shape, src_stride, dst_stride, dim);
+        }
+      } else {
+        stridedcopy_async_impl<scalar_t_>(
+            reinterpret_cast<uint64_t>(input_ptr),
+            reinterpret_cast<uint64_t>(output_ptr),
+            shape, src_stride, dst_stride, dim);
+      }
+    });
+    return;
+  } else
+#endif
+  {
+    auto handle = c10_tpu::getCurrentTPUStream();
+    tpudnnStridedCopyAsync(
+        handle,
+        tpu::TPUGenerateTpudnnTensor(handle, src),
+        tpu::TPUGenerateTpudnnTensor(handle, dst));
+  }
+}
+
 #define CONTIGUOUS_FALLBACK(OP_FUNC, self, other, out, alpha)                    \
 do {                                                                              \
   if (!(self).is_contiguous() || !(other).is_contiguous() || !(out).is_contiguous())\
@@ -1547,11 +1669,7 @@ do {                                                                            
       (out) = OP_FUNC((self).contiguous(), (other).contiguous(), (alpha));        \
     } else {                                                                      \
       auto out_ = OP_FUNC((self).contiguous(), (other).contiguous(), (alpha));    \
-      auto handle = c10_tpu::getCurrentTPUStream();                               \
-      tpudnnStridedCopyAsync(                                                     \
-          handle,                                                                 \
-          tpu::TPUGenerateTpudnnTensor(handle, out_),                             \
-          tpu::TPUGenerateTpudnnTensor(handle, (out)));                           \
+      copy_noncontig_by_backend(out_, (out));                                     \
     }                                                                             \
     SHOW_TENSOR_OP((self), (other), (out));                                       \
     return (out);                                                                 \
@@ -1567,18 +1685,14 @@ do {                                                                            
       (out) = OP_FUNC((self).contiguous(), (other).contiguous());                 \
     } else {                                                                      \
       auto out_ = OP_FUNC((self).contiguous(), (other).contiguous());             \
-      auto handle = c10_tpu::getCurrentTPUStream();                               \
-      tpudnnStridedCopyAsync(                                                     \
-          handle,                                                                 \
-          tpu::TPUGenerateTpudnnTensor(handle, out_),                             \
-          tpu::TPUGenerateTpudnnTensor(handle, (out)));                           \
+      copy_noncontig_by_backend(out_, (out));                                     \
     }                                                                             \
     SHOW_TENSOR_OP((self), (other), (out));                                       \
     return (out);                                                                 \
   }                                                                               \
 } while (0)
 
-// pattern1: self.shape == other.shape = out.shape, 
+// pattern1: self.shape == other.shape = out.shape,
 //           self.stride[0] != other.stride[0]
 #define PATTERN1(OP_FUNC, self, other, out, alpha)                              \
 do {                                                                            \
@@ -1601,7 +1715,7 @@ do {                                                                            
     TIMING_END;                                                                  \
     return out;                                                                  \
   }                                                                              \
-}while (0)                                                                      
+}while (0)
 
 Tensor &add_out_tpu(const Tensor &self, const Tensor &other,
                     const Scalar &alpha, Tensor &out) {
@@ -2033,6 +2147,44 @@ Tensor &bitwise_xor_out_tpu(const Tensor &self, const Tensor &other,
       if (out.is_contiguous()) {
         out = bitwise_xor(self.contiguous(), other.contiguous());
       } else {
+#ifdef USING_PPL
+        if (usePPLKernels())
+        {  int dim = self.dim();
+          int shape[FW_MAX_SHAPE_DIMS] = {1};
+          int src_stride[FW_MAX_SHAPE_DIMS] = {1};
+          int dst_stride[FW_MAX_SHAPE_DIMS] = {1};
+
+          for (int i = 0; i < dim; ++i) {
+            shape[i] = self.size(i);
+            src_stride[i] = self.stride(i);
+            dst_stride[i] = out.stride(i);
+          }
+          simplify(shape, src_stride, dst_stride, &dim);
+          AT_DISPATCH_FLOAT_INT_TYPES( self.scalar_type(), "stridedcopy", [&] {
+            scalar_t* input_ptr = self.data_ptr<scalar_t>();
+            scalar_t* output_ptr = out.data_ptr<scalar_t>();
+            if (dim > 4 ){
+              const int batch_size = shape[0];
+              shape[0] = 1;
+              for (int b = 0; b < batch_size; ++b) {
+                uint64_t cur_input_addr = reinterpret_cast<uint64_t>(input_ptr + b * src_stride[0]);
+                uint64_t cur_output_addr = reinterpret_cast<uint64_t>(output_ptr + b * dst_stride[0]);
+                stridedcopy_async_impl<scalar_t>(
+                  cur_input_addr,
+                  cur_output_addr,
+                  shape, src_stride, dst_stride, dim);
+              }
+            } else {
+              stridedcopy_async_impl<scalar_t>(
+                reinterpret_cast<uint64_t>(input_ptr),
+                reinterpret_cast<uint64_t>(output_ptr),
+                shape, src_stride, dst_stride, dim);
+            }
+
+          });
+        } else
+#endif
+        {
         auto out_ = bitwise_xor(self.contiguous(), other.contiguous());
         auto handle = c10_tpu::getCurrentTPUStream();
         tpudnnStridedCopyAsync(
@@ -2040,6 +2192,7 @@ Tensor &bitwise_xor_out_tpu(const Tensor &self, const Tensor &other,
             tpu::TPUGenerateTpudnnTensor(handle, out_),
             tpu::TPUGenerateTpudnnTensor(handle, out));
       }
+    }
       SHOW_TENSOR_OP(self, other, out);
       return out;
     }
@@ -2081,12 +2234,51 @@ Tensor &bitwise_and_out_tpu(const Tensor &self, const Tensor &other,
       if (out.is_contiguous()) {
         out = bitwise_and(self.contiguous(), other.contiguous());
       } else {
+#ifdef USING_PPL
+        if (usePPLKernels())
+        {  int dim = self.dim();
+          int shape[FW_MAX_SHAPE_DIMS] = {1};
+          int src_stride[FW_MAX_SHAPE_DIMS] = {1};
+          int dst_stride[FW_MAX_SHAPE_DIMS] = {1};
+
+          for (int i = 0; i < dim; ++i) {
+            shape[i] = self.size(i);
+            src_stride[i] = self.stride(i);
+            dst_stride[i] = out.stride(i);
+          }
+          simplify(shape, src_stride, dst_stride, &dim);
+          AT_DISPATCH_FLOAT_INT_TYPES( self.scalar_type(), "stridedcopy", [&] {
+            scalar_t* input_ptr = self.data_ptr<scalar_t>();
+            scalar_t* output_ptr = out.data_ptr<scalar_t>();
+            if (dim > 4 ){
+              const int batch_size = shape[0];
+              shape[0] = 1;
+              for (int b = 0; b < batch_size; ++b) {
+                uint64_t cur_input_addr = reinterpret_cast<uint64_t>(input_ptr + b * src_stride[0]);
+                uint64_t cur_output_addr = reinterpret_cast<uint64_t>(output_ptr + b * dst_stride[0]);
+                stridedcopy_async_impl<scalar_t>(
+                  cur_input_addr,
+                  cur_output_addr,
+                  shape, src_stride, dst_stride, dim);
+              }
+            } else {
+              stridedcopy_async_impl<scalar_t>(
+                reinterpret_cast<uint64_t>(input_ptr),
+                reinterpret_cast<uint64_t>(output_ptr),
+                shape, src_stride, dst_stride, dim);
+            }
+
+          });
+        } else
+#endif
+        {
         auto out_ = bitwise_and(self.contiguous(), other.contiguous());
         auto handle = c10_tpu::getCurrentTPUStream();
         tpudnnStridedCopyAsync(
             handle,
             tpu::TPUGenerateTpudnnTensor(handle, out_),
             tpu::TPUGenerateTpudnnTensor(handle, out));
+        }
       }
       SHOW_TENSOR_OP(self, other, out);
       return out;
@@ -2127,12 +2319,51 @@ Tensor &bitwise_or_out_tpu(const Tensor &self, const Tensor &other,
       if (out.is_contiguous()) {
         out = bitwise_or(self.contiguous(), other.contiguous());
       } else {
+#ifdef USING_PPL
+        if (usePPLKernels())
+        {  int dim = self.dim();
+          int shape[FW_MAX_SHAPE_DIMS] = {1};
+          int src_stride[FW_MAX_SHAPE_DIMS] = {1};
+          int dst_stride[FW_MAX_SHAPE_DIMS] = {1};
+
+          for (int i = 0; i < dim; ++i) {
+            shape[i] = self.size(i);
+            src_stride[i] = self.stride(i);
+            dst_stride[i] = out.stride(i);
+          }
+          simplify(shape, src_stride, dst_stride, &dim);
+          AT_DISPATCH_FLOAT_INT_TYPES( self.scalar_type(), "stridedcopy", [&] {
+            scalar_t* input_ptr = self.data_ptr<scalar_t>();
+            scalar_t* output_ptr = out.data_ptr<scalar_t>();
+            if (dim > 4 ){
+              const int batch_size = shape[0];
+              shape[0] = 1;
+              for (int b = 0; b < batch_size; ++b) {
+                uint64_t cur_input_addr = reinterpret_cast<uint64_t>(input_ptr + b * src_stride[0]);
+                uint64_t cur_output_addr = reinterpret_cast<uint64_t>(output_ptr + b * dst_stride[0]);
+                stridedcopy_async_impl<scalar_t>(
+                  cur_input_addr,
+                  cur_output_addr,
+                  shape, src_stride, dst_stride, dim);
+              }
+            } else {
+              stridedcopy_async_impl<scalar_t>(
+                reinterpret_cast<uint64_t>(input_ptr),
+                reinterpret_cast<uint64_t>(output_ptr),
+                shape, src_stride, dst_stride, dim);
+            }
+
+          });
+        } else
+#endif
+        {
         auto out_ = bitwise_or(self.contiguous(), other.contiguous());
         auto handle = c10_tpu::getCurrentTPUStream();
         tpudnnStridedCopyAsync(
             handle,
             tpu::TPUGenerateTpudnnTensor(handle, out_),
             tpu::TPUGenerateTpudnnTensor(handle, out));
+        }
       }
       SHOW_TENSOR_OP(self, other, out);
       return out;
@@ -2172,12 +2403,51 @@ Tensor &equal_out_tpu(const Tensor &self, const Tensor &other, Tensor &out) {
     if (out.is_contiguous()) {
       out = eq(self.contiguous(), other.contiguous());
     } else {
+#ifdef USING_PPL
+      if (usePPLKernels())
+      {  int dim = self.dim();
+        int shape[FW_MAX_SHAPE_DIMS] = {1};
+        int src_stride[FW_MAX_SHAPE_DIMS] = {1};
+        int dst_stride[FW_MAX_SHAPE_DIMS] = {1};
+
+        for (int i = 0; i < dim; ++i) {
+          shape[i] = self.size(i);
+          src_stride[i] = self.stride(i);
+          dst_stride[i] = out.stride(i);
+        }
+        simplify(shape, src_stride, dst_stride, &dim);
+        AT_DISPATCH_FLOAT_INT_TYPES( self.scalar_type(), "stridedcopy", [&] {
+          scalar_t* input_ptr = self.data_ptr<scalar_t>();
+          scalar_t* output_ptr = out.data_ptr<scalar_t>();
+          if (dim > 4 ){
+            const int batch_size = shape[0];
+            shape[0] = 1;
+            for (int b = 0; b < batch_size; ++b) {
+              uint64_t cur_input_addr = reinterpret_cast<uint64_t>(input_ptr + b * src_stride[0]);
+              uint64_t cur_output_addr = reinterpret_cast<uint64_t>(output_ptr + b * dst_stride[0]);
+              stridedcopy_async_impl<scalar_t>(
+                cur_input_addr,
+                cur_output_addr,
+                shape, src_stride, dst_stride, dim);
+            }
+          } else {
+            stridedcopy_async_impl<scalar_t>(
+              reinterpret_cast<uint64_t>(input_ptr),
+              reinterpret_cast<uint64_t>(output_ptr),
+              shape, src_stride, dst_stride, dim);
+          }
+
+        });
+      } else
+#endif
+      {
       auto out_ = eq(self.contiguous(), other.contiguous());
       auto handle = c10_tpu::getCurrentTPUStream();
       tpudnnStridedCopyAsync(
           handle,
           tpu::TPUGenerateTpudnnTensor(handle, out_),
           tpu::TPUGenerateTpudnnTensor(handle, out));
+      }
     }
     SHOW_TENSOR_OP(self, other, out);
     return out;
@@ -2215,12 +2485,51 @@ Tensor &greater_or_equal_out_tpu(const Tensor &self, const Tensor &other,
       if (out.is_contiguous()) {
         out = ge(self.contiguous(), other.contiguous());
       } else {
+#ifdef USING_PPL
+      if (usePPLKernels())
+      {  int dim = self.dim();
+        int shape[FW_MAX_SHAPE_DIMS] = {1};
+        int src_stride[FW_MAX_SHAPE_DIMS] = {1};
+        int dst_stride[FW_MAX_SHAPE_DIMS] = {1};
+
+        for (int i = 0; i < dim; ++i) {
+          shape[i] = self.size(i);
+          src_stride[i] = self.stride(i);
+          dst_stride[i] = out.stride(i);
+        }
+        simplify(shape, src_stride, dst_stride, &dim);
+        AT_DISPATCH_FLOAT_INT_TYPES( self.scalar_type(), "stridedcopy", [&] {
+          scalar_t* input_ptr = self.data_ptr<scalar_t>();
+          scalar_t* output_ptr = out.data_ptr<scalar_t>();
+          if (dim > 4 ){
+            const int batch_size = shape[0];
+            shape[0] = 1;
+            for (int b = 0; b < batch_size; ++b) {
+              uint64_t cur_input_addr = reinterpret_cast<uint64_t>(input_ptr + b * src_stride[0]);
+              uint64_t cur_output_addr = reinterpret_cast<uint64_t>(output_ptr + b * dst_stride[0]);
+              stridedcopy_async_impl<scalar_t>(
+                cur_input_addr,
+                cur_output_addr,
+                shape, src_stride, dst_stride, dim);
+            }
+          } else {
+            stridedcopy_async_impl<scalar_t>(
+              reinterpret_cast<uint64_t>(input_ptr),
+              reinterpret_cast<uint64_t>(output_ptr),
+              shape, src_stride, dst_stride, dim);
+          }
+
+        });
+      } else
+#endif
+      {
         auto out_ = ge(self.contiguous(), other.contiguous());
         auto handle = c10_tpu::getCurrentTPUStream();
         tpudnnStridedCopyAsync(
             handle,
             tpu::TPUGenerateTpudnnTensor(handle, out_),
             tpu::TPUGenerateTpudnnTensor(handle, out));
+      }
       }
       SHOW_TENSOR_OP(self, other, out);
       return out;
@@ -2260,12 +2569,51 @@ Tensor &greater_out_tpu(const Tensor &self, const Tensor &other, Tensor &out) {
     if (out.is_contiguous()) {
       out = gt(self.contiguous(), other.contiguous());
     } else {
+#ifdef USING_PPL
+      if (usePPLKernels())
+      {  int dim = self.dim();
+        int shape[FW_MAX_SHAPE_DIMS] = {1};
+        int src_stride[FW_MAX_SHAPE_DIMS] = {1};
+        int dst_stride[FW_MAX_SHAPE_DIMS] = {1};
+
+        for (int i = 0; i < dim; ++i) {
+          shape[i] = self.size(i);
+          src_stride[i] = self.stride(i);
+          dst_stride[i] = out.stride(i);
+        }
+        simplify(shape, src_stride, dst_stride, &dim);
+        AT_DISPATCH_FLOAT_INT_TYPES( self.scalar_type(), "stridedcopy", [&] {
+          scalar_t* input_ptr = self.data_ptr<scalar_t>();
+          scalar_t* output_ptr = out.data_ptr<scalar_t>();
+          if (dim > 4 ){
+            const int batch_size = shape[0];
+            shape[0] = 1;
+            for (int b = 0; b < batch_size; ++b) {
+              uint64_t cur_input_addr = reinterpret_cast<uint64_t>(input_ptr + b * src_stride[0]);
+              uint64_t cur_output_addr = reinterpret_cast<uint64_t>(output_ptr + b * dst_stride[0]);
+              stridedcopy_async_impl<scalar_t>(
+                cur_input_addr,
+                cur_output_addr,
+                shape, src_stride, dst_stride, dim);
+            }
+          } else {
+            stridedcopy_async_impl<scalar_t>(
+              reinterpret_cast<uint64_t>(input_ptr),
+              reinterpret_cast<uint64_t>(output_ptr),
+              shape, src_stride, dst_stride, dim);
+          }
+
+        });
+      } else
+#endif
+      {
       auto out_ = gt(self.contiguous(), other.contiguous());
       auto handle = c10_tpu::getCurrentTPUStream();
       tpudnnStridedCopyAsync(
           handle,
           tpu::TPUGenerateTpudnnTensor(handle, out_),
           tpu::TPUGenerateTpudnnTensor(handle, out));
+      }
     }
     SHOW_TENSOR_OP(self, other, out);
     return out;
@@ -2302,12 +2650,51 @@ Tensor &less_than_or_equal_out_tpu(const Tensor &self, const Tensor &other,
     if (out.is_contiguous()) {
       out = le(self.contiguous(), other.contiguous());
     } else {
+#ifdef USING_PPL
+      if (usePPLKernels())
+      {  int dim = self.dim();
+        int shape[FW_MAX_SHAPE_DIMS] = {1};
+        int src_stride[FW_MAX_SHAPE_DIMS] = {1};
+        int dst_stride[FW_MAX_SHAPE_DIMS] = {1};
+
+        for (int i = 0; i < dim; ++i) {
+          shape[i] = self.size(i);
+          src_stride[i] = self.stride(i);
+          dst_stride[i] = out.stride(i);
+        }
+        simplify(shape, src_stride, dst_stride, &dim);
+        AT_DISPATCH_FLOAT_INT_TYPES( self.scalar_type(), "stridedcopy", [&] {
+          scalar_t* input_ptr = self.data_ptr<scalar_t>();
+          scalar_t* output_ptr = out.data_ptr<scalar_t>();
+          if (dim > 4 ){
+            const int batch_size = shape[0];
+            shape[0] = 1;
+            for (int b = 0; b < batch_size; ++b) {
+              uint64_t cur_input_addr = reinterpret_cast<uint64_t>(input_ptr + b * src_stride[0]);
+              uint64_t cur_output_addr = reinterpret_cast<uint64_t>(output_ptr + b * dst_stride[0]);
+              stridedcopy_async_impl<scalar_t>(
+                cur_input_addr,
+                cur_output_addr,
+                shape, src_stride, dst_stride, dim);
+            }
+          } else {
+            stridedcopy_async_impl<scalar_t>(
+              reinterpret_cast<uint64_t>(input_ptr),
+              reinterpret_cast<uint64_t>(output_ptr),
+              shape, src_stride, dst_stride, dim);
+          }
+
+        });
+      } else
+#endif
+      {
       auto out_ = le(self.contiguous(), other.contiguous());
       auto handle = c10_tpu::getCurrentTPUStream();
       tpudnnStridedCopyAsync(
           handle,
           tpu::TPUGenerateTpudnnTensor(handle, out_),
           tpu::TPUGenerateTpudnnTensor(handle, out));
+      }
     }
     SHOW_TENSOR_OP(self, other, out);
     return out;
@@ -2347,12 +2734,51 @@ Tensor &less_than_out_tpu(const Tensor &self, const Tensor &other,
     if (out.is_contiguous()) {
       out = lt(self.contiguous(), other.contiguous());
     } else {
+#ifdef USING_PPL
+      if (usePPLKernels())
+      {  int dim = self.dim();
+        int shape[FW_MAX_SHAPE_DIMS] = {1};
+        int src_stride[FW_MAX_SHAPE_DIMS] = {1};
+        int dst_stride[FW_MAX_SHAPE_DIMS] = {1};
+
+        for (int i = 0; i < dim; ++i) {
+          shape[i] = self.size(i);
+          src_stride[i] = self.stride(i);
+          dst_stride[i] = out.stride(i);
+        }
+        simplify(shape, src_stride, dst_stride, &dim);
+        AT_DISPATCH_FLOAT_INT_TYPES( self.scalar_type(), "stridedcopy", [&] {
+          scalar_t* input_ptr = self.data_ptr<scalar_t>();
+          scalar_t* output_ptr = out.data_ptr<scalar_t>();
+          if (dim > 4 ){
+            const int batch_size = shape[0];
+            shape[0] = 1;
+            for (int b = 0; b < batch_size; ++b) {
+              uint64_t cur_input_addr = reinterpret_cast<uint64_t>(input_ptr + b * src_stride[0]);
+              uint64_t cur_output_addr = reinterpret_cast<uint64_t>(output_ptr + b * dst_stride[0]);
+              stridedcopy_async_impl<scalar_t>(
+                cur_input_addr,
+                cur_output_addr,
+                shape, src_stride, dst_stride, dim);
+            }
+          } else {
+            stridedcopy_async_impl<scalar_t>(
+              reinterpret_cast<uint64_t>(input_ptr),
+              reinterpret_cast<uint64_t>(output_ptr),
+              shape, src_stride, dst_stride, dim);
+          }
+
+        });
+      } else
+#endif
+      {
       auto out_ = lt(self.contiguous(), other.contiguous());
       auto handle = c10_tpu::getCurrentTPUStream();
       tpudnnStridedCopyAsync(
           handle,
           tpu::TPUGenerateTpudnnTensor(handle, out_),
           tpu::TPUGenerateTpudnnTensor(handle, out));
+      }
     }
     SHOW_TENSOR_OP(self, other, out);
     return out;
@@ -2390,12 +2816,51 @@ Tensor &not_equal_out_tpu(const Tensor &self, const Tensor &other,
     if (out.is_contiguous()) {
       out = ne(self.contiguous(), other.contiguous());
     } else {
+#ifdef USING_PPL
+      if (usePPLKernels())
+      {  int dim = self.dim();
+        int shape[FW_MAX_SHAPE_DIMS] = {1};
+        int src_stride[FW_MAX_SHAPE_DIMS] = {1};
+        int dst_stride[FW_MAX_SHAPE_DIMS] = {1};
+
+        for (int i = 0; i < dim; ++i) {
+          shape[i] = self.size(i);
+          src_stride[i] = self.stride(i);
+          dst_stride[i] = out.stride(i);
+        }
+        simplify(shape, src_stride, dst_stride, &dim);
+        AT_DISPATCH_FLOAT_INT_TYPES( self.scalar_type(), "stridedcopy", [&] {
+          scalar_t* input_ptr = self.data_ptr<scalar_t>();
+          scalar_t* output_ptr = out.data_ptr<scalar_t>();
+          if (dim > 4 ){
+            const int batch_size = shape[0];
+            shape[0] = 1;
+            for (int b = 0; b < batch_size; ++b) {
+              uint64_t cur_input_addr = reinterpret_cast<uint64_t>(input_ptr + b * src_stride[0]);
+              uint64_t cur_output_addr = reinterpret_cast<uint64_t>(output_ptr + b * dst_stride[0]);
+              stridedcopy_async_impl<scalar_t>(
+                cur_input_addr,
+                cur_output_addr,
+                shape, src_stride, dst_stride, dim);
+            }
+          } else {
+            stridedcopy_async_impl<scalar_t>(
+              reinterpret_cast<uint64_t>(input_ptr),
+              reinterpret_cast<uint64_t>(output_ptr),
+              shape, src_stride, dst_stride, dim);
+          }
+
+        });
+      } else
+#endif
+      {
       auto out_ = ne(self.contiguous(), other.contiguous());
       auto handle = c10_tpu::getCurrentTPUStream();
       tpudnnStridedCopyAsync(
           handle,
           tpu::TPUGenerateTpudnnTensor(handle, out_),
           tpu::TPUGenerateTpudnnTensor(handle, out));
+      }
     }
     SHOW_TENSOR_OP(self, other, out);
     return out;
@@ -2433,12 +2898,51 @@ Tensor &shift_left_out_tpu(const Tensor &self, const Tensor &other,
     if (out.is_contiguous()) {
       out = bitwise_left_shift(self.contiguous(), other.contiguous());
     } else {
+#ifdef USING_PPL
+      if (usePPLKernels())
+      {  int dim = self.dim();
+        int shape[FW_MAX_SHAPE_DIMS] = {1};
+        int src_stride[FW_MAX_SHAPE_DIMS] = {1};
+        int dst_stride[FW_MAX_SHAPE_DIMS] = {1};
+
+        for (int i = 0; i < dim; ++i) {
+          shape[i] = self.size(i);
+          src_stride[i] = self.stride(i);
+          dst_stride[i] = out.stride(i);
+        }
+        simplify(shape, src_stride, dst_stride, &dim);
+        AT_DISPATCH_FLOAT_INT_TYPES( self.scalar_type(), "stridedcopy", [&] {
+          scalar_t* input_ptr = self.data_ptr<scalar_t>();
+          scalar_t* output_ptr = out.data_ptr<scalar_t>();
+          if (dim > 4 ){
+            const int batch_size = shape[0];
+            shape[0] = 1;
+            for (int b = 0; b < batch_size; ++b) {
+              uint64_t cur_input_addr = reinterpret_cast<uint64_t>(input_ptr + b * src_stride[0]);
+              uint64_t cur_output_addr = reinterpret_cast<uint64_t>(output_ptr + b * dst_stride[0]);
+              stridedcopy_async_impl<scalar_t>(
+                cur_input_addr,
+                cur_output_addr,
+                shape, src_stride, dst_stride, dim);
+            }
+          } else {
+            stridedcopy_async_impl<scalar_t>(
+              reinterpret_cast<uint64_t>(input_ptr),
+              reinterpret_cast<uint64_t>(output_ptr),
+              shape, src_stride, dst_stride, dim);
+          }
+
+        });
+      } else
+#endif
+      {
       auto out_ = bitwise_left_shift(self.contiguous(), other.contiguous());
       auto handle = c10_tpu::getCurrentTPUStream();
       tpudnnStridedCopyAsync(
           handle,
           tpu::TPUGenerateTpudnnTensor(handle, out_),
           tpu::TPUGenerateTpudnnTensor(handle, out));
+      }
     }
     SHOW_TENSOR_OP(self, other, out);
     return out;
@@ -2478,12 +2982,51 @@ Tensor &shift_right_arithmetic_out_tpu(const Tensor &self, const Tensor &other,
     if (out.is_contiguous()) {
       out = bitwise_right_shift(self.contiguous(), other.contiguous());
     } else {
+      #ifdef USING_PPL
+      if (usePPLKernels())
+      {  int dim = self.dim();
+        int shape[FW_MAX_SHAPE_DIMS] = {1};
+        int src_stride[FW_MAX_SHAPE_DIMS] = {1};
+        int dst_stride[FW_MAX_SHAPE_DIMS] = {1};
+
+        for (int i = 0; i < dim; ++i) {
+          shape[i] = self.size(i);
+          src_stride[i] = self.stride(i);
+          dst_stride[i] = out.stride(i);
+        }
+        simplify(shape, src_stride, dst_stride, &dim);
+        AT_DISPATCH_FLOAT_INT_TYPES( self.scalar_type(), "stridedcopy", [&] {
+          scalar_t* input_ptr = self.data_ptr<scalar_t>();
+          scalar_t* output_ptr = out.data_ptr<scalar_t>();
+          if (dim > 4 ){
+            const int batch_size = shape[0];
+            shape[0] = 1;
+            for (int b = 0; b < batch_size; ++b) {
+              uint64_t cur_input_addr = reinterpret_cast<uint64_t>(input_ptr + b * src_stride[0]);
+              uint64_t cur_output_addr = reinterpret_cast<uint64_t>(output_ptr + b * dst_stride[0]);
+              stridedcopy_async_impl<scalar_t>(
+                cur_input_addr,
+                cur_output_addr,
+                shape, src_stride, dst_stride, dim);
+            }
+          } else {
+            stridedcopy_async_impl<scalar_t>(
+              reinterpret_cast<uint64_t>(input_ptr),
+              reinterpret_cast<uint64_t>(output_ptr),
+              shape, src_stride, dst_stride, dim);
+          }
+
+        });
+      } else
+#endif
+      {
       auto out_ = bitwise_right_shift(self.contiguous(), other.contiguous());
       auto handle = c10_tpu::getCurrentTPUStream();
       tpudnnStridedCopyAsync(
           handle,
           tpu::TPUGenerateTpudnnTensor(handle, out_),
           tpu::TPUGenerateTpudnnTensor(handle, out));
+      }
     }
     SHOW_TENSOR_OP(self, other, out);
     return out;
@@ -2522,12 +3065,51 @@ Tensor &minimum_out_tpu(const Tensor &self, const Tensor &other, Tensor &out) {
     if (out.is_contiguous()) {
       out = minimum(self.contiguous(), other.contiguous());
     } else {
+#ifdef USING_PPL
+      if (usePPLKernels())
+      {  int dim = self.dim();
+        int shape[FW_MAX_SHAPE_DIMS] = {1};
+        int src_stride[FW_MAX_SHAPE_DIMS] = {1};
+        int dst_stride[FW_MAX_SHAPE_DIMS] = {1};
+
+        for (int i = 0; i < dim; ++i) {
+          shape[i] = self.size(i);
+          src_stride[i] = self.stride(i);
+          dst_stride[i] = out.stride(i);
+        }
+        simplify(shape, src_stride, dst_stride, &dim);
+        AT_DISPATCH_FLOAT_INT_TYPES( self.scalar_type(), "stridedcopy", [&] {
+          scalar_t* input_ptr = self.data_ptr<scalar_t>();
+          scalar_t* output_ptr = out.data_ptr<scalar_t>();
+          if (dim > 4 ){
+            const int batch_size = shape[0];
+            shape[0] = 1;
+            for (int b = 0; b < batch_size; ++b) {
+              uint64_t cur_input_addr = reinterpret_cast<uint64_t>(input_ptr + b * src_stride[0]);
+              uint64_t cur_output_addr = reinterpret_cast<uint64_t>(output_ptr + b * dst_stride[0]);
+              stridedcopy_async_impl<scalar_t>(
+                cur_input_addr,
+                cur_output_addr,
+                shape, src_stride, dst_stride, dim);
+            }
+          } else {
+            stridedcopy_async_impl<scalar_t>(
+              reinterpret_cast<uint64_t>(input_ptr),
+              reinterpret_cast<uint64_t>(output_ptr),
+              shape, src_stride, dst_stride, dim);
+          }
+
+        });
+      } else
+#endif
+      {
       auto out_ = minimum(self.contiguous(), other.contiguous());
       auto handle = c10_tpu::getCurrentTPUStream();
       tpudnnStridedCopyAsync(
           handle,
           tpu::TPUGenerateTpudnnTensor(handle, out_),
           tpu::TPUGenerateTpudnnTensor(handle, out));
+      }
     }
     SHOW_TENSOR_OP(self, other, out);
     return out;
@@ -2583,12 +3165,51 @@ Tensor &maximum_out_tpu(const Tensor &self, const Tensor &other, Tensor &out) {
     if (out.is_contiguous()) {
       out = maximum(self.contiguous(), other.contiguous());
     } else {
+#ifdef USING_PPL
+      if (usePPLKernels())
+      {  int dim = self.dim();
+        int shape[FW_MAX_SHAPE_DIMS] = {1};
+        int src_stride[FW_MAX_SHAPE_DIMS] = {1};
+        int dst_stride[FW_MAX_SHAPE_DIMS] = {1};
+
+        for (int i = 0; i < dim; ++i) {
+          shape[i] = self.size(i);
+          src_stride[i] = self.stride(i);
+          dst_stride[i] = out.stride(i);
+        }
+        simplify(shape, src_stride, dst_stride, &dim);
+        AT_DISPATCH_FLOAT_INT_TYPES( self.scalar_type(), "stridedcopy", [&] {
+          scalar_t* input_ptr = self.data_ptr<scalar_t>();
+          scalar_t* output_ptr = out.data_ptr<scalar_t>();
+          if (dim > 4 ){
+            const int batch_size = shape[0];
+            shape[0] = 1;
+            for (int b = 0; b < batch_size; ++b) {
+              uint64_t cur_input_addr = reinterpret_cast<uint64_t>(input_ptr + b * src_stride[0]);
+              uint64_t cur_output_addr = reinterpret_cast<uint64_t>(output_ptr + b * dst_stride[0]);
+              stridedcopy_async_impl<scalar_t>(
+                cur_input_addr,
+                cur_output_addr,
+                shape, src_stride, dst_stride, dim);
+            }
+          } else {
+            stridedcopy_async_impl<scalar_t>(
+              reinterpret_cast<uint64_t>(input_ptr),
+              reinterpret_cast<uint64_t>(output_ptr),
+              shape, src_stride, dst_stride, dim);
+          }
+
+        });
+      } else
+#endif
+      {
       auto out_ = maximum(self.contiguous(), other.contiguous());
       auto handle = c10_tpu::getCurrentTPUStream();
       tpudnnStridedCopyAsync(
           handle,
           tpu::TPUGenerateTpudnnTensor(handle, out_),
           tpu::TPUGenerateTpudnnTensor(handle, out));
+      }
     }
     SHOW_TENSOR_OP(self, other, out);
     return out;
@@ -2653,12 +3274,51 @@ Tensor &pow_out_tpu(const Tensor &self, const Tensor &other, Tensor &out) {
     if (out.is_contiguous()) {
       out = pow(self.contiguous(), other.contiguous());
     } else {
+#ifdef USING_PPL
+      if (usePPLKernels())
+      {  int dim = self.dim();
+        int shape[FW_MAX_SHAPE_DIMS] = {1};
+        int src_stride[FW_MAX_SHAPE_DIMS] = {1};
+        int dst_stride[FW_MAX_SHAPE_DIMS] = {1};
+
+        for (int i = 0; i < dim; ++i) {
+          shape[i] = self.size(i);
+          src_stride[i] = self.stride(i);
+          dst_stride[i] = out.stride(i);
+        }
+        simplify(shape, src_stride, dst_stride, &dim);
+        AT_DISPATCH_FLOAT_INT_TYPES( self.scalar_type(), "stridedcopy", [&] {
+          scalar_t* input_ptr = self.data_ptr<scalar_t>();
+          scalar_t* output_ptr = out.data_ptr<scalar_t>();
+          if (dim > 4 ){
+            const int batch_size = shape[0];
+            shape[0] = 1;
+            for (int b = 0; b < batch_size; ++b) {
+              uint64_t cur_input_addr = reinterpret_cast<uint64_t>(input_ptr + b * src_stride[0]);
+              uint64_t cur_output_addr = reinterpret_cast<uint64_t>(output_ptr + b * dst_stride[0]);
+              stridedcopy_async_impl<scalar_t>(
+                cur_input_addr,
+                cur_output_addr,
+                shape, src_stride, dst_stride, dim);
+            }
+          } else {
+            stridedcopy_async_impl<scalar_t>(
+              reinterpret_cast<uint64_t>(input_ptr),
+              reinterpret_cast<uint64_t>(output_ptr),
+              shape, src_stride, dst_stride, dim);
+          }
+
+        });
+      } else
+#endif
+      {
       auto out_ = pow(self.contiguous(), other.contiguous());
       auto handle = c10_tpu::getCurrentTPUStream();
       tpudnnStridedCopyAsync(
           handle,
           tpu::TPUGenerateTpudnnTensor(handle, out_),
           tpu::TPUGenerateTpudnnTensor(handle, out));
+      }
     }
     SHOW_TENSOR_OP(self, other, out);
     return out;

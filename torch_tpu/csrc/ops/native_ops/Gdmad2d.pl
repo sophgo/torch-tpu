@@ -23,12 +23,13 @@ void gdmad2d_kernel(T *ptr_output, T *ptr_input, const int outer_size, const int
     auto out_gt = gtensor<T>(shape, GLOBAL, ptr_output);
 
     for (auto w_idx = 0; w_idx < slice_size_for_core; w_idx += block_w) {
-        int w = min(block_w, slice_size_for_core - w_idx);
-        dim4 input_global_offset = {0, 0, 0, core_offset + w_idx};
-        dim4 local_shape = {1, 1, 1, w};
+      enable_pipeline();
+      int w = min(block_w, slice_size_for_core - w_idx);
+      dim4 input_global_offset = {0, 0, 0, core_offset + w_idx};
+      dim4 local_shape = {1, 1, 1, w};
 
-        dma::move(out_gt.sub_view(local_shape, input_global_offset),
-                  in_gt.sub_view(local_shape, input_global_offset));
+      dma::move(out_gt.sub_view(local_shape, input_global_offset),
+                in_gt.sub_view(local_shape, input_global_offset));
     }
 }
 

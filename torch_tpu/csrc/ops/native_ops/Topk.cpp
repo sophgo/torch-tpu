@@ -34,6 +34,26 @@ static void topk_async(
         outer_size, axis_size, inner_size,
         k, largest,
         tile_size);
+    } else if constexpr (std::is_same_v<scalar_t, at::Half>) {
+      return topk_fp16(
+        stream,
+#ifndef BACKEND_SG2260
+        ppl_module,
+#endif
+        index_addr, input_addr, value_addr,
+        outer_size, axis_size, inner_size,
+        k, largest,
+        tile_size);
+    } else if constexpr (std::is_same_v<scalar_t, at::BFloat16>) {
+    return topk_bf16(
+      stream,
+#ifndef BACKEND_SG2260
+      ppl_module,
+#endif
+      index_addr, input_addr, value_addr,
+      outer_size, axis_size, inner_size,
+      k, largest,
+      tile_size);
     }
     return -1;
   };
