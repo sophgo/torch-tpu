@@ -572,7 +572,8 @@ class bdist_wheel(_bdist_wheel, ExtBase):
         tpuDNN_libs = glob.glob(os.path.join(BASE_DIR, 'third_party/tpuDNN/*_lib/*.so'))
         for lib in tpuDNN_libs:
             target = re.match(r'.+tpuDNN/(\w+)_lib.+', lib).group(1)
-            if 'tpudnn' in lib:
+            base_name = os.path.basename(lib)
+            if 'tpudnn' in base_name:
                 if 'bm1684x' in lib:
                     if SOC_CROSS:
                         lib = os.path.join(BASE_DIR, 'third_party/tpuDNN/bm1684x_lib/arm/libtpudnn.so')
@@ -583,10 +584,10 @@ class bdist_wheel(_bdist_wheel, ExtBase):
                     self.copy_file(lib, os.path.join(pkg_dir, f'lib/libtpudnn.{target}.so'))
                 else:
                     if (SOC_CROSS or SOC_MODE):
-                        if 'riscv' in lib:
+                        if 'riscv' in base_name:
                             self.copy_file(lib, os.path.join(pkg_dir, f'lib/libtpudnn.{target}.so'))
                     else:
-                        if 'riscv' not in lib:
+                        if 'riscv' not in base_name:
                             self.copy_file(lib, os.path.join(pkg_dir, f'lib/libtpudnn.{target}.so'))
 
         chip_arch = os.environ.get('CHIP_ARCH')
