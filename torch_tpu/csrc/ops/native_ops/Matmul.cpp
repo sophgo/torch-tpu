@@ -240,14 +240,27 @@ Tensor & addmm_out_tpu ( const Tensor & self, const Tensor & mat1, const Tensor 
 
 
           auto stream = c10_tpu::getCurrentTPUStream();
-          auto status = tpudnnMatmulAsync(
-            stream,
-            tpu::TPUGenerateTpudnnTensor(stream, mat1_),
-            tpu::TPUGenerateTpudnnTensor(stream, mat2_),
-            tpu::TPUGenerateTpudnnTensor(stream, self),
-            tpu::TPUGenerateTpudnnTensor(stream, out));
-          TORCH_CHECK ( status == TPUDNN_STATUS_SUCCESS );
-
+          auto f32_io_16_cal = tpu::OpCalDtype::Instance().get_mmDtype() == TPUDNN_DTYPE_BF16 ||
+                               tpu::OpCalDtype::Instance().get_mmDtype() == TPUDNN_DTYPE_FP16;
+          if (f32_io_16_cal) {
+            auto status = tpudnnMatmulAsync_f32io_16_cal(
+              stream,
+              tpu::TPUGenerateTpudnnTensor(stream, mat1_),
+              tpu::TPUGenerateTpudnnTensor(stream, mat2_),
+              tpu::TPUGenerateTpudnnTensor(stream, self),
+              tpu::OpCalDtype::Instance().get_mmDtype(),
+              tpu::TPUGenerateTpudnnTensor(stream, out));
+            TORCH_CHECK ( status == TPUDNN_STATUS_SUCCESS );
+          }
+          else {
+            auto status = tpudnnMatmulAsync(
+              stream,
+              tpu::TPUGenerateTpudnnTensor(stream, mat1_),
+              tpu::TPUGenerateTpudnnTensor(stream, mat2_),
+              tpu::TPUGenerateTpudnnTensor(stream, self),
+              tpu::TPUGenerateTpudnnTensor(stream, out));
+            TORCH_CHECK ( status == TPUDNN_STATUS_SUCCESS );
+          }
         }
         else
         {
@@ -297,13 +310,28 @@ Tensor & mm_out_tpu ( const Tensor & self, const Tensor & mat2, Tensor & out )
         auto mat2_ = mat2.is_contiguous() == false && is_transposed ( mat2 ) == false ? mat2.contiguous() : mat2;
 
         auto stream = c10_tpu::getCurrentTPUStream();
-        auto status = tpudnnMatmulAsync(
-          stream,
-          tpu::TPUGenerateTpudnnTensor(stream, self_),
-          tpu::TPUGenerateTpudnnTensor(stream, mat2_),
-          tpudnnUndefinedTensor(),
-          tpu::TPUGenerateTpudnnTensor(stream, out));
-        TORCH_CHECK ( status == TPUDNN_STATUS_SUCCESS );
+
+        auto f32_io_16_cal = tpu::OpCalDtype::Instance().get_mmDtype() == TPUDNN_DTYPE_BF16 ||
+                             tpu::OpCalDtype::Instance().get_mmDtype() == TPUDNN_DTYPE_FP16;
+        if (f32_io_16_cal) {
+          auto status = tpudnnMatmulAsync_f32io_16_cal(
+            stream,
+            tpu::TPUGenerateTpudnnTensor(stream, self_),
+            tpu::TPUGenerateTpudnnTensor(stream, mat2_),
+            tpudnnUndefinedTensor(),
+            tpu::OpCalDtype::Instance().get_mmDtype(),
+            tpu::TPUGenerateTpudnnTensor(stream, out));
+          TORCH_CHECK ( status == TPUDNN_STATUS_SUCCESS );
+        }
+        else {
+          auto status = tpudnnMatmulAsync(
+            stream,
+            tpu::TPUGenerateTpudnnTensor(stream, self_),
+            tpu::TPUGenerateTpudnnTensor(stream, mat2_),
+            tpudnnUndefinedTensor(),
+            tpu::TPUGenerateTpudnnTensor(stream, out));
+          TORCH_CHECK ( status == TPUDNN_STATUS_SUCCESS );
+        }
       #endif
   }
   TIMING_END;
@@ -438,7 +466,7 @@ std::tuple<Tensor &,Tensor &> linalg_cholesky_ex_out_tpu(const Tensor & self, bo
   CPU_IMPL_WARNING();
   auto outputs_cpu = linalg_cholesky_ex(self.cpu(), upper, check_errors);
   L    = std::get<0> (outputs_cpu).to(L.device());
-  info = std::get<1> (outputs_cpu).to(info.device()); 
+  info = std::get<1> (outputs_cpu).to(info.device());
   return {L, info};
 }
 TORCH_LIBRARY_IMPL ( aten, TPU, m )
@@ -450,7 +478,7 @@ std::tuple<Tensor &,Tensor &> linalg_inv_ex_out_tpu(const Tensor & A, bool check
   CPU_IMPL_WARNING();
   auto outputs_cpu = linalg_inv_ex(A.cpu(), check_errors);
   inverse    = std::get<0> (outputs_cpu).to(inverse.device());
-  info       = std::get<1> (outputs_cpu).to(info.device()); 
+  info       = std::get<1> (outputs_cpu).to(info.device());
   return {inverse, info};
 }
 
