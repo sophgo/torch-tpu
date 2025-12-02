@@ -183,7 +183,40 @@ RUN TZ=Asia/Shanghai \
     && git config --global --add safe.directory '*' \
     && rm -rf /tmp/*
 
+# ********************************************************************************
+#
+# stage 2: related to pytest regression
+# ********************************************************************************
+RUN apt-get update && \
+    pip install --force-reinstall Scons==4.8.1 && \
+    apt-get install -y flex bison && \
+    pip3 install pytest-html loguru gcovr==6.0 pytest-cov && \
+    # Installing SonarScanner
+    apt-get install -y openjdk-17-jdk && \
+    wget https://binaries.sonarsource.com/Distribution/sonar-scanner-cli/sonar-scanner-cli-7.3.0.5189-linux-x64.zip && \
+    unzip sonar-scanner-cli-7.3.0.5189-linux-x64.zip && \
+    mv sonar-scanner-7.3.0.5189-linux-x64/ /opt/sonar-scanner && \
+    rm sonar-scanner-cli-7.3.0.5189-linux-x64.zip && \
+    # Installing nvm
+    curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.39.0/install.sh | bash && \
+    apt-get clean && \
+    rm -rf /var/lib/apt/lists/* /tmp/* ~/.cache/*
 
+# set env
+ENV PATH="/opt/sonar-scanner/bin:${PATH}"
+ENV NVM_DIR="/root/.nvm"
+
+# add env to bashrc
+RUN echo 'export PATH=/opt/sonar-scanner/bin:$PATH' >> ~/.bashrc && \
+    echo 'export NVM_DIR="$HOME/.nvm"' >> ~/.bashrc && \
+    echo '[ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"' >> ~/.bashrc && \
+    echo '[ -s "$NVM_DIR/bash_completion" ] && \. "$NVM_DIR/bash_completion"' >> ~/.bashrc
+
+# Installing Node.js and Claude Code
+RUN . ~/.bashrc && \
+    nvm install 20 && \
+    nvm use 20 && \
+    npm install -g @anthropic-ai/claude-code --registry=https://registry.npmmirror.com
 
 # ********************************************************************************
 #
