@@ -228,19 +228,6 @@ To use 32IC format for convolution weights:
 export TORCHTPU_STORAGE_CAST=ON
 ```
 
-## Examples with Other Training Frameworks
-
-The repository includes several example implementations demonstrating different distributed training frameworks:
-
-| Example                                                                                                             | Framework   |
-| ------------------------------------------------------------------------------------------------------------------- | ----------- |
-| [Qwen2-7B](https://github.com/sophgo/TPU-Megatron-Patch/tree/qwen2-7b/examples/qwen2) | Megatron-LM |
-
-
-<!-- | [BERT](./examples/bert/README.md)      | [examples/bert](./examples/bert)   |            |
-| [GPT](./examples/gpt/README.md)        | [examples/gpt](./examples/gpt)     |            |
-| [ViT](./examples/vit/README.md)        | [examples/vit](./examples/vit)     |            | -->
-
 
 ## License
 

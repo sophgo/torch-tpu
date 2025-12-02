@@ -186,19 +186,6 @@ rebuild_TPU1686
 develop_torch_tpu
 ```
 
-## 其他训练框架示例
-
-本仓库包含多个示例实现，展示了不同的分布式训练框架：
-
-| 示例                                    | 位置                                | 源框架              |
-| -------------------------------------- | ---------------------------------- | ------------------ |
-| [Qwen2-7B](./examples/qwen2/README.md) | [examples/qwen2](./examples/qwen2/README.md) | [PAI-Megatron-Patch](https://github.com/alibaba/Pai-Megatron-Patch) |
-
-<!-- | [BERT](./examples/bert/README.md)      | [examples/bert](./examples/bert)   |            |
-| [GPT](./examples/gpt/README.md)        | [examples/gpt](./examples/gpt)     |            |
-| [ViT](./examples/vit/README.md)        | [examples/vit](./examples/vit)     |            | -->
-
-查看 [examples 目录](./examples) 获取每个框架的详细说明和配置。
 
 ## 许可证
 
