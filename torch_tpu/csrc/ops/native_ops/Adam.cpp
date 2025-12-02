@@ -7,6 +7,138 @@
 
 
 #include "common/config.h"
+#ifdef USING_PPL
+#include "Adam.h"
+#define AT_DISPATCH_FLOAT_INT_TYPES(scalar_type, name, func)  \
+AT_DISPATCH_SWITCH(                   \
+scalar_type, name,                    \
+AT_DISPATCH_CASE(at::kFloat, func)    \
+AT_DISPATCH_CASE(at::kHalf, func)     \
+AT_DISPATCH_CASE(at::kBFloat16, func) \
+AT_DISPATCH_CASE(at::kInt, func)      \
+AT_DISPATCH_CASE(at::kShort, func)    \
+AT_DISPATCH_CASE(at::kChar, func)     \
+AT_DISPATCH_CASE(at::kByte, func))
+
+template <typename scalar_t>
+static void adambackward_async(
+    uint64_t weight_out,
+    uint64_t m_out,
+    uint64_t v_out,
+    uint64_t vmax_out,
+    uint64_t grad_weight,
+    uint64_t weight_in,
+    uint64_t m_in,
+    uint64_t v_in,
+    uint64_t vmax_in,
+    uint64_t t,
+    float lr,
+    float beta1,
+    float beta2,
+    float eps,
+    float weight_decay,
+    bool amsgrad,
+    bool maximize,
+    int inner_size)
+{
+auto kernel = [&](TPUStream stream, tpuKernelModule_t ppl_module,
+    uint32_t tile_size) -> int {
+  if constexpr (std::is_same_v<scalar_t, float>) {
+    return adambackward_fp32(
+      stream,
+#ifndef BACKEND_SG2260
+      ppl_module,
+#endif
+      weight_out,
+      m_out,
+      v_out,
+      vmax_out,
+      grad_weight,
+      weight_in,
+      m_in,
+      v_in,
+      vmax_in,
+      t,
+      lr,
+      beta1,
+      beta2,
+      eps,
+      weight_decay,
+      amsgrad,
+      maximize,
+      inner_size,
+      tile_size);
+  } else if constexpr (std::is_same_v<scalar_t, at::Half>) {
+    return adambackward_fp16(
+      stream,
+#ifndef BACKEND_SG2260
+      ppl_module,
+#endif
+      weight_out,
+      m_out,
+      v_out,
+      vmax_out,
+      grad_weight,
+      weight_in,
+      m_in,
+      v_in,
+      vmax_in,
+      t,
+      lr,
+      beta1,
+      beta2,
+      eps,
+      weight_decay,
+      amsgrad,
+      maximize,
+      inner_size,
+      tile_size);
+  } else if constexpr (std::is_same_v<scalar_t, at::BFloat16>) {
+    return adambackward_bf16(
+      stream,
+#ifndef BACKEND_SG2260
+      ppl_module,
+#endif
+      weight_out,
+      m_out,
+      v_out,
+      vmax_out,
+      grad_weight,
+      weight_in,
+      m_in,
+      v_in,
+      vmax_in,
+      t,
+      lr,
+      beta1,
+      beta2,
+      eps,
+      weight_decay,
+      amsgrad,
+      maximize,
+      inner_size,
+      tile_size);
+}
+  return -1;
+};
+
+auto stream = c10_tpu::getCurrentTPUStream();
+tpuKernelModule_t ppl_module = getPplModule();
+int tile_size = inner_size;
+
+while (tile_size >= 1) {
+  int ret = kernel(stream, ppl_module, tile_size);
+  if (ret == 0) {
+    return;
+  } else {
+    tile_size = tile_size / 2;
+    continue;
+  }
+}
+
+TORCH_CHECK(false, "adambackward_async failed!");
+}
+#endif
 namespace at {
 void _fused_adam_out_tpu(
     at::TensorList self,
@@ -25,7 +157,7 @@ void _fused_adam_out_tpu(
     const c10::optional<at::Tensor>& grad_scale,
     const c10::optional<at::Tensor>& found_inf
 )
-{ 
+{
     TIMING_START;
     // Check that all tensors are on the same device
     for (const auto& s : self) {
@@ -62,6 +194,37 @@ void _fused_adam_out_tpu(
     auto stream = c10_tpu::getCurrentTPUStream();
     // Adam need inplace operation
     for (size_t i = 0; i < self.size(); ++i) {
+#ifdef USING_PPL
+  if (usePPLKernels())
+  {
+    uint32_t inner_size = 1;
+    for (const auto j : c10::irange(self[i].dim())) {
+        inner_size *= self[i].size(j);
+    }
+    AT_DISPATCH_FLOAT_INT_TYPES( self[i].scalar_type(), "adambackward_async", [&] {
+            adambackward_async<scalar_t>(
+                reinterpret_cast<uint64_t>(self[i].data_ptr()),
+                reinterpret_cast<uint64_t>(exp_avgs[i].data_ptr()),
+                reinterpret_cast<uint64_t>(exp_avg_sqs[i].data_ptr()),
+                amsgrad ? reinterpret_cast<uint64_t>(max_exp_avg_sqs[i].data_ptr()) : 0ULL,
+                reinterpret_cast<uint64_t>(grads[i].data_ptr()),
+                reinterpret_cast<uint64_t>(self[i].data_ptr()),
+                reinterpret_cast<uint64_t>(exp_avgs[i].data_ptr()),
+                reinterpret_cast<uint64_t>(exp_avg_sqs[i].data_ptr()),
+                amsgrad ? reinterpret_cast<uint64_t>(max_exp_avg_sqs[i].data_ptr()) : 0ULL,
+                reinterpret_cast<uint64_t>(state_steps[i].data_ptr()),
+                lr,
+                beta1,
+                beta2,
+                eps,
+                weight_decay,
+                amsgrad,
+                maximize,
+                inner_size);
+        });
+    } else
+#endif
+    {
         auto status = tpudnnAdamBackwardMultiCoreAsync(
             stream,
             tpu::TPUGenerateTpudnnTensor(stream, self[i]),
@@ -83,6 +246,7 @@ void _fused_adam_out_tpu(
             maximize
         );
         TORCH_CHECK(status == TPUDNN_STATUS_SUCCESS, "_fused_adam_out_tpu failed.");
+    }
     }
     TIMING_END;
 }
@@ -107,7 +271,7 @@ void _fused_adamw_out_tpu(
     const c10::optional<at::Tensor>& grad_scale,
     const c10::optional<at::Tensor>& found_inf
 )
-{ 
+{
     TIMING_START;
     // Check that all tensors are on the same device
     for (const auto& s : self) {
