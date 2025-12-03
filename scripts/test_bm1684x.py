@@ -207,7 +207,8 @@ if __name__ == "__main__":
         __file__,
         f"--html={report_file}",
         "--self-contained-html",
-        "--capture=tee-sys"
+        "--capture=tee-sys",
+        "--maxfail=1"
     ]
 
     print(f"Starting full test  execution...")

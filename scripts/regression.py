@@ -43,7 +43,8 @@ def run_tests_sequentially():
             test_file_path,
             f"--html={html_report_path}",
             "--self-contained-html",
-            "--capture=tee-sys"
+            "--capture=tee-sys",
+            "--maxfail=1"
         ]
 
         exit_code = pytest.main(pytest_args)
