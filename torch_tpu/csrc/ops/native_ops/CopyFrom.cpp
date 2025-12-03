@@ -121,12 +121,14 @@ static void copy_impl(
 
 #ifdef USING_PPL
 #include "Gdmad2d.h"
-#define AT_DISPATCH_FLOAT_INT_TYPES(scalar_type, name, func)  \
+#define AT_DISPATCH_FLOAT_AND_INT_TYPES(scalar_type, name, func)  \
 AT_DISPATCH_SWITCH(                   \
 scalar_type, name,                    \
 AT_DISPATCH_CASE(at::kFloat, func)    \
 AT_DISPATCH_CASE(at::kHalf, func)     \
 AT_DISPATCH_CASE(at::kBFloat16, func) \
+AT_DISPATCH_CASE(at::kFloat8_e4m3fn, func) \
+AT_DISPATCH_CASE(at::kFloat8_e5m2, func) \
 AT_DISPATCH_CASE(at::kInt, func)      \
 AT_DISPATCH_CASE(at::kShort, func)    \
 AT_DISPATCH_CASE(at::kChar, func)     \
@@ -183,7 +185,9 @@ static void gdmad2d_async_impl(
             ppl_module,
 #endif
             output_addr, input_addr, outer_size, tile_size);
-    } else if constexpr (std::is_same_v<scalar_t, uint8_t>) {
+    } else if constexpr (std::is_same_v<scalar_t, uint8_t> ||
+      std::is_same_v<scalar_t, Float8_e4m3fn> ||
+      std::is_same_v<scalar_t, Float8_e5m2>) {
         return gdmad2d_uint8(
             stream,
 #ifndef BACKEND_SG2260
@@ -412,7 +416,7 @@ Tensor _copy_from_tpu(const Tensor &self, const Tensor &dst,
           for (const auto i : c10::irange(self.dim())) {
               outer_size *= self.size(i);
           }
-          AT_DISPATCH_FLOAT_INT_TYPES( self.scalar_type(), "gdmad2d", [&] {
+          AT_DISPATCH_FLOAT_AND_INT_TYPES( self.scalar_type(), "gdmad2d", [&] {
             gdmad2d_async_impl<scalar_t>(
               reinterpret_cast<uint64_t>(self.data_ptr()),
               reinterpret_cast<uint64_t>(dst.data_ptr()),
@@ -620,7 +624,7 @@ Tensor &clone_out_tpu(const Tensor &self,
       for (const auto i : c10::irange(self.dim())) {
           outer_size *= self.size(i);
       }
-      AT_DISPATCH_FLOAT_INT_TYPES( self.scalar_type(), "gdmad2d", [&] {
+      AT_DISPATCH_FLOAT_AND_INT_TYPES( self.scalar_type(), "gdmad2d", [&] {
         gdmad2d_async_impl<scalar_t>(
           reinterpret_cast<uint64_t>(self.data_ptr()),
           reinterpret_cast<uint64_t>(dst.data_ptr()),
