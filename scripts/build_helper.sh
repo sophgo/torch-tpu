@@ -19,7 +19,7 @@ function develop_torch_tpu(){
 function bdist_wheel()
 {
   pushd ${TPUTRAIN_TOP}
-  python setup.py bdist_wheel
+  python setup.py bdist_wheel || exit 1
 
   if [ $# -ne 1 ]; then
     echo -e "[message] wheel not installed, use reinstall_torch_tpu to install wheel package"

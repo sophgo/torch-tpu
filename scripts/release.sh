@@ -9,7 +9,7 @@ TORCH_TPU_NONINTERACTIVE=ON python setup.py clean
 # bash scripts/auto_generate_patch.sh || exit -1
 bdist_wheel || exit -1
 mkdir -p release
-cp dist/*.whl release/
+cp dist/*.whl release/ || exit 1
 unset RELEASE_MODE
 
 source scripts/envsetup.sh sg2260

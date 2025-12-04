@@ -43,8 +43,13 @@ def test_release():
         exit $ret;
     fi
 
-    source $CURRENT_DIR/envsetup.sh sg2260 || exit 1
-    rebuild_TPU1686 || exit 1
+    if [ -d "$CURRENT_DIR/../../TPU1686" ]; then
+        echo "################################"
+        echo "TPU1686 folder found, rebuilding"
+        echo "################################"
+        source $CURRENT_DIR/envsetup.sh sg2260 || exit 1
+        rebuild_TPU1686 || exit 1
+    fi
 
     echo "################################"
     echo "Test release"
@@ -84,12 +89,17 @@ def test_building():
     echo "DEVELOP_TORCH_TPU"
     echo "################################"
     new_clean || exit 1
-    rebuild_TPU1686 || exit 1
+    if [ -d "$CURRENT_DIR/../../TPU1686" ]; then
+        echo "################################"
+        echo "TPU1686 folder found, rebuilding"
+        echo "################################"
+        rebuild_TPU1686 || exit 1
+    fi
     new_build || exit 1
 
     TPU_TRAIN_CMODEL_PATH=$CURRENT_DIR/../build/firmware_${{CHIP_ARCH}}_cmodel/libfirmware.so
     echo "[INFO]tpu_train_cmodel_path:$TPU_TRAIN_CMODEL_PATH"
-    set_cmodel_firmware $TPU_TRAIN_CMODEL_PATH
+    set_cmodel_firmware $TPU_TRAIN_CMODEL_PATH || exit 1
 
     """
 

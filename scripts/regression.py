@@ -55,6 +55,15 @@ def run_tests_sequentially():
         print(f"HTML report saved to: {html_report_path}")
         print(f"{'='*60}")
 
+        if exit_code != 0:
+            print(f"\n❌ {chip_name} test failed with exit code {exit_code}")
+            print("Stopping all further chip tests")
+
+            remaining_chips = [name for _, name in test_modules[len(exit_codes):]]
+            for chip in remaining_chips:
+                print(f"Marking {chip} test as failed (skipped due to previous failure)")
+                exit_codes.append(1)
+            break
 
     final_output_dir = os.path.join(current_dir, "../report")
     print(final_output_dir)
