@@ -551,6 +551,7 @@ void * TPUAlloc ( size_t Size, int Index )
 
 void TPUFree ( void * Ptr )
 {
+  if (!devMgrPtr) return;
   unsigned long long dev_index = GetDeviceIndexByUnifiedAddr((unsigned long long)Ptr);
   unsigned long long data_ptr = GetAddrByUnifiedAddr((unsigned long long)Ptr);
   TPUDeviceManager::GetInstance().Free ( (void *)data_ptr, dev_index );
@@ -558,6 +559,7 @@ void TPUFree ( void * Ptr )
 
 void TPUEmptyCache ()
 {
+  if (!devMgrPtr) return;
   TPUDeviceManager::GetInstance().EmptyCache( TPUGetDeviceIndex() );
 }
 
